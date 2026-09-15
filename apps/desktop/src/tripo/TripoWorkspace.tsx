@@ -44,7 +44,8 @@ export function TripoWorkspace(): JSX.Element {
   const models = useGen3dStore((s) => s.models);
   const [viewing, setViewing] = useState(false);
   const engineBooting = useGen3dStore((s) => s.engineBooting);
-  const module3d = moduleState(engineReady, models, engineBooting);
+  const comfy3d = useGen3dStore((s) => s.comfy);
+  const module3d = moduleState(engineReady, models, engineBooting, comfy3d);
   /*
    * Gate only once the catalog has actually answered — flashing a download wall
    * during the sidecar's boot would be a lie that corrects itself a second

@@ -19,6 +19,7 @@
  */
 import type { JSX } from 'react';
 import { useEffect, useState } from 'react';
+import { useGenModule, useGenModulesStore } from '../state/gen-modules-store';
 import { useGen3dStore } from './gen3d-client';
 import { IcCube, IcDownload } from './icons';
 import { formatModuleSize, type ModuleState, moduleHeadline } from './module-state';
@@ -34,6 +35,53 @@ export function ModuleGate({ state, onView }: ModuleGateProps): JSX.Element {
   const models = useGen3dStore((s) => s.models);
   const [error, setError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
+  /*
+   * THE DOWNLOAD THAT NEEDS NOTHING BUILT. the user (2026-09-14): "one click
+   * download of any of these modules … any user on any mac device". The engine
+   * below compiles Metal kernels, which wants Xcode; ComfyUI's native TRELLIS.2
+   * does not, so when main reports that path it is the button — the ComfyUI
+   * module, then the model's weights, the same two cards the video studio
+   * shows, pressed in order by one press here. The engine stays on offer
+   * underneath for what only it does (rig, retopo, motion, text → 3D).
+   */
+  const comfy = state.comfy ?? null;
+  const comfyOffered = comfy !== null && !comfy.ready;
+  const installModule = useGenModulesStore((s) => s.install);
+  const refreshModules = useGenModulesStore((s) => s.refresh);
+  const modulesLoaded = useGenModulesStore((s) => s.loaded);
+  const comfyRuntime = useGenModule('comfy');
+  const comfyWeights = useGenModule(`weights:${comfy?.modelId ?? 'trellis2-comfy'}`);
+  const refreshCatalog = useGen3dStore((s) => s.refresh);
+  useEffect(() => {
+    if (comfyOffered && !modulesLoaded) void refreshModules();
+  }, [comfyOffered, modulesLoaded, refreshModules]);
+  const comfyInstalling = comfyRuntime?.installing === true || comfyWeights?.installing === true;
+  const comfyDetail = comfyRuntime?.installing
+    ? comfyRuntime.detail
+    : comfyWeights?.installing
+      ? comfyWeights.detail
+      : undefined;
+  const comfyPercent = comfyRuntime?.installing
+    ? comfyRuntime.percent
+    : comfyWeights?.installing
+      ? comfyWeights.percent
+      : undefined;
+  const startComfy = () => {
+    if (comfy === null) return;
+    setStarting(true);
+    setError(null);
+    void (async () => {
+      try {
+        if (!comfy.runtimeReady) await installModule('comfy');
+        await installModule(`weights:${comfy.modelId}`);
+        await refreshCatalog();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setStarting(false);
+      }
+    })();
+  };
 
   // While a download runs the panel should show it moving, not sit on a static
   // "installing…" — the sizes here are tens of gigabytes.
@@ -77,7 +125,18 @@ export function ModuleGate({ state, onView }: ModuleGateProps): JSX.Element {
           {moduleHeadline(state)}
         </h2>
 
-        {booting ? (
+        {comfyOffered && comfyInstalling ? (
+          <p className="tp-gate-copy" data-testid="tp-gate-progress">
+            {comfyDetail ?? 'Starting the download…'}
+            {comfyPercent !== undefined ? ` (${Math.round(comfyPercent * 100)}%)` : ''} Bobble keeps
+            working while this runs.
+          </p>
+        ) : comfyOffered ? (
+          <p className="tp-gate-copy">
+            Image to 3D on ComfyUI — nothing to build, works on any Apple Silicon Mac. About{' '}
+            {comfy?.approxGB} GB, once.
+          </p>
+        ) : booting ? (
           <p className="tp-gate-copy">The local engine is starting. This takes a few seconds.</p>
         ) : runtimeMissing ? (
           <p className="tp-gate-copy">Runs on a local Python engine. Bobble installs it for you.</p>
@@ -112,29 +171,50 @@ export function ModuleGate({ state, onView }: ModuleGateProps): JSX.Element {
             starts the same flow; only the label differs, because "set up" and
             "download" are honestly different amounts of work.
           */}
+          {comfyOffered ? (
+            <button
+              type="button"
+              className="tp-gate-primary"
+              data-testid="tp-gate-download-comfy"
+              disabled={comfyInstalling || starting}
+              onClick={startComfy}
+            >
+              <IcDownload size={15} />
+              {comfyInstalling || starting
+                ? 'Downloading…'
+                : `Download 3D module (${comfy?.approxGB} GB)`}
+            </button>
+          ) : null}
           <button
             type="button"
-            className="tp-gate-primary"
+            className={comfyOffered ? 'tp-gate-secondary' : 'tp-gate-primary'}
             hidden={booting}
             data-testid="tp-gate-download"
             disabled={state.status === 'installing' || starting}
             onClick={start}
+            title={
+              comfyOffered
+                ? 'The Bobble 3D engine: faster, and the only path to rig, retopo, motion and text → 3D. Builds Metal kernels, so it needs Xcode.'
+                : undefined
+            }
           >
             <IcDownload size={15} />
             {state.status === 'installing' || starting
               ? runtimeMissing
                 ? 'Setting up…'
                 : 'Downloading…'
-              : runtimeMissing
-                ? /* The size is unknown until the engine answers, and it cannot
-                     answer without a runtime — so this one names the action
-                     rather than a number it does not have. */
-                  'Set up 3D'
-                : /* No size means the catalog has not answered yet; asking for a
+              : comfyOffered
+                ? 'Bobble 3D engine (needs Xcode)'
+                : runtimeMissing
+                  ? /* The size is unknown until the engine answers, and it cannot
+                       answer without a runtime — so this one names the action
+                       rather than a number it does not have. */
+                    'Set up 3D'
+                  : /* No size means the catalog has not answered yet; asking for a
                      download we cannot cost is how a button lies. */
-                  size === ''
-                  ? 'Checking…'
-                  : `Download module (${size})`}
+                    size === ''
+                    ? 'Checking…'
+                    : `Download module (${size})`}
           </button>
           <button
             type="button"

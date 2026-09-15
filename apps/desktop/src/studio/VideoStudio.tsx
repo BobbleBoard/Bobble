@@ -169,7 +169,14 @@ export function VideoStudio(): JSX.Element {
       {...(job?.cancellable === true ? { onStop: cancel } : {})}
       runLabel={enhancer.enhancing ? 'Enhancing…' : 'Generate'}
       {...(blocked !== undefined ? { blocked } : {})}
-      notice={<ModuleCard id="comfy" place="studio" />}
+      notice={
+        <>
+          <ModuleCard id="comfy" place="studio" />
+          {/* The chosen model's own files, once a run has asked for them —
+              "Recommended" resolves in main, so its card arrives from there. */}
+          {model !== '' ? <ModuleCard id={`weights:${model}`} place="studio" /> : null}
+        </>
+      }
       error={error}
       onRetry={() => void onRun()}
       {...(handoff.card !== undefined ? { input: handoff.card } : {})}

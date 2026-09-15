@@ -160,13 +160,23 @@ export const THRASHING_PAGES_PER_SEC = 2000;
 /**
  * The reserve, when the user has not named one.
  *
- * A quarter of the machine, floored at 2 GB and capped at 8 — the shape of the
- * problem is not linear. An 8 GB laptop cannot spare 25% and still run anything,
- * so it gets the 2 GB floor; a 128 GB workstation does not need 32 GB held back
- * for a text editor, so it stops at 8.
+ * A sixth of the machine, floored at 2 GB and capped at 8 — the shape of the
+ * problem is not linear. An 8 GB laptop cannot spare much and still run
+ * anything, so it gets the 2 GB floor; a 128 GB workstation does not need
+ * 21 GB held back for a text editor, so it stops at 8.
+ *
+ * It was a quarter (6 GB on 24 GB), and that quarter is what made the models
+ * a 24 GB Mac is bought for impossible ON a 24 GB Mac: the guardian's answer
+ * for a job is `peak × 1.15 + 1 GB + reserve`, and with 6 GB held back nothing
+ * that peaks above 14.8 GB could ever be admitted (`fits` says "never" the
+ * moment need + reserve exceeds the machine) — TRELLIS.2 on ComfyUI measures
+ * 11.5 GB at 512³, LTX-2.5's encoder stage 14 GB. A sixth (4 GB) keeps the
+ * promise the reserve exists for — the machine stays usable — and lets a 24 GB
+ * Mac run what it can physically hold; the live guardian still holds and sheds
+ * on the readings.
  */
 export function defaultReserveGB(totalGB: number): number {
-  return Math.min(8, Math.max(2, Math.round(totalGB * 0.25)));
+  return Math.min(8, Math.max(2, Math.round(totalGB / 6)));
 }
 
 /** The reserve as the fraction of the budget a launch may take. */

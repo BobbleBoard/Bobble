@@ -164,7 +164,14 @@ export function buildVideoJob(
       height: params.height,
       length,
     };
-    if (params.negativePrompt !== undefined) inputs.negativePrompt = params.negativePrompt;
+    // A negative prompt only where the graph has a tower for one: H3 has none,
+    // and the LTX-2.5 distilled graph dropped its encode (measured identical
+    // frames at cfg 1). fillWorkflow throws on an unbound input, so the
+    // template's own map decides.
+    const binds = (key: string): boolean => key in (model.comfy?.paramMap ?? {});
+    if (params.negativePrompt !== undefined && binds('negativePrompt')) {
+      inputs.negativePrompt = params.negativePrompt;
+    }
     if (params.steps !== undefined) inputs.steps = params.steps;
     const comfy: ComfyJobSpec = {
       prompt: params.prompt,

@@ -148,16 +148,30 @@ describe('room keeper', () => {
     expect(d.park).toHaveBeenCalledTimes(2);
   });
 
-  it('does nothing when there is no chat model to give up', async () => {
-    const { d } = deps({ park: vi.fn(async () => ({ ok: false, reason: 'no server' })) });
+  it('keeps asking when there is no chat model YET, and parks it once it is there', async () => {
+    // The chat model boots asynchronously at launch: the first park lands
+    // before there is a server. That is "not yet", not "never".
+    let server = false;
+    const { d } = deps({
+      park: vi.fn(async () => (server ? { ok: true } : { ok: false, reason: 'no server' })),
+    });
     const keeper = createRoomKeeper(d);
     keeper.held('j1');
     await flush();
-    keeper.held('j1');
-    await vi.advanceTimersByTimeAsync(5000);
     expect(d.park).toHaveBeenCalledTimes(1);
-    expect(d.reconsider).not.toHaveBeenCalled();
     expect(keeper.parked).toBe(false);
+    await vi.advanceTimersByTimeAsync(5000);
+    const asked = vi.mocked(d.park).mock.calls.length;
+    expect(asked).toBeGreaterThan(1);
+    expect(keeper.parked).toBe(false);
+    server = true;
+    // The next retry finds a server: parked, and the queue asked to look again
+    // (before the grace, which is the helper's one second, could give up).
+    await vi.advanceTimersByTimeAsync(600);
+    await flush();
+    expect(vi.mocked(d.park).mock.calls.length).toBeGreaterThan(asked);
+    expect(keeper.parked).toBe(true);
+    expect(d.reconsider).toHaveBeenCalled();
   });
 
   it('never parks twice or resumes while a park is landing', async () => {

@@ -30,6 +30,7 @@ import type { IpcMain } from 'electron';
 import {
   comfyMainPy,
   comfyModelPathsYaml,
+  ensureComfyCurrent,
   writeComfyModelPaths,
   writeComfyShim,
 } from '../inference/engines-main';
@@ -86,6 +87,11 @@ export async function comfyOrigin(): Promise<string> {
   // Same argument for the H3 detection shim: an install that predates it would
   // otherwise need a reinstall to gain a file whose content is deterministic.
   writeComfyShim();
+  // And for the checkout itself: one that predates the native 3D nodes moves
+  // to master here, venv kept (engines-main: refreshComfyTree). A no-op once
+  // it is current. Before the supervisor starts, so a running server never has
+  // its files replaced under it.
+  if (handle === null || handle.supervisor.running !== true) await ensureComfyCurrent();
   return supervisor().resolveOrigin();
 }
 

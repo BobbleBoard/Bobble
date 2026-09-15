@@ -16,6 +16,7 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import * as path from 'node:path';
+import { default3dModel, type GenEvent } from '@pi-desktop/gen-service';
 import {
   CORE_MODULE_MODELS,
   consumeNdjsonStream,
@@ -45,12 +46,16 @@ import {
 } from '@pi-desktop/shared';
 import { ensureUv } from '@pi-desktop/web-tools';
 import { app, BrowserWindow, type IpcMain, type WebContents } from 'electron';
-import { moduleMissingMessage } from '../gen/gen-modules';
+import type { Run3dFn } from '../gen/gen-manager';
+import { GenModuleMissingError, moduleMissingMessage } from '../gen/gen-modules';
+import { weightsPresent } from '../gen/weights-on-shelf';
 import { tieredSpawn } from '../inference/worker-tier';
 import type { AppEventMap } from '../ipc-contract';
 import { runLibraryMigration } from '../storage/storage-main';
+import { comfyEngineInstalled } from '../studio/studio-main';
 import { DictationSession, transcribe } from './dictation-main';
 import type {
+  Comfy3dInfo,
   DictationInvokeMap,
   Gen3dInvokeMap,
   Gen3dModelId,
@@ -552,6 +557,158 @@ function liveDictation(): DictationSession {
   return dictationSession;
 }
 
+/*
+ * IMAGE → 3D ON COMFYUI — the path with nothing to build on this Mac.
+ *
+ * The Bobble 3D engine (the sidecar above) is the fast one and the full one:
+ * MLX TRELLIS.2 at 117s for 512³ with texture, then segment, retopo, rig,
+ * motion. It is also the one that needs git and Xcode's Metal toolchain to
+ * build its kernels, which a fresh Mac does not have. the user (2026-09-14): "any
+ * user on any mac device can use video image 3d and audio generation with an
+ * m1-m6 mac" — so the path a fresh Mac gets is ComfyUI's own TRELLIS.2 nodes
+ * (0.35+, Comfy-Org int8 weights, no custom wheels): MEASURED 314s to a
+ * 300k-face PBR GLB at 512³ on the M5 Pro 24GB. Slower, and it needs nothing.
+ *
+ * It runs through gen-manager's queue (`run3d`) — the same module and weights
+ * gates, admission, room-making as a video job — and reports on this file's
+ * `gen3d:job` channel in the sidecar's own shape, so the studio's panels and
+ * viewport do not know which engine made the model.
+ */
+let comfy3dRunner: Run3dFn | null = null;
+export function setComfy3dRunner(fn: Run3dFn): void {
+  comfy3dRunner = fn;
+}
+
+export function comfy3dInfo(): Comfy3dInfo {
+  const model = default3dModel();
+  const runtimeReady = comfyEngineInstalled();
+  const weightsReady = weightsPresent(model);
+  const weightGB = (model.weights ?? []).reduce((n, f) => n + (f.bytes ?? 0), 0) / 1e9;
+  return {
+    runtimeReady,
+    weightsReady,
+    ready: runtimeReady && weightsReady,
+    modelId: model.id,
+    approxGB: Math.round(((runtimeReady ? 0 : 6) + (weightsReady ? 0 : weightGB)) * 10) / 10,
+  };
+}
+
+/** The engine's own core set on disk (no boot) — what decides the default route. */
+function sidecarCoreInstalled(): boolean {
+  const installed = detectInstalled(existsSync, cacheRoot());
+  return CORE_MODULE_MODELS.every((id) => installed[id] === true);
+}
+
+/**
+ * The three samplers of the graph, in order, and their step counts (see
+ * gen-service comfy-workflow trellis2ImageTo3dGraph). ComfyUI reports progress
+ * per node with the step counter starting over at each, so a reset marks the
+ * next phase; everything after the last one is the mesh stage, which has no
+ * counter and is announced by name.
+ */
+const COMFY_3D_PHASES = [
+  { label: 'Structure', steps: 12 },
+  { label: 'Shape', steps: 20 },
+  { label: 'Texture', steps: 12 },
+] as const;
+const COMFY_3D_SAMPLER_STEPS = COMFY_3D_PHASES.reduce((n, p) => n + p.steps, 0);
+
+function runComfy3d(req: Gen3dInvokeMap['gen3d:generate']['request']): {
+  ok: boolean;
+  jobId?: string;
+  error?: string;
+} {
+  const runner = comfy3dRunner;
+  if (runner === null) return { ok: false, error: 'the ComfyUI 3D path is not wired' };
+  const imagePath = req.imagePaths?.[0];
+  if (req.kind !== 'image' || imagePath === undefined) {
+    return {
+      ok: false,
+      error:
+        'Without the Bobble 3D engine a model is made from a picture — make or drop an image first.',
+    };
+  }
+  const jobId = `c3d_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const outputDir = path.join(gen3dSandboxDir(homedir()), jobId);
+  const say = (
+    stage: 'geometry' | 'texture',
+    message: string,
+    stagePercent: number,
+    overallPercent: number,
+  ): void => {
+    broadcast('gen3d:job', { jobId, stage, message, stagePercent, overallPercent, done: false });
+  };
+  startMemorySampling(`comfy3d:${req.resolution}`);
+  say('geometry', 'Getting the 3D module ready…', 0, 0);
+
+  let phase = 0;
+  let lastStep = 0;
+  let stepsBefore = 0;
+  const onEvent = (event: GenEvent): void => {
+    if (event.event !== 'progress') return;
+    const { step, total } = event;
+    // A counter that went backwards is the next sampler starting.
+    if (step < lastStep && phase < COMFY_3D_PHASES.length - 1) {
+      stepsBefore += COMFY_3D_PHASES[phase]?.steps ?? total;
+      phase += 1;
+    }
+    lastStep = step;
+    const current = COMFY_3D_PHASES[phase] ?? COMFY_3D_PHASES[COMFY_3D_PHASES.length - 1];
+    const done = stepsBefore + step;
+    // The samplers are ~55% of the wall clock at 512³ (145s of 314s MEASURED);
+    // the decodes and the CPU mesh stage take the rest, and have no counter.
+    const overall = Math.min(0.55, (done / COMFY_3D_SAMPLER_STEPS) * 0.55);
+    say(
+      phase >= 2 ? 'texture' : 'geometry',
+      `${current?.label ?? 'Sampling'} (step ${step}/${total})…`,
+      total > 0 ? step / total : 0,
+      overall,
+    );
+  };
+
+  void runner(
+    {
+      imagePath,
+      outputDir,
+      ...(req.textureSize !== undefined ? { textureSize: req.textureSize } : {}),
+      ...(req.faceBudget !== undefined && req.faceBudget > 0 ? { faces: req.faceBudget } : {}),
+    },
+    onEvent,
+  )
+    .then(({ outputs }) => {
+      const glb = outputs.find((o) => o.outputPath.toLowerCase().endsWith('.glb'));
+      if (glb === undefined) throw new Error('ComfyUI finished without a model file');
+      broadcast('gen3d:job', {
+        jobId,
+        stage: 'texture',
+        message: 'Textured model ready',
+        stagePercent: 1,
+        overallPercent: 1,
+        artifact: { kind: 'model-glb', path: glb.outputPath, label: 'Textured model' },
+        done: true,
+      });
+    })
+    .catch((err: unknown) => {
+      const message =
+        err instanceof GenModuleMissingError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : String(err);
+      broadcast('gen3d:job', {
+        jobId,
+        stage: 'geometry',
+        message: 'Generation failed',
+        stagePercent: 0,
+        overallPercent: 0,
+        done: true,
+        error: message,
+      });
+    })
+    .finally(() => stopMemorySampling());
+  return { ok: true, jobId };
+}
+
 const handlers: IpcHandlers<Gen3dInvokeMap & DictationInvokeMap> = {
   /** Dictation. Not a job — see dictation-main.ts for why. */
   'audio:transcribe': async (req) => {
@@ -593,7 +750,8 @@ const handlers: IpcHandlers<Gen3dInvokeMap & DictationInvokeMap> = {
       const spec = GEN3D_MODEL_SPECS.find((sp) => sp.id === id);
       return n + (spec === undefined ? 0 : specTotalBytes(spec));
     }, 0);
-    return { installed: missing.length === 0, remainingBytes };
+    // Either path makes the studio usable; the ComfyUI one costs nothing to ask.
+    return { installed: missing.length === 0 || comfy3dInfo().ready, remainingBytes };
   },
   'gen3d:catalog': async () => {
     // Report the live catalog ONLY if the sidecar is already up — never block
@@ -621,6 +779,7 @@ const handlers: IpcHandlers<Gen3dInvokeMap & DictationInvokeMap> = {
             engineBooting: false,
             models: composeModels(installed, inFlight),
             resolutions: TRELLIS_RESOLUTIONS,
+            comfy: comfy3dInfo(),
           };
         }
       } catch (err) {
@@ -655,6 +814,7 @@ const handlers: IpcHandlers<Gen3dInvokeMap & DictationInvokeMap> = {
       engineBooting: sidecarStarting !== null,
       models: composeModels(installed, downloading),
       resolutions: TRELLIS_RESOLUTIONS,
+      comfy: comfy3dInfo(),
     };
   },
   'gen3d:download': async (req) => {
@@ -667,6 +827,14 @@ const handlers: IpcHandlers<Gen3dInvokeMap & DictationInvokeMap> = {
     return res ?? { ok: false };
   },
   'gen3d:generate': async (req) => {
+    /*
+     * WHICH ENGINE. The Bobble 3D engine when its core set is on disk (or asked
+     * for by name); ComfyUI otherwise — a fresh Mac's first model comes out of
+     * the path that needs nothing built. `engine: 'comfy'` picks it outright.
+     */
+    const useComfy =
+      req.engine === 'comfy' || (req.engine === undefined && !sidecarCoreInstalled());
+    if (useComfy) return runComfy3d(req);
     startMemorySampling(`generate:${req.kind}:${req.resolution}`);
     const res = await sidecarPost<{ ok: boolean; jobId?: string; error?: string }>(
       '/generate',

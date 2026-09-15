@@ -72,6 +72,18 @@ describe('judge', () => {
     expect(judge({ memoryFree: 0.12, sources: [] }, LOW).verdict).toBe('hold');
     expect(judge({ memoryFree: 0.07, sources: [] }, LOW).verdict).toBe('shed');
     expect(LOW.shedFree).toBe(AUTO.shedFree);
+    // A load burst at 30% free — ComfyUI reading a 5 GB DiT in — is a hold in
+    // BOTH modes, not a shed in low: the tight line does not move with the mode.
+    const burst = { memoryFree: 0.3, swapIoPerSec: 44506, sources: [] };
+    expect(judge(burst, AUTO).verdict).toBe('hold');
+    expect(judge(burst, LOW).verdict).toBe('hold');
+    expect(LOW.tightFree).toBe(AUTO.tightFree);
+    // With memory comfortable the burst is also marked as having ROOM, which
+    // is what gives it the longer streak in settle().
+    expect(judge({ memoryFree: 0.43, swapIoPerSec: 9000, sources: [] }, AUTO).room).toBe(true);
+    expect(judge({ memoryFree: 0.22, swapIoPerSec: 9000, sources: [] }, LOW).room).toBe(false);
+    // …and a real thrash (swapping with memory gone) is a shed in both.
+    expect(judge({ memoryFree: 0.15, swapIoPerSec: 9000, sources: [] }, LOW).verdict).toBe('shed');
   });
 
   it('says why, in words a person can act on', () => {
@@ -117,6 +129,20 @@ describe('settle', () => {
     const s = settle(hot, 'hold', 0, AUTO, hotStreak);
     expect(s.verdict).toBe('shed');
     expect(s.reason).toMatch(/readings running/);
+  });
+
+  it('a burst with room to land is given the longer streak', () => {
+    // 43% free and churning (the mesh bake): four readings are not a thrash…
+    const roomy = { verdict: 'hold' as const, reason: 'swapping', hot: true, room: true };
+    let hotStreak = 0;
+    for (let i = 1; i < AUTO.hotReadingsWithRoom; i++) {
+      const s = settle(roomy, 'hold', 0, AUTO, hotStreak);
+      expect(s.verdict).toBe('hold');
+      hotStreak = s.hotStreak;
+    }
+    // …twenty of them are.
+    expect(settle(roomy, 'hold', 0, AUTO, hotStreak).verdict).toBe('shed');
+    expect(AUTO.hotReadingsWithRoom).toBeGreaterThan(AUTO.hotReadings);
   });
 
   it('a burst that ends resets the count', () => {

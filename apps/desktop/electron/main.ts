@@ -44,7 +44,7 @@ import {
 import { createGenModules } from './gen/gen-modules-main';
 import { startGuardian } from './gen/guardian-main';
 import { genWorkerCandidates, resolveGenWorkerScript } from './gen/worker-path';
-import { registerGen3dIpc } from './gen3d/gen3d-main';
+import { registerGen3dIpc, setComfy3dRunner } from './gen3d/gen3d-main';
 import { registerImportIpc } from './import/import-main';
 import {
   getInferenceUtility,
@@ -919,6 +919,8 @@ function registerAppIpc(): void {
       },
     });
     genQueueRef = genQueue;
+    // Image → 3D on ComfyUI goes through this same queue (gen3d-main runComfy3d).
+    setComfy3dRunner(genQueue.run3d);
     log.info('experimental generation stack wired (gen bridge live)');
   }
 

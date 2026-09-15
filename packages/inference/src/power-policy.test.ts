@@ -28,12 +28,16 @@ const at = (over: Partial<PowerInputs>): PowerInputs => ({
 });
 
 describe('the reserve', () => {
-  it('is a quarter of the machine, but neither greedy nor useless at the extremes', () => {
-    // An 8 GB laptop cannot spare 25% and still run anything…
+  it('is a sixth of the machine, but neither greedy nor useless at the extremes', () => {
+    // An 8 GB laptop cannot spare much and still run anything…
     expect(defaultReserveGB(8)).toBe(2);
-    expect(defaultReserveGB(16)).toBe(4);
-    expect(defaultReserveGB(24)).toBe(6);
-    // …and a workstation does not need 32 GB held back for a text editor.
+    expect(defaultReserveGB(16)).toBe(3);
+    // …a 24 GB Mac keeps 4 GB, which is what lets a 12 GB-peak job be admitted
+    // at all (12 × 1.15 + 1 + 4 = 17.8 of 24; with the old 6 GB, LTX-2.5's
+    // 16 GB peak was "never": 19.4 + 6 > 24)…
+    expect(defaultReserveGB(24)).toBe(4);
+    expect(defaultReserveGB(32)).toBe(5);
+    // …and a workstation does not need 21 GB held back for a text editor.
     expect(defaultReserveGB(128)).toBe(8);
   });
 
@@ -181,8 +185,9 @@ describe('auto', () => {
   it('is full speed on a calm machine, holding the reserve back', () => {
     const d = decidePower(at({}));
     expect(d.level).toBe('full');
-    expect(d.memoryFraction).toBeCloseTo(0.75, 2);
-    expect(d.reason).toContain('6 GB');
+    // A 24 GB machine keeps a sixth — 4 GB — back (defaultReserveGB).
+    expect(d.memoryFraction).toBeCloseTo(20 / 24, 2);
+    expect(d.reason).toContain('4 GB');
   });
 
   it('steps down the moment a reading is bad', () => {

@@ -8,11 +8,12 @@
  * Electron-free: the Electron gen manager imports this and adds the socket
  * bridge + IPC. Nothing here touches Electron or React.
  */
-export type { License, MfluxBackendConfig, ModalityModel } from './catalog.js';
+export type { License, MfluxBackendConfig, ModalityModel, WeightFile } from './catalog.js';
 export {
   activeModels,
   defaultImageModel,
   defaultVideoModel,
+  default3dModel,
   getModel,
   jobFootprintGB,
   MODALITY_CATALOG,

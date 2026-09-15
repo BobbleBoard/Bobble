@@ -10,6 +10,7 @@
  */
 import { create } from 'zustand';
 import type {
+  Comfy3dInfo,
   Gen3dDownloadUpdate,
   Gen3dJobUpdate,
   Gen3dModelId,
@@ -26,6 +27,8 @@ interface Gen3dState {
   engineBooting: boolean;
   models: readonly Gen3dModelInfo[];
   resolutions: Readonly<Record<Gen3dResolution, number>>;
+  /** Image → 3D on ComfyUI — the path with nothing to build (gen3d:catalog). */
+  comfy: Comfy3dInfo | null;
   /** Live download progress by model id. */
   downloads: Readonly<Record<string, Gen3dDownloadUpdate>>;
   /** The active generation/stage job (one at a time in the UI). */
@@ -127,6 +130,7 @@ export const useGen3dStore = create<Gen3dState>((set, get) => ({
   engineBooting: false,
   models: [],
   resolutions: { low: 512, medium: 1024, high: 1536 },
+  comfy: null,
   downloads: {},
   job: null,
   modelReadyJobId: null,
@@ -147,6 +151,7 @@ export const useGen3dStore = create<Gen3dState>((set, get) => ({
       engineBooting: res.engineBooting,
       models: res.models,
       resolutions: res.resolutions,
+      comfy: res.comfy,
     });
   },
   setDownloadPromptOpen: (open, focus = null) =>

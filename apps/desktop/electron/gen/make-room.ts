@@ -143,12 +143,18 @@ export function createRoomKeeper(deps: RoomDeps): RoomKeeper {
       .then(async (r) => {
         if (disposed) return;
         if (!r.ok) {
-          // No chat model at all: nothing to give up, the hold is honest.
-          if (r.reason === 'no server') {
-            hopeless.add(jobId);
-            return;
-          }
-          // Mid-request (or starting): ask again once the turn has moved on.
+          /*
+           * NOT YET, NOT NEVER. `no server` used to mark the job hopeless —
+           * "nothing to give up, the hold is honest" — and MEASURED it was the
+           * first answer every time a generation was asked for in the first
+           * minute of a launch: the chat model boots asynchronously, so the
+           * park arrived before there was a server, the job was written off,
+           * the model then loaded (a 9B at Q8 with its context is 12 GB), the
+           * hold went to 11% free, and the one lever that lifts it was never
+           * pulled again. So a missing server is asked again like a busy one.
+           * A Mac with no chat model at all answers `no server` on every
+           * retry, and each retry is one cheap call while a job is held.
+           */
           deps.log('chat model not parked yet', { jobId, reason: r.reason });
           scheduleRetry(jobId);
           return;

@@ -463,8 +463,13 @@ function ModelPanel(): JSX.Element {
   const installed = (id: Gen3dModelId): boolean =>
     models.find((m) => m.id === id)?.installed === true;
   // Geometry is TRELLIS-2 (image→3D); a text prompt goes through Mage-Flow first.
-  const geometryReady = engineReady && installed('trellis2');
-  const canRunReal = geometryReady && (inputMode !== 'text' || installed('mageflow'));
+  // ComfyUI's native TRELLIS.2 is geometry too — from a picture, with no engine.
+  const comfy = useGen3dStore((s) => s.comfy);
+  const engineGeometry = engineReady && installed('trellis2');
+  const comfyGeometry = comfy?.ready === true;
+  const geometryReady = engineGeometry || comfyGeometry;
+  const canRunReal =
+    (inputMode === 'text' ? engineGeometry && installed('mageflow') : geometryReady) === true;
   const busy = job !== null && !job.done;
   const startError = useGen3dStore((s) => s.startError);
   /** The first model this run needs and does not have. */
@@ -480,13 +485,15 @@ function ModelPanel(): JSX.Element {
       openDownload(true, 'trellis2');
       return;
     }
-    if (inputMode === 'text' && !installed('mageflow')) {
-      openDownload(true, 'mageflow');
+    if (inputMode === 'text' && (!engineGeometry || !installed('mageflow'))) {
+      openDownload(true, engineGeometry ? 'mageflow' : 'trellis2');
       return;
     }
     if (missingInput) return;
     void generate({
       kind: inputMode === 'text' ? 'text' : 'image',
+      // A picture with no engine goes to ComfyUI; the engine keeps its own jobs.
+      ...(inputMode === 'image' && !engineGeometry ? { engine: 'comfy' as const } : {}),
       ...(inputMode === 'text' ? { prompt: prompt.trim() } : {}),
       ...(inputMode === 'image' ? { imagePaths: genImages.map((i) => i.path) } : {}),
       resolution: genResolution,

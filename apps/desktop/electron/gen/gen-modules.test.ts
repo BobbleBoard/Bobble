@@ -8,6 +8,8 @@ import {
   moduleForBackend,
   moduleMissingMessage,
   uvLineToDetail,
+  weightsModelId,
+  weightsModuleFor,
 } from './gen-modules';
 
 function manager(overrides: { ready?: Set<string>; installMs?: number; fail?: boolean } = {}) {
@@ -139,5 +141,72 @@ describe('what the model reads', () => {
       uvLineToDetail('Resolved 96 packages in 1.20s\n\x1b[2mDownloading torch (215MiB)\x1b[0m\n'),
     ).toBe('Downloading torch (215MiB)');
     expect(uvLineToDetail('   \n')).toBeUndefined();
+  });
+});
+
+describe("a model's weights are a module of their own", () => {
+  const meta = (id: string) =>
+    id === 'weights:ltx-2.5-distilled'
+      ? {
+          label: 'LTX-2.5 22B distilled weights',
+          blurb: 'The 4 files this model loads.',
+          approxGB: 24.5,
+          noun: 'LTX-2.5 22B distilled',
+        }
+      : undefined;
+
+  it('names one only for an entry that lists files', () => {
+    expect(weightsModuleFor({ id: 'ltx-2.5-distilled', weights: [{}] })).toBe(
+      'weights:ltx-2.5-distilled',
+    );
+    expect(weightsModuleFor({ id: 'hyperframes' })).toBeUndefined();
+    expect(weightsModuleFor({ id: 'x', weights: [] })).toBeUndefined();
+    expect(weightsModelId('weights:ltx-2.5-distilled')).toBe('ltx-2.5-distilled');
+    expect(weightsModelId('comfy')).toBeNull();
+  });
+
+  it('is unknown until a job asks, then shows with the catalog’s name and size', async () => {
+    const ready = new Set<string>();
+    const emitted: unknown[][] = [];
+    const m = new GenModulesManager({
+      ready: async (id) => ready.has(id),
+      install: async (id, report) => {
+        report('Downloading comfyicu/LTX-2.5…', 0.2);
+        ready.add(id);
+      },
+      emit: (states) => emitted.push(states as unknown[]),
+      meta,
+      setTimeout: () => ({}),
+      clearTimeout: () => undefined,
+    });
+    expect(m.status().map((s) => s.id)).toEqual([...GEN_MODULE_IDS]);
+    const job = m.ensure('weights:ltx-2.5-distilled');
+    await new Promise((r) => setTimeout(r, 0));
+    const shown = m.status().find((s) => s.id === 'weights:ltx-2.5-distilled');
+    expect(shown).toMatchObject({
+      label: 'LTX-2.5 22B distilled weights',
+      approxGB: 24.5,
+      wanted: true,
+      ready: false,
+    });
+    await m.install('weights:ltx-2.5-distilled');
+    await job;
+    expect(m.status().find((s) => s.id === 'weights:ltx-2.5-distilled')?.ready).toBe(true);
+  });
+
+  it('the marker and the sentence carry the weights id, and the model is told the name', () => {
+    const msg = moduleMissingMessage(
+      'weights:ltx-2.5-distilled',
+      meta('weights:ltx-2.5-distilled'),
+    );
+    expect(msg).toContain('LTX-2.5 22B distilled is not set up on this Mac yet');
+    expect(msg).toContain('"Download ltx-2.5 22b distilled weights"');
+    expect(MODULE_MARKER_RE.exec(msg)?.[1]).toBe('weights:ltx-2.5-distilled');
+    // A dismissal names the module the same way.
+    const err = new GenModuleMissingError(
+      'weights:ltx-2.5-distilled',
+      meta('weights:ltx-2.5-distilled'),
+    );
+    expect(err.message).toContain('[[bobble-module:weights:ltx-2.5-distilled]]');
   });
 });

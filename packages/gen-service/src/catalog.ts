@@ -42,6 +42,22 @@ export interface MfluxBackendConfig {
 }
 
 /** A catalog entry for one generation model. */
+/** One file a graph loads: the repo it is fetched from and its path there. */
+export interface WeightFile {
+  readonly repo: string;
+  readonly path: string;
+  /** Bytes, when the repo tree has been read (the download prompt's copy). */
+  readonly bytes?: number;
+  /**
+   * The ComfyUI type folder a file with no folder of its own belongs in.
+   * Comfy-Org lays a repo out as ComfyUI reads it (`vae/…`, `diffusion_models/…`);
+   * the GGUF conversions are one file at the repo root, and ComfyUI finds a
+   * loader's name only inside a type folder — so such a file is shelved as
+   * `<org__repo>/<folder>/<name>` once it has landed.
+   */
+  readonly folder?: 'unet' | 'diffusion_models' | 'text_encoders' | 'clip' | 'vae';
+}
+
 export interface ModalityModel {
   /** Stable catalog id (what the tool/app references). */
   readonly id: string;
@@ -105,6 +121,18 @@ export interface ModalityModel {
   readonly mflux?: MfluxBackendConfig;
   /** ComfyUI wiring (`comfyui`-backed video / music / advanced-image entries). */
   readonly comfy?: ComfyBackendConfig;
+  /**
+   * THE FILES THE GRAPH LOADS, and where an UNGATED copy of each lives.
+   *
+   * A ComfyUI graph names its weights by file name and finds them by type
+   * folder; this is the list that puts them there. Every repo here can be
+   * fetched with no Hugging Face account — a gated source is not "one click"
+   * — so where the official release is gated (Lightricks/LTX-2.5) a mirror
+   * that carries the same bytes is named instead. Each file lands on its
+   * shelf as `<library>/<shelf>/<org__repo>/<path>`, the model store's own
+   * layout, and ComfyUI is pointed at every such folder.
+   */
+  readonly weights?: readonly WeightFile[];
   /** Sensible default denoising steps for this model. */
   readonly defaultSteps?: number;
   /** Default quantization to request (mflux `-q`). */
@@ -651,6 +679,26 @@ export const MODALITY_CATALOG: readonly ModalityModel[] = [
     runsLocally: true,
     heavy: true,
     recommended: true,
+    // The three files the graph names, from the repos ComfyUI's own template
+    // points at (Comfy-Org's repackaging, city96's GGUF encoder) — none gated.
+    weights: [
+      {
+        repo: 'Comfy-Org/Wan_2.1_ComfyUI_repackaged',
+        path: 'split_files/diffusion_models/wan2.1_t2v_1.3B_fp16.safetensors',
+        bytes: 2_840_000_000,
+      },
+      {
+        repo: 'Comfy-Org/Wan_2.1_ComfyUI_repackaged',
+        path: 'split_files/vae/wan_2.1_vae.safetensors',
+        bytes: 254_000_000,
+      },
+      {
+        repo: 'city96/umt5-xxl-encoder-gguf',
+        path: 'umt5-xxl-encoder-Q5_K_M.gguf',
+        bytes: 4_150_000_000,
+        folder: 'text_encoders',
+      },
+    ],
     comfy: {
       kind: 'comfyui',
       workflowTemplate: 'wan2.1-t2v-1.3b',
@@ -676,19 +724,54 @@ export const MODALITY_CATALOG: readonly ModalityModel[] = [
     license: 'ltx-2-community',
     commercialUse: false,
     approxSizeGB: 25,
-    // The encoder (15.4GB) and the transformer (7.3GB at Q2_K) are never
-    // resident together — ComfyUI frees the first before loading the second.
+    /*
+     * The encoder (15.4GB) and the transformer (7.3GB at Q2_K) are never
+     * resident together — ComfyUI frees the first before loading the second.
+     * MEASURED 2026-09-14 on the M5 Pro 24GB as the OS's own free-memory drop
+     * across a 640x352x49 job: 14.2 GB, with the process at 14.1 GB RSS and
+     * the OS pushing 5.7 GB out to swap on the way — a ~20 GB working set. It
+     * runs on 24 GB by swapping, which is what the guardian calls thrashing,
+     * so 24 is not a machine this fits; 32 is.
+     */
     peakResidentGB: 16,
-    minUnifiedMemoryGB: 24,
+    minUnifiedMemoryGB: 32,
     runsLocally: true,
     heavy: true,
     recommended: true,
+    /*
+     * Lightricks/LTX-2.5 is gated; comfyicu/LTX-2.5 mirrors the whole tree
+     * (145k downloads) and is not, so the encoder and both VAEs come from
+     * there. The Q2_K transformer is the ComfyUI-GGUF conversion several
+     * accounts host identically (ruygar / agosh / courageaihub).
+     */
+    weights: [
+      {
+        repo: 'ruygar/LTX-2.5-Comfy-GGUF',
+        path: 'ltx-2.5-22b-distilled-transformer-bf16-Q2_K.gguf',
+        bytes: 7_325_780_064,
+        folder: 'unet',
+      },
+      {
+        repo: 'comfyicu/LTX-2.5',
+        path: 'text_encoders/gemma4-12b-with-proj-ltx-2.5-comfy-int8-convrot.safetensors',
+        bytes: 15_372_971_786,
+      },
+      {
+        repo: 'comfyicu/LTX-2.5',
+        path: 'vae/ltx-2.5-video-vae-bf16.safetensors',
+        bytes: 1_472_223_346,
+      },
+      {
+        repo: 'comfyicu/LTX-2.5',
+        path: 'vae/ltx-2.5-audio-vae-bf16.safetensors',
+        bytes: 364_866_540,
+      },
+    ],
     comfy: {
       kind: 'comfyui',
       workflowTemplate: 'ltx-2.5-distilled-gguf',
       paramMap: {
         prompt: '6.inputs.text',
-        negativePrompt: '7.inputs.text',
         width: '70.inputs.width',
         height: '70.inputs.height',
         length: ['70.inputs.length', '71.inputs.frames_number'],
@@ -714,6 +797,25 @@ export const MODALITY_CATALOG: readonly ModalityModel[] = [
     minUnifiedMemoryGB: 24,
     runsLocally: true,
     heavy: true,
+    weights: [
+      {
+        repo: 'Abiray/MiniMax-H3-Pruned-GGUF',
+        path: 'MiniMax-H3-FL2VA-Pruned-Q3_K_M.gguf',
+        bytes: 8_900_000_000,
+        folder: 'unet',
+      },
+      {
+        repo: 'joeygambino/MiniMax-H3-encoder-GGUF',
+        path: 'MiniMax-H3-encoder-Q4_K_M.gguf',
+        bytes: 19_760_000_000,
+        folder: 'text_encoders',
+      },
+      {
+        repo: 'Comfy-Org/MiniMax-H3',
+        path: 'vae/minimax_h3_video_vae_fp16.safetensors',
+        bytes: 5_210_000_000,
+      },
+    ],
     comfy: {
       kind: 'comfyui',
       workflowTemplate: 'minimax-h3-t2v-gguf',
@@ -817,6 +919,129 @@ export const MODALITY_CATALOG: readonly ModalityModel[] = [
       'Quality tier: 22B bf16 / single-file ComfyUI-repackaged SAFETENSORS (correction #2: not diffusers / not GGUF). runsLocally:false below 64GB → routes to a remote ComfyUI (same adapter, http://host:port). 22B reliability is tech-demo (2-stage VAE decode hit NaN on analogue). LTX-2 Community EULA — gated.',
   },
 
+  // ---- 3D on ComfyUI's own nodes (0.35+): image → PBR GLB, no git, no Xcode --
+  {
+    id: 'trellis2-comfy',
+    modality: '3d',
+    label: 'TRELLIS.2 (ComfyUI)',
+    backend: 'comfyui',
+    repo: 'Comfy-Org/TRELLIS.2',
+    license: 'mit',
+    commercialUse: true,
+    approxSizeGB: 9,
+    /*
+     * MEASURED at 512³ on the M5 Pro 24GB, quiet machine, as the OS's own
+     * free-memory drop across the whole job: 11.5 GB (the ComfyUI process
+     * peaking at 9.7 GB RSS through the shape stage, the int8 DiT and both
+     * VAEs resident, plus 2.2 GB the OS chose to swap). The guardian's own
+     * headroom (15% + 1 GB) is what covers that spill; this is the drop.
+     */
+    peakResidentGB: 12,
+    minUnifiedMemoryGB: 16,
+    runsLocally: true,
+    heavy: true,
+    recommended: true,
+    weights: [
+      {
+        repo: 'Comfy-Org/TRELLIS.2',
+        path: 'diffusion_models/trellis_2_int8_convrot.safetensors',
+        bytes: 5_253_048_192,
+      },
+      {
+        repo: 'Comfy-Org/TRELLIS.2',
+        path: 'clip_vision/dino_v3_vit_l.safetensors',
+        bytes: 1_213_000_000,
+      },
+      {
+        repo: 'Comfy-Org/TRELLIS.2',
+        path: 'vae/trellis_2_shape_vae_bf16.safetensors',
+        bytes: 1_100_000_000,
+      },
+      {
+        repo: 'Comfy-Org/TRELLIS.2',
+        path: 'vae/trellis_2_texture_vae_bf16.safetensors',
+        bytes: 950_000_000,
+      },
+      {
+        repo: 'Comfy-Org/BiRefNet',
+        path: 'background_removal/birefnet.safetensors',
+        bytes: 444_473_596,
+      },
+    ],
+    comfy: {
+      kind: 'comfyui',
+      workflowTemplate: 'trellis2-image-to-3d',
+      paramMap: {
+        image: '122.inputs.image',
+        seed: ['3.inputs.seed', '18.inputs.seed', '12.inputs.seed'],
+        faces: '186.inputs.target_face_count',
+        textureSize: ['196.inputs.resolution', '147.inputs.texture_size', '224.inputs.resolution'],
+      },
+    },
+    notes:
+      "Image → textured 3D on ComfyUI's native TRELLIS.2 nodes (0.35): the same Microsoft model as the Bobble 3D engine, repackaged by Comfy-Org as int8, with ComfyUI's own decimate / unwrap / bake behind it. MEASURED on an M5 Pro 24GB at 512³: 314s to a 300k-face GLB with base colour, metallic, roughness, normal and AO maps. Slower than the MLX engine (117s), and it needs neither git nor Xcode — one click, any Apple Silicon Mac. 1024³ is deliberately not offered here: measured 28 minutes on this path. MIT weights.",
+  },
+  {
+    id: 'pixal3d-comfy',
+    modality: '3d',
+    label: 'Pixal3D (ComfyUI)',
+    backend: 'comfyui',
+    repo: 'Comfy-Org/Pixal3D',
+    license: 'mit',
+    commercialUse: true,
+    approxSizeGB: 10,
+    // The same pipeline at the same size; TRELLIS.2's measured drop stands in
+    // (the DiTs are within 0.3 GB of each other, the VAEs are shared).
+    peakResidentGB: 12,
+    minUnifiedMemoryGB: 16,
+    runsLocally: true,
+    heavy: true,
+    weights: [
+      {
+        repo: 'Comfy-Org/Pixal3D',
+        path: 'diffusion_models/pixal3d_int8_convrot.safetensors',
+        bytes: 5_584_555_824,
+      },
+      {
+        repo: 'Comfy-Org/Pixal3D',
+        path: 'clip_vision/dino_v3_L_naf_fp32.safetensors',
+        bytes: 1_215_214_176,
+      },
+      {
+        repo: 'Comfy-Org/TRELLIS.2',
+        path: 'vae/trellis_2_shape_vae_bf16.safetensors',
+        bytes: 1_100_000_000,
+      },
+      {
+        repo: 'Comfy-Org/TRELLIS.2',
+        path: 'vae/trellis_2_texture_vae_bf16.safetensors',
+        bytes: 950_000_000,
+      },
+      {
+        repo: 'Comfy-Org/BiRefNet',
+        path: 'background_removal/birefnet.safetensors',
+        bytes: 444_473_596,
+      },
+      {
+        repo: 'Comfy-Org/MoGe',
+        path: 'geometry_estimation/moge_2_vitl_normal_fp16.safetensors',
+        bytes: 661_859_924,
+      },
+    ],
+    comfy: {
+      kind: 'comfyui',
+      workflowTemplate: 'pixal3d-image-to-3d',
+      paramMap: {
+        image: '122.inputs.image',
+        seed: ['3.inputs.seed', '18.inputs.seed', '12.inputs.seed'],
+        faces: '186.inputs.target_face_count',
+        textureSize: ['196.inputs.resolution', '147.inputs.texture_size', '224.inputs.resolution'],
+      },
+    },
+    notes:
+      "Pixal3D on the same native pipeline, with MoGe reading the photo's field of view so the model keeps the camera's perspective. MEASURED on an M5 Pro 24GB at 512³: 260s to a textured GLB — the faster of the two, and the more photographic on a real object. MIT weights.",
+  },
+
   // ---- 3D (direct MLX/uv workers, NOT ComfyUI on Mac; reserved) ---------
   {
     id: 'triposr',
@@ -873,6 +1098,17 @@ export function modelsForModality(modality: Modality): ModalityModel[] {
 /** Models that are actually wired + runnable now (not reserved, run locally). */
 export function activeModels(): ModalityModel[] {
   return MODALITY_CATALOG.filter((m) => m.reserved !== true && m.runsLocally);
+}
+
+/** The 3D model a picture goes to when none is named: the first recommended
+ * ComfyUI-backed 3D entry (TRELLIS.2), else the first ComfyUI-backed one. */
+export function default3dModel(): ModalityModel {
+  const threeD = modelsForModality('3d').filter(
+    (m) => m.backend === 'comfyui' && m.reserved !== true,
+  );
+  const pick = threeD.find((m) => m.recommended === true) ?? threeD[0];
+  if (pick === undefined) throw new Error('catalog has no ComfyUI 3D model');
+  return pick;
 }
 
 /** The default image model (the first image entry). */

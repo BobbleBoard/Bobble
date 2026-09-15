@@ -80,6 +80,20 @@ export interface Gen3dModelInfo {
   readonly note: string;
 }
 
+/** The ComfyUI-native 3D path's state — see `gen3d:catalog`. */
+export interface Comfy3dInfo {
+  /** The ComfyUI module is installed. */
+  readonly runtimeReady: boolean;
+  /** Every file the default model's graph loads is on its shelf. */
+  readonly weightsReady: boolean;
+  /** Both — a picture can become a model right now. */
+  readonly ready: boolean;
+  /** Catalog id of the model the path runs (`trellis2-comfy`). */
+  readonly modelId: string;
+  /** Rough size of what is still to fetch, GB (runtime + weights). */
+  readonly approxGB: number;
+}
+
 /** TRELLIS structure resolution presets (verified against the repo by the
  * engine; the UI treats them as low/medium/high). */
 export type Gen3dResolution = 'low' | 'medium' | 'high';
@@ -177,6 +191,14 @@ export type Gen3dInvokeMap = {
       readonly models: readonly Gen3dModelInfo[];
       /** Engine-verified resolution presets, e.g. {low:768, medium:1024, high:1536}. */
       readonly resolutions: Readonly<Record<Gen3dResolution, number>>;
+      /**
+       * Image → 3D on ComfyUI's own nodes (TRELLIS.2, repackaged by Comfy-Org):
+       * the path with nothing to build on this Mac — no git, no Xcode. Ready
+       * when the ComfyUI module and the model's weights are both on disk; a
+       * generation from a picture runs on it whenever the engine above is not
+       * installed, and the gate offers it as the download.
+       */
+      readonly comfy: Comfy3dInfo;
     };
   };
   /** Start downloading the given models (progress via gen3d:download events). */
@@ -219,6 +241,12 @@ export type Gen3dInvokeMap = {
        * Only meaningful with `imageOnly`.
        */
       readonly editFrom?: string;
+      /**
+       * Which engine makes the model. Absent: the Bobble 3D engine when it is
+       * installed, ComfyUI otherwise. `comfy` runs the ComfyUI path outright
+       * (image input only — it has no text→image hop of its own).
+       */
+      readonly engine?: 'engine' | 'comfy';
     };
     response: { readonly ok: boolean; readonly jobId?: string; readonly error?: string };
   };

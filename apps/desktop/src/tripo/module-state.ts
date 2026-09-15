@@ -16,7 +16,11 @@
  * So this file owns one judgement, kept pure and tested, because the whole
  * gating UI hangs off it and "greyed out" must never be a guess.
  */
-import type { Gen3dModelId, Gen3dModelInfo } from '../../electron/gen3d/gen3d-contract';
+import type {
+  Comfy3dInfo,
+  Gen3dModelId,
+  Gen3dModelInfo,
+} from '../../electron/gen3d/gen3d-contract';
 
 /**
  * The models that make the studio USEFUL, in the order a first run needs them.
@@ -61,6 +65,12 @@ export interface ModuleState {
   readonly missing: readonly Gen3dModelId[];
   /** True when the studio can actually run something. */
   readonly usable: boolean;
+  /**
+   * The ComfyUI path's own state, when main reported it. `ready` here is what
+   * makes a studio with no engine usable for image → 3D; not ready is what
+   * the gate offers to download first, because it needs nothing built.
+   */
+  readonly comfy?: Comfy3dInfo;
 }
 
 /**
@@ -75,6 +85,36 @@ export function moduleState(
   engineReady: boolean,
   models: readonly Gen3dModelInfo[],
   engineBooting = false,
+  comfy?: Comfy3dInfo | null,
+): ModuleState {
+  const withComfy = (state: ModuleState): ModuleState =>
+    comfy === undefined || comfy === null ? state : { ...state, comfy };
+  /*
+   * A PICTURE CAN BECOME A MODEL WITHOUT THE ENGINE. ComfyUI's native TRELLIS.2
+   * (the modules' Download button, nothing to build) is a whole path of its
+   * own; when it is ready the studio is usable whatever the sidecar says —
+   * the engine stays the faster, fuller option the panels can still offer.
+   */
+  if (comfy?.ready === true) {
+    const core = CORE_MODULE_MODELS.map((id) => models.find((m) => m.id === id)).filter(
+      (m): m is Gen3dModelInfo => m !== undefined,
+    );
+    const missing = core.filter((m) => !m.installed);
+    return withComfy({
+      status: 'ready',
+      remainingBytes: missing.reduce((n, m) => n + m.sizeBytes, 0),
+      missing: missing.map((m) => m.id),
+      usable: true,
+    });
+  }
+  return withComfy(moduleStateOfEngine(engineReady, models, engineBooting));
+}
+
+/** The engine's own judgement, as before the ComfyUI path existed. */
+function moduleStateOfEngine(
+  engineReady: boolean,
+  models: readonly Gen3dModelInfo[],
+  engineBooting: boolean,
 ): ModuleState {
   const core = CORE_MODULE_MODELS.map((id) => models.find((m) => m.id === id)).filter(
     (m): m is Gen3dModelInfo => m !== undefined,
@@ -119,7 +159,11 @@ export function moduleHeadline(state: ModuleState): string {
     case 'checking':
       return 'Starting the 3D engine…';
     case 'no-runtime':
-      return 'The 3D engine runtime is not available';
+      // With the ComfyUI path on offer, a missing engine is not the story —
+      // the module is simply not downloaded yet.
+      return state.comfy !== undefined && !state.comfy.ready
+        ? '3D module not installed'
+        : 'The 3D engine runtime is not available';
     case 'installing':
       return 'Downloading the 3D module…';
     case 'not-installed':

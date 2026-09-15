@@ -54,7 +54,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
@@ -240,6 +240,9 @@ export async function launchApp(name, options = {}) {
    * it here only so the value handed back is the one the app actually got.
    */
   const home = env.HOME ?? probeHome(name);
+  // Ours to remove at the end: a caller's own home is theirs, and a stable one
+  // (probeHome's `stable`) is a per-name path a mkdtemp name never has.
+  const throwaway = env.HOME === undefined && /-[A-Za-z0-9]{6}$/.test(home);
   mkdirSync(path.join(home, '.pi', 'agent', 'sessions', 'proj'), { recursive: true });
 
   const before = frontmostApp();
@@ -298,6 +301,15 @@ export async function launchApp(name, options = {}) {
     await app.close().catch(() => undefined);
     const complaint = focusComplaint(before, during);
     if (complaint !== null) check(false, complaint);
+    /*
+     * THE THROWAWAY HOME IS THROWN AWAY. Each one holds whatever the run
+     * installed — a uv Python, a module's wheels, generated media — and none of
+     * it was ever removed: MEASURED 277 of them, 55 GB, on the day the disk ran
+     * out under a download. `PI_E2E_KEEP_HOME=1` keeps it for a post-mortem.
+     */
+    if (throwaway && process.env.PI_E2E_KEEP_HOME !== '1') {
+      rmSync(home, { recursive: true, force: true });
+    }
     if (process.exitCode === 1) {
       console.error(`${name}: ${failures.length} failure(s)`);
       return false;

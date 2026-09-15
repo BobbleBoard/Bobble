@@ -336,7 +336,7 @@ export interface DesktopSettings {
   showComputerUseStatusPill: boolean;
   /**
    * GB of memory the app promises never to take, so the machine stays usable
-   * while it works. `undefined`/0 ⇒ derived from the machine's size (a quarter,
+   * while it works. `undefined`/0 ⇒ derived from the machine's size (a sixth,
    * floored at 2 GB and capped at 8 — see `defaultReserveGB`). A NUMBER rather
    * than a fraction because that is what people mean by "leave me some room".
    */

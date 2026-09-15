@@ -37,7 +37,12 @@ import path from 'node:path';
 import { cacheRoot, libraryRoot } from '@pi-desktop/inference';
 import { ensureUv, PINNED_UV, uvDir } from '@pi-desktop/web-tools';
 import type { EngineState } from '../ipc-contract';
-import { COMFY_H3_SHIM_DIRNAME, COMFY_H3_SHIM_PY } from './comfy-h3-shim';
+import {
+  COMFY_H3_SHIM_DIRNAME,
+  COMFY_H3_SHIM_PY,
+  COMFY_MESH_ON_CPU_FILENAME,
+  COMFY_MESH_ON_CPU_PY,
+} from './comfy-h3-shim';
 import { engineInstalled, mlxVenvRoot, vllmVenvRoot } from './engine-paths';
 
 /** Where the managed Python venv for the MLX engines lives. */
@@ -225,6 +230,13 @@ const COMFY_CATEGORIES = [
   'loras',
   'controlnet',
   'upscale_models',
+  // The native 3D pipeline (ComfyUI ≥ 0.35): BiRefNet cuts the subject out,
+  // MoGe reads the camera for Pixal3D; LTX-2.5's second stage is a latent
+  // upscaler. Three type folders ComfyUI looks up that the list did not name,
+  // so a repo laid out exactly as Comfy-Org ships it was invisible.
+  'background_removal',
+  'geometry_estimation',
+  'latent_upscale_models',
 ] as const;
 
 export function writeComfyModelPaths(): void {
@@ -251,9 +263,31 @@ export function writeComfyModelPaths(): void {
       modality === 'Support' || modality === 'Unsorted'
         ? [folder]
         : subs.map((s) => path.join(folder, s));
+    const hasTypeDir = (dir: string): boolean =>
+      COMFY_CATEGORIES.some((c) => existsSync(path.join(dir, c)));
     for (const dir of candidates) {
-      const hasTypeDir = COMFY_CATEGORIES.some((c) => existsSync(path.join(dir, c)));
-      if (hasTypeDir) shelves.push(dir);
+      if (hasTypeDir(dir)) shelves.push(dir);
+      /*
+       * AND THE REPO FOLDERS ON THE SHELF. The model store lands a repo as
+       * `<shelf>/<org__repo>/<its own tree>` (download-repo.ts), and Comfy-Org
+       * ships that tree the way ComfyUI reads it — `diffusion_models/…`,
+       * `vae/…` — one level below the shelf, or two when a repo keeps its files
+       * under `split_files/`. MEASURED: with only the shelf listed, the 3D
+       * weights sat on disk and the graph was refused with "'dino_v3_vit_l
+       * .safetensors' not in []".
+       */
+      let repos: string[];
+      try {
+        repos = readdirSync(dir);
+      } catch {
+        continue;
+      }
+      for (const repo of repos) {
+        const repoDir = path.join(dir, repo);
+        if (hasTypeDir(repoDir)) shelves.push(repoDir);
+        const split = path.join(repoDir, 'split_files');
+        if (hasTypeDir(split)) shelves.push(split);
+      }
     }
   }
   const entryFor = (name: string, base: string, isDefault: boolean): string[] => [
@@ -334,6 +368,104 @@ async function fetchGitHubTree(
   rmSync(scratch, { recursive: true, force: true });
 }
 
+/**
+ * The ComfyUI this app's graphs are written against. The native TRELLIS.2 and
+ * Pixal3D nodes (image → 3D with no git, no Xcode, no custom wheels) landed in
+ * 0.34.0; the graphs were verified on 0.35.0.
+ */
+export const COMFY_REQUIRED_VERSION = '0.35.0';
+
+/** `__version__` from the checkout's comfyui_version.py; null when unreadable. */
+export function comfyVersionInstalled(): string | null {
+  try {
+    const text = readFileSync(path.join(comfyRoot(), 'comfyui_version.py'), 'utf8');
+    return /__version__\s*=\s*"([^"]+)"/.exec(text)?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Dotted-number comparison: negative when a < b. */
+export function compareVersions(a: string, b: string): number {
+  const pa = a.split('.').map((n) => Number.parseInt(n, 10) || 0);
+  const pb = b.split('.').map((n) => Number.parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i += 1) {
+    const d = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (d !== 0) return d;
+  }
+  return 0;
+}
+
+/** Below the version the graphs need — a checkout that predates the nodes. */
+export function comfyTreeIsStale(): boolean {
+  const v = comfyVersionInstalled();
+  return v === null || compareVersions(v, COMFY_REQUIRED_VERSION) < 0;
+}
+
+/**
+ * What survives a refresh of the checkout: the venv (a 6 GB torch install),
+ * the custom nodes we fetched or wrote, and everything the person's own use
+ * of ComfyUI produced. The rest IS the version, and is replaced.
+ */
+const COMFY_KEEP = new Set([
+  '.venv',
+  'custom_nodes',
+  'user',
+  'input',
+  'output',
+  'temp',
+  'models',
+  'pi-model-paths.yaml',
+  'extra_model_paths.yaml',
+]);
+
+/**
+ * Bring the checkout to master while keeping the venv.
+ *
+ * The install fetched the tree once and never again, so a Mac that installed
+ * ComfyUI at 0.33.0 (this one did, on 2026-09-12) would never have gained the
+ * native 3D nodes that arrived in 0.34, and the 3D studio's graph would fail
+ * with "node not found" for as long as that checkout lived. Fetching master is
+ * a 12 MB tarball; the requirements install afterwards is uv answering "already
+ * satisfied" in a couple of seconds when nothing moved, and the real download
+ * only when a pin did.
+ */
+export async function refreshComfyTree(uv: string): Promise<void> {
+  const root = comfyRoot();
+  const scratch = mkdtempSync(path.join(tmpdir(), 'bobble-comfy-tree-'));
+  try {
+    await fetchGitHubTree('comfyanonymous', 'ComfyUI', 'master', path.join(scratch, 'tree'));
+    for (const name of readdirSync(root)) {
+      if (COMFY_KEEP.has(name)) continue;
+      rmSync(path.join(root, name), { recursive: true, force: true });
+    }
+    for (const name of readdirSync(path.join(scratch, 'tree'))) {
+      if (name === 'custom_nodes' || name === 'user' || name === 'input' || name === 'output')
+        continue;
+      if (name === 'models' && existsSync(path.join(root, 'models'))) continue;
+      renameSync(path.join(scratch, 'tree', name), path.join(root, name));
+    }
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+  await run(
+    uv,
+    ['pip', 'install', '--python', comfyVenv(), '-r', path.join(root, 'requirements.txt')],
+    30 * 60_000,
+  );
+}
+
+/**
+ * A checkout on the version the graphs need. No-op when it already is; the
+ * refresh otherwise — called by the installer and by the studio before it
+ * starts the server, the way the model-paths yaml is rewritten on every start.
+ */
+export async function ensureComfyCurrent(): Promise<void> {
+  if (!existsSync(comfyMainPy()) || !existsSync(comfyVenv()) || !comfyTreeIsStale()) return;
+  const uv = await ensureUvPath();
+  await refreshComfyTree(uv);
+}
+
 async function installComfyGguf(uv: string): Promise<void> {
   const dir = path.join(comfyRoot(), 'custom_nodes', 'ComfyUI-GGUF');
   if (!existsSync(dir)) {
@@ -358,6 +490,7 @@ export function writeComfyShim(): void {
   const dir = path.join(comfyRoot(), 'custom_nodes', COMFY_H3_SHIM_DIRNAME);
   mkdirSync(dir, { recursive: true });
   writeFileSync(path.join(dir, '__init__.py'), COMFY_H3_SHIM_PY);
+  writeFileSync(path.join(dir, COMFY_MESH_ON_CPU_FILENAME), COMFY_MESH_ON_CPU_PY);
 }
 
 const OPS: Record<string, EngineOps> = {
@@ -413,6 +546,10 @@ const OPS: Record<string, EngineOps> = {
       if (!existsSync(comfyMainPy())) {
         rmSync(comfyRoot(), { recursive: true, force: true });
         await fetchGitHubTree('comfyanonymous', 'ComfyUI', 'master', comfyRoot());
+      } else if (comfyTreeIsStale()) {
+        // Installed before the native 3D nodes existed: the venv stays, the
+        // tree moves to master (refreshComfyTree explains).
+        await refreshComfyTree(uv);
       }
       if (!existsSync(comfyVenv())) {
         await run(uv, ['venv', comfyVenv(), '--python', '3.12']);

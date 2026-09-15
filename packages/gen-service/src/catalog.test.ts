@@ -141,8 +141,57 @@ describe('ComfyUI-backed entries', () => {
       expect(typeof m.comfy?.workflowTemplate).toBe('string');
       expect(m.comfy?.workflowTemplate.length).toBeGreaterThan(0);
       expect(Object.keys(m.comfy?.paramMap ?? {}).length).toBeGreaterThan(0);
-      // prompt is the one param every generative graph binds.
-      expect(m.comfy?.paramMap.prompt).toBeDefined();
+      // A graph is driven by words or by a picture — never by neither.
+      const drivenBy = m.modality === '3d' ? 'image' : 'prompt';
+      expect(m.comfy?.paramMap[drivenBy]).toBeDefined();
+    }
+  });
+
+  it('every weight a comfy entry lists is on the shelf its graph reads from', () => {
+    // A file lands at `<shelf>/<org__repo>/<path>` and ComfyUI resolves a
+    // loader's name inside the type folder the path starts with — so the
+    // path's first segment must be a type folder the app points ComfyUI at,
+    // or the download would land somewhere the graph never looks.
+    const typeFolders = [
+      'checkpoints',
+      'unet',
+      'diffusion_models',
+      'clip',
+      'clip_vision',
+      'text_encoders',
+      'audio_encoders',
+      'vae',
+      'loras',
+      'controlnet',
+      'upscale_models',
+      'background_removal',
+      'geometry_estimation',
+      'latent_upscale_models',
+    ];
+    for (const m of comfyEntries) {
+      for (const w of m.weights ?? []) {
+        expect(w.repo.split('/')).toHaveLength(2);
+        // A bare file name (the GGUF conversions) names the type folder it
+        // is shelved into; a path already carries one — at its root, or under
+        // Comfy-Org's `split_files/`.
+        const segs = w.path.split('/');
+        const first = segs[0] === 'split_files' ? segs[1] : segs[0];
+        if (w.path.includes('/')) expect(typeFolders).toContain(first);
+        else expect(typeFolders).toContain(w.folder);
+      }
+    }
+  });
+
+  it('the 3D entries on ComfyUI need no gate: MIT weights from ungated repos', () => {
+    for (const id of ['trellis2-comfy', 'pixal3d-comfy']) {
+      const m = getModel(id);
+      expect(m?.backend).toBe('comfyui');
+      expect(m?.modality).toBe('3d');
+      expect(m?.commercialUse).toBe(true);
+      expect(m?.runsLocally).toBe(true);
+      expect(m?.reserved).not.toBe(true);
+      expect((m?.weights ?? []).length).toBeGreaterThanOrEqual(5);
+      expect(m?.comfy?.paramMap.image).toBe('122.inputs.image');
     }
   });
 

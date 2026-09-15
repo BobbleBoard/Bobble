@@ -29,10 +29,45 @@
  * asset-gate.ts: no download ever runs in a test.
  */
 
-/** The modules a person can install. `comfy` serves video AND ComfyUI audio. */
-export type GenModuleId = 'image' | 'audio' | 'comfy' | '3d';
+/**
+ * The modules a person can install. `comfy` serves video AND ComfyUI audio.
+ *
+ * `weights:<catalog id>` is a model's own files — the second thing a ComfyUI
+ * job needs after the runtime. the user (2026-09-14): "one click download of any
+ * of these modules … video image 3d and audio generation with an m1-m6 mac".
+ * A runtime with no weights is not one click; it is one click and then an
+ * error naming a file. So the weights are a module with the same button, the
+ * same wait, the same card — one per catalog entry that lists what it loads
+ * (`ModalityModel.weights`), known to the manager the first time a job asks.
+ */
+export type GenRuntimeModuleId = 'image' | 'audio' | 'comfy' | '3d';
+export type GenModuleId = GenRuntimeModuleId | `weights:${string}`;
 
-export const GEN_MODULE_IDS: readonly GenModuleId[] = ['image', 'audio', 'comfy', '3d'];
+export const GEN_MODULE_IDS: readonly GenRuntimeModuleId[] = ['image', 'audio', 'comfy', '3d'];
+
+/** The weights module of a catalog entry, or nothing when it lists no files. */
+export function weightsModuleFor(model: {
+  readonly id: string;
+  readonly weights?: readonly unknown[];
+}): GenModuleId | undefined {
+  return model.weights !== undefined && model.weights.length > 0
+    ? `weights:${model.id}`
+    : undefined;
+}
+
+/** The catalog id behind a weights module; null for a runtime module. */
+export function weightsModelId(id: GenModuleId): string | null {
+  return id.startsWith('weights:') ? id.slice('weights:'.length) : null;
+}
+
+/** What a module is called and costs — the runtime ones here, the weights
+ * ones from the catalog through the ports (`meta`). */
+export interface GenModuleMeta {
+  readonly label: string;
+  readonly blurb: string;
+  readonly approxGB: number;
+  readonly noun: string;
+}
 
 /** What the renderer shows for one module. */
 export interface GenModuleState {
@@ -55,10 +90,7 @@ export interface GenModuleState {
   readonly wanted: boolean;
 }
 
-export const GEN_MODULE_META: Record<
-  GenModuleId,
-  { label: string; blurb: string; approxGB: number; noun: string }
-> = {
+export const GEN_MODULE_META: Record<GenRuntimeModuleId, GenModuleMeta> = {
   image: {
     label: 'Image module',
     blurb: 'The picture engine (mflux on MLX). Models download on first use.',
@@ -99,6 +131,9 @@ export interface GenModulePorts {
   /** A job of this module succeeded: persist that (a marker), so the next
    * launch does not hold a job on a probe that cannot see a uv cache. */
   readonly remember?: (id: GenModuleId) => void;
+  /** What a weights module is called and costs (from the catalog). A module
+   * the ports cannot name is one the manager will not hold a job for. */
+  readonly meta?: (id: GenModuleId) => GenModuleMeta | undefined;
   /** Injectable clock for the gate's wait (tests). */
   readonly now?: () => number;
   readonly setTimeout?: (fn: () => void, ms: number) => unknown;
@@ -117,15 +152,17 @@ export const MODULE_WAIT_MS = 4 * 60 * 1000;
 export function moduleMarker(id: GenModuleId): string {
   return `[[bobble-module:${id}]]`;
 }
-export const MODULE_MARKER_RE = /\[\[bobble-module:(image|audio|comfy|3d)\]\]/;
+export const MODULE_MARKER_RE = /\[\[bobble-module:(image|audio|comfy|3d|weights:[a-z0-9._-]+)\]\]/;
 
 /**
  * The words the MODEL gets when a module is missing and nobody installed it.
  * They say what to do — ask — and what not to do, because MEASURED the model
  * otherwise tries to install Python tooling itself.
  */
-export function moduleMissingMessage(id: GenModuleId): string {
-  const meta = GEN_MODULE_META[id];
+export function moduleMissingMessage(
+  id: GenModuleId,
+  meta: GenModuleMeta = fallbackMeta(id),
+): string {
   return (
     `${meta.noun} is not set up on this Mac yet. A "Download ${meta.label.toLowerCase()}" ` +
     'button is showing in the chat and in the studio — ask the user to press it, then try ' +
@@ -134,9 +171,25 @@ export function moduleMissingMessage(id: GenModuleId): string {
   );
 }
 
+/** A runtime module's meta, or a plain name for a weights module nobody described. */
+function fallbackMeta(id: GenModuleId): GenModuleMeta {
+  const runtime = (GEN_MODULE_META as Record<string, GenModuleMeta | undefined>)[id];
+  if (runtime !== undefined) return runtime;
+  const model = weightsModelId(id) ?? id;
+  return {
+    label: `${model} weights`,
+    blurb: 'The files this model loads.',
+    approxGB: 0,
+    noun: `${model}`,
+  };
+}
+
 export class GenModuleMissingError extends Error {
-  constructor(readonly module: GenModuleId) {
-    super(moduleMissingMessage(module));
+  constructor(
+    readonly module: GenModuleId,
+    meta?: GenModuleMeta,
+  ) {
+    super(moduleMissingMessage(module, meta));
     this.name = 'GenModuleMissingError';
   }
 }
@@ -163,7 +216,7 @@ export class GenModulesManager {
 
   /** Ask the ports again for every module the last answer said was not ready. */
   async refresh(): Promise<GenModuleState[]> {
-    for (const id of GEN_MODULE_IDS) {
+    for (const id of this.#known()) {
       if (this.#ready.get(id) === true) continue;
       const ready = await this.#ports.ready(id).catch(() => false);
       this.#ready.set(id, ready);
@@ -173,11 +226,29 @@ export class GenModulesManager {
 
   /** The state as last known — synchronous, so every emit is a true snapshot. */
   status(): GenModuleState[] {
-    return GEN_MODULE_IDS.map((id) => this.#stateOf(id));
+    return this.#known().map((id) => this.#stateOf(id));
+  }
+
+  /**
+   * The four runtimes always; a weights module once anything has touched it —
+   * a job at its gate, a press of its button, an answer from its probe. Those
+   * are the ones a card can be showing for.
+   */
+  #known(): GenModuleId[] {
+    const ids = new Set<GenModuleId>(GEN_MODULE_IDS);
+    for (const id of this.#ready.keys()) ids.add(id);
+    for (const id of this.#installing.keys()) ids.add(id);
+    for (const id of this.#waiters.keys()) ids.add(id);
+    for (const id of this.#error.keys()) ids.add(id);
+    return [...ids];
+  }
+
+  #meta(id: GenModuleId): GenModuleMeta {
+    return this.#ports.meta?.(id) ?? fallbackMeta(id);
   }
 
   #stateOf(id: GenModuleId): GenModuleState {
-    const meta = GEN_MODULE_META[id];
+    const meta = this.#meta(id);
     const live = this.#detail.get(id);
     const error = this.#error.get(id);
     return {
@@ -270,7 +341,7 @@ export class GenModulesManager {
       const arm = this.#ports.setTimeout ?? ((fn, ms) => setTimeout(fn, ms));
       waiter.timer = arm(() => {
         this.#drop(id, waiter);
-        reject(new GenModuleMissingError(id));
+        reject(new GenModuleMissingError(id, this.#meta(id)));
       }, MODULE_WAIT_MS);
       list.push(waiter);
       this.#waiters.set(id, list);
@@ -284,7 +355,7 @@ export class GenModulesManager {
     this.#waiters.delete(id);
     for (const w of waiting) {
       this.#clear(w.timer);
-      w.reject(new GenModuleMissingError(id));
+      w.reject(new GenModuleMissingError(id, this.#meta(id)));
     }
     this.#broadcast();
   }

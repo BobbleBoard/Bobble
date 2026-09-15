@@ -35,11 +35,13 @@ import path from 'node:path';
 import {
   activeModels,
   ComfyClient,
+  default3dModel,
   defaultGenSpawn,
   defaultImageModel,
   defaultVideoModel,
   type GenEvent,
   type GenJob,
+  type GenOutput,
   GenServiceClient,
   getModel,
   JobQueue,
@@ -81,7 +83,7 @@ import type {
   GenInvokeMap,
   GenSurfacePayload,
 } from './gen-ipc-contract';
-import { type GenModulesManager, moduleForBackend } from './gen-modules';
+import { type GenModulesManager, moduleForBackend, weightsModuleFor } from './gen-modules';
 import { createStillRenderer } from './hyperframes-still';
 import { openStillWindow } from './hyperframes-window';
 import { createRoomKeeper, type RoomKeeper } from './make-room';
@@ -299,7 +301,31 @@ export interface GenQueueControl {
   readonly queued: () => number;
   readonly shedRunning: (reason: string) => string[];
   readonly reconsider: () => void;
+  /** Image → 3D on ComfyUI through this same queue — see {@link Run3dFn}. */
+  readonly run3d: Run3dFn;
 }
+
+/**
+ * Image → 3D through the same door as every other generation: the module and
+ * weights gates, the guardian's admission, the queue, the room-making.
+ * gen3d-main calls this for the 3D studio and the chat when the job runs on
+ * ComfyUI (the path that needs no engine built on this Mac).
+ */
+export interface Run3dParams {
+  readonly imagePath: string;
+  /** Catalog id of a `comfyui`-backed 3D entry; the recommended one when absent. */
+  readonly model?: string;
+  readonly seed?: number;
+  /** Faces the textures are painted onto (0 = the graph's own budget). */
+  readonly faces?: number;
+  readonly textureSize?: number;
+  /** Where the GLB lands. */
+  readonly outputDir: string;
+}
+export type Run3dFn = (
+  params: Run3dParams,
+  onEvent: (event: GenEvent) => void,
+) => Promise<{ readonly jobId: string; readonly outputs: GenOutput[] }>;
 
 export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
   /*
@@ -452,6 +478,18 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
   const modules = opts.modules;
   const ensureModule = async (backend: string): Promise<void> => {
     const id = moduleForBackend(backend);
+    if (id === undefined || modules === undefined) return;
+    await modules.ensure(id);
+  };
+  /**
+   * AND THEN ITS WEIGHTS. A ComfyUI graph names its files; a catalog entry
+   * that lists them (`weights`) gets the same gate for them — the same card,
+   * the same wait, the same sentence for the model — one click after the
+   * runtime's. An entry that lists nothing (its files arrive some other way)
+   * passes through.
+   */
+  const ensureWeights = async (model: ModalityModel): Promise<void> => {
+    const id = weightsModuleFor(model);
     if (id === undefined || modules === undefined) return;
     await modules.ensure(id);
   };
@@ -627,6 +665,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
       // Download-then-continue: an mflux image needs no up-front pack, so this is
       // a no-op here; the seam is uniform so a future comfyui-backed image gates too.
       await ensureModule(job.backend);
+      await ensureWeights(model);
       const need = needForModel(model);
       if (need !== undefined && ensureAsset !== undefined) await ensureAsset(need);
       noteSinks.set(jobId, (line) => {
@@ -727,6 +766,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
       // Download-then-continue: a comfyui-backed video (LTX / Wan) whose weights
       // pack is missing PROMPTS the user, downloads on accept, then continues here.
       await ensureModule(job.backend);
+      await ensureWeights(model);
       const need = needForModel(model);
       if (need !== undefined && ensureAsset !== undefined) await ensureAsset(need);
       noteSinks.set(jobId, (line) => {
@@ -898,6 +938,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
       // Same download-then-continue courtesy the video path gets: a ComfyUI music
       // or SFX model whose weights pack is missing prompts, downloads, continues.
       await ensureModule(job.backend);
+      await ensureWeights(model);
       const need = needForModel(model);
       if (need !== undefined && ensureAsset !== undefined) await ensureAsset(need);
       noteSinks.set(jobId, (line) => {
@@ -1228,8 +1269,49 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
 
   roomKeepers.add(() => keeper?.dispose());
 
+  const run3d: Run3dFn = async (params, onEvent) => {
+    const model = getModel(params.model ?? default3dModel().id);
+    if (model === undefined || model.modality !== '3d' || model.comfy === undefined) {
+      throw new Error(`unknown or non-ComfyUI 3D model "${params.model ?? ''}"`);
+    }
+    const jobId = `gen3d_${Date.now()}_${randomBytes(3).toString('hex')}`;
+    await mkdir(params.outputDir, { recursive: true });
+    const inputs: Record<string, string | number | boolean> = {};
+    if (params.faces !== undefined && params.faces > 0) inputs.faces = params.faces;
+    if (params.textureSize !== undefined) inputs.textureSize = params.textureSize;
+    const job: GenJob = {
+      id: jobId,
+      modality: '3d',
+      backend: 'comfyui',
+      outputDir: params.outputDir,
+      comfy: {
+        prompt: '',
+        modelId: model.id,
+        workflowTemplate: model.comfy.workflowTemplate,
+        inputs,
+        seeds: [params.seed ?? randomInt(0, 1_000_000_000)],
+        inputImage: params.imagePath,
+      },
+    };
+    try {
+      await ensureModule(job.backend);
+      await ensureWeights(model);
+      await opts.freshReading?.();
+      const outputs = await jobQueue.enqueue(job, {
+        heavy: model.heavy,
+        footprintGB: jobFootprintGB(model),
+        onEvent,
+      }).result;
+      moduleSucceeded(job.backend);
+      return { jobId, outputs };
+    } finally {
+      await settleRoom();
+    }
+  };
+
   return {
     running: () => jobQueue.runningCount > 0,
+    run3d,
     queued: () => jobQueue.queuedCount,
     shedRunning: (reason) => jobQueue.shedRunning(reason),
     reconsider: () => jobQueue.reconsider(),

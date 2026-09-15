@@ -109,3 +109,44 @@ describe('a runtime that is still starting is not a runtime that is missing', ()
     expect(moduleState(true, installed, false).status).toBe('ready');
   });
 });
+
+describe('the ComfyUI path — image → 3D with nothing to build', () => {
+  const comfy = (ready: boolean, runtimeReady = ready, weightsReady = ready) => ({
+    runtimeReady,
+    weightsReady,
+    ready,
+    modelId: 'trellis2-comfy',
+    approxGB: ready ? 0 : 15.5,
+  });
+
+  it('makes a studio with no engine usable when ComfyUI and the weights are there', () => {
+    const s = moduleState(false, [], false, comfy(true));
+    expect(s.status).toBe('ready');
+    expect(s.usable).toBe(true);
+    expect(s.comfy?.ready).toBe(true);
+  });
+
+  it('keeps the engine judgement, and the offer, when ComfyUI is not ready', () => {
+    const s = moduleState(false, allCore(false), false, comfy(false));
+    expect(s.status).toBe('no-runtime');
+    expect(s.usable).toBe(false);
+    expect(s.comfy).toMatchObject({ ready: false, approxGB: 15.5 });
+    // The headline is about the module, not the engine's runtime.
+    expect(moduleHeadline(s)).toBe('3D module not installed');
+  });
+
+  it('still says the engine is missing when no ComfyUI path was reported', () => {
+    const s = moduleState(false, allCore(false), false, null);
+    expect(s.comfy).toBeUndefined();
+    expect(moduleHeadline(s)).toBe('The 3D engine runtime is not available');
+  });
+
+  it('with the engine installed as well, the engine’s missing core still totals', () => {
+    const models = allCore(true);
+    models[0] = m(CORE_MODULE_MODELS[0] as Gen3dModelId, false, 4 * GB);
+    const s = moduleState(true, models, false, comfy(true));
+    expect(s.usable).toBe(true);
+    expect(s.missing).toEqual([CORE_MODULE_MODELS[0]]);
+    expect(s.remainingBytes).toBe(4 * GB);
+  });
+});

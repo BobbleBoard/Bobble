@@ -275,7 +275,7 @@ function PowerSection() {
         </SettingRow>
         <SettingRow
           label="Keep free for me"
-          hint="Memory Bobble will not take, so your other apps keep theirs. Left alone it picks a quarter of this machine."
+          hint="Memory Bobble will not take, so your other apps keep theirs. Left alone it picks a sixth of this machine."
         >
           <input
             type="number"

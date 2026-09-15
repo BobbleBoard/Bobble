@@ -246,6 +246,13 @@ export interface ComfyJobSpec {
   readonly inputs: Record<string, string | number | boolean>;
   /** One seed per candidate; length drives how many outputs the job produces. */
   readonly seeds: readonly number[];
+  /**
+   * An input PICTURE, as an absolute path on this machine. ComfyUI's
+   * `LoadImage` reads from its own input folder by name, so the adapter uploads
+   * this file first (`/upload/image`) and binds the name it comes back with to
+   * the template's `image` param. Image → 3D is what this is for.
+   */
+  readonly inputImage?: string;
 }
 
 /**

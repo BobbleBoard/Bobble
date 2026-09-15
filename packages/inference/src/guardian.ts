@@ -59,6 +59,13 @@ export interface GuardianLimits {
   readonly holdFree: number;
   /** Below this, running heavy work is cancelled. */
   readonly shedFree: number;
+  /**
+   * "Tight" for the two corroborated sheds (heavy swap, a main-thread stall):
+   * memory at or under this AND the other signal is a thrash. The same in
+   * every mode — a shed line that moved with the mode is a mode that stops
+   * generations, which 'low' must never be (see limitsFor).
+   */
+  readonly tightFree: number;
   /** A main-thread stall at least this long, with memory already under
    * `holdFree`, counts as thrashing. */
   readonly stallMs: number;
@@ -69,6 +76,15 @@ export interface GuardianLimits {
   /** Consecutive swap-hot readings (with memory to spare) before that counts as
    * a thrash. A load burst is one or two; a thrash is all of them. */
   readonly hotReadings: number;
+  /**
+   * The same streak when memory is COMFORTABLE (free above `holdFree`). A
+   * mesh bake churning through temporaries on a machine with 40% free is not
+   * a freeze in the making — MEASURED, TRELLIS.2's CPU mesh stage runs the
+   * compressor at 4,000–11,000 pages/s for ten seconds with 43% free, and four
+   * readings of that stopped the job five minutes in. With room to land a
+   * burst is given this many readings before it is called a thrash.
+   */
+  readonly hotReadingsWithRoom: number;
 }
 
 /*
@@ -99,10 +115,21 @@ export function limitsFor(mode: PowerMode): GuardianLimits {
   return {
     holdFree: low ? 0.3 : 0.2,
     shedFree: 0.08,
+    /*
+     * NOT `holdFree`. The swap-and-tight shed read the mode's hold line, so in
+     * 'low' — the DEFAULT — a job whose load burst dipped to 30% free was
+     * cancelled on the spot: MEASURED, ComfyUI loading TRELLIS.2's 5 GB DiT
+     * and two VAEs on an otherwise idle 24 GB Mac read "swapping hard (44,506
+     * pages/s) with 30% of memory free" and was shed before its first step.
+     * That is the load, not a freeze, and 'full' would have held it for four
+     * readings and then let it run. The line is the same in both modes now.
+     */
+    tightFree: 0.2,
     stallMs: 1500,
     thrashingPagesPerSec: 2000,
     recoveryReadings: 4,
     hotReadings: 4,
+    hotReadingsWithRoom: 20,
   };
 }
 
@@ -113,6 +140,8 @@ export interface GuardianJudgement {
   /** Swapping hard with memory to spare — a burst that becomes a thrash if it
    * lasts. `settle` counts these. */
   readonly hot?: boolean;
+  /** …and with memory COMFORTABLE (above the hold line): the longer streak. */
+  readonly room?: boolean;
 }
 
 /** The verdict a single reading argues for, before any hysteresis. */
@@ -138,7 +167,7 @@ export function judge(reading: GuardianReading, limits: GuardianLimits): Guardia
    * `settle` counts the streak, because a burst ends and a thrash does not.
    */
   const swapping = (reading.swapIoPerSec ?? 0) >= limits.thrashingPagesPerSec;
-  if (swapping && free !== undefined && free <= limits.holdFree) {
+  if (swapping && free !== undefined && free <= limits.tightFree) {
     return {
       verdict: 'shed',
       reason: `the machine is swapping hard (${Math.round(reading.swapIoPerSec ?? 0)} pages/s) with ${pct}% of memory free`,
@@ -150,7 +179,7 @@ export function judge(reading: GuardianReading, limits: GuardianLimits): Guardia
    * the state a big model is supposed to run in. Together they are the pointer
    * freezing.
    */
-  if ((reading.stallMs ?? 0) >= limits.stallMs && free !== undefined && free <= limits.holdFree) {
+  if ((reading.stallMs ?? 0) >= limits.stallMs && free !== undefined && free <= limits.tightFree) {
     return {
       verdict: 'shed',
       reason: `the app stalled for ${Math.round((reading.stallMs ?? 0) / 100) / 10}s with ${pct}% of memory free`,
@@ -161,6 +190,7 @@ export function judge(reading: GuardianReading, limits: GuardianLimits): Guardia
       verdict: 'hold',
       reason: `the machine is swapping (${Math.round(reading.swapIoPerSec ?? 0)} pages/s)`,
       hot: true,
+      room: free !== undefined && free > limits.holdFree,
     };
   }
   if (reading.memory === 'warn') {
@@ -193,8 +223,10 @@ export function settle(
   if (next.verdict === 'hold') {
     if (next.hot === true) {
       const hot = hotStreak + 1;
-      // A burst that will not end is a thrash, whatever the free figure says.
-      if (hot >= limits.hotReadings) {
+      // A burst that will not end is a thrash, whatever the free figure says —
+      // and "will not end" is judged with the room it has to land in.
+      const allowed = next.room === true ? limits.hotReadingsWithRoom : limits.hotReadings;
+      if (hot >= allowed) {
         return {
           verdict: 'shed',
           calmStreak: 0,

@@ -245,11 +245,17 @@ function ltx25Graph(): ComfyGraph {
       inputs: { text: '', clip: ['38', 0] },
       _meta: { title: 'Positive prompt' },
     },
-    '7': {
-      class_type: 'CLIPTextEncode',
-      inputs: { text: '', clip: ['38', 0] },
-      _meta: { title: 'Negative prompt' },
-    },
+    /*
+     * NO SECOND ENCODE. The distilled model runs at video_cfg 1 / audio_cfg 1,
+     * where the guider never evaluates the negative tower — and a
+     * `CLIPTextEncode` of the empty string still costs a full pass through the
+     * 12B encoder: MEASURED 35s of a 195s job (ComfyUI 0.35, M5 Pro 24GB).
+     * Zeroing the positive gives `LTXVConditioning` the negative it needs for
+     * free, and frame 24 of the same seed is bit-identical (mean abs diff 0.0).
+     * So this template binds no `negativePrompt`; video-dispatch does not send
+     * one to a graph that has nowhere to put it.
+     */
+    '7': { class_type: 'ConditioningZeroOut', inputs: { conditioning: ['6', 0] } },
     '60': {
       class_type: 'LTXVConditioning',
       inputs: { positive: ['6', 0], negative: ['7', 0], frame_rate: 24 },
@@ -335,7 +341,6 @@ function ltx25Graph(): ComfyGraph {
  * joint latent — a video latent longer than its audio latent will not concat. */
 const LTX_25_PARAM_MAP = {
   prompt: '6.inputs.text',
-  negativePrompt: '7.inputs.text',
   width: '70.inputs.width',
   height: '70.inputs.height',
   // Both halves of the joint latent, or `LTXVConcatAVLatent` gets a 49-frame
@@ -608,6 +613,288 @@ function fluxGgufGraph(): ComfyGraph {
   };
 }
 
+/**
+ * Image → 3D on ComfyUI's own nodes (0.35): TRELLIS.2 or Pixal3D, then the
+ * mesh pipeline that ships beside them — no git, no Xcode, no custom wheels,
+ * which is what puts a 3D model within one click on any Apple Silicon Mac.
+ *
+ * THE SHAPE OF IT, from the upstream template
+ * (`3d_pixal3d_trellis2_image_to_model.json`), with the switches resolved:
+ *
+ *   BiRefNet cuts the subject out → ImageCropToMask squares it (1.0 pad for
+ *   TRELLIS.2, 1.1 for Pixal3D, which also reads the camera's field of view
+ *   off MoGe) → DINOv3 conditioning → a 12-step STRUCTURE sample on the
+ *   int8 DiT (cfg 7.5, shift 5, guidance only from 66.7%, rescaled 0.7) →
+ *   a 20-step SHAPE sample at 512³ → the shape VAE → a 12-step TEXTURE sample
+ *   at cfg 1 → the texture VAE (a coloured voxel field) → decimate to
+ *   300k faces → smooth normals → UV unwrap → bake base colour / metallic /
+ *   roughness from the voxels, a normal map and ambient occlusion from the
+ *   dense mesh → one GLB with a PBR material (SaveGLB), plus the raw
+ *   vertex-painted mesh as a second file.
+ *
+ * WHAT IS NOT HERE, and why:
+ *
+ *  - the 1024/1536 UPSAMPLE stage. MEASURED on the M5 Pro 24GB: 835s for the
+ *    12 upsample steps, 134s to decode, 474s to texture — half an hour before
+ *    the mesh stage, against 314s for the whole 512 chain. The Bobble 3D
+ *    engine (MLX, needs Xcode) does 1024 in 352s; this path is the one that
+ *    needs nothing, and 512 is where it earns that.
+ *  - RemeshMesh. It rebuilds the surface at 768³ before decimating; the
+ *    decimate-only chain gives a 300k-face mesh in 38s and the mug in it is
+ *    the mug.
+ *
+ * ON THE CPU: every mesh node after the VAEs. On MPS they die with a negative
+ * scatter index (ComfyUI 0.35 / torch 2.13); `bobble_comfy_fixes/mesh_on_cpu.py`,
+ * installed with the engine, answers "cpu" while one runs. int8 or bf16 DiT is
+ * the same speed here (75s vs 82s for the shape stage) — the int8 is 5 GB
+ * smaller, so it is the one the catalog names.
+ *
+ * MEASURED on the M5 Pro 24GB, mug.png at 512³: TRELLIS.2 314s (structure 31s,
+ * shape 82s, decode 25s, texture 33s + 15s, decimate 38s, unwrap 6s, normal
+ * bake 11s, AO 50s, voxel bake 8s); Pixal3D 260s.
+ */
+function trellis2ImageTo3dGraph(engine: 'trellis2' | 'pixal3d'): ComfyGraph {
+  const cond = engine === 'trellis2' ? '299' : '298';
+  const conditioning: ComfyGraph =
+    engine === 'trellis2'
+      ? {
+          '15': {
+            class_type: 'CLIPVisionLoader',
+            inputs: { clip_name: 'dino_v3_vit_l.safetensors' },
+          },
+          '40': {
+            class_type: 'UNETLoader',
+            inputs: { unet_name: 'trellis_2_int8_convrot.safetensors', weight_dtype: 'default' },
+          },
+          '299': {
+            class_type: 'Trellis2Conditioning',
+            inputs: { clip_vision_model: ['15', 0], image: ['312', 0] },
+          },
+        }
+      : {
+          '15': {
+            class_type: 'CLIPVisionLoader',
+            inputs: { clip_name: 'dino_v3_L_naf_fp32.safetensors' },
+          },
+          '40': {
+            class_type: 'UNETLoader',
+            inputs: { unet_name: 'pixal3d_int8_convrot.safetensors', weight_dtype: 'default' },
+          },
+          '55': {
+            class_type: 'LoadMoGeModel',
+            inputs: { model_name: 'moge_2_vitl_normal_fp16.safetensors' },
+          },
+          '56': {
+            class_type: 'MoGeInference',
+            inputs: {
+              moge_model: ['55', 0],
+              image: ['312', 0],
+              resolution_level: 9,
+              fov_x_degrees: 0,
+              batch_size: 4,
+              force_projection: true,
+              apply_mask: true,
+            },
+          },
+          '242': {
+            class_type: 'MoGeGeometryToFOV',
+            inputs: { moge_geometry: ['56', 0], axis: 'horizontal', unit: 'degrees' },
+          },
+          '298': {
+            class_type: 'Pixal3DConditioning',
+            inputs: { clip_vision_model: ['15', 0], image: ['312', 0], camera_angle_x: ['242', 0] },
+          },
+        };
+  return {
+    '122': { class_type: 'LoadImage', inputs: { image: '' }, _meta: { title: 'Input picture' } },
+    '193': {
+      class_type: 'LoadBackgroundRemovalModel',
+      inputs: { bg_removal_name: 'birefnet.safetensors' },
+    },
+    '192': {
+      class_type: 'RemoveBackground',
+      inputs: { bg_removal_model: ['193', 0], image: ['122', 0] },
+    },
+    '312': {
+      class_type: 'ImageCropToMask',
+      inputs: {
+        images: ['122', 0],
+        masks: ['192', 0],
+        width: 1024,
+        height: 1024,
+        pad_factor: engine === 'trellis2' ? 1.0 : 1.1,
+        grow_mask: 0,
+        background: '#000000',
+      },
+    },
+    ...conditioning,
+    '117': {
+      class_type: 'VAELoader',
+      inputs: { vae_name: 'trellis_2_shape_vae_bf16.safetensors' },
+    },
+    '118': {
+      class_type: 'VAELoader',
+      inputs: { vae_name: 'trellis_2_texture_vae_bf16.safetensors' },
+    },
+    // Structure: guidance from two thirds in, rescaled, on a shift-5 schedule.
+    '199': {
+      class_type: 'CFGOverride',
+      inputs: { model: ['40', 0], cfg: 1, start_percent: 0.667, end_percent: 1 },
+    },
+    '125': { class_type: 'RescaleCFG', inputs: { model: ['199', 0], multiplier: 0.7 } },
+    '108': { class_type: 'ModelSamplingSD3', inputs: { model: ['125', 0], shift: 5 } },
+    '87': { class_type: 'EmptyTrellis2LatentStructure', inputs: { batch_size: 1 } },
+    '3': {
+      class_type: 'KSampler',
+      inputs: {
+        model: ['108', 0],
+        seed: 0,
+        steps: 12,
+        cfg: 7.5,
+        sampler_name: 'euler',
+        scheduler: 'normal',
+        positive: [cond, 0],
+        negative: [cond, 1],
+        latent_image: ['87', 0],
+        denoise: 1,
+      },
+    },
+    '119': {
+      class_type: 'VaeDecodeStructureTrellis2',
+      inputs: { samples: ['3', 0], vae: ['117', 0], resolution: '32' },
+    },
+    // Shape at 512³.
+    '279': {
+      class_type: 'CFGOverride',
+      inputs: { model: ['40', 0], cfg: 1, start_percent: 0.769, end_percent: 1 },
+    },
+    '126': { class_type: 'RescaleCFG', inputs: { model: ['279', 0], multiplier: 0.5 } },
+    '91': {
+      class_type: 'Trellis2ShapeStage',
+      inputs: { positive: [cond, 0], negative: [cond, 1], voxel: ['119', 0] },
+    },
+    '18': {
+      class_type: 'KSampler',
+      inputs: {
+        model: ['126', 0],
+        seed: 0,
+        steps: 20,
+        cfg: 7.5,
+        sampler_name: 'euler',
+        scheduler: 'normal',
+        positive: ['91', 0],
+        negative: ['91', 1],
+        latent_image: ['91', 2],
+        denoise: 1,
+      },
+    },
+    '92': { class_type: 'VaeDecodeShapeTrellis', inputs: { samples: ['18', 0], vae: ['117', 0] } },
+    // Texture, guidance-free.
+    '98': {
+      class_type: 'Trellis2TextureStage',
+      inputs: { positive: ['91', 0], negative: ['91', 1], shape_latent: ['18', 0] },
+    },
+    '12': {
+      class_type: 'KSampler',
+      inputs: {
+        model: ['40', 0],
+        seed: 0,
+        steps: 12,
+        cfg: 1,
+        sampler_name: 'euler',
+        scheduler: 'normal',
+        positive: ['98', 0],
+        negative: ['98', 1],
+        latent_image: ['98', 2],
+        denoise: 1,
+      },
+    },
+    '93': {
+      class_type: 'VaeDecodeTextureTrellis',
+      inputs: { samples: ['12', 0], vae: ['118', 0], shape_subdivides: ['92', 1] },
+    },
+    /*
+     * The mesh, on the CPU (see the header). 200k faces and 1024² sheets, not
+     * upstream's 700k and 2048²: the bakes hold several float sheets at once,
+     * and MEASURED inside the app a 2048² pass ran the compressor at
+     * 4,000–11,000 pages/s for ten seconds on a 24 GB Mac — the churn the
+     * guardian reads as a thrash. A quarter of the sheet is a quarter of that,
+     * and 1024² on 200k faces is the studio's own default texel density.
+     */
+    '186': {
+      class_type: 'DecimateMesh',
+      inputs: { mesh: ['92', 0], target_face_count: 200000, placement_mode: 'midpoint' },
+    },
+    '238': { class_type: 'MeshSmoothNormals', inputs: { mesh: ['186', 0], crease_angle: 180 } },
+    '196': {
+      class_type: 'UnwrapMesh',
+      inputs: {
+        mesh: ['238', 0],
+        segmenter: 'pec',
+        resolution: 1024,
+        padding: 1,
+        weld_distance: 0.0002,
+      },
+    },
+    '147': {
+      class_type: 'BakeTextureFromVoxel',
+      inputs: {
+        mesh: ['196', 0],
+        voxel_colors: ['93', 0],
+        reference_mesh: ['92', 0],
+        texture_size: 1024,
+      },
+    },
+    '224': {
+      class_type: 'BakeNormalMapFromMesh',
+      inputs: {
+        low_poly: ['196', 0],
+        high_poly: ['92', 0],
+        resolution: 1024,
+        cage_distance: 0.05,
+        ignore_backfaces: true,
+      },
+    },
+    '233': {
+      class_type: 'BakeAmbientOcclusion',
+      inputs: {
+        low_poly: ['196', 0],
+        high_poly: ['92', 0],
+        resolution: 1024,
+        samples: 64,
+        max_distance: 0.71,
+        strength: 1,
+        bias: 0.01,
+      },
+    },
+    '210': {
+      class_type: 'ApplyTextureToMesh',
+      inputs: {
+        mesh: ['196', 0],
+        base_color: ['147', 0],
+        metallic: ['147', 1],
+        roughness: ['147', 2],
+        occlusion: ['233', 0],
+        normal_map: ['224', 0],
+      },
+    },
+    '260': { class_type: 'MeshSmoothNormals', inputs: { mesh: ['210', 0], crease_angle: 180 } },
+    '9': { class_type: 'SaveGLB', inputs: { mesh: ['260', 0], filename_prefix: 'pi-model' } },
+  };
+}
+
+/**
+ * The 3D splice points. One seed reaches all three samplers; the texture size
+ * is the atlas AND the bakes AND the unwrap's texel-density target, which have
+ * to agree or the charts are packed for a sheet that is not the one painted.
+ */
+const IMAGE_TO_3D_PARAM_MAP = {
+  image: '122.inputs.image',
+  seed: ['3.inputs.seed', '18.inputs.seed', '12.inputs.seed'],
+  faces: '186.inputs.target_face_count',
+  textureSize: ['196.inputs.resolution', '147.inputs.texture_size', '224.inputs.resolution'],
+} as const;
+
 const FLUX_GGUF_PARAM_MAP = {
   prompt: '6.inputs.text',
   width: '5.inputs.width',
@@ -689,6 +976,16 @@ export const WORKFLOW_TEMPLATES: Readonly<Record<string, WorkflowTemplate>> = {
     id: 'flux1-dev-gguf-q6k',
     graph: fluxGgufGraph(),
     paramMap: FLUX_GGUF_PARAM_MAP,
+  },
+  'trellis2-image-to-3d': {
+    id: 'trellis2-image-to-3d',
+    graph: trellis2ImageTo3dGraph('trellis2'),
+    paramMap: IMAGE_TO_3D_PARAM_MAP,
+  },
+  'pixal3d-image-to-3d': {
+    id: 'pixal3d-image-to-3d',
+    graph: trellis2ImageTo3dGraph('pixal3d'),
+    paramMap: IMAGE_TO_3D_PARAM_MAP,
   },
 };
 

@@ -26,8 +26,8 @@
  * to N concurrent runs on one unified-memory budget.
  */
 
-import { writeFile as fsWriteFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { readFile as fsReadFile, writeFile as fsWriteFile } from 'node:fs/promises';
+import { basename, join } from 'node:path';
 import { GenAbortError } from './client.js';
 import { fillWorkflow, WORKFLOW_TEMPLATES, type WorkflowTemplate } from './comfy-workflow.js';
 import type { GenEvent, GenJob, GenOutput } from './protocol.js';
@@ -113,6 +113,8 @@ export interface ComfyClientDeps {
   readonly clientId?: string;
   /** Injectable file writer for downloaded outputs (default: `fs.writeFile`). */
   readonly writeFileImpl?: (path: string, data: Uint8Array) => Promise<void>;
+  /** Injectable file reader for the input picture (default: `fs.readFile`). */
+  readonly readFileImpl?: (path: string) => Promise<Uint8Array>;
   /** Workflow template registry (default: the bundled {@link WORKFLOW_TEMPLATES}). */
   readonly registry?: Readonly<Record<string, WorkflowTemplate>>;
 }
@@ -253,12 +255,21 @@ export class ComfyClient {
       await this.#awaitOpen(ws, options.signal);
       emit({ event: 'start', jobId, total: totalSteps, candidates: seeds.length });
 
+      // The input picture, once, before any candidate: image → 3D reads it by
+      // the name ComfyUI's input folder gives it.
+      const uploaded =
+        spec.inputImage === undefined ? null : await this.#uploadImage(origin, spec.inputImage);
+
       const outputs: GenOutput[] = [];
       for (let i = 0; i < seeds.length; i++) {
         if (aborted) throw new GenAbortError();
         if (wsFailure !== null) throw wsFailure;
         const seed = seeds[i] ?? 0;
-        const graph = fillWorkflow(spec, seed, registry);
+        const graph = fillWorkflow(
+          uploaded === null ? spec : { ...spec, inputs: { ...spec.inputs, image: uploaded } },
+          seed,
+          registry,
+        );
         const promptId = await this.#postPrompt(origin, graph, clientId);
 
         await new Promise<void>((resolve, reject) => {
@@ -367,6 +378,28 @@ export class ComfyClient {
     return (await res.json()) as ComfyHistory;
   }
 
+  /**
+   * Put a picture in ComfyUI's input folder and return the name it is known by
+   * there. `overwrite` so a re-run of the same file does not accrue `_1`, `_2`
+   * copies that would all be the same bytes.
+   */
+  async #uploadImage(origin: string, filePath: string): Promise<string> {
+    const bytes = await (this.#deps.readFileImpl ?? ((p: string) => fsReadFile(p)))(filePath);
+    const form = new FormData();
+    // A copy into a plain ArrayBuffer: Blob refuses a view over a shared one.
+    form.append('image', new Blob([new Uint8Array(bytes).slice().buffer]), basename(filePath));
+    form.append('overwrite', 'true');
+    const res = await this.#fetch(`${origin}/upload/image`, { method: 'POST', body: form });
+    if (!res.ok) throw new Error(`ComfyUI /upload/image failed (${res.status})`);
+    const body = (await res.json()) as { name?: string; subfolder?: string };
+    if (typeof body.name !== 'string' || body.name.length === 0) {
+      throw new Error('ComfyUI /upload/image returned no file name');
+    }
+    return body.subfolder !== undefined && body.subfolder.length > 0
+      ? `${body.subfolder}/${body.name}`
+      : body.name;
+  }
+
   /** Download every output file this prompt produced (`/view`) into the job's outputDir. */
   async #downloadOutputs(
     origin: string,
@@ -380,7 +413,8 @@ export class ComfyClient {
     const outputsMap = entry?.outputs ?? {};
     const files: ComfyFileRef[] = [];
     for (const nodeOut of Object.values(outputsMap)) {
-      for (const key of ['images', 'gifs', 'audio', 'video', 'files'] as const) {
+      // `3d` is what SaveGLB reports its file under (ComfyUI 0.35).
+      for (const key of ['images', 'gifs', 'audio', 'video', 'files', '3d'] as const) {
         const arr = (nodeOut as Record<string, unknown>)[key];
         if (Array.isArray(arr)) {
           for (const f of arr)
