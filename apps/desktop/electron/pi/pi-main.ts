@@ -32,6 +32,7 @@ import {
   visionStateFilePath,
 } from '../inference/llm-main';
 import type { AppEventMap } from '../ipc-contract';
+import { releaseMacBrake } from '../mac/mac-agent';
 import { officeGenEnv, primeOfficeGen } from '../office/office-gen-env';
 import {
   activeProjectFullAccess,
@@ -273,6 +274,8 @@ const sessions = createPiSessions<WebContents>({
   },
   sendEvent: (sender, event) => events.send(sender, 'pi:event', event),
   sendVisionWanted: (sender) => events.send(sender, 'llm:vision-wanted', {}),
+  // The person asking again is what releases a latched Stop / take-over.
+  onUserPrompt: () => releaseMacBrake(),
   sendExtensionsDisabled: (sender, reason) =>
     events.send(sender, 'pi:extensions-disabled', { reason }),
   log,

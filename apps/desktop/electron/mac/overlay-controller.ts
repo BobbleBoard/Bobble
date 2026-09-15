@@ -42,6 +42,7 @@
  */
 import { MacHelperClient } from '@pi-desktop/pi-mac';
 import { createLogger } from '@pi-desktop/shared';
+import { showsMacOverlay } from '../background-mode';
 import {
   comboLabel,
   type MacCursorState,
@@ -190,7 +191,11 @@ class MacOverlayController {
     if (this.#client === null) {
       this.#client = new MacHelperClient({
         helperPath: this.#helperPath,
-        helperArgs: ['--overlay'],
+        /* Headless under a probe: the panel is created and driven, and never
+           ordered onto the screen — `showsMacOverlay` is the one switch for
+           "may the phantom appear", and it was not wired to the native panel
+           (the user, 2026-09-15: the overlay leaking from the test harness). */
+        helperArgs: showsMacOverlay() ? ['--overlay'] : ['--overlay', '--headless'],
         /* The overlay child's stderr was piped and never read, so everything it
            said about its own health was invisible. the user: "you need to log
            whenever that's happening". A line starting `overlay:` is the panel

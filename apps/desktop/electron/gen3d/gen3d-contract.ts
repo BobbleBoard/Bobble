@@ -268,6 +268,12 @@ export type Gen3dInvokeMap = {
       /** Retopo tuning (AutoRemesher target density / curvature adaptivity). */
       readonly targetQuads?: number;
       readonly adaptivity?: number;
+      /**
+       * Retopo: `quick` is a triangle low-poly by decimation (seconds — MEASURED
+       * 7.6 s on a 186k-face jet against 81 s for the quad remesh, and 200 s+
+       * for it at low power); `quads` (default) is the QuadriFlow remesh.
+       */
+      readonly method?: 'quads' | 'quick';
       /** Rig: measure the shape and STOP — the UI asks "humanoid?" from this. */
       readonly probeOnly?: boolean;
       /** Rig: refuse to fit a humanoid skeleton to a non-humanoid mesh. */

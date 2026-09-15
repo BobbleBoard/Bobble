@@ -63,15 +63,27 @@ try {
   });
   console.log('before:', JSON.stringify(before));
   check(before.versions === 1, 'one stage on the rail to begin with');
-  // Retopologise through the engine, as a node on this asset.
+  // Retopologise through the engine, as a node on this asset. RETOPO_MODE
+  // picks the path: `quick` (the decimation low-poly, seconds — the default
+  // here, so the rail has its second stage without waiting on QuadriFlow) or
+  // `quads` (the remesh).
+  const mode = process.env.RETOPO_MODE ?? 'quick';
+  await page.click('[data-testid="tp-rail-retopo"]');
+  await sleep(600);
+  await shot('00-retopo-panel');
+  const t0 = Date.now();
   const started = await page.evaluate(
-    (b) =>
-      window.__gen3d_store?.().getState().runStage('retopo', b.path, {
-        assetId: b.assetId,
-        versionId: b.versionId,
-        op: 'retopo',
-      }),
-    before,
+    ({ b, mode }) =>
+      window
+        .__gen3d_store?.()
+        .getState()
+        .runStage(
+          'retopo',
+          b.path,
+          { assetId: b.assetId, versionId: b.versionId, op: 'retopo' },
+          { method: mode },
+        ),
+    { b: before, mode },
   );
   console.log('retopo:', JSON.stringify(started));
   const twoStages = await until(() => {
@@ -79,6 +91,7 @@ try {
     const a = s?.assets.find((x) => x.id === s.loadedAssetId);
     return (a?.versions.length ?? 0) >= 2 && a?.currentVersionId !== a?.versions[0]?.id;
   }, 8 * 60_000);
+  console.log(`retopo (${mode}) took ${Math.round((Date.now() - t0) / 1000)}s`);
   check(twoStages, 'the retopo landed as a second stage and became the working version');
   await sleep(2500);
   const rail = await page.evaluate(() =>

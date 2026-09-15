@@ -299,7 +299,8 @@ async function deliverBytes(
  * real topology).
  */
 export interface PdTopology {
-  readonly kind: 'quad' | 'mixed';
+  /** `tri` is the quick low-poly: the input's own triangles, thinned. */
+  readonly kind: 'quad' | 'mixed' | 'tri';
   readonly quads: number;
   readonly tris: number;
   readonly ngons: number;
@@ -331,6 +332,14 @@ interface LoadedGLTF {
 export interface Viewer3DProps {
   /** The axis-gizmo DOM to keep in sync (elements tagged data-ax / data-axline). */
   readonly gizmoRef: React.RefObject<HTMLDivElement | null>;
+}
+
+/** The stat line's word for a remeshed topology: quads, a mix, or — the quick
+ * low-poly's case — triangles again. `kind` comes from the engine's record. */
+function topologyLabel(kind: string): string {
+  if (kind === 'quad') return 'Quad';
+  if (kind === 'tri') return 'Triangle';
+  return 'Quad + tri';
 }
 
 export default function Viewer3D({ gizmoRef }: Viewer3DProps): JSX.Element {
@@ -899,11 +908,7 @@ export default function Viewer3D({ gizmoRef }: Viewer3DProps): JSX.Element {
           id,
           importedTopology !== null ? importedTopology.polygons : faces,
           importedTopology !== null ? importedTopology.vertices : verts,
-          importedTopology !== null
-            ? importedTopology.kind === 'quad'
-              ? 'Quad'
-              : 'Quad + tri'
-            : 'Triangle',
+          importedTopology !== null ? topologyLabel(importedTopology.kind) : 'Triangle',
         );
       pendingThumb = id;
       loadingId = null;
@@ -1142,7 +1147,7 @@ export default function Viewer3D({ gizmoRef }: Viewer3DProps): JSX.Element {
       const stats =
         topo !== null
           ? {
-              topology: topo.kind === 'quad' ? 'Quad' : 'Quad + tri',
+              topology: topologyLabel(topo.kind),
               faces: topo.polygons,
               vertices: topo.vertices,
             }

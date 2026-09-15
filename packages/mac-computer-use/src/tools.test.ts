@@ -146,6 +146,33 @@ describe('registerMacComputerUseTools', () => {
     expect(img).toMatchObject({ type: 'image', mimeType: 'image/png', data: 'AAAA' });
   });
 
+  /* the user (2026-09-15): "add a flag … 'visual' or 'screenshot' … to force
+     visual even on text based control apps". */
+  it('`visual` is the same ask as `screenshot`, and reaches the helper as one', async () => {
+    const bridge = new FakeBridge().on('snapshot', () => ({
+      ...SNAP([{ index: 1, role: 'AXButton', name: 'OK' }]),
+      screenshot: { path: '/tmp/x.png', base64: 'BBBB', mimeType: 'image/png' },
+    }));
+    const tools = collectTools(bridge);
+    const r = await run(tools, 'mac_snapshot', { visual: true });
+    expect(bridge.calls[0]).toMatchObject({ method: 'snapshot', params: { screenshot: true } });
+    expect(r.content.find((c) => c.type === 'image')).toMatchObject({ data: 'BBBB' });
+  });
+
+  it('a picture asked for and not taken says why, first — and names the grant', async () => {
+    const bridge = new FakeBridge().on('snapshot', () => ({
+      ...SNAP([{ index: 1, role: 'AXButton', name: 'OK' }]),
+      screenshot: { error: 'screen-recording-denied' },
+      permissions: { accessibility: true, screenRecording: false },
+    }));
+    const tools = collectTools(bridge);
+    const r = await run(tools, 'mac_snapshot', { visual: true });
+    const text = (r.content[0] as { text: string }).text;
+    expect(text.startsWith('You asked for a picture and none could be taken')).toBe(true);
+    expect(text).toContain('Allow Screen Recording');
+    expect(r.content.find((c) => c.type === 'image')).toBeUndefined();
+  });
+
   it('click by index re-snapshots + retries once on a stale index', async () => {
     let clicks = 0;
     const bridge = new FakeBridge()

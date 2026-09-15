@@ -147,8 +147,25 @@ export function registerAskUser(pi: ExtensionAPI): void {
       }
       const raw = await ctx.ui.input(spec.question, encodeAskUser(spec));
       if (raw === undefined) {
+        /*
+         * NOT "the user dismissed it". `undefined` is every way a question can
+         * close without a choice — the person clearing it, a background chat's
+         * dialog gate, the turn being stopped — and the tool cannot tell them
+         * apart. MEASURED: told "the user dismissed the question", a model
+         * asked the same thing four more times, reading each auto-close as a
+         * person refusing to answer; the user: "ensure all tool returns are that it
+         * did something, not the user interrupted." Say what is known — no
+         * answer — and what to do with that.
+         */
         return {
-          content: [{ type: 'text', text: 'The user dismissed the question without answering.' }],
+          content: [
+            {
+              type: 'text',
+              text:
+                'No answer came back for that question — it closed without a choice. Decide ' +
+                'it yourself with a sensible default and carry on; do not ask it again.',
+            },
+          ],
           details: { cancelled: true },
         };
       }

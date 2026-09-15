@@ -742,6 +742,31 @@ function applyControl(mode: 'agent' | 'stopped' | 'user'): void {
 }
 
 /**
+ * THE USER'S NEXT MESSAGE IS THE HAND-BACK.
+ *
+ * The brake latched past the turn it stopped. `clearSession` releases it, but
+ * the overlay only clears a session while control is 'agent' (monitor-core),
+ * so a Stop — the surface button, the bubble's ✕, or the global Escape, which
+ * fires for ANY Escape pressed anywhere while an app is being driven — left
+ * 'stopped' standing until the app quit. MEASURED in two sessions (09-13
+ * Notes, 09-14 Chrome): a fresh chat's first `mac launch` answered "The user
+ * pressed Stop, so Mac control is off … ask whether to carry on", the model
+ * asked, and the user's "carry on" changed nothing, because nothing the
+ * model does can clear it. the user: "despite it executing some command itself
+ * [the thought is] 'The user closed <thing>' … it thinks since the user
+ * closed something it should stop."
+ *
+ * The refusal itself says what releases it: the user asking again. A new
+ * prompt from the person is exactly that — for a stop AND for a take-over —
+ * and they keep Stop for the run it starts.
+ */
+export function releaseMacBrake(): void {
+  if (macMonitor.control() === 'agent') return;
+  log.info("mac computer-use: brake released by the user's next message");
+  applyControl('agent');
+}
+
+/**
  * A BRAKE THE USER CAN REACH WITHOUT BEING IN BOBBLE.
  *
  * The whole feature runs while the user is somewhere else, so the stop has to

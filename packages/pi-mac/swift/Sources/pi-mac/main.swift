@@ -48,7 +48,9 @@ case "--serve":
 case "--stream":
   runStream(Array(arguments.dropFirst()))
 case "--overlay":
-  runOverlay()
+  // `--overlay --headless`: the panel is driven and rendered, never shown —
+  // what the app passes for a run that must not touch the screen.
+  runOverlay(headless: arguments.contains("--headless"))
 default:
   writeStderr(
     "usage: pi-mac [--check | --snapshot [--frontmost|--pid N|--app NAME] [--screenshot]"

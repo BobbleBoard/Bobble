@@ -140,6 +140,17 @@ def test_retopo_knobs_reach_the_worker() -> None:
     assert argv[argv.index("--adaptivity") + 1] == "0.5", argv
 
 
+def test_retopo_quick_mode_reaches_the_worker_and_quads_is_the_default() -> None:
+    """the user (2026-09-15): a 'quick mode' for retopology — the decimation path."""
+    _, mesh = _fixture()
+    quick = _staged({"op": "retopo", "modelPath": str(mesh), "method": "quick"})
+    assert quick[quick.index("--method") + 1] == "quick", quick
+    plain = _staged({"op": "retopo", "modelPath": str(mesh)})
+    assert plain[plain.index("--method") + 1] == "quads", plain
+    odd = _staged({"op": "retopo", "modelPath": str(mesh), "method": "banana"})
+    assert odd[odd.index("--method") + 1] == "quads", odd
+
+
 def test_rig_probe_only_reaches_the_worker() -> None:
     _, mesh = _fixture()
     assert "--probe-only" in _staged(

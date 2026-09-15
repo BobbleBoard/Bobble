@@ -892,6 +892,7 @@ function StagePanel({
   const engineModel = models.find((m) => m.id === engineId);
   const engineInstalled = engineReady && engineModel?.installed === true;
   const targetQuads = useTripoStore((s) => s.faceLimit);
+  const retopoMode = useTripoStore((s) => s.retopoMode);
   const imageVersions = useTripoStore((s) => s.imageVersions);
   const imageIndex = useTripoStore((s) => s.imageIndex);
   const genResolution = useTripoStore((s) => s.genResolution);
@@ -923,7 +924,7 @@ function StagePanel({
      ten minutes; the button said only "Segment Parts". */
   const estimate = formatEstimate(
     estimateSeconds({
-      key: stageKey(op, { painting: needsReference }),
+      key: stageKey(op, { painting: needsReference, quick: retopoMode === 'quick' }),
       totalMemoryBytes,
       faces: version?.faces,
     }),
@@ -956,7 +957,7 @@ function StagePanel({
             version.diskPath,
             { assetId: loaded.id, versionId: version.id, op },
             op === 'retopo'
-              ? { targetQuads: targetQuads * 1000 }
+              ? { targetQuads: targetQuads * 1000, method: retopoMode }
               : // Texturing re-bakes from the colours the GENERATION saved, so
                 // point the engine at this asset's root version — a mesh that
                 // has since been retopologised sits in a different job dir.
@@ -1058,6 +1059,17 @@ function SegmentPanel(): JSX.Element {
 }
 
 function RetopoPanel(): JSX.Element {
+  const retopoMode = useTripoStore((s) => s.retopoMode);
+  const set = useTripoStore((s) => s.set);
+  /*
+   * A QUICK MODE. the user (2026-09-15), watching a remesh pass eight minutes:
+   * "remeshing should be a quick process … attempt to find a faster
+   * alternative for a 'quick mode'". The quad remesh is QuadriFlow on a closed
+   * surface — 46 s on a 186k-face jet at full priority, 200 s at low power,
+   * far longer with a generation beside it. The quick mode thins the mesh's
+   * own triangles instead (0.1 s) and keeps the texture bake: 7.6 s end to
+   * end. Triangles, not quads, which is what the label says.
+   */
   return (
     <StagePanel
       icon={<IcRetopo size={17} />}
@@ -1065,10 +1077,29 @@ function RetopoPanel(): JSX.Element {
       engine={RETOPO_MODEL}
       engineId="autoremesher"
       capability="retopo"
-      runLabel="Start Retopology"
+      runLabel={retopoMode === 'quick' ? 'Make Low-Poly' : 'Start Retopology'}
       runTestid="tp-retopo-btn"
       emptyCopy={STAGE_EMPTY}
-    />
+    >
+      <div className="tp-field-row" data-testid="tp-retopo-mode">
+        <span className="tp-field-label">Mode</span>
+        <Segmented
+          size="sm"
+          testid="tp-retopo-mode-seg"
+          options={[
+            { id: 'quick', label: 'Quick', hint: 'Triangles, seconds — thins the mesh you have.' },
+            { id: 'quads', label: 'Quads', hint: 'A clean quad surface — a minute or more.' },
+          ]}
+          value={retopoMode}
+          onChange={(v) => set('retopoMode', v)}
+        />
+      </div>
+      <p className="tp-select-copy" data-testid="tp-retopo-mode-copy">
+        {retopoMode === 'quick'
+          ? 'Keeps the model\u2019s own triangles and thins them to the face limit — seconds, texture kept.'
+          : 'Rebuilds the surface as clean quads (QuadriFlow) — a minute or more, longest in Low power.'}
+      </p>
+    </StagePanel>
   );
 }
 

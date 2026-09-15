@@ -44,6 +44,18 @@ describe('stage estimates', () => {
     expect(large / small).toBeLessThan(18);
   });
 
+  /* the user (2026-09-15): the quick low-poly is seconds, and the button must say
+     so instead of promising the remesh's minutes. MEASURED 7.6 s on a 186k jet. */
+  it('the quick retopology is a seconds estimate, whatever the mesh', () => {
+    const mem = 24 * GB;
+    expect(stageKey('retopo', { quick: true })).toBe('retopo:quick');
+    expect(stageKey('retopo')).toBe('retopo');
+    const quick = estimateSeconds({ key: 'retopo:quick', totalMemoryBytes: mem, faces: 900_000 });
+    expect(quick).not.toBeNull();
+    expect(quick ?? 0).toBeLessThan(45);
+    expect(formatEstimate(quick)).toBe('about 30 sec');
+  });
+
   it('leaves the stages whose cost is fixed alone', () => {
     const mem = 24 * GB;
     const a = estimateSeconds({ key: 'rig:template', totalMemoryBytes: mem, faces: 10_000 });

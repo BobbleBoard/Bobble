@@ -123,6 +123,12 @@ describe('registerAskUser', () => {
       ctx,
     );
     expect((result?.details as { cancelled?: boolean })?.cancelled).toBe(true);
+    /* And it never says the USER did it: `undefined` is also a background
+       chat's dialog gate and a stopped turn, and a model told "the user
+       dismissed the question" asked four more times. */
+    const text = (result?.content?.[0] as { text?: string })?.text ?? '';
+    expect(text).not.toMatch(/user/i);
+    expect(text).toMatch(/do not ask it again/);
   });
 
   // SB-3: a spawned child pi reports hasUI === true but has no human to answer;

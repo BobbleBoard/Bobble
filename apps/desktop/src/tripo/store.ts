@@ -200,6 +200,8 @@ interface TripoState {
   faceLimit: number;
   topology: 'triangle' | 'quad';
   symmetry: 'auto' | 'on' | 'off';
+  /** Retopology: the quad remesh (minutes) or the quick triangle low-poly (seconds). */
+  retopoMode: 'quads' | 'quick';
   genModel: string;
   /** TRELLIS structure resolution preset for generation. */
   genResolution: 'low' | 'medium' | 'high';
@@ -394,6 +396,7 @@ export const useTripoStore = create<TripoState>((set, get) => ({
   faceLimit: 30,
   topology: 'triangle',
   symmetry: 'auto',
+  retopoMode: 'quads',
   genModel: 'trellis-2',
   genResolution: 'medium',
   imageVersions: [],

@@ -25,11 +25,15 @@
  *     panel itself from its own layer tree, which needs no Screen Recording
  *     grant and captures exactly what it draws.
  *
- * SCREEN HYGIENE: every screenshot is taken with the panel HIDDEN (CoreAnimation
- * still runs, so the renders are honest) because the probe backdrop is a
- * full-desktop opaque layer. The panel is only ordered on screen for the short
- * window-server/visibility assertions, where it shows nothing but a small
- * transparent cursor and pill and never takes focus.
+ * SCREEN HYGIENE: nothing here reaches the screen. The app runs in background
+ * mode and spawns the panel `--headless` — created, driven, masked and
+ * rendered from its own layer tree, never ordered in — so even the "show"
+ * calls below put nothing in front of whoever is using this Mac. (They used
+ * to: a phantom and a pill for the length of the visibility checks. the user,
+ * 2026-09-15: "always on top errors in the computer use overlay in your test
+ * harness/leaking somewhere".) The screenshots are renders of the layer tree,
+ * which never needed the screen. PI_E2E_VISIBLE=1 puts the panel on screen for
+ * a run someone wants to watch, and the window-server assertions come back.
  *
  * Run `npm run build` first. Shots default to $TMPDIR/mac-overlay-shots
  * (override with MAC_OVERLAY_OUT).
@@ -226,14 +230,30 @@ try {
   for (const flag of ['canJoinAllSpaces', 'ignoresCycle', 'fullScreenAuxiliary']) {
     if (info.behavior?.[flag] !== true) fail(`panel collection behavior missing .${flag}`);
   }
-  // The window server genuinely has it on screen — `isVisible` alone is our own
-  // bookkeeping and would still be true under an activation policy that refuses
-  // to display windows at all.
   if (info.visible !== true) fail('panel not visible after overlay-show');
-  if (info.onScreenPerWindowServer !== true) {
-    fail('the window server does not have the panel on screen (activation policy refused it?)');
+  /*
+   * NEVER ON THE SCREEN, under a probe. the user (2026-09-15): "always on top
+   * errors in the computer use overlay in your test harness/leaking
+   * somewhere". This used to assert the opposite — that the window server had
+   * the panel on screen — and every run put a phantom and a pill over whatever
+   * he was reading. The app now spawns the panel `--headless` in background
+   * mode: created, driven, masked and rendered, and never ordered in. The
+   * window-server assertion flips accordingly, and stays available for a
+   * PI_E2E_VISIBLE=1 run, where being on screen is the point.
+   */
+  if (info.headless === true) {
+    if (info.onScreenPerWindowServer === true || info.onScreen === true) {
+      fail('the panel reached the screen in a headless run');
+    }
+    console.log(
+      'panel checks OK: screen-sized, transient, click-through, non-activating, HEADLESS',
+    );
+  } else {
+    if (info.onScreenPerWindowServer !== true) {
+      fail('the window server does not have the panel on screen (activation policy refused it?)');
+    }
+    console.log('panel checks OK: screen-sized, transient, click-through, non-activating');
   }
-  console.log('panel checks OK: screen-sized, transient, click-through, non-activating');
 
   const mainInfo = await dbg('overlay-info');
   if (mainInfo.result?.visible !== true) fail('overlay-info says not visible');

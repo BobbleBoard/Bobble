@@ -43,6 +43,9 @@ const BASELINE_SECONDS: Readonly<Record<string, number>> = {
   'texture:rebake': 120,
   'texture:paint': 165,
   retopo: 180,
+  /* MEASURED 2026-09-15 on a 186k-face jet: 7.6 s end to end (0.1 s of
+     decimation; the rest is the texture bake). */
+  'retopo:quick': 12,
   'rig:template': 60,
   'rig:skintokens': 150,
   'rig:medial': 20,
@@ -107,9 +110,10 @@ export function formatEstimate(seconds: number | null): string | null {
 /** The estimate key for a stage, given how it is going to run. */
 export function stageKey(
   op: 'segment' | 'retopo' | 'texture' | 'rig' | 'motion',
-  opts: { readonly painting?: boolean; readonly rigger?: string } = {},
+  opts: { readonly painting?: boolean; readonly rigger?: string; readonly quick?: boolean } = {},
 ): string {
   if (op === 'texture') return opts.painting === true ? 'texture:paint' : 'texture:rebake';
   if (op === 'rig') return `rig:${opts.rigger ?? 'template'}`;
+  if (op === 'retopo' && opts.quick === true) return 'retopo:quick';
   return op;
 }

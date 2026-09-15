@@ -96,6 +96,7 @@ function setup() {
   const created: FakeBridge[] = [];
   const sent: Array<{ senderId: number; event: PiBridgeEvent }> = [];
   const warns: unknown[][] = [];
+  const userPrompts: string[] = [];
   const sessions = createPiSessions<FakeSender>({
     createBridge: (_req, onEvent) => {
       const bridge = new FakeBridge(onEvent, 4242 + created.length);
@@ -103,9 +104,10 @@ function setup() {
       return bridge;
     },
     sendEvent: (sender, event) => sent.push({ senderId: sender.id, event }),
+    onUserPrompt: (message) => userPrompts.push(message),
     log: { info: () => {}, warn: (...args) => warns.push(args) },
   });
-  return { sessions, created, sent, warns };
+  return { sessions, created, sent, warns, userPrompts };
 }
 
 describe('createPiSessions', () => {
@@ -249,6 +251,17 @@ describe('createPiSessions', () => {
     expect(
       await sessions.handlers['pi:respond-ui'](sender, { id: 'x', answer: { cancelled: true } }),
     ).toEqual({ delivered: false });
+  });
+
+  /* The mac brake is spent by the PERSON asking again — never by the app's own
+     `/harness workspace …` prompts, which arrive on every chat open. */
+  it('reports a user prompt to onUserPrompt, but not an app command', async () => {
+    const { sessions, userPrompts } = setup();
+    const sender = new FakeSender(1);
+    await sessions.handlers['pi:start'](sender, {});
+    await sessions.handlers['pi:prompt'](sender, { message: '/harness workspace /tmp/x' });
+    await sessions.handlers['pi:prompt'](sender, { message: 'open notes and type hello' });
+    expect(userPrompts).toEqual(['open notes and type hello']);
   });
 
   it('applies per-channel send timeouts (reads 10s, mutations 30s)', async () => {
@@ -421,7 +434,12 @@ describe('createPiSessions', () => {
     expect(created).toHaveLength(3);
     expect(created.every((c) => !c.extensionsDisabled)).toBe(true);
     // The last request wins, and exactly one bridge is live at the end.
-    expect(sessions.bridges().filter((x) => x.alive).map((x) => x.pid)).toEqual([6002]);
+    expect(
+      sessions
+        .bridges()
+        .filter((x) => x.alive)
+        .map((x) => x.pid),
+    ).toEqual([6002]);
   });
 
   it('pi:restart acks pi-not-running when nothing is live', async () => {

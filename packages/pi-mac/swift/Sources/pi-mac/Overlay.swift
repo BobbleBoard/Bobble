@@ -56,11 +56,16 @@ import UniformTypeIdentifiers
 // a single path, a blue body (#78BFE5) under a white keyline, with a teal glow
 // behind it — so the shape lives in pointerGlyph() as his own curves and these
 // constants only say how big it is drawn and how it is painted.
-/// Body fill and keyline, straight off his SVG.
-private let GLYPH_BODY = cgColor(0x78 / 255.0, 0xBF / 255.0, 0xE5 / 255.0, 1)
+/// THE PAINT CHANGED, THE SHAPE DID NOT. the user (2026-09-15): "make the computer
+/// use fake cursor have a black fill, and a subtle blue edge glow". His curves
+/// stay; the body is near-black under a thin white keyline (the way the Mac's
+/// own pointer is drawn, so it reads as a pointer on a white page), and the
+/// glow behind the edge is the pill's blue at a low opacity — subtle, and the
+/// one thing that says "phantom, not your pointer".
+private let GLYPH_BODY = cgColor(0.04, 0.045, 0.06, 1)
 private let GLYPH_KEYLINE = cgColor(1, 1, 1, 1)
-/// The glow colour behind it (#95F9E5), at his two opacities.
-private let GLYPH_GLOW = cgColor(0x95 / 255.0, 0xF9 / 255.0, 0xE5 / 255.0, 1)
+/// The edge glow: the pill's blue (see PILL_BLUE), not the old teal halo.
+private let GLYPH_GLOW = cgColor(0.153, 0.412, 0.937, 1)
 /// His stroke width, in the 291-wide viewBox the path is written in — so it
 /// scales WITH the glyph rather than going fat as the cursor shrinks.
 private let GLYPH_STROKE_W: CGFloat = 13.79
@@ -697,6 +702,17 @@ final class OverlayPanel: NSPanel {
 
 // ── the controller ───────────────────────────────────────────────────────────
 
+/// HEADLESS: the panel exists and is driven — cursor, pill, mask, renders —
+/// and is NEVER ordered onto a screen. the user (2026-09-15): "always on top
+/// errors in the computer use overlay in your test harness/leaking somewhere,
+/// always check and fix these as they come up." Every probe launches the real
+/// app, the real app spawns this real panel, and `show()` put a phantom cursor
+/// and a pill on his display each time one ran. The app passes `--headless`
+/// whenever it is itself running unnoticed (background-mode.ts), so nothing
+/// a test does can reach the screen; the renders a probe judges come off the
+/// layer tree, which never needed the screen.
+var overlayHeadless = false
+
 final class OverlayController: NSObject {
   private let panel: OverlayPanel
   private let root = CALayer()
@@ -752,6 +768,10 @@ final class OverlayController: NSObject {
   /// Probe-only solid backdrop: the panel is transparent, so a rendered PNG of
   /// a white glyph on nothing is unreadable. Painted behind `stage`.
   private let backdrop = CALayer()
+  /// What `show`/`hide` last asked for — the phantom's own state, which under
+  /// `overlayHeadless` is the only visibility there is (the panel never goes
+  /// on screen, so `panel.isVisible` stays false by design).
+  private var shownIntent = false
 
   private let glyph: (path: CGPath, box: CGSize, tip: CGPoint, strokeWidth: CGFloat)
   private var cursorAX: CGPoint?
@@ -843,7 +863,9 @@ final class OverlayController: NSObject {
        ordered in over that other app, transparent, eating its clicks, and
        drawing ✕/pause over it on hover. So the controls exist only while the
        pill is actually being shown: on this Space, and not under any hole. */
-    let showing = pillEnabled && bubble.opacity > 0.4 && panel.isVisible && !offSpace && !pillCovered
+    let showing =
+      pillEnabled && bubble.opacity > 0.4 && panel.isVisible && !offSpace && !pillCovered
+      && !overlayHeadless
     if !showing {
       if win.isVisible { win.orderOut(nil) }
       return
@@ -996,36 +1018,45 @@ final class OverlayController: NSObject {
      * were tuned for a glyph that no longer exists — keeping them would have
      * made his artwork a different picture.
      */
+    /*
+     * A SUBTLE BLUE EDGE GLOW, behind a black body. The glow is the path
+     * stroked in the pill's blue and blurred outward by its own shadow — a
+     * soft rim just past the keyline, not the old wide teal halo (that one
+     * measured wider than the glyph on a white page and was the "noticable
+     * glow" the user first asked us to drop). Low opacity on purpose: it is a hint
+     * at the edge, and the black body carries the shape.
+     */
     glyphGlowSoft.frame = cursorGroup.bounds
     glyphGlowSoft.contentsScale = scale
     glyphGlowSoft.path = glyph.path
     glyphGlowSoft.fillColor = GLYPH_GLOW
     glyphGlowSoft.strokeColor = GLYPH_GLOW
-    glyphGlowSoft.lineWidth = glyph.strokeWidth * 1.42
+    glyphGlowSoft.lineWidth = glyph.strokeWidth * 1.1
     glyphGlowSoft.lineJoin = .round
-    glyphGlowSoft.opacity = 0.383
+    glyphGlowSoft.opacity = 0.55
     glyphGlowSoft.shadowColor = GLYPH_GLOW
-    glyphGlowSoft.shadowOpacity = 1
-    glyphGlowSoft.shadowRadius = glyph.strokeWidth * 1.0
+    glyphGlowSoft.shadowOpacity = 0.9
+    glyphGlowSoft.shadowRadius = glyph.strokeWidth * 0.9
     glyphGlowSoft.shadowOffset = .zero
     cursorGroup.addSublayer(glyphGlowSoft)
 
+    // The body: black, with a thin white keyline — the Mac pointer's own
+    // recipe, which is what keeps it legible on a dark app too.
     glyphFill.frame = cursorGroup.bounds
     glyphFill.contentsScale = scale
     glyphFill.path = glyph.path
     glyphFill.fillColor = GLYPH_BODY
     glyphFill.strokeColor = GLYPH_KEYLINE
-    glyphFill.lineWidth = glyph.strokeWidth
+    glyphFill.lineWidth = glyph.strokeWidth * 0.5
     glyphFill.lineJoin = .round
     cursorGroup.addSublayer(glyphFill)
 
     glyphStroke.frame = cursorGroup.bounds
     glyphStroke.contentsScale = scale
     glyphStroke.path = glyph.path
-    glyphStroke.fillColor = nil
-    glyphStroke.strokeColor = GLYPH_KEYLINE
-    glyphStroke.lineWidth = glyph.strokeWidth * 0.34
-    glyphStroke.lineJoin = .round
+    glyphStroke.fillColor = GLYPH_BODY
+    glyphStroke.strokeColor = nil
+    glyphStroke.lineWidth = 0
     cursorGroup.addSublayer(glyphStroke)
 
     stage.addSublayer(cursorGroup)
@@ -1143,6 +1174,14 @@ final class OverlayController: NSObject {
     // it before ordering the panel in would black out the user's display. Making
     // `show` clear it means no caller can get that wrong.
     setBackdrop(nil)
+    shownIntent = true
+    if overlayHeadless {
+      // Driven, masked and rendered exactly as when shown — but the window
+      // server never sees it. See `overlayHeadless`.
+      refreshOcclusion()
+      startOcclusionTimer()
+      return
+    }
     if !panel.isVisible {
       // orderFrontRegardless, never makeKeyAndOrderFront: showing the overlay
       // must not touch who owns the user's focus.
@@ -1183,6 +1222,7 @@ final class OverlayController: NSObject {
   }
 
   func hide() {
+    shownIntent = false
     stopOcclusionTimer()
     if panel.isVisible { panel.orderOut(nil) }
     // The controls are a window of their own; a hidden phantom must not leave
@@ -1695,7 +1735,10 @@ final class OverlayController: NSObject {
          z-order from some earlier moment. */
       noteUnmasked("the occlusion timer is not running — the mask is frozen")
     }
-    guard trackedWindow > 0 || trackedPid > 0, panel.isVisible else { return }
+    // Headless keeps masking: the cut is what a probe checks, and the panel
+    // is never on screen to be visible.
+    guard trackedWindow > 0 || trackedPid > 0, overlayHeadless ? shownIntent : panel.isVisible
+    else { return }
     let ours: Set<Int> = [panel.windowNumber, controls?.windowNumber ?? -1]
     let list =
       (CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
@@ -2349,7 +2392,10 @@ final class OverlayController: NSObject {
     let behavior = panel.collectionBehavior
     var d: [String: Any] = [
       "ok": true,
-      "visible": panel.isVisible,
+      "headless": overlayHeadless,
+      // Under headless the phantom's own state; on a screen, the panel's.
+      "visible": overlayHeadless ? shownIntent : panel.isVisible,
+      "onScreen": panel.isVisible,
       // Window-server truth: does the compositor actually have our panel on
       // screen? `isVisible` is our own bookkeeping; this is the check that
       // catches an activation policy that silently refuses to show windows.
@@ -2670,7 +2716,8 @@ private func handleOverlay(
 /// focus. MEASURED on macOS 26: the panel displays fine under it, contradicting
 /// the documented "may not create windows". See verifyDisplayedOnce() for the
 /// fallback that catches a future macOS enforcing the docs.
-func runOverlay() {
+func runOverlay(headless: Bool = false) {
+  overlayHeadless = headless
   NSApplication.shared.setActivationPolicy(.prohibited)
   let controller = OverlayController()
   /* The pill's buttons are the one thing in the overlay a person can press, so

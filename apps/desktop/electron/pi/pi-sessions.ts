@@ -84,6 +84,9 @@ export interface PiSessionsDeps<S extends SessionSender> {
   sendEvent: (sender: S, event: PiBridgeEvent) => void;
   /** Ask the renderer to switch vision on (see 'llm:vision-wanted'). */
   sendVisionWanted?: (sender: S) => void;
+  /** A message from the PERSON (not an app command such as `/harness …`) is
+   * about to go to pi — the moment a latched brake is spent (mac-agent). */
+  onUserPrompt?: (message: string) => void;
   /** Tell the renderer this session came up with NO tools, and why. */
   sendExtensionsDisabled?: (sender: S, reason: string) => void;
   log: SessionLog;
@@ -319,6 +322,9 @@ export function createPiSessions<S extends SessionSender>(deps: PiSessionsDeps<S
     },
 
     'pi:prompt': (sender, req) => {
+      // The person spoke — whether or not pi is up to hear it (a latched mac
+      // brake is released by the asking, not by the answer).
+      if (!req.message.trimStart().startsWith('/')) deps.onUserPrompt?.(req.message);
       const bridge = bridgeFor(sender);
       if (bridge === undefined) return { success: false, error: 'pi is not running' };
       return ack(

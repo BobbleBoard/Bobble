@@ -45,17 +45,6 @@ const check = (ok, what, detail = '') => {
   if (!ok) failures += 1;
 };
 
-/** Any CSS colour Chromium might hand back, as 0-255 channels. `color-mix()`
- * resolves to `color(srgb r g b / a)` with FRACTIONAL channels, which a naive
- * rgb() regex reads as black — and "black" would pass a no-purple check that
- * was never actually looking at the colour. */
-function channels(css) {
-  const srgb = /color\(srgb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)/.exec(css);
-  if (srgb !== null) return [1, 2, 3].map((i) => Math.round(Number(srgb[i]) * 255));
-  const rgb = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(css);
-  return rgb === null ? null : [1, 2, 3].map((i) => Number(rgb[i]));
-}
-
 if (process.platform !== 'darwin') {
   console.log('mac-brake-probe: SKIP — macOS only');
   process.exit(0);
@@ -175,10 +164,31 @@ async function connect(app) {
       'and the refusal tells it what to do instead',
       refused?.error,
     );
-    check((await dbg('overlay-info')).result?.engaged === false, 'the phantom is off the screen');
+    // `visible` is the controller's own bookkeeping (info() has no `engaged`).
+    check((await dbg('overlay-info')).result?.visible === false, 'the phantom is off the screen');
 
     await dbg('mac-control', { mode: 'agent' });
     check((await monitor())?.control === 'agent', 'control can be handed back');
+
+    /*
+     * …AND THE USER'S NEXT MESSAGE HANDS IT BACK TOO. The brake used to latch
+     * past the run it stopped: a fresh chat's first `mac launch` still said
+     * "The user pressed Stop" (MEASURED, two sessions), the model asked whether
+     * to carry on, and the user's "carry on" changed nothing. A prompt from the
+     * person is the answer; an app command (`/harness …`) is not.
+     */
+    await dbg('mac-control', { mode: 'stopped' });
+    check((await monitor())?.control === 'stopped', 'stopped again');
+    await page.evaluate(() =>
+      window.piDesktop.invoke('pi:prompt', { message: '/harness workspace /tmp' }).catch(() => {}),
+    );
+    await sleep(300);
+    check((await monitor())?.control === 'stopped', "an app command is not the user's hand-back");
+    await page.evaluate(() =>
+      window.piDesktop.invoke('pi:prompt', { message: 'carry on with notes' }).catch(() => {}),
+    );
+    await sleep(300);
+    check((await monitor())?.control === 'agent', "the user's next message releases the brake");
 
     await dbg('mac-control', { mode: 'user' });
     const takeover = await dbg('screenshot', { pid: 909090 });
@@ -194,149 +204,28 @@ async function connect(app) {
   }
 }
 
-// ══ 2. the phantom itself, with nothing else driving it ════════════════════
+/*
+ * (The former section 2 drove an `overlay.html` BrowserWindow — the overlay
+ * before it went native. That window no longer exists, so its checks — the
+ * hit-testable bubble, the palette, the pill's copy — live in
+ * mac-overlay-probe.mjs against the NSPanel, where they belong. What survives
+ * from it is the one thing that would otherwise silently not exist.)
+ */
 {
   const app = await launch(false);
   try {
-    const { dbg, overlayPage } = await connect(app);
-    // The overlay's own tracking loop over a synthetic window: no TCC, no app.
-    await dbg('overlay-fake-control', { pid: 424242, x: 140, y: 140, w: 900, h: 620 });
-    const overlay = await overlayPage();
-    check(overlay !== null, 'the overlay window is up');
-    if (overlay === null) throw new Error('no overlay window');
-    await overlay.evaluate(() => {
-      document.body.style.background = '#eceef2';
-    });
-    await dbg('overlay-cursor', { x: 460, y: 340 });
-    await dbg('overlay-status', { status: 'thinking' });
-    await sleep(500);
-
-    // ── C2: the bubble really is hit-testable ─────────────────────────────
-    // Spy on the real Electron call, not on our own flag: "main thinks it is
-    // catching the mouse" and "the window stopped being click-through" are two
-    // different claims, and only the second one is the feature.
-    await app.evaluate(({ BrowserWindow }) => {
-      const win = BrowserWindow.getAllWindows().find((w) =>
-        w.webContents.getURL().includes('overlay.html'),
-      );
-      if (!win) return;
-      globalThis.__ignoreCalls = [];
-      const orig = win.setIgnoreMouseEvents.bind(win);
-      win.setIgnoreMouseEvents = (...args) => {
-        globalThis.__ignoreCalls.push(args);
-        return orig(...args);
-      };
-    });
-    /* THE REAL SIGNAL, not the debug shortcut. The page has no preload and no
-       ipcRenderer: it speaks by opening a `pd-overlay:` URL that main's
-       window-open handler reads and denies. Driving the DOM event is the only
-       way to prove that channel exists — a debug op calls the handler directly
-       and would pass even if the page could not reach main at all. */
-    await overlay.evaluate(() => {
-      document.getElementById('bubble').dispatchEvent(new MouseEvent('mouseenter'));
-    });
-    await sleep(200);
-    check(
-      (await dbg('overlay-info')).result?.catching === true,
-      'hovering the bubble catches the mouse (through the page, not a debug op)',
-    );
-    // The hold is a dead man's switch (main takes the mouse back on a watchdog),
-    // so a pointer that simply RESTS on the bubble has to keep it alive — or the
-    // ✕ quietly stops working after a few seconds of hovering.
-    await sleep(5_000);
-    check(
-      (await dbg('overlay-info')).result?.catching === true,
-      'and a long hover keeps it — the ✕ does not go dead under the pointer',
-    );
-    await overlay.evaluate(() => {
-      document.getElementById('bubble').dispatchEvent(new MouseEvent('mouseleave'));
-    });
-    await sleep(200);
-    check(
-      (await dbg('overlay-info')).result?.catching === false,
-      'leaving the bubble gives the mouse back',
-    );
-    const calls = await app.evaluate(() => globalThis.__ignoreCalls ?? []);
-    check(
-      calls.some((c) => c[0] === false),
-      'the window really stopped being click-through',
-      JSON.stringify(calls),
-    );
-    check(
-      calls.some((c) => c[0] === true && c[1]?.forward === true),
-      'and really went back to forwarding every mouse event through',
-    );
-
+    await connect(app);
     /* C7's brake for the user who is NOT in Bobble. It is never armed in a
        test run — eating the Escape key of whoever is using this machine is
        exactly the kind of "taking notice" the headless rule forbids — so what
-       is checked here is the thing that would silently not exist: whether
-       macOS will hand this app the accelerator at all. Held for microseconds. */
+       is checked here is whether macOS will hand this app the accelerator at
+       all. Held for microseconds. */
     const escRegistrable = await app.evaluate(({ globalShortcut }) => {
       const ok = globalShortcut.register('Escape', () => {});
       globalShortcut.unregister('Escape');
       return ok;
     });
     check(escRegistrable === true, 'macOS will give Bobble the global Escape brake');
-
-    // ── T2/T8: one phantom, one palette ───────────────────────────────────
-    const bubble = await overlay.evaluate(() => {
-      const b = document.getElementById('bubble');
-      const s = getComputedStyle(b);
-      return {
-        stop: document.getElementById('bstop')?.textContent ?? null,
-        border: s.borderTopColor,
-        background: s.backgroundColor,
-        accent: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim(),
-      };
-    });
-    check(bubble.stop === '✕', 'the bubble has a stop control in it');
-    check(bubble.accent !== '', 'main pushed the app accent into the overlay', bubble.accent);
-    for (const [what, css] of [
-      ['ring', bubble.border],
-      ['pill', bubble.background],
-    ]) {
-      const c = channels(css);
-      check(
-        c !== null && c[0] <= c[2] && c[0] <= c[1] + 8,
-        `the bubble ${what} is not purple`,
-        css,
-      );
-    }
-    await overlay.screenshot({ path: path.join(OUT_DIR, '01-bubble-brake.png') });
-
-    // ── H5: "Reading the screen" is a state that finally happens ──────────
-    await dbg('overlay-status', { status: 'reading' });
-    await sleep(350);
-    check(
-      (
-        await overlay.evaluate(() => document.getElementById('btext')?.textContent ?? '')
-      ).startsWith('Reading'),
-      'the bubble says what a snapshot actually is',
-    );
-    await overlay.screenshot({ path: path.join(OUT_DIR, '02-reading.png') });
-
-    // ── C2: the ✕ is the brake ────────────────────────────────────────────
-    // Again through the page: a real click on the real button.
-    await overlay.evaluate(() => document.getElementById('bstop').click());
-    await sleep(250);
-    check(
-      (await dbg('overlay-info')).result?.engaged === false,
-      'the ✕ on the bubble stops the run',
-    );
-    const afterX = await dbg('snapshot', { pid: 424242 });
-    check(afterX?.ok === false, 'and the agent is refused from that moment', afterX?.error);
-    await dbg('mac-control', { mode: 'agent' });
-
-    // ── F6: a long think stops looking like a short one ───────────────────
-    await dbg('overlay-fake-control', { pid: 424242, x: 140, y: 140, w: 900, h: 620 });
-    await dbg('overlay-status', { status: 'thinking' });
-    console.log('    (waiting out the still-thinking threshold…)');
-    await sleep(10_500);
-    const late = await overlay.evaluate(() => document.getElementById('btext')?.textContent ?? '');
-    check(late.startsWith('Still thinking'), 'a long think says how long it has been', late);
-    check(/\d+s/.test(late), 'and how long is a NUMBER, not another three dots', late);
-    await overlay.screenshot({ path: path.join(OUT_DIR, '03-still-thinking.png') });
   } finally {
     await app.close().catch(() => {});
   }

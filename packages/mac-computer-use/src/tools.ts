@@ -693,11 +693,23 @@ export function registerMacComputerUseTools(
       screenshot: Type.Optional(
         Type.Boolean({
           description:
-            'Force a screenshot even when Accessibility answers (heavier). Also spelled ' +
-            '--image and --visual. Default false — an ' +
+            'Force a screenshot even when Accessibility answers (heavier). Default false — an ' +
             'app with no AX elements attaches one on its own. The image covers every window the ' +
             'app has open, sheets and dialogs included, and the text gives the screen rect it ' +
             'covers so a point read off it maps onto the screen.',
+        }),
+      ),
+      /* the user (2026-09-15): "add a flag / parameter to the computer use cli tool
+         for 'snapshot' that is 'visual' or 'screenshot' or something to force
+         visual even on text based control apps." `--visual` used to be a
+         resolver alias for --screenshot, so it worked but appeared nowhere in
+         the help; now it is its own argument, and the help lists it. */
+      visual: Type.Optional(
+        Type.Boolean({
+          description:
+            'The same as --screenshot: attach a picture of the app even when its controls are ' +
+            'listed as text. Use it when the layout matters — where things are, what is drawn, ' +
+            'a chart, a canvas — and act by x,y read off the image.',
         }),
       ),
     }),
@@ -721,8 +733,9 @@ export function registerMacComputerUseTools(
          * window and tells the model to work in coordinates.
          */
         const page = { find: params.find, from: params.from };
-        let snap = await snapshot(params.app, params.screenshot === true, page);
-        if (params.screenshot !== true && isAxOpaque(snap)) {
+        const askedForPicture = params.screenshot === true || params.visual === true;
+        let snap = await snapshot(params.app, askedForPicture, page);
+        if (!askedForPicture && isAxOpaque(snap)) {
           snap = await snapshot(params.app, true, page);
         }
         /*
@@ -780,11 +793,33 @@ export function registerMacComputerUseTools(
                   })
                   .join('\n');
         }
-        const content: AgentToolResult<MacDetails>['content'] = [
-          { type: 'text', text: `${formatMacSnapshot(snap, view())}${nearMiss}` },
-        ];
         const shot = snap.screenshot;
-        const wantImage = params.screenshot === true || isAxOpaque(snap);
+        const wantImage = askedForPicture || isAxOpaque(snap);
+        const hasShot = shot?.base64 !== undefined && shot.base64 !== '';
+        /*
+         * A PICTURE THAT WAS ASKED FOR AND NOT DELIVERED SAYS WHY, FIRST.
+         *
+         * `--visual` on a Mac without the Screen Recording grant answered with
+         * the ordinary element list and, three lines down, "picture:
+         * unavailable (Screen Recording off)" — which reads as the flag doing
+         * nothing. MEASURED on the user's own Mac (the installed helper reports
+         * screenRecording:false). The reason and the one thing that changes it
+         * go at the top: the user's Allow button on the computer-use monitor.
+         */
+        const noPicture =
+          askedForPicture && !hasShot
+            ? snap.permissions?.screenRecording === false
+              ? 'You asked for a picture and none could be taken: macOS has not granted Bobble ' +
+                'Screen Recording. The user can allow it with the "Allow Screen Recording" ' +
+                'button on the computer-use monitor (or in System Settings → Privacy & ' +
+                'Security → Screen Recording). Until then the controls below are your view — ' +
+                'act by [index], and do not ask for the picture again this turn.\n\n'
+              : 'You asked for a picture and the capture came back empty (the app may have no ' +
+                'window on screen right now). The controls below are your view.\n\n'
+            : '';
+        const content: AgentToolResult<MacDetails>['content'] = [
+          { type: 'text', text: `${noPicture}${formatMacSnapshot(snap, view())}${nearMiss}` },
+        ];
         if (wantImage && shot?.base64 !== undefined && shot.base64 !== '') {
           content.push({
             type: 'image',

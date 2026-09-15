@@ -80,6 +80,8 @@ STAGE_OPTION_KEYS = (
     "humanoid",
     "targetQuads",
     "adaptivity",
+    # Retopo: "quick" (triangle low-poly, seconds) or "quads" (the remesh).
+    "method",
     "probeOnly",
     "requireHumanoid",
     "rigger",
@@ -447,6 +449,9 @@ class JobManager:
                     # that did not come from the Face-limit control.
                     "--target-quads", str(int(options.get("targetQuads") or 0)),
                     "--adaptivity", str(float(options.get("adaptivity") or 1.0)),
+                    # `quick` is the seconds-long triangle low-poly (decimation);
+                    # anything else is the quad remesh. See retopo_worker.quick_mode.
+                    "--method", "quick" if options.get("method") == "quick" else "quads",
                 ]
                 cwd = self.registry.tool_dir("meshtools")
             elif op == "rig":

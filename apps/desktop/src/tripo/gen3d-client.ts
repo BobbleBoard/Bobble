@@ -88,6 +88,7 @@ interface Gen3dState {
     origin?: StageOrigin,
     extra?: {
       readonly targetQuads?: number;
+      readonly method?: 'quads' | 'quick';
       readonly adaptivity?: number;
       readonly probeOnly?: boolean;
       readonly requireHumanoid?: boolean;

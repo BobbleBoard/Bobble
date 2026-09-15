@@ -359,6 +359,9 @@ def main() -> None:
     ap.add_argument("--timeout", type=int, default=600)
     # Components below this share of the faces are decimation debris.
     ap.add_argument("--min-component-fraction", type=float, default=0.001)
+    # `quads` (default) is the quad remesh; `quick` is a triangle low-poly by
+    # quadric decimation — see quick_mode() for the numbers behind it.
+    ap.add_argument("--method", choices=("quads", "quick"), default="quads")
     args = ap.parse_args()
 
     out_dir = Path(args.out_dir)
@@ -400,6 +403,10 @@ def main() -> None:
         healed = drop_small_components(
             healed, args.min_component_fraction, lambda m: progress(STAGE, m, 2, TOTAL_STEPS)
         )
+
+    if args.method == "quick":
+        quick_mode(source, healed, prep, args, out_dir)
+        return
 
     # QuadriFlow needs a manifold surface; repair only if this one isn't.
     bnd, nonman = count_boundary_and_nonmanifold(healed)
@@ -537,6 +544,99 @@ def main() -> None:
         + (", texture kept" if textured else "")
     )
     progress(STAGE, f"Retopology done — {summary}", TOTAL_STEPS, TOTAL_STEPS)
+    stage_done(STAGE, summary)
+
+
+def quick_mode(source, healed, prep, args, out_dir: Path) -> None:
+    """A triangle low-poly in seconds, for when the minutes are the problem.
+
+    the user (2026-09-15), on a remesh he watched pass eight minutes: "remeshing
+    should be a quick process … attempt to find a faster alternative for a
+    'quick mode'." MEASURED on that model (a 186k-face jet, this machine):
+
+      close the surface (384³) + QuadriFlow to 100k    46 s at utility QoS
+                                                       200 s at background QoS (low power)
+                                                       >8 min with a generation running beside it
+      QuadriFlow on a coarser closing (256³ / 192³)    64 s / 59 s — the target, not the input, sets it
+      QuadriFlow straight on the unclosed mesh         46 s and an EMPTY result (its silent exit-0)
+      QuadriFlow on a decimated closing                did not finish in 600 s
+      quadric decimation of the healed mesh to 30k     0.1 s
+
+    So the quick mode is the decimation: no closing, no remesher, the input's
+    own topology thinned to the target, then the same texture bake the quad
+    path does (the unwrap is the only cost left, and it scales with the
+    faces it is given). Triangles, not quads — the label says so.
+    """
+    import trimesh
+
+    target_quads = args.target_quads or adaptive_target_quads(len(healed.faces))
+    target_faces = target_quads * 2  # a quad is two triangles; the Faces control means the same thing
+    progress(STAGE, f"Thinning to ~{target_faces:,} triangles…", 3, TOTAL_STEPS)
+    thinned = decimate_to(healed, target_faces, lambda m: progress(STAGE, m, 3, TOTAL_STEPS))
+    thinned = drop_small_components(
+        thinned, args.min_component_fraction, lambda m: progress(STAGE, m, 3, TOTAL_STEPS)
+    )
+    if len(thinned.faces) == 0:
+        error("the quick low-poly came out empty")
+        sys.exit(1)
+    progress(STAGE, f"Thinned to {len(thinned.faces):,} triangles", 3, TOTAL_STEPS)
+
+    out_obj = out_dir / "retopo-quads.obj"
+    export_geometry_obj(thinned, str(out_obj))
+
+    progress(STAGE, "Measuring topology…", 4, TOTAL_STEPS)
+    polys = read_polygons(out_obj)
+    tris = len(polys)
+
+    progress(STAGE, "Converting result to GLB…", 5, TOTAL_STEPS)
+    lowpoly = trimesh.load(str(out_obj), force="mesh", process=False)
+    open_edges = count_nonmanifold_edges(lowpoly)
+    from _meshprep import count_boundary_edges
+
+    holes = count_boundary_edges(lowpoly)
+    low_vertices = int(len(lowpoly.vertices))
+    textured = False
+    vertex_map = None
+    if base_colour(source)[0] is not None:
+        painted = bake(source, lowpoly, lambda m: progress(STAGE, m, 5, TOTAL_STEPS))
+        if painted is not None:
+            vertex_map = painted.metadata.pop("pd_vertex_map", None)
+            painted.metadata.update(lowpoly.metadata)
+            lowpoly = painted
+            textured = True
+
+    wire = remap_wire(polygon_edges(polys), vertex_map, low_vertices)
+    topology = {
+        "kind": "tri",
+        "quads": 0,
+        "tris": tris,
+        "ngons": 0,
+        "polygons": tris,
+        "vertices": low_vertices,
+        "triangles": int(len(lowpoly.faces)),
+        "textured": textured,
+        "boundaryEdges": holes,
+        "nonManifoldEdges": open_edges,
+        "watertight": bool(holes == 0),
+        "source": "decimation",
+        "prep": prep.as_dict(),
+    }
+    if len(wire) // 2 <= MAX_WIRE_EDGES:
+        topology["wireEdges"] = wire
+    lowpoly.metadata["pd_topology"] = topology
+
+    out_glb = out_dir / "retopo.glb"
+    lowpoly.export(str(out_glb), include_normals=True)
+    (out_dir / "retopo-topology.json").write_text(json.dumps(topology_summary(topology), indent=2))
+
+    artifact(STAGE, "model-glb", str(out_glb), f"Low-poly · {tris:,} triangles")
+    artifact(STAGE, "model-obj", str(out_obj), "Low-poly mesh (OBJ)")
+    summary = (
+        f"{tris:,} triangles (quick mode)"
+        + (", watertight" if holes == 0 else f", {holes:,} open edges")
+        + (", texture kept" if textured else "")
+    )
+    progress(STAGE, f"Low-poly done — {summary}", TOTAL_STEPS, TOTAL_STEPS)
     stage_done(STAGE, summary)
 
 
