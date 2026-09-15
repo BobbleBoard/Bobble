@@ -72,6 +72,20 @@ Model: FLUX.2 klein (4B) (flux2-klein-4b, apache-2.0)`;
     expect(items[0]?.name).toBe('fox-under-oak-tree.png');
   });
 
+  /* SEEN 2026-09-15: `--save_to=/cow-on-the-moon.png` — the root of the disk —
+     and the failure sentence's path became a second, 9-byte card. */
+  it('does not mount the destination a failed save names', () => {
+    const failed = `Generated 1 image on the canvas:
+  1. /Users/j/Bobble/generated/a-cow-on-the-moon/cand0_seed545320292.png (seed 545320292)
+Could not save to /cow-on-the-moon.png: EACCES: permission denied, mkdir '/'
+Model: FLUX.2 klein (4B) (flux2-klein-4b, apache-2.0)`;
+    const items = mediaFromToolResult('generate_image', failed);
+    expect(items.map((i) => i.path)).toEqual([
+      '/Users/j/Bobble/generated/a-cow-on-the-moon/cand0_seed545320292.png',
+    ]);
+    expect(items[0]?.name).toBe('cand0_seed545320292.png');
+  });
+
   it('names each candidate after its own copy', () => {
     const two = `Generated 2 images on the canvas:
   1. /g/a/cand0_seed1.png (seed 1)

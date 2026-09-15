@@ -152,6 +152,15 @@ export function mediaFromToolResult(
    * So the copies are read for their NAMES, the generated files for their
    * pixels, and the card is one card called what the user called it.
    */
+  /*
+   * …AND A DESTINATION THAT COULD NOT BE WRITTEN IS NOT A PICTURE. The tool
+   * says "Could not save to /cow-on-the-moon.png: EACCES" (SEEN 2026-09-15: a
+   * 4B asked for `--save_to=/cow-on-the-moon.png`, the root of the disk), and
+   * that path scanned like any other — a second card, "9 B", for a file that
+   * does not exist. The line is a sentence about a failure; drop it before
+   * the scan.
+   */
+  text = text.replace(/^Could not save to .*$/gm, '');
   const savedIdx = text.indexOf('\nSaved to:');
   const savedNames: string[] = [];
   if (savedIdx !== -1) {

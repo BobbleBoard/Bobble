@@ -760,6 +760,14 @@ export async function saveOutputs(
     });
   let target = saveTo.trim();
   if (target === '~' || target.startsWith('~/')) target = path.join(homedir(), target.slice(1));
+  /*
+   * `/cow-on-the-moon.png` IS NOT A FILE AT THE ROOT OF THE DISK. SEEN
+   * 2026-09-15 (qwen3.5-4b): a leading slash on a bare name, twice in one turn
+   * — the same slip the file tools repair as a dropped root — and macOS's
+   * read-only system volume answered EACCES. Nothing a model asks for lives
+   * at `/`; a single segment under it means the working folder.
+   */
+  if (/^\/[^/]+$/.test(target)) target = target.slice(1);
   const trailingSlash = /[\\/]$/.test(target);
   /*
    * RELATIVE TO THE WORKING FOLDER, the one the prompt names. MEASURED

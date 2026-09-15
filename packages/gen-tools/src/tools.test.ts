@@ -478,6 +478,18 @@ describe('saveOutputs', () => {
     expect(folder.paths).toEqual(['/work/image-of-a-cow/pics.png']);
   });
 
+  it('reads `/name.png` — a bare name with a slipped root slash — as the working folder', async () => {
+    const f = fake();
+    const r = await saveOutputs(['/g/a.png'], '/cow-on-the-moon.png', 'a cow', {
+      ...f.deps,
+      root: '/work/image-of-a-cow',
+    });
+    expect(r.paths).toEqual(['/work/image-of-a-cow/cow-on-the-moon.png']);
+    // A real absolute path is left alone.
+    const abs = await saveOutputs(['/g/a.png'], '/pics/book/cow.png', 'a cow', f.deps);
+    expect(abs.paths).toEqual(['/pics/book/cow.png']);
+  });
+
   it('keeps the name but not a wrong extension: the bytes are PNG', async () => {
     const f = fake();
     const r = await saveOutputs(['/g/cand0.png'], '/pics/fox-storybook.jpg', 'fox', f.deps);
