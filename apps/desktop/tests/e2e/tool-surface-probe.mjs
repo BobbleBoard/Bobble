@@ -492,6 +492,29 @@ try {
       () => document.querySelector('[data-testid="presented"]') !== null,
     );
     check(presentCard, 'a present card is in the thread');
+    // The picture in the canvas, and no red error row after the reply (the
+    // vision relaunch used to fire while the harness's follow-up was in flight).
+    await sleep(8000);
+    const afterPresent = await page.evaluate(() => ({
+      canvasError: document.querySelector('.pd-media-error')?.textContent ?? null,
+      canvasImage: [...document.querySelectorAll('.pd-media img')].some(
+        (i) => i.complete && i.naturalWidth > 0,
+      ),
+      turnErrors: window
+        .__pi_store()
+        .getState()
+        .messages.filter((m) => m.kind === 'assistant' && m.errorMessage !== undefined)
+        .map((m) => m.errorMessage),
+    }));
+    check(
+      afterPresent.canvasError === null,
+      `the canvas tab shows no error (${afterPresent.canvasError})`,
+    );
+    check(afterPresent.canvasImage, 'the presented picture is loaded in the canvas');
+    check(
+      afterPresent.turnErrors.length === 0,
+      `no assistant turn ended in an error (${afterPresent.turnErrors.join(' | ')})`,
+    );
     await shot('pass3-present');
   }
 } finally {

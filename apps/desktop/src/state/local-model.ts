@@ -372,6 +372,11 @@ export async function ensureVisionMode(): Promise<{
   if (decision.action === 'already-on') return { ok: true, changed: false };
   if (decision.action === 'none') return { ok: false, changed: false, reason: decision.reason };
 
-  const res = await activateLocalModel(decision.modelId, decision.quant, 'multimodal');
+  // Never over a running turn: the relaunch is a hard restart of the server pi
+  // is talking to (the vision-wanted handler already waited for quiet; a send
+  // that slipped in since is let finish).
+  const res = await activateLocalModel(decision.modelId, decision.quant, 'multimodal', {
+    waitForIdleTurn: true,
+  });
   return { ok: res.success, changed: res.success, reason: res.error };
 }

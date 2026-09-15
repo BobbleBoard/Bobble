@@ -607,7 +607,38 @@ export function connectLlm(): void {
    * turn simply never produced a token.
    */
   window.piDesktop.onEvent('llm:vision-wanted', () => {
-    void import('./local-model').then(({ ensureVisionMode }) => ensureVisionMode());
+    void (async () => {
+      /*
+       * TRULY IDLE, NOT MERELY AT agent_end. Main raises this on pi's agent_end,
+       * but the harness answers that same event with its own follow-ups (the
+       * verify nudge, the prime) — one more model call on the very server the
+       * relaunch is about to stop. MEASURED 2026-09-15 (tool-surface probe): a
+       * presented picture on a text-only engine → the want → the relaunch →
+       * pi respawned mid-nudge → a red "fetch failed" under a reply that had
+       * already finished. Wait for the store to report nothing streaming and
+       * nothing in flight, and for that to hold a moment, before switching.
+       */
+      const { usePiStore } = await import('./pi-slice');
+      const idle = () => {
+        const s = usePiStore.getState();
+        return (
+          !s.agent.isStreaming &&
+          !s.promptInFlight &&
+          !s.messages.some((m) => m.kind === 'assistant' && m.isStreaming === true)
+        );
+      };
+      const deadline = Date.now() + 60_000;
+      let quietSince: number | null = null;
+      while (Date.now() < deadline) {
+        if (idle()) {
+          quietSince ??= Date.now();
+          if (Date.now() - quietSince >= 1500) break;
+        } else quietSince = null;
+        await new Promise((r) => setTimeout(r, 250));
+      }
+      const { ensureVisionMode } = await import('./local-model');
+      await ensureVisionMode();
+    })();
   });
   window.piDesktop.onEvent('llm:download-progress', (p) =>
     useLlmStore.getState().applyDownloadProgress({

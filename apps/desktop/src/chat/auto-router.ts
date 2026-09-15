@@ -572,6 +572,20 @@ function serverIsReady(): boolean {
   return s.phase === 'ready' && s.serverRunning && s.model?.id != null;
 }
 
+/**
+ * A relaunch the RENDERER has decided on but the supervisor has not yet
+ * reflected. `activateLocalModel` raises the "switching…" banner the instant
+ * it starts (every path: a pick, the vision relaunch, calibration), and the
+ * server's phase only turns 'starting' an IPC round-trip later — so a send in
+ * that gap saw a ready server, dispatched, and pi's request landed on a port
+ * that was being torn down. MEASURED 2026-09-15: "present it" typed right
+ * after a picture on a text-only engine (the on-demand vision relaunch) — a
+ * red "fetch failed" on the reply, then the turn carried on after the repoint.
+ */
+function switchInProgress(): boolean {
+  return useModelSelectionStore.getState().switching !== null;
+}
+
 // `[pi-diag]` lines are mirrored to the terminal in dev (see main.ts) so the
 // server-start decision is visible instead of a silent no-op.
 const diag = (msg: string): void => {
@@ -597,7 +611,7 @@ export function ensureChatServerReady(): Promise<void> {
     new URLSearchParams(window.location.search).has('piNoServer')
   )
     return Promise.resolve();
-  if (serverIsReady()) {
+  if (serverIsReady() && !switchInProgress()) {
     diag('ensureChatServerReady: server already ready — no-op');
     return Promise.resolve();
   }
@@ -615,7 +629,12 @@ export function ensureChatServerReady(): Promise<void> {
       // in-progress load, the model never finishes, and pi respawns each time
       // (the bobbing "exec" + an endless 503 "Loading model"). Only start a server
       // when nothing is coming up (idle / error / no server).
-      if (phase !== 'starting' && phase !== 'downloading' && !serverIsReady()) {
+      if (
+        phase !== 'starting' &&
+        phase !== 'downloading' &&
+        !serverIsReady() &&
+        !switchInProgress()
+      ) {
         let target = resolveBootModel(sel, {
           tierModels: fresh.recommendation?.tierModels,
           downloadedModelIds: fresh.status.downloadedModelIds,
@@ -646,12 +665,12 @@ export function ensureChatServerReady(): Promise<void> {
       // whatever the model returns rather than hanging forever).
       const deadline = Date.now() + 300_000;
       while (Date.now() < deadline) {
-        if (serverIsReady()) {
+        if (serverIsReady() && !switchInProgress()) {
           diag('ensureChatServerReady: server READY');
           return;
         }
         const p = useLlmStore.getState().status.phase;
-        if (p === 'error' || p === 'idle') {
+        if ((p === 'error' || p === 'idle') && !switchInProgress()) {
           diag(`ensureChatServerReady: giving up — phase=${p}`);
           return;
         }
