@@ -1031,7 +1031,7 @@ final class OverlayController: NSObject {
     glyphGlowSoft.path = glyph.path
     glyphGlowSoft.fillColor = GLYPH_GLOW
     glyphGlowSoft.strokeColor = GLYPH_GLOW
-    glyphGlowSoft.lineWidth = glyph.strokeWidth * 1.1
+    glyphGlowSoft.lineWidth = glyph.strokeWidth * 1.6
     glyphGlowSoft.lineJoin = .round
     glyphGlowSoft.opacity = 0.55
     glyphGlowSoft.shadowColor = GLYPH_GLOW
@@ -1040,23 +1040,26 @@ final class OverlayController: NSObject {
     glyphGlowSoft.shadowOffset = .zero
     cursorGroup.addSublayer(glyphGlowSoft)
 
-    // The body: black, with a thin white keyline — the Mac pointer's own
-    // recipe, which is what keeps it legible on a dark app too.
+    // The body: black under his keyline AT HIS THICKNESS. the user, on the first
+    // cut of the black fill: "keep the thickness of the border" — the white
+    // band is the SVG's own stroke width, centred on the path exactly as it
+    // was over the blue body, and the thin keyline on top is unchanged too.
     glyphFill.frame = cursorGroup.bounds
     glyphFill.contentsScale = scale
     glyphFill.path = glyph.path
     glyphFill.fillColor = GLYPH_BODY
     glyphFill.strokeColor = GLYPH_KEYLINE
-    glyphFill.lineWidth = glyph.strokeWidth * 0.5
+    glyphFill.lineWidth = glyph.strokeWidth
     glyphFill.lineJoin = .round
     cursorGroup.addSublayer(glyphFill)
 
     glyphStroke.frame = cursorGroup.bounds
     glyphStroke.contentsScale = scale
     glyphStroke.path = glyph.path
-    glyphStroke.fillColor = GLYPH_BODY
-    glyphStroke.strokeColor = nil
-    glyphStroke.lineWidth = 0
+    glyphStroke.fillColor = nil
+    glyphStroke.strokeColor = GLYPH_KEYLINE
+    glyphStroke.lineWidth = glyph.strokeWidth * 0.34
+    glyphStroke.lineJoin = .round
     cursorGroup.addSublayer(glyphStroke)
 
     stage.addSublayer(cursorGroup)
