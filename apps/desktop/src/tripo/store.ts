@@ -276,6 +276,9 @@ interface TripoState {
   previewVersionId: string | null;
   /** The history tree panel is open. */
   historyOpen: boolean;
+  /** Where an export or a Send To went (or why it did not) — the studio's own
+   * word on it, under the viewport, until the next one. */
+  deliveryNote: string | null;
   /** Rig gating: the "is this humanoid?" question, raised by the shape probe. */
   humanoidPrompt: {
     readonly assetId: string;
@@ -318,6 +321,7 @@ interface TripoState {
   setCurrentVersion: (assetId: string, versionId: string) => void;
   /** Inspect a version without making it current (null = back to current). */
   previewVersion: (versionId: string | null) => void;
+  setDeliveryNote: (note: string | null) => void;
   /** The viewer captured a real rendered preview for a version. */
   setAssetThumb: (versionId: string, thumb: string) => void;
   setAssetCounts: (versionId: string, faces: number, vertices: number, topology?: string) => void;
@@ -434,7 +438,8 @@ export const useTripoStore = create<TripoState>((set, get) => ({
   manageMode: false,
   checkedAssets: [],
   previewVersionId: null,
-  historyOpen: false,
+  historyOpen: true,
+  deliveryNote: null,
   humanoidPrompt: null,
 
   history: [],
@@ -536,6 +541,7 @@ export const useTripoStore = create<TripoState>((set, get) => ({
       previewVersionId: null,
     })),
   previewVersion: (versionId) => set({ previewVersionId: versionId }),
+  setDeliveryNote: (note) => set({ deliveryNote: note }),
   setAssetThumb: (versionId, thumb) =>
     set((s) => ({
       assets: s.assets.map((a) =>

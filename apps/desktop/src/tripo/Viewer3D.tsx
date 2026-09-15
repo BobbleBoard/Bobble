@@ -233,14 +233,61 @@ function buildGeneratedTexture(): InstanceType<typeof THREE.CanvasTexture> {
 }
 
 /** Trigger a browser download for exported bytes/text. */
-function downloadBlob(data: BlobPart, fileName: string, mime: string): void {
-  const blob = new Blob([data], { type: mime });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = fileName;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 4000);
+/*
+ * THROUGH MAIN, NOT AN `<a download>`. In Electron a download link lands in
+ * ~/Downloads with no panel and no word — the studio's Export "did nothing"
+ * (the user, 2026-09-14: "send to and export buttons should be functional and
+ * work"). Export goes through the save panel; Send To writes the file under
+ * ~/Bobble/generated/3d and opens it in the chosen app. Either way the person
+ * is told where it went, in the studio's own status line.
+ */
+/** How much of the viewport's left the floating panel covers, in px (0 when
+ * it is not there — the studio gated, or a window too narrow for it). */
+function coveredLeft(host: HTMLElement): number {
+  const panel = host.parentElement?.querySelector<HTMLElement>('.tp-genpanel');
+  if (panel === null || panel === undefined) return 0;
+  const a = host.getBoundingClientRect();
+  const b = panel.getBoundingClientRect();
+  return Math.max(0, Math.min(b.right, a.right) - a.left);
+}
+
+async function deliverBytes(
+  data: BlobPart,
+  fileName: string,
+  deliver: ViewerExportRequest['deliver'],
+): Promise<void> {
+  const blob = new Blob([data]);
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  let binary = '';
+  const CHUNK = 0x8000;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+  const base64 = btoa(binary);
+  const note = useTripoStore.getState().setDeliveryNote;
+  try {
+    if (deliver?.kind === 'sendTo') {
+      const res = await window.piDesktop.invoke('canvas:send-bytes-to', {
+        base64,
+        fileName,
+        app: deliver.app,
+      });
+      note(
+        res.ok
+          ? `Opened in ${deliver.app} — ${res.savedTo ?? fileName}`
+          : (res.error ?? `${deliver.app} could not open it`),
+      );
+    } else {
+      const res = await window.piDesktop.invoke('canvas:save-bytes', {
+        base64,
+        suggestedName: fileName,
+      });
+      if (res.ok) note(`Saved ${res.savedTo ?? fileName}`);
+      else if (res.error !== undefined) note(res.error);
+    }
+  } catch (err) {
+    note(err instanceof Error ? err.message : String(err));
+  }
 }
 
 /**
@@ -872,25 +919,26 @@ export default function Viewer3D({ gizmoRef }: Viewer3DProps): JSX.Element {
       const root = exportRoot();
       if (root === null) return;
       const base = req.fileName.replace(/\.[a-z0-9]+$/i, '');
+      const deliver = req.deliver;
       if (req.format === 'GLB') {
         new GLTFExporter().parse(
           root,
           (out) => {
-            if (out instanceof ArrayBuffer) downloadBlob(out, `${base}.glb`, 'model/gltf-binary');
-            else downloadBlob(JSON.stringify(out), `${base}.gltf`, 'model/gltf+json');
+            if (out instanceof ArrayBuffer) void deliverBytes(out, `${base}.glb`, deliver);
+            else void deliverBytes(JSON.stringify(out), `${base}.gltf`, deliver);
           },
           () => {},
           { binary: true },
         );
       } else if (req.format === 'OBJ') {
-        downloadBlob(new OBJExporter().parse(root), `${base}.obj`, 'text/plain');
+        void deliverBytes(new OBJExporter().parse(root), `${base}.obj`, deliver);
       } else if (req.format === 'STL') {
         const out = new STLExporter().parse(root, { binary: true });
-        downloadBlob(out as unknown as BlobPart, `${base}.stl`, 'model/stl');
+        void deliverBytes(out as unknown as BlobPart, `${base}.stl`, deliver);
       } else {
         void (async () => {
           const out = await new USDZExporter().parseAsync(root);
-          downloadBlob(out as unknown as BlobPart, `${base}.usdz`, 'model/vnd.usdz+zip');
+          void deliverBytes(out as unknown as BlobPart, `${base}.usdz`, deliver);
         })();
       }
       host.dataset.tpExported = `${base}.${req.format.toLowerCase()}`;
@@ -1140,6 +1188,16 @@ export default function Viewer3D({ gizmoRef }: Viewer3DProps): JSX.Element {
       if (w === 0 || h === 0) return;
       renderer.setSize(w, h);
       camera.aspect = w / h;
+      /*
+       * THE CARD IS OVER THE LEFT OF THIS CANVAS. The left panel floats on
+       * the viewport (tripo.css .tp-genpanel), so the middle of the canvas is
+       * not the middle of what can be seen. The view offset slides the
+       * projection right by half the card, so the model sits in the centre
+       * of the clear part — the same trick DCC apps use for docked panels.
+       */
+      const covered = coveredLeft(host);
+      if (covered > 0 && w > covered * 2) camera.setViewOffset(w, h, -covered / 2, 0, w, h);
+      else camera.clearViewOffset();
       camera.updateProjectionMatrix();
     };
     resize();

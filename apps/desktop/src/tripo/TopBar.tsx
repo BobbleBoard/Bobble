@@ -17,7 +17,7 @@
  * named for the target) and Export (opens the dialog).
  */
 import type { JSX } from 'react';
-import { IcDownload, IcShare } from './icons';
+import { IcExport, IcShare } from './icons';
 import { DCC_LOGOS, DccLogoIcon } from './logos';
 import { MenuAnchor } from './primitives';
 import { useTripoStore } from './store';
@@ -43,7 +43,7 @@ export function TripoTopBarControls(): JSX.Element {
             disabled={!hasModel}
             onClick={() => toggleMenu('sendto')}
           >
-            <IcShare size={14} />
+            <IcShare size={15} />
             Send To
             {/*
               No caret. the user: "remove the little down arrow in the 'send to'
@@ -62,7 +62,7 @@ export function TripoTopBarControls(): JSX.Element {
                 data-testid={`tp-sendto-${logo.id}`}
                 title={`Exports a GLB for ${logo.label}`}
                 onClick={() => {
-                  requestSendTo(logo.id);
+                  requestSendTo(logo.id, logo.label);
                   closeMenus();
                 }}
               >
@@ -80,7 +80,7 @@ export function TripoTopBarControls(): JSX.Element {
         disabled={!hasModel}
         onClick={() => set('modal', 'export')}
       >
-        <IcDownload size={15} />
+        <IcExport size={15} />
         Export
       </button>
     </div>

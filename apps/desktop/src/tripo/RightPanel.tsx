@@ -13,14 +13,12 @@ import {
   IcArmature,
   IcBoxNode,
   IcCaretSmall,
-  IcCheck,
   IcCube,
   IcDots,
   IcEye,
   IcEyeOff,
   IcFilter,
   IcGrid4,
-  IcHistory,
   IcInfo,
   IcLayers,
   IcManage,
@@ -30,16 +28,8 @@ import {
   IcUpload,
 } from './icons';
 import { MenuAnchor, MenuItem } from './primitives';
-import {
-  type AssetVersion,
-  currentVersion,
-  hasSiblings,
-  type StudioAsset,
-  type TripoOp,
-  useTripoStore,
-  versionDepth,
-} from './store';
-import { importModelFile, saveAssetTree } from './viewer-io';
+import { currentVersion, type StudioAsset, useTripoStore } from './store';
+import { importModelFile } from './viewer-io';
 
 // ── assets tab ────────────────────────────────────────────────────────────
 
@@ -284,150 +274,6 @@ function AssetsTab(): JSX.Element {
   );
 }
 
-// ── history tab: the asset's version tree ─────────────────────────────────
-
-const OP_LABEL: Record<TripoOp, string> = {
-  source: 'Source',
-  segment: 'Segment',
-  retopo: 'Retopology',
-  texture: 'Texture',
-  rig: 'Rig',
-  motion: 'Motion',
-};
-
-function VersionRow({
-  asset,
-  version,
-}: {
-  readonly asset: StudioAsset;
-  readonly version: AssetVersion;
-}): JSX.Element {
-  const previewVersionId = useTripoStore((s) => s.previewVersionId);
-  const previewVersion = useTripoStore((s) => s.previewVersion);
-  const setCurrentVersion = useTripoStore((s) => s.setCurrentVersion);
-  const isCurrent = asset.currentVersionId === version.id;
-  const isViewing = previewVersionId === null ? isCurrent : previewVersionId === version.id;
-  const depth = versionDepth(asset, version);
-  const branch = hasSiblings(asset, version);
-
-  return (
-    <div
-      className="tp-ver-row"
-      data-current={isCurrent}
-      data-viewing={isViewing}
-      data-branch={branch}
-      style={{ paddingLeft: `${8 + depth * 16}px` }}
-      data-testid={`tp-ver-${version.id}`}
-    >
-      <button
-        type="button"
-        className="tp-ver-main"
-        // Inspecting an earlier state must not silently change what the asset
-        // IS — that is what "Make current" is for.
-        onClick={() => previewVersion(isCurrent ? null : version.id)}
-      >
-        <span className="tp-ver-dot" data-op={version.op} />
-        <span className="tp-ver-body">
-          <span className="tp-ver-label">
-            {OP_LABEL[version.op]}
-            {branch ? <span className="tp-ver-branch-tag">branch</span> : null}
-          </span>
-          <span className="tp-ver-sub">
-            {version.faces > 0 ? `${version.faces.toLocaleString()} faces` : version.label}
-            {version.topology !== null ? ` · ${version.topology}` : ''}
-          </span>
-        </span>
-      </button>
-      {version.thumb !== null ? (
-        <img className="tp-ver-thumb" src={version.thumb} alt="" />
-      ) : (
-        <span className="tp-ver-thumb tp-ver-thumb-empty">
-          <IcCube size={13} />
-        </span>
-      )}
-      {isCurrent ? (
-        <span className="tp-ver-current" title="Current working version">
-          <IcCheck size={13} />
-        </span>
-      ) : (
-        <button
-          type="button"
-          className="tp-ver-make"
-          data-testid={`tp-ver-make-${version.id}`}
-          title="Make this the working version"
-          onClick={() => {
-            setCurrentVersion(asset.id, version.id);
-            saveAssetTree();
-          }}
-        >
-          Use
-        </button>
-      )}
-    </div>
-  );
-}
-
-/** Depth-first order so children sit directly under their parent — that is what
- * makes a branch legible as a branch. */
-function orderedVersions(asset: StudioAsset): AssetVersion[] {
-  const out: AssetVersion[] = [];
-  const walk = (parentId: string | null): void => {
-    for (const v of asset.versions.filter((x) => x.parentId === parentId)) {
-      out.push(v);
-      walk(v.id);
-    }
-  };
-  walk(null);
-  // Defensive: never drop a node whose parent went missing.
-  for (const v of asset.versions) if (!out.includes(v)) out.push(v);
-  return out;
-}
-
-function HistoryTab(): JSX.Element {
-  const loadedAssetId = useTripoStore((s) => s.loadedAssetId);
-  const assets = useTripoStore((s) => s.assets);
-  const previewVersionId = useTripoStore((s) => s.previewVersionId);
-  const previewVersion = useTripoStore((s) => s.previewVersion);
-  const asset = assets.find((a) => a.id === loadedAssetId);
-
-  if (asset === undefined) {
-    return (
-      <div className="tp-property-empty" data-testid="tp-history-empty">
-        <IcHistory size={26} />
-        <p>Load a model to see its version history</p>
-      </div>
-    );
-  }
-
-  const rows = orderedVersions(asset);
-  return (
-    <>
-      <div className="tp-section-title tp-hier-title">
-        {asset.name} · {rows.length} version{rows.length === 1 ? '' : 's'}
-      </div>
-      <p className="tp-select-copy">
-        Every operation adds a node here instead of a new asset. Click a node to inspect it; “Use”
-        makes it the working version, and running an op from an older node creates a branch.
-      </p>
-      {previewVersionId !== null ? (
-        <button
-          type="button"
-          className="tp-btn-quiet"
-          data-testid="tp-ver-back-to-current"
-          onClick={() => previewVersion(null)}
-        >
-          Back to the working version
-        </button>
-      ) : null}
-      <div className="tp-ver-tree" data-testid="tp-ver-tree">
-        {rows.map((v) => (
-          <VersionRow key={v.id} asset={asset} version={v} />
-        ))}
-      </div>
-    </>
-  );
-}
-
 // ── property tab ──────────────────────────────────────────────────────────
 
 interface HierRow {
@@ -602,16 +448,9 @@ export function RightPanel(): JSX.Element {
           <IcGrid4 size={15} />
           Assets
         </button>
-        <button
-          type="button"
-          className="tp-right-tab"
-          data-active={rightTab === 'history'}
-          data-testid="tp-tab-history"
-          onClick={() => set('rightTab', 'history')}
-        >
-          <IcHistory size={15} />
-          History
-        </button>
+        {/* No History tab: the asset's stages are the rail on the viewport
+            (HistoryRail.tsx) — hover previews, click goes back, the next op
+            branches. the user: "replace history tab with something like shown". */}
         <button
           type="button"
           className="tp-right-tab"
@@ -628,7 +467,7 @@ export function RightPanel(): JSX.Element {
       </div>
       <div className="tp-right-body">
         {rightTab === 'assets' ? <AssetsTab /> : null}
-        {rightTab === 'history' ? <HistoryTab /> : null}
+
         {rightTab === 'property' ? <PropertyTab /> : null}
       </div>
     </aside>

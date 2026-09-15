@@ -605,6 +605,8 @@
  * as well as a line did, without drawing anything.
  */
 .tp-body {
+  /* The left card floats over the viewport (below); this is what it floats in. */
+  position: relative;
   display: flex;
   flex: 1;
   min-height: 0;
@@ -716,20 +718,30 @@
 
 /* ═══ generation panel ══════════════════════════════════════════════════ */
 
+/*
+ * THE LEFT CARD FLOATS OVER THE VIEWPORT. the user (2026-09-14): "make the
+ * 'generate model' and 'image' and 'segment' and all cards on the left float
+ * above the viewport." It was a column of its own (302px, shrinking to 232);
+ * now the viewport runs from the rail to the right panel and the card sits on
+ * it, frosted, the way the stats and the gizmo do — the model has the whole
+ * width behind the card and the card no longer decides the viewport's size.
+ */
 .tp-genpanel {
-  /* SHRINKS. The rail (74) + this (302) + the right panel (344) came to 720px
-   * that could not give, against a window whose minWidth is 640 — so the last
-   * column was pushed out of the window and clipped, with no scrollbar to say
-   * so. The viewport was the only flexible column and it bottoms out at 0.
-   * `flex: 0 1 302px` keeps the comfortable width and lets it compress to
-   * min-width when the window is genuinely narrow. */
-  flex: 0 1 302px;
-  min-width: 232px;
+  position: absolute;
+  top: 0;
+  bottom: 12px;
+  left: calc(12px + 74px + 10px);
+  width: 302px;
+  z-index: 6;
   display: flex;
   flex-direction: column;
-  background: var(--pd-bg-raised);
-  border: 1px solid var(--pd-border-subtle);
   min-height: 0;
+  border-radius: var(--pd-radius-lg);
+  background: color-mix(in srgb, var(--pd-bg-overlay) 86%, transparent);
+  border: 1px solid var(--pd-border-subtle);
+  -webkit-backdrop-filter: blur(var(--pd-blur-overlay));
+  backdrop-filter: blur(var(--pd-blur-overlay));
+  box-shadow: var(--pd-shadow-lg);
 }
 .tp-panel-header {
   display: flex;
@@ -1680,6 +1692,8 @@
      box. */
   padding-inline: 32px;
   pointer-events: none;
+  /* Clear of the floating card. */
+  padding-left: 312px;
 }
 .tp-empty .tp-logomark {
   color: color-mix(in srgb, var(--pd-text-primary) 45%, transparent);
@@ -1713,20 +1727,20 @@
  * sits on a blurred pill; this matches them instead of inventing a third
  * treatment.
  */
+/* NO CARD. the user (2026-09-14): "remove the card on these let them float" —
+   three lines of figures on the viewport, the way the gizmo floats. A tight
+   text shadow keeps them legible over a light model. */
 .tp-stats {
   position: absolute;
-  top: 14px;
-  left: 18px;
+  top: 16px;
+  /* Right of the floating card. */
+  left: calc(302px + 10px + 20px);
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 8px 12px;
-  border-radius: var(--pd-radius-md);
-  background: color-mix(in srgb, var(--pd-bg-overlay) 88%, transparent);
-  border: 1px solid var(--pd-border-subtle);
-  -webkit-backdrop-filter: blur(var(--pd-blur-overlay));
-  backdrop-filter: blur(var(--pd-blur-overlay));
+  gap: 5px;
+  padding: 0;
   pointer-events: none;
+  text-shadow: 0 1px 2px color-mix(in srgb, var(--pd-bg-base) 70%, transparent);
 }
 .tp-stat {
   display: flex;
@@ -1977,11 +1991,145 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* material strip */
+/* The studio's engine chip in the app's top bar (StudioEngineChip.tsx). */
+.tp-engine-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: var(--pd-font-size-caption);
+  color: var(--pd-text-secondary);
+  background: var(--pd-bg-raised);
+  border: 1px solid var(--pd-border-subtle);
+  white-space: nowrap;
+}
+.tp-engine-chip-rate {
+  color: var(--pd-accent-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ═══ history rail — the asset's stages, on the viewport (HistoryRail.tsx) ═══ */
+/* The mock: a soft rounded panel, "History" with a chevron, dots on a dashed
+   line, one stage a row; the current one blue with a white core, the one
+   under the pointer pink. Sits at the viewport's top-right, under the gizmo. */
+.tp-history-rail {
+  position: absolute;
+  top: 70px;
+  right: 16px;
+  z-index: 4;
+  min-width: 168px;
+  max-width: 240px;
+  padding: 10px 14px 6px;
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--pd-bg-overlay) 82%, transparent);
+  border: 1px solid var(--pd-border-subtle);
+  -webkit-backdrop-filter: blur(var(--pd-blur-overlay));
+  backdrop-filter: blur(var(--pd-blur-overlay));
+  box-shadow: var(--pd-shadow-md);
+}
+.tp-history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 2px 0 6px;
+  border: 0;
+  background: transparent;
+  color: var(--pd-text-primary);
+  font: inherit;
+  font-weight: var(--pd-font-weight-semibold);
+  font-size: var(--pd-font-size-body);
+  cursor: pointer;
+}
+.tp-history-caret {
+  color: var(--pd-text-secondary);
+  transition: transform var(--pd-duration-fast) var(--pd-easing-standard);
+}
+.tp-history-rail[data-open="false"] .tp-history-caret {
+  transform: rotate(180deg);
+}
+.tp-history-list {
+  position: relative;
+  margin: 0;
+  padding: 6px 0 4px;
+  list-style: none;
+}
+/* The dashed line the dots sit on. */
+.tp-history-list::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 14px;
+  bottom: 14px;
+  border-left: 2px dashed color-mix(in srgb, var(--pd-text-muted) 45%, transparent);
+}
+.tp-history-item {
+  position: relative;
+}
+.tp-history-node {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 0;
+  border: 0;
+  background: transparent;
+  color: var(--pd-text-secondary);
+  font: inherit;
+  font-size: var(--pd-font-size-caption);
+  text-align: left;
+  cursor: pointer;
+  transition: color var(--pd-duration-fast) var(--pd-easing-standard);
+}
+.tp-history-node:hover,
+.tp-history-node:focus-visible {
+  color: var(--pd-text-primary);
+}
+.tp-history-dot {
+  position: relative;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--pd-text-muted) 55%, var(--pd-bg-raised));
+  box-shadow: 0 0 0 2px var(--pd-bg-overlay);
+  transition:
+    background var(--pd-duration-fast) var(--pd-easing-standard),
+    transform var(--pd-duration-fast) var(--pd-easing-standard);
+}
+/* Under the pointer: the pink of the mock, a stage being looked at. */
+.tp-history-node[data-previewing="true"] .tp-history-dot,
+.tp-history-node:hover:not([data-current="true"]) .tp-history-dot {
+  background: #ec6fb4;
+  transform: scale(1.08);
+}
+/* The working version: blue with a white core. */
+.tp-history-node[data-current="true"] {
+  color: var(--pd-accent-primary);
+  cursor: default;
+}
+.tp-history-node[data-current="true"] .tp-history-dot {
+  background: var(--pd-accent-primary);
+}
+.tp-history-node[data-current="true"] .tp-history-dot::after {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border-radius: 999px;
+  background: #fff;
+}
+.tp-history-label {
+  line-height: 1.25;
+}
+
+/* material strip — at the foot now that the action bar under it is gone */
 .tp-material-strip {
   position: absolute;
-  bottom: 72px;
-  left: 50%;
+  bottom: 20px;
+  /* Centred in the part of the viewport the floating card leaves clear. */
+  left: calc(50% + 156px);
   transform: translateX(-50%);
   display: flex;
   align-items: center;
@@ -2084,6 +2232,25 @@
 }
 
 /* bottom action pill */
+.tp-delivery-note {
+  position: absolute;
+  left: calc(50% + 156px);
+  bottom: 70px;
+  transform: translateX(-50%);
+  max-width: min(78%, 640px);
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-size: var(--pd-font-size-caption);
+  color: var(--pd-text-secondary);
+  background: color-mix(in srgb, var(--pd-bg-overlay) 88%, transparent);
+  border: 1px solid var(--pd-border-subtle);
+  -webkit-backdrop-filter: blur(var(--pd-blur-overlay));
+  backdrop-filter: blur(var(--pd-blur-overlay));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
 .tp-actionbar {
   position: absolute;
   bottom: 16px;
@@ -4552,12 +4719,12 @@
 /* While the generating bottom bar is up, lift the floating viewport controls
    clear of it rather than letting the bar sit on top of Export/render modes.
    Both are centred with translateX(-50%), so the lift must keep that. */
-.tp-viewport .tp-actionbar,
-.tp-viewport .tp-material-strip {
+.tp-viewport .tp-material-strip,
+.tp-viewport .tp-delivery-note {
   transition: transform var(--pd-duration-normal, 260ms) var(--pd-easing-standard);
 }
-.tp-viewport[data-genfoot="true"] .tp-actionbar,
-.tp-viewport[data-genfoot="true"] .tp-material-strip {
+.tp-viewport[data-genfoot="true"] .tp-material-strip,
+.tp-viewport[data-genfoot="true"] .tp-delivery-note {
   transform: translate(-50%, -56px);
 }
 
@@ -4622,6 +4789,8 @@
 .tp-image-stage {
   position: absolute;
   inset: 0;
+  /* Clear of the floating card. */
+  padding-left: 312px;
   display: flex;
   flex-direction: column;
   align-items: center;

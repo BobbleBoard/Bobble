@@ -22,6 +22,12 @@ import { type StudioAsset, type TripoOp, useTripoStore } from './store';
 export interface ViewerExportRequest {
   readonly format: ExportFormat;
   readonly fileName: string;
+  /**
+   * `save` — the save panel (Export). `sendTo` — write the file and open it
+   * in that app (Send To); `app` is the DCC's display name for `open -a`.
+   * Absent: `save`.
+   */
+  readonly deliver?: { readonly kind: 'save' } | { readonly kind: 'sendTo'; readonly app: string };
 }
 
 export type ViewerCommandHandler = (req: ViewerExportRequest) => void;
@@ -40,10 +46,14 @@ export function requestExport(format: ExportFormat, fileName: string): void {
 
 /** Send To <app>: exports a GLB named for the target app (the interop format
  * every listed DCC imports). The button is disabled until a model is loaded. */
-export function requestSendTo(targetId: string): void {
+export function requestSendTo(targetId: string, appName: string): void {
   const s = useTripoStore.getState();
   const name = s.assets.find((a) => a.id === s.loadedAssetId)?.name;
-  exportHandler?.({ format: 'GLB', fileName: `${name ?? 'model'}-for-${targetId}` });
+  exportHandler?.({
+    format: 'GLB',
+    fileName: `${name ?? 'model'}-for-${targetId}`,
+    deliver: { kind: 'sendTo', app: appName },
+  });
 }
 
 /**

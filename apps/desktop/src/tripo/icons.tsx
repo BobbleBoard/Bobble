@@ -298,10 +298,28 @@ export const IcPrinter = make(
 export const IcStar = make(
   <path d="M12 3.5l2.5 5.4 5.9.7-4.4 4 1.2 5.9-5.2-3-5.2 3 1.2-5.9-4.4-4 5.9-.7z" />,
 );
+/*
+ * SEND TO IS THE ARROW ALONE. the user (2026-09-14): "send to SVG should only be
+ * the arrow, no L shape and 20% larger arrow." The L under it was the tray
+ * every share glyph draws; without it the curved arrow takes the whole box,
+ * scaled up a fifth about its centre.
+ */
 export const IcShare = make(
+  <path
+    d="M13 5.5c4.5.6 7.2 3.6 7.5 8.5-1.9-2.4-4.3-3.6-7.5-3.5v3.6L5 8.9l8-5z"
+    transform="translate(12 10) scale(1.2) translate(-12 -10)"
+  />,
+);
+/*
+ * EXPORT IS AN ARROW OUT OF A TRAY. the user (2026-09-14): "export SVG should have
+ * up arrow with half square outline below it" — the mark macOS uses for
+ * sharing out, which is what exporting a file is.
+ */
+export const IcExport = make(
   <>
-    <path d="M13 5.5c4.5.6 7.2 3.6 7.5 8.5-1.9-2.4-4.3-3.6-7.5-3.5v3.6L5 8.9l8-5z" />
-    <path d="M4 14v4.5A1.5 1.5 0 0 0 5.5 20H17" opacity={0.7} />
+    <path d="M12 14.5V3.6" />
+    <path d="M7.4 8.2 12 3.6l4.6 4.6" />
+    <path d="M5 11.5v7A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5v-7" />
   </>,
 );
 /*

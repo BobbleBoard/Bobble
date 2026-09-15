@@ -19,10 +19,12 @@ import {
   copyFileSync,
   createReadStream,
   existsSync,
+  mkdirSync,
   readFileSync,
   realpathSync,
   type Stats,
   statSync,
+  writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -40,6 +42,7 @@ import {
   shell,
   type WebContents,
 } from 'electron';
+import { bobbleDir, GENERATED_DIR } from '../bobble-paths';
 import { allowedWriteRoots } from '../fs-handlers';
 import type {
   AppEventMap,
@@ -504,6 +507,57 @@ export function registerCanvasIpc(
       return { ok: false, error: message };
     }
   });
+  registerBytesHandlers(guard);
+}
+
+/** The 3D studio's Export and Send To — see ipc-contract for why these exist. */
+function registerBytesHandlers(guard: (event: IpcMainInvokeEvent, channel: string) => void): void {
+  ipcMain.handle(
+    'canvas:save-bytes',
+    async (event, req: { base64: string; suggestedName: string }) => {
+      guard(event, 'canvas:save-bytes');
+      const win = BrowserWindow.fromWebContents(event.sender);
+      const opts = { defaultPath: path.join(app.getPath('downloads'), req.suggestedName) };
+      const result = await (win === null
+        ? dialog.showSaveDialog(opts)
+        : dialog.showSaveDialog(win, opts));
+      if (result.canceled || result.filePath === undefined) return { ok: false };
+      try {
+        writeFileSync(result.filePath, Buffer.from(req.base64, 'base64'));
+        return { ok: true, savedTo: result.filePath };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        log.warn('save-bytes failed', { error: message });
+        return { ok: false, error: message };
+      }
+    },
+  );
+  ipcMain.handle(
+    'canvas:send-bytes-to',
+    async (event, req: { base64: string; fileName: string; app: string }) => {
+      guard(event, 'canvas:send-bytes-to');
+      // The generated-media root is inside the pd-file fence and is where every
+      // other made thing lands, so the file stays findable after the hand-off.
+      const dir = path.join(bobbleDir(GENERATED_DIR), '3d');
+      mkdirSync(dir, { recursive: true });
+      const target = path.join(dir, path.basename(req.fileName));
+      try {
+        writeFileSync(target, Buffer.from(req.base64, 'base64'));
+        await openApp(req.app, target);
+        return { ok: true, savedTo: target };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        log.warn('open-with failed', { app: req.app, error: message });
+        return {
+          ok: false,
+          savedTo: target,
+          error: /Unable to find application/i.test(message)
+            ? `${req.app} is not installed on this Mac — the file is at ${target}`
+            : message,
+        };
+      }
+    },
+  );
 }
 
 /** `open -a <app> <target>` as a promise (macOS). Rejects on a non-zero exit

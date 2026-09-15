@@ -15,6 +15,7 @@ import { BlendGraph } from './BlendGraph';
 import { EXPORT_FORMATS, type ExportFormat } from './data';
 import { GenStage } from './GenStage';
 import { useGen3dStore } from './gen3d-client';
+import { HistoryRail } from './HistoryRail';
 import {
   IcCamera,
   IcCaretSmall,
@@ -23,7 +24,6 @@ import {
   IcFrame,
   IcHistory,
   IcMouse,
-  IcPlanet,
   IcQuestion,
   IcSun,
   IcTrackpad,
@@ -321,39 +321,12 @@ function RenderModeStrip(): JSX.Element {
 }
 
 // ── bottom action pill: turntable + Export, nothing else ─────────────────
-function ActionBar(): JSX.Element {
-  const autoRotate = useTripoStore((s) => s.autoRotate);
-  const set = useTripoStore((s) => s.set);
-
-  return (
-    <div className="tp-actionbar" data-testid="tp-actionbar">
-      <Hint text="Turntable">
-        <button
-          type="button"
-          className="tp-action-btn"
-          data-active={autoRotate}
-          data-testid="tp-turntable-btn"
-          onClick={() => set('autoRotate', !autoRotate)}
-        >
-          <IcPlanet size={16} />
-        </button>
-      </Hint>
-      {/* The top bar already owns the canonical Export CTA; this in-viewport
-          shortcut is the same action with the same label, so it renders quiet
-          rather than as a second identical accent pill (they measured 3160px^2
-          each, side by side, with nothing to distinguish them). */}
-      <button
-        type="button"
-        className="tp-export-cta tp-export-cta-quiet"
-        data-testid="tp-export-pill-btn"
-        onClick={() => set('modal', 'export')}
-      >
-        <IcDownload size={15} />
-        Export
-      </button>
-    </div>
-  );
-}
+/*
+ * NO ACTION BAR. the user (2026-09-14): "remove lower 'turntable' and export
+ * buttons." Export lives in the app's top-right cluster (TopBar.tsx); the
+ * turntable was a toggle nobody reached for under a strip that already
+ * carries the modes.
+ */
 
 // ── export dialog (REAL: three.js exporters via viewer-io) ───────────────
 function ExportDialog(): JSX.Element {
@@ -572,6 +545,7 @@ export function Viewport(): JSX.Element {
   const [flash, setFlash] = useState(0);
   const job = useGen3dStore((s) => s.job);
   const generating = job !== null && !job.done;
+  const deliveryNote = useTripoStore((s) => s.deliveryNote);
 
   // The animation state machine editor takes over the whole viewport.
   const showGraph = tool === 'animate' && graphOpen;
@@ -634,13 +608,15 @@ export function Viewport(): JSX.Element {
 
       <Gizmo gizmoRef={gizmoRef} />
       <FloatToolbar onSnapshot={() => setFlash((f) => f + 1)} />
+      {loadedAssetId !== null ? <HistoryRail /> : null}
       {flash > 0 ? <div key={flash} className="tp-flash" /> : null}
 
-      {loadedAssetId !== null ? (
-        <>
-          <RenderModeStrip />
-          <ActionBar />
-        </>
+      {loadedAssetId !== null ? <RenderModeStrip /> : null}
+
+      {deliveryNote !== null ? (
+        <output className="tp-delivery-note" data-testid="tp-delivery-note">
+          {deliveryNote}
+        </output>
       ) : null}
 
       {/* The generating experience: full-viewport while there is nothing to

@@ -99,6 +99,10 @@ import { WindowDropOverlay } from './WindowDropOverlay';
 /* `lazyRoute` so a chunk that will not fetch costs the app these two buttons
  * and nothing else — see RouteBoundary.tsx. `inline` because a card in the top
  * bar would be a worse failure than the one it is reporting. */
+const StudioEngineChip = lazyRoute('3D engine chip', () => import('../tripo/StudioEngineChip'), {
+  pick: (m) => m.StudioEngineChip,
+  variant: 'inline',
+});
 const TripoTopBarControls = lazyRoute('3D controls', () => import('../tripo/TopBar'), {
   pick: (m) => m.TripoTopBarControls,
   variant: 'inline',
@@ -711,7 +715,15 @@ export function ChatApp({
                         content route (the hub, Scheduled, Connectors) is not
                         about a conversation, so neither the dial nor the model's
                         state belongs in its bar. */}
-                    {contentTitle === undefined ? <EngineMenu /> : null}
+                    {contentTitle === undefined ? (
+                      modality === '3d' ? (
+                        /* The studio's engine and its steps/s, not the chat
+                           model's dial (StudioEngineChip.tsx). */
+                        <StudioEngineChip />
+                      ) : (
+                        <EngineMenu />
+                      )
+                    ) : null}
                     {/* The downloads tray, on every route (downloads start on
                         the hub and are watched from the chat): the icon is up
                         while anything moves or there is news, and the bars,
@@ -899,7 +911,8 @@ export function ChatApp({
                 rect before the renderer sees them, and a second control in the
                 same corner would hit the identical bug on its own.
               */}
-              <ModeToggle />
+              {/* Not in the 3D studio — the user: "no work/chat buttons here". */}
+              {modality === '3d' ? null : <ModeToggle />}
             </div>
 
             <CanvasErrorBoundary>

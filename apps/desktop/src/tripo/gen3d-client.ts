@@ -511,3 +511,10 @@ export function ensureGen3dWired(): void {
     void useGen3dStore.getState().refresh();
   });
 }
+
+// E2E hook (same ?piE2E=1 opt-in as __tripo_store): a probe can read the
+// engine's state and run a stage the way the panels do.
+if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('piE2E')) {
+  (window as unknown as { __gen3d_store?: () => typeof useGen3dStore }).__gen3d_store = () =>
+    useGen3dStore;
+}

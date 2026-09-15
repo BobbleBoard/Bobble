@@ -1032,6 +1032,26 @@ export type CanvasInvokeMap = {
     request: { path: string; suggestedName?: string };
     response: { ok: boolean; savedTo?: string; error?: string };
   };
+  /**
+   * Save BYTES the renderer made — a mesh the 3D viewer just exported — through
+   * the same save panel. An `<a download>` click in Electron lands in
+   * ~/Downloads with no panel and no word, which is why the studio's Export
+   * looked like it did nothing (the user, 2026-09-14: "send to and export buttons
+   * should be functional and work"). Base64 because IPC carries strings well
+   * and a 20 MB GLB is fine that way.
+   */
+  'canvas:save-bytes': {
+    request: { base64: string; suggestedName: string };
+    response: { ok: boolean; savedTo?: string; error?: string };
+  };
+  /**
+   * Hand a file the renderer made to another app: written under the
+   * generated-media root, then `open -a <app>`. The 3D studio's Send To.
+   */
+  'canvas:send-bytes-to': {
+    request: { base64: string; fileName: string; app: string };
+    response: { ok: boolean; savedTo?: string; error?: string };
+  };
   /** Renderer → main: report a compact snapshot of what's on the canvas right now
    * (canvas-awareness). Main caches it and serves it to the pi child's `context`
    * hook (browser url/title re-enriched from the live view). Debounced by the
@@ -1055,6 +1075,8 @@ export const CANVAS_INVOKE_CHANNELS = [
   'canvas:reveal',
   'canvas:start-drag',
   'canvas:save-as',
+  'canvas:save-bytes',
+  'canvas:send-bytes-to',
   'canvas:report-state',
   'canvas:site-icon',
 ] as const satisfies readonly (keyof CanvasInvokeMap)[];
