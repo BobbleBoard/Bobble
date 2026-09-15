@@ -21,6 +21,7 @@
  */
 import { type JSX, useCallback, useMemo, useState } from 'react';
 import { ThreadMedia } from '../chat/ThreadMedia';
+import { ModuleCard } from '../media/ModuleCard';
 import { useGenStore } from '../state/gen-store';
 import { aspectOf, RunHeader, StudioJob, widthOf } from './StudioRun';
 import {
@@ -168,6 +169,7 @@ export function VideoStudio(): JSX.Element {
       {...(job?.cancellable === true ? { onStop: cancel } : {})}
       runLabel={enhancer.enhancing ? 'Enhancing…' : 'Generate'}
       {...(blocked !== undefined ? { blocked } : {})}
+      notice={<ModuleCard id="comfy" place="studio" />}
       error={error}
       onRetry={() => void onRun()}
       {...(handoff.card !== undefined ? { input: handoff.card } : {})}

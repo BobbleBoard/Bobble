@@ -21,9 +21,18 @@
  * one-click uninstall honest.
  */
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import path from 'node:path';
 import { cacheRoot, libraryRoot } from '@pi-desktop/inference';
+import { ensureUv, PINNED_UV, uvDir } from '@pi-desktop/web-tools';
 import type { EngineState } from '../ipc-contract';
 import { COMFY_H3_SHIM_DIRNAME, COMFY_H3_SHIM_PY } from './comfy-h3-shim';
 import { engineInstalled, mlxVenvRoot, vllmVenvRoot } from './engine-paths';
@@ -135,6 +144,13 @@ function run(cmd: string, args: string[], timeoutMs = 20 * 60_000): Promise<void
 }
 
 /** `uv` is how the venv is created and populated; without it MLX installs fail. */
+/**
+ * A uv already on this Mac, by the places people put it — plus the app's own
+ * pinned copy (`ensureUv`'s marker), which is what a Mac that never had Python
+ * tooling gets. `null` only when there is none of either; an INSTALL then
+ * fetches the pinned copy (see {@link ensureUvPath}) rather than telling the
+ * user to go and install uv.
+ */
 function uvPath(): string | null {
   for (const p of [
     path.join(process.env.HOME ?? '', '.local/bin/uv'),
@@ -143,14 +159,26 @@ function uvPath(): string | null {
   ]) {
     if (existsSync(p)) return p;
   }
+  try {
+    const marker = JSON.parse(
+      readFileSync(path.join(uvDir(PINNED_UV.version), '.installed.json'), 'utf8'),
+    ) as { uvPath?: string };
+    if (typeof marker.uvPath === 'string' && existsSync(marker.uvPath)) return marker.uvPath;
+  } catch {
+    // no pinned copy yet
+  }
   return null;
 }
 
+/** uv for an install: what is here, else the pinned copy, fetched. */
+async function ensureUvPath(): Promise<string> {
+  const here = uvPath();
+  if (here !== null) return here;
+  return (await ensureUv()).uvPath;
+}
+
 async function ensureVenv(): Promise<string> {
-  const uv = uvPath();
-  if (uv === null) {
-    throw new Error('uv is required to install MLX engines and was not found');
-  }
+  const uv = await ensureUvPath();
   if (!existsSync(pyRoot())) {
     await run(uv, ['venv', pyRoot(), '--python', '3.12']);
   }
@@ -354,8 +382,7 @@ const OPS: Record<string, EngineOps> = {
     // the whole tree here, and a size that is wrong by half is worse than slow.
     bytes: () => (existsSync(comfyRoot()) ? dirBytes(comfyRoot(), 400_000) : undefined),
     install: async () => {
-      const uv = uvPath();
-      if (uv === null) throw new Error('uv is required to install ComfyUI and was not found');
+      const uv = await ensureUvPath();
       if (!existsSync(comfyMainPy())) {
         rmSync(comfyRoot(), { recursive: true, force: true });
         await run(
@@ -474,8 +501,7 @@ const OPS: Record<string, EngineOps> = {
     bytes: () => (existsSync(vllmVenvRoot()) ? dirBytes(vllmVenvRoot(), 400_000) : undefined),
     install: async () => {
       if (process.platform !== 'linux') throw new Error('vLLM runs on Linux only');
-      const uv = uvPath();
-      if (uv === null) throw new Error('uv is required to install vLLM and was not found');
+      const uv = await ensureUvPath();
       if (!existsSync(vllmVenvRoot())) await run(uv, ['venv', vllmVenvRoot(), '--python', '3.12']);
       await run(uv, ['pip', 'install', '--python', vllmVenvRoot(), 'vllm'], 60 * 60_000);
     },

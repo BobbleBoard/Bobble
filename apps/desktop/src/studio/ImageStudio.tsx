@@ -25,6 +25,7 @@
  */
 import { type JSX, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ThreadMedia } from '../chat/ThreadMedia';
+import { ModuleCard } from '../media/ModuleCard';
 import { useGenStore } from '../state/gen-store';
 import { aspectOf, RunHeader, StudioJob, widthOf } from './StudioRun';
 import {
@@ -332,6 +333,7 @@ export function ImageStudio(): JSX.Element {
       {...(job?.cancellable === true ? { onStop: cancel } : {})}
       runLabel={enhancer.enhancing ? 'Enhancing…' : handoff.input !== null ? 'Edit' : 'Generate'}
       {...(blocked !== undefined ? { blocked } : {})}
+      notice={<ModuleCard id="image" place="studio" />}
       error={error}
       onRetry={() => void onRun()}
       {...(handoff.card !== undefined ? { input: handoff.card } : {})}

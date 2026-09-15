@@ -95,6 +95,7 @@ export { isGenEvent, NdjsonParser, parseGenEventLine } from './protocol.js';
 export type { WorkerUvArgsOptions } from './worker-command.js';
 export {
   baseWorkerWith,
+  buildEnvWarmArgs,
   buildWorkerUvArgs,
   DEFAULT_PYTHON_VERSION,
   GEN_WORKER_PATH_ENV,

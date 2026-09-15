@@ -66,6 +66,27 @@ export function baseWorkerWith(backend: Backend, mfluxPin: string = MFLUX_PIN): 
   }
 }
 
+/**
+ * The argv that WARMS a backend's environment and nothing else: the same
+ * `uv run --with …` prefix the worker gets, running a one-line python instead
+ * of worker.py. uv resolves and downloads every package before that line runs,
+ * so this is the multi-gigabyte first-run download, done on purpose, with its
+ * progress on screen (see the app's gen-modules) instead of inside somebody's
+ * first picture. Pure.
+ */
+export function buildEnvWarmArgs(opts: {
+  backend: Backend;
+  mfluxPin?: string;
+  python?: string;
+  extraWith?: readonly string[];
+}): string[] {
+  const args = ['run', '--no-project', '--python', opts.python ?? DEFAULT_PYTHON_VERSION];
+  for (const dep of baseWorkerWith(opts.backend, opts.mfluxPin)) args.push('--with', dep);
+  for (const dep of opts.extraWith ?? []) args.push('--with', dep);
+  args.push('python', '-c', "print('module ready')");
+  return args;
+}
+
 /** Env var an embedder can set to point at an explicit worker.py (packaged app). */
 export const GEN_WORKER_PATH_ENV = 'PI_GEN_WORKER_PATH';
 

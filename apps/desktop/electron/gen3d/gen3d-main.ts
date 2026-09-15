@@ -45,6 +45,7 @@ import {
 } from '@pi-desktop/shared';
 import { ensureUv } from '@pi-desktop/web-tools';
 import { app, BrowserWindow, type IpcMain, type WebContents } from 'electron';
+import { moduleMissingMessage } from '../gen/gen-modules';
 import { tieredSpawn } from '../inference/worker-tier';
 import type { AppEventMap } from '../ipc-contract';
 import { runLibraryMigration } from '../storage/storage-main';
@@ -145,6 +146,39 @@ function audioPaths(): { python: string; worker: string } {
   return { python, worker };
 }
 
+/**
+ * THE 3D MODULE, as gen-modules sees it. Ready once the sidecar is up (its
+ * first start is its install: uv, then its pinned environment); the button
+ * starts it and streams the log lines it prints on the way up.
+ */
+export function gen3dModuleReady(): boolean {
+  return sidecar !== null;
+}
+export async function warmGen3dModule(
+  report: (detail: string, percent?: number) => void,
+): Promise<void> {
+  report('Starting the 3D engine — its environment downloads on the first start…');
+  const stop = moduleReporters.add(report);
+  try {
+    const instance = await ensureSidecar();
+    if (instance === null) throw new Error('the 3D engine did not start — see the log');
+    report('3D engine ready');
+  } finally {
+    stop();
+  }
+}
+/** Card detail lines while the sidecar boots (see the log sink in startSidecar). */
+const moduleReporters = {
+  set: new Set<(detail: string, percent?: number) => void>(),
+  add(fn: (detail: string, percent?: number) => void): () => void {
+    this.set.add(fn);
+    return () => this.set.delete(fn);
+  },
+  say(line: string): void {
+    for (const fn of this.set) fn(line);
+  },
+};
+
 async function ensureSidecar(): Promise<Gen3dSidecar | null> {
   if (sidecar !== null) return sidecar;
   if (sidecarStarting !== null) return sidecarStarting;
@@ -225,7 +259,10 @@ async function startSidecar(): Promise<Gen3dSidecar | null> {
     sandboxDir,
     registryPath,
     port,
-    log: (msg, meta) => log.info(msg, meta),
+    log: (msg, meta) => {
+      log.info(msg, meta);
+      moduleReporters.say(msg);
+    },
     onDown: () => {
       if (sidecar === instance) sidecar = null;
       sidecarStarting = null;
@@ -379,8 +416,10 @@ async function sidecarPost<T>(route: string, body: unknown): Promise<T | null> {
 // uses, so there stays ONE engine, ONE model manager, ONE 24 GB job at a time.
 // ---------------------------------------------------------------------------
 
-const ENGINE_DOWN =
-  'The 3D engine runtime is not available (uv/Python sidecar failed to start). Install uv and retry.';
+// "Install uv and retry" sent the model off to pip-install things (MEASURED —
+// see gen/gen-modules.ts); the sentence is the module's now, with the marker
+// that puts the Download button in the chat.
+const ENGINE_DOWN = moduleMissingMessage('3d');
 
 export interface ImageJobRequest {
   /** Text→image prompt, or (with `editFrom`) the edit instruction. */

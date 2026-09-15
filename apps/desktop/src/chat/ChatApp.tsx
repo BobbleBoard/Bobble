@@ -65,6 +65,7 @@ import { GuardianBanner } from './GuardianBanner';
 import { useHarnessTitleSync } from './harness-title';
 import { InputNeededBanner } from './InputNeededBanner';
 import { ModeToggle } from './ModeToggle';
+import { ModuleNotice } from './ModuleNotice';
 import { SessionSidebar } from './SessionSidebar';
 import { StageAnnouncer } from './StageAnnouncer';
 import { useSiteIcon } from './site-icons';
@@ -821,6 +822,9 @@ export function ChatApp({
                         Restored an earlier session; some history was truncated.
                       </div>
                     ) : null}
+                    {/* A generation the model asked for that this Mac cannot make
+                  yet: the Download button, right where the reply is waited for. */}
+                    <ModuleNotice />
                     {/* Round-12 W2: the project (working-folder) chip moved OFF the
                   top of the composer into the sticking-out ComposerBar below the
                   input (mounted inside ChatComposer). */}

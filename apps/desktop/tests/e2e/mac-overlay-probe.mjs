@@ -311,7 +311,8 @@ try {
   await sleep(280);
   const typing = await native();
   await shotAt('04-typing.png', RECT.x + 450, RECT.y + 300, 620);
-  if (typing.bubble?.text !== 'Typing' || !typing.bubble?.sub?.includes('Hello from Pi')) {
+  // the user (2026-09-13): the pill says the action, never what is being typed.
+  if (typing.bubble?.text !== 'Typing' || (typing.bubble?.sub ?? '') !== '') {
     fail(`typing pill: ${JSON.stringify(typing.bubble)}`);
   }
   if (typing.bubble?.dots !== true) fail('typing dots not shown');
@@ -321,7 +322,7 @@ try {
   await sleep(220);
   const keyed = await native();
   await shotAt('05-key-combo.png', RECT.x + 450, RECT.y + 300);
-  if (keyed.bubble?.text !== 'Pressing ⌘⇧S') fail(`key pill label: ${keyed.bubble?.text}`);
+  if (keyed.bubble?.text !== 'Pressing a key') fail(`key pill label: ${keyed.bubble?.text}`);
 
   // ── dark backdrop variant (the glyph must read on dark too) ───────────────
   await withBackdrop('1e2030');

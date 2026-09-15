@@ -274,6 +274,13 @@ export function bubbleText(
       visible: true,
     };
   }
+  /*
+   * THE BUBBLE SAYS THE ACTION, NOT ITS CONTENTS. the user (2026-09-13): "don't
+   * show what it's typing or what it's clicking in the little pill just show
+   * the action or 'thinking'". The object (what was clicked, the typed text,
+   * the key) is the act strip's — a history under the picture — and never the
+   * pill's. Opening keeps its app: that is the action, not its contents.
+   */
   const { verb, object } = actWords(state, text);
   const mark = true;
   switch (state) {
@@ -288,7 +295,7 @@ export function bubbleText(
       };
     case 'clicking':
       return {
-        label: object === '' ? 'Clicking' : `Clicking ${object}`,
+        label: 'Clicking',
         detail: '',
         dots: false,
         mark,
@@ -298,15 +305,15 @@ export function bubbleText(
     case 'typing':
       return {
         label: 'Typing',
-        detail: object,
+        detail: '',
         dots: false,
         mark,
-        truncate: 'head',
+        truncate: 'drop',
         visible: true,
       };
     case 'pressing':
       return {
-        label: `Pressing ${object}`.trimEnd(),
+        label: 'Pressing a key',
         detail: '',
         dots: false,
         mark,
@@ -315,7 +322,7 @@ export function bubbleText(
       };
     case 'scrolling':
       return {
-        label: object === '' ? 'Scrolling the window' : `Scrolling ${object}`,
+        label: 'Scrolling',
         detail: '',
         dots: false,
         mark,

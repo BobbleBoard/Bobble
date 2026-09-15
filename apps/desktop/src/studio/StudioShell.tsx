@@ -137,6 +137,12 @@ export interface StudioShellProps {
    * accepting the file into a run that would fail forty seconds later.
    */
   readonly onDropFiles?: (files: readonly File[]) => boolean;
+  /**
+   * WHAT HAS TO BE INSTALLED FIRST — the module card (media/ModuleCard), above
+   * the composer, for as long as this room's engine is not on the Mac. It is
+   * the first thing a fresh install sees in the room, which is the point.
+   */
+  readonly notice?: ReactNode;
   readonly children: ReactNode;
   readonly testid?: string;
 }
@@ -161,6 +167,7 @@ export function StudioShell({
   onRetry,
   input,
   onDropFiles,
+  notice,
   children,
   testid = 'studio',
 }: StudioShellProps): JSX.Element {
@@ -297,6 +304,7 @@ export function StudioShell({
           value-stating buttons on the page's own background.
         */}
         <div className="pd-studio-compose">
+          {notice}
           {/* What this run is working FROM — see the `input` prop. Above the
               field because it is part of the sentence being written. */}
           {input !== undefined ? (

@@ -8234,3 +8234,130 @@ body[data-media-expanded="true"] .pd-studio-compose {
     transform: rotate(360deg);
   }
 }
+
+/* ── generation module cards (media/ModuleCard) ─────────────────────────────
+ * the user: "a popup/prominent button that has something like 'download module'
+ * for image/audio/3d/video". One card, in the studio above the composer and
+ * in the chat above the input while a request waits on it. Prominent by
+ * being the only filled control in its column; opaque, on the raised ground. */
+.pd-module-notice {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 700px;
+  margin: 0 auto 10px;
+}
+.pd-module-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--pd-border-default);
+  border-radius: var(--pd-radius-lg);
+  background: var(--pd-bg-raised);
+  box-shadow: var(--pd-shadow-edge), var(--pd-shadow-sm);
+}
+.pd-module-card[data-place="studio"] {
+  margin: 0 0 10px;
+}
+.pd-module-card-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.pd-module-card-title {
+  margin: 0;
+  font-size: var(--pd-font-size-body);
+  font-weight: var(--pd-font-weight-medium);
+  color: var(--pd-text-primary);
+}
+.pd-module-card-sub {
+  margin: 0;
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+  color: var(--pd-text-secondary);
+  /* Two lines, then a cut: the sentence is short, the box is not always wide. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  text-wrap: pretty;
+}
+.pd-module-card-track {
+  position: relative;
+  height: 4px;
+  margin-top: 6px;
+  border-radius: 999px;
+  background: var(--pd-bg-track);
+  overflow: hidden;
+}
+.pd-module-card-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--pd-accent-primary);
+  transition: width var(--pd-duration-base) var(--pd-easing-standard);
+}
+/* No number yet: the bar sweeps, so a long resolve still reads as alive. */
+.pd-module-card-track[data-indeterminate="true"] .pd-module-card-fill {
+  width: 38%;
+  animation: pd-module-sweep 1.4s ease-in-out infinite;
+}
+@keyframes pd-module-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(280%);
+  }
+}
+.pd-module-card-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pd-module-card-btn {
+  height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--pd-radius-button);
+  background: var(--pd-accent-primary);
+  color: var(--pd-text-on-accent);
+  font: inherit;
+  font-size: var(--pd-font-size-caption);
+  font-weight: var(--pd-font-weight-medium);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.pd-module-card-btn:hover {
+  filter: brightness(1.08);
+}
+.pd-module-card-btn:focus-visible {
+  outline: 2px solid var(--pd-accent-primary);
+  outline-offset: 2px;
+}
+.pd-module-card-close {
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--pd-border-subtle);
+  border-radius: var(--pd-radius-button);
+  background: transparent;
+  color: var(--pd-text-secondary);
+  font: inherit;
+  font-size: var(--pd-font-size-caption);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.pd-module-card-close:hover {
+  background: var(--pd-bg-hover);
+  color: var(--pd-text-primary);
+}
+@media (prefers-reduced-motion: reduce) {
+  .pd-module-card-track[data-indeterminate="true"] .pd-module-card-fill {
+    animation: none;
+    width: 100%;
+    opacity: 0.5;
+  }
+}

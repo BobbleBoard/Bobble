@@ -4,6 +4,7 @@ import path from 'node:path';
 import { claudePaths, parseClaudeWindowState } from '@pi-desktop/importers';
 import { excludeCacheFromIndexing } from '@pi-desktop/inference';
 import { createIpcEventSender, createLogger, registerIpcHandlers } from '@pi-desktop/shared';
+import { ensureUv } from '@pi-desktop/web-tools';
 import {
   app,
   BrowserWindow,
@@ -40,6 +41,7 @@ import {
   registerGenCatalogIpc,
   registerGenIpc,
 } from './gen/gen-manager';
+import { createGenModules } from './gen/gen-modules-main';
 import { startGuardian } from './gen/guardian-main';
 import { genWorkerCandidates, resolveGenWorkerScript } from './gen/worker-path';
 import { registerGen3dIpc } from './gen3d/gen3d-main';
@@ -831,7 +833,28 @@ function registerAppIpc(): void {
         }),
       });
     }
+    /*
+     * THE MODULES (gen/gen-modules.ts): what a modality needs on this Mac and
+     * the button that installs it. Their state is pushed to the window; the
+     * gate inside registerGenIpc holds a job on them.
+     */
+    const genModules = createGenModules((states) => {
+      const wc = mainWindow?.webContents ?? null;
+      if (wc !== null && !wc.isDestroyed()) events.send(wc, 'gen:module', states);
+    });
     const genQueue = registerGenIpc({
+      /*
+       * uv, FOUND THE WAY THE REST OF THE APP FINDS IT. The client's own probe
+       * is PATH only, and a packaged app launched from Finder has the bare
+       * system PATH — the user's `~/.local/bin/uv` was invisible to it, every
+       * picture failed with "uv is required … Install uv and retry", and the
+       * model then tried to pip-install uv on a Mac with no pip. `ensureUv`
+       * looks on PATH, then at the app's own pinned copy, and fetches that
+       * copy when there is none — the same bootstrap the 3D sidecar and the
+       * office pipeline already rely on.
+       */
+      resolveUv: async () => (await ensureUv()).uvPath,
+      modules: genModules,
       /*
        * Hold a heavy generation while the machine is struggling.
        *

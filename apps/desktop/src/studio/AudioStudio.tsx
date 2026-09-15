@@ -32,6 +32,7 @@
  */
 import { type JSX, useCallback, useMemo, useRef, useState } from 'react';
 import { ThreadMedia } from '../chat/ThreadMedia';
+import { ModuleCard } from '../media/ModuleCard';
 import { useGenStore } from '../state/gen-store';
 import { RunHeader, StudioJob } from './StudioRun';
 import {
@@ -264,6 +265,7 @@ export function AudioStudio(): JSX.Element {
               : 'Generate'
       }
       {...(blocked !== undefined ? { blocked } : {})}
+      notice={<ModuleCard id={mode === 'speech' ? 'audio' : 'comfy'} place="studio" />}
       error={error}
       onRetry={() => void onRun()}
       {...(handoff.card !== undefined ? { input: handoff.card } : {})}

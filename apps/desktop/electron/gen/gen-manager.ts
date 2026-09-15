@@ -81,6 +81,7 @@ import type {
   GenInvokeMap,
   GenSurfacePayload,
 } from './gen-ipc-contract';
+import { type GenModulesManager, moduleForBackend } from './gen-modules';
 import { createStillRenderer } from './hyperframes-still';
 import { openStillWindow } from './hyperframes-window';
 import { createRoomKeeper, type RoomKeeper } from './make-room';
@@ -193,6 +194,12 @@ export interface GenManagerOptions {
    * a download-then-continue gate for `comfyui`-backed jobs is built from it.
    */
   readonly comfyInstall?: Pick<ComfyInstallManager, 'status' | 'recordConsent' | 'run'>;
+  /**
+   * The generation MODULES (gen-modules.ts): a job whose runtime is not on
+   * this Mac waits for the Download button rather than failing or installing
+   * in silence, and continues when the install lands. Absent: no gate.
+   */
+  readonly modules?: GenModulesManager;
 }
 
 /**
@@ -438,6 +445,21 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
       ? makeComfyAssetGate(opts.comfyInstall, { awaitConsent })
       : undefined);
 
+  // ── the module gate (gen-modules.ts) ────────────────────────────────────────
+  // Before a job's weights, its RUNTIME: the uv environment for mflux / mlx-audio,
+  // ComfyUI for the rest. Not ready → the job waits for the Download button the
+  // renderer is now showing, and continues when the install lands.
+  const modules = opts.modules;
+  const ensureModule = async (backend: string): Promise<void> => {
+    const id = moduleForBackend(backend);
+    if (id === undefined || modules === undefined) return;
+    await modules.ensure(id);
+  };
+  const moduleSucceeded = (backend: string): void => {
+    const id = moduleForBackend(backend);
+    if (id !== undefined) modules?.markReady(id);
+  };
+
   /**
    * The worker's own words, tidied enough to sit in a one-line status.
    *
@@ -604,6 +626,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
     try {
       // Download-then-continue: an mflux image needs no up-front pack, so this is
       // a no-op here; the seam is uniform so a future comfyui-backed image gates too.
+      await ensureModule(job.backend);
       const need = needForModel(model);
       if (need !== undefined && ensureAsset !== undefined) await ensureAsset(need);
       noteSinks.set(jobId, (line) => {
@@ -616,6 +639,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
         footprintGB,
         onEvent,
       }).result;
+      moduleSucceeded(job.backend);
       progress = undefined;
       send('gen:update', { tabId, payload: payload('done') });
       return { jobId, outputs };
@@ -702,6 +726,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
     try {
       // Download-then-continue: a comfyui-backed video (LTX / Wan) whose weights
       // pack is missing PROMPTS the user, downloads on accept, then continues here.
+      await ensureModule(job.backend);
       const need = needForModel(model);
       if (need !== undefined && ensureAsset !== undefined) await ensureAsset(need);
       noteSinks.set(jobId, (line) => {
@@ -726,6 +751,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
           ? { extraWith: model.auxDeps }
           : {}),
       }).result;
+      moduleSucceeded(job.backend);
       progress = undefined;
       send('gen:update', { tabId, payload: payload('done') });
       // A chat model can't watch an MP4 — extract a still poster frame (best-effort).
@@ -871,6 +897,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
     try {
       // Same download-then-continue courtesy the video path gets: a ComfyUI music
       // or SFX model whose weights pack is missing prompts, downloads, continues.
+      await ensureModule(job.backend);
       const need = needForModel(model);
       if (need !== undefined && ensureAsset !== undefined) await ensureAsset(need);
       noteSinks.set(jobId, (line) => {
@@ -895,6 +922,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
           ? { extraWith: model.auxDeps }
           : {}),
       }).result;
+      moduleSucceeded(job.backend);
       progress = undefined;
       canvasPush('gen:update', payload('done'));
       return {
@@ -1161,6 +1189,39 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
           return { state: await installer.status(req.acceptedLicenses) };
         }
         return { state: await installer.run(req.packIds, req.acceptedLicenses) };
+      },
+    );
+  }
+
+  // The modules' own invokes (gen-modules.ts): a fresh status, the Download
+  // button, the card's close. Progress rides the `gen:module` event the manager
+  // emits through its port.
+  if (modules !== undefined) {
+    ipcMain.handle('gen:module-status', async (event) => {
+      guard(event, 'gen:module-status');
+      return { modules: await modules.refresh() };
+    });
+    ipcMain.handle(
+      'gen:module-install',
+      async (event, req: GenInvokeMap['gen:module-install']['request']) => {
+        guard(event, 'gen:module-install');
+        // Fire; the states carry the outcome. A failure is on the card, not
+        // thrown at the button.
+        modules.install(req.id).catch((err) => {
+          log.warn('module install failed', {
+            id: req.id,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        });
+        return { modules: modules.status() };
+      },
+    );
+    ipcMain.handle(
+      'gen:module-dismiss',
+      async (event, req: GenInvokeMap['gen:module-dismiss']['request']) => {
+        guard(event, 'gen:module-dismiss');
+        modules.dismiss(req.id);
+        return { modules: modules.status() };
       },
     );
   }

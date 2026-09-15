@@ -18,6 +18,7 @@
  * invokes the install UI drives.
  */
 import type { ComfyInstallEvent, ComfyInstallState, ComfyPackLicense } from './comfy-install';
+import type { GenModuleId, GenModuleState } from './gen-modules';
 
 /**
  * The live state of one running generation, as the renderer needs to draw it.
@@ -94,6 +95,12 @@ export type GenEventMap = {
   'gen:update': { tabId: string; payload: GenSurfacePayload };
   /** ComfyUI install progress (consent / venv / torch / per-pack download / config). */
   'gen:comfy-install': ComfyInstallEvent;
+  /**
+   * The generation MODULES (gen-modules.ts): every one's readiness, the
+   * install in flight with its progress, and which ones a waiting job wants —
+   * the card's whole state, pushed on every change.
+   */
+  'gen:module': readonly GenModuleState[];
   /**
    * The machine's own state, as the guardian judges it (gen/guardian-main.ts).
    *
@@ -254,6 +261,12 @@ export type GenInvokeMap = {
     request: { acceptedLicenses?: readonly ComfyPackLicense[] };
     response: { state: ComfyInstallState };
   };
+  /** Every module's state, probed fresh. */
+  'gen:module-status': { request: Record<string, never>; response: { modules: GenModuleState[] } };
+  /** The Download button: start the install (progress arrives on `gen:module`). */
+  'gen:module-install': { request: { id: GenModuleId }; response: { modules: GenModuleState[] } };
+  /** The card's close: every job waiting on the module stops, with its sentence. */
+  'gen:module-dismiss': { request: { id: GenModuleId }; response: { modules: GenModuleState[] } };
 };
 
 export const GEN_EVENT_CHANNELS = [
@@ -261,6 +274,7 @@ export const GEN_EVENT_CHANNELS = [
   'gen:open-file',
   'gen:update',
   'gen:comfy-install',
+  'gen:module',
 ] as const satisfies readonly (keyof GenEventMap)[];
 export const GEN_INVOKE_CHANNELS = [
   'gen:generate',
@@ -270,4 +284,7 @@ export const GEN_INVOKE_CHANNELS = [
   'gen:comfy-consent',
   'gen:comfy-start',
   'gen:comfy-status',
+  'gen:module-status',
+  'gen:module-install',
+  'gen:module-dismiss',
 ] as const satisfies readonly (keyof GenInvokeMap)[];

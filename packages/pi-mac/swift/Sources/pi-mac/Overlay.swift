@@ -1298,14 +1298,20 @@ final class OverlayController: NSObject {
   /// `status` is the state name (thinking/clicking/typing/pressing/scrolling/
   /// opening/reading); `text` is the already-prettified label the Node side
   /// built (a key-combo glyph run, a typing preview, an app name).
+  ///
+  /// THE PILL SAYS THE ACTION, NOT ITS CONTENTS. the user (2026-09-13): "don't
+  /// show what it's typing or what it's clicking in the little pill just show
+  /// the action or 'thinking'". So typing is "Typing" with no preview under
+  /// it, a key press is "Pressing a key", a click is "Clicking". The text still
+  /// arrives (the canvas act strip is a history and keeps it); the pill drops it.
   func setStatus(_ status: String, text: String) {
     bubbleStatus = status
     switch status {
     case "typing":
       bubbleTextValue = "Typing"
-      bubbleSubValue = text
+      bubbleSubValue = ""
     case "pressing":
-      bubbleTextValue = text.isEmpty ? "Pressing" : "Pressing \(text)"
+      bubbleTextValue = "Pressing a key"
       bubbleSubValue = ""
     case "opening":
       bubbleTextValue = text.isEmpty ? "Opening" : text

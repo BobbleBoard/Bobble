@@ -27,27 +27,27 @@ import {
 const say = (state: Parameters<typeof bubbleText>[0], text = '', since = 0, after = ''): Bubble =>
   bubbleText(state, text, since, after);
 
-describe('bubbleText — naming the act', () => {
-  it('names what is being clicked when the producer supplies a name', () => {
-    expect(say('clicking', 'Save').label).toBe('Clicking Save');
-    expect(say('clicking', 'Cancel').label).toBe('Clicking Cancel');
-  });
-
-  it('falls back to the bare verb rather than inventing a target', () => {
+describe('bubbleText — the action, never its contents', () => {
+  // the user (2026-09-13): "don't show what it's typing or what it's clicking in
+  // the little pill just show the action or 'thinking'".
+  it('says Clicking, whatever was clicked', () => {
+    expect(say('clicking', 'Save').label).toBe('Clicking');
     expect(say('clicking').label).toBe('Clicking');
   });
 
-  it('says what is being typed, and what key is being pressed', () => {
-    expect(say('typing', 'bobble-dialog-probe')).toMatchObject({
-      label: 'Typing',
-      detail: 'bobble-dialog-probe',
-    });
-    expect(say('pressing', '⌘S').label).toBe('Pressing ⌘S');
+  it('says Typing with nothing typed under it, and Pressing a key without the key', () => {
+    expect(say('typing', 'bobble-dialog-probe')).toMatchObject({ label: 'Typing', detail: '' });
+    expect(say('pressing', '⌘S').label).toBe('Pressing a key');
   });
 
-  it('never says a bare "Scrolling" with no object at all', () => {
-    expect(say('scrolling').label).toBe('Scrolling the window');
-    expect(say('scrolling', 'the sidebar').label).toBe('Scrolling the sidebar');
+  it('says Scrolling, and Opening keeps the app because that IS the action', () => {
+    expect(say('scrolling', 'the sidebar').label).toBe('Scrolling');
+    expect(say('opening', 'Opening TextEdit').label).toBe('Opening TextEdit');
+  });
+
+  it('the act strip still gets the object (actWords is the history, not the pill)', () => {
+    expect(actWords('typing', 'hello')).toEqual({ verb: 'Type', object: 'hello' });
+    expect(actWords('pressing', '⌘S')).toEqual({ verb: 'Press', object: '⌘S' });
   });
 });
 
