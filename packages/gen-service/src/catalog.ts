@@ -979,7 +979,7 @@ export const MODALITY_CATALOG: readonly ModalityModel[] = [
       },
     },
     notes:
-      "Image → textured 3D on ComfyUI's native TRELLIS.2 nodes (0.35): the same Microsoft model as the Bobble 3D engine, repackaged by Comfy-Org as int8, with ComfyUI's own decimate / unwrap / bake behind it. MEASURED on an M5 Pro 24GB at 512³: 314s to a 300k-face GLB with base colour, metallic, roughness, normal and AO maps. Slower than the MLX engine (117s), and it needs neither git nor Xcode — one click, any Apple Silicon Mac. 1024³ is deliberately not offered here: measured 28 minutes on this path. MIT weights.",
+      "Image → textured 3D on ComfyUI's native TRELLIS.2 nodes (0.35): the same Microsoft model as the Bobble 3D engine, repackaged by Comfy-Org as int8, with ComfyUI's own decimate / unwrap / bake behind it. MEASURED on an M5 Pro 24GB at 512³: about 6 minutes to a remeshed 100k-face GLB with base colour, metallic, roughness, normal and AO maps on a 2048² sheet. Slower than the MLX engine (117s), and it needs neither git nor Xcode — one click, any Apple Silicon Mac. 1024³ is deliberately not offered here: measured 28 minutes on this path. MIT weights.",
   },
   {
     id: 'pixal3d-comfy',

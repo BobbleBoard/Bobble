@@ -639,9 +639,6 @@ function fluxGgufGraph(): ComfyGraph {
  *    the mesh stage, against 314s for the whole 512 chain. The Bobble 3D
  *    engine (MLX, needs Xcode) does 1024 in 352s; this path is the one that
  *    needs nothing, and 512 is where it earns that.
- *  - RemeshMesh. It rebuilds the surface at 768³ before decimating; the
- *    decimate-only chain gives a 300k-face mesh in 38s and the mug in it is
- *    the mug.
  *
  * ON THE CPU: every mesh node after the VAEs. On MPS they die with a negative
  * scatter index (ComfyUI 0.35 / torch 2.13); `bobble_comfy_fixes/mesh_on_cpu.py`,
@@ -814,16 +811,39 @@ function trellis2ImageTo3dGraph(engine: 'trellis2' | 'pixal3d'): ComfyGraph {
       inputs: { samples: ['12', 0], vae: ['118', 0], shape_subdivides: ['92', 1] },
     },
     /*
-     * The mesh, on the CPU (see the header). 200k faces and 1024² sheets, not
-     * upstream's 700k and 2048²: the bakes hold several float sheets at once,
-     * and MEASURED inside the app a 2048² pass ran the compressor at
-     * 4,000–11,000 pages/s for ten seconds on a 24 GB Mac — the churn the
-     * guardian reads as a thrash. A quarter of the sheet is a quarter of that,
-     * and 1024² on 200k faces is the studio's own default texel density.
+     * The mesh, on the CPU (see the header) — upstream's own post-processing,
+     * kept: REMESH the decoded surface first (512³ unsigned-distance dual
+     * contouring, twenty Taubin passes), and only then decimate, unwrap and
+     * bake from THAT. the user (2026-09-14), on a mug baked straight off the
+     * decoded voxel surface: "this cup shows a lot of artifacting … 100%
+     * fixable as trellis and pixal both produce much higher quality models
+     * than that". LOOKED AT in the studio's own viewport, same mug: without
+     * the remesh, the normal map is voxel noise and the textured view is
+     * speckled; with it, a clean glaze, a clean rim, clean normals. 100k
+     * faces on a 2048² sheet (21 texels a face) — 200k on 1024² put chart
+     * gutters under every other texel. MEASURED standalone: remesh 27s,
+     * decimate 83s, bakes ~90s.
      */
+    '241': {
+      class_type: 'RemeshMesh',
+      inputs: {
+        mesh: ['92', 0],
+        resolution: 512,
+        sign_mode: 'udf',
+        'sign_mode.qef': false,
+        'sign_mode.drop_inverted_components': false,
+        'sign_mode.drop_enclosed_components': false,
+        band: 1,
+        project_back: 0,
+        fix_poles: false,
+        smooth_iters: 20,
+        drop_small_components: 0.01,
+        precluster_max_verts: 20000000,
+      },
+    },
     '186': {
       class_type: 'DecimateMesh',
-      inputs: { mesh: ['92', 0], target_face_count: 200000, placement_mode: 'midpoint' },
+      inputs: { mesh: ['241', 0], target_face_count: 100000, placement_mode: 'midpoint' },
     },
     '238': { class_type: 'MeshSmoothNormals', inputs: { mesh: ['186', 0], crease_angle: 180 } },
     '196': {
@@ -831,7 +851,7 @@ function trellis2ImageTo3dGraph(engine: 'trellis2' | 'pixal3d'): ComfyGraph {
       inputs: {
         mesh: ['238', 0],
         segmenter: 'pec',
-        resolution: 1024,
+        resolution: 2048,
         padding: 1,
         weld_distance: 0.0002,
       },
@@ -842,15 +862,15 @@ function trellis2ImageTo3dGraph(engine: 'trellis2' | 'pixal3d'): ComfyGraph {
         mesh: ['196', 0],
         voxel_colors: ['93', 0],
         reference_mesh: ['92', 0],
-        texture_size: 1024,
+        texture_size: 2048,
       },
     },
     '224': {
       class_type: 'BakeNormalMapFromMesh',
       inputs: {
         low_poly: ['196', 0],
-        high_poly: ['92', 0],
-        resolution: 1024,
+        high_poly: ['241', 0],
+        resolution: 2048,
         cage_distance: 0.05,
         ignore_backfaces: true,
       },
@@ -859,7 +879,7 @@ function trellis2ImageTo3dGraph(engine: 'trellis2' | 'pixal3d'): ComfyGraph {
       class_type: 'BakeAmbientOcclusion',
       inputs: {
         low_poly: ['196', 0],
-        high_poly: ['92', 0],
+        high_poly: ['241', 0],
         resolution: 1024,
         samples: 64,
         max_distance: 0.71,
