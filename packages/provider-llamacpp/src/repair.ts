@@ -18,6 +18,8 @@
  * rung 2 with full access to the raw string, tool name, and schema.
  */
 
+import { appendFileSync } from 'node:fs';
+
 /**
  * JSON-Schema-shaped view of a TypeBox tool parameter schema.
  *
@@ -461,6 +463,128 @@ export function fuzzyMatchToolName(
   return best !== undefined && bestScore >= threshold
     ? { name: best, score: bestScore }
     : undefined;
+}
+
+// --- An unknown NAME: a command line typed as a tool, or a misspelling -------
+
+/** What a name that is not a tool turned out to be — the call to run instead. */
+export interface UnknownToolResolution {
+  readonly name: string;
+  readonly arguments: Record<string, unknown>;
+}
+
+/**
+ * The host's answer to "this is not one of my tools — is it one of my
+ * commands?" Pushed over the repair bridge; absent outside the harness.
+ */
+export type UnknownToolResolver = (
+  name: string,
+  args: Record<string, unknown>,
+) => UnknownToolResolution | undefined;
+
+/**
+ * A STRUCTURED CALL WHOSE NAME IS NOT A TOOL.
+ *
+ * MEASURED 2026-09-15, qwen3.5-4b on rapid-mlx, in bash-CLI mode (the only
+ * advertised tool is `bash`; every capability is a command on its PATH). Asked
+ * for a picture, the model emitted
+ *     <tool_call> {"name": "media generate image", "arguments": {"prompt": …}}
+ * — the command it had been told about, as a tool NAME, with the command's
+ * own flags as arguments. pi answered "Tool media generate image not found",
+ * the model tried `media --help` the same way, got the same answer, and
+ * painted a cow with PIL. Asked to show the file, `coordinate present` went the
+ * same way. Three intents, each one unambiguous and each one exactly the call
+ * the shell would have run, all refused on the framing.
+ *
+ * The name is the command and the arguments are its flags; the translation is
+ * mechanical, so it is done here rather than left for the model to work out
+ * from a "not found". The HOST decides what is a command (the resolver), and
+ * only a rewrite onto a registered tool is taken — the provider never invents
+ * a callable. A misspelt real tool still goes to the fuzzy match below it, and
+ * a name that is neither is left for pi's own "not found" path.
+ */
+/**
+ * TEMPLATE DEBRIS IN THE ARGUMENTS — the XML tool template's own closing tags,
+ * read back as data.
+ *
+ * MEASURED 2026-09-15 on rapid-mlx (Qwen XML tool calls, no grammar): for a
+ * call naming a tool the engine had no schema for, the parsed arguments came
+ * back as `{path: "cow-on-the-moon.png", "</parameter": …}` and, on the
+ * retry, `path: "…/cow-on-the-moon.png</parameter\""` — the template's
+ * `</parameter>` split into keys and glued onto values. Left alone, the
+ * translated command carried a stray `"</parameter"` positional and a path
+ * that named no file. A key that is a tag is never an argument; a value that
+ * ends in one never meant to. Pure; applied to unknown-named calls only,
+ * which is where the engine's lenient parse is the one in play.
+ */
+const DEBRIS_KEY = /^<\/?[a-z_]+>?$/i;
+const DEBRIS_TAIL = /(?:\s*<\/?(?:parameter|function|tool_call)>?["']?)+$/i;
+
+export function scrubTemplateDebris(args: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(args)) {
+    if (DEBRIS_KEY.test(key.trim())) continue;
+    if (typeof value === 'string') {
+      const clean = value.replace(DEBRIS_TAIL, '');
+      if (clean.trim() === '' && value.trim() !== '') continue;
+      out[key] = clean;
+      continue;
+    }
+    out[key] = value;
+  }
+  return out;
+}
+
+export function resolveUnknownToolName(
+  name: string,
+  argStr: string,
+  registered: readonly string[],
+  resolver: UnknownToolResolver | undefined,
+): { name: string; argStr: string } | undefined {
+  if (name.length === 0 || registered.length === 0 || registered.includes(name)) return undefined;
+  if (resolver !== undefined) {
+    let args: Record<string, unknown> | undefined;
+    try {
+      const parsed: unknown = argStr.length > 0 ? JSON.parse(argStr) : {};
+      args =
+        parsed !== null && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {};
+    } catch {
+      args = repairToolCallJson(argStr) ?? {};
+    }
+    let hit: UnknownToolResolution | undefined;
+    try {
+      hit = resolver(name, scrubTemplateDebris(args));
+    } catch {
+      hit = undefined;
+    }
+    tapUnknownTool(name, argStr, hit);
+    if (hit !== undefined && registered.includes(hit.name)) {
+      return { name: hit.name, argStr: JSON.stringify(hit.arguments) };
+    }
+  }
+  const match = fuzzyMatchToolName(name, registered);
+  return match === undefined ? undefined : { name: match.name, argStr };
+}
+
+/**
+ * The raw call and what it became, on the PI_DIAG_PROMPTS record (request-tap):
+ * the request bodies only ever show the REWRITTEN call, so the engine's own
+ * parse of an unknown name — the thing being repaired — was nowhere. Never
+ * throws.
+ */
+function tapUnknownTool(name: string, argStr: string, hit: UnknownToolResolution | undefined): void {
+  const diag = process.env.PI_DIAG_PROMPTS;
+  if (diag === undefined || !diag.includes('/')) return;
+  try {
+    appendFileSync(
+      diag,
+      `[pi-diag-unknown-tool] name=${JSON.stringify(name)} args=${JSON.stringify(argStr)} → ${
+        hit === undefined ? 'left for pi' : JSON.stringify(hit)
+      }\n`,
+    );
+  } catch {
+    /* a diagnostic never breaks a turn */
+  }
 }
 
 // --- Rung 4 support: per-session schema relaxation -------------------------

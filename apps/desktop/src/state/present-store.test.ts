@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   classifyPresented,
   extOf,
+  openPresented,
   presentedFor,
   UNSAVED_CHAT,
   usePresentStore,
@@ -115,5 +116,58 @@ describe('a presented card remembers where it was handed over', () => {
       (i) => i.path === '/a/logo.png',
     );
     expect(logos.map((i) => i.afterMessageId)).toEqual(['m1', 'm9']);
+  });
+});
+
+describe('openPresented — what door a presented file goes through', () => {
+  /* MEASURED 2026-09-15: a presented PNG was read as TEXT into an image tab with
+     no mediaSrc — "Failed to load file content" beside a card that said the
+     picture was ready. The preview surfaces stream bytes over pd-file://. */
+  const controller = () => {
+    const tabs: Array<{
+      id: string;
+      key: string;
+      filePath?: string;
+      mediaSrc?: string;
+      kind: string;
+    }> = [];
+    return {
+      tabs,
+      upsertTab: vi.fn((key: string, spec: Record<string, unknown>) => {
+        const id = `t${tabs.length + 1}`;
+        tabs.push({ id, key, ...(spec as object) } as never);
+        return id;
+      }),
+      updateTab: vi.fn(),
+      focusTab: vi.fn(),
+      getState: () => ({ tabs }),
+    };
+  };
+
+  it('opens a picture as a media tab with a pd-file src, never as text', async () => {
+    const c = controller();
+    (window as unknown as { piDesktop: unknown }).piDesktop = {
+      invoke: vi.fn(async (channel: string) => {
+        if (channel === 'fs:read-file') throw new Error('binary read must not happen');
+        if (channel === 'fs:list-dir') return { entries: [] };
+        return {};
+      }),
+    };
+    await openPresented(c as never, { path: '/work/image-of-a-cow/cow-on-moon.png' });
+    const tab = c.tabs.find((t) => t.kind === 'image');
+    expect(tab?.mediaSrc).toMatch(/^pd-file:\/\/f\/work\/image-of-a-cow\/cow-on-moon\.png$/);
+  });
+
+  it('still reads a page as text, so the html surface renders it', async () => {
+    const c = controller();
+    (window as unknown as { piDesktop: unknown }).piDesktop = {
+      invoke: vi.fn(async (channel: string) =>
+        channel === 'fs:read-file' ? { text: '<h1>hi</h1>' } : { entries: [] },
+      ),
+    };
+    await openPresented(c as never, { path: '/work/site/index.html' });
+    const tab = c.tabs[0] as unknown as { kind: string; artifact?: { content: { text: string } } };
+    expect(tab.kind).toBe('html');
+    expect(tab.artifact?.content.text).toBe('<h1>hi</h1>');
   });
 });

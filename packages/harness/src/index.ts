@@ -136,8 +136,12 @@ import { registerPlanTool } from './tools/plan-tool.js';
 import { PRESENT_TOOL_NAME, registerPresentTool } from './tools/present.js';
 import { presentBridgeFromEnv } from './tools/present-bridge.js';
 import { withRepeatNotice } from './tools/repeat-notice.js';
-import { registerSandboxFileTools, resolveWorkspaceRoot } from './tools/sandbox-fs.js';
-import { buildCli, commandNameFor, pathFor } from './tools/tool-cli.js';
+import {
+  registerSandboxFileTools,
+  resolveWorkspaceRoot,
+  WORKSPACE_ROOT_ENV,
+} from './tools/sandbox-fs.js';
+import { buildCli, commandLineForCall, commandNameFor, pathFor } from './tools/tool-cli.js';
 import { protectShimDollars, registerToolCli } from './tools/tool-cli-bridge.js';
 import { toolCliGroups, toolCliShimCommands } from './tools/tool-cli-groups.js';
 import { truncateToolOutput } from './tools/tool-output-truncate.js';
@@ -1631,6 +1635,32 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       // Per-session relaxed-schema lookup (rung 4). Closes over the live map, so a
       // relaxation stored after this deps object was pushed is still seen.
       relaxedSchemaFor: (toolName) => relaxedSchemas.get(toolName),
+      /*
+       * A COMMAND LINE TYPED AS A TOOL NAME, in bash-CLI mode.
+       *
+       * MEASURED 2026-09-15: the model emitted `media generate image` as a
+       * structured call with the command's flags as its arguments, and pi
+       * said "not found". The words are the command and the arguments are the
+       * flags, so the call becomes the `bash` line the shell would have run —
+       * through the same shim, socket and dispatcher a typed command uses, so
+       * the Activity tab shows it as the tool it is. Only OUR shims translate;
+       * anything else stays "not found". Deferred to call time on purpose:
+       * `pi.getAllTools()` is an action method and this deps object is first
+       * built during activate, where action methods are refused.
+       */
+      ...(toolCliMode
+        ? {
+            resolveUnknownTool: (name: string, args: Record<string, unknown>) => {
+              const command = commandLineForCall(
+                buildCli(toolCliGroups(), cliVisibleTools()),
+                name,
+                args,
+                toolCliShimCommands(toolCliGroups()),
+              );
+              return command === undefined ? undefined : { name: 'bash', arguments: { command } };
+            },
+          }
+        : {}),
       // Authoritative per-call outcome — the only entry carrying `ok`.
       onRepair: (info) =>
         pi.appendEntry(HARNESS_REPAIR_ENTRY, {
@@ -2503,6 +2533,8 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   if (readSubagentDepth(process.env) === 0) {
     registerPresentTool(pi, {
       bridge: presentBridgeFromEnv(),
+      // A relative path means the working folder — the one `write` just used.
+      resolvePath: (p) => join(liveRoot(), p),
       stat: async (target) => {
         try {
           return { isDirectory: (await stat(target)).isDirectory() };
@@ -2830,6 +2862,11 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
    */
   function toolCliPreamble(): string {
     const cli = buildCli(toolCliGroups(), cliVisibleTools());
+    const presentCommand = cli.groups.some((g) =>
+      g.commands.some((c) => c.tool.name === PRESENT_TOOL_NAME),
+    )
+      ? (cliCommandForTool?.(PRESENT_TOOL_NAME) ?? null)
+      : null;
     return [
       /*
        * NAMES ONLY — the command TREE is deliberately not here, and removing it
@@ -2929,6 +2966,25 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       '',
       'Never tell the user you are unable to do something one of these commands does.',
       '',
+      /*
+       * SHOWING IS A COMMAND. the user (2026-09-15): "guide the model via system
+       * prompt to always utilize the present tool to display files to the
+       * user." MEASURED the same day: asked to "present it", a 4B ran `open`,
+       * was refused, and told the user the picture was "now visible" without
+       * anything having been shown. See PRESENT_RULE for the schemas-mode
+       * twin; here it names the command, and only when the command exists (a
+       * subagent has no `present`).
+       */
+      ...(presentCommand === null
+        ? []
+        : [
+            'Whatever you make or change for the user — a picture, a page, a document, a',
+            `clip, a model, a script — show it to them with \`${presentCommand} <path>\` as`,
+            'your last step. A path in prose is not showing it; the command opens it beside',
+            'the chat and hands you a preview of what they will see — look at that before',
+            'you say you are done.',
+            '',
+          ]),
       /*
        * The file commands are fenced and self-repairing (write fence, dropped
        * root slash, stray markdown fence, edit diagnosis); shell redirection is
@@ -4518,6 +4574,17 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
             return;
           }
           runtime.workspaceRoot = dir;
+          /*
+           * AND THE OTHER EXTENSIONS LEARN IT TOO. gen-tools, web-tools and
+           * the rest live in this same process and cannot read `runtime`;
+           * they resolve a relative path against WORKSPACE_ROOT_ENV, which the
+           * app set at spawn — before this chat's folder existed. MEASURED
+           * 2026-09-15: "Working folder: …/image-of-a-cow" in the prompt,
+           * `--save_to=cow-on-the-moon.png` saved one level up, and the
+           * model's `present cow-on-the-moon.png` found nothing. The env is
+           * the one channel every extension already reads.
+           */
+          process.env[WORKSPACE_ROOT_ENV] = dir;
           /* The model learns of the move at its next turn — as a note in the
              conversation, not a rewrite of the frozen prompt (see
              before_agent_start: the prefix the server holds stays reusable). */

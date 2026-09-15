@@ -242,6 +242,82 @@ describe('createMlxStream — REUSES the repair ladder (matters more for MLX #10
   });
 });
 
+describe('a structured call whose NAME is a command line (bash-CLI mode)', () => {
+  /*
+   * MEASURED 2026-09-15, qwen3.5-4b on rapid-mlx: the only advertised tool is
+   * `bash`, and the model emitted `media generate image {prompt, save_to}` as
+   * a tool call — the command as a name. pi answered "Tool media generate
+   * image not found" and the model painted the picture itself.
+   */
+  const tools: Context['tools'] = [
+    {
+      name: 'bash',
+      description: 'run a command',
+      parameters: Type.Object({ command: Type.String() }),
+    },
+  ];
+  const commandCall = (chunksName: string, args: string) =>
+    sseFetch([
+      {
+        choices: [
+          { delta: { tool_calls: [{ index: 0, id: 'c9', function: { name: chunksName } }] } },
+        ],
+      },
+      { choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: args } }] } }] },
+      { choices: [{ delta: {}, finish_reason: 'tool_calls' }] },
+    ]);
+
+  it('becomes the bash call the harness says runs it', async () => {
+    const { fetchImpl } = commandCall(
+      'media generate image',
+      '{"prompt":"a cow on the moon","save_to":"pics"}',
+    );
+    const onRepair = vi.fn();
+    const resolveUnknownTool = vi.fn((name: string, args: Record<string, unknown>) =>
+      name === 'media generate image'
+        ? { name: 'bash', arguments: { command: `media generate image --prompt="${args.prompt}"` } }
+        : undefined,
+    );
+    const stream = createMlxStream({
+      fetchImpl,
+      repairProvider: () => ({ onRepair, resolveUnknownTool }),
+    })(makeModel(), emptyContext(tools));
+    const { final, events } = await consume(stream);
+    const call = final.content.find((c) => c.type === 'toolCall');
+    expect(call?.type === 'toolCall' && call.name).toBe('bash');
+    expect(call?.type === 'toolCall' && call.arguments).toEqual({
+      command: 'media generate image --prompt="a cow on the moon"',
+    });
+    expect(resolveUnknownTool).toHaveBeenCalledWith('media generate image', {
+      prompt: 'a cow on the moon',
+      save_to: 'pics',
+    });
+    const end = events.find((e) => e.type === 'toolcall_end');
+    expect(end?.type === 'toolcall_end' && end.toolCall.name).toBe('bash');
+    expect(onRepair).toHaveBeenCalledWith({ toolName: 'bash', rung: 0, ok: true });
+  });
+
+  it('leaves a name the harness does not claim for pi to refuse', async () => {
+    const { fetchImpl } = commandCall('python3', '{"code":"print(1)"}');
+    const stream = createMlxStream({
+      fetchImpl,
+      repairProvider: () => ({ resolveUnknownTool: () => undefined }),
+    })(makeModel(), emptyContext(tools));
+    const { final } = await consume(stream);
+    const call = final.content.find((c) => c.type === 'toolCall');
+    expect(call?.type === 'toolCall' && call.name).toBe('python3');
+  });
+
+  it('maps a misspelt real tool to the real one, as provider-llamacpp does', async () => {
+    const { fetchImpl } = commandCall('Bash', '{"command":"ls"}');
+    const stream = createMlxStream({ fetchImpl })(makeModel(), emptyContext(tools));
+    const { final } = await consume(stream);
+    const call = final.content.find((c) => c.type === 'toolCall');
+    expect(call?.type === 'toolCall' && call.name).toBe('bash');
+    expect(call?.type === 'toolCall' && call.arguments).toEqual({ command: 'ls' });
+  });
+});
+
 describe('the host hooks', () => {
   /*
    * MEASURED by a repo audit: this provider called neither `onPayload` nor

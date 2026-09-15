@@ -5,6 +5,7 @@ import {
   CAPABILITY_PROMPT_MARKER,
   CLI_MECHANISM_SWAPS,
   MANAGER_PROMPT_MARKER,
+  PRESENT_RULE,
   retargetToolNames,
   SHELL_CWD_TRUTH,
   stripToolCatalog,
@@ -186,6 +187,26 @@ describe('the prompt must not contradict the interface it ships with', () => {
       const p = augmentSystemPrompt('base', { toolInterface: mode });
       expect(p.length).toBeGreaterThan('base'.length + 50);
     }
+  });
+});
+
+describe('showing the user a file is a tool call, and the prompt says so', () => {
+  /* the user (2026-09-15): "guide the model via system prompt to always utilize
+     the present tool to display files to the user." */
+  it('schemas mode carries the rule, naming `present`', () => {
+    const p = augmentSystemPrompt('base', { toolInterface: 'schemas' });
+    expect(p).toContain(PRESENT_RULE);
+    expect(p).toContain('show it with `present` as your last step');
+  });
+
+  it('CLI mode leaves it to the preamble, which opens the prompt with the command', () => {
+    // The bullet is dropped here so the rule is stated once — index.ts's
+    // toolCliPreamble names `coordinate present <path>` at the top.
+    const p = augmentSystemPrompt('base', { toolInterface: 'bash-cli' });
+    expect(p).not.toContain('show it with `present`');
+    expect(CAPABILITY_PROMPT, 'the bullet the CLI strip targets must exist').toContain(
+      PRESENT_RULE,
+    );
   });
 });
 

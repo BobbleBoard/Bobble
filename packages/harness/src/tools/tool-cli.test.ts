@@ -4,6 +4,7 @@ import {
   type CliGroupSpec,
   type CliTool,
   coerceArgs,
+  commandLineForCall,
   commandNameFor,
   parseArgv,
   pathFor,
@@ -516,5 +517,147 @@ describe('svg — a group whose one tool IS the command', () => {
       kind: 'call',
       args: { prompt: 'a gear icon, single colour', out: 'assets/gear.svg' },
     });
+  });
+});
+
+describe('a one-command group named by its group word', () => {
+  const svg: CliTool = {
+    name: 'generate_svg',
+    description: 'Draw an SVG.',
+    parameters: {
+      type: 'object',
+      properties: { prompt: { type: 'string' }, image: { type: 'string' } },
+    },
+  };
+  const one = buildCli([{ name: 'svg', summary: 'Draw vectors.', tools: ['generate_svg'] }], [svg]);
+
+  it('`svg --help` is the COMMAND help — usage and arguments, not the group page', () => {
+    const res = resolveCli(one, ['svg', '--help']);
+    expect(res.kind).toBe('text');
+    expect(res.kind === 'text' && res.text).toMatch(/^Usage:/m);
+    expect(res.kind === 'text' && res.text).toContain('--prompt');
+    expect(res.kind === 'text' && res.text).not.toContain('svg <command> --help');
+  });
+
+  it('a bare `svg` still shows the group page, and flags still call', () => {
+    expect(resolveCli(one, ['svg']).kind).toBe('text');
+    expect(resolveCli(one, ['svg', '--prompt=a star'])).toEqual({
+      kind: 'call',
+      tool: 'generate_svg',
+      args: { prompt: 'a star' },
+    });
+  });
+});
+
+describe('a tool call that named the command — turned back into the line', () => {
+  /*
+   * MEASURED 2026-09-15: in bash-CLI mode a 4B emitted `media generate image`
+   * as a structured tool call with the command's flags as its arguments, then
+   * `media --help`, then `coordinate present {file_path}`. Each is the shell
+   * line in the other notation; the translation is mechanical.
+   */
+  const present: CliTool = {
+    name: 'present',
+    description: 'Show the user a file.',
+    parameters: {
+      type: 'object',
+      properties: { path: { type: 'string' }, note: { type: 'string' } },
+      required: ['path'],
+    },
+  };
+  const full = buildCli(
+    [...SPECS, { name: 'coordinate', summary: 'Settle things with people.', tools: ['present'] }],
+    [...TOOLS, present],
+  );
+  const shims = ['tools', 'media', 'browser', 'coordinate'];
+
+  /** What /bin/sh hands the shim: the line split on unquoted spaces. */
+  const argvOf = (line: string): string[] =>
+    (line.match(/"(?:[^"\\]|\\.)*"|\S+/g) ?? []).map((w) =>
+      w.startsWith('"') ? w.slice(1, -1).replace(/\\(.)/g, '$1') : w,
+    );
+
+  it('the command as a name, its flags as arguments → the line, and it resolves', () => {
+    const line = commandLineForCall(
+      full,
+      'media generate image',
+      { prompt: 'a cow on the moon', n: 2 },
+      shims,
+    );
+    expect(line).toBe('media generate image "--prompt=a cow on the moon" --n=2');
+    const res = resolveCli(full, argvOf(line ?? ''));
+    expect(res).toEqual({
+      kind: 'call',
+      tool: 'generate_image',
+      args: { prompt: 'a cow on the moon', n: 2 },
+    });
+  });
+
+  it('`media --help` typed as a name is the help', () => {
+    const line = commandLineForCall(full, 'media --help', {}, shims);
+    expect(line).toBe('media --help');
+    expect(resolveCli(full, argvOf(line ?? '')).kind).toBe('text');
+  });
+
+  it('an argument the command does not know becomes a positional, so it still lands', () => {
+    const line = commandLineForCall(
+      full,
+      'coordinate present',
+      { file_path: 'image-of-a-cow/cow-on-moon.png' },
+      shims,
+    );
+    expect(line).toBe('coordinate present image-of-a-cow/cow-on-moon.png');
+    expect(resolveCli(full, argvOf(line ?? ''))).toEqual({
+      kind: 'call',
+      tool: 'present',
+      args: { path: 'image-of-a-cow/cow-on-moon.png' },
+    });
+  });
+
+  it("a tool's registered name is the same intent", () => {
+    expect(commandLineForCall(full, 'present', { path: 'a.png' }, shims)).toBe(
+      'coordinate present --path=a.png',
+    );
+    expect(commandLineForCall(full, 'generate_image', { prompt: 'fox' }, shims)).toBe(
+      'media generate image --prompt=fox',
+    );
+  });
+
+  it('accepts the joiners a model writes instead of spaces', () => {
+    expect(commandLineForCall(full, 'media_generate_image', { prompt: 'fox' }, shims)).toBe(
+      'media generate image --prompt=fox',
+    );
+    expect(commandLineForCall(full, 'browser.snapshot', {}, shims)).toBe('browser snapshot');
+  });
+
+  it('refuses anything whose head is not one of our shims', () => {
+    expect(commandLineForCall(full, 'python3', { code: '1' }, shims)).toBeUndefined();
+    expect(commandLineForCall(full, 'ls -la', {}, shims)).toBeUndefined();
+    expect(commandLineForCall(full, 'some_tool', {}, shims)).toBeUndefined();
+    expect(commandLineForCall(full, '', {}, shims)).toBeUndefined();
+  });
+
+  it('quotes for the shell: dollars, quotes, newlines, and the values a schema types', () => {
+    const line = commandLineForCall(
+      full,
+      'media generate image',
+      { prompt: 'Revenue was $412,000 "up" 14%\nsecond line', size: '512x512', n: true },
+      shims,
+    );
+    expect(line).toBe(
+      'media generate image "--prompt=Revenue was \\$412,000 \\"up\\" 14%\nsecond line" --size=512x512 --n=true',
+    );
+    const res = resolveCli(full, argvOf(line ?? ''));
+    expect(res.kind === 'call' && res.args.prompt).toBe(
+      'Revenue was $412,000 "up" 14%\nsecond line',
+    );
+  });
+
+  it('a nested value travels as JSON', () => {
+    const line = commandLineForCall(full, 'coordinate present', { path: 'a', note: 'n' }, shims);
+    expect(line).toBe('coordinate present --path=a --note=n');
+    expect(commandLineForCall(full, 'browser click', { pos: { x: 1, y: 2 } }, shims)).toBe(
+      'browser click "{\\"x\\":1,\\"y\\":2}"',
+    );
   });
 });

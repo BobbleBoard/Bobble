@@ -461,6 +461,23 @@ describe('saveOutputs', () => {
     expect(existing.paths).toEqual(['/pics/book/title.png']);
   });
 
+  /* MEASURED: `--save_to=cow-on-the-moon.png` landed in pi's cwd, a level above
+     the working folder the prompt had named, and `present cow-on-the-moon.png`
+     found nothing there. */
+  it('roots a relative destination at the working folder, not at pi’s cwd', async () => {
+    const f = fake();
+    const r = await saveOutputs(['/g/a.png'], 'cow-on-the-moon.png', 'a cow', {
+      ...f.deps,
+      root: '/work/image-of-a-cow',
+    });
+    expect(r.paths).toEqual(['/work/image-of-a-cow/cow-on-the-moon.png']);
+    const folder = await saveOutputs(['/g/a.png'], 'pics', 'a cow', {
+      ...f.deps,
+      root: '/work/image-of-a-cow',
+    });
+    expect(folder.paths).toEqual(['/work/image-of-a-cow/pics.png']);
+  });
+
   it('keeps the name but not a wrong extension: the bytes are PNG', async () => {
     const f = fake();
     const r = await saveOutputs(['/g/cand0.png'], '/pics/fox-storybook.jpg', 'fox', f.deps);

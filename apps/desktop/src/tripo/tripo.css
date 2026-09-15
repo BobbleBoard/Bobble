@@ -2015,7 +2015,9 @@
    under the pointer pink. Sits at the viewport's top-right, under the gizmo. */
 .tp-history-rail {
   position: absolute;
-  top: 70px;
+  /* Under the axis gizmo (top 12 + 76 tall), not over its X/Z balls — the user:
+     "history should not overlap with axes gizmos". */
+  top: 100px;
   right: 16px;
   z-index: 4;
   min-width: 168px;

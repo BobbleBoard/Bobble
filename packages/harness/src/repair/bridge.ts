@@ -38,6 +38,15 @@ export interface LiveRepairDeps {
    * pass at rung 2 rather than re-escalating. Absent → the strict schema stands.
    */
   readonly relaxedSchemaFor?: (toolName: string) => ToolSchemaLike | undefined;
+  /**
+   * A structured call whose NAME is not a registered tool — in bash-CLI mode,
+   * one of our command lines typed as a name. Answers with the `bash` call
+   * that runs it, or undefined. MUST mirror the provider's bridge.
+   */
+  readonly resolveUnknownTool?: (
+    name: string,
+    args: Record<string, unknown>,
+  ) => { readonly name: string; readonly arguments: Record<string, unknown> } | undefined;
 }
 
 /** MUST equal the provider's `REPAIR_BRIDGE_READY`. */

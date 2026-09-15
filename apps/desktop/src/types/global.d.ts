@@ -17,6 +17,7 @@ declare global {
     __pi_store?: () => typeof usePiStore;
     /** The StoreSink the event router drives — probes raise notifications with it. */
     __pi_sink?: () => import('@pi-desktop/engine').StoreSink;
+    __pi_restart?: (opts?: { cwd?: string; sessionPath?: string }) => Promise<unknown>;
     /** Probe-only: stop the running turn (see pi-connect abortPi). */
     __pi_abort?: () => void;
     /** E2E hook: accessor for the canvas controller (open browser/terminal

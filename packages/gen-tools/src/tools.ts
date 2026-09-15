@@ -741,6 +741,8 @@ export async function saveOutputs(
     copy?: (from: string, to: string) => Promise<void>;
     ensureDir?: (dir: string) => Promise<void>;
     isDir?: (p: string) => Promise<boolean>;
+    /** What a relative destination is relative to (default: the working folder). */
+    root?: string;
   } = {},
 ): Promise<{ paths: string[]; error?: string }> {
   if (saveTo === undefined || saveTo.trim() === '' || outputPaths.length === 0)
@@ -759,7 +761,17 @@ export async function saveOutputs(
   let target = saveTo.trim();
   if (target === '~' || target.startsWith('~/')) target = path.join(homedir(), target.slice(1));
   const trailingSlash = /[\\/]$/.test(target);
-  target = path.resolve(target);
+  /*
+   * RELATIVE TO THE WORKING FOLDER, the one the prompt names. MEASURED
+   * 2026-09-15: told "Working folder: …/Bobble/image-of-a-cow — relative paths
+   * resolve inside it", the model asked for `--save_to=cow-on-the-moon.png`,
+   * and the picture landed in …/Bobble — pi's own cwd, one level up — so its
+   * `coordinate present cow-on-the-moon.png`, resolved where the prompt said,
+   * found nothing. The harness publishes the live folder on the env the
+   * `svg` command's `out` already reads (WORKSPACE_ROOT_ENV); a relative
+   * `save_to` means the same folder every other relative path means.
+   */
+  target = path.resolve(deps.root ?? process.env.PI_DESKTOP_WORKSPACE_ROOT ?? process.cwd(), target);
   /*
    * FILE OR FOLDER. Named with an image extension: a file. A trailing slash,
    * or a directory that already exists: a folder. Otherwise — SEEN (4B): eight

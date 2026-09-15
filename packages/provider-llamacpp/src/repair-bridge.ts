@@ -19,7 +19,7 @@
  * types. Keep the two in sync.
  */
 
-import type { RepairRung, ToolCallFixer } from './repair.js';
+import type { RepairRung, ToolCallFixer, UnknownToolResolver } from './repair.js';
 
 /**
  * The live repair wiring the harness pushes to the provider at runtime:
@@ -41,6 +41,12 @@ export interface LiveRepairDeps {
    * desktop "N% processing" ring reads.
    */
   readonly onPromptProgress?: (fraction: number) => void;
+  /**
+   * The host's answer for a structured call whose NAME is not a tool: in the
+   * harness's bash-CLI mode a command line typed as a name (`media generate
+   * image`) becomes the `bash` call that runs it (see resolveUnknownToolName).
+   */
+  readonly resolveUnknownTool?: UnknownToolResolver;
 }
 
 /** Mutable holder the streamSimple resolves at call time (see `repairProvider`). */

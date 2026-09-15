@@ -424,6 +424,16 @@ export function resolveCli(cli: CliModel, argv: readonly string[]): CliResolutio
   if (restWords.length === 0) {
     const sole = group.commands.length === 1 ? group.commands[0] : undefined;
     const hasFlags = Object.keys(parsed.flags).length > 0 || parsed.positionals.length > 0;
+    /*
+     * AND ITS `--help` IS THE COMMAND'S HELP. `svg --help` used to print the
+     * group page — one line naming `svg` and "run `svg <command> --help` for
+     * arguments" — for a command that HAS no sub-word to put there. MEASURED
+     * by the tool surface probe: the one command whose help could not be
+     * reached was the one the preamble tells the model to read first.
+     */
+    if (sole !== undefined && sole.path.length === 0 && parsed.wantsHelp) {
+      return { kind: 'text', text: renderCommandHelp(sole) };
+    }
     if (sole === undefined || sole.path.length > 0 || !hasFlags) {
       return { kind: 'text', text: renderGroupHelp(group) };
     }
@@ -534,6 +544,104 @@ export function resolveCli(cli: CliModel, argv: readonly string[]): CliResolutio
   }
 
   return { kind: 'call', tool: match.tool.name, args };
+}
+
+// ── a call named like a command ──────────────────────────────────────────────
+
+/**
+ * THE COMMAND LINE FOR A TOOL CALL THAT NAMED THE COMMAND.
+ *
+ * MEASURED 2026-09-15 (qwen3.5-4b, rapid-mlx, bash-CLI mode): asked for a
+ * picture, the model emitted a STRUCTURED call named `media generate image`
+ * with `{prompt, save_to}` as its arguments — the command it had been told
+ * about, as a tool name, with the command's own flags. Then `media --help` the
+ * same way, then `coordinate present` with a `file_path`. pi answers "Tool …
+ * not found" to each, and the model painted the cow with PIL.
+ *
+ * Every one of those is the line the shell would have run, written in the
+ * other notation. The translation is mechanical — the words are the command
+ * path, the arguments are its flags — so this turns the call back into the
+ * line, and the provider hands it to `bash` (resolveUnknownToolName). Nothing
+ * is invented: the head word has to be one of OUR shims, so `ls`, `python3` or
+ * a hallucinated name still fall through to "not found".
+ *
+ * Arguments the command's schema knows become `--key=value` (the form
+ * `parseArgv` reads without consuming the next word); ones it does not know
+ * become positionals, so `present {file_path}` still fills `--path` the way a
+ * typed `coordinate present <file>` does. A tool's registered name is accepted
+ * too (`web_search`, `present`): a model that reaches for the schemas-mode
+ * name it learned is naming the same thing.
+ */
+export function commandLineForCall(
+  cli: CliModel,
+  name: string,
+  args: Readonly<Record<string, unknown>>,
+  shimCommands: readonly string[],
+): string | undefined {
+  const words = commandWordsFor(cli, name, shimCommands);
+  if (words === undefined) return undefined;
+  const command = findCommand(cli, words);
+  const props = command === undefined ? undefined : schemaOf(command.tool)?.properties;
+  const flags: string[] = [];
+  const positionals: string[] = [];
+  for (const [key, value] of Object.entries(args)) {
+    if (value === undefined || value === null) continue;
+    const text =
+      typeof value === 'string'
+        ? value
+        : typeof value === 'object'
+          ? JSON.stringify(value)
+          : String(value);
+    if (props !== undefined && !(resolveFlagName(key, props) in props)) {
+      positionals.push(text);
+      continue;
+    }
+    flags.push(`--${key}=${text}`);
+  }
+  return [...words, ...flags, ...positionals].map(shellWord).join(' ');
+}
+
+/** The command path a call's name stands for, or undefined when it is not ours. */
+function commandWordsFor(
+  cli: CliModel,
+  name: string,
+  shimCommands: readonly string[],
+): string[] | undefined {
+  const trimmed = name.trim();
+  if (trimmed === '') return undefined;
+  for (const g of cli.groups) {
+    for (const c of g.commands) {
+      if (c.tool.name === trimmed) return [g.name, ...c.path];
+    }
+  }
+  /* Spaces, or the joiners a model writes instead of them: `media_generate_image`,
+     `media.generate.image`, `media:generate`. Only the single-token form is
+     split that way — a real flag such as `--save-to` keeps its hyphen. */
+  let words = trimmed.split(/\s+/).filter((w) => w !== '');
+  if (words.length === 1) words = trimmed.split(/[_.:/]+/).filter((w) => w !== '');
+  const head = words[0];
+  if (head === undefined) return undefined;
+  return head === 'tools' || shimCommands.includes(head) ? words : undefined;
+}
+
+/** The command the leading words name — longest path wins, as in resolveCli. */
+function findCommand(cli: CliModel, words: readonly string[]): CliCommand | undefined {
+  const [head, ...rest] = words;
+  const group = cli.groups.find((g) => g.name === head);
+  if (group === undefined) return undefined;
+  return [...group.commands]
+    .filter((c) => c.path.every((w, i) => rest[i] === w))
+    .sort((a, b) => b.path.length - a.path.length)[0];
+}
+
+/**
+ * One argv word, safe for /bin/sh. Double quotes rather than single so a `$`
+ * arrives escaped: the bash tool's `protectShimDollars` leaves an escaped one
+ * alone, and inside single quotes its backslash would have reached the tool.
+ */
+function shellWord(word: string): string {
+  if (/^[A-Za-z0-9_@%+=:,./-]+$/.test(word)) return word;
+  return `"${word.replace(/[\\"$`]/g, (c) => `\\${c}`)}"`;
 }
 
 function schemaOf(tool: CliTool): CliSchema | undefined {

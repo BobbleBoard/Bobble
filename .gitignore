@@ -62,3 +62,6 @@ scratchpad/mac-video-model/frames.txt
 scratchpad/demos/*/frames/
 scratchpad/demos/*/frames.txt
 scratchpad/capture-probe/
+
+# Python bytecode from the office pipeline running in-tree
+__pycache__/

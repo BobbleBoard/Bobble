@@ -23,7 +23,13 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import net from 'node:net';
 import path from 'node:path';
 import { buildOmniSvgRequest, decodeOmniSvg, idsFromCompletion } from '@pi-desktop/gen-service';
-import { ensureLlamaCpp, getCatalogModel, modelDir } from '@pi-desktop/inference';
+import {
+  cacheRoot,
+  ensureLlamaCpp,
+  getCatalogModel,
+  libraryRoot,
+  modelDir,
+} from '@pi-desktop/inference';
 import { createLogger } from '@pi-desktop/shared';
 
 const log = createLogger('desktop:omnisvg');
@@ -58,6 +64,16 @@ export interface OmniSvgOutput {
 }
 
 /** The model's files on disk, or what is missing — the connector's install state. */
+/**
+ * WHERE THE FILES MAY BE. The connector's download lands them in the catalog
+ * folder (`modelDir`). The GGUFs converted on this Mac were placed by hand in
+ * `<cache>/omnisvg/gguf`, and the library migration shelved that folder as
+ * `Image/Vector/OmniSVG/gguf` with a link left behind — and neither is the
+ * catalog folder, so `svg` reported "not installed" over 5 GB of weights that
+ * were sitting on the shelf named for them. MEASURED 2026-09-15 by the tool
+ * surface probe: `generate_svg` absent from the registry, `svg` absent from
+ * `tools`. The first folder holding both files wins.
+ */
 export function omniSvgFiles(): {
   gguf: string;
   mmproj: string;
@@ -65,11 +81,20 @@ export function omniSvgFiles(): {
   missing: string[];
 } {
   const model = getCatalogModel(OMNISVG_MODEL_ID);
-  const dir = modelDir(OMNISVG_MODEL_ID);
-  const gguf = path.join(dir, model?.files[0]?.name ?? 'OmniSVG1.1_4B-Q8_0.gguf');
-  const mmproj = path.join(dir, model?.mmproj?.name ?? 'mmproj-OmniSVG1.1_4B-F16.gguf');
-  const missing = [gguf, mmproj].filter((f) => !existsSync(f));
-  return { gguf, mmproj, ready: missing.length === 0, missing };
+  const ggufName = model?.files[0]?.name ?? 'OmniSVG1.1_4B-Q8_0.gguf';
+  const mmprojName = model?.mmproj?.name ?? 'mmproj-OmniSVG1.1_4B-F16.gguf';
+  const dirs = [
+    modelDir(OMNISVG_MODEL_ID),
+    path.join(libraryRoot(), 'Image', 'Vector', 'OmniSVG', 'gguf'),
+    path.join(cacheRoot(), 'omnisvg', 'gguf'),
+  ];
+  const states = dirs.map((dir) => {
+    const gguf = path.join(dir, ggufName);
+    const mmproj = path.join(dir, mmprojName);
+    const missing = [gguf, mmproj].filter((f) => !existsSync(f));
+    return { gguf, mmproj, ready: missing.length === 0, missing };
+  });
+  return states.find((s) => s.ready) ?? (states[0] as (typeof states)[number]);
 }
 
 async function freePort(): Promise<number> {

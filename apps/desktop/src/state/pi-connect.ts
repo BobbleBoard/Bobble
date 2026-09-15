@@ -245,10 +245,22 @@ export async function restartPi(
     // Same conversation id as the initial spawn: a projectless respawn (project
     // cleared, model switch with no session to resume) lands back in this
     // conversation's sandbox rather than HOME.
-    return await window.piDesktop.invoke('pi:restart', {
+    const res = await window.piDesktop.invoke('pi:restart', {
       conversationId: conversationId(),
       ...(opts ?? {}),
     });
+    /*
+     * THE FOLDER SURVIVES THE RESPAWN. A fresh pi knows only the cwd it was
+     * spawned with; this chat's working folder — decided at its first message
+     * and handed over with `/harness workspace` — lives in the harness's
+     * runtime, which the respawn threw away. MEASURED 2026-09-15: the guardian
+     * shed a picture under memory pressure, the app relaunched the chat model
+     * gently and respawned pi, and the model's next `--save_to=cow-moon.png`
+     * landed in ~/Bobble instead of ~/Bobble/image-of-a-cow while the prompt
+     * still said the folder was the working directory.
+     */
+    if (currentWorkspace !== null) await applyWorkspace(currentWorkspace);
+    return res;
   } finally {
     // NOT synchronously. The bridge-exit event is delivered over IPC and can land
     // a tick or two AFTER `pi:restart` resolves — clearing the flag here raced it,
@@ -1583,4 +1595,7 @@ if (typeof window !== 'undefined' && new URLSearchParams(window.location.search)
    * a live model that happens to trip a warning.
    */
   window.__pi_sink = () => createPiSink();
+  /* The deliberate respawn, for probes — the path that must re-apply the
+     chat's working folder (see restartPi). */
+  window.__pi_restart = (opts?: { cwd?: string; sessionPath?: string }) => restartPi(opts);
 }

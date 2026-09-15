@@ -10,6 +10,8 @@ import {
   relaxToolSchema,
   repairToolCallArguments,
   repairToolCallJson,
+  resolveUnknownToolName,
+  scrubTemplateDebris,
   stripCodeFences,
   stripToolCallScaffolding,
   type ToolSchemaLike,
@@ -549,5 +551,99 @@ describe('once a written call is a real tool call, the text stops carrying it', 
     const q = reconstructToolCallFromContent(prose, registered);
     expect(q?.shape).toBe('prose-json');
     expect(withoutWrittenToolCall(prose, q as NonNullable<typeof q>)).toBe('I will call\n\nnow.');
+  });
+});
+
+describe('an unknown NAME — a command line typed as a tool, or a misspelling', () => {
+  const registered = ['read', 'write', 'edit', 'bash'];
+  const asBash = (name: string, args: Record<string, unknown>) =>
+    name.startsWith('media ')
+      ? { name: 'bash', arguments: { command: `${name} --prompt=${String(args.prompt)}` } }
+      : undefined;
+
+  it('does nothing for a registered name', () => {
+    expect(resolveUnknownToolName('bash', '{"command":"ls"}', registered, asBash)).toBeUndefined();
+  });
+
+  it('turns the command the host claims into its bash call, arguments carried over', () => {
+    const r = resolveUnknownToolName(
+      'media generate image',
+      '{"prompt":"a fox"}',
+      registered,
+      asBash,
+    );
+    expect(r).toEqual({
+      name: 'bash',
+      argStr: JSON.stringify({ command: 'media generate image --prompt=a fox' }),
+    });
+  });
+
+  it('parses damaged arguments with rung 1 before asking the host', () => {
+    const seen: Record<string, unknown>[] = [];
+    resolveUnknownToolName('media --help', '{"prompt":"a fox"', registered, (_n, args) => {
+      seen.push(args);
+      return { name: 'bash', arguments: { command: 'media --help' } };
+    });
+    expect(seen).toEqual([{ prompt: 'a fox' }]);
+  });
+
+  it('ignores a host answer that names a tool which is not registered either', () => {
+    const r = resolveUnknownToolName('media generate image', '{}', registered, () => ({
+      name: 'generate_image',
+      arguments: {},
+    }));
+    expect(r).toBeUndefined();
+  });
+
+  it('falls back to the fuzzy match for a misspelt real tool', () => {
+    expect(resolveUnknownToolName('Bash', '{"command":"ls"}', registered, asBash)).toEqual({
+      name: 'bash',
+      argStr: '{"command":"ls"}',
+    });
+  });
+
+  it('leaves a name that is neither for pi to refuse', () => {
+    expect(resolveUnknownToolName('python3', '{}', registered, asBash)).toBeUndefined();
+    expect(resolveUnknownToolName('python3', '{}', registered, undefined)).toBeUndefined();
+  });
+
+  it('survives a host that throws', () => {
+    expect(
+      resolveUnknownToolName('media x', '{}', registered, () => {
+        throw new Error('boom');
+      }),
+    ).toBeUndefined();
+  });
+});
+
+describe("the XML template's closing tags, read back as arguments", () => {
+  it('drops a key that is a tag and trims a tag glued onto a value', () => {
+    expect(
+      scrubTemplateDebris({
+        path: '/a/cow-on-the-moon.png</parameter"',
+        '</parameter': '',
+        '</function>': 'x',
+        note: 'fine',
+        n: 2,
+      }),
+    ).toEqual({ path: '/a/cow-on-the-moon.png', note: 'fine', n: 2 });
+  });
+
+  it('drops a value that is nothing but a tag, keeps a genuinely empty one', () => {
+    expect(scrubTemplateDebris({ a: '</parameter>', b: '' })).toEqual({ b: '' });
+  });
+
+  it('is what the host sees for an unknown-named call', () => {
+    const seen: Record<string, unknown>[] = [];
+    resolveUnknownToolName(
+      'coordinate present',
+      '{"path":"cow.png</parameter\\"","</parameter":""}',
+      ['bash'],
+      (_n, args) => {
+        seen.push(args);
+        return { name: 'bash', arguments: { command: 'x' } };
+      },
+    );
+    expect(seen).toEqual([{ path: 'cow.png' }]);
   });
 });

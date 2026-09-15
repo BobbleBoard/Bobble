@@ -20,6 +20,8 @@
  * The second line is the plain absolute path, so the model can feed it straight
  * back to `edit_image` (or to the 3D studio) without parsing a URL.
  */
+import { homedir } from 'node:os';
+import { isAbsolute, join, resolve } from 'node:path';
 import type { AgentToolResult, ExtensionAPI } from '@mariozechner/pi-coding-agent';
 import { Type } from '@sinclair/typebox';
 import type { ImageBridge, ImageBridgeResult } from './image-bridge-client.js';
@@ -190,9 +192,17 @@ export function registerImageTools(
       'edit_image: change an existing image from a plain-language instruction; renders inline in the chat.',
     parameters: EditParams,
     async execute(_toolCallId, params, signal): Promise<AgentToolResult<ImageToolDetails>> {
-      const imagePath = params.image_path.trim();
+      const raw = params.image_path.trim();
       const instruction = params.instruction.trim();
-      if (imagePath === '') return errorResult(EDIT_IMAGE_TOOL, 'image_path is empty');
+      if (raw === '') return errorResult(EDIT_IMAGE_TOOL, 'image_path is empty');
+      /* A relative path means the working folder — the folder the picture was
+         saved in — not the app's own cwd, which is where the bridge would have
+         looked (WORKSPACE_ROOT_ENV is the harness's live folder; see
+         saveOutputs in gen-tools for the measured miss). */
+      const expanded = raw.startsWith('~/') ? join(homedir(), raw.slice(2)) : raw;
+      const imagePath = isAbsolute(expanded)
+        ? expanded
+        : resolve(env.PI_DESKTOP_WORKSPACE_ROOT ?? process.cwd(), expanded);
       if (instruction === '') return errorResult(EDIT_IMAGE_TOOL, 'instruction is empty');
       return imageToolResult(
         EDIT_IMAGE_TOOL,

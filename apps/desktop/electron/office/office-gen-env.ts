@@ -21,7 +21,7 @@
  * only the default, which is the same `python3` the harness falls back to.
  */
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { cacheRoot } from '@pi-desktop/inference';
 import { createLogger } from '@pi-desktop/shared';
@@ -91,9 +91,35 @@ export function hasLibs(python: string, spawnImpl: typeof spawn = spawn): Promis
   });
 }
 
+/**
+ * THE VENV'S PYTHON MUST OUTLIVE WHOEVER MADE IT.
+ *
+ * MEASURED 2026-09-15 on the user's Mac: `office make` answered "No module named
+ * 'docx'" with every library installed in the venv — its `bin/python` was a
+ * symlink into `/var/folders/…/pd-home-office-live-d585Rc/.local/share/uv/
+ * python/…`, a probe's throwaway home, long deleted. uv keeps its managed
+ * interpreters under HOME by default, and the venv lives under the cache
+ * root, so a venv made under one home dangles under the next. The
+ * interpreters go under the cache root too, beside the venv that needs them.
+ */
+function uvEnv(): NodeJS.ProcessEnv {
+  return { ...process.env, UV_PYTHON_INSTALL_DIR: path.join(cacheRoot(), 'uv', 'python') };
+}
+
+/** A venv directory whose interpreter no longer resolves — see uvEnv. */
+function venvIsBroken(): boolean {
+  if (!existsSync(venvDir())) return false;
+  try {
+    lstatSync(venvPython());
+  } catch {
+    return true; // the dir is there and the link is not: half-made, or half-removed
+  }
+  return !existsSync(venvPython()); // the link is there and points at nothing
+}
+
 function run(cmd: string, args: string[], timeoutMs: number): Promise<void> {
   return new Promise((resolve, reject) => {
-    const child = spawn(cmd, args, { stdio: ['ignore', 'ignore', 'pipe'] });
+    const child = spawn(cmd, args, { stdio: ['ignore', 'ignore', 'pipe'], env: uvEnv() });
     let stderr = '';
     child.stderr?.on('data', (d) => {
       stderr = `${stderr}${String(d)}`.slice(-4000);
@@ -119,6 +145,10 @@ function run(cmd: string, args: string[], timeoutMs: number): Promise<void> {
 async function provisionVenv(): Promise<string> {
   const { uvPath } = await ensureUv();
   const dir = venvDir();
+  if (venvIsBroken()) {
+    log.warn('office venv interpreter is gone; rebuilding the venv', { dir });
+    rmSync(dir, { recursive: true, force: true });
+  }
   if (!existsSync(venvPython())) {
     await run(uvPath, ['venv', dir, '--python', '3.12'], 5 * 60_000);
   }

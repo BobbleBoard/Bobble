@@ -108,6 +108,32 @@ describe('registerPresentTool', () => {
     expect(r.content[0]?.text).toContain('nothing at /a/missing.png');
   });
 
+  /* MEASURED: `present probe-note.md` right after writing it — stat'd in pi's
+     cwd, opened by the app from another, "ENOENT" under a "Presented" line. */
+  it('roots a relative path at the working folder, and shows THAT path', async () => {
+    const { pi, tools } = collect();
+    const seen: string[] = [];
+    registerPresentTool(pi, {
+      bridge,
+      stat: async (p) => {
+        seen.push(p);
+        return { isDirectory: false };
+      },
+      resolvePath: (p) => `/work/${p}`,
+    });
+    const exec = tools[0]?.execute as (
+      i: string,
+      p: unknown,
+    ) => Promise<{ content: Array<{ type: string; text?: string }> }>;
+    const r = await exec('t', { path: 'notes/probe-note.md' });
+    expect(seen).toEqual(['/work/notes/probe-note.md']);
+    expect(bridge.show).toHaveBeenLastCalledWith({ path: '/work/notes/probe-note.md' });
+    expect(r.content[0]?.text).toContain('Presented /work/notes/probe-note.md');
+    // An absolute path and a ~ path are left where they point.
+    await exec('t', { path: '/abs/x.png' });
+    expect(seen.at(-1)).toBe('/abs/x.png');
+  });
+
   it('says so when there is no desktop app to present into', async () => {
     const { pi, tools } = collect();
     registerPresentTool(pi, { bridge: null, stat: async () => ({ isDirectory: false }) });

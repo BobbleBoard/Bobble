@@ -132,6 +132,23 @@ export const CLI_MECHANISM_SWAPS: ReadonlyArray<readonly [string, string]> = [
   ],
 ];
 
+/**
+ * SHOWING IS A TOOL CALL. the user (2026-09-15): "guide the model via system prompt
+ * to always utilize the present tool to display files to the user."
+ *
+ * MEASURED the same day: asked to "present it" after making a picture, a 4B
+ * ran `open <file>` (refused — it takes the screen), then named the path in
+ * prose and said "the image is now visible". It was not. `present` already
+ * carried a guideline ("make this your last action…") in pi's Guidelines
+ * block, which sits after four thousand characters of other things; a small
+ * model acts on what it read first, so the rule is stated here in the rules
+ * and, in CLI mode, in the preamble that opens the prompt (index.ts
+ * toolCliPreamble — which is why capabilityPromptForCli drops this bullet:
+ * once per prompt, not twice).
+ */
+export const PRESENT_RULE =
+  '- WHATEVER YOU MAKE OR CHANGE FOR THE USER — a picture, a page, a document, a clip, a model, a script — show it with `present` as your last step. A path in prose is not showing it; `present` opens it beside the chat and hands you a preview of what they will see, so look at that before you say you are done.';
+
 export const CAPABILITY_PROMPT = `${CAPABILITY_PROMPT_MARKER}
 
 ${CAPABILITY_REACH_SCHEMAS}
@@ -143,6 +160,7 @@ Choosing where to act — native app vs browser:
 Rules:
 - You CAN reach the user's calendar, mail, messages, contacts, reminders, files, and the web through your tools. Never claim you "cannot access" or "don't have the capability" for anything above — if unsure, call \`capability\` first, then act.
 - Prefer acting with your tools over refusing, disclaiming, or telling the user to do it themselves.
+${PRESENT_RULE}
 - WHEN YOU BUILD SOMETHING, HAVE IT TESTED — spawn_subagent takes specialist:"tester", which works out how to DRIVE what you built, runs it as a user would, and comes back with the failures and screenshots. "I fixed it" is a claim; "the tester ran it and it passed" is a result.
 - YOU HAVE A MANAGER AND A TEAM for a big build: talk_to_manager hands the work to a manager who splits it across their engineers and delivers it back for you to review. Ask yourself at the START of a large request whether to call them in — building a large project alone is the more expensive mistake, and the easier one to make.`;
 
@@ -335,6 +353,8 @@ export function capabilityPromptForCli(commandFor?: ReadonlyMap<string, string>)
       'if unsure, run `<command> --help` first, then act',
     );
   for (const [schemas, cli] of CLI_MECHANISM_SWAPS) body = body.replace(schemas, cli);
+  // Said once, at the top: the CLI preamble opens with the same rule.
+  body = body.replace(`${PRESENT_RULE}\n`, '');
   return commandFor === undefined ? body : retargetToolNames(body, commandFor);
 }
 

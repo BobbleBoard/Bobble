@@ -223,7 +223,18 @@ export async function openPresented(
    * Text and pages keep the path below: the html tab renders, the file tab
    * shows the note.
    */
-  if (previewKindForExt(extOf(item.path)) !== null && tab === 'file') {
+  /*
+   * …AND A PICTURE OPENS AS A PICTURE. The door above was only taken for a
+   * `file`-tab kind, so a presented PNG — the commonest hand-over there is —
+   * fell through to the text path below: `fs:read-file` on a binary, an
+   * image tab with no `mediaSrc`, and the surface's "Failed to load file
+   * content" beside a card that said the picture was ready. MEASURED
+   * 2026-09-15 (tool-surface probe pass 3, then present-canvas-probe): the
+   * thread showed the cow, the canvas tab could not. Every kind the preview
+   * surfaces stream over pd-file:// goes through openFileInCanvas; only the
+   * text-shaped kinds (a page, code, an SVG's markup) are read as text.
+   */
+  if (previewKindForExt(extOf(item.path)) !== null) {
     await openFileInCanvas(controller as unknown as CanvasController, item.path);
     const opened = (controller as unknown as CanvasController)
       .getState()

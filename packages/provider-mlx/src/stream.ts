@@ -37,11 +37,13 @@ import {
   type RepairRung,
   reconstructToolCallFromContent,
   repairToolCallArguments,
+  resolveUnknownToolName,
   settleReply,
   type ToolCallFixer,
   type ToolSchemaLike,
   tapRequest,
   tapUsage,
+  type UnknownToolResolver,
   validateAgainstSchema,
   withoutWrittenToolCall,
 } from '@pi-desktop/provider-llamacpp';
@@ -71,6 +73,8 @@ export interface MlxStreamDeps {
         fixer?: ToolCallFixer;
         extraRungs?: readonly RepairRung[];
         onRepair?: (info: { toolName: string; rung: number | undefined; ok: boolean }) => void;
+        /** A command line typed as a tool name → the `bash` call that runs it. */
+        resolveUnknownTool?: UnknownToolResolver;
       }
     | undefined;
 }
@@ -562,6 +566,33 @@ export function createMlxStream(deps: MlxStreamDeps = {}): MlxStreamFn {
         for (const state of toolStates.values()) {
           const block = output.content[state.contentIndex];
           if (block?.type !== 'toolCall') continue;
+          /*
+           * An unknown structured tool name — the same step provider-llamacpp
+           * takes, which this provider did not: a command line typed as a name
+           * (`media generate image`, bash-CLI mode) becomes the `bash` call that
+           * runs it, a misspelling maps to the nearest registered tool, and
+           * anything else is left for pi's "not found". MEASURED here first:
+           * qwen3.5-4b on rapid-mlx named the command instead of running it.
+           */
+          if (!registeredNames.includes(state.name)) {
+            const live = deps.repairProvider?.();
+            const resolvedName = resolveUnknownToolName(
+              state.name,
+              state.argStr,
+              registeredNames,
+              live?.resolveUnknownTool,
+            );
+            if (resolvedName !== undefined) {
+              state.name = resolvedName.name;
+              state.argStr = resolvedName.argStr;
+              block.name = resolvedName.name;
+              (live?.onRepair ?? deps.onRepair)?.({
+                toolName: resolvedName.name,
+                rung: 0,
+                ok: true,
+              });
+            }
+          }
           const schema = schemaFor(state.name);
 
           let parsed: Record<string, unknown> | undefined;

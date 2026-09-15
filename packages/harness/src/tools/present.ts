@@ -28,6 +28,7 @@
  */
 
 import { homedir } from 'node:os';
+import { isAbsolute } from 'node:path';
 import type { ExtensionAPI } from '@mariozechner/pi-coding-agent';
 import { Type } from '@sinclair/typebox';
 
@@ -165,6 +166,15 @@ export interface PresentBridge {
 export interface PresentToolDeps {
   readonly bridge: PresentBridge | null;
   readonly stat: (p: string) => Promise<{ isDirectory: boolean } | null>;
+  /**
+   * Where a RELATIVE path is rooted — the working folder the file tools use.
+   * MEASURED 2026-09-15: `coordinate present probe-note.md` right after `file
+   * write probe-note.md` said "Presented probe-note.md" and then "The preview
+   * could not be produced: ENOENT" — the tool's stat ran in pi's own cwd, the
+   * app's did not, and the card opened nothing. The model's relative path is
+   * the same relative path it just wrote, and it means the same folder.
+   */
+  readonly resolvePath?: (p: string) => string;
 }
 
 /**
@@ -187,7 +197,9 @@ export function registerPresentTool(pi: ExtensionAPI, deps: PresentToolDeps): vo
     ],
     parameters: Type.Object({
       path: Type.String({
-        description: 'Absolute path to the finished file, folder or project to show the user.',
+        description:
+          'Path to the finished file, folder or project to show the user — absolute, or ' +
+          'relative to the working folder.',
       }),
       note: Type.Optional(
         Type.String({ description: 'One line for the card — what this is. Optional.' }),
@@ -223,7 +235,11 @@ export function registerPresentTool(pi: ExtensionAPI, deps: PresentToolDeps): vo
        * leading ~/ is a home reference; a tilde anywhere else is a filename
        * character and is left alone.
        */
-      const resolved = p.startsWith('~/') ? `${homedir()}${p.slice(1)}` : p;
+      const expanded = p.startsWith('~/') ? `${homedir()}${p.slice(1)}` : p;
+      const resolved =
+        !isAbsolute(expanded) && deps.resolvePath !== undefined
+          ? deps.resolvePath(expanded)
+          : expanded;
       const info = await deps.stat(resolved);
       if (info === null) {
         return {

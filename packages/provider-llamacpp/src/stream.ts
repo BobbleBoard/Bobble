@@ -34,12 +34,13 @@ import {
 } from './context-trim.js';
 import { createLiveTpsReporter } from './live-tps.js';
 import {
-  fuzzyMatchToolName,
   type RepairRung,
   reconstructToolCallFromContent,
   repairToolCallArguments,
+  resolveUnknownToolName,
   type ToolCallFixer,
   type ToolSchemaLike,
+  type UnknownToolResolver,
   validateAgainstSchema,
   withoutWrittenToolCall,
 } from './repair.js';
@@ -149,6 +150,8 @@ export interface LlamaCppStreamDeps {
          * turn's status channel (harness-prefill) for the desktop ring, which the
          * static provider deps can't reach (no per-turn ctx here). */
         onPromptProgress?: (fraction: number) => void;
+        /** A command line typed as a tool name → the `bash` call that runs it. */
+        resolveUnknownTool?: UnknownToolResolver;
       }
     | undefined;
 }
@@ -930,21 +933,23 @@ export function createLlamaCppStream(deps: LlamaCppStreamDeps = {}): LlamaCppStr
           const block = output.content[state.contentIndex];
           if (block?.type !== 'toolCall') continue;
 
-          // Fuzzy tool-name correction: an unknown/misspelled structured tool name
-          // maps to the nearest REGISTERED tool above the confidence threshold, so
-          // the correct schema resolves and the call executes; below the threshold
-          // the name is left for pi's existing "tool not found" path.
-          if (
-            state.name.length > 0 &&
-            registeredNames.length > 0 &&
-            !registeredNames.includes(state.name)
-          ) {
-            const match = fuzzyMatchToolName(state.name, registeredNames);
-            if (match !== undefined) {
-              state.name = match.name;
-              block.name = match.name;
-              (live?.onRepair ?? deps.onRepair)?.({ toolName: match.name, rung: 0, ok: true });
-            }
+          // An unknown structured tool name: one of the host's command lines
+          // typed as a name becomes the `bash` call that runs it (the harness
+          // answers over the bridge), a misspelling maps to the nearest
+          // REGISTERED tool above the confidence threshold so the correct schema
+          // resolves and the call executes; anything else is left for pi's
+          // existing "tool not found" path. See resolveUnknownToolName.
+          const resolvedName = resolveUnknownToolName(
+            state.name,
+            state.argStr,
+            registeredNames,
+            live?.resolveUnknownTool,
+          );
+          if (resolvedName !== undefined) {
+            state.name = resolvedName.name;
+            state.argStr = resolvedName.argStr;
+            block.name = resolvedName.name;
+            (live?.onRepair ?? deps.onRepair)?.({ toolName: resolvedName.name, rung: 0, ok: true });
           }
 
           const schema = schemaFor(state.name);
