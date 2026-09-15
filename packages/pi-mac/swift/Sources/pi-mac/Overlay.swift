@@ -723,6 +723,8 @@ final class OverlayController: NSObject {
   private let cursorGroup = CALayer()
   private let glyphFill = CAShapeLayer()
   private let glyphGlowSoft = CAShapeLayer()
+  /// The extra glow that only a DARK ground shows — see where it is built.
+  private let glyphGlowDark = CALayer()
   private let glyphStroke = CAShapeLayer()
   /*
    * THE PILL'S LOOK, in one place because the user specified it in one breath:
@@ -984,6 +986,7 @@ final class OverlayController: NSObject {
     root.contentsScale = scale
 
     backdrop.frame = root.bounds
+    backdrop.name = "backdrop"
     backdrop.backgroundColor = nil
     backdrop.isHidden = true
     root.addSublayer(backdrop)
@@ -1047,6 +1050,28 @@ final class OverlayController: NSObject {
     glyphGlowSoft.shadowRadius = glyph.strokeWidth * 5
     glyphGlowSoft.shadowOffset = .zero
     cursorGroup.addSublayer(glyphGlowSoft)
+
+    /*
+     * MORE GLOW ON DARK, NONE ADDED ON WHITE. the user: "slightly more glow on
+     * dark, keep white as is." A screen blend is exactly that arithmetic —
+     * 1 − (1−a)(1−b): against white it adds nothing, against a dark ground it
+     * adds the glow's own light. This layer draws no stroke of its own; its
+     * shadow is a blurred ring (the path stroked, as a shadowPath) with the
+     * same radius as the glow above it, so the two fall off together.
+     */
+    glyphGlowDark.frame = cursorGroup.bounds
+    glyphGlowDark.contentsScale = scale
+    glyphGlowDark.backgroundColor = nil
+    glyphGlowDark.shadowPath = glyph.path.copy(
+      strokingWithWidth: glyph.strokeWidth * 1.1, lineCap: .round, lineJoin: .round,
+      miterLimit: 10)
+    glyphGlowDark.shadowColor = GLYPH_GLOW
+    glyphGlowDark.shadowOpacity = 1
+    glyphGlowDark.shadowRadius = glyph.strokeWidth * 5
+    glyphGlowDark.shadowOffset = .zero
+    glyphGlowDark.opacity = 0.32
+    glyphGlowDark.compositingFilter = "screenBlendMode"
+    cursorGroup.insertSublayer(glyphGlowDark, below: glyphGlowSoft)
 
     // The body: black under his keyline AT HIS THICKNESS. the user, on the first
     // cut of the black fill: "keep the thickness of the border" — the white
@@ -2383,9 +2408,47 @@ final class OverlayController: NSObject {
      * alpha, Gaussian-blurred by shadowRadius, tinted, offset — underneath the
      * contents pass. Our tree keeps its shadows beneath its contents anyway.
      */
+    // The probe backdrop is a sublayer BELOW the stage, and `render(in:)`
+    // paints the tree bottom-up — so shadows painted before the tree would
+    // end up underneath an opaque backdrop (MEASURED: the dark renders never
+    // showed a blur at all). Ground first, then the shadows, then the tree
+    // with the ground hidden for the pass; rendering the stage on its own is
+    // not an option, because a layer rendered directly loses its own mask.
+    let hadGround = !backdrop.isHidden
+    if hadGround {
+      // A layer renders at its own origin; put it where its frame is.
+      ctx.saveGState()
+      ctx.translateBy(x: backdrop.frame.minX, y: backdrop.frame.minY)
+      backdrop.render(in: ctx)
+      ctx.restoreGState()
+    }
     let tree = root.presentation() ?? root
-    drawShadows(of: tree, in: ctx, rootLayer: tree)
-    tree.render(in: ctx)
+    // The occlusion mask cuts the shadows too — as it does on screen, where
+    // the mask is applied to the stage's whole composite. Same fill rule.
+    ctx.saveGState()
+    if let mask = (stage.presentation() ?? stage).mask as? CAShapeLayer, let path = mask.path {
+      ctx.addPath(path)
+      ctx.clip(using: mask.fillRule == .evenOdd ? .evenOdd : .winding)
+    }
+    for layer in tree.sublayers ?? [] where layer.name != "backdrop" {
+      drawShadows(of: layer, in: ctx, rootLayer: tree)
+    }
+    ctx.restoreGState()
+    if hadGround {
+      CATransaction.begin()
+      CATransaction.setDisableActions(true)
+      backdrop.isHidden = true
+      CATransaction.commit()
+      CATransaction.flush()
+    }
+    (root.presentation() ?? root).render(in: ctx)
+    if hadGround {
+      CATransaction.begin()
+      CATransaction.setDisableActions(true)
+      backdrop.isHidden = false
+      CATransaction.commit()
+      CATransaction.flush()
+    }
     /* The buttons live on their own window (the phantom must stay
        click-through), so they are not in this layer tree. Draw them in at the
        pill's position, or a render of a hovered pill would show the blur with
@@ -2456,6 +2519,13 @@ final class OverlayController: NSObject {
           let cictx = CIContext(options: [.workingColorSpace: NSNull()])
           if let out = cictx.createCGImage(blurred, from: ci.extent) {
             ctx.saveGState()
+            // The compositor's blend for this layer, where CoreGraphics has
+            // the same one: the dark-only glow is a screen blend.
+            if let filter = layer.compositingFilter as? String {
+              if filter == "screenBlendMode" { ctx.setBlendMode(.screen) }
+              else if filter == "plusL" || filter == "plusLighter" { ctx.setBlendMode(.plusLighter) }
+              else if filter == "multiplyBlendMode" { ctx.setBlendMode(.multiply) }
+            }
             ctx.setAlpha(CGFloat(layer.shadowOpacity) * CGFloat(layer.opacity))
             let at = src.offsetBy(dx: layer.shadowOffset.width, dy: layer.shadowOffset.height)
             ctx.clip(to: at, mask: out)
