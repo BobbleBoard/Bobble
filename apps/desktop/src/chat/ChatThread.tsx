@@ -41,6 +41,7 @@ import { useLlmStore } from '../state/llm-store';
 import { forkAndReprompt, switchBranch } from '../state/pi-connect';
 import { usePiStore } from '../state/pi-slice';
 import {
+  isInlinePresented,
   openPresented,
   type PresentedRecord,
   presentedFor,
@@ -57,6 +58,7 @@ import { corpChatView } from './corp/corp-thread-view';
 import { HarnessChecklistPanel, ThreadStatusIndicator } from './HarnessStatus';
 import { HistoryPole } from './HistoryPole';
 import { MessageErrorBoundary } from './MessageErrorBoundary';
+import { PresentedInline } from './PresentedInline';
 import { awaitingReplyAfterLatestTurn, sentAttachmentsPrefilling } from './sent-prefill';
 import { BlindImageNote, UserImage } from './UserImage';
 
@@ -275,23 +277,29 @@ export function ChatThread() {
   /* One card, wherever it is drawn — anchored to its turn or at the foot. */
   const renderPresented = (records: readonly PresentedRecord[]): ReactNode => (
     <div className="flex flex-col gap-2 px-1 pt-2" data-testid="presented">
-      {records.map((item) => (
-        <PresentCard
-          key={item.path}
-          item={item}
-          /* Body AND the blue Open → the canvas (the user: "by default it opens
-           * in the canvas or it should"). The dropdown is "Open with": every
-           * application, the OS default among them. */
-          onActivate={() => void openPresented(canvasController, item)}
-          onOpen={() => void openPresented(canvasController, item)}
-          onOpenWith={(_it, appId) => {
-            void window.piDesktop.invoke('canvas:open-with', { path: item.path, appId });
-          }}
-          onReveal={() => {
-            void window.piDesktop.invoke('canvas:reveal', { path: item.path });
-          }}
-        />
-      ))}
+      {records.map((item) =>
+        /* A chart, or a small SVG, IS shown here — the card is the thing, not
+         * a row pointing at the canvas (PresentedInline). */
+        isInlinePresented(item) ? (
+          <PresentedInline key={item.path} item={item} />
+        ) : (
+          <PresentCard
+            key={item.path}
+            item={item}
+            /* Body AND the blue Open → the canvas (the user: "by default it opens
+             * in the canvas or it should"). The dropdown is "Open with": every
+             * application, the OS default among them. */
+            onActivate={() => void openPresented(canvasController, item)}
+            onOpen={() => void openPresented(canvasController, item)}
+            onOpenWith={(_it, appId) => {
+              void window.piDesktop.invoke('canvas:open-with', { path: item.path, appId });
+            }}
+            onReveal={() => {
+              void window.piDesktop.invoke('canvas:reveal', { path: item.path });
+            }}
+          />
+        ),
+      )}
     </div>
   );
 

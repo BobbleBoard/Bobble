@@ -26,6 +26,7 @@ import {
   IconDownload,
   IconExpand,
   IconFolders,
+  IconInline,
   IconMarkup,
 } from '../tab-icons.tsx';
 import { FileTree } from './file-tree.tsx';
@@ -167,6 +168,8 @@ export interface CanvasOperationBarProps {
   onMediaDownload?: (format: string) => void;
   onMediaRefresh?: () => void;
   onMediaExpand?: () => void;
+  /** "Show in chat" — offered on a tab lifted from an inline card (`tab.inline`). */
+  onShowInline?: () => void;
   // shared
   onClose?: () => void;
   className?: string;
@@ -213,6 +216,8 @@ function renderOps(props: CanvasOperationBarProps): ReactNode {
     case 'code':
     case 'markdown':
       return <RenderableOps {...props} />;
+    case 'chart':
+      return <ChartOps {...props} />;
     default:
       // terminal / subagent — no operation bar.
       return null;
@@ -415,6 +420,7 @@ function RenderableOps({
   fileViewMode,
   onFileViewModeChange,
   onMediaExpand,
+  onShowInline,
   onClose,
 }: CanvasOperationBarProps) {
   const mode = fileViewMode ?? viewModeDefault(tab);
@@ -425,6 +431,73 @@ function RenderableOps({
         {mediaName(tab)} · <span className="pd-media-type">{renderableType(tab)}</span>
       </span>
       <span className="pd-canvas-opbar-spacer" />
+      {tab.inline === true ? <ShowInChat onShowInline={onShowInline} /> : null}
+      <IconButton size="sm" aria-label="Expand" onClick={() => onMediaExpand?.()}>
+        <IconExpand size={16} />
+      </IconButton>
+      <IconButton size="sm" aria-label="Close" onClick={() => onClose?.()}>
+        <IconClose size={16} />
+      </IconButton>
+    </>
+  );
+}
+
+/**
+ * "Show in chat" — the way back for a card that was moved over. the user: "a tab
+ * in the canvas dropping out and becoming an inline card". The button is the
+ * inverse of the card's corner control, in the same place a person looks for
+ * the tab's own actions.
+ */
+function ShowInChat({ onShowInline }: Pick<CanvasOperationBarProps, 'onShowInline'>) {
+  return (
+    <Button
+      size="sm"
+      variant="secondary"
+      className="pd-canvas-show-inline"
+      aria-label="Show in chat"
+      onClick={() => onShowInline?.()}
+    >
+      <IconInline size={14} />
+      Show in chat
+    </Button>
+  );
+}
+
+/* ── Chart ──────────────────────────────────────────────────────────────── */
+
+/**
+ * The bar for a data visual: its name, "Show in chat" when it came from the
+ * thread, the SVG download (the same drawing the `chart` tool wrote beside
+ * the spec), Open/Reveal for the file on disk, expand and close.
+ */
+function ChartOps({
+  tab,
+  onMediaDownload,
+  onMediaExpand,
+  onShowInline,
+  onClose,
+  onOpen,
+  onOpenWith,
+  onReveal,
+}: CanvasOperationBarProps) {
+  return (
+    <>
+      <span className="pd-media-title">
+        {mediaName(tab)} · <span className="pd-media-type">CHART</span>
+      </span>
+      <span className="pd-canvas-opbar-spacer" />
+      {tab.inline === true ? <ShowInChat onShowInline={onShowInline} /> : null}
+      <IconButton
+        size="sm"
+        aria-label="Download as SVG"
+        title="Download as SVG"
+        onClick={() => onMediaDownload?.('svg')}
+      >
+        <IconDownload size={16} />
+      </IconButton>
+      {tab.filePath ? (
+        <OpenSplit tab={tab} onOpen={onOpen} onOpenWith={onOpenWith} onReveal={onReveal} />
+      ) : null}
       <IconButton size="sm" aria-label="Expand" onClick={() => onMediaExpand?.()}>
         <IconExpand size={16} />
       </IconButton>

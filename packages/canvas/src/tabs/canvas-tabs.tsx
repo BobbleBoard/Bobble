@@ -12,6 +12,7 @@ import {
 } from '@pi-desktop/ui';
 import {
   type ComponentType,
+  type CSSProperties,
   Fragment,
   lazy,
   type ReactNode,
@@ -38,6 +39,7 @@ import { IconFolder, IconPanelRight, IconPopout, IconSubagent } from '../tab-ico
 import { CanvasOperationBar, hasViewToggle, viewModeDefault } from './canvas-operation-bar.tsx';
 import type { CanvasController } from './controller.ts';
 import { FileTree } from './file-tree.tsx';
+import { inlineTransitionStyle } from './inline-transition.ts';
 import { CANVAS_TAB_KINDS } from './tab-kinds.ts';
 import type { CanvasTab, FileTreeNode, FileViewMode } from './tab-model.ts';
 import { useCanvasTabs } from './use-canvas-tabs.tsx';
@@ -157,6 +159,12 @@ export interface CanvasTabsHandlers {
   onMediaDownload?: (tabId: string, format: string) => void;
   onMediaRefresh?: (tabId: string) => void;
   onMediaExpand?: (tabId: string) => void;
+  /**
+   * "Show in chat" on a tab that was lifted from an inline card (`tab.inline`):
+   * the app closes the tab inside a view transition so the tab folds back into
+   * its card. Omitted, the tab simply closes — the card returns either way.
+   */
+  onShowInline?: (tabId: string) => void;
   onSubagentSelect?: (tabId: string, subagentId: string) => void;
   /** Situation room — a worker node was clicked (route its live stream into
    * the chat area, with the stylized task-briefing bubble leading it). */
@@ -506,6 +514,10 @@ export function CanvasTabs({
               handlers?.onMediaRefresh?.(activeTab.id);
             }}
             onMediaExpand={() => handlers?.onMediaExpand?.(activeTab.id)}
+            onShowInline={() => {
+              if (handlers?.onShowInline !== undefined) handlers.onShowInline(activeTab.id);
+              else canvas.closeTab(activeTab.id);
+            }}
             onClose={() => canvas.closeTab(activeTab.id)}
           />
         ) : null}
@@ -514,6 +526,13 @@ export function CanvasTabs({
           className="pd-canvas-tabpanel"
           role="tabpanel"
           id="pd-canvas-tabpanel"
+          // A tab lifted from an inline card is the card's other half: named
+          // for the view transition that moves it there and back.
+          style={
+            activeTab?.inline === true && activeTab.key !== undefined
+              ? (inlineTransitionStyle(activeTab.key) as CSSProperties)
+              : undefined
+          }
           // Named by the tab that selected it, so a screen reader reaching the
           // panel says which tab's content this is.
           {...(activeTab !== null && activeTab !== undefined

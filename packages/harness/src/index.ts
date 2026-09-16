@@ -97,6 +97,7 @@ import {
 } from './title/conversation-title.js';
 import { registerAskUser } from './tools/ask-user.js';
 import { registerCapabilityTool } from './tools/capability-tool.js';
+import { CHART_TOOL, registerChartTool } from './tools/chart-tool.js';
 import {
   coercedEditRefusal,
   coercedSearchRefusal,
@@ -109,6 +110,7 @@ import {
 import { degenerateCommandRefusal } from './tools/degenerate-command.js';
 import { diskWalkRefusal, wouldWalkDisk } from './tools/disk-walk.js';
 import { diagnoseEditFailure } from './tools/edit-diagnosis.js';
+import { handmadeChartRefusal, isHandmadeChart } from './tools/handmade-chart.js';
 import {
   handmadeMediaRefusal,
   isHandmadeMedia,
@@ -2564,6 +2566,17 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     });
   }
 
+  /*
+   * `chart` — a data visual drawn from its numbers, in the chat (chart-tool.ts).
+   * Pure TypeScript, so it is in EVERY chat with no pipeline to check for; a
+   * child agent draws the file and reports it up, the top-level model's card
+   * is the one the user sees.
+   */
+  registerChartTool(pi, {
+    bridge: readSubagentDepth(process.env) === 0 ? presentBridgeFromEnv() : null,
+    root: (ctxCwd) => resolveWorkspaceRoot(ctxCwd),
+  });
+
   // Only the top-level agent (depth 0) registers the tool — a spawned child
   // (depth >= 1) does not, so subagents can't recursively spawn subagents (v1).
   if (readSubagentDepth(process.env) < MAX_SUBAGENT_DEPTH) {
@@ -3768,6 +3781,25 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
           };
         }
         /*
+         * …AND A CHART PLOTTED WITH matplotlib IN A HEREDOC WHILE `chart`
+         * DRAWS IT IN THE CHAT — see handmade-chart.ts. The identical command
+         * again is the exit: a plotting script can be what the user asked for.
+         */
+        if (chartScriptRefused === cmd) {
+          chartScriptRefused = null;
+        } else {
+          const chartAvailable = pi.getAllTools().some((t) => t.name === CHART_TOOL);
+          const handmadeChart = isHandmadeChart({ content: cmd, chartAvailable });
+          if (handmadeChart !== null) {
+            chartScriptRefused = cmd;
+            pi.appendEntry(HARNESS_LOOP_ENTRY, { action: 'block', cause: 'handmade-chart' });
+            return {
+              block: true,
+              reason: handmadeChartRefusal(handmadeChart, { cli: toolCliMode }),
+            };
+          }
+        }
+        /*
          * …AND A PAGE READ WITH curl WHILE `web fetch` IS ONE COMMAND AWAY —
          * see raw-page-fetch.ts. MEASURED: four `curl … | grep height` calls
          * on the Eiffel Tower's Wikipedia page, kilobytes of markup each, and
@@ -3925,6 +3957,28 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
             exists = true;
           } catch {
             exists = false;
+          }
+          /*
+           * …AND A CHART — a plotting script written to disk, or the bars typed
+           * as <rect>s into a .svg — see handmade-chart.ts. Before the
+           * OmniSVG guard: a chart typed as markup is a chart, not a drawing.
+           */
+          const handmadeChart = isHandmadeChart({
+            path: input.path,
+            content: body,
+            chartAvailable: pi.getAllTools().some((t) => t.name === CHART_TOOL),
+          });
+          if (handmadeChart !== null) {
+            svgRefused.set(abs, body);
+            pi.appendEntry(HARNESS_LOOP_ENTRY, { action: 'block', cause: 'handmade-chart' });
+            return {
+              block: true,
+              reason: handmadeChartRefusal(handmadeChart, {
+                cli: toolCliMode,
+                edit: event.toolName === 'edit',
+                path: input.path,
+              }),
+            };
           }
           if (
             event.toolName === 'write' &&
@@ -4097,6 +4151,9 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
    * Re-writing those exact bytes is the deliberate escape; a tweaked retry is a
    * fresh refusal. Per session. */
   const svgRefused = new Map<string, string>();
+  /** The last plotting script refused at bash (handmade-chart.ts); the same
+   * command again is the deliberate escape — the script may be the ask. */
+  let chartScriptRefused: string | null = null;
   pi.on('tool_result', (event) => {
     /* In CLI mode every call is `bash`, so the real tool name is only known at
        the dispatch (see the CLI host's `call`); tally there instead, or the

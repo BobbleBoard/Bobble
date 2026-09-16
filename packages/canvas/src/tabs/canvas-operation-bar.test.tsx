@@ -382,3 +382,37 @@ describe('visibleCrumbs', () => {
     ).toEqual(['var', '…', 'heart', '01.svg']);
   });
 });
+
+describe('chart + inline tabs', () => {
+  it('a chart tab gets its name, an SVG download, and no Show-in-chat unless it came from one', async () => {
+    const onMediaDownload = vi.fn();
+    const { container } = await render(
+      <CanvasOperationBar
+        tab={tab({ kind: 'chart', title: 'Units Sold by Year' })}
+        onMediaDownload={onMediaDownload}
+      />,
+    );
+    expect(container.querySelector('.pd-media-title')?.textContent).toContain('Units Sold by Year');
+    expect(container.querySelector('.pd-media-type')?.textContent).toBe('CHART');
+    expect(container.querySelector('.pd-canvas-show-inline')).toBeNull();
+    await click(container.querySelector('button[aria-label="Download as SVG"]'));
+    expect(onMediaDownload).toHaveBeenCalledWith('svg');
+  });
+
+  it('a tab lifted from an inline card offers Show in chat, for charts and for svg alike', async () => {
+    for (const kind of ['chart', 'svg'] as const) {
+      const onShowInline = vi.fn();
+      const { container, unmount } = await render(
+        <CanvasOperationBar
+          tab={tab({ kind, title: 'Lifted', inline: true })}
+          onShowInline={onShowInline}
+        />,
+      );
+      const button = container.querySelector('.pd-canvas-show-inline');
+      expect(button?.textContent).toContain('Show in chat');
+      await click(button);
+      expect(onShowInline).toHaveBeenCalledTimes(1);
+      await unmount();
+    }
+  });
+});

@@ -402,10 +402,10 @@ export function registerOfficeTools(pi: ExtensionAPI, deps: OfficeToolDeps): voi
       'Make a real .pptx slide deck, .docx document, .xlsx workbook, .pdf — or a standalone chart ' +
       '(.svg) of DATA — from a brief: designed layouts, fitted type, charts drawn from their ' +
       'numbers, through the on-device document pipeline. Every request for a deck, a presentation, ' +
-      'a report, a memo, a spreadsheet, a PDF, or a bar/line/pie chart of some numbers goes here; ' +
-      'never write these with python-pptx, python-docx, openpyxl, reportlab, matplotlib or by ' +
-      'assembling the XML, and never ask image generation for a chart (a painted picture cannot ' +
-      'put a value on an axis). The brief is the whole content: put in it every fact, number, ' +
+      'a report, a memo, a spreadsheet or a PDF goes here; never write these with python-pptx, ' +
+      'python-docx, openpyxl, reportlab or by assembling the XML. (A chart on its own is quicker ' +
+      'with the chart tool, which draws it in the chat; kind chart here is for a chart made in a ' +
+      'document flow.) The brief is the whole content: put in it every fact, number, ' +
       'name and section the file should contain, in order — the pipeline writes only what the ' +
       'brief gives it and invents nothing. It returns a slide-by-slide (or block-by-block) summary ' +
       'and opens the file in the canvas. For changes to a file that exists, use office_edit.',
@@ -413,7 +413,6 @@ export function registerOfficeTools(pi: ExtensionAPI, deps: OfficeToolDeps): voi
       'office_make: a deck, document, workbook, PDF or data chart from a brief (on-device)',
     promptGuidelines: [
       'Decks, reports, memos, spreadsheets and PDFs are made with office_make from a brief that carries all the content — never with python-pptx, python-docx, openpyxl or hand-written XML.',
-      'A chart of data (bars, a line, a pie) is office_make with kind chart and the numbers in the brief — it is drawn from them; never a generated image, never matplotlib.',
     ],
     parameters: Type.Object({
       // Required in the schema (so `office make pptx "…"` fills it first) but

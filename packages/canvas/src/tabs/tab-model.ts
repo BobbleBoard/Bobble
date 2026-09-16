@@ -57,7 +57,9 @@ export type CanvasTabKind =
   // through `macMonitor` and the surface paints them onto a <canvas>.
   | 'computer-use'
   | 'markdown'
-  | 'code';
+  | 'code'
+  // A data visual (ChartSurface): artifact-backed, its text the JSON spec.
+  | 'chart';
 
 /** The media-preview surface's load state (loading → loaded | error). */
 export type MediaPreviewStatus = 'loading' | 'loaded' | 'error';
@@ -228,6 +230,14 @@ export interface CanvasTab {
    * frames off it directly. Same shape of arrangement as `situationEvents`.
    */
   macMonitor?: MacMonitorFeed;
+
+  /**
+   * This tab was LIFTED from an inline card in the chat — a chart or a small
+   * SVG that started beside the words and was moved over. The operation bar
+   * offers "Show in chat", which closes the tab; the card comes back where it
+   * was (the tab's key is the card's, so the two are never both shown).
+   */
+  inline?: boolean;
 
   /** Free-form per-surface data the core never reads. */
   data?: Record<string, unknown>;

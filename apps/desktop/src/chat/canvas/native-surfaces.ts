@@ -19,7 +19,12 @@
  * chrome indicator with controller.updateTab({ driving: true }).
  */
 import '@xterm/xterm/css/xterm.css';
-import type { CanvasController, CanvasTab, CanvasTabsHandlers } from '@pi-desktop/canvas';
+import {
+  artifactExportText,
+  type CanvasController,
+  type CanvasTab,
+  type CanvasTabsHandlers,
+} from '@pi-desktop/canvas';
 import { FitAddon } from '@xterm/addon-fit';
 import { type ITheme, Terminal } from '@xterm/xterm';
 import { useCallback, useEffect, useRef } from 'react';
@@ -262,10 +267,19 @@ export class NativeSurfaces {
    * for data URIs directly; http(s) srcs are handed to the OS default handler. */
   #downloadMedia(tabId: string, format: string): void {
     const tab = this.#tab(tabId);
-    const src = tab?.mediaSrc ?? tab?.artifact?.content.text;
-    if (!src) return;
     const name = (tab?.title ?? 'download').replace(/[^\w.-]+/g, '_');
     const filename = /\.[a-z0-9]+$/i.test(name) ? name : `${name}.${format.toLowerCase()}`;
+    // A chart tab's text is its spec; what downloads is the drawing.
+    if (tab?.artifact?.content.kind === 'chart') {
+      const svg = artifactExportText(tab.artifact.content);
+      const a = document.createElement('a');
+      a.href = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+      a.download = filename;
+      a.click();
+      return;
+    }
+    const src = tab?.mediaSrc ?? tab?.artifact?.content.text;
+    if (!src) return;
     if (src.startsWith('data:')) {
       const a = document.createElement('a');
       a.href = src;

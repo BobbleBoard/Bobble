@@ -233,6 +233,29 @@ export const CAPABILITIES: readonly Capability[] = [
     tools: ['generate_svg'],
   },
   {
+    name: 'chart',
+    /* the user (2026-09-16), Claude's inline chart beside Bobble's pipeline
+       picture: "we need parity on these datavisuals, it's a common use case
+       and very formulaic and doable … not just bar charts, all datavisuals".
+       The line names every way the ask arrives — chart, plot, graph,
+       visualise, "show me … over the years" — and the habits it replaces,
+       because MEASURED on a 4B the same four numbers went to image generation
+       once and to the office pipeline once before either was told otherwise. */
+    summary:
+      'Draw an interactive chart of numbers in the chat — bar, stacked, horizontal bar, line, ' +
+      'area, scatter, donut — from the labels and values, in a second. Every request to chart, ' +
+      'plot, graph or visualise data goes here; never image generation, matplotlib or hand-written SVG.',
+    guidance:
+      'chart takes the type, the title, the labels and the values (several series as "Name: 1, 2; ' +
+      'Other: 3, 4"; a unit, a highlight, a source note) and puts the chart in the chat as a card ' +
+      'the user can hover, flip to a table, or open larger in the canvas. Put the real numbers in ' +
+      '— it draws exactly what it is given. Then say in one line what the chart shows; the values ' +
+      'are in front of the user already.',
+    /* One tool, and in CLI mode it IS the command (tool-cli.ts maps `chart`
+       to an empty path under this group). */
+    tools: ['chart'],
+  },
+  {
     name: 'office',
     /* the user, reading the canvas assessment: "model should not be using
        python-pptx, there is a dedicated subagent for each pptx/docx/xlsx
@@ -246,7 +269,8 @@ export const CAPABILITIES: readonly Capability[] = [
     summary:
       'Make a real slide deck (.pptx), document (.docx), workbook (.xlsx) or PDF from a brief, and ' +
       'edit or read existing ones. Every deck, report, memo or spreadsheet goes here — never ' +
-      'python-pptx, python-docx, openpyxl or hand-written XML, and never `read` on an office file.',
+      'python-pptx, python-docx, openpyxl or hand-written XML, and never `read` on an office file. ' +
+      '(A chart on its own is the chart capability.)',
     guidance:
       'office_make takes a brief and returns the finished file, open in the canvas, with a ' +
       'slide-by-slide summary. Put EVERYTHING the file should say into the brief — the facts, the ' +

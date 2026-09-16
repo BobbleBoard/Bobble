@@ -5265,3 +5265,410 @@
   background: color-mix(in srgb, var(--pd-accent-primary) 88%, #000);
   color: #fff;
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * Chart (data visuals) — the same card inline in the chat and in a canvas tab
+ * ────────────────────────────────────────────────────────────────────── */
+
+.pd-chart {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pd-space-xs);
+  padding: var(--pd-space-md) var(--pd-space-md) var(--pd-space-sm);
+  color: var(--pd-text-primary);
+  font-size: var(--pd-font-size-caption);
+  min-width: 0;
+}
+
+.pd-chart--fill {
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.pd-chart--inline {
+  /* The inline card: fixed at the thread's width, never wider than the chat. */
+  width: 100%;
+}
+
+.pd-chart-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--pd-space-sm);
+}
+
+.pd-chart-titles {
+  min-width: 0;
+}
+
+.pd-chart-title {
+  font-size: var(--pd-font-size-body);
+  font-weight: var(--pd-font-weight-medium);
+  line-height: 1.3;
+}
+
+.pd-chart-subtitle {
+  color: var(--pd-text-muted);
+  margin-top: 2px;
+}
+
+.pd-chart-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--pd-space-xs);
+  flex: none;
+}
+
+.pd-chart-toggle-legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.pd-chart-toggle {
+  /* A fieldset (the two buttons are one choice): its UA box reset. */
+  margin: 0;
+  min-width: 0;
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--pd-border-subtle);
+  border-radius: var(--pd-radius-md);
+  background: var(--pd-bg-inset);
+}
+
+.pd-chart-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 22px;
+  border: 0;
+  border-radius: calc(var(--pd-radius-md) - 2px);
+  background: transparent;
+  color: var(--pd-text-muted);
+  cursor: pointer;
+  transition:
+    background var(--pd-duration-fast) var(--pd-easing-standard),
+    color var(--pd-duration-fast) var(--pd-easing-standard);
+}
+
+.pd-chart-toggle-btn:hover {
+  color: var(--pd-text-primary);
+}
+
+.pd-chart-toggle-btn[data-active] {
+  background: var(--pd-bg-raised);
+  color: var(--pd-text-primary);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+}
+
+.pd-chart-box {
+  position: relative;
+  width: 100%;
+  min-height: 120px;
+}
+
+.pd-chart--fill .pd-chart-box {
+  flex: 1;
+  min-height: 0;
+}
+
+.pd-chart-svg {
+  display: block;
+  overflow: visible;
+}
+
+.pd-chart-text {
+  font-family: var(--pd-font-family, inherit);
+  font-size: 12px;
+  fill: var(--pd-text-primary);
+}
+
+.pd-chart-text--mute {
+  fill: var(--pd-text-muted);
+}
+
+.pd-chart-text--small {
+  font-size: 11px;
+}
+
+.pd-chart-text--big {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.pd-chart-grid {
+  stroke: var(--pd-border-subtle);
+  stroke-width: 1;
+}
+
+.pd-chart-axis {
+  stroke: var(--pd-text-ghost);
+  stroke-width: 1;
+}
+
+/* The hover band — Claude's grey column behind the hovered category. */
+.pd-chart-band {
+  fill: transparent;
+  transition: fill var(--pd-duration-fast) var(--pd-easing-standard);
+}
+
+.pd-chart-band[data-hover] {
+  fill: var(--pd-bg-hover);
+}
+
+.pd-chart-bar,
+.pd-chart-slice,
+.pd-chart-dot {
+  transition: opacity var(--pd-duration-fast) var(--pd-easing-standard);
+}
+
+.pd-chart-marker {
+  fill: var(--pd-bg-raised);
+}
+
+.pd-chart-legend-row {
+  cursor: default;
+}
+
+.pd-chart-tooltip {
+  position: absolute;
+  z-index: 3;
+  min-width: 120px;
+  padding: var(--pd-space-xs) var(--pd-space-sm);
+  border: 1px solid var(--pd-border-subtle);
+  border-radius: var(--pd-radius-md);
+  background: var(--pd-bg-raised);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.12);
+  pointer-events: none;
+  font-size: var(--pd-font-size-caption);
+}
+
+.pd-chart-tooltip-title {
+  color: var(--pd-text-muted);
+  margin-bottom: 2px;
+}
+
+.pd-chart-tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.pd-chart-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex: none;
+}
+
+.pd-chart-tooltip-value {
+  font-weight: 600;
+}
+
+.pd-chart-tooltip-name {
+  color: var(--pd-text-muted);
+}
+
+.pd-chart-note {
+  color: var(--pd-text-ghost);
+  font-size: var(--pd-font-size-footnote);
+}
+
+.pd-chart-table-wrap {
+  overflow: auto;
+}
+
+.pd-chart-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--pd-font-size-caption);
+}
+
+.pd-chart-table th {
+  text-align: left;
+  font-weight: var(--pd-font-weight-medium);
+  color: var(--pd-text-muted);
+  padding: var(--pd-space-xs) var(--pd-space-sm);
+  border-bottom: 1px solid var(--pd-border-subtle);
+}
+
+.pd-chart-table td {
+  padding: var(--pd-space-sm);
+  border-bottom: 1px solid var(--pd-border-subtle);
+}
+
+.pd-chart-table tr:last-child td {
+  border-bottom: 0;
+}
+
+/* The inline widget holding a chart takes the thread's width (a chart is not a badge). */
+.pd-inline-widget[data-kind="chart"] {
+  width: 100%;
+  max-width: min(100%, 44rem);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * Presented inline (a chart card, a small SVG) and the stub it leaves behind
+ * while its tab is open in the canvas
+ * ────────────────────────────────────────────────────────────────────── */
+
+.pd-inline-chart {
+  position: relative;
+  width: 100%;
+  max-width: min(100%, 44rem);
+  border: 1px solid var(--pd-border-subtle);
+  border-radius: var(--pd-radius-lg);
+  background: var(--pd-bg-raised);
+  overflow: hidden;
+}
+
+/* The corner control beside the chart ⇄ table toggle. */
+.pd-inline-chart-move {
+  color: var(--pd-text-secondary);
+}
+
+.pd-inline-chart-move:hover {
+  color: var(--pd-text-primary);
+}
+
+/* A quiet line under the card: the file on disk. */
+.pd-inline-file {
+  display: flex;
+  align-items: center;
+  gap: var(--pd-space-xs);
+  padding: 0 var(--pd-space-xs);
+  color: var(--pd-text-tertiary);
+  font-size: var(--pd-font-size-caption);
+}
+
+.pd-inline-file button {
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+
+.pd-inline-file button:hover {
+  color: var(--pd-text-primary);
+}
+
+/* The card, collapsed to a row while it is showing in the canvas. */
+.pd-inline-stub {
+  display: flex;
+  align-items: center;
+  gap: var(--pd-space-sm);
+  width: 100%;
+  max-width: min(100%, 44rem);
+  padding: var(--pd-space-sm) var(--pd-space-md);
+  border: 1px dashed var(--pd-border-subtle);
+  border-radius: var(--pd-radius-lg);
+  color: var(--pd-text-secondary);
+  font-size: var(--pd-font-size-caption);
+  background: transparent;
+}
+
+.pd-inline-stub-icon {
+  display: inline-flex;
+  color: var(--pd-text-tertiary);
+}
+
+.pd-inline-stub-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--pd-text-primary);
+}
+
+.pd-inline-stub-where {
+  color: var(--pd-text-tertiary);
+}
+
+/* The canvas half of the move: a Show-in-chat button in the operation bar. */
+.pd-canvas-show-inline {
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+/* The chart bar at the rail's width: the file name gives way, the controls never shrink. */
+.pd-canvas-opbar[data-kind="chart"] > .pd-media-title {
+  flex: 0 1 auto;
+  min-width: 2.5rem;
+}
+
+.pd-canvas-opbar[data-kind="chart"] > :not(.pd-media-title):not(.pd-canvas-opbar-spacer) {
+  flex: 0 0 auto;
+}
+
+.pd-chart-text--value {
+  font-size: 11px;
+  font-weight: 600;
+  fill: var(--pd-text-primary);
+}
+
+/*
+ * The view transition itself: the named element (card ⇄ tab panel) morphs;
+ * everything else cross-fades briefly. `::view-transition-group` carries the
+ * moving box; the old and new snapshots are stretched to it so a card that
+ * grows into a panel scales rather than pops. The root's own cross-fade is
+ * kept short so the rest of the app does not blink.
+ */
+::view-transition-group(*) {
+  animation-duration: 320ms;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+::view-transition-old(*),
+::view-transition-new(*) {
+  animation-duration: 320ms;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 140ms;
+}
+
+::view-transition-old(*):only-child,
+::view-transition-new(*):only-child {
+  /* A named element with no counterpart (the panel opening for the first
+   * time) fades rather than flying in from nowhere. */
+  animation-duration: 200ms;
+}
+
+/*
+ * The card ⇄ panel pair: the two snapshots are very different shapes (a
+ * 380px card, a full-height panel). Left to the defaults each keeps its own
+ * aspect ratio and the taller one hangs out of the moving box — the panel's
+ * bars were drawn over the composer for a third of a second. Clipped to the
+ * box, filled from the top so the titles stay put while the box grows.
+ */
+::view-transition-group(.pd-inline) {
+  overflow: clip;
+  border-radius: var(--pd-radius-lg);
+}
+
+::view-transition-old(.pd-inline),
+::view-transition-new(.pd-inline) {
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation-duration: 0s;
+  }
+}

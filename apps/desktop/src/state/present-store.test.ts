@@ -3,8 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   classifyPresented,
   extOf,
+  isInlinePresented,
   openPresented,
   presentedFor,
+  presentTabKey,
   UNSAVED_CHAT,
   usePresentStore,
 } from './present-store';
@@ -169,5 +171,93 @@ describe('openPresented — what door a presented file goes through', () => {
     const tab = c.tabs[0] as unknown as { kind: string; artifact?: { content: { text: string } } };
     expect(tab.kind).toBe('html');
     expect(tab.artifact?.content.text).toBe('<h1>hi</h1>');
+  });
+});
+
+describe('a chart, or a small SVG, is shown IN the thread', () => {
+  beforeEach(() => usePresentStore.getState().clear());
+  const items = () => presentedFor(usePresentStore.getState(), UNSAVED_CHAT);
+  const RAW = {
+    type: 'bar',
+    title: 'Units Sold by Year',
+    labels: ['2021', '2022'],
+    values: [12, 19],
+  };
+
+  it('a presented .svg with its chart spec records a chart card, normalised', () => {
+    usePresentStore.getState().add({ path: '/ws/units.svg', chart: RAW });
+    const [item] = items();
+    expect(item?.kind).toBe('chart');
+    expect(item?.chart?.series[0]?.points).toEqual([
+      { label: '2021', value: 12 },
+      { label: '2022', value: 19 },
+    ]);
+    expect(isInlinePresented(item as never)).toBe(true);
+  });
+
+  it('a spec the chart model cannot read leaves a plain image card, never a throw', () => {
+    usePresentStore.getState().add({ path: '/ws/broken.svg', chart: { title: 'no data' } });
+    const [item] = items();
+    expect(item?.kind).toBe('image');
+    expect(item?.chart).toBeUndefined();
+    expect(isInlinePresented(item as never)).toBe(false);
+  });
+
+  it('a small SVG travels with its markup and is inline; a poster is a canvas card', () => {
+    const s = usePresentStore.getState();
+    s.add({ path: '/ws/icon.svg', svg: { width: 64, height: 64, bytes: 90, text: '<svg/>' } });
+    s.add({ path: '/ws/poster.svg', svg: { width: 1920, height: 1080, bytes: 90000 } });
+    const [icon, poster] = items();
+    expect(isInlinePresented(icon as never)).toBe(true);
+    expect(isInlinePresented(poster as never)).toBe(false);
+  });
+
+  it('openPresented lifts a chart into a chart tab synchronously, keyed as the card, marked inline', () => {
+    const tabs: Array<Record<string, unknown>> = [];
+    const c = {
+      upsertTab: vi.fn((key: string, spec: Record<string, unknown>) => {
+        tabs.push({ key, ...spec });
+        return 't1';
+      }),
+      updateTab: vi.fn(),
+      focusTab: vi.fn(),
+      getState: () => ({ tabs }),
+    };
+    usePresentStore.getState().add({ path: '/ws/units.svg', chart: RAW });
+    const [item] = items();
+    // Not awaited on purpose: the tab must exist before the promise settles,
+    // because the click runs inside a view transition's synchronous update.
+    void openPresented(c as never, item as never);
+    expect(tabs).toHaveLength(1);
+    expect(tabs[0]).toMatchObject({
+      key: presentTabKey('/ws/units.svg'),
+      kind: 'chart',
+      title: 'Units Sold by Year',
+      filePath: '/ws/units.svg',
+      inline: true,
+    });
+    const artifact = tabs[0]?.artifact as { content: { kind: string; text: string } };
+    expect(artifact.content.kind).toBe('chart');
+    expect(JSON.parse(artifact.content.text)).toMatchObject({ type: 'bar' });
+  });
+
+  it('openPresented lifts a small SVG into an svg tab from its markup, marked inline', () => {
+    const tabs: Array<Record<string, unknown>> = [];
+    const c = {
+      upsertTab: vi.fn((key: string, spec: Record<string, unknown>) => {
+        tabs.push({ key, ...spec });
+        return 't1';
+      }),
+      updateTab: vi.fn(),
+      focusTab: vi.fn(),
+      getState: () => ({ tabs }),
+    };
+    usePresentStore
+      .getState()
+      .add({ path: '/ws/icon.svg', svg: { width: 64, height: 64, bytes: 90, text: '<svg/>' } });
+    const [item] = items();
+    void openPresented(c as never, item as never);
+    expect(tabs[0]).toMatchObject({ kind: 'svg', inline: true, filePath: '/ws/icon.svg' });
+    expect((tabs[0]?.artifact as { content: { text: string } }).content.text).toBe('<svg/>');
   });
 });

@@ -13,6 +13,7 @@ describe('built-in connectors', () => {
     expect(BUILTIN_CONNECTOR_IDS).toEqual([
       'cli-tools',
       'hyperframes',
+      'data-visuals',
       'video-editing',
       'mac-calendar',
       'mac-mail',
@@ -56,7 +57,8 @@ describe('built-in connectors', () => {
   it('is merged to the FRONT of the exported catalog', () => {
     expect(KNOWN_CONNECTORS[0]?.id).toBe('cli-tools');
     expect(KNOWN_CONNECTORS[1]?.id).toBe('hyperframes');
-    expect(KNOWN_CONNECTORS[2]?.id).toBe('video-editing');
+    expect(KNOWN_CONNECTORS[2]?.id).toBe('data-visuals');
+    expect(KNOWN_CONNECTORS[3]?.id).toBe('video-editing');
   });
 
   it('renders a neutral (non-brand, currentColor) inline SVG mark', () => {

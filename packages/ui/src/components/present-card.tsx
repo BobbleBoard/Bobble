@@ -20,7 +20,17 @@ import clsx from 'clsx';
 import { forwardRef, type HTMLAttributes } from 'react';
 
 /** What kind of thing was presented — drives the glyph and the `Kind · EXT` line. */
-export type PresentKind = 'image' | 'page' | 'code' | 'document' | 'project' | 'media' | 'file';
+export type PresentKind =
+  | 'image'
+  | 'page'
+  | 'code'
+  | 'document'
+  | 'project'
+  | 'media'
+  | 'file'
+  // A data visual: the thread renders its interactive card; a plain row is
+  // the fallback when the card cannot.
+  | 'chart';
 
 export interface PresentedItem {
   /** Absolute path — the identity, and the tooltip. */
@@ -47,6 +57,7 @@ const KIND_LABEL: Record<PresentKind, string> = {
   project: 'Project',
   media: 'Media',
   file: 'File',
+  chart: 'Chart',
 };
 
 /** Every application that can open it, the OS default first. */

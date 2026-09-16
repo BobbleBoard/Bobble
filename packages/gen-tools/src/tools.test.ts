@@ -518,7 +518,7 @@ describe('dataChartPrompt — a chart of numbers is not a picture', () => {
     const p =
       'A vertical bar chart showing units sold (in thousands) by year. Years on x-axis: 2021, 2022, ' +
       '2023, 2024. Bar heights: 2021=12, 2022=19, 2023=27, 2024=35. Include title "Units Sold by Year".';
-    expect(dataChartPrompt(p)).toMatch(/office_make with kind "chart"/);
+    expect(dataChartPrompt(p)).toMatch(/chart bar "Title" --labels/);
   });
 
   it('lets art through — chart words without data', () => {

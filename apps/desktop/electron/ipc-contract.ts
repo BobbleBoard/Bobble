@@ -1249,7 +1249,18 @@ export type AppEventMap = {
    * The model called `present`: show this artefact to the user — a card in the
    * thread and the thing itself open (or running) in the canvas.
    */
-  'present:show': { path: string; note?: string };
+  'present:show': {
+    path: string;
+    note?: string;
+    /**
+     * A chart's spec (the `<stem>.chart.json` beside a presented .svg): the
+     * thread renders it as an interactive card instead of a file row, and the
+     * canvas only on request. See electron/pi/present-inline.ts.
+     */
+    chart?: Record<string, unknown>;
+    /** A presented SVG's size and, when icon-sized and light, its markup. */
+    svg?: { width: number; height: number; bytes: number; text?: string };
+  };
   /**
    * Download progress. `received`/`total`/`fraction` are THIS FILE's; the
    * `job*` fields are the whole download's and are what the bar should follow —

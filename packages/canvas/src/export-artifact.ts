@@ -1,10 +1,13 @@
 import type { Artifact, ArtifactContent } from './model.ts';
+import { chartArtifactSvg } from './surfaces/chart-surface.tsx';
 
 const KIND_EXTENSION: Record<string, string> = {
   code: 'txt',
   markdown: 'md',
   html: 'html',
   svg: 'svg',
+  // A chart artifact's text is its spec; what leaves the app is the drawing.
+  chart: 'svg',
 };
 
 const LANGUAGE_EXTENSION: Record<string, string> = {
@@ -25,6 +28,7 @@ export function artifactMimeType(content: ArtifactContent): string {
     case 'html':
       return 'text/html';
     case 'svg':
+    case 'chart':
       return 'image/svg+xml';
     case 'markdown':
       return 'text/markdown';
@@ -46,9 +50,17 @@ export function artifactFilename(artifact: Artifact): string {
   return `${base}.${ext}`;
 }
 
+/** What a download of this artifact contains: its text, or a chart's drawing. */
+export function artifactExportText(content: ArtifactContent): string {
+  if (content.kind === 'chart') return chartArtifactSvg(content.text) ?? content.text;
+  return content.text;
+}
+
 /** Trigger a browser download of the artifact's text. Requires a DOM. */
 export function downloadArtifact(artifact: Artifact, doc: Document = document): void {
-  const blob = new Blob([artifact.content.text], { type: artifactMimeType(artifact.content) });
+  const blob = new Blob([artifactExportText(artifact.content)], {
+    type: artifactMimeType(artifact.content),
+  });
   const url = URL.createObjectURL(blob);
   const anchor = doc.createElement('a');
   anchor.href = url;

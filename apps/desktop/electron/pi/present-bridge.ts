@@ -31,6 +31,7 @@ import { getInferenceVisionReady } from '../inference/llm-main';
 import { wantVision } from '../inference/vision-want';
 import type { AppEventMap } from '../ipc-contract';
 import { captureViewForFile } from '../office/office-manager';
+import { presentInlinePayload } from './present-inline';
 
 const log = createLogger('desktop:present');
 /*
@@ -285,9 +286,15 @@ async function handle(req: Request): Promise<Record<string, unknown>> {
   if (req.method === 'show') {
     const wc = getWindow?.() ?? null;
     if (wc === null || wc.isDestroyed()) return { ok: false, error: 'no Bobble window' };
-    // The renderer opens it in the canvas and renders the card.
-    events.send(wc, 'present:show', { path: target, note: req.params?.note });
-    log.info('presented', { path: target });
+    // The renderer renders the card — and for a chart or a small SVG, the
+    // thing itself, inline (present-inline.ts); the rest opens in the canvas.
+    const inline = await presentInlinePayload(target);
+    events.send(wc, 'present:show', { path: target, note: req.params?.note, ...inline });
+    log.info('presented', {
+      path: target,
+      chart: inline.chart !== undefined,
+      svg: inline.svg !== undefined ? `${inline.svg.width}x${inline.svg.height}` : undefined,
+    });
     return { ok: true };
   }
   if (req.method === 'preview') {

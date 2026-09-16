@@ -9,6 +9,7 @@ import {
 import type { ComponentType } from 'react';
 import {
   IconAudio,
+  IconChart,
   IconCode,
   IconCube,
   IconDisplay,
@@ -60,6 +61,8 @@ export const CANVAS_TAB_KINDS: Record<CanvasTabKind, CanvasTabKindMeta> = {
   },
   html: { kind: 'html', label: 'Preview', icon: IconMarkup, live: false, opensInCanvas: false },
   svg: { kind: 'svg', label: 'SVG', icon: IconMarkup, live: false, opensInCanvas: false },
+  // A data visual — inline in the chat when small, here when the user moves it.
+  chart: { kind: 'chart', label: 'Chart', icon: IconChart, live: false, opensInCanvas: false },
   image: { kind: 'image', label: 'Image', icon: IconImage, live: false, opensInCanvas: true },
   // A generation image surface — artifact-backed like `image`, but streams
   // candidates as the job runs (the gen-canvas surface handles `canStream`). The

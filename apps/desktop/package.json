@@ -26,6 +26,7 @@
     "@pi-desktop/afm": "workspace:*",
     "@pi-desktop/browser-use": "workspace:*",
     "@pi-desktop/canvas": "workspace:*",
+    "@pi-desktop/charts": "workspace:*",
     "@pi-desktop/coordination": "workspace:*",
     "@pi-desktop/engine": "workspace:*",
     "@pi-desktop/gen-canvas": "workspace:*",
@@ -38,6 +39,7 @@
     "@pi-desktop/mac-computer-use": "workspace:*",
     "@pi-desktop/mac-connectors": "workspace:*",
     "@pi-desktop/mcp-lite": "workspace:*",
+    "@pi-desktop/model-store": "workspace:*",
     "@pi-desktop/pi-mac": "workspace:*",
     "@pi-desktop/provider-afm": "workspace:*",
     "@pi-desktop/provider-llamacpp": "workspace:*",
@@ -56,8 +58,7 @@
     "rehype-raw": "^7.0.0",
     "rehype-sanitize": "^6.0.0",
     "remark-gfm": "^4.0.1",
-    "zustand": "^5.0.14",
-    "@pi-desktop/model-store": "workspace:*"
+    "zustand": "^5.0.14"
   },
   "optionalDependencies": {
     "node-pty": "^1.1.0"

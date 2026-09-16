@@ -131,6 +131,9 @@ const COMMAND_PATH_OVERRIDES: Readonly<Record<string, readonly string[]>> = {
      The group is `svg` and its one tool has no sub-word, so the command is the
      group name and the prompt is the positional. */
   generate_svg: [],
+  /* The same shape: the `chart` group's one tool IS the command —
+     `chart bar "Units Sold by Year" --labels … --values …`. */
+  chart: [],
 };
 
 export function pathFor(group: string, toolName: string): string[] {

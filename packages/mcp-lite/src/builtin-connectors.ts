@@ -42,6 +42,11 @@ const VIDEO_EDITING_DESCRIPTION =
   'A typed ffmpeg façade — trim, concat, overlay, extract frames, and probe ' +
   'video, with safe argv (no shell).';
 
+const DATA_VISUALS_DESCRIPTION =
+  'Charts drawn from their numbers, in the chat — bar, stacked, horizontal bar, line, area, ' +
+  'scatter, donut — as an interactive card (hover values, chart/table toggle, open in the canvas), ' +
+  'with the SVG written into the project. Pure, on-device, no model weights.';
+
 /** One first-party macOS connector card: an always-on `kind:'builtin'` gallery
  * entry for a `@pi-desktop/mac-connectors` app surface. `command:''` (never a
  * server); a static tool list drives the detail view. */
@@ -242,6 +247,38 @@ export const BUILTIN_CONNECTORS: KnownConnector[] = [
       name: 'HyperFrames',
       icon: '🎞️',
       description: HYPERFRAMES_DESCRIPTION,
+      command: '',
+    },
+  },
+  {
+    /*
+     * DATA VISUALS — the user (2026-09-16), Claude's inline chart beside ours:
+     * "we need parity on these datavisuals … this can be a connector". The
+     * `chart` tool is pure TypeScript and always registered (harness
+     * chart-tool.ts); this card is where a person discovers that a chart of
+     * numbers is one call away and what its command looks like.
+     */
+    id: 'data-visuals',
+    name: 'Data visuals',
+    kind: 'builtin',
+    firstParty: true,
+    official: true,
+    category: 'analytics',
+    icon: '📊',
+    description: DATA_VISUALS_DESCRIPTION,
+    popular: true,
+    tools: [
+      {
+        name: 'chart',
+        description:
+          'chart <type> "<title>" --labels "…" --values "…" — a bar, stacked, hbar, line, area, scatter or donut chart of the numbers, shown inline.',
+      },
+    ],
+    template: {
+      id: 'data-visuals',
+      name: 'Data visuals',
+      icon: '📊',
+      description: DATA_VISUALS_DESCRIPTION,
       command: '',
     },
   },

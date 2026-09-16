@@ -590,9 +590,9 @@ export function dataChartPrompt(prompt: string | undefined): string | null {
   if (numbers.length < 3) return null;
   return (
     'A chart of data is drawn from its numbers, not painted — image generation cannot put a value ' +
-    'on an axis. Make it with the document pipeline instead: office_make with kind "chart" and ' +
-    'the numbers, labels, title and unit in the brief (CLI: office make chart --brief "…" --out ' +
-    'name.svg). The result is an .svg that opens on the canvas and goes into a deck or document as-is.'
+    'on an axis. Draw it with the chart tool instead: chart with the type, title, labels and values ' +
+    '(CLI: chart bar "Title" --labels "2021, 2022, 2023" --values "12, 19, 27"). It appears in the ' +
+    'chat as an interactive card in a second, and writes an .svg into the project for a page or a deck.'
   );
 }
 

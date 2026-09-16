@@ -184,6 +184,10 @@ const NEUTRAL_ICON_SVGS: Record<string, string> = {
       '<circle cx="4.5" cy="18.5" r="1.5"/><circle cx="19.5" cy="5.5" r="1.5"/><circle cx="9.5" cy="12.5" r="1.25"/><circle cx="13.5" cy="8.5" r="1.25"/>',
   ),
   // Scissors (a typed ffmpeg cut/edit façade).
+  // Three bars on a baseline — the chart card's own glyph.
+  'data-visuals': neutralSvg(
+    '<path d="M4 20h16"/><rect x="5.5" y="11" width="3.5" height="7" rx="0.8"/><rect x="10.25" y="6" width="3.5" height="12" rx="0.8"/><rect x="15" y="9" width="3.5" height="9" rx="0.8"/>',
+  ),
   'video-editing': neutralSvg(
     '<circle cx="6" cy="6.5" r="2.15"/><circle cx="6" cy="17.5" r="2.15"/><path d="M7.9 7.7 19.5 16.5M7.9 16.3 19.5 7.5M12 12l4-2.9"/>',
   ),

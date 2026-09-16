@@ -1,3 +1,4 @@
+import { normalizeChartSpec, pointCount } from '@pi-desktop/charts';
 import { IconButton } from '@pi-desktop/ui';
 import { type ReactNode, useCallback, useLayoutEffect, useRef, useState } from 'react';
 import type { Artifact } from './model.ts';
@@ -6,7 +7,9 @@ import { ensureDefaultSurfaces } from './surfaces/register-builtins.tsx';
 import { IconExpand } from './tab-icons.tsx';
 
 /** Kinds that MAY live inline in the chat when small (everything else → canvas). */
-const INLINE_ELIGIBLE_KINDS = new Set(['svg', 'html', 'widget']);
+const INLINE_ELIGIBLE_KINDS = new Set(['svg', 'html', 'widget', 'chart']);
+/** A chart stays inline up to this many points; a wider dataset opens beside the chat. */
+const MAX_INLINE_CHART_POINTS = 60;
 /** Default char budget before an inline-eligible artifact is pushed to canvas. */
 const DEFAULT_MAX_INLINE_CHARS = 2000;
 
@@ -28,6 +31,16 @@ export function shouldGoToCanvas(
 ): boolean {
   const max = options.maxInlineChars ?? DEFAULT_MAX_INLINE_CHARS;
   if (!INLINE_ELIGIBLE_KINDS.has(artifact.content.kind)) return true;
+  if (artifact.content.kind === 'chart') {
+    // The spec's size is not the picture's: judge a chart by its points.
+    try {
+      return (
+        pointCount(normalizeChartSpec(JSON.parse(artifact.content.text))) > MAX_INLINE_CHART_POINTS
+      );
+    } catch {
+      return true;
+    }
+  }
   return (artifact.content.text?.length ?? 0) > max;
 }
 
@@ -101,7 +114,12 @@ export function InlineWidget({
 
   const rootClass = ['pd-inline-widget', className].filter(Boolean).join(' ');
   return (
-    <div className={rootClass} data-overflowing={overflowing || undefined}>
+    <div
+      className={rootClass}
+      data-overflowing={overflowing || undefined}
+      data-kind={artifact.content.kind}
+      data-testid="inline-widget"
+    >
       <IconButton
         size="sm"
         className="pd-inline-widget-move"

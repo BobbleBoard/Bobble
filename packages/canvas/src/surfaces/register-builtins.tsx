@@ -4,6 +4,7 @@ import {
   type SurfaceProps,
   type SurfaceRegistry,
 } from '../registry.ts';
+import { ChartSurface } from './chart-surface.tsx';
 import { CodeSurface } from './code-surface.tsx';
 import { FileSurface } from './file-surface.tsx';
 import { HtmlSurface } from './html-surface.tsx';
@@ -52,6 +53,15 @@ export function registerBuiltinSurfaces(
       opensInCanvas: true,
       match: matchKind('markdown'),
       component: MarkdownSurface,
+    }),
+    // A data visual: the spec (JSON) is the artifact's text; inline-eligible
+    // like svg/html — the chat is where a chart of a few numbers belongs.
+    registry.register({
+      kind: 'chart',
+      canStream: false,
+      opensInCanvas: false,
+      match: matchKind('chart'),
+      component: ChartSurface,
     }),
     registry.register({
       kind: 'html',

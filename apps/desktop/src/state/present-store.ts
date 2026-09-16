@@ -12,6 +12,7 @@ import type { OpenWithChoice } from '@pi-desktop/ui';
  */
 
 import type { CanvasController, CanvasTabKind } from '@pi-desktop/canvas';
+import { type ChartSpec, normalizeChartSpec } from '@pi-desktop/charts';
 import type { PresentKind } from '@pi-desktop/ui';
 import { create } from 'zustand';
 import { previewKindForExt } from '../chat/canvas/file-preview';
@@ -41,6 +42,28 @@ export interface PresentedRecord {
   /** Apps that can open it — hydrated after the record appears. */
   openApps?: readonly OpenWithChoice[];
   defaultApp?: OpenWithChoice;
+  /**
+   * A chart's spec, when the presented .svg had the `chart` tool's sidecar
+   * beside it: the thread renders the interactive card from this instead of a
+   * file row, and the canvas only on request. the user: "some items showing inline
+   * cards like anthropic has here, while larger things go to the canvas still".
+   */
+  chart?: ChartSpec;
+  /**
+   * A presented SVG's size and, when it is icon-sized and light, its markup —
+   * the drawing itself goes inline; a poster stays a canvas tab.
+   */
+  svg?: { width: number; height: number; bytes: number; text?: string };
+}
+
+/** Does this record show the thing itself in the thread (a chart card, a small SVG)? */
+export function isInlinePresented(item: Pick<PresentedRecord, 'chart' | 'svg'>): boolean {
+  return item.chart !== undefined || item.svg?.text !== undefined;
+}
+
+/** The canvas tab key a presented path opens under — the inline card's twin. */
+export function presentTabKey(path: string): string {
+  return `present:${path}`;
 }
 
 /** Extension → how we label it and which canvas surface opens it. */
@@ -105,6 +128,9 @@ interface PresentState {
     afterMessageId?: string | null;
     /** The chat the hand-over belongs to (its session file); unsaved → ''. */
     chat?: string;
+    /** The chart spec beside a presented .svg, as main read it (unvalidated). */
+    chart?: Record<string, unknown>;
+    svg?: { width: number; height: number; bytes: number; text?: string };
   }) => PresentedRecord;
   /** Attach the apps that can open a presented artefact (async, best-effort). */
   setApps: (path: string, apps: OpenWithChoice[], defaultAppId: string | null) => void;
@@ -120,15 +146,27 @@ export function presentedFor(state: PresentState, chat: string): PresentedRecord
 
 export const usePresentStore = create<PresentState>((set, get) => ({
   byChat: {},
-  add: ({ path, note, afterMessageId = null, chat = UNSAVED_CHAT }) => {
+  add: ({ path, note, afterMessageId = null, chat = UNSAVED_CHAT, chart, svg }) => {
     const { kind } = classifyPresented(path);
     const have = presentedFor(get(), chat);
+    // A spec main could read but the chart model cannot make sense of is a
+    // plain file again — the card must never throw for a sidecar's typo.
+    let spec: ChartSpec | undefined;
+    if (chart !== undefined) {
+      try {
+        spec = normalizeChartSpec(chart);
+      } catch {
+        spec = undefined;
+      }
+    }
     const record: PresentedRecord = {
       path,
-      kind,
+      kind: spec !== undefined ? 'chart' : kind,
       at: have.reduce((m, i) => Math.max(m, i.at), 0) + 1,
       afterMessageId,
       ...(note !== undefined ? { note } : {}),
+      ...(spec !== undefined ? { chart: spec } : {}),
+      ...(svg !== undefined ? { svg } : {}),
     };
     /*
      * A file presented again from the SAME message (the model iterating within
@@ -208,11 +246,51 @@ export const usePresentStore = create<PresentState>((set, get) => ({
  * wiring and the card's Open button, so both land on the same tab. */
 export async function openPresented(
   controller: { upsertTab: (key: string, spec: never) => string } | null,
-  item: { path: string; note?: string },
+  item: { path: string; note?: string; chart?: ChartSpec; svg?: PresentedRecord['svg'] },
 ): Promise<void> {
   if (controller === null) return;
   const { tab } = classifyPresented(item.path);
   const title = item.path.split(/[\\/]/).pop() ?? item.path;
+  /*
+   * A CHART OPENS AS ITS CARD, LARGER — and SYNCHRONOUSLY, because the click
+   * that opens it runs inside a view transition (flushSync): the inline card
+   * has to become the tab within the same DOM update for the browser to
+   * animate one into the other. The spec is already on the record, so no file
+   * is read. `inline: true` puts "Show in chat" in the tab's bar; the key is
+   * the card's, so the card collapses to its stub while the tab is open.
+   */
+  if (item.chart !== undefined) {
+    const key = presentTabKey(item.path);
+    controller.upsertTab(key, {
+      kind: 'chart',
+      key,
+      title: item.chart.title !== '' ? item.chart.title : title,
+      filePath: item.path,
+      inline: true,
+      artifact: {
+        id: key,
+        title: item.chart.title !== '' ? item.chart.title : title,
+        filename: title,
+        content: { kind: 'chart', text: JSON.stringify(item.chart) },
+      },
+      // No subtitle: the tool's note repeats the title ("a bar chart 'Units…'").
+    } as never);
+    return;
+  }
+  /* A small SVG's markup travelled with the record: the same synchronous open. */
+  if (item.svg?.text !== undefined) {
+    const key = presentTabKey(item.path);
+    controller.upsertTab(key, {
+      kind: 'svg',
+      key,
+      title,
+      filePath: item.path,
+      inline: true,
+      artifact: { id: key, title, filename: title, content: { kind: 'svg', text: item.svg.text } },
+      ...(item.note !== undefined ? { subtitle: item.note } : {}),
+    } as never);
+    return;
+  }
   /*
    * A DECK OPENS AS A DECK. This used to read every presented file as TEXT and
    * put it in a file tab — so a .pptx the model had just made arrived in the
@@ -293,7 +371,7 @@ export function connectPresent(): () => void {
   if (new URLSearchParams(window.location.search).has('piE2E')) {
     (window as unknown as { __present_store?: unknown }).__present_store = () => usePresentStore;
   }
-  return window.piDesktop.onEvent('present:show', ({ path, note }) => {
+  return window.piDesktop.onEvent('present:show', ({ path, note, chart, svg }) => {
     // Anchor it to the turn that produced it — see `afterMessageId` — in the
     // chat that is RUNNING: the one in the background if a turn is going there,
     // else the one on screen. Read lazily off the live store so this module
@@ -303,12 +381,21 @@ export function connectPresent(): () => void {
     const messages = bg !== null ? bg.messages : pi.messages;
     const chat = bg !== null ? bg.sessionFile : (pi.session?.sessionFile ?? UNSAVED_CHAT);
     const anchor = messages[messages.length - 1]?.id ?? null;
-    const record = usePresentStore
-      .getState()
-      .add({ path, chat, afterMessageId: anchor, ...(note !== undefined ? { note } : {}) });
+    const record = usePresentStore.getState().add({
+      path,
+      chat,
+      afterMessageId: anchor,
+      ...(note !== undefined ? { note } : {}),
+      ...(chart !== undefined ? { chart } : {}),
+      ...(svg !== undefined ? { svg } : {}),
+    });
     // The canvas belongs to the chat on screen; a background chat's artefact
-    // waits in its card until the user comes back to it.
-    if (bg === null) void openPresented(getCanvasController() as never, record);
+    // waits in its card until the user comes back to it. A chart or a small
+    // SVG shows IN the thread and does not open the canvas on its own — the
+    // card's corner control moves it over when the user wants it larger.
+    if (bg === null && !isInlinePresented(record)) {
+      void openPresented(getCanvasController() as never, record);
+    }
   });
 }
 

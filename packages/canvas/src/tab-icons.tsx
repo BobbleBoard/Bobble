@@ -264,3 +264,31 @@ export function IconDisplay(props: IconProps) {
     </Icon>
   );
 }
+
+/** A line chart glyph — the chart half of the chart ⇄ table toggle. */
+export function IconChart(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M2 13h12M2 13V3M3.5 10.5l3-3.5 2.5 2 4-4.5" />
+    </Icon>
+  );
+}
+
+/** A table glyph — the other half of the toggle. */
+export function IconTable(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="2" y="3" width="12" height="10" rx="1.5" />
+      <path d="M2 7h12M2 10h12M6.5 3v10" />
+    </Icon>
+  );
+}
+
+/** Bring a canvas tab back into the chat — the reverse of IconExpand. */
+export function IconInline(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M3 6h3V3M13 10h-3v3M6 6L2.5 2.5M10 10l3.5 3.5" />
+    </Icon>
+  );
+}

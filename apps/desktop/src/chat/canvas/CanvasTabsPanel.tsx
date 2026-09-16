@@ -45,6 +45,7 @@ import { useNativeSurfaces } from './native-surfaces';
 import { createCanvasDragResize } from './resize-collapse';
 import { useSubagentCanvasRouting } from './subagent-routing';
 import { useArtifactCanvasRouting } from './tabs-routing';
+import { withViewTransition } from './view-transition';
 
 /** E2E: probes open browser/terminal tabs through the shared controller. Gated
  * on the same `?piE2E=1` opt-in as `window.__pi_store` (see pi-connect.ts). */
@@ -374,6 +375,16 @@ export function CanvasTabsPanel({ suppressed = false }: { suppressed?: boolean }
     return () => window.removeEventListener('keydown', onKey);
   }, [onNewTab]);
 
+  // "Show in chat" on a tab lifted from an inline card: close it inside a view
+  // transition so the panel folds back into the card (PresentedInline is the
+  // other half — the card returns the moment its tab is gone).
+  const onShowInline = useCallback(
+    (tabId: string) => {
+      withViewTransition(() => controller.closeTab(tabId));
+    },
+    [controller],
+  );
+
   // Clicking a subagent row opens (or refreshes) a per-subagent "work" tab — a
   // markdown view of what that child did: its activity timeline + its full output
   // (the summary that also returns to chat). The child's live transcript never
@@ -473,7 +484,7 @@ export function CanvasTabsPanel({ suppressed = false }: { suppressed?: boolean }
   // surface with copyable content (round-5 #20/#21).
   const surface = (
     <CanvasTabs
-      handlers={{ ...surfaceHandlers, onSubagentSelect, onSituationNodeSelect }}
+      handlers={{ ...surfaceHandlers, onSubagentSelect, onSituationNodeSelect, onShowInline }}
       onNewTab={onNewTab}
       onMenuOpenChange={setOverlayOpen}
       onPopout={popOut}

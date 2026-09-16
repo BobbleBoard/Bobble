@@ -12,7 +12,12 @@ export type { CanvasPlacement, CanvasProps } from './canvas.tsx';
 export { Canvas } from './canvas.tsx';
 export type { CanvasConfig } from './context.ts';
 export { CanvasConfigContext, defaultCanvasConfig } from './context.ts';
-export { artifactFilename, artifactMimeType, downloadArtifact } from './export-artifact.ts';
+export {
+  artifactExportText,
+  artifactFilename,
+  artifactMimeType,
+  downloadArtifact,
+} from './export-artifact.ts';
 export type { StartHarnessOptions } from './harness/harness-runtime.ts';
 export { startHarness } from './harness/harness-runtime.ts';
 export type { ApplyHtmlPatchOptions } from './harness/patcher.ts';
@@ -120,6 +125,13 @@ export {
 // Surfaces
 export type { BrowserSurfaceProps } from './surfaces/browser-surface.tsx';
 export { BrowserSurface } from './surfaces/browser-surface.tsx';
+export {
+  ChartSurface,
+  ChartTable,
+  ChartView,
+  chartArtifactSvg,
+  specFromText,
+} from './surfaces/chart-surface.tsx';
 export { streamingUpdateSpec } from './surfaces/code-append.ts';
 export type { CodeSurfaceProps } from './surfaces/code-surface.tsx';
 export { CodeSurface, rawSourceContent } from './surfaces/code-surface.tsx';
@@ -222,6 +234,7 @@ export {
   IconAppGeneric,
   IconArrowLeft,
   IconArrowRight,
+  IconChart,
   IconCode,
   IconDisplay,
   IconDownload,
@@ -229,6 +242,7 @@ export {
   IconFilm,
   IconFolder,
   IconFolders,
+  IconInline,
   IconMarkup,
   IconMinimize,
   IconPanelRight,
@@ -254,6 +268,7 @@ export { CanvasController, createCanvasController } from './tabs/controller.ts';
 // Filterable file-tree panel (file operation bar)
 export type { FileTreeProps } from './tabs/file-tree.tsx';
 export { FileTree, filterFileTree } from './tabs/file-tree.tsx';
+export { inlineTransitionName, inlineTransitionStyle } from './tabs/inline-transition.ts';
 // Project picker (📁 <project> chip → search dropdown)
 export type { ProjectPickerItem, ProjectPickerProps } from './tabs/project-picker.tsx';
 export { ProjectPicker } from './tabs/project-picker.tsx';
