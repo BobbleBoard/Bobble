@@ -81,7 +81,7 @@ ROUTER.default_stage = STAGE
 ROUTER.fallback_message = "Deciding which surface belongs to which part"
 
 
-def install_extraction_progress(pipe, parts, evaluator_cls) -> None:
+def install_extraction_progress(pipe, parts, evaluator_cls, before_decode=None) -> None:
     """Report the MESH EXTRACTION, which used to run in total silence.
 
     `input_to_part_shape()` runs the denoise AND the extraction in one call, and
@@ -111,6 +111,8 @@ def install_extraction_progress(pipe, parts, evaluator_cls) -> None:
     real_decode = pipe.decode_shape
 
     def decode_with_progress(*a, **kw):
+        if before_decode is not None:
+            before_decode()
         progress(STAGE, f"Building part meshes ({len(parts)} parts)…")
         return real_decode(*a, **kw)
 
@@ -439,6 +441,32 @@ def main() -> None:
         pipe.system.base_model = _CachedEncoder(pipe.system.base_model, prompts, text_states, text_mask)
         gc.collect()
 
+    # Phase timings, because the shape of this run is not what it looks like:
+    # once the DiT is fast, the encode and the extraction are the bill.
+    marks: list[tuple[str, float]] = [("load", time.time())]
+
+    def mark(name: str) -> None:
+        marks.append((name, time.time()))
+        progress(STAGE, f"{name} took {marks[-1][1] - marks[-2][1]:.0f}s")
+
+    # THE MESH IS ENCODED BEFORE THE DENOISER ARRIVES. The shape VAE's encode
+    # of 128k surface points is a torch-CPU pass with a couple of GB of
+    # temporaries; MEASURED (footprint sampling), with the 8.6 GB MLX DiT
+    # already resident it was the run's low point at 29% free, and through
+    # the app — the app's own memory on top — the kernel went critical there.
+    # Encoded first, its temporaries are gone before the denoiser loads.
+    progress(STAGE, "Encoding input mesh…")
+    mesh, _, _ = load_mesh(args.mesh)
+    surface = sample_surface(mesh, num_samples=128_000)
+    # float() BEFORE .to(device): sample_surface yields float64 and MPS
+    # cannot receive float64 tensors (verified failure here).
+    surface = torch.from_numpy(surface).float().unsqueeze(0).to(pipe.device)
+    latents, _ = pipe.encode_shape(surface)
+    del surface, mesh
+    gc.collect()
+    mark("mesh encode")
+
+    if use_mlx:
         # The denoise is 27 transformer blocks run `steps` times; everything
         # else in this pipeline runs once. Moving just that to MLX is what
         # turns ~25 min of CPU into ~2 min, without touching the VAE, the text
@@ -462,30 +490,20 @@ def main() -> None:
     # back to skimage on the CPU on either path, leaving only the field
     # evaluation on-device to pay for shuttling the shape model across.
 
-    # Phase timings, because the shape of this run is not what it looks like:
-    # once the DiT is fast, the encode and the extraction are the bill.
-    marks: list[tuple[str, float]] = [("load", time.time())]
-
-    def mark(name: str) -> None:
-        marks.append((name, time.time()))
-        progress(STAGE, f"{name} took {marks[-1][1] - marks[-2][1]:.0f}s")
-
-    progress(STAGE, "Encoding input mesh…")
-    mesh, _, _ = load_mesh(args.mesh)
-    surface = sample_surface(mesh, num_samples=128_000)
-    # float() BEFORE .to(device): sample_surface yields float64 and MPS
-    # cannot receive float64 tensors (verified failure here).
-    surface = torch.from_numpy(surface).float().unsqueeze(0).to(pipe.device)
-    latents, _ = pipe.encode_shape(surface)
-    mark("mesh encode")
-
     # See install_extraction_progress: without this the readout freezes on
     # "… (30/30)" for the whole extraction.
     try:
         from cube_part.utils.field import ImplicitFieldCoarseToFineEvaluator as _Evaluator
     except Exception:  # noqa: BLE001 — upstream may move it; the phase label still lands
         _Evaluator = None
-    install_extraction_progress(pipe, parts, _Evaluator)
+    install_extraction_progress(
+        pipe,
+        parts,
+        _Evaluator,
+        # The last denoise step is the denoiser's last use: 8.6 GB handed back
+        # before the extraction's own temporaries (MEASURED ~5 GB) arrive.
+        before_decode=(lambda: _cubepart_mlx_bridge.release(pipe.system)) if use_mlx else None,
+    )
 
     progress(STAGE, f"Decomposing into {len(parts)} parts ({args.steps} steps)…")
     part_meshes = pipe.input_to_part_shape(

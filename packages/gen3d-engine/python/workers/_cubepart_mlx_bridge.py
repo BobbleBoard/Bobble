@@ -38,7 +38,26 @@ if os.environ.get("PI_CUBEPART_MLX_PRECISE", "1") == "1":
 import mlx.core as mx  # noqa: E402
 
 from _cubepart_mlx import CubePartDiT  # noqa: E402
+
+# MLX keeps the buffers a forward pass frees in a cache for the next one, and
+# lets that cache grow without bound. The first denoise step of this DiT
+# (18 rows x 9 slots x 1024 latents through 27 blocks) allocates several GB
+# of temporaries that then sit cached next to the 8.6 GB of weights — on a
+# 24 GB Mac, through the app, that first step is where the kernel went
+# critical. A gigabyte of cache keeps the steady state fast; the rest goes
+# back to the machine between steps.
+mx.set_cache_limit(1 << 30)
 from _cubepart_mlx_weights import load_weights  # noqa: E402
+
+
+def _note(text: str) -> None:
+    """A line in the job's progress stream (the worker's stage), best-effort."""
+    try:
+        from _progress import progress
+
+        progress("segment", text)
+    except Exception:  # noqa: BLE001 — a note must never break the run
+        pass
 
 
 class MlxDiT(torch.nn.Module):
@@ -56,6 +75,7 @@ class MlxDiT(torch.nn.Module):
         # them on the buffer address, holding a reference so the address cannot
         # be recycled under us while the entry is live.
         self._const_cache: dict = {}
+        self._reported = False
 
     def _const(self, name: str, t: torch.Tensor, build):
         key = (t.data_ptr(), tuple(t.shape), str(t.dtype))
@@ -116,16 +136,43 @@ class MlxDiT(torch.nn.Module):
             "txt",
             encoder_hidden_states, lambda t: mx.array(t.detach().float().cpu().numpy())
         )
-        out = self._mlx(
-            mx.array(hidden_states.float().cpu().numpy()),
-            txt_mx,
-            mx.array(t_proj),
-            img_freqs,
-            txt_freqs,
-            multi_freqs,
-            mask,
-        )
+        hs = mx.array(hidden_states.float().cpu().numpy())
+        t_mx = mx.array(t_proj)
+        # ONE GROUP OF SLOTS PER PASS. Classifier-free guidance stacks the
+        # conditional and unconditional batches into 2 x num_multi rows; the
+        # gated blocks attend within a group and the joint blocks within a
+        # row, so the groups never see each other and running them one after
+        # the other is the same arithmetic. MEASURED: the whole batch in one
+        # pass peaked at 11.4 GB against 8.6 GB of weights — 2.8 GB of
+        # temporaries on top, and through the app that first step is where a
+        # 24 GB Mac went critical. Half the rows, half the temporaries.
+        num_multi = multi_freqs.shape[0] // seq
+        groups = max(1, hs.shape[0] // num_multi)
+        if groups > 1 and hs.shape[0] % num_multi == 0:
+            outs = []
+            for g in range(groups):
+                rows = slice(g * num_multi, (g + 1) * num_multi)
+                # The mask is over keys within a group and is the same for
+                # both halves ([1,1,1,L] from the pipeline); a per-group mask
+                # ([G,1,1,L]) is sliced to its row.
+                mask_g = mask if mask is None or mask.shape[0] == 1 else mask[g : g + 1]
+                out_g = self._mlx(
+                    hs[rows], txt_mx[rows], t_mx[rows], img_freqs, txt_freqs, multi_freqs, mask_g
+                )
+                mx.eval(out_g)
+                outs.append(out_g)
+            out = mx.concatenate(outs, axis=0)
+        else:
+            out = self._mlx(hs, txt_mx, t_mx, img_freqs, txt_freqs, multi_freqs, mask)
         mx.eval(out)
+        if not self._reported:
+            # Once, after the first step: the denoiser's true footprint — the
+            # weights plus the temporaries the first forward pass allocated.
+            self._reported = True
+            _note(
+                f"Denoiser after its first step: {mx.get_active_memory() / 1e9:.1f} GB in use, "
+                f"{mx.get_peak_memory() / 1e9:.1f} GB peak, {mx.get_cache_memory() / 1e9:.1f} GB cached"
+            )
         result = torch.from_numpy(np.array(out, copy=False)).to(hidden_states.device)
         if not return_dict:
             return (result,)
@@ -167,6 +214,14 @@ class _StreamedTensors:
             self._file = safe_open(str(self._path), framework="pt").__enter__()
         return self._file.get_tensor(key).float().numpy()
 
+    def close(self) -> None:
+        """Unmap the checkpoint. Its 8.6 GB of clean pages are reclaimable
+        either way, but a mapping keeps them counted as active; unmapped, the
+        kernel drops them first when the first denoise step asks for room."""
+        if self._file is not None:
+            self._file.__exit__(None, None, None)
+            self._file = None
+
 
 def install(
     system,
@@ -203,10 +258,43 @@ def install(
         pass
 
     model = CubePartDiT(num_layers=num_layers, multi_index=multi_index)
-    load_weights(model, _StreamedTensors(Path(checkpoint_path)))
+    mx.reset_peak_memory()
+    # WEIGHTS IN HALF PRECISION, ARITHMETIC IN FULL. The checkpoint is 8.6 GB
+    # of float32; stored as float16 it is 4.3 GB, and MLX promotes every
+    # matmul with a float32 activation to float32, so only the weights are
+    # rounded (2^-11 relative). MEASURED on the real blocks (9 rows, precise
+    # kernels): relative rms error 1.0e-3 against float32 storage, max
+    # 7.3e-3 on values up to 8.6 — bfloat16 storage was 9.8e-3, the level
+    # (1.7e-2) at which the pipeline's parts stopped crossing the iso-surface,
+    # and is not offered. The 4.3 GB is what lets the first denoise step fit
+    # beside the app on a 24 GB Mac; PI_CUBEPART_MLX_WEIGHTS=fp32 restores
+    # the full-width weights for an A/B.
+    dtype = mx.float32 if os.environ.get("PI_CUBEPART_MLX_WEIGHTS", "fp16") == "fp32" else mx.float16
+    streamed = _StreamedTensors(Path(checkpoint_path))
+    load_weights(model, streamed, dtype=dtype)
     mx.eval(model.parameters())
+    streamed.close()
+    mx.clear_cache()
+    _note(
+        f"Denoiser in MLX: {mx.get_active_memory() / 1e9:.1f} GB of {'float16' if dtype == mx.float16 else 'float32'} weights "
+        f"({mx.get_peak_memory() / 1e9:.1f} GB peak while loading)"
+    )
 
     shim = MlxDiT(model, pos_embed, time_proj)
     system.diffusion_model = shim
     gc.collect()
     return shim
+
+
+def release(system) -> None:
+    """Drop the MLX denoiser once the last step has run — 8.6 GB back before
+    the extraction (torch, CPU) allocates its own."""
+    shim = system.diffusion_model
+    system.diffusion_model = None
+    if isinstance(shim, MlxDiT):
+        shim._mlx = None
+        shim._const_cache.clear()
+        shim._rope_cache.clear()
+    del shim
+    gc.collect()
+    mx.clear_cache()

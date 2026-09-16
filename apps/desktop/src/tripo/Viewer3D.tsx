@@ -243,9 +243,18 @@ function buildGeneratedTexture(): InstanceType<typeof THREE.CanvasTexture> {
  */
 /** How much of the viewport's left the floating panel covers, in px (0 when
  * it is not there — the studio gated, or a window too narrow for it). */
+/** The floating card, wherever the studio's layout puts it. It is a SIBLING
+ * of the viewport (.tp-body > Rail, GenPanel, Viewport), not a child of the
+ * canvas host's parent — looking for it under the parent found nothing, and
+ * the offset silently never applied (see the note in resize()). */
+function floatingPanel(host: HTMLElement): HTMLElement | null {
+  const root = host.closest<HTMLElement>('.tp-body') ?? host.parentElement;
+  return root?.querySelector<HTMLElement>('.tp-genpanel') ?? null;
+}
+
 function coveredLeft(host: HTMLElement): number {
-  const panel = host.parentElement?.querySelector<HTMLElement>('.tp-genpanel');
-  if (panel === null || panel === undefined) return 0;
+  const panel = floatingPanel(host);
+  if (panel === null) return 0;
   const a = host.getBoundingClientRect();
   const b = panel.getBoundingClientRect();
   return Math.max(0, Math.min(b.right, a.right) - a.left);
@@ -815,6 +824,8 @@ export default function Viewer3D({ gizmoRef }: Viewer3DProps): JSX.Element {
       importedGroup = group;
       importedId = id;
       scene.add(group);
+      // The clear part of the canvas is what this model must fit — see resize().
+      resize();
 
       // Play what it came with, on loop, straight away. A generated clip is the
       // whole point of the motion stage, and asking the user to find a play
@@ -1199,15 +1210,84 @@ export default function Viewer3D({ gizmoRef }: Viewer3DProps): JSX.Element {
        * not the middle of what can be seen. The view offset slides the
        * projection right by half the card, so the model sits in the centre
        * of the clear part — the same trick DCC apps use for docked panels.
+       * LOOKED AT (2026-09-16): the offset had never applied — the card is
+       * the viewport's sibling and was being looked for under the canvas's
+       * parent; the mannequin sat centred with its left half behind the card.
        */
       const covered = coveredLeft(host);
       if (covered > 0 && w > covered * 2) camera.setViewOffset(w, h, -covered / 2, 0, w, h);
       else camera.clearViewOffset();
+      /*
+       * …AND ZOOMED OUT TO FIT IT. Sliding the projection centres the model
+       * in the clear part but leaves it the size a full canvas would give
+       * it: LOOKED AT (2026-09-16, the mug at 2.6 units), a 400 px model in
+       * a 410 px clear strip, its handle under the floating view controls on
+       * the right. The model's bounding sphere is projected at the camera's
+       * current distance and the zoom brought down until it fits the strip
+       * with room for the controls. Never zoomed in: a small model on a wide
+       * canvas stays the size the camera gives it.
+       */
+      camera.zoom = zoomToClear(w, h, covered);
       camera.updateProjectionMatrix();
+    };
+    const CLEAR_MARGIN_PX = 80; // the floating view controls + the card's fade
+    const corner = new THREE.Vector3();
+    const zoomToClear = (w: number, _h: number, covered: number): number => {
+      if (importedGroup === null || covered <= 0) return 1;
+      const box = new THREE.Box3().setFromObject(importedGroup);
+      if (box.isEmpty()) return 1;
+      // The box's eight corners on screen at zoom 1 — the model's real
+      // width, not its bounding sphere's (a mug's sphere is its height, and
+      // fitting THAT left it at half the strip). The offset does not move
+      // the extent, only where it sits, so it is not cleared for the measure.
+      camera.zoom = 1;
+      camera.updateProjectionMatrix();
+      let left = Number.POSITIVE_INFINITY;
+      let right = Number.NEGATIVE_INFINITY;
+      for (let i = 0; i < 8; i += 1) {
+        corner.set(
+          (i & 1) === 0 ? box.min.x : box.max.x,
+          (i & 2) === 0 ? box.min.y : box.max.y,
+          (i & 4) === 0 ? box.min.z : box.max.z,
+        );
+        corner.project(camera);
+        if (corner.z > 1) return 1; // behind the camera: no measure to take
+        const px = ((corner.x + 1) / 2) * w;
+        left = Math.min(left, px);
+        right = Math.max(right, px);
+      }
+      const modelPx = right - left;
+      const room = w - covered - 2 * CLEAR_MARGIN_PX;
+      if (!(modelPx > 0) || room <= 0) return 1;
+      return Math.min(1, room / modelPx);
     };
     resize();
     const ro = new ResizeObserver(resize);
     ro.observe(host);
+    /*
+     * …AND THE CARD IS WATCHED TOO. The host's ResizeObserver only fires when
+     * the CANVAS changes size; the floating card mounts after it, and swaps
+     * width with the stage (Segmentation's card is not Model's). LOOKED AT
+     * (2026-09-16, the fresh-cache probe's motion screenshot): the mannequin
+     * centred on the canvas with its left half behind the card — the offset
+     * measured at mount had found no card yet. So the card is observed once
+     * it exists, and every stage swap re-measures.
+     */
+    let panelRo: ResizeObserver | null = null;
+    const watchPanel = () => {
+      const panel = floatingPanel(host);
+      panelRo?.disconnect();
+      panelRo = null;
+      if (panel !== null) {
+        panelRo = new ResizeObserver(resize);
+        panelRo.observe(panel);
+      }
+      resize();
+    };
+    watchPanel();
+    const panelObserver = new MutationObserver(watchPanel);
+    const panelRoot = host.closest<HTMLElement>('.tp-body') ?? host.parentElement;
+    if (panelRoot !== null) panelObserver.observe(panelRoot, { childList: true, subtree: true });
 
     // ── camera-synced axis gizmo ────────────────────────────────────────────
     const AXES: readonly {
@@ -1424,6 +1504,8 @@ export default function Viewer3D({ gizmoRef }: Viewer3DProps): JSX.Element {
       unsubscribe();
       themeObserver.disconnect();
       ro.disconnect();
+      panelRo?.disconnect();
+      panelObserver.disconnect();
       controls.dispose();
       if (mixer !== null) mixer.stopAllAction();
       scene.traverse((o) => {
