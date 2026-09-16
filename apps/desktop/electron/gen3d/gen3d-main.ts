@@ -630,8 +630,12 @@ export function setComfy3dRunner(fn: Run3dFn): void {
  */
 type Admit = (footprintGB?: number) => { ok: boolean; reason?: string; never?: boolean };
 let admitFn: Admit | null = null;
-export function setGen3dAdmission(fn: Admit): void {
+/** Take a fresh reading — the guard's idle cadence is 15 s, and a stage waiting
+ * at the door for the last one's memory to come back should not wait on that. */
+let refreshFn: (() => Promise<unknown>) | null = null;
+export function setGen3dAdmission(fn: Admit, refresh?: () => Promise<unknown>): void {
   admitFn = fn;
+  refreshFn = refresh ?? null;
 }
 const guardedJobs = new Map<string, () => void>();
 
@@ -698,13 +702,29 @@ function guardSidecarJob(jobId: string, label: string): void {
   );
 }
 
-function admitSidecarJob(
+/** How long a stage waits at the door for memory to come back before it is
+ * refused. The seconds after a big stage ends are the common case: its worker
+ * is gone but the kernel is still reclaiming (MEASURED, motion right after a
+ * part split: "needs about 12.5 GB and only 13.9 GB is available" — twenty
+ * seconds later there was plenty). A job that could never fit is refused at
+ * once. */
+const ADMISSION_WAIT_MS = 20_000;
+const ADMISSION_POLL_MS = 1_000;
+
+async function admitSidecarJob(
   op: string,
   resolution?: string,
   prompt?: string,
-): { ok: true } | { ok: false; error: string } {
+): Promise<{ ok: true } | { ok: false; error: string }> {
   if (admitFn === null) return { ok: true };
-  const verdict = admitFn(sidecarFootprintGB(op, resolution, prompt));
+  const footprint = sidecarFootprintGB(op, resolution, prompt);
+  const deadline = Date.now() + ADMISSION_WAIT_MS;
+  let verdict = admitFn(footprint);
+  while (!verdict.ok && verdict.never !== true && Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, ADMISSION_POLL_MS));
+    if (refreshFn !== null) await refreshFn().catch(() => undefined);
+    verdict = admitFn(footprint);
+  }
   if (verdict.ok) return { ok: true };
   return {
     ok: false,
@@ -1027,7 +1047,10 @@ const handlers: IpcHandlers<Gen3dInvokeMap & DictationInvokeMap> = {
     // A grey finish is an untextured run; colour/PBR decide what the bake writes.
     const finish: Gen3dFinish = req.finish ?? (req.texture ? 'pbr' : 'grey');
     const body = { ...req, texture: finish !== 'grey', finish };
-    const admitted = admitSidecarJob(req.imageOnly === true ? 'image' : 'generate', req.resolution);
+    const admitted = await admitSidecarJob(
+      req.imageOnly === true ? 'image' : 'generate',
+      req.resolution,
+    );
     if (!admitted.ok) return { ok: false, error: admitted.error };
     startMemorySampling(`generate:${req.kind}:${req.resolution}`);
     const res = await sidecarPost<{ ok: boolean; jobId?: string; error?: string }>(
@@ -1042,7 +1065,7 @@ const handlers: IpcHandlers<Gen3dInvokeMap & DictationInvokeMap> = {
     return res;
   },
   'gen3d:stage': async (req) => {
-    const admitted = admitSidecarJob(req.op, req.resolution, req.prompt);
+    const admitted = await admitSidecarJob(req.op, req.resolution, req.prompt);
     if (!admitted.ok) return { ok: false, error: admitted.error };
     startMemorySampling(`stage:${req.op}`);
     const res = await sidecarPost<{ ok: boolean; jobId?: string; error?: string }>('/stage', req);

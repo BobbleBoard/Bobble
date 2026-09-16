@@ -7,17 +7,24 @@
  * the scheduler hint from process-priority.ts, so a twelve-thread diffusion
  * step loses ties to the window server instead of winning them.
  *
- * The tier follows the user's power mode, read at spawn time: 'utility' (CPU
- * yields, disk does not — weights still load at full speed) in full and auto,
- * 'background' (both yield) in low. It is a hint the OS honours under
- * contention and ignores otherwise, so an idle machine gives nothing away.
+ * The tier is 'utility' in EVERY power mode. It used to be 'background' in
+ * low, on the belief that a tier is a hint the OS honours under contention
+ * and ignores otherwise. MEASURED (2026-09-16, an idle M5 Pro, 2048² float32
+ * matmuls in torch): default 1826 GFLOP/s, `taskpolicy -c utility` 1779,
+ * `taskpolicy -b` 155 — the background tier is confined to the efficiency
+ * cores and throttled whether or not anyone wants the cores, twelve times
+ * slower. Through the app that was CubePart's part split taking over forty
+ * minutes on the default ('low') settings where the same worker took five
+ * standalone, and every CPU stage (retopo, mesh post, text encoders) paying
+ * the same. Utility is the tier that matches the intent: the pointer wins
+ * the ties, and an idle machine gives nothing away. Low power's real levers
+ * are elsewhere (power-policy.ts: pacing, no previews, the low-RAM run).
  */
 import { type ChildProcess, type SpawnOptions, spawn } from 'node:child_process';
-import { readSettings } from '../settings/settings-main';
 import { setWorkerTier, type WorkerTier } from './process-priority';
 
 export function workerTier(): WorkerTier {
-  return readSettings().powerMode === 'low' ? 'background' : 'utility';
+  return 'utility';
 }
 
 /** Apply the current tier to a child that was just spawned. Best-effort, logged. */

@@ -933,7 +933,10 @@ function registerAppIpc(): void {
     // Image → 3D on ComfyUI goes through this same queue (gen3d-main runComfy3d).
     setComfy3dRunner(genQueue.run3d);
     // …and the engine's own stages ask the same guardian before they start.
-    setGen3dAdmission((gb) => guardian.admit(gb));
+    setGen3dAdmission(
+      (gb) => guardian.admit(gb),
+      () => guardian.refresh(),
+    );
     log.info('experimental generation stack wired (gen bridge live)');
   }
 

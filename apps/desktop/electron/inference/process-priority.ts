@@ -11,10 +11,18 @@
  * it only loses when something the user is looking at wants the same core. That
  * is exactly the shape wanted here — no throughput given away for nothing.
  *
- * macOS: `taskpolicy -b -p <pid>` moves a running process to the background QoS
- * tier (verified: exits 0 without sudo). Linux: `renice`. Windows has no
- * equivalent we can reach from here without a native module, so it is a no-op —
- * and saying so is better than pretending.
+ * macOS: `taskpolicy -t 5 -l 5 -p <pid>` drops a running process to the lowest
+ * throughput and latency QoS TIERS (the `-p` form's documented knobs; exits 0
+ * without sudo) — NOT `-b`, the DARWIN_BG tier. MEASURED (2026-09-16, an idle
+ * M5 Pro, torch 2048² float32 matmuls): unclamped 1826 GFLOP/s, tiers 5/5
+ * 1789, `-b` 155. The background tier is confined to the efficiency cores and
+ * throttled whether or not anyone else wants the cores — twelve times slower,
+ * on the DEFAULT ('low') settings, for every CPU-bound stage (CubePart's part
+ * split went from five minutes standalone to over forty through the app) and
+ * for the chat server's own token loop. "A hint that costs nothing when idle"
+ * was the intent; the tiers are what actually meet it. Linux: `renice`.
+ * Windows has no equivalent we can reach from here without a native module,
+ * so it is a no-op — and saying so is better than pretending.
  *
  * Best-effort throughout: a missing tool or a refused call is not an error, it
  * is a machine where this particular lever does not exist.
@@ -40,9 +48,14 @@ const LINUX_NICE_UTILITY = 5;
  * those ties. It costs the worker nothing while the user is idle.
  *
  *   'utility'    macOS `taskpolicy -c utility` — lower CPU priority, NOT the
- *                disk-throttled background tier. The default for heavy work:
- *                a video render still loads its 15 GB of weights at full speed.
- *   'background' macOS `taskpolicy -b` — CPU and I/O both yield. Low power mode.
+ *                disk-throttled background tier. The tier for heavy work in
+ *                every mode: a video render still loads its 15 GB of weights
+ *                at full speed, and MEASURED it keeps ~97% of the CPU's
+ *                matmul throughput on an idle machine.
+ *   'background' macOS `taskpolicy -b` — CPU and I/O both yield. MEASURED at
+ *                155 GFLOP/s against 1826 unthrottled (efficiency cores only,
+ *                idle machine or not): twelve times slower. No longer used
+ *                for generation workers — kept for callers that mean it.
  */
 export type WorkerTier = 'utility' | 'background';
 
@@ -54,9 +67,15 @@ export async function setWorkerTier(
   if (!Number.isFinite(pid) || pid <= 0) return 'failed';
   try {
     if (deps.platform === 'darwin') {
+      // The `-p` form documents -b/-B and the -t/-l tiers; `-c utility -p`
+      // exits 0 but is not documented for a running process, so utility is
+      // the tiers. 'background' keeps the real DARWIN_BG tier for a caller
+      // that means it (twelve times slower on CPU — see the header).
       await deps.exec(
         'taskpolicy',
-        tier === 'background' ? ['-b', '-p', String(pid)] : ['-c', 'utility', '-p', String(pid)],
+        tier === 'background'
+          ? ['-b', '-p', String(pid)]
+          : ['-t', '5', '-l', '5', '-p', String(pid)],
       );
       return 'applied';
     }
@@ -91,8 +110,10 @@ export async function setBackgroundPriority(
   if (!Number.isFinite(pid) || pid <= 0) return 'failed';
   try {
     if (deps.platform === 'darwin') {
-      // -b backgrounds, -B restores. Both take the pid of a RUNNING process.
-      await deps.exec('taskpolicy', [background ? '-b' : '-B', '-p', String(pid)]);
+      // Tiers 5/5 yield, 0/0 is the default; both take the pid of a RUNNING
+      // process. Never -b: see the header for what that costs.
+      const tier = background ? '5' : '0';
+      await deps.exec('taskpolicy', ['-t', tier, '-l', tier, '-p', String(pid)]);
       return 'applied';
     }
     if (deps.platform === 'linux') {

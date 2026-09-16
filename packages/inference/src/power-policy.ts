@@ -104,7 +104,7 @@ export interface PowerDecision {
    */
   readonly keepKvOnHost?: boolean;
   /** Run the inference process at background priority so the OS schedules the
-   * user first. macOS `taskpolicy -b`, Linux `nice`. */
+   * user first. macOS `taskpolicy` QoS tiers (never -b: the E-core clamp is 12× slower), Linux `nice`. */
   readonly backgroundPriority: boolean;
   /**
    * NO "may a heavy job start" answer lives here. the user, correcting the first

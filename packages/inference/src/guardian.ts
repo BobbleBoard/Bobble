@@ -67,6 +67,19 @@ export interface GuardianLimits {
   readonly holdFree: number;
   /** Below this, running heavy work is PAUSED in place. */
   readonly pauseFree: number;
+  /**
+   * The "room" line for the two corroborated pauses (a swap burst, the
+   * kernel's "warn"): at or under this, a burst has nowhere to land and the
+   * run is paused; above it, the burst is a hold. THE SAME IN EVERY MODE —
+   * it read the mode's hold line, and in 'low' (the default) that was 30%:
+   * MEASURED (2026-09-16, CubePart's text encode through the app at 28–30%
+   * free), 39 pause/resume cycles in seven minutes, each resume swapping
+   * back in the pages the pause had let the kernel evict, each swap-in
+   * burst the next pause. The encode ran at half speed and the machine was
+   * never in danger. A line that moves with the mode is a mode that stops
+   * generations, which 'low' must never be (see tightFree).
+   */
+  readonly pauseRoomFree: number;
   /** Below this, running heavy work is cancelled. */
   readonly shedFree: number;
 
@@ -141,6 +154,7 @@ export function limitsFor(mode: PowerMode): GuardianLimits {
      * and the job resumes.
      */
     pauseFree: 0.15,
+    pauseRoomFree: 0.25,
     shedFree: 0.08,
     pausedReadingsBeforeShed: 20,
     resumeReadings: 3,
@@ -236,13 +250,14 @@ export function judge(reading: GuardianReading, limits: GuardianLimits): Guardia
     };
   }
   /*
-   * THE PAUSE LINES. The kernel saying "warn", the reclaimable figure under
-   * 15%, or the actually-free pages under 6%: running work stops in place,
+   * THE PAUSE LINES. The kernel saying "warn" with memory under the room
+   * line, the reclaimable figure under 15%: running work stops in place,
    * now, and the next reading decides whether it resumes or goes. A swap
    * burst WITHOUT room to land pauses too (with room it stays a hold — a
-   * model loading on an idle machine is a burst, not a freeze).
+   * model loading on an idle machine is a burst, not a freeze). The room
+   * line (`pauseRoomFree`) is the same in every power mode.
    */
-  const room = free !== undefined && free > limits.holdFree;
+  const room = free !== undefined && free > limits.pauseRoomFree;
   if (swapping && !room) {
     return {
       verdict: 'pause',
@@ -257,10 +272,10 @@ export function judge(reading: GuardianReading, limits: GuardianLimits): Guardia
    * more while it reclaims cache, with memorystatus_level at 40% — the load,
    * not a freeze — and a run paused on that reading never sees it lift and
    * is ended for a burst that would have passed. Warn pauses when the
-   * reclaimable figure is ALSO tight (under the hold line); on its own it
-   * holds new work at the door.
+   * reclaimable figure is ALSO tight (under the room line, the same in every
+   * mode); on its own it holds new work at the door.
    */
-  if (reading.memory === 'warn' && free !== undefined && free <= limits.holdFree) {
+  if (reading.memory === 'warn' && free !== undefined && free <= limits.pauseRoomFree) {
     return {
       verdict: 'pause',
       reason: `the system reports memory pressure with ${pct}% free${pctNow === undefined ? '' : ` (${pctNow}% of pages)`}`,

@@ -98,12 +98,19 @@ describe('judge', () => {
     expect(LOW.shedFree).toBe(AUTO.shedFree);
     expect(LOW.pauseFree).toBe(AUTO.pauseFree);
     // A load burst at 30% free — ComfyUI reading a 5 GB DiT in — has room to
-    // land at auto (a hold) and is at low's own hold line, where it is paused
-    // for the length of the burst; in neither mode is it a shed.
+    // land in BOTH modes: a hold, never a pause. The room line used to be
+    // low's own 30% hold line, and MEASURED (CubePart's text encode through
+    // the app at 28–30% free) that was 39 pause/resume cycles in seven
+    // minutes, each resume swapping back in what the pause had let the
+    // kernel evict. Low must not slow a generation to half speed either.
     const burst = { memoryFree: 0.3, swapIoPerSec: 44506, sources: [] };
     expect(judge(burst, AUTO).verdict).toBe('hold');
-    expect(judge(burst, LOW).verdict).toBe('pause');
+    expect(judge(burst, LOW).verdict).toBe('hold');
+    expect(judge({ ...burst, memoryFree: 0.28 }, LOW).verdict).toBe('hold');
+    expect(judge({ ...burst, memoryFree: 0.28, memory: 'warn' }, LOW).verdict).toBe('hold');
+    expect(judge({ ...burst, memoryFree: 0.24 }, LOW).verdict).toBe('pause');
     expect(LOW.tightFree).toBe(AUTO.tightFree);
+    expect(LOW.pauseRoomFree).toBe(AUTO.pauseRoomFree);
     // With memory comfortable the burst is also marked as having ROOM, which
     // is what gives it the longer streak in settle().
     expect(judge({ memoryFree: 0.43, swapIoPerSec: 9000, sources: [] }, AUTO).room).toBe(true);
