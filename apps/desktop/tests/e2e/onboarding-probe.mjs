@@ -1,7 +1,7 @@
 /**
  * Onboarding E2E: seeds a Codex install (config.toml + a session + a skill) under
  * an isolated HOME, then walks the fresh-profile wizard
- * source → import → theme → experience → capabilities → chat, asserting the
+ * source → import → theme → experience → capabilities → computer use → chat, asserting the
  * imports actually landed (pi session converted, MCP registry + skill written,
  * onboarding flag persisted). Then relaunches the SAME profile and asserts the
  * wizard is skipped straight to chat. Run `pnpm build` first.
@@ -132,8 +132,15 @@ const commonEnv = {
     await page.click('[data-testid="capability-image"]');
     await page.click('[data-testid="onboarding-next"]');
 
+    // Step 6 — computer use: on, and one app ticked in the grid of real icons.
+    await page.waitForSelector('[data-testid="onboarding-computer-use"]', { timeout: 8000 });
+    await page.waitForSelector('[data-testid^="app-tile-"]', { timeout: 20_000 });
+    const firstTile = await page.getAttribute('[data-testid^="app-tile-"]', 'data-testid');
+    await page.click(`[data-testid="${firstTile}"]`);
+    await page.click('[data-testid="onboarding-next"]');
+
     /*
-     * Step 6 — SETUP, which this probe predates.
+     * Step 7 — SETUP, which this probe predates.
      *
      * The wizard grew a sixth step ("Getting you running" — it picks a model for
      * the machine), so `capabilities` stopped being the last one and stopped
@@ -155,6 +162,19 @@ const commonEnv = {
     // Chose Codex → codex flavor persisted live.
     const flavor = await page.getAttribute('html', 'data-flavor');
     assert(flavor === 'codex', `expected codex flavor, got ${flavor}`);
+
+    // The computer-use choice reached settings.json: on, with the ticked app.
+    const settings = JSON.parse(
+      (await import('node:fs')).readFileSync(
+        path.join(home, '.pi', 'desktop', 'settings.json'),
+        'utf8',
+      ),
+    );
+    assert(settings.computerUse?.enabled === true, 'computer use should be on');
+    assert(
+      Array.isArray(settings.computerUse?.apps) && settings.computerUse.apps.length === 1,
+      `one app should be allowed, got ${JSON.stringify(settings.computerUse)}`,
+    );
   } finally {
     await app.close();
   }

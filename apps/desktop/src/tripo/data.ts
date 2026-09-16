@@ -30,13 +30,16 @@ export interface ModelVersion {
 
 /** Mesh-generation models (the AI Model dropdown in Generate). */
 export const GEN_MODELS: readonly ModelVersion[] = [
-  { id: 'trellis-2', label: 'TRELLIS-2', hint: 'Image or text to 3D. Runs on Metal.' },
+  { id: 'trellis2', label: 'TRELLIS-2', hint: 'Image or text to 3D. Runs on Metal.' },
   {
-    id: 'hunyuan-omni',
-    label: 'Hunyuan 3D Omni',
-    hint: 'No Metal port. Unavailable on this Mac.',
+    id: 'pixal3d',
+    label: 'Pixal3D',
+    hint: 'Image to 3D on ComfyUI, with the camera read from the picture.',
   },
 ];
+
+/** The gen catalog id Pixal3D runs under on ComfyUI (its weights module is `weights:<id>`). */
+export const PIXAL3D_COMFY_ID = 'pixal3d-comfy';
 
 /** One engine per downstream stage (shown as the stage's Model row). */
 export const SEGMENT_MODEL = 'CubePart';

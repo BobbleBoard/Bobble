@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import platform
 import plistlib
 import subprocess
 import sys
@@ -42,10 +43,15 @@ def provision(registry: Registry, model: dict, log, cancelled: threading.Event) 
     env_kind = model["env"]
     if env_kind == "trellis":
         # The MLX tree is the one that runs 1024 and can texture an existing
-        # mesh, so it is provisioned alongside — not instead of — the PyTorch
-        # tree, which still owns the KDTree texture baker.
+        # mesh, and — with the app's prebuilt Metal wheels — the one a Mac
+        # without Xcode can have at all. The PyTorch-MPS tree is provisioned
+        # beside it only where its Metal backends can be compiled; a Mac
+        # without a compiler gets the MLX tree alone, which runs everything.
         _provision_trellis_mlx(registry, log)
-        _provision_trellis(registry, log)
+        if _metal_env() or _metal_compiler_present():
+            _provision_trellis(registry, log)
+        else:
+            log("No Metal compiler on this Mac — the MLX TRELLIS tree is the engine here")
     elif env_kind == "mageflow":
         _provision_mageflow(registry, log)
     elif env_kind == "cubepart":
@@ -62,6 +68,44 @@ def provision(registry: Registry, model: dict, log, cancelled: threading.Event) 
         _provision_ardy(registry, log)
     else:
         raise RuntimeError(f"unknown env kind: {env_kind}")
+
+
+def _metal_compiler_present() -> bool:
+    """Can `xcrun metal` run here? Only a full Xcode carries it."""
+    if shutil.which("xcrun") is None:
+        return False
+    probe = subprocess.run(["xcrun", "-f", "metal"], capture_output=True)
+    return probe.returncode == 0
+
+
+#: The Metal packages requirements_macos.txt names as source archives — the
+#: three builds that need Xcode's `metal`. Shipped prebuilt instead.
+_METAL_SOURCE_PACKAGES = ("mtldiffrast", "cumesh", "flex_gemm")
+
+
+def _requirements_without_metal_sources(tool: Path) -> Path:
+    """requirements_macos.txt minus the `pkg @ https://…tar.gz` Metal lines."""
+    src = tool / "requirements_macos.txt"
+    kept = []
+    for line in src.read_text().splitlines():
+        head = line.split("@", 1)[0].strip().lower()
+        if "@" in line and head in _METAL_SOURCE_PACKAGES:
+            continue
+        kept.append(line)
+    out = tool / ".requirements_prebuilt.txt"
+    out.write_text("\n".join(kept) + "\n")
+    return out
+
+
+def _prebuilt_manifest(registry: Registry) -> dict | None:
+    """The shipped prebuilt set for this platform, when it is here."""
+    path = registry.prebuilt("darwin-arm64", "manifest.json")
+    if path is None or platform.machine() != "arm64" or platform.system() != "Darwin":
+        return None
+    try:
+        return json.loads(path.read_text())
+    except (OSError, ValueError):
+        return None
 
 
 def _metal_env() -> dict:
@@ -98,16 +142,41 @@ def _provision_trellis_mlx(registry: Registry, log) -> None:
     env["HF_HOME"] = str(registry.hf_home)
     env.update(_metal_env())
 
+    # THE PREBUILT SET. the user (2026-09-15): "all basic stuff needs to work out
+    # of the box". The Metal rasteriser and the sparse GEMM kernels only build
+    # with Xcode's `metal` compiler, and the o_voxel shape encoder with a C++
+    # compiler — neither of which a fresh Mac has. The app ships them built
+    # (packages/gen3d-engine/prebuilt, built once on a Mac that had Xcode,
+    # against the torch the manifest pins), so the environment here is
+    # wheels all the way down. A machine WITH Xcode still takes this path:
+    # a prebuilt wheel is the same code, minutes sooner. The source build is
+    # the fallback for a platform the manifest does not cover.
+    manifest = _prebuilt_manifest(registry)
     if not py.exists():
         log("Creating the MLX TRELLIS environment…")
         _run([registry.uv_path, "venv", "--python", "3.12", ".venv"], tool, log, env)
-        _run(
-            [registry.uv_path, "pip", "install", "--python", str(py),
-             "--no-build-isolation", "-r", "requirements_macos.txt"],
-            tool, log, env,
-        )
+        if manifest is not None:
+            wheels = [
+                str(w) for w in (registry.prebuilt("darwin-arm64", n) for n in manifest["wheels"])
+                if w is not None
+            ]
+            log("Installing the MLX TRELLIS requirements (prebuilt Metal wheels)…")
+            _run(
+                [registry.uv_path, "pip", "install", "--python", str(py),
+                 f"torch=={manifest['torch']}",
+                 "-r", str(_requirements_without_metal_sources(tool)), *wheels],
+                tool, log, env,
+            )
+        else:
+            _run(
+                [registry.uv_path, "pip", "install", "--python", str(py),
+                 "--no-build-isolation", "-r", "requirements_macos.txt"],
+                tool, log, env,
+            )
 
     # Import-time guard on the texturing pipeline, and the shape encoder itself.
+    # The prebuilt wheel above already carries o_voxel._C; this is the source
+    # build for a platform without one.
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "patches"))
     try:
         import o_voxel_cpu
@@ -262,7 +331,28 @@ def _provision_skintokens(registry: Registry, log) -> None:
         _run([str(py), "download.py", "--model"], tool, log)
 
 
+def _provision_quadriflow(registry: Registry, log) -> None:
+    """QuadriFlow, the PRIMARY quad remesher — from the shipped prebuilt copy.
+
+    It was a hand-built binary in `bin/` that nothing provisioned: a fresh Mac
+    had no remesher at all and every quad retopology failed at the exec. The
+    app ships the arm64 build (BSD, hjwdzh/QuadriFlow) and copies it in.
+    """
+    cli = registry.quadriflow_cli()
+    if cli.exists():
+        return
+    shipped = registry.prebuilt("darwin-arm64", "quadriflow")
+    if shipped is None:
+        log("QuadriFlow is not shipped for this platform; quad retopology will be unavailable")
+        return
+    log("Installing QuadriFlow…")
+    shutil.copyfile(shipped, cli)
+    cli.chmod(0o755)
+    subprocess.run(["xattr", "-d", "com.apple.quarantine", str(cli)], capture_output=True)
+
+
 def _provision_autoremesher(registry: Registry, model: dict, log) -> None:
+    _provision_quadriflow(registry, log)
     cli = registry.autoremesher_cli()
     spec = registry.spec["autoremesher"]
     if not cli.exists():

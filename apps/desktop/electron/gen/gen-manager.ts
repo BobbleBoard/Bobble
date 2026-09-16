@@ -44,10 +44,12 @@ import {
   type GenOutput,
   GenServiceClient,
   getModel,
+  imageTo3dTemplateFor,
   JobQueue,
   jobFootprintGB,
   MODALITY_CATALOG,
   type ModalityModel,
+  type ModelFinish,
   modelsForModality,
   previewCostGB,
 } from '@pi-desktop/gen-service';
@@ -319,8 +321,19 @@ export interface Run3dParams {
   /** Faces the textures are painted onto (0 = the graph's own budget). */
   readonly faces?: number;
   readonly textureSize?: number;
+  /** How far to finish the model — grey shape, painted colour, or the full
+   * PBR material (the default). Picks the graph; see comfy-workflow. */
+  readonly finish?: ModelFinish;
   /** Where the GLB lands. */
   readonly outputDir: string;
+  /**
+   * A line about the wait, when there is one — "Waiting for memory — needs
+   * about 14.8 GB and only 18.5 GB is available (keeping 4 GB for you)".
+   * The chat and the studios get these through their note sinks; without this
+   * the 3D studio sat on "Getting the 3D module ready…" for as long as a hold
+   * lasted (MEASURED: a 24 GB Mac at 77% free never admits the 512³ job).
+   */
+  readonly onNote?: (text: string) => void;
 }
 export type Run3dFn = (
   params: Run3dParams,
@@ -1276,9 +1289,12 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
     }
     const jobId = `gen3d_${Date.now()}_${randomBytes(3).toString('hex')}`;
     await mkdir(params.outputDir, { recursive: true });
+    const finish = params.finish ?? 'pbr';
     const inputs: Record<string, string | number | boolean> = {};
     if (params.faces !== undefined && params.faces > 0) inputs.faces = params.faces;
-    if (params.textureSize !== undefined) inputs.textureSize = params.textureSize;
+    // A grey model has no atlas, so its graph binds no texture size.
+    if (params.textureSize !== undefined && finish !== 'grey')
+      inputs.textureSize = params.textureSize;
     const job: GenJob = {
       id: jobId,
       modality: '3d',
@@ -1287,12 +1303,13 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
       comfy: {
         prompt: '',
         modelId: model.id,
-        workflowTemplate: model.comfy.workflowTemplate,
+        workflowTemplate: imageTo3dTemplateFor(model.comfy.workflowTemplate, finish),
         inputs,
         seeds: [params.seed ?? randomInt(0, 1_000_000_000)],
         inputImage: params.imagePath,
       },
     };
+    if (params.onNote !== undefined) noteSinks.set(jobId, params.onNote);
     try {
       await ensureModule(job.backend);
       await ensureWeights(model);
@@ -1305,6 +1322,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
       moduleSucceeded(job.backend);
       return { jobId, outputs };
     } finally {
+      noteSinks.delete(jobId);
       await settleRoom();
     }
   };

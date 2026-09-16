@@ -23,10 +23,11 @@ import {
 } from '@pi-desktop/ui';
 import { type ReactNode, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { cx } from '../onboarding/cx';
-import { IconCpu, IconShield, IconSlider, IconSun } from './icons';
+import { IconCpu, IconCursor, IconShield, IconSlider, IconSun } from './icons';
 import { AgentPanel } from './panels/AgentPanel';
 import { AppearancePanel } from './panels/AppearancePanel';
 import { CapabilitiesPanel } from './panels/CapabilitiesPanel';
+import { ComputerUsePanel } from './panels/ComputerUsePanel';
 import { ConnectorsPanel } from './panels/ConnectorsPanel';
 import { EnginePanel } from './panels/EnginePanel';
 import { HarnessPanel } from './panels/HarnessPanel';
@@ -44,7 +45,8 @@ export type SettingsSection =
   | 'agent'
   | 'search'
   | 'connectors'
-  | 'capabilities';
+  | 'capabilities'
+  | 'computer-use';
 
 /** Sections this panel renders. `models` is deliberately absent — it is a view. */
 const NAV: Array<{ id: SettingsSection; label: string; icon: ReactNode }> = [
@@ -54,6 +56,7 @@ const NAV: Array<{ id: SettingsSection; label: string; icon: ReactNode }> = [
   { id: 'appearance', label: 'Appearance', icon: <IconSun /> },
   { id: 'interface', label: 'Interface', icon: <IconSlider /> },
   { id: 'agent', label: 'Agent', icon: <IconShield /> },
+  { id: 'computer-use', label: 'Computer use', icon: <IconCursor /> },
   { id: 'search', label: 'Web search', icon: <IconSearch /> },
   { id: 'connectors', label: 'Connectors', icon: <IconConnector /> },
   { id: 'capabilities', label: 'Capabilities', icon: <IconPuzzle /> },
@@ -70,6 +73,7 @@ const TITLES: Record<SettingsSection, string> = {
   search: 'Web search',
   connectors: 'Connectors',
   capabilities: 'Capabilities',
+  'computer-use': 'Computer use',
 };
 
 function SectionBody({
@@ -103,6 +107,8 @@ function SectionBody({
       return <ConnectorsPanel onOpenConnectors={onOpenConnectors} />;
     case 'capabilities':
       return <CapabilitiesPanel />;
+    case 'computer-use':
+      return <ComputerUsePanel />;
   }
 }
 

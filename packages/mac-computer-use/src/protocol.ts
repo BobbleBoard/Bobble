@@ -46,7 +46,10 @@ export type MacAgentMethod =
   | 'tabClose'
   | 'recordStart'
   | 'recordStop'
-  | 'setDriving';
+  | 'setDriving'
+  /* The person's standing computer-use policy (Settings → Computer use): on/off
+     and the apps allowed without asking — see policy.ts. */
+  | 'policy';
 
 /** One request on the wire. */
 export interface MacAgentRequest {

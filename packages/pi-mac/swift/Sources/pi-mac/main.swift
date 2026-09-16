@@ -24,6 +24,10 @@ NSApplication.shared.setActivationPolicy(.prohibited)
 //                                          snapshot and the acts that follow, so
 //                                          the bridge can act by [index]. This is
 //                                          the mode Electron main drives.
+//   pi-mac --apps [dir …]              → the installed apps, one JSON line
+//                                          (id/name/path) — the computer-use
+//                                          chooser's list.
+//   pi-mac --app-icon <app> <px> <out>  → the app's real icon as a PNG.
 //   pi-mac --overlay                    → the phantom-cursor overlay: a
 //                                          screen-sized, click-through,
 //                                          Mission-Control-excluded NSPanel
@@ -47,6 +51,10 @@ case "--serve":
   runServe()
 case "--stream":
   runStream(Array(arguments.dropFirst()))
+case "--apps":
+  runAppsCommand(Array(arguments.dropFirst()))
+case "--app-icon":
+  runAppIconCommand(Array(arguments.dropFirst()))
 case "--overlay":
   // `--overlay --headless`: the panel is driven and rendered, never shown —
   // what the app passes for a run that must not touch the screen.
@@ -54,6 +62,6 @@ case "--overlay":
 default:
   writeStderr(
     "usage: pi-mac [--check | --snapshot [--frontmost|--pid N|--app NAME] [--screenshot]"
-      + " | --act <json> | --serve | --overlay]\n")
+      + " | --act <json> | --serve | --apps [dir …] | --app-icon <app> <px> <out> | --overlay]\n")
   exit(2)
 }

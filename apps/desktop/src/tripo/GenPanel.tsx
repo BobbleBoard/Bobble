@@ -15,8 +15,9 @@
 import type { JSX, ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import type { Gen3dModelId, Gen3dRole } from '../../electron/gen3d/gen3d-contract';
+import { ModuleCard } from '../media/ModuleCard';
 import { AnimatePanel } from './AnimatePanel';
-import { GEN_MODELS, RETOPO_MODEL, SEGMENT_MODEL, TEXTURE_MODEL } from './data';
+import { GEN_MODELS, PIXAL3D_COMFY_ID, RETOPO_MODEL, SEGMENT_MODEL, TEXTURE_MODEL } from './data';
 import { CapabilityLoop, DownloadPanel } from './gen-ui';
 import { formatGb, useGen3dStore } from './gen3d-client';
 import {
@@ -34,7 +35,7 @@ import {
   IcTexture,
   IcUpload,
 } from './icons';
-import { Hint, MenuAnchor, MenuItem, Segmented, SliderRow, Toggle } from './primitives';
+import { Hint, MenuAnchor, MenuItem, Segmented, SliderRow } from './primitives';
 import { estimateSeconds, formatEstimate, stageKey } from './stage-estimates';
 import { currentVersion, type TripoInputMode, useTripoStore } from './store';
 import { addInputImages, importModelFile, MAX_INPUT_IMAGES } from './viewer-io';
@@ -448,8 +449,9 @@ function ModelPanel(): JSX.Element {
   const prompt = useTripoStore((s) => s.prompt);
   const genImages = useTripoStore((s) => s.genImages);
   const genResolution = useTripoStore((s) => s.genResolution);
-  const genAutoTexture = useTripoStore((s) => s.genAutoTexture);
+  const genFinish = useTripoStore((s) => s.genFinish);
   const genTextureSize = useTripoStore((s) => s.genTextureSize);
+  const genModel = useTripoStore((s) => s.genModel);
   const faceLimit = useTripoStore((s) => s.faceLimit);
   const set = useTripoStore((s) => s.set);
 
@@ -465,8 +467,14 @@ function ModelPanel(): JSX.Element {
   // Geometry is TRELLIS-2 (image→3D); a text prompt goes through Mage-Flow first.
   // ComfyUI's native TRELLIS.2 is geometry too — from a picture, with no engine.
   const comfy = useGen3dStore((s) => s.comfy);
-  const engineGeometry = engineReady && installed('trellis2');
-  const comfyGeometry = comfy?.ready === true;
+  // Pixal3D is ComfyUI's model only — the engine has no port of it — so
+  // picking it routes a picture there whatever else is installed. Its weights
+  // are its own; a run without them lands on the Download card.
+  const pixal = genModel === 'pixal3d';
+  const engineGeometry = engineReady && installed('trellis2') && !pixal;
+  // Pixal3D needs the runtime; its weights arrive through the card below — a
+  // run asks for them, and Download continues that same run.
+  const comfyGeometry = pixal ? comfy?.runtimeReady === true : comfy?.ready === true;
   const geometryReady = engineGeometry || comfyGeometry;
   const canRunReal =
     (inputMode === 'text' ? engineGeometry && installed('mageflow') : geometryReady) === true;
@@ -497,8 +505,10 @@ function ModelPanel(): JSX.Element {
       ...(inputMode === 'text' ? { prompt: prompt.trim() } : {}),
       ...(inputMode === 'image' ? { imagePaths: genImages.map((i) => i.path) } : {}),
       resolution: genResolution,
-      texture: genAutoTexture,
-      ...(genAutoTexture ? { textureSize: genTextureSize } : {}),
+      model: pixal ? 'pixal3d' : 'trellis2',
+      texture: genFinish !== 'grey',
+      finish: genFinish,
+      ...(genFinish !== 'grey' ? { textureSize: genTextureSize } : {}),
       // Face limit, in thousands; the top of the slider means Adaptive (0 →
       // worker default). Read by the panel and now actually sent.
       faceBudget: faceLimit >= 100 ? 0 : faceLimit * 1000,
@@ -544,15 +554,25 @@ function ModelPanel(): JSX.Element {
             onChange={(v) => set('genResolution', v)}
           />
         </div>
+        {/* Grey / Color / PBR — how far the model is finished. the user
+            (2026-09-15): "add a setting for Grey/Color/PBR". Grey is the
+            shape alone (what Auto-texture off used to mean), Color the
+            painted base colour, PBR the full material. */}
         <div className="tp-field-row">
-          <span className="tp-field-label">Auto-texture</span>
-          <Toggle
-            on={genAutoTexture}
-            onChange={(v) => set('genAutoTexture', v)}
-            testid="tp-autotexture-toggle"
+          <span className="tp-field-label">Finish</span>
+          <Segmented
+            size="sm"
+            testid="tp-finish"
+            options={[
+              { id: 'grey', label: 'Grey', hint: 'Shape only — the quickest model.' },
+              { id: 'color', label: 'Color', hint: 'Painted colour, no metal or roughness.' },
+              { id: 'pbr', label: 'PBR', hint: 'Full material: colour, metal, roughness.' },
+            ]}
+            value={genFinish}
+            onChange={(v) => set('genFinish', v)}
           />
         </div>
-        {genAutoTexture ? (
+        {genFinish !== 'grey' ? (
           <div className="tp-field-row">
             <span className="tp-field-label">Texture size</span>
             <Segmented
@@ -570,6 +590,9 @@ function ModelPanel(): JSX.Element {
         ) : null}
         <GeoAccordion />
         <AiModelSelect />
+        {/* Pixal3D's own weights, once a run has asked for them: the same
+            download-then-continue card the video studio shows for a model. */}
+        {pixal ? <ModuleCard id={`weights:${PIXAL3D_COMFY_ID}`} place="studio" /> : null}
       </div>
       <div className="tp-panel-foot">
         {/* A refused request has no job, so nothing else would ever mention it. */}
@@ -605,7 +628,8 @@ function ImagePanel(): JSX.Element {
   const [prompt, setPrompt] = useState('');
   const [editPrompt, setEditPrompt] = useState('');
   const genResolution = useTripoStore((s) => s.genResolution);
-  const genAutoTexture = useTripoStore((s) => s.genAutoTexture);
+  const genFinish = useTripoStore((s) => s.genFinish);
+  const genModel = useTripoStore((s) => s.genModel);
   const set = useTripoStore((s) => s.set);
   // Every image this session made, so an EDIT can be compared against what it
   // came from and Make 3D acts on whichever one the user settled on. Reading
@@ -648,7 +672,7 @@ function ImagePanel(): JSX.Element {
       kind: 'text',
       prompt: editPrompt.trim(),
       resolution: genResolution,
-      texture: genAutoTexture,
+      texture: genFinish !== 'grey',
       imageOnly: true,
       editFrom: resultImage,
     });
@@ -784,7 +808,9 @@ function ImagePanel(): JSX.Element {
                     kind: 'image',
                     imagePaths: [resultImage],
                     resolution: genResolution,
-                    texture: genAutoTexture,
+                    model: genModel === 'pixal3d' ? 'pixal3d' : 'trellis2',
+                    texture: genFinish !== 'grey',
+                    finish: genFinish,
                   });
                 }}
               >
@@ -811,7 +837,7 @@ function ImagePanel(): JSX.Element {
                 kind: 'text',
                 prompt: prompt.trim(),
                 resolution: genResolution,
-                texture: genAutoTexture,
+                texture: genFinish !== 'grey',
                 imageOnly: true,
               })
             }
@@ -897,6 +923,7 @@ function StagePanel({
   const imageIndex = useTripoStore((s) => s.imageIndex);
   const genResolution = useTripoStore((s) => s.genResolution);
   const genTextureSize = useTripoStore((s) => s.genTextureSize);
+  const genFinish = useTripoStore((s) => s.genFinish);
 
   const op = capability as 'segment' | 'retopo' | 'texture' | 'rig';
   const busy = job !== null && !job.done;
@@ -969,6 +996,8 @@ function StagePanel({
                     ...(reference !== undefined ? { imagePath: reference.path } : {}),
                     resolution: genResolution,
                     textureSize: genTextureSize,
+                    // A texture is never grey; the panel's Finish decides colour or PBR.
+                    finish: genFinish === 'color' ? 'color' : 'pbr',
                   }
                 : undefined,
           );
@@ -1104,6 +1133,13 @@ function RetopoPanel(): JSX.Element {
 }
 
 function TexturePanel(): JSX.Element {
+  const genFinish = useTripoStore((s) => s.genFinish);
+  const genTextureSize = useTripoStore((s) => s.genTextureSize);
+  const set = useTripoStore((s) => s.set);
+  // The stage shares the generation's Finish (a texture is never grey, so the
+  // choice here is Color or PBR) and its atlas size, so what a re-texture
+  // writes is the same thing a generation would have.
+  const finish = genFinish === 'color' ? 'color' : 'pbr';
   return (
     <StagePanel
       icon={<IcTexture size={17} />}
@@ -1114,7 +1150,35 @@ function TexturePanel(): JSX.Element {
       runLabel="Generate Texture"
       runTestid="tp-texture-btn"
       emptyCopy={STAGE_EMPTY}
-    />
+    >
+      <div className="tp-field-row" data-testid="tp-texture-finish">
+        <span className="tp-field-label">Finish</span>
+        <Segmented
+          size="sm"
+          testid="tp-texture-finish-seg"
+          options={[
+            { id: 'color', label: 'Color', hint: 'Painted colour, no metal or roughness.' },
+            { id: 'pbr', label: 'PBR', hint: 'Full material: colour, metal, roughness.' },
+          ]}
+          value={finish}
+          onChange={(v) => set('genFinish', v)}
+        />
+      </div>
+      <div className="tp-field-row">
+        <span className="tp-field-label">Texture size</span>
+        <Segmented
+          size="sm"
+          testid="tp-texture-stage-size"
+          options={[
+            { id: '1024', label: '1K' },
+            { id: '2048', label: '2K' },
+            { id: '4096', label: '4K' },
+          ]}
+          value={String(genTextureSize)}
+          onChange={(v) => set('genTextureSize', Number(v) as 1024 | 2048 | 4096)}
+        />
+      </div>
+    </StagePanel>
   );
 }
 

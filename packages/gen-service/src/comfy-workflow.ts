@@ -650,7 +650,25 @@ function fluxGgufGraph(): ComfyGraph {
  * shape 82s, decode 25s, texture 33s + 15s, decimate 38s, unwrap 6s, normal
  * bake 11s, AO 50s, voxel bake 8s); Pixal3D 260s.
  */
-function trellis2ImageTo3dGraph(engine: 'trellis2' | 'pixal3d'): ComfyGraph {
+/**
+ * How far the model is finished — the user (2026-09-15): "add a setting for
+ * Grey/Color/PBR".
+ *   grey   the shape only: structure → shape → remesh → decimate. No texture
+ *          sampler, no unwrap, no bakes — the cheapest model, for when the
+ *          form is what is wanted (MEASURED at 512³: the texture sampler and
+ *          decode are ~48 s and the unwrap + three bakes another ~75 s).
+ *   color  painted: the texture stage runs and its base colour is baked onto
+ *          an atlas, with nothing else — no metal/roughness, no normal map, no
+ *          occlusion. A coloured model that lights like clay.
+ *   pbr    the full material: base colour + metallic + roughness from the
+ *          voxel bake, a normal map and ambient occlusion from the high-poly.
+ */
+export type ModelFinish = 'grey' | 'color' | 'pbr';
+
+function trellis2ImageTo3dGraph(
+  engine: 'trellis2' | 'pixal3d',
+  finish: ModelFinish = 'pbr',
+): ComfyGraph {
   const cond = engine === 'trellis2' ? '299' : '298';
   const conditioning: ComfyGraph =
     engine === 'trellis2'
@@ -729,10 +747,6 @@ function trellis2ImageTo3dGraph(engine: 'trellis2' | 'pixal3d'): ComfyGraph {
       class_type: 'VAELoader',
       inputs: { vae_name: 'trellis_2_shape_vae_bf16.safetensors' },
     },
-    '118': {
-      class_type: 'VAELoader',
-      inputs: { vae_name: 'trellis_2_texture_vae_bf16.safetensors' },
-    },
     // Structure: guidance from two thirds in, rescaled, on a shift-5 schedule.
     '199': {
       class_type: 'CFGOverride',
@@ -786,6 +800,18 @@ function trellis2ImageTo3dGraph(engine: 'trellis2' | 'pixal3d'): ComfyGraph {
       },
     },
     '92': { class_type: 'VaeDecodeShapeTrellis', inputs: { samples: ['18', 0], vae: ['117', 0] } },
+    ...(finish === 'grey' ? {} : trellis2TextureNodes()),
+    ...trellis2MeshNodes(finish),
+  };
+}
+
+/** The texture sampler and its decode — everything a grey model skips. */
+function trellis2TextureNodes(): ComfyGraph {
+  return {
+    '118': {
+      class_type: 'VAELoader',
+      inputs: { vae_name: 'trellis_2_texture_vae_bf16.safetensors' },
+    },
     // Texture, guidance-free.
     '98': {
       class_type: 'Trellis2TextureStage',
@@ -810,9 +836,18 @@ function trellis2ImageTo3dGraph(engine: 'trellis2' | 'pixal3d'): ComfyGraph {
       class_type: 'VaeDecodeTextureTrellis',
       inputs: { samples: ['12', 0], vae: ['118', 0], shape_subdivides: ['92', 1] },
     },
+  };
+}
+
+/**
+ * The mesh, on the CPU (see the header) — remesh, decimate, and then as much
+ * of unwrap + bake + apply as the finish asks for. The saved GLB is node '9'
+ * for every finish so the runner finds it the same way.
+ */
+function trellis2MeshNodes(finish: ModelFinish): ComfyGraph {
+  const remeshAndDecimate: ComfyGraph = {
     /*
-     * The mesh, on the CPU (see the header) — upstream's own post-processing,
-     * kept: REMESH the decoded surface first (512³ unsigned-distance dual
+     * Upstream's own post-processing, kept: REMESH the decoded surface first (512³ unsigned-distance dual
      * contouring, twenty Taubin passes), and only then decimate, unwrap and
      * bake from THAT. the user (2026-09-14), on a mug baked straight off the
      * decoded voxel surface: "this cup shows a lot of artifacting … 100%
@@ -846,6 +881,14 @@ function trellis2ImageTo3dGraph(engine: 'trellis2' | 'pixal3d'): ComfyGraph {
       inputs: { mesh: ['241', 0], target_face_count: 100000, placement_mode: 'midpoint' },
     },
     '238': { class_type: 'MeshSmoothNormals', inputs: { mesh: ['186', 0], crease_angle: 180 } },
+  };
+  if (finish === 'grey') {
+    return {
+      ...remeshAndDecimate,
+      '9': { class_type: 'SaveGLB', inputs: { mesh: ['238', 0], filename_prefix: 'pi-model' } },
+    };
+  }
+  const unwrapAndBake: ComfyGraph = {
     '196': {
       class_type: 'UnwrapMesh',
       inputs: {
@@ -865,6 +908,23 @@ function trellis2ImageTo3dGraph(engine: 'trellis2' | 'pixal3d'): ComfyGraph {
         texture_size: 2048,
       },
     },
+  };
+  if (finish === 'color') {
+    return {
+      ...remeshAndDecimate,
+      ...unwrapAndBake,
+      // Base colour only: the painted look, lit like clay.
+      '210': {
+        class_type: 'ApplyTextureToMesh',
+        inputs: { mesh: ['196', 0], base_color: ['147', 0] },
+      },
+      '260': { class_type: 'MeshSmoothNormals', inputs: { mesh: ['210', 0], crease_angle: 180 } },
+      '9': { class_type: 'SaveGLB', inputs: { mesh: ['260', 0], filename_prefix: 'pi-model' } },
+    };
+  }
+  return {
+    ...remeshAndDecimate,
+    ...unwrapAndBake,
     '224': {
       class_type: 'BakeNormalMapFromMesh',
       inputs: {
@@ -914,6 +974,27 @@ const IMAGE_TO_3D_PARAM_MAP = {
   faces: '186.inputs.target_face_count',
   textureSize: ['196.inputs.resolution', '147.inputs.texture_size', '224.inputs.resolution'],
 } as const;
+/** Colour: no normal bake to size. */
+const IMAGE_TO_3D_COLOR_PARAM_MAP = {
+  image: '122.inputs.image',
+  seed: ['3.inputs.seed', '18.inputs.seed', '12.inputs.seed'],
+  faces: '186.inputs.target_face_count',
+  textureSize: ['196.inputs.resolution', '147.inputs.texture_size'],
+} as const;
+/** Grey: two samplers, no atlas at all. */
+const IMAGE_TO_3D_GREY_PARAM_MAP = {
+  image: '122.inputs.image',
+  seed: ['3.inputs.seed', '18.inputs.seed'],
+  faces: '186.inputs.target_face_count',
+} as const;
+
+/**
+ * The template a 3D catalog entry's `workflowTemplate` becomes for a finish:
+ * the entry names the PBR graph; colour and grey are its siblings.
+ */
+export function imageTo3dTemplateFor(workflowTemplate: string, finish: ModelFinish): string {
+  return finish === 'pbr' ? workflowTemplate : `${workflowTemplate}-${finish}`;
+}
 
 const FLUX_GGUF_PARAM_MAP = {
   prompt: '6.inputs.text',
@@ -1002,10 +1083,30 @@ export const WORKFLOW_TEMPLATES: Readonly<Record<string, WorkflowTemplate>> = {
     graph: trellis2ImageTo3dGraph('trellis2'),
     paramMap: IMAGE_TO_3D_PARAM_MAP,
   },
+  'trellis2-image-to-3d-color': {
+    id: 'trellis2-image-to-3d-color',
+    graph: trellis2ImageTo3dGraph('trellis2', 'color'),
+    paramMap: IMAGE_TO_3D_COLOR_PARAM_MAP,
+  },
+  'trellis2-image-to-3d-grey': {
+    id: 'trellis2-image-to-3d-grey',
+    graph: trellis2ImageTo3dGraph('trellis2', 'grey'),
+    paramMap: IMAGE_TO_3D_GREY_PARAM_MAP,
+  },
   'pixal3d-image-to-3d': {
     id: 'pixal3d-image-to-3d',
     graph: trellis2ImageTo3dGraph('pixal3d'),
     paramMap: IMAGE_TO_3D_PARAM_MAP,
+  },
+  'pixal3d-image-to-3d-color': {
+    id: 'pixal3d-image-to-3d-color',
+    graph: trellis2ImageTo3dGraph('pixal3d', 'color'),
+    paramMap: IMAGE_TO_3D_COLOR_PARAM_MAP,
+  },
+  'pixal3d-image-to-3d-grey': {
+    id: 'pixal3d-image-to-3d-grey',
+    graph: trellis2ImageTo3dGraph('pixal3d', 'grey'),
+    paramMap: IMAGE_TO_3D_GREY_PARAM_MAP,
   },
 };
 

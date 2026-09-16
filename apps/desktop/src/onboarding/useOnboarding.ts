@@ -12,6 +12,8 @@ import type {
   GenerationCapabilities,
   OnboardingChoices,
 } from '../../electron/import/import-contract';
+import type { ComputerUseSettings } from '../../electron/settings/settings-contract';
+import { useSettingsStore } from '../state/settings-store';
 import { useThemeStore } from '../store/theme';
 import {
   DEFAULT_CAPABILITIES,
@@ -29,6 +31,7 @@ export const ONBOARDING_STEPS = [
   'theme',
   'experience',
   'capabilities',
+  'computer-use',
   'setup',
 ] as const;
 export type OnboardingStepId = (typeof ONBOARDING_STEPS)[number];
@@ -57,6 +60,8 @@ interface OnboardingStore {
   selectedSkills: Set<string>;
   experience: ExperienceLevel | null;
   capabilities: GenerationCapabilities;
+  /** Computer use on/off + the apps allowed without asking (the app grid). */
+  computerUse: ComputerUseSettings;
 
   load: () => Promise<void>;
   setSource: (source: SourceChoice) => void;
@@ -65,6 +70,7 @@ interface OnboardingStore {
   toggleSkill: (name: string) => void;
   setExperience: (level: ExperienceLevel) => void;
   toggleCapability: (key: keyof GenerationCapabilities) => void;
+  setComputerUse: (next: ComputerUseSettings) => void;
   next: () => void;
   back: () => void;
   canProceed: () => boolean;
@@ -126,6 +132,9 @@ export const useOnboardingStore = create<OnboardingStore>((set, get) => ({
   selectedSkills: new Set(),
   experience: null,
   capabilities: { ...DEFAULT_CAPABILITIES },
+  // On by default with nothing pre-approved — the step is where a person
+  // ticks the apps they are happy to hand over, or switches the whole thing off.
+  computerUse: { enabled: true, apps: [] },
 
   load: async () => {
     const [detect, claude, codex, sessions] = await Promise.all([
@@ -196,6 +205,7 @@ export const useOnboardingStore = create<OnboardingStore>((set, get) => ({
 
   toggleCapability: (key) =>
     set((s) => ({ capabilities: { ...s.capabilities, [key]: !s.capabilities[key] } })),
+  setComputerUse: (computerUse) => set({ computerUse }),
 
   next: () => set((s) => ({ step: Math.min(s.step + 1, ONBOARDING_STEPS.length - 1) })),
   back: () => set((s) => ({ step: Math.max(s.step - 1, 0) })),
@@ -244,8 +254,12 @@ export const useOnboardingStore = create<OnboardingStore>((set, get) => ({
         permissionMode,
         capabilities: s.capabilities,
         importedSessionCount,
+        computerUse: s.computerUse,
       };
       await window.piDesktop.invoke('onboarding:complete', { choices });
+      // The standing policy lives in settings. A first run seeds it from the
+      // choices; a redo (settings already exist) needs it written outright.
+      await useSettingsStore.getState().update({ computerUse: s.computerUse });
     } finally {
       set({ finishing: false });
       onDone();

@@ -19,6 +19,7 @@
  * real UI: `ensure(ctx, target)` returns allow / a structured refusal reason.
  */
 import type { ExtensionContext } from '@mariozechner/pi-coding-agent';
+import { COMPUTER_USE_OFF_REASON, type ComputerUsePolicy, policyVerdict } from './policy.js';
 
 /**
  * What one app being driven can COST, said on the prompt itself.
@@ -107,6 +108,13 @@ export interface MacConsentOptions {
   readonly preConsented?: boolean;
   readonly promptTitle?: string;
   readonly promptMessage?: string;
+  /**
+   * The person's standing policy — computer use on/off and the apps allowed
+   * without asking (Settings → Computer use, set during onboarding). Read on
+   * every gate so a change in Settings applies to the next action, not the
+   * next session. Absent or failing = no policy = the per-app question.
+   */
+  readonly policy?: () => Promise<ComputerUsePolicy | null>;
 }
 
 /*
@@ -179,6 +187,22 @@ export function createMacConsentGate(opts: MacConsentOptions = {}): MacConsentGa
       const denied = checkDenylist(targetApp, denylist);
       if (denied !== null) return { ok: false, reason: denied };
       const app = key(targetApp);
+      // The standing answer first: off refuses even a pre-consented run, and a
+      // listed app needs no question. Anything else falls through to asking.
+      if (opts.policy !== undefined) {
+        let policy: ComputerUsePolicy | null = null;
+        try {
+          policy = await opts.policy();
+        } catch {
+          policy = null;
+        }
+        const verdict = policyVerdict(policy, targetApp);
+        if (verdict === 'off') return { ok: false, reason: COMPUTER_USE_OFF_REASON };
+        if (verdict === 'allowed') {
+          if (app !== null) allowed.add(app);
+          return { ok: true };
+        }
+      }
       if (anyApp) return { ok: true };
       if (app !== null && allowed.has(app)) return { ok: true };
       // An act with no app named at all is covered by any grant already given —

@@ -117,6 +117,8 @@ describe('the ComfyUI path — image → 3D with nothing to build', () => {
     ready,
     modelId: 'trellis2-comfy',
     approxGB: ready ? 0 : 15.5,
+    pixal3dWeightsReady: false,
+    pixal3dGB: 6.8,
   });
 
   it('makes a studio with no engine usable when ComfyUI and the weights are there', () => {

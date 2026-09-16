@@ -16,7 +16,7 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import * as path from 'node:path';
-import { default3dModel, type GenEvent } from '@pi-desktop/gen-service';
+import { default3dModel, type GenEvent, getModel } from '@pi-desktop/gen-service';
 import {
   CORE_MODULE_MODELS,
   consumeNdjsonStream,
@@ -57,6 +57,8 @@ import { DictationSession, transcribe } from './dictation-main';
 import type {
   Comfy3dInfo,
   DictationInvokeMap,
+  Gen3dFinish,
+  Gen3dGeometryModel,
   Gen3dInvokeMap,
   Gen3dModelId,
   Gen3dModelInfo,
@@ -103,6 +105,15 @@ const downloading = new Set<string>();
  * dev; override with GEN3D_PY_DIR for packaged builds — see report).
  * The bundle runs from apps/desktop/dist-electron (3 hops to the repo root)
  * while ts-node-ish dev paths sit one deeper — probe both. */
+/**
+ * The shipped prebuilt tree beside the sidecar's python (see
+ * packages/gen3d-engine/prebuilt/README.md) — unpacked from the asar like the
+ * python is, and next to `GEN3D_PY_DIR` when a probe points at a checkout.
+ */
+function prebuiltDir(): string {
+  return path.join(path.dirname(path.dirname(sidecarScriptPath())), 'prebuilt');
+}
+
 function sidecarScriptPath(): string {
   const override = process.env.GEN3D_PY_DIR;
   if (override !== undefined && override.length > 0) return path.join(override, 'server.py');
@@ -252,7 +263,7 @@ async function startSidecar(): Promise<Gen3dSidecar | null> {
   mkdirSync(cacheDir, { recursive: true });
   mkdirSync(sandboxDir, { recursive: true });
   const registryPath = path.join(cacheDir, 'registry.json');
-  writeFileSync(registryPath, JSON.stringify(toSidecarRegistry(), null, 2));
+  writeFileSync(registryPath, JSON.stringify(toSidecarRegistry(prebuiltDir()), null, 2));
 
   const port = await pickFreePort();
   const instance = new Gen3dSidecar({
@@ -579,11 +590,18 @@ export function setComfy3dRunner(fn: Run3dFn): void {
   comfy3dRunner = fn;
 }
 
+/** The catalog id ComfyUI runs for a geometry model named on a request. */
+const COMFY_3D_MODEL_IDS: Readonly<Record<Gen3dGeometryModel, string>> = {
+  trellis2: 'trellis2-comfy',
+  pixal3d: 'pixal3d-comfy',
+};
+
 export function comfy3dInfo(): Comfy3dInfo {
   const model = default3dModel();
   const runtimeReady = comfyEngineInstalled();
   const weightsReady = weightsPresent(model);
   const weightGB = (model.weights ?? []).reduce((n, f) => n + (f.bytes ?? 0), 0) / 1e9;
+  const pixal = getModel(COMFY_3D_MODEL_IDS.pixal3d);
   return {
     runtimeReady,
     weightsReady,
@@ -591,6 +609,12 @@ export function comfy3dInfo(): Comfy3dInfo {
     modelId: model.id,
     // The runtime is 1.5 GB on this platform (gen-modules GEN_MODULE_META).
     approxGB: Math.round(((runtimeReady ? 0 : 1.5) + (weightsReady ? 0 : weightGB)) * 10) / 10,
+    pixal3dWeightsReady: pixal !== undefined && weightsPresent(pixal),
+    pixal3dGB:
+      pixal === undefined
+        ? 0
+        : Math.round(((pixal.weights ?? []).reduce((n, f) => n + (f.bytes ?? 0), 0) / 1e9) * 10) /
+          10,
   };
 }
 
@@ -612,7 +636,10 @@ const COMFY_3D_PHASES = [
   { label: 'Shape', steps: 20 },
   { label: 'Texture', steps: 12 },
 ] as const;
-const COMFY_3D_SAMPLER_STEPS = COMFY_3D_PHASES.reduce((n, p) => n + p.steps, 0);
+/** A grey model has no texture sampler — two phases, not three. */
+function comfy3dPhases(finish: Gen3dFinish): readonly { label: string; steps: number }[] {
+  return finish === 'grey' ? COMFY_3D_PHASES.slice(0, 2) : COMFY_3D_PHASES;
+}
 
 function runComfy3d(req: Gen3dInvokeMap['gen3d:generate']['request']): {
   ok: boolean;
@@ -629,6 +656,9 @@ function runComfy3d(req: Gen3dInvokeMap['gen3d:generate']['request']): {
         'Without the Bobble 3D engine a model is made from a picture — make or drop an image first.',
     };
   }
+  const finish: Gen3dFinish = req.finish ?? (req.texture ? 'pbr' : 'grey');
+  const phases = comfy3dPhases(finish);
+  const samplerSteps = phases.reduce((n, p) => n + p.steps, 0);
   const jobId = `c3d_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const outputDir = path.join(gen3dSandboxDir(homedir()), jobId);
   const say = (
@@ -645,23 +675,36 @@ function runComfy3d(req: Gen3dInvokeMap['gen3d:generate']['request']): {
   let phase = 0;
   let lastStep = 0;
   let stepsBefore = 0;
+  // CPU passes after the last sampler (remesh, decimate, unwrap, the bakes)
+  // report their own counters; each restart is one more of them.
+  let meshPasses = 0;
   const onEvent = (event: GenEvent): void => {
     if (event.event !== 'progress') return;
     const { step, total } = event;
-    // A counter that went backwards is the next sampler starting.
-    if (step < lastStep && phase < COMFY_3D_PHASES.length - 1) {
-      stepsBefore += COMFY_3D_PHASES[phase]?.steps ?? total;
-      phase += 1;
+    // A counter that went backwards is the next sampler starting — or, past
+    // the last sampler, the next mesh pass.
+    if (step < lastStep) {
+      if (phase < phases.length - 1) {
+        stepsBefore += phases[phase]?.steps ?? total;
+        phase += 1;
+      } else {
+        meshPasses += 1;
+      }
     }
     lastStep = step;
-    const current = COMFY_3D_PHASES[phase] ?? COMFY_3D_PHASES[COMFY_3D_PHASES.length - 1];
+    const current = phases[phase] ?? phases[phases.length - 1];
     const done = stepsBefore + step;
     // The samplers are ~55% of the wall clock at 512³ (145s of 314s MEASURED);
-    // the decodes and the CPU mesh stage take the rest, and have no counter.
-    const overall = Math.min(0.55, (done / COMFY_3D_SAMPLER_STEPS) * 0.55);
+    // the decodes and the CPU mesh passes take the rest. Their number is not
+    // known up front, so each pass moves the bar a tenth, capped short of done.
+    const overall =
+      meshPasses === 0
+        ? Math.min(0.55, (done / samplerSteps) * 0.55)
+        : Math.min(0.95, 0.55 + 0.1 * (meshPasses - 1) + 0.1 * (total > 0 ? step / total : 0));
+    const label = meshPasses > 0 ? 'Mesh' : (current?.label ?? 'Sampling');
     say(
-      phase >= 2 ? 'texture' : 'geometry',
-      `${current?.label ?? 'Sampling'} (step ${step}/${total})…`,
+      phase >= 2 || (meshPasses > 0 && finish !== 'grey') ? 'texture' : 'geometry',
+      `${label} (step ${step}/${total})…`,
       total > 0 ? step / total : 0,
       overall,
     );
@@ -671,6 +714,11 @@ function runComfy3d(req: Gen3dInvokeMap['gen3d:generate']['request']): {
     {
       imagePath,
       outputDir,
+      model: COMFY_3D_MODEL_IDS[req.model ?? 'trellis2'],
+      finish,
+      // A hold's reason, or the room being made — said where the studio's
+      // panels read, instead of "Getting the 3D module ready…" for the wait.
+      onNote: (text) => say('geometry', text, 0, 0),
       ...(req.textureSize !== undefined ? { textureSize: req.textureSize } : {}),
       ...(req.faceBudget !== undefined && req.faceBudget > 0 ? { faces: req.faceBudget } : {}),
     },
@@ -679,13 +727,14 @@ function runComfy3d(req: Gen3dInvokeMap['gen3d:generate']['request']): {
     .then(({ outputs }) => {
       const glb = outputs.find((o) => o.outputPath.toLowerCase().endsWith('.glb'));
       if (glb === undefined) throw new Error('ComfyUI finished without a model file');
+      const label = finish === 'grey' ? 'Untextured geometry' : 'Textured model';
       broadcast('gen3d:job', {
         jobId,
-        stage: 'texture',
-        message: 'Textured model ready',
+        stage: finish === 'grey' ? 'geometry' : 'texture',
+        message: finish === 'grey' ? 'Model ready' : 'Textured model ready',
         stagePercent: 1,
         overallPercent: 1,
-        artifact: { kind: 'model-glb', path: glb.outputPath, label: 'Textured model' },
+        artifact: { kind: 'model-glb', path: glb.outputPath, label },
         done: true,
       });
     })
@@ -847,17 +896,23 @@ const handlers: IpcHandlers<Gen3dInvokeMap & DictationInvokeMap> = {
      * for by name); ComfyUI otherwise — a fresh Mac's first model comes out of
      * the path that needs nothing built. `engine: 'comfy'` picks it outright.
      */
+    // Pixal3D has no engine port — it is ComfyUI's, whichever engine is installed.
     const useComfy =
-      req.engine === 'comfy' || (req.engine === undefined && !sidecarCoreInstalled());
+      req.engine === 'comfy' ||
+      req.model === 'pixal3d' ||
+      (req.engine === undefined && !sidecarCoreInstalled());
     if (useComfy) return runComfy3d(req);
+    // A grey finish is an untextured run; colour/PBR decide what the bake writes.
+    const finish: Gen3dFinish = req.finish ?? (req.texture ? 'pbr' : 'grey');
+    const body = { ...req, texture: finish !== 'grey', finish };
     startMemorySampling(`generate:${req.kind}:${req.resolution}`);
     const res = await sidecarPost<{ ok: boolean; jobId?: string; error?: string }>(
       '/generate',
-      req,
+      body,
     );
     if (res === null) return { ok: false, error: ENGINE_DOWN };
     if (res.ok && res.jobId !== undefined) {
-      jobPlans.set(res.jobId, planGenerate(req.kind, req.texture));
+      jobPlans.set(res.jobId, planGenerate(req.kind, body.texture));
     }
     return res;
   },

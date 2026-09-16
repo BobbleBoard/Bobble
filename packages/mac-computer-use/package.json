@@ -8,6 +8,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./protocol": "./src/protocol.ts",
+    "./permissions": "./src/permissions.ts",
+    "./policy": "./src/policy.ts",
     "./tool-names": "./src/tool-names.ts"
   },
   "scripts": {

@@ -11,6 +11,12 @@
  *   SHOT_DIR=/tmp/comfy3d node apps/desktop/tests/e2e/comfy3d-probe.mjs
  *
  * The run itself is the measured ~5 minutes at 512³ (comfy-workflow.ts).
+ *
+ * FINISH=grey|color|pbr (default pbr) asks for that finish — the user (2026-09-15):
+ * "add a setting for Grey/Color/PBR" — and the GLB's own material list is read
+ * back to prove what was written: grey has no textures, colour a base colour
+ * and nothing else, PBR the metal/roughness, normal and occlusion maps too.
+ * MODEL=pixal3d runs ComfyUI's Pixal3D graph instead of TRELLIS.2.
  */
 import {
   appendFileSync,
@@ -35,6 +41,14 @@ if (!existsSync(IMAGE)) {
 const { app, page, shot, check, finish, home } = await launchApp('comfy3d', {
   realCache: true,
   args: ['--', '--piE2E=1'],
+  /*
+   * NO CHAT MODEL. The app boots the library's model on launch, and a 9B at
+   * 64k context is 12.6 GB — MEASURED landing on top of the 3D job here: the
+   * guardian shed the run at 13% free with the machine swapping, then held it
+   * behind the server it had just let in. A 3D job needs no chat model, so
+   * the probe says so rather than racing it.
+   */
+  env: { PI_E2E_NO_SERVER: '1' },
 });
 // The main process's own log (the guardian, the room keeper, the queue) — it
 // goes to stderr, and the verdicts live nowhere else.
@@ -43,6 +57,23 @@ for (const stream of [app.process().stderr, app.process().stdout]) {
   stream?.on('data', (chunk) => appendFileSync(mainLog, chunk));
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** Which PBR maps a GLB's materials reference — from its JSON chunk, no loader. */
+function glbMaterialMaps(file) {
+  const buf = readFileSync(file);
+  const jsonLength = buf.readUInt32LE(12);
+  const json = JSON.parse(buf.subarray(20, 20 + jsonLength).toString('utf8'));
+  const mats = json.materials ?? [];
+  const has = (pick) => mats.some((m) => pick(m) !== undefined);
+  return {
+    textures: (json.textures ?? []).length,
+    baseColor: has((m) => m.pbrMetallicRoughness?.baseColorTexture),
+    metallicRoughness: has((m) => m.pbrMetallicRoughness?.metallicRoughnessTexture),
+    normal: has((m) => m.normalTexture),
+    occlusion: has((m) => m.occlusionTexture),
+  };
+}
+
 try {
   // The picture must be somewhere the app can read: its own home is fenced in.
   const dir = path.join(home, 'Bobble', 'generated', 'probe');
@@ -79,16 +110,20 @@ try {
 
   // Ask for the model on the ComfyUI engine and watch the job stream.
   const t0 = Date.now();
+  const FINISH = process.env.FINISH ?? 'pbr';
+  const MODEL = process.env.MODEL ?? 'trellis2';
   const started = await page.evaluate(
-    (imagePath) =>
+    ({ imagePath, finish, model }) =>
       window.piDesktop.invoke('gen3d:generate', {
         kind: 'image',
         imagePaths: [imagePath],
         resolution: 'low',
-        texture: true,
+        texture: finish !== 'grey',
+        finish,
+        model,
         engine: 'comfy',
       }),
-    image,
+    { imagePath: image, finish: FINISH, model: MODEL },
   );
   console.log('generate:', JSON.stringify(started));
   check(started.ok === true && typeof started.jobId === 'string', 'main accepted the job');
@@ -136,9 +171,26 @@ try {
   if (typeof glb === 'string' && existsSync(glb)) {
     const mb = statSync(glb).size / 1e6;
     console.log(`model: ${glb} (${mb.toFixed(1)} MB)`);
-    check(mb > 1, 'the GLB has textures in it (> 1 MB)');
+    // The material the file actually carries, read from its JSON chunk.
+    const maps = glbMaterialMaps(glb);
+    console.log(`material maps: ${JSON.stringify(maps)}`);
+    if (FINISH === 'grey') {
+      check(maps.textures === 0, 'grey: the GLB carries no textures at all');
+    } else if (FINISH === 'color') {
+      check(maps.baseColor, 'colour: a base colour texture');
+      check(
+        !maps.metallicRoughness && !maps.normal && !maps.occlusion,
+        'colour: no metal/roughness, normal or occlusion maps',
+      );
+    } else {
+      check(mb > 1, 'the GLB has textures in it (> 1 MB)');
+      check(
+        maps.baseColor && maps.metallicRoughness && maps.normal && maps.occlusion,
+        'PBR: base colour, metal/roughness, normal and occlusion maps',
+      );
+    }
     // The home goes at finish(); the model is the evidence, so it comes out.
-    copyFileSync(glb, path.join(process.env.SHOT_DIR ?? '/tmp', 'model.glb'));
+    copyFileSync(glb, path.join(process.env.SHOT_DIR ?? '/tmp', `model-${MODEL}-${FINISH}.glb`));
   }
   // The studio took it: an asset in the tree, the viewport showing it.
   await sleep(4000);

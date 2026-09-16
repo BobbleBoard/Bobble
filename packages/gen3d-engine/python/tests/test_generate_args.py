@@ -107,3 +107,10 @@ def test_every_generate_shape_builds() -> None:
         {"kind": "text", "prompt": "a jeep", "image_paths": []},
     ):
         _spawned(**kw)  # raises on a NameError, asserts if nothing spawned
+
+
+def test_the_finish_reaches_the_bake() -> None:
+    """Grey/Color/PBR: the bake is told what to write, and PBR is the default."""
+    argv = _spawned(finish="color")
+    assert argv[argv.index("--finish") + 1] == "color", argv
+    assert _spawned()[_spawned().index("--finish") + 1] == "pbr"

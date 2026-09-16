@@ -98,6 +98,51 @@ def _fix_cuda_isms(path: Path) -> bool:
     return True
 
 
+#: The Eigen commit trellis2-apple's o-voxel pins as a submodule (read from the
+#: checkout's gitlink at the pinned trellis2-apple commit).
+EIGEN_PIN = "21e4582d1739107337a03460c81412981130373e"
+
+
+def _fetch_eigen(checkout: Path, dest: Path, env: dict, log) -> None:
+    """Eigen at the pin: the submodule when git can run, else GitLab's archive.
+
+    A tarball checkout of trellis2-apple has no `.git`, and a fresh Mac has no
+    git at all, so the archive is the ordinary path; the submodule route is
+    kept for a git checkout that already has the gitlink.
+    """
+    from engine.registry import git_usable
+
+    if (checkout / ".git").exists() and git_usable():
+        subprocess.run(
+            ["git", "submodule", "update", "--init", "--depth", "1",
+             "o-voxel/third_party/eigen"],
+            cwd=checkout, env=env, check=False,
+        )
+        if (dest / "Eigen" / "Dense").exists():
+            return
+    import shutil
+    import tarfile
+    import tempfile
+    import urllib.request
+
+    url = f"https://gitlab.com/libeigen/eigen/-/archive/{EIGEN_PIN}/eigen-{EIGEN_PIN}.tar.gz"
+    with tempfile.TemporaryDirectory() as tmp:
+        tar_path = Path(tmp) / "eigen.tar.gz"
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        with opener.open(url, timeout=120) as resp, tar_path.open("wb") as out:
+            shutil.copyfileobj(resp, out)
+        with tarfile.open(tar_path) as tar:
+            tar.extractall(tmp, filter="data")
+        tops = [p for p in Path(tmp).iterdir() if p.is_dir()]
+        if len(tops) != 1:
+            log(f"o_voxel: unexpected Eigen archive layout {[t.name for t in tops]}")
+            return
+        if dest.exists():
+            shutil.rmtree(dest)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(tops[0]), str(dest))
+
+
 def apply(checkout: Path, python: Path, uv: str, env: dict, log) -> bool:
     """Patch and build. Returns True when `o_voxel._C` imports afterwards."""
     root = checkout / "o-voxel"
@@ -117,12 +162,8 @@ def apply(checkout: Path, python: Path, uv: str, env: dict, log) -> bool:
         log("o_voxel: wrote the missing CPU entry point")
 
     if not (root / "third_party" / "eigen" / "Eigen" / "Dense").exists():
-        log("o_voxel: fetching the Eigen submodule…")
-        subprocess.run(
-            ["git", "submodule", "update", "--init", "--depth", "1",
-             "o-voxel/third_party/eigen"],
-            cwd=checkout, env=env, check=False,
-        )
+        log("o_voxel: fetching Eigen…")
+        _fetch_eigen(checkout, root / "third_party" / "eigen", env, log)
 
     for rel in (
         "src/convert/flexible_dual_grid.cpp",

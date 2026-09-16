@@ -92,11 +92,21 @@ export interface Comfy3dInfo {
   readonly modelId: string;
   /** Rough size of what is still to fetch, GB (runtime + weights). */
   readonly approxGB: number;
+  /** Pixal3D's own weights are on the shelf (it shares the runtime). */
+  readonly pixal3dWeightsReady: boolean;
+  /** What Pixal3D's weights weigh, GB — the number beside its name. */
+  readonly pixal3dGB: number;
 }
 
 /** TRELLIS structure resolution presets (verified against the repo by the
  * engine; the UI treats them as low/medium/high). */
 export type Gen3dResolution = 'low' | 'medium' | 'high';
+
+/** Grey shape / painted colour / full PBR material — see `gen3d:generate`. */
+export type Gen3dFinish = 'grey' | 'color' | 'pbr';
+
+/** The geometry models a generation can name — see `gen3d:generate`. */
+export type Gen3dGeometryModel = 'trellis2' | 'pixal3d';
 
 /** A generation/stage job's live update. `overallPercent` spans the whole
  * pipeline; `stagePercent` is within the current stage. */
@@ -222,6 +232,22 @@ export type Gen3dInvokeMap = {
       readonly imagePaths?: readonly string[];
       readonly resolution: Gen3dResolution;
       readonly texture: boolean;
+      /**
+       * How far the model is finished — the user (2026-09-15): "add a setting for
+       * Grey/Color/PBR". `grey` is the shape alone (`texture` false), `color`
+       * the painted base colour with nothing else, `pbr` (the default) the
+       * full material with metal/roughness — and, on ComfyUI, a normal map
+       * and occlusion baked from the high-poly. On the engine `texture` still
+       * decides whether the bake runs; this decides what it writes.
+       */
+      readonly finish?: Gen3dFinish;
+      /**
+       * Which model makes the geometry. `trellis2` runs on the Bobble 3D engine
+       * when it is installed and on ComfyUI's native nodes otherwise; `pixal3d`
+       * exists only as ComfyUI's native path (Comfy-Org's int8 weights), so it
+       * always goes there. Absent = trellis2.
+       */
+      readonly model?: Gen3dGeometryModel;
       readonly imageOnly?: boolean;
       /** TRELLIS bake resolution in texels (1024/2048/4096). */
       readonly textureSize?: number;
@@ -323,6 +349,8 @@ export type Gen3dInvokeMap = {
       readonly resolution?: 'low' | 'medium' | 'high';
       /** Texture: the atlas edge, in texels. */
       readonly textureSize?: 1024 | 2048 | 4096;
+      /** Texture: the painted colour alone, or the full PBR material (default). */
+      readonly finish?: 'color' | 'pbr';
     };
     response: { readonly ok: boolean; readonly jobId?: string; readonly error?: string };
   };

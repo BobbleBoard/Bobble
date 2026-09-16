@@ -308,3 +308,12 @@ def test_the_shape_probe_always_measures() -> None:
     _, mesh = _fixture()
     body = {"op": "rig", "modelPath": str(mesh), "probeOnly": True}
     assert _rigger(body, skintokens=True) == "rig_worker.py"
+
+
+def test_texture_finish_reaches_the_worker_and_pbr_is_the_default() -> None:
+    """Re-texturing a model as Color must write the colour alone."""
+    gen_mesh, _ = _fixture()
+    argv = _staged({"op": "texture", "modelPath": str(gen_mesh), "finish": "color"})
+    assert argv[argv.index("--finish") + 1] == "color", argv
+    argv = _staged({"op": "texture", "modelPath": str(gen_mesh)})
+    assert argv[argv.index("--finish") + 1] == "pbr", argv

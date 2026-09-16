@@ -1096,9 +1096,25 @@ export type MacInvokeMap = {
     request: { op: string; params?: Record<string, unknown> };
     response: { ok: boolean; result?: unknown; error?: string };
   };
+  /**
+   * The apps installed on this Mac with their real icons (128 px PNGs the
+   * `pi-mac` helper drew, cached under the support root, handed over as data
+   * URLs) — the computer-use chooser's grid, in onboarding and Settings →
+   * Computer use. Denylisted apps (Bobble, Keychain Access, System Settings)
+   * are not offered.
+   */
+  'mac:list-apps': {
+    request: { refresh?: boolean } | undefined;
+    response: {
+      apps: { id: string; name: string; path: string; icon: string | null }[];
+    };
+  };
 };
 
-export const MAC_INVOKE_CHANNELS = ['mac:debug'] as const satisfies readonly (keyof MacInvokeMap)[];
+export const MAC_INVOKE_CHANNELS = [
+  'mac:debug',
+  'mac:list-apps',
+] as const satisfies readonly (keyof MacInvokeMap)[];
 
 // The computer-use monitor's own channels live in mac/mac-monitor-contract.ts
 // (they are a real product surface, not an E2E seam like `mac:debug`).

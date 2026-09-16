@@ -623,7 +623,7 @@ def bake_atlas_front_facing(verts, faces, uvs, coords, attrs, origin, voxel_size
     return base, mr, cover
 
 
-def export_glb_pbr(vertices, faces, uvs, base_color_img, mr_img, out_path) -> None:
+def export_glb_pbr(vertices, faces, uvs, base_color_img, mr_img, out_path, finish="pbr") -> None:
     """Write the textured GLB ourselves instead of trellis-mac's exporter.
 
     Two things that exporter does are wrong, and both are silent.
@@ -647,16 +647,29 @@ def export_glb_pbr(vertices, faces, uvs, base_color_img, mr_img, out_path) -> No
 
     Kept from the original: nothing else changes, so the atlas, the UVs and the
     face order are byte-identical to what the bake produced.
+
+    `finish` is the user's Grey/Color/PBR setting as it reaches the bake: the
+    colour finish writes the base colour alone as a plain dielectric (metal 0,
+    roughness 0.85 — the same painted look the retopo re-bake gives), so the
+    baked metal/roughness stays out of a model the person asked for as colour.
     """
     import trimesh
     from PIL import Image as PILImage
 
     mesh = trimesh.Trimesh(vertices=vertices, faces=faces, process=False)
-    material = trimesh.visual.material.PBRMaterial(
-        baseColorTexture=PILImage.fromarray(base_color_img),
-        metallicFactor=1.0,
-        roughnessFactor=1.0,
-    )
+    if finish == "color":
+        material = trimesh.visual.material.PBRMaterial(
+            baseColorTexture=PILImage.fromarray(base_color_img),
+            metallicFactor=0.0,
+            roughnessFactor=0.85,
+        )
+        mr_img = None
+    else:
+        material = trimesh.visual.material.PBRMaterial(
+            baseColorTexture=PILImage.fromarray(base_color_img),
+            metallicFactor=1.0,
+            roughnessFactor=1.0,
+        )
     if mr_img is not None:
         material.metallicRoughnessTexture = PILImage.fromarray(mr_img)
     mesh.visual = trimesh.visual.TextureVisuals(uv=uvs, material=material)
@@ -968,12 +981,37 @@ def texture_from_image(args) -> None:
     y_prime = out_verts[:, 1].copy()
     out_verts[:, 1] = out_verts[:, 2]
     out_verts[:, 2] = -y_prime
-    export_glb_pbr(out_verts, new_faces, export_uvs, base_color_img, mr_img, out_path)
+    export_glb_pbr(
+        out_verts, new_faces, export_uvs, base_color_img, mr_img, out_path, args.finish
+    )
     del pipeline
     empty_cache()
     progress(STAGE_TEXTURE, f"Painted in {time.time() - t1:.0f}s")
     artifact(STAGE_TEXTURE, "model-glb", str(out_path), "Textured model")
     stage_done(STAGE_TEXTURE, "Texturing done")
+
+
+def apply_colour_finish(glb):
+    """Strip a baked GLB down to its painted colour — the user's "Color".
+
+    o_voxel's exporter writes the full material (base colour + metal/roughness,
+    sometimes a normal map). A colour finish keeps only the base colour and
+    lights it as a plain dielectric, matching what export_glb_pbr writes for
+    the same setting on the KDTree path, so the two bakers agree.
+    """
+    import trimesh
+
+    geoms = glb.geometry.values() if isinstance(glb, trimesh.Scene) else [glb]
+    for geom in geoms:
+        material = getattr(getattr(geom, "visual", None), "material", None)
+        if material is None or not isinstance(material, trimesh.visual.material.PBRMaterial):
+            continue
+        material.metallicRoughnessTexture = None
+        material.normalTexture = None
+        material.occlusionTexture = None
+        material.metallicFactor = 0.0
+        material.roughnessFactor = 0.85
+    return glb
 
 
 def bake_textures(
@@ -983,6 +1021,7 @@ def bake_textures(
     out_path: Path,
     texture_size: int,
     face_budget: int = 0,
+    finish: str = "pbr",
 ) -> None:
     """Metal bake via o_voxel/mtldiffrast, KDTree fallback — adapted from
     trellis-mac generate.py (incl. its _grid_sample_3d transpose fix).
@@ -1067,6 +1106,8 @@ def bake_textures(
                 texture_size=size,
                 verbose=True,
             )
+            if finish == "color":
+                apply_colour_finish(glb)
             glb.export(str(out_path))
             return
         except RuntimeError as err:
@@ -1117,7 +1158,7 @@ def bake_textures(
     # texture lands on the wrong faces. A rigid rotation leaves UVs and face
     # indices untouched, so converting the positions here is safe.
     export_glb_pbr(
-        to_gltf_up(new_verts), new_faces, export_uvs, base_color_img, mr_img, out_path
+        to_gltf_up(new_verts), new_faces, export_uvs, base_color_img, mr_img, out_path, finish
     )
 
 
@@ -1204,7 +1245,9 @@ def run_bake_only(args) -> None:
     # The GLB on disk is Y-up; the volume is in TRELLIS's frame.
     verts = from_gltf_up(tm.vertices)
     model_path = out_dir / "model.glb"
-    bake_textures(volume, verts, tm.faces, model_path, args.texture_size, args.bake_faces)
+    bake_textures(
+        volume, verts, tm.faces, model_path, args.texture_size, args.bake_faces, args.finish
+    )
     artifact("texture", "model-glb", str(model_path), "Textured model")
     stage_done("texture", "Texturing done")
 
@@ -1288,7 +1331,7 @@ def run_one(pipeline, args) -> None:
         save_voxels(mesh_out, out_dir / "voxels.npz")
         bake_textures(
             volume_of(mesh_out), clean_verts, clean_faces, model_path,
-            args.texture_size, args.bake_faces,
+            args.texture_size, args.bake_faces, args.finish,
         )
         artifact("texture", "model-glb", str(model_path), "Textured model")
         stage_done("texture", "Texturing done")
@@ -1323,6 +1366,8 @@ def _build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--mesh")
     ap.add_argument("--voxels")
     ap.add_argument("--bake-faces", type=int, default=0)
+    # What the bake writes: the painted colour alone, or the full PBR material.
+    ap.add_argument("--finish", choices=["color", "pbr"], default="pbr")
     return ap
 
 

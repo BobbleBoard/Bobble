@@ -136,7 +136,7 @@ try {
   }
   if (process.env.TEXTURE === 'off') {
     const on = await win
-      .evaluate(() => window.__tripo_store?.().getState?.().genAutoTexture)
+      .evaluate(() => window.__tripo_store?.().getState?.().genFinish)
       .catch(() => null);
     if (on === true) {
       await win
@@ -146,7 +146,7 @@ try {
       await win.waitForTimeout(400);
     }
     say(
-      `auto-texture: ${await win.evaluate(() => window.__tripo_store?.().getState?.().genAutoTexture)}`,
+      `finish: ${await win.evaluate(() => window.__tripo_store?.().getState?.().genFinish)}`,
     );
   }
 

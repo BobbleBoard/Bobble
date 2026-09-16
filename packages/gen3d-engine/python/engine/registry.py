@@ -14,6 +14,9 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+import tarfile
+import tempfile
+import urllib.request
 from pathlib import Path
 
 # Pinned tool-repo commits (verified working together on this hardware,
@@ -86,6 +89,12 @@ class Registry:
         for d in (self.hf_home, self.src_dir, self.bin_dir, self.stamp_dir):
             d.mkdir(parents=True, exist_ok=True)
         self.uv_path = shutil.which("uv") or str(Path.home() / ".local" / "bin" / "uv")
+        # What the app ships ready-built for this platform (see prebuilt_dir):
+        # the Metal wheels a fresh Mac cannot compile, and QuadriFlow.
+        prebuilt = spec.get("prebuiltDir")
+        self.prebuilt_dir: Path | None = (
+            Path(prebuilt) if isinstance(prebuilt, str) and prebuilt else None
+        )
 
     @classmethod
     def load(cls, registry_path: Path, cache_dir: Path) -> "Registry":
@@ -230,7 +239,12 @@ class Registry:
             return False
         env = model["env"]
         if env == "trellis":
-            return self.venv_python("trellis-mac").exists()
+            # Either tree runs the geometry; the MLX one is the fast one and
+            # the only one a Mac without Xcode can have (prebuilt wheels).
+            return (
+                self.venv_python("trellis2-apple").exists()
+                or self.venv_python("trellis-mac").exists()
+            )
         if env == "mageflow":
             return self.venv_python("Mage").exists()
         if env == "cubepart":
@@ -271,14 +285,96 @@ class Registry:
     def write_stamp(self, model_id: str) -> None:
         self.stamp_path(model_id).write_text(json.dumps({"id": model_id, "ok": True}))
 
-    # ---- git ----------------------------------------------------------------
+    # ---- prebuilt ------------------------------------------------------------
+    def prebuilt(self, *parts: str) -> Path | None:
+        """A file under the shipped prebuilt tree, or None when it is not there."""
+        if self.prebuilt_dir is None:
+            return None
+        p = self.prebuilt_dir.joinpath(*parts)
+        return p if p.exists() else None
+
+    # ---- tool sources ----------------------------------------------------------
     def ensure_tool_clone(self, name: str, log) -> Path:
+        """The tool's source tree at its pinned commit — WITHOUT git.
+
+        the user (2026-09-15): "all basic stuff needs to work out of the box". A
+        `git clone` on a Mac that has never installed the Command Line Tools is
+        not a clone: it is the "would you like to install the developer tools?"
+        dialog, and the sidecar hanging behind it. So a missing tree comes down
+        as GitHub's archive of the pinned commit (a plain tarball, unpacked with
+        Python's own tarfile) and remembers its pin in `.bobble-pin`.
+
+        A tree that is already here is left as it is: a git checkout made
+        before this existed is moved to the pin only when git can actually run
+        (never prompting for it), and a tarball tree is at its pin by
+        construction.
+        """
         url, pin = TOOL_REPOS[name]
         dest = self.tool_dir(name)
-        if not dest.exists():
-            log(f"Cloning {name}…")
+        if dest.exists():
+            if (dest / ".git").exists() and git_usable():
+                subprocess.run(
+                    ["git", "-C", str(dest), "checkout", pin], check=False, capture_output=True
+                )
+            return dest
+        log(f"Fetching {name}…")
+        try:
+            fetch_tool_archive(url, pin, dest)
+        except Exception as err:  # noqa: BLE001 — the archive is the way; git is the old one
+            if not git_usable():
+                raise RuntimeError(
+                    f"could not fetch {name} from GitHub ({err}) and git is not available"
+                ) from err
+            log(f"Archive download failed ({err}); cloning {name} with git instead…")
             subprocess.run(["git", "clone", url, str(dest)], check=True, capture_output=True)
-        subprocess.run(
-            ["git", "-C", str(dest), "checkout", pin], check=True, capture_output=True
-        )
+            subprocess.run(
+                ["git", "-C", str(dest), "checkout", pin], check=True, capture_output=True
+            )
         return dest
+
+
+def git_usable() -> bool:
+    """True when `git` runs here without asking macOS to install anything.
+
+    On a Mac without the Command Line Tools `/usr/bin/git` exists and is the
+    stub that opens the install dialog; `xcode-select -p` failing is how that
+    is told apart from a real git, without ever running the stub.
+    """
+    if shutil.which("git") is None:
+        return False
+    if shutil.which("xcode-select") is not None:
+        probe = subprocess.run(["xcode-select", "-p"], capture_output=True)
+        if probe.returncode != 0:
+            return False
+    return True
+
+
+def archive_url(repo_url: str, pin: str) -> str:
+    """`https://github.com/o/r.git` + pin → GitHub's tarball of that commit."""
+    base = repo_url.removesuffix(".git").rstrip("/")
+    return f"{base}/archive/{pin}.tar.gz"
+
+
+def fetch_tool_archive(repo_url: str, pin: str, dest: Path) -> None:
+    """Download the pinned tarball and unpack it as `dest`.
+
+    GitHub's archive has one top-level folder (`<repo>-<ref>`); that folder
+    becomes `dest`. Unpacked beside `dest` first and renamed last, so a failed
+    download never leaves a half tree that looks provisioned.
+    """
+    url = archive_url(repo_url, pin)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=dest.parent, prefix=f".{dest.name}-") as tmp:
+        tar_path = Path(tmp) / "src.tar.gz"
+        # No system proxy handler: macOS proxies have broken localhost fetches
+        # before (gen-service); GitHub is reached the plain way.
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        with opener.open(url, timeout=120) as resp, tar_path.open("wb") as out:
+            shutil.copyfileobj(resp, out)
+        with tarfile.open(tar_path) as tar:
+            tar.extractall(tmp, filter="data")
+        tops = [p for p in Path(tmp).iterdir() if p.is_dir()]
+        if len(tops) != 1:
+            raise RuntimeError(f"unexpected archive layout for {url}: {[t.name for t in tops]}")
+        (tops[0] / ".bobble-pin").write_text(pin + "\n")
+        shutil.move(str(tops[0]), str(dest))

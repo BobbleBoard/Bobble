@@ -11,9 +11,9 @@
 export type { License, MfluxBackendConfig, ModalityModel, WeightFile } from './catalog.js';
 export {
   activeModels,
+  default3dModel,
   defaultImageModel,
   defaultVideoModel,
-  default3dModel,
   getModel,
   jobFootprintGB,
   MODALITY_CATALOG,
@@ -43,8 +43,13 @@ export type {
   CreateComfySupervisorOptions,
 } from './comfy-supervisor.js';
 export { buildComfyArgs, createComfySupervisor } from './comfy-supervisor.js';
-export type { ComfyGraph, ComfyNode, WorkflowTemplate } from './comfy-workflow.js';
-export { fillWorkflow, getWorkflowTemplate, WORKFLOW_TEMPLATES } from './comfy-workflow.js';
+export type { ComfyGraph, ComfyNode, ModelFinish, WorkflowTemplate } from './comfy-workflow.js';
+export {
+  fillWorkflow,
+  getWorkflowTemplate,
+  imageTo3dTemplateFor,
+  WORKFLOW_TEMPLATES,
+} from './comfy-workflow.js';
 export type { GenRunnerLike, MakeGenRunnerDeps } from './gen-runner.js';
 export { makeGenRunner } from './gen-runner.js';
 export type {

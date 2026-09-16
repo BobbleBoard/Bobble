@@ -27,6 +27,8 @@ export interface PickedImage {
 /** Viewport render modes; wireframe is a separate ON/OFF overlay toggle that
  * draws edges ON TOP of the active mode (the user). */
 export type TripoRenderMode = 'clay' | 'textured' | 'normal';
+/** Grey shape / painted colour / full PBR — the finish a generation is asked for. */
+export type TripoFinish = 'grey' | 'color' | 'pbr';
 export type TripoModal = null | 'help' | 'export';
 
 /**
@@ -220,8 +222,13 @@ interface TripoState {
   hasSkeleton: boolean;
   /** TRELLIS bake resolution in texels. */
   genTextureSize: 1024 | 2048 | 4096;
-  /** Chain Hunyuan Paint texturing after geometry. */
-  genAutoTexture: boolean;
+  /**
+   * How far a generated model is finished — the user (2026-09-15): "add a setting
+   * for Grey/Color/PBR". Grey is the shape alone, Color the painted base
+   * colour, PBR the full material. Replaces the Auto-texture toggle: grey is
+   * what "off" meant, and the other two say what "on" writes.
+   */
+  genFinish: TripoFinish;
   /** Picked input images for image→3D (1 = single image, more = multi-image
    * conditioning; unlabeled, TRELLIS pools them — more improve accuracy). */
   genImages: readonly PickedImage[];
@@ -397,14 +404,14 @@ export const useTripoStore = create<TripoState>((set, get) => ({
   topology: 'triangle',
   symmetry: 'auto',
   retopoMode: 'quads',
-  genModel: 'trellis-2',
+  genModel: 'trellis2',
   genResolution: 'medium',
   imageVersions: [],
   imageIndex: 0,
   showSkeleton: false,
   hasSkeleton: false,
   genTextureSize: 2048,
-  genAutoTexture: true,
+  genFinish: 'pbr',
   genImages: [],
 
   skeleton: false,

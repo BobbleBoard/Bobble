@@ -3,6 +3,7 @@ import { MODALITY_CATALOG } from './catalog.ts';
 import {
   fillWorkflow,
   getWorkflowTemplate,
+  imageTo3dTemplateFor,
   WORKFLOW_TEMPLATES,
   type WorkflowTemplate,
 } from './comfy-workflow.ts';
@@ -127,6 +128,81 @@ describe('workflow registry ↔ catalog consistency', () => {
           expect(tmpl.graph[nodeId], `${tmpl.id} missing node ${nodeId}`).toBeDefined();
         }
       }
+    }
+  });
+});
+
+describe('image → 3D finish (grey / colour / PBR)', () => {
+  const spec = (
+    workflowTemplate: string,
+    inputs: Record<string, number | string>,
+  ): ComfyJobSpec => ({
+    prompt: '',
+    modelId: 'trellis2-comfy',
+    workflowTemplate,
+    inputs,
+    seeds: [5],
+    inputImage: '/tmp/mug.png',
+  });
+
+  it('every 3D template has its colour and grey siblings, for both engines', () => {
+    for (const base of ['trellis2-image-to-3d', 'pixal3d-image-to-3d']) {
+      expect(imageTo3dTemplateFor(base, 'pbr')).toBe(base);
+      for (const finish of ['color', 'grey'] as const) {
+        expect(getWorkflowTemplate(imageTo3dTemplateFor(base, finish))).toBeDefined();
+      }
+    }
+  });
+
+  it('PBR bakes everything: voxel colour, normal map and occlusion reach the material', () => {
+    const graph = fillWorkflow(
+      spec('trellis2-image-to-3d', { faces: 80000, textureSize: 1024 }),
+      5,
+    );
+    expect(at(graph, '210.inputs.normal_map')).toEqual(['224', 0]);
+    expect(at(graph, '210.inputs.occlusion')).toEqual(['233', 0]);
+    expect(at(graph, '210.inputs.metallic')).toEqual(['147', 1]);
+    expect(at(graph, '224.inputs.resolution')).toBe(1024);
+    expect(at(graph, '12.inputs.seed')).toBe(5);
+  });
+
+  it('colour keeps the texture stage and bakes the base colour only', () => {
+    const graph = fillWorkflow(
+      spec('trellis2-image-to-3d-color', { faces: 80000, textureSize: 1024 }),
+      5,
+    );
+    expect(at(graph, '12.class_type')).toBe('KSampler');
+    expect(at(graph, '147.inputs.texture_size')).toBe(1024);
+    expect(at(graph, '210.inputs.base_color')).toEqual(['147', 0]);
+    expect(at(graph, '210.inputs.normal_map')).toBeUndefined();
+    expect(at(graph, '210.inputs.metallic')).toBeUndefined();
+    expect(at(graph, '224')).toBeUndefined();
+    expect(at(graph, '233')).toBeUndefined();
+    expect(at(graph, '9.inputs.mesh')).toEqual(['260', 0]);
+  });
+
+  it('grey stops after the shape: no texture sampler, no atlas, the decimated mesh is saved', () => {
+    const graph = fillWorkflow(spec('trellis2-image-to-3d-grey', { faces: 80000 }), 5);
+    expect(at(graph, '18.inputs.seed')).toBe(5);
+    expect(at(graph, '12')).toBeUndefined();
+    expect(at(graph, '93')).toBeUndefined();
+    expect(at(graph, '118')).toBeUndefined();
+    expect(at(graph, '196')).toBeUndefined();
+    expect(at(graph, '186.inputs.target_face_count')).toBe(80000);
+    expect(at(graph, '9.inputs.mesh')).toEqual(['238', 0]);
+  });
+
+  it('a texture size is not a grey input — fillWorkflow refuses it rather than losing it', () => {
+    expect(() => fillWorkflow(spec('trellis2-image-to-3d-grey', { textureSize: 1024 }), 5)).toThrow(
+      /no paramMap binding/,
+    );
+  });
+
+  it('Pixal3D reads the camera from MoGe in every finish', () => {
+    for (const finish of ['pbr', 'color', 'grey'] as const) {
+      const graph = fillWorkflow(spec(imageTo3dTemplateFor('pixal3d-image-to-3d', finish), {}), 5);
+      expect(at(graph, '298.inputs.camera_angle_x')).toEqual(['242', 0]);
+      expect(at(graph, '9.class_type')).toBe('SaveGLB');
     }
   });
 });

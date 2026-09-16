@@ -288,6 +288,21 @@ export interface ChatOrganization {
 
 /** The whole live desktop-settings document. Seeded from onboarding.json on the
  * first read, authoritative thereafter. */
+/** One app the person has allowed Bobble to drive without asking. */
+export interface ComputerUseApp {
+  /** The bundle identifier — stable across renames and localisation. */
+  id: string;
+  /** The name Finder shows, which is also what the model names. */
+  name: string;
+}
+
+export interface ComputerUseSettings {
+  /** Off: every Mac-driving action is refused, naming this setting. */
+  enabled: boolean;
+  /** Apps used without the per-app question. Others ask first. */
+  apps: ComputerUseApp[];
+}
+
 export interface DesktopSettings {
   version: 1;
   theme: { flavor: ThemeFlavor; mode: ThemeModePref };
@@ -410,6 +425,17 @@ export interface DesktopSettings {
   /** Manage Storage's delete confirmation, once "don't show again" is ticked. */
   hideDeleteModelConfirm: boolean;
   /**
+   * Mac computer use — whether Bobble may drive apps at all, and which apps it
+   * may drive without asking. the user (2026-09-15): "a UI on onboarding for
+   * computer use on/off and then if on choose what apps to allow control of
+   * … editable later in settings via a similar UI." Off refuses every `mac`
+   * action with a sentence naming the setting; an app on the list is used
+   * without the per-app question; any other app still asks first (the
+   * denylist — Bobble itself, Keychain Access, System Settings — is never
+   * askable). See mac/computer-use-policy.ts.
+   */
+  computerUse: ComputerUseSettings;
+  /**
    * Which pi drives the chat (Settings -> Harness). `pi-bundled` is the default
    * and means "whatever ships in the app"; `pi-system` resolves the one on PATH;
    * `pi-custom` uses {@link harnessConfigPath}. External agents (Claude Code,
@@ -471,6 +497,8 @@ export interface DesktopSettingsPatch {
   /** Skip the delete-chat confirmation dialog. */
   hideDeleteChatConfirm?: boolean;
   hideDeleteModelConfirm?: boolean;
+  /** Full replacement (the chooser read-modify-writes the whole object). */
+  computerUse?: ComputerUseSettings;
 }
 
 /** Icon-stroke bounds — mirrors the IconStrokeControl slider range. */

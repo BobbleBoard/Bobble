@@ -91,6 +91,8 @@ STAGE_OPTION_KEYS = (
     "imagePath",
     "resolution",
     "textureSize",
+    # Texture stage: the painted colour alone ("color") or the full material.
+    "finish",
 )
 
 
@@ -202,6 +204,9 @@ class JobManager:
         # textures are painted onto.
         face_budget = int(body.get("faceBudget") or 0)
         edit_from = str(body.get("editFrom") or "")
+        # What the bake writes: the painted colour alone, or the full PBR
+        # material. A grey model is simply `texture` false.
+        finish = "color" if body.get("finish") == "color" else "pbr"
 
         if kind == "text":
             if not prompt:
@@ -231,7 +236,7 @@ class JobManager:
             target=self._run_generate,
             args=(
                 job, kind, prompt, image_paths, resolution, texture,
-                image_only, texture_size, edit_from, face_budget,
+                image_only, texture_size, edit_from, face_budget, finish,
             ),
             daemon=True,
         ).start()
@@ -356,6 +361,7 @@ class JobManager:
         texture_size: int = 0,
         edit_from: str = "",
         face_budget: int = 0,
+        finish: str = "pbr",
     ) -> None:
         job_dir = self._job_dir(job)
         try:
@@ -401,6 +407,7 @@ class JobManager:
                     # at exactly the built-in budget regardless of what was
                     # picked. 0 means "no cap from the UI" (Adaptive).
                     *(["--bake-faces", str(face_budget)] if face_budget > 0 else []),
+                    "--finish", finish,
                     *((["--prompt", prompt]) if prompt else []),
                 ],
                 cwd=self.registry.geometry_tool_dir(),
@@ -530,10 +537,12 @@ class JobManager:
                 # Costs no weights and no load — the pipeline is never touched.
                 venv = self.registry.geometry_python()
                 script = WORKERS_DIR / "trellis_worker.py"
+                finish = "color" if options.get("finish") == "color" else "pbr"
                 args = [
                     "--bake-only",
                     "--mesh", model_path,
                     "--out-dir", str(job_dir),
+                    "--finish", finish,
                     # Same Face limit the generate path honours, so re-baking a
                     # model does not silently change its density.
                     *(
@@ -560,6 +569,7 @@ class JobManager:
                         "--mesh", model_path,
                         "--image", str(options["imagePath"]),
                         "--out-dir", str(job_dir),
+                        "--finish", finish,
                         "--pipeline-type", self.registry.pipeline_type(
                             str(options.get("resolution") or "low")
                         ),

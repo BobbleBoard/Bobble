@@ -45,8 +45,10 @@ import { createLogger } from '@pi-desktop/shared';
 import { app, globalShortcut, ipcMain, screen, systemPreferences } from 'electron';
 import { resolveBundledPackageAsset } from '../app-paths';
 import { isBackgroundMode } from '../background-mode';
+import { readSettings } from '../settings/settings-main';
 import { isTrustedIpcEvent } from '../trusted-senders';
 import { userLaunchEnv } from './launch-env';
+import { listInstalledApps } from './mac-apps';
 import {
   macMonitor,
   registerMacMonitorIpc,
@@ -555,7 +557,7 @@ async function typeWithOverlay(params: Record<string, unknown>): Promise<MacActA
 function controlRefusal(method: MacAgentMethod): string | null {
   const control = macMonitor.control();
   if (control === 'agent') return null;
-  if (method === 'check' || method === 'setDriving') return null;
+  if (method === 'check' || method === 'setDriving' || method === 'policy') return null;
   const app = macMonitor.state().appName.trim();
   const named = app === '' ? 'the app' : app;
   if (control === 'user') {
@@ -653,6 +655,10 @@ async function dispatch(method: MacAgentMethod, params: Record<string, unknown>)
       }
       return { ok: true };
     }
+    // The person's standing answer (Settings → Computer use), read fresh on
+    // every gate so a change applies to the next action — see policy.ts.
+    case 'policy':
+      return computerUsePolicy();
     default:
       throw new Error(`unknown method: ${String(method)}`);
   }
@@ -813,8 +819,20 @@ function armEscBrake(on: boolean): void {
  * PI_E2E=1 only, a renderer-reachable debug channel the probes use
  * (tests/e2e/mac-overlay-probe.mjs / mac-brake-probe.mjs).
  */
+/** The standing policy as the bridge hands it to the consent gate. */
+function computerUsePolicy(): { enabled: boolean; apps: { id: string; name: string }[] } {
+  const cu = readSettings().computerUse;
+  return { enabled: cu.enabled, apps: cu.apps.map((a) => ({ id: a.id, name: a.name })) };
+}
+
 export function registerMacAgentIpc(): void {
   startServer();
+  // The installed apps with their real icons, for the computer-use chooser.
+  ipcMain.handle('mac:list-apps', async (event, req: { refresh?: boolean } | undefined) => {
+    if (!isTrustedIpcEvent(event)) throw new Error('[mac-agent] rejected mac:list-apps');
+    if (!isSupportedPlatform() || !existsSync(HELPER_PATH)) return { apps: [] };
+    return { apps: await listInstalledApps(HELPER_PATH, req?.refresh === true) };
+  });
   // The overlay is a SECOND pi-mac process (`--overlay`) — same binary, same
   // wire format, its own NSApplication runloop — so it needs the same resolved
   // path the `--serve` bridge uses.

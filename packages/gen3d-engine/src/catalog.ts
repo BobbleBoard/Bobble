@@ -423,7 +423,10 @@ export function autoremesherCli(cacheDir: string): string {
 
 /** The JSON registry handed to the Python sidecar (single source of truth —
  * Python never hardcodes repos/sizes). */
-export function toSidecarRegistry(): {
+export function toSidecarRegistry(prebuiltDir?: string): {
+  /** The app's shipped prebuilt tree (packages/gen3d-engine/prebuilt) — the
+   * Metal wheels and QuadriFlow a fresh Mac cannot build. Absent = build. */
+  prebuiltDir?: string;
   models: {
     id: Gen3dModelId;
     env: Gen3dModelSpec['env'];
@@ -435,6 +438,7 @@ export function toSidecarRegistry(): {
   pipelineTypes: Record<Gen3dResolution, string>;
 } {
   return {
+    ...(prebuiltDir === undefined ? {} : { prebuiltDir }),
     models: GEN3D_MODEL_SPECS.map((s) => ({
       id: s.id,
       env: s.env,

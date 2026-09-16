@@ -71,6 +71,10 @@ interface Gen3dState {
     imagePaths?: readonly string[];
     resolution: Gen3dResolution;
     texture: boolean;
+    /** Grey shape / painted colour / full PBR (the default). */
+    finish?: 'grey' | 'color' | 'pbr';
+    /** Which geometry model: TRELLIS-2 (engine or ComfyUI) or Pixal3D (ComfyUI). */
+    model?: 'trellis2' | 'pixal3d';
     /** Stop after the text→image hop (for the Image panel's "Generate image"). */
     imageOnly?: boolean;
     /** TRELLIS bake resolution in texels. */
@@ -114,6 +118,8 @@ interface Gen3dState {
       readonly resolution?: 'low' | 'medium' | 'high';
       /** Texture: the atlas edge, in texels. */
       readonly textureSize?: 1024 | 2048 | 4096;
+      /** Texture: the painted colour alone, or the full PBR material. */
+      readonly finish?: 'color' | 'pbr';
       /**
        * The humanoid verdict the user already confirmed, carried onto the
        * version this job produces. UI-only — stripped before the IPC call.

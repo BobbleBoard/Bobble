@@ -48,6 +48,11 @@ export interface OnboardingChoices {
   capabilities: GenerationCapabilities;
   /** How many Codex sessions were converted into pi sessions. */
   importedSessionCount: number;
+  /**
+   * Computer use: on or off, and the apps Bobble may drive without asking.
+   * Optional so a record written before the step existed still reads.
+   */
+  computerUse?: { enabled: boolean; apps: { id: string; name: string }[] };
 }
 
 export interface OnboardingState {

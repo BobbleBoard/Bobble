@@ -14,6 +14,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useGen3dStore } from './gen3d-client';
 import { IcCube } from './icons';
 import { CORE_MODULE_MODELS } from './module-state';
+import { useTripoStore } from './store';
 
 const STEP_RE = /\(?(?:step )?(\d+)\s*\/\s*(\d+)\)?/;
 
@@ -22,13 +23,19 @@ export function StudioEngineChip(): JSX.Element {
   const comfy = useGen3dStore((s) => s.comfy);
   const engineReady = useGen3dStore((s) => s.engineReady);
   const models = useGen3dStore((s) => s.models);
+  const genModel = useTripoStore((s) => s.genModel);
   const engineCore =
     engineReady && CORE_MODULE_MODELS.every((id) => models.find((m) => m.id === id)?.installed);
-  const engine = engineCore
-    ? 'Bobble 3D engine'
-    : comfy?.ready === true
-      ? 'ComfyUI · TRELLIS.2'
-      : 'No engine yet';
+  // Pixal3D is ComfyUI's model — the chip says so even with the engine installed.
+  const pixal = genModel === 'pixal3d';
+  const engine =
+    engineCore && !pixal
+      ? 'Bobble 3D engine'
+      : comfy?.runtimeReady === true && (pixal ? comfy.pixal3dWeightsReady : comfy.weightsReady)
+        ? `ComfyUI · ${pixal ? 'Pixal3D' : 'TRELLIS.2'}`
+        : pixal
+          ? 'Pixal3D · needs its weights'
+          : 'No engine yet';
 
   // Steps a second, from the last two distinct step readings.
   const last = useRef<{ step: number; at: number } | null>(null);

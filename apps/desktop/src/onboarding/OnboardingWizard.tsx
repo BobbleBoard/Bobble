@@ -1,6 +1,6 @@
 /**
  * First-run onboarding wizard. Mounts before ChatApp on first run (App.tsx
- * gate), walks source → import → theme → experience → capabilities, then applies
+ * gate), walks source → import → theme → experience → capabilities → computer use, then applies
  * the selected imports + persists the choices and hands off to chat.
  */
 import { Button, Spinner } from '@pi-desktop/ui';
@@ -8,6 +8,7 @@ import { useEffect } from 'react';
 import { cx } from './cx';
 import { SetupStep } from './SetupStep';
 import { CapabilitiesStep } from './steps/CapabilitiesStep';
+import { ComputerUseStep } from './steps/ComputerUseStep';
 import { ExperienceStep } from './steps/ExperienceStep';
 import { ImportStep } from './steps/ImportStep';
 import { SourceStep } from './steps/SourceStep';
@@ -36,6 +37,10 @@ const STEP_META: Record<(typeof ONBOARDING_STEPS)[number], { title: string; subt
     title: 'What do you want to create?',
     subtitle: 'Switch on generation features. Installs happen later.',
   },
+  'computer-use': {
+    title: 'Let Bobble use your Mac?',
+    subtitle: 'Pick the apps it may drive without asking. Everything else asks first.',
+  },
 };
 
 function StepBody({ index }: { index: number }) {
@@ -50,6 +55,8 @@ function StepBody({ index }: { index: number }) {
       return <ExperienceStep />;
     case 'capabilities':
       return <CapabilitiesStep />;
+    case 'computer-use':
+      return <ComputerUseStep />;
     case 'setup':
       return <SetupStep />;
     default:

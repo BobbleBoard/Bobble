@@ -65,22 +65,10 @@ export function AgentPanel() {
        * to make it worse by hand, and it duplicated a decision the harness
        * already owns. The underlying `/harness preset` route is untouched for
        * anything that drives it directly.
+       *
+       * The computer-use status pill moved to Settings → Computer use with the
+       * rest of that subject (on/off, the app grid).
        */}
-      <SettingRow
-        label="Show computer use status pill"
-        hint="The small label beside the phantom cursor while the agent drives an app. Turning it off leaves the cursor — you still see where it is acting, just without words over your windows."
-      >
-        <SegmentedControl
-          aria-label="Show computer use status pill"
-          data-testid="settings-status-pill"
-          value={settings.showComputerUseStatusPill === false ? 'off' : 'on'}
-          onValueChange={(v) => void update({ showComputerUseStatusPill: v === 'on' })}
-          options={[
-            { value: 'on', label: 'Show' },
-            { value: 'off', label: 'Hide' },
-          ]}
-        />
-      </SettingRow>
     </SettingSection>
   );
 }

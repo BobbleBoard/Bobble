@@ -17,6 +17,7 @@
 import type { ExtensionAPI } from '@mariozechner/pi-coding-agent';
 import { MacAgentClient, type MacBridge } from './bridge-client.js';
 import { createMacConsentGate } from './permissions.js';
+import type { ComputerUsePolicy } from './policy.js';
 import {
   type MacComputerUseOptions,
   registerChromeTools,
@@ -26,6 +27,7 @@ import {
 export * from './bridge-client.js';
 export * from './format.js';
 export * from './permissions.js';
+export * from './policy.js';
 export * from './protocol.js';
 export * from './session-state.js';
 export * from './tools.js';
@@ -47,6 +49,15 @@ export function registerMacComputerUse(pi: ExtensionAPI, options: MacComputerUse
 export default function activate(pi: ExtensionAPI): void {
   const bridge: MacBridge | null = MacAgentClient.fromEnv();
   const preConsented = process.env.PI_MAC_PRECONSENT === '1';
-  registerMacComputerUseTools(pi, { bridge, consent: createMacConsentGate({ preConsented }) });
+  // The person's standing policy lives in the app's settings; the app answers
+  // `policy` over the bridge, so a change in Settings reaches the next action.
+  const policy =
+    bridge === null
+      ? undefined
+      : async () => bridge.request<ComputerUsePolicy | null>('policy').catch(() => null);
+  registerMacComputerUseTools(pi, {
+    bridge,
+    consent: createMacConsentGate({ preConsented, ...(policy === undefined ? {} : { policy }) }),
+  });
   registerChromeTools(pi, bridge);
 }

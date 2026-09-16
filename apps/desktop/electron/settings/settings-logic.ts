@@ -9,6 +9,8 @@ import {
   type AdvancedSettings,
   type ChatOrganization,
   type ChatProject,
+  type ComputerUseApp,
+  type ComputerUseSettings,
   DEFAULT_ADVANCED,
   type DesktopSettings,
   type DesktopSettingsPatch,
@@ -144,6 +146,10 @@ export const DEFAULT_SETTINGS: DesktopSettings = {
   chatOrg: { projects: [], assignments: {}, pinned: [], titles: {} },
   hideDeleteChatConfirm: false,
   hideDeleteModelConfirm: false,
+  // On, with no pre-approved apps: exactly what the app did before the chooser
+  // existed — each app asks once per session — so an installed setup does not
+  // change under anyone's feet. Onboarding is where a fresh one decides.
+  computerUse: { enabled: true, apps: [] },
   harnessId: 'pi-bundled',
   harnessConfigPath: '',
 };
@@ -403,7 +409,28 @@ export function clampSettings(raw: unknown): DesktopSettings {
     chatOrg: clampChatOrg(o.chatOrg),
     hideDeleteChatConfirm: bool(o.hideDeleteChatConfirm, d.hideDeleteChatConfirm),
     hideDeleteModelConfirm: bool(o.hideDeleteModelConfirm, d.hideDeleteModelConfirm),
+    computerUse: clampComputerUse(o.computerUse, d.computerUse),
   };
+}
+
+/** `{ enabled, apps[] }` with each app an `{ id, name }` pair; junk drops out. */
+function clampComputerUse(value: unknown, fallback: ComputerUseSettings): ComputerUseSettings {
+  if (typeof value !== 'object' || value === null) return fallback;
+  const o = value as Record<string, unknown>;
+  const apps: ComputerUseApp[] = [];
+  const seen = new Set<string>();
+  if (Array.isArray(o.apps)) {
+    for (const entry of o.apps) {
+      if (typeof entry !== 'object' || entry === null) continue;
+      const e = entry as Record<string, unknown>;
+      if (typeof e.id !== 'string' || e.id.trim() === '') continue;
+      const id = e.id.trim();
+      if (seen.has(id.toLowerCase())) continue;
+      seen.add(id.toLowerCase());
+      apps.push({ id, name: typeof e.name === 'string' ? e.name : id });
+    }
+  }
+  return { enabled: bool(o.enabled, fallback.enabled), apps };
 }
 
 /** Merge a one-level-deep patch over a valid document, re-clamping the result. */
@@ -456,6 +483,7 @@ export function seedFromOnboarding(
     theme: { flavor: choices.theme.flavor, mode: choices.theme.mode },
     permissionMode: choices.permissionMode,
     capabilities: choices.capabilities,
+    ...(choices.computerUse === undefined ? {} : { computerUse: choices.computerUse }),
     ...(mcpMode === null ? {} : { mcpMode }),
   });
 }
