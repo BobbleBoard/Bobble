@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { CAPABILITIES } from '../presets/capabilities.js';
 import {
   editsAsInstruction,
-  OFFICE_MAKE_TOOL,
   inferOfficeKind,
+  OFFICE_MAKE_TOOL,
   OFFICE_TOOL_NAMES,
   registerOfficeTools,
   runOffice,
@@ -346,6 +346,35 @@ describe('the same brief twice is not made twice', () => {
       content: `${content}\n## Slide 4: D — the Q4 plan: a second counter, a holiday menu, two hires\n## Slide 5: E — staff turnover 22% to 11%`,
     });
     expect(spawned).toHaveLength(2);
+  });
+});
+
+describe('office make without a kind reaches the tool', () => {
+  /* MEASURED on a 4B: `office make --brief="… a Word document (docx) …"` was
+     refused at the door with "missing --kind" — the tool, which reads the
+     kind from the brief, never saw the line. `cliOptional` on the schema
+     property leaves that argument to the tool. */
+  it('is not refused at the door — the tool reads the kind from the brief', () => {
+    const { pi, tools } = collect();
+    registerOfficeTools(pi, { bridge: null, root: () => '/ws' });
+    const cli = buildCli(
+      [{ name: 'office', summary: 'Documents.', tools: [...OFFICE_TOOL_NAMES] }],
+      tools.map((t) => ({
+        name: t.name as string,
+        description: t.description as string,
+        parameters: t.parameters as never,
+      })),
+    );
+    const r = resolveCli(cli, [
+      'office',
+      'make',
+      '--brief=One-page memo to the team as a Word document (docx) about async standups',
+    ]);
+    expect(r.kind).toBe('call');
+    expect((r as { args?: { kind?: string } }).args?.kind).toBeUndefined();
+    // …and the positional form still fills the kind first.
+    const r2 = resolveCli(cli, ['office', 'make', 'pptx', 'a deck about solar, four slides']);
+    expect((r2 as { args?: { kind?: string } }).args?.kind).toBe('pptx');
   });
 });
 

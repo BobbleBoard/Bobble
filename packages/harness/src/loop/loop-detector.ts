@@ -117,6 +117,10 @@ export const DEFAULT_REPEAT_STEER_AFTER = 75;
 /** Wall-clock window for the identical-call abort (the user): the SAME call must keep
  * repeating for 3 minutes before it's treated as a stuck loop and aborted. */
 export const DEFAULT_REPEAT_WALL_MS = 3 * 60 * 1000;
+/** The small-cycle abort: at least this many calls inside the wall-clock window… */
+export const CYCLE_MIN_CALLS = 12;
+/** …made up of no more than this many distinct calls. */
+export const CYCLE_DISTINCT = 3;
 
 /**
  * Default unproductive-wandering thresholds, used when a {@link LoopDetectorConfig}
@@ -343,6 +347,18 @@ export function createLoopDetector(config: LoopDetectorConfig): LoopDetector {
   let steered = false;
   let lastSignature: string | null = null;
   const recent: string[] = [];
+  /*
+   * A SMALL CYCLE IS THE SAME STALL. The identical-call clock restarts on any
+   * different signature, so a model alternating between two writes and a
+   * read never trips it: MEASURED on a 4B, 179 calls in twelve minutes —
+   * 150 of one `write`, a dozen of one `read`, a few of a second `write` —
+   * and the turn ran to its cap. Every call in the last window is kept with
+   * its time; when the window holds many calls and only a few distinct ones
+   * for the whole wall-clock period, the model is going round, whatever the
+   * order. Assumes nothing about the task: reading twelve different files is
+   * twelve signatures, and never looks like this.
+   */
+  const timed: { sig: string; t: number }[] = [];
 
   /** Escalate a streak to steer/abort, honoring the one-steer-per-turn rule. */
   function escalate(
@@ -379,6 +395,8 @@ export function createLoopDetector(config: LoopDetectorConfig): LoopDetector {
       lastSignature = sig;
       recent.push(sig);
       if (recent.length > windowSize) recent.shift();
+      timed.push({ sig, t });
+      if (timed.length > 400) timed.shift();
 
       // Productivity tracking: a read-only/exploration call climbs the streak; any
       // concrete action (write/edit/bash/answer/connector/gen call …) resets it.
@@ -403,6 +421,25 @@ export function createLoopDetector(config: LoopDetectorConfig): LoopDetector {
           cause: 'identical',
           reason: reasonFor('identical', identicalStreak, true),
         };
+      }
+      // …and the small cycle (see `timed`): the calls of the last wall-clock
+      // window, many of them, spanning (nearly) the whole window, and no more
+      // than CYCLE_DISTINCT distinct ones among them.
+      const inWindow = timed.filter((x) => t - x.t <= repeatWallMs);
+      const oldest = inWindow[0];
+      if (
+        oldest !== undefined &&
+        inWindow.length >= CYCLE_MIN_CALLS &&
+        t - oldest.t >= repeatWallMs * 0.9
+      ) {
+        const distinct = new Set(inWindow.map((x) => x.sig)).size;
+        if (distinct <= CYCLE_DISTINCT) {
+          return {
+            kind: 'abort',
+            cause: 'identical',
+            reason: `stuck cycling between ${distinct} tool calls for minutes without progress (${inWindow.length}× in the window)`,
+          };
+        }
       }
       if (identicalStreak >= repeatSteerAfter && !steered) {
         steered = true;

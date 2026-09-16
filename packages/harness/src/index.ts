@@ -99,9 +99,11 @@ import { registerAskUser } from './tools/ask-user.js';
 import { registerCapabilityTool } from './tools/capability-tool.js';
 import {
   coercedEditRefusal,
+  coercedSearchRefusal,
   coercedWriteEscalation,
   coercedWriteRefusal,
   isCoercedEdit,
+  isCoercedSearch,
   isCoercedToolCall,
 } from './tools/coerced-write.js';
 import { degenerateCommandRefusal } from './tools/degenerate-command.js';
@@ -3790,6 +3792,19 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
      * fact, because the write succeeding is the actual harm: "Successfully wrote
      * 30 bytes" rewards the one action that cannot reach the window.
      */
+    /*
+     * …AND A SEARCH WRITTEN INTO A FILE — see isCoercedSearch. MEASURED: the
+     * 4B's first act on a research question, in two runs, was a `write`
+     * whose content began "Searching for …"; the second run made that call
+     * 150 times. Only while a web search is actually registered.
+     */
+    if (event.toolName === 'write' && pi.getAllTools().some((t) => t.name === 'web_search')) {
+      const body = (event.input as { content?: unknown })?.content;
+      if (typeof body === 'string' && isCoercedSearch(body)) {
+        pi.appendEntry(HARNESS_LOOP_ENTRY, { action: 'block', cause: 'coerced-search' });
+        return { block: true, reason: coercedSearchRefusal(body, { cli: toolCliMode }) };
+      }
+    }
     if (FILE_TOOLS.has(event.toolName) && controlledApp !== null) {
       const body = (event.input as { content?: unknown })?.content;
       if (typeof body === 'string' && isCoercedToolCall(body, controlledApp)) {

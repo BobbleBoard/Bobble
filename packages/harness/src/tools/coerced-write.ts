@@ -182,3 +182,55 @@ export function coercedEditRefusal(
     `that index. Nothing you write to disk reaches ${app}.`
   );
 }
+
+/*
+ * …AND THE SAME SHAPE WITH A SEARCH IN IT.
+ *
+ * MEASURED on a 4B asked how tall the Eiffel Tower is, in two separate runs:
+ * its FIRST act was `write { path: "eiffel_tower_height.txt", content:
+ * "Searching for Eiffel Tower height including antennas..." }`, and in the
+ * second run it made that call 150 times in twelve minutes. That is not a
+ * note; it is a web search emitted through the one file tool the grammar had
+ * to offer. `web search` was a bash command away the whole time.
+ *
+ * Narrow on purpose: a short body (one or two lines, no file shape) that
+ * OPENS with a searching/looking-up phrase. A real note about a search
+ * ("Searched three pages; the answer is 330 m") is past tense and specific,
+ * and a file of results has more than two lines.
+ */
+const SEARCH_OPENER =
+  /^(?:searching|search(?:ing)?\s+for|looking\s+up|look\s+up|finding|find\s+out|researching|research|querying|query)\b/i;
+
+/** Is this `write` content a web search that lost its way? */
+export function isCoercedSearch(content: string): boolean {
+  const body = content.trim();
+  if (body === '' || body.length > MAX_CHARS) return false;
+  const lines = body.split('\n').filter((l) => l.trim() !== '');
+  if (lines.length > MAX_LINES) return false;
+  if (FILE_SHAPED.test(body)) return false;
+  return SEARCH_OPENER.test(lines[0] ?? '');
+}
+
+/** The query the model already wrote, without its own preamble. */
+function queryOf(content: string): string {
+  return (
+    content
+      .trim()
+      .split('\n')[0]
+      ?.replace(SEARCH_OPENER, '')
+      .replace(/^\s*(?:for|about|on)\s+/i, '')
+      .replace(/[.…\s]+$/, '')
+      .trim() ?? ''
+  );
+}
+
+export function coercedSearchRefusal(content: string, opts: { cli: boolean }): string {
+  const q = queryOf(content) || 'what you are looking for';
+  const search = opts.cli ? `web search "${q}"` : `web_search with query "${q}"`;
+  const fetch = opts.cli ? 'web fetch <url>' : 'web_fetch';
+  return (
+    `Not written — that is a search, not a file, and a file cannot search. Run it: \`${search}\` ` +
+    `returns titles, URLs and snippets; then \`${fetch}\` reads the page whose URL you will cite. ` +
+    'Write a file only when there is something found to keep.'
+  );
+}

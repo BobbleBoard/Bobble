@@ -28,7 +28,7 @@
  */
 
 import { homedir } from 'node:os';
-import { isAbsolute } from 'node:path';
+import { dirname, isAbsolute, join } from 'node:path';
 import type { ExtensionAPI } from '@mariozechner/pi-coding-agent';
 import { Type } from '@sinclair/typebox';
 
@@ -236,11 +236,34 @@ export function registerPresentTool(pi: ExtensionAPI, deps: PresentToolDeps): vo
        * character and is left alone.
        */
       const expanded = p.startsWith('~/') ? `${homedir()}${p.slice(1)}` : p;
-      const resolved =
+      let resolved =
         !isAbsolute(expanded) && deps.resolvePath !== undefined
           ? deps.resolvePath(expanded)
           : expanded;
-      const info = await deps.stat(resolved);
+      let info = await deps.stat(resolved);
+      /*
+       * THE FOLDER'S OWN NAME, REPEATED. A tool result names the file by its
+       * absolute path, `…/Bobble/draw-a-simple-bicycle-as/bicycle.svg`; the
+       * model is told its working folder is Bobble and so writes
+       * `draw-a-simple-bicycle-as/bicycle.svg` — which a resolver rooted at the
+       * chat's own folder turns into the folder inside itself. MEASURED on a
+       * 4B, twice (a cp and a present, one turn apart). The path it wrote is
+       * a path FROM THE PARENT; when nothing is at the first reading and the
+       * relative path's first segment is the workspace's own name, the second
+       * reading is the one it meant.
+       */
+      if (info === null && !isAbsolute(expanded) && deps.resolvePath !== undefined) {
+        const root = deps.resolvePath('.');
+        const first = expanded.split('/')[0];
+        if (first !== undefined && first === root.split('/').filter(Boolean).at(-1)) {
+          const again = join(dirname(root), expanded);
+          const info2 = await deps.stat(again);
+          if (info2 !== null) {
+            resolved = again;
+            info = info2;
+          }
+        }
+      }
       if (info === null) {
         return {
           content: [

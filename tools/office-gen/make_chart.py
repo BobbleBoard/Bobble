@@ -46,7 +46,10 @@ def _as_spec(brief: str) -> dict | None:
             obj = json.loads(m.group(0))
         except json.JSONDecodeError:
             return None
-    return obj if isinstance(obj, dict) and ("series" in obj or "items" in obj or "points" in obj) else None
+    if not isinstance(obj, dict):
+        return None
+    keys = ("series", "items", "points", "data", "labels")
+    return obj if any(k in obj for k in keys) else None
 
 
 def spec_from_brief(brief: str) -> dict:

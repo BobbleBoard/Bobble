@@ -534,7 +534,8 @@ export function resolveCli(cli: CliModel, argv: readonly string[]): CliResolutio
     const looksLikePath = (a: string) => /^[^\s"']+\.[A-Za-z0-9]{2,5}$/.test(a);
     const at = spare.findIndex(looksLikePath);
     const firstKey = positionalKeys(schema, 1)[0];
-    const promptFilled = firstKey !== undefined && firstKey !== 'out' && args[firstKey] !== undefined;
+    const promptFilled =
+      firstKey !== undefined && firstKey !== 'out' && args[firstKey] !== undefined;
     if (at >= 0 && (promptFilled || spare.length > 1)) {
       args.out = spare[at];
       spare = spare.filter((_a, i) => i !== at);
@@ -550,7 +551,14 @@ export function resolveCli(cli: CliModel, argv: readonly string[]): CliResolutio
     Object.assign(args, coerceArgs(raw, schema));
   }
 
-  const missing = (schema?.required ?? []).filter((k) => args[k] === undefined);
+  // A required property a tool marks `cliOptional` is one it can work out
+  // for itself (office_make reads the kind from the brief or the out path);
+  // the CLI leaves it to the tool rather than refusing at the door.
+  const missing = (schema?.required ?? []).filter(
+    (k) =>
+      args[k] === undefined &&
+      (props[k] as { cliOptional?: unknown } | undefined)?.cliOptional !== true,
+  );
   if (missing.length > 0) {
     return {
       kind: 'error',

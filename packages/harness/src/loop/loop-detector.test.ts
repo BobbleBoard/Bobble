@@ -72,6 +72,52 @@ describe('identical-call streak', () => {
     if (late.kind === 'abort') expect(late.cause).toBe('identical');
   });
 
+  it('aborts a small CYCLE of calls that fills the wall-clock window', () => {
+    // MEASURED on a 4B: 179 calls in twelve minutes — 150 of one write, a
+    // dozen of one read, a few of a second write — and the identical-call
+    // clock restarted on every change of signature, so nothing fired.
+    let clock = 1000;
+    const d = createLoopDetector({
+      ...CFG,
+      maxSteps: 1000,
+      repeatSteerAfter: 1000,
+      now: () => clock,
+      repeatWallMs: 180_000,
+    });
+    const cycle = [
+      ['write', { path: 'a.txt', content: 'searching' }],
+      ['write', { path: 'a.txt', content: 'searching' }],
+      ['read', { path: 'a.txt' }],
+      ['write', { path: 'b.txt', content: 'searching' }],
+    ] as const;
+    let signal = d.onToolCall('write', { path: 'a.txt', content: 'searching' });
+    for (let i = 0; i < 40; i += 1) {
+      clock += 4_000; // 40 calls over 160 s: inside the window, not yet a loop
+      const [tool, args] = cycle[i % cycle.length] ?? cycle[0];
+      signal = d.onToolCall(tool, args);
+      expect(signal.kind).toBe('none');
+    }
+    clock += 25_000; // …and past three minutes of the same three calls: a loop
+    signal = d.onToolCall('write', { path: 'a.txt', content: 'searching' });
+    expect(signal.kind).toBe('abort');
+    if (signal.kind === 'abort') expect(signal.reason).toMatch(/cycling between 3 tool calls/);
+  });
+
+  it('never mistakes reading many different files for a cycle', () => {
+    let clock = 1000;
+    const d = createLoopDetector({
+      ...CFG,
+      maxSteps: 1000,
+      now: () => clock,
+      repeatWallMs: 180_000,
+    });
+    for (let i = 0; i < 60; i += 1) {
+      clock += 4_000;
+      // Concrete actions (a write is not "wandering"), each a distinct call.
+      expect(d.onToolCall('write', { path: `file-${i}.ts`, content: 'x' }).kind).toBe('none');
+    }
+  });
+
   it('resets the streak when a different call interrupts it', () => {
     const d = createLoopDetector(CFG);
     d.onToolCall('bash', { command: 'ls' });

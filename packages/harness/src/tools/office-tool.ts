@@ -347,11 +347,15 @@ function repeatOf(path: string, brief: string): string | null {
  */
 export const BRIEF_MIN_CHARS = 80;
 
-export function briefTooThin(brief: string): string | null {
+export function briefTooThin(brief: string, kind?: OfficeKind): string | null {
   const t = brief.trim();
   if (t.length >= BRIEF_MIN_CHARS && (t.includes('\n') || t.split(/\s+/).length >= 15)) {
     return null;
   }
+  // A chart's whole content is a handful of numbers — MEASURED, a 4B's
+  // `{"title":"Units Sold","labels":[…],"numbers_data":[12,19,27,35]}` (110
+  // characters) is a complete chart, and was refused as a title.
+  if (kind === 'chart' && (t.match(/\d+(?:[.,]\d+)?/g) ?? []).length >= 3) return null;
   return (
     `That is a title, not the content — ${t.length} characters. A document is made from what it should SAY: ` +
     'the facts, the numbers, the names, each section or slide in order. Put all of that in, then make it once.'
@@ -412,11 +416,16 @@ export function registerOfficeTools(pi: ExtensionAPI, deps: OfficeToolDeps): voi
       'A chart of data (bars, a line, a pie) is office_make with kind chart and the numbers in the brief — it is drawn from them; never a generated image, never matplotlib.',
     ],
     parameters: Type.Object({
+      // Required in the schema (so `office make pptx "…"` fills it first) but
+      // `cliOptional`: a line without it reaches the tool, where the kind is
+      // read from the brief or the out path — the CLI's own "missing --kind"
+      // refusal never let it get that far.
       kind: Type.Union(
         KINDS.map((k) => Type.Literal(k)),
         {
           description:
-            'pptx (slides), docx (document), xlsx (workbook), pdf, or chart (one bar/hbar/line/donut chart of data, as .svg).',
+            'pptx (slides), docx (document), xlsx (workbook), pdf, or chart (one bar/hbar/line/donut chart of data, as .svg). Left out, it is read from the brief or the out path.',
+          cliOptional: true,
         },
       ),
       brief: Type.String({
@@ -437,15 +446,15 @@ export function registerOfficeTools(pi: ExtensionAPI, deps: OfficeToolDeps): voi
       const p = params as { kind?: unknown; brief?: unknown; out?: unknown; slides?: unknown };
       const brief = typeof p.brief === 'string' ? p.brief.trim() : '';
       const given = typeof p.kind === 'string' ? p.kind.toLowerCase().replace(/^\./, '') : '';
-      const kind = (KINDS as readonly string[]).includes(given)
-        ? given
+      const kind: OfficeKind | null = (KINDS as readonly string[]).includes(given)
+        ? (given as OfficeKind)
         : inferOfficeKind(brief, typeof p.out === 'string' ? p.out : undefined);
       if (kind === null) {
         return errorResult(
           `office_make needs a kind: one of ${KINDS.join(', ')} — or name it in the brief ("a Word document") or in out (report.docx).`,
         );
       }
-      const thin = briefTooThin(brief);
+      const thin = briefTooThin(brief, kind);
       if (thin !== null) return errorResult(`office_make needs a brief. ${thin}`);
       const root = deps.root(ctx?.cwd);
       const out = resolveAgainst(root, typeof p.out === 'string' ? p.out : undefined);

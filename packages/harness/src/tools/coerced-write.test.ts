@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   coercedEditRefusal,
+  coercedSearchRefusal,
   coercedWriteEscalation,
   coercedWriteRefusal,
   isCoercedEdit,
+  isCoercedSearch,
   isCoercedToolCall,
 } from './coerced-write';
 
@@ -100,5 +102,24 @@ describe('the refusal has to answer what was actually asked', () => {
     const r = coercedWriteEscalation('open -a "Maps"', 'Maps', '`mac snapshot`', 3);
     expect(r).toContain('3th time');
     expect(r).toContain('open -a "Maps"');
+  });
+});
+
+describe('isCoercedSearch — a web search written into a file', () => {
+  it('catches the line a 4B wrote 150 times', () => {
+    expect(isCoercedSearch('Searching for Eiffel Tower height including antennas...')).toBe(true);
+    expect(isCoercedSearch('Look up the tallest building in the world')).toBe(true);
+    expect(
+      coercedSearchRefusal('Searching for Eiffel Tower height including antennas...', {
+        cli: true,
+      }),
+    ).toContain('web search "Eiffel Tower height including antennas"');
+  });
+
+  it('leaves real notes and real files alone', () => {
+    expect(isCoercedSearch('Searched three pages; the tower is 330 m with antennas.')).toBe(false);
+    expect(isCoercedSearch('# Findings\n- Eiffel Tower: 330 m\n- Source: wikipedia')).toBe(false);
+    expect(isCoercedSearch('def search(q):\n    return q')).toBe(false);
+    expect(isCoercedSearch('')).toBe(false);
   });
 });

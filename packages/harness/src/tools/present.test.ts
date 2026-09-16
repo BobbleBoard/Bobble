@@ -134,6 +134,33 @@ describe('registerPresentTool', () => {
     expect(seen.at(-1)).toBe('/abs/x.png');
   });
 
+  /* MEASURED on a 4B: the svg tool named the file by its absolute path,
+     `…/Bobble/draw-a-simple-bicycle-as/bicycle.svg`; told its folder was
+     Bobble, the model presented `draw-a-simple-bicycle-as/bicycle.svg` and was
+     told there was nothing there. The path it wrote is the one from the parent. */
+  it("reads a relative path that starts with the working folder's own name from the parent", async () => {
+    const { pi, tools } = collect();
+    const files = new Set(['/home/Bobble/draw-a-bicycle/bicycle.svg']);
+    registerPresentTool(pi, {
+      bridge,
+      stat: async (p) => (files.has(p) ? { isDirectory: false } : null),
+      resolvePath: (p) =>
+        p === '.' ? '/home/Bobble/draw-a-bicycle' : `/home/Bobble/draw-a-bicycle/${p}`,
+    });
+    const exec = tools[0]?.execute as (
+      i: string,
+      p: unknown,
+    ) => Promise<{ isError?: boolean; content: Array<{ type: string; text?: string }> }>;
+    const r = await exec('t', { path: 'draw-a-bicycle/bicycle.svg' });
+    expect(r.isError).not.toBe(true);
+    expect(bridge.show).toHaveBeenLastCalledWith({
+      path: '/home/Bobble/draw-a-bicycle/bicycle.svg',
+    });
+    // A genuinely missing file is still missing.
+    const miss = await exec('t', { path: 'draw-a-bicycle/other.svg' });
+    expect(miss.isError).toBe(true);
+  });
+
   it('says so when there is no desktop app to present into', async () => {
     const { pi, tools } = collect();
     registerPresentTool(pi, { bridge: null, stat: async () => ({ isDirectory: false }) });

@@ -72,8 +72,22 @@ def normalise(spec: dict) -> dict:
         kind = "bar"
     series_in = spec.get("series")
     if not isinstance(series_in, list) or not series_in:
-        # Accept the deck's flat form: {"items": [{"label","value"}]}.
+        # Accept the deck's flat form: {"items": [{"label","value"}]} …
         items = spec.get("items") or spec.get("points") or spec.get("data") or []
+        # … and the two-array form a model writes unprompted (MEASURED, a 4B:
+        # {"labels": [...], "numbers_data": [12, 19, 27, 35]}): parallel lists
+        # of labels and values under whatever the values were called.
+        if not items and isinstance(spec.get("labels"), list):
+            values = next(
+                (spec[k] for k in ("values", "numbers", "numbers_data", "data_values", "y", "counts", "amounts")
+                 if isinstance(spec.get(k), list)),
+                None,
+            )
+            if values is None:
+                values = next((v for k, v in spec.items() if k != "labels" and isinstance(v, list)
+                               and v and all(isinstance(x, (int, float, str)) for x in v)), None)
+            if values is not None:
+                items = [{"label": str(l), "value": v} for l, v in zip(spec["labels"], values)]
         series_in = [{"name": spec.get("y_label") or "", "points": items}]
     series = []
     for s in series_in[:4]:
