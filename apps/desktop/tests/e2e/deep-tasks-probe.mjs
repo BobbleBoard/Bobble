@@ -56,7 +56,10 @@ const TASKS = [
     prompt:
       'Here are units sold (thousands) by year: 2021: 12, 2022: 19, 2023: 27, 2024: 35. Make a bar chart of it and show me.',
     files: [/\.(svg|png)$/i],
-    tools: [/\b(svg|python3?|matplotlib)\b/],
+    // A chart of data is the office pipeline's `chart` kind — drawn from the
+    // numbers, never painted (media generate image) or hand-plotted.
+    tools: [/\boffice\b/],
+    forbid: [/media generate image|matplotlib/],
     present: true,
   },
   {

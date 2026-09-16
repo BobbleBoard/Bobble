@@ -52,12 +52,41 @@ def _as_spec(brief: str) -> dict | None:
     return obj if any(k in obj for k in keys) else None
 
 
+TYPE_WORDS = (
+    ("donut", r"\b(pie|donut|doughnut)\b"),
+    ("hbar", r"\b(horizontal bars?|hbar|ranked|ranking)\b"),
+    ("line", r"\b(line chart|line graph|trend line|over time as a line)\b"),
+    ("bar", r"\b(bar chart|bar graph|column chart|columns?|bars)\b"),
+)
+
+
+def settle_type(spec: dict, brief: str) -> dict:
+    """The type the brief NAMES wins; a short single series is bars.
+
+    MEASURED on a 4B asked for "a bar chart" of four years: its brief carried
+    the title and the numbers but not the word, and the local model drew a
+    line. A line through four points is not a trend chart; the request's own
+    word, when it has one, is the answer, and without one a handful of
+    categories is bars.
+    """
+    low = brief.lower()
+    for kind, pat in TYPE_WORDS:
+        if re.search(pat, low):
+            spec["type"] = kind
+            return spec
+    series = spec.get("series") if isinstance(spec.get("series"), list) else []
+    points = len((series[0] or {}).get("points") or []) if series and isinstance(series[0], dict) else 0
+    if str(spec.get("type", "")).lower() == "line" and len(series) == 1 and points <= 6:
+        spec["type"] = "bar"
+    return spec
+
+
 def spec_from_brief(brief: str) -> dict:
     direct = _as_spec(brief)
     if direct is not None:
-        return direct
+        return settle_type(direct, brief)
     raw = ask(SYSTEM, f"Request:\n{brief}", schema_hint=SCHEMA, max_tokens=1200)
-    return parse_json(raw, "chart")
+    return settle_type(parse_json(raw, "chart"), brief)
 
 
 def revise(spec: dict, instruction: str) -> dict:

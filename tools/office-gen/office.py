@@ -221,7 +221,7 @@ def retry(fn, what: str):
         return fn()
 
 
-def make(kind: str, brief: str, out: Path, slides: int | None) -> dict:
+def make(kind: str, brief: str, out: Path, slides: int | None, auto_out: bool = False) -> dict:
     t0 = time.time()
     warnings: list[str] = []
     if kind == "pptx":
@@ -259,6 +259,14 @@ def make(kind: str, brief: str, out: Path, slides: int | None) -> dict:
         import chart_render
         import make_chart
         spec = retry(lambda: make_chart.spec_from_brief(brief), "chart")
+        if auto_out:
+            # Named after the chart, not after a slug of its numbers — a brief
+            # that is JSON made `units-sold-by-year----label---2021---value--12.svg`.
+            title = str(spec.get("title") or "").strip()
+            stem = "".join(c if c.isalnum() else "-" for c in title.lower()).strip("-")
+            stem = "-".join(x for x in stem.split("-") if x)[:48]
+            if stem:
+                out = out.with_name(f"{stem}.svg")
         info = chart_render.render(spec, out)
         # The spec beside the file is what `office edit chart.svg` revises.
         out.with_suffix(".chart.json").write_text(json.dumps(chart_render.normalise(spec), indent=1))
@@ -406,7 +414,7 @@ def main(argv: list[str]) -> None:
             if kind is None:
                 fail("office make needs a kind: one of " + ", ".join(KINDS) +
                      " — `office make docx --brief …` (or name it in --out: report.docx).")
-            emit(make(kind, brief, resolve_out(a.out, kind, brief), a.slides))
+            emit(make(kind, brief, resolve_out(a.out, kind, brief), a.slides, auto_out=not a.out))
         elif a.cmd == "edit":
             src = Path(a.file).expanduser().resolve()
             if not src.is_file():
