@@ -14,17 +14,27 @@ MEASURED on an M5 Pro (24 GB), 20 fps, 10 denoising steps:
 plus a one-off text encode, which is the expensive part — see below.
 
 THE TEXT ENCODER IS THE COST, AND IT IS CACHED. ARDY conditions on LLM2Vec
-embeddings built on Llama-3-8B: 16 GB of weights to turn one sentence into one
-vector. MEASURED, and the split is not where it looks — encoding takes ~4s, but
-getting the encoder ready takes ~155s, nearly all of it `PeftModel` loading two
-LoRA adapters over 16 GB and merging them.
+embeddings built on Llama-3-8B-Instruct: eight billion parameters — 16 GB of
+bfloat16 — to turn one sentence into one 4096-d vector. Upstream loads that in
+PyTorch on the CPU behind PEFT (~72 s of adapter stacking, then ~11 s per
+sentence), and on a 24 GB Mac it does not fit: MEASURED on a fresh cache, the
+encode swapped at 50–75k pages/s for twenty seconds and the memory guard
+rightly ended the job. (An earlier note here said "8 GB in bf16"; that was
+wrong by half.)
 
-So the embedding is cached on disk, keyed by the prompt: 16 KB of float32 per
-sentence buys skipping the entire encoder. A prompt seen before generates in
-about the 2s the diffusion actually takes; a new one pays the ~155s once. The
-encoder is also loaded, used and DROPPED before the diffusion loop — on a 24 GB
-machine, holding it through generation is the difference between running and
-swapping.
+So the encoder is ARDY's, ported: _llm2vec_mlx.py folds both LoRA adapters
+into the base weights once (exact — LoRA is additive), quantizes them to 8-bit
+MLX (8.3 GB on disk, ~21 s to bake, kept under the engine's models dir) and
+runs the bidirectional Llama on Metal: 3 s to load, 0.1 s per sentence, and
+the 16 GB PyTorch encoder is never loaded. MEASURED against the fp32 PyTorch
+embedding cached for "A person walks forward.": cosine 0.99993 (bf16 PyTorch
+scored 0.99997 against the same reference; 6-bit 0.9988 and 4-bit 0.985 were
+tried and rejected — the conditioning is the whole clip).
+
+The embedding is still cached on disk, keyed by the prompt: 16 KB of float32
+per sentence buys skipping the encoder entirely, so a prompt seen before
+generates in about the 2 s the diffusion actually takes. The encoder is loaded,
+used and DROPPED before the diffusion loop either way.
 
 RUNNING ON METAL IS GATED, NOT ASSUMED. tests/ardy_mps_gate.py checks that the
 float64->float32 cast MPS forces is harmless (it is: bit-identical output), that
@@ -146,6 +156,64 @@ def to_device(model, device: str):
     return model
 
 
+def encode_prompt_mlx(model, prompt: str):
+    """One sentence → ARDY's (text_feat, text_pad_mask), through the MLX encoder.
+
+    The baked encoder lives under the engine's models dir (next to Pixal3D);
+    the first prompt on a machine bakes it from the three repos the ardy-motion
+    download already brought in — streamed, so ~21 s and a few GB of headroom,
+    never the 16 GB model.
+    """
+    import os
+
+    import torch
+
+    from _llm2vec_mlx import (
+        BASE_REPO,
+        MNTP_REPO,
+        SUPERVISED_REPO,
+        Llm2VecMlx,
+        bake,
+        baked_dir,
+        is_baked,
+    )
+
+    hf_home = Path(os.environ.get("HF_HOME", str(Path.home() / ".cache" / "bobble" / "gen3d" / "hf")))
+    out = baked_dir(hf_home.parent / "models", 8)
+    if not is_baked(out):
+        from huggingface_hub import snapshot_download
+
+        progress(STAGE, "Preparing the text encoder (one time, under a minute)…")
+        base = Path(
+            snapshot_download(
+                BASE_REPO,
+                local_files_only=True,
+                allow_patterns=["*.safetensors", "*.json", "*.model", "tokenizer*"],
+            )
+        )
+        mntp = Path(snapshot_download(MNTP_REPO, local_files_only=True))
+        supervised = Path(snapshot_download(SUPERVISED_REPO, local_files_only=True))
+        bake(
+            out,
+            base_snapshot=base,
+            mntp_snapshot=mntp,
+            supervised_snapshot=supervised,
+            bits=8,
+            note=lambda m: progress(STAGE, m),
+        )
+    progress(STAGE, "Reading the prompt…")
+    encoder = Llm2VecMlx(out)
+    model.text_encoder = encoder
+    try:
+        with torch.no_grad():
+            return model._encode_text([prompt])
+    finally:
+        # Released before the loop that needs the memory.
+        model.text_encoder = None
+        del encoder
+        gc.collect()
+
+
 def pick_device(requested: str) -> str:
     import torch
 
@@ -171,16 +239,13 @@ def run(args: argparse.Namespace, out_dir: Path) -> None:
     # it in its constructor, and the float64 rest pose has to be cast before any
     # such move can succeed.
     #
-    # The text encoder is skipped ENTIRELY on a cache hit — `text_encoder=False`
-    # rather than loading 16 GB and then not using it.
+    # `text_encoder=False` ALWAYS: upstream's PyTorch encoder (16 GB, see the
+    # module docstring) is never loaded. A prompt not in the cache is read by
+    # the MLX port below, which attaches itself as `model.text_encoder` for the
+    # one call ARDY makes (`_encode_text`) and is dropped again.
     cached = None if args.no_cache else cached_embedding(args.prompt, name)
     progress(STAGE, "Loading the motion model…")
-    model = load_model(
-        name,
-        device="cpu",
-        text_encoder=False if cached is not None else None,
-        text_encoder_fp32=True,
-    )
+    model = load_model(name, device="cpu", text_encoder=False)
     fps = model.motion_rep.fps
     num_frames = int(seconds * fps)
     steps = args.steps or int(model.diffusion.num_base_steps)
@@ -191,17 +256,12 @@ def run(args: argparse.Namespace, out_dir: Path) -> None:
         text_pad_mask = torch.from_numpy(mask_np)
         progress(STAGE, "Recognised this prompt — skipping the text encoder")
     else:
-        progress(STAGE, "Reading the prompt (first time for this wording, ~2 min)…")
         t_text = time.time()
-        with torch.no_grad():
-            text_feat, text_pad_mask = model._encode_text([args.prompt])
+        text_feat, text_pad_mask = encode_prompt_mlx(model, args.prompt)
         text_feat = text_feat.float()
         store_embedding(
             args.prompt, name, text_feat.cpu().numpy(), text_pad_mask.cpu().numpy()
         )
-        # 16 GB released before the loop that needs the memory.
-        model.text_encoder = None
-        gc.collect()
         progress(STAGE, f"Understood the prompt in {time.time() - t_text:.1f}s")
 
     # One embedding, repeated per requested sample: the prompt is the same, only

@@ -180,6 +180,17 @@ export function startGuardian(opts: GuardianMainOptions): GuardianMain {
         if (guard) {
           void pausables.terminateAll(why).then((ended) => {
             if (ended.length > 0) log(`TERMINATED ${ended.join(', ')}: ${reason}`);
+            /*
+             * THE PAUSE ENDS WITH THE SHED. What was ended is gone; what was
+             * only paused (the chat) runs again on the memory that came back
+             * — and the registry's "paused" is cleared, or the NEXT run to
+             * register would be stopped on arrival and never continued.
+             * MEASURED: a CubePart stage sat in ps state T for eighteen
+             * minutes after a shed, because the verdict went pause → shed →
+             * calm and only pause → calm resumed anything.
+             */
+            const resumed = pausables.resumeAll();
+            if (resumed.length > 0) log(`RESUME ${resumed.join(', ')} after the shed`);
             // Nothing heavy to end but the machine is still at the wall: the
             // chat model is the load, and it goes rather than the Mac.
             if (stopped.length === 0 && ended.length === 0 && opts.parkChatModel !== undefined) {
@@ -212,8 +223,10 @@ export function startGuardian(opts: GuardianMainOptions): GuardianMain {
         }
         return;
       }
-      if (wasPaused && verdict !== 'pause') {
-        // The machine has breathed: let the stopped runs go on.
+      if ((wasPaused || pausables.paused()) && verdict !== 'pause') {
+        // The machine has breathed: let the stopped runs go on. Checked
+        // against the registry too, not only the last verdict — a pause
+        // must never outlive the reading that caused it.
         const resumed = pausables.resumeAll();
         if (resumed.length > 0) log(`RESUME ${resumed.join(', ')}: ${reason}`);
         opts.announce({

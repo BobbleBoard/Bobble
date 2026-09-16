@@ -29,8 +29,6 @@ vi.mock('@pi-desktop/inference', async (importOriginal) => {
 
 import { guardRun, pausables, startGuardian } from './guardian-main';
 
-const tick = () => new Promise((r) => setTimeout(r, 0));
-
 describe('the memory guard in main', () => {
   it('pauses, resumes, and terminates the runs registered with it', async () => {
     const kill = vi.spyOn(process, 'kill').mockImplementation(() => true);
@@ -71,7 +69,28 @@ describe('the memory guard in main', () => {
       // Nothing is admitted while a pause stands.
       expect(g.admit(1).ok).toBe(false);
 
-      // Three calm readings later: resumed.
+      // Three readings OFF the pause line — still "warn", still a hold at the
+      // door — and the run is let go: its own memory is what keeps the kernel
+      // at warn, so waiting for calm was a pause that never lifted (MEASURED
+      // 2026-09-16: CubePart in ps state T for five minutes).
+      readings.push(
+        { memoryFree: 0.4, memory: 'warn' },
+        { memoryFree: 0.4, memory: 'warn' },
+        { memoryFree: 0.4, memory: 'warn' },
+      );
+      expect(await g.refresh()).toBe('pause');
+      expect(kill).not.toHaveBeenCalledWith(process.pid, 'SIGCONT');
+      await g.refresh();
+      expect(await g.refresh()).toBe('hold');
+      expect(kill).toHaveBeenCalledWith(process.pid, 'SIGCONT');
+      expect(announced.at(-1)).toBe('hold+resumed:the 3D texture');
+      expect(pausables.paused()).toBe(false);
+      expect(g.admit().ok).toBe(false); // unknown sizes wait at the door under a hold
+      kill.mockClear();
+
+      // A dip pauses it again; calm readings resume it.
+      readings.push({ memoryFree: 0.12 });
+      expect(await g.refresh()).toBe('pause');
       readings.push({ memoryFree: 0.7 }, { memoryFree: 0.7 }, { memoryFree: 0.7 });
       await g.refresh();
       await g.refresh();
@@ -79,14 +98,26 @@ describe('the memory guard in main', () => {
       expect(kill).toHaveBeenCalledWith(process.pid, 'SIGCONT');
       expect(announced.at(-1)).toBe('calm+resumed:the 3D texture');
 
-      // The kernel warning with 1% actually free: the wall. The run is ended
-      // through its own cancel.
+      // A pause, then the wall: the run is ended through its own cancel, and
+      // the pause does not outlive it — a run registered afterwards runs.
+      readings.push({ memoryFree: 0.12 });
+      expect(await g.refresh()).toBe('pause');
       readings.push({ memoryFree: 0.5, memory: 'critical', memoryFreeNow: 0.01 });
       expect(await g.refresh()).toBe('shed');
-      await tick();
+      await new Promise((r) => setTimeout(r, 600));
       expect(cancel).toHaveBeenCalledWith(
         expect.stringMatching(/Stopped to keep your Mac responsive/),
       );
+      expect(pausables.paused()).toBe(false);
+      kill.mockClear();
+      const offLater = guardRun({
+        id: 'gen3d:2',
+        label: 'the part split',
+        kind: 'gen3d',
+        pid: () => process.pid,
+      });
+      expect(kill).not.toHaveBeenCalledWith(process.pid, 'SIGSTOP');
+      offLater();
     } finally {
       off();
     }

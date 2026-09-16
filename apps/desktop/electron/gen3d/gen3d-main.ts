@@ -13,6 +13,7 @@
  * Artifacts land under ~/.pi/desktop/sandbox/gen3d/<jobId>/ — inside the
  * pd-file fence — while model weights live in ~/.cache/pi-desktop/gen3d/.
  */
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import * as path from 'node:path';
@@ -307,6 +308,26 @@ async function startSidecar(): Promise<Gen3dSidecar | null> {
        * prerequisite for any overnight batch — otherwise a night's work is one
        * image and several hundred lock errors by morning.
        */
+      /*
+       * …AND THE STUDIO HEARS IT. The panels watch `gen3d:job` for their job's
+       * done; a sidecar that died mid-stage (killed by the memory guard, or
+       * out of memory on its own) never sent one, so the stage sat on
+       * "Running…" until the app was restarted. Each in-flight job ends here
+       * with the reason.
+       */
+      for (const [jobId, plan] of jobPlans) {
+        broadcast('gen3d:job', {
+          jobId,
+          stage: plan[plan.length - 1]?.stage ?? 'geometry',
+          message: 'The 3D engine stopped',
+          stagePercent: 0,
+          overallPercent: 0,
+          done: true,
+          error: 'the 3D engine stopped before this finished — try again',
+        });
+        guardedJobs.get(jobId)?.();
+        guardedJobs.delete(jobId);
+      }
       jobPlans.clear();
       imageJobs.failAll('the generation sidecar stopped before this job finished');
       stopMemorySampling();
@@ -616,21 +637,43 @@ const guardedJobs = new Map<string, () => void>();
 
 /** Rough resident footprints, GB, per sidecar op — the numbers admission is
  * asked about (MEASURED: TRELLIS 512 ≈ 10–12 GB, CubePart's pipeline 9.9 GB). */
-function sidecarFootprintGB(op: string, resolution?: string): number {
+function sidecarFootprintGB(op: string, resolution?: string, prompt?: string): number {
   switch (op) {
     case 'generate':
       return resolution === 'high' ? 20 : resolution === 'medium' ? 16 : 10;
     case 'texture':
       return 10;
     case 'segment':
-      return 10;
+      // MEASURED after cubepart_worker's re-sequencing: the 8.9 GB text
+      // encoder is read and dropped before the 8.6 GB MLX denoiser loads, so
+      // the peak is one of them plus the VAE — not all three (that was ~27 GB
+      // at load, the number that put every segment into swap).
+      return 12;
     case 'motion':
-      return 4;
+      // A prompt seen before costs ARDY alone (~2 GB); a new wording brings
+      // the 8-bit MLX text encoder in for a second (~9.5 GB), then drops it.
+      return prompt !== undefined && motionPromptCached(prompt) ? 4 : 10;
     case 'retopo':
       return 2;
     default:
       return 1;
   }
+}
+
+/**
+ * Whether motion_worker.py has this prompt's embedding on disk — the same key
+ * it uses (`_cache_path`: sha256 of "<model>\0<prompt>", first 32 hex chars,
+ * under ~/.cache/bobble/gen3d/ardy-text). Read here only to size the
+ * admission; the worker remains the one writer.
+ */
+function motionPromptCached(prompt: string): boolean {
+  const digest = createHash('sha256')
+    .update(`ARDY-Core-RP-20FPS-Horizon40\0${prompt}`)
+    .digest('hex')
+    .slice(0, 32);
+  return existsSync(
+    path.join(homedir(), '.cache', 'bobble', 'gen3d', 'ardy-text', `${digest}.npz`),
+  );
 }
 
 function guardSidecarJob(jobId: string, label: string): void {
@@ -642,6 +685,12 @@ function guardSidecarJob(jobId: string, label: string): void {
       label,
       kind: 'gen3d',
       pid: () => sidecar?.pid,
+      // The sidecar is the server the stage runs under, not the stage: a
+      // pause stops the whole tree (harmless — its HTTP waits with it), but
+      // a termination ends the worker through /cancel and then only the
+      // tree BELOW the server (uv → python server → worker), so the server
+      // stays up for the next stage.
+      spareDepth: 1,
       cancel: async () => {
         await sidecarPost<{ ok: boolean }>('/cancel', { jobId });
       },
@@ -652,9 +701,10 @@ function guardSidecarJob(jobId: string, label: string): void {
 function admitSidecarJob(
   op: string,
   resolution?: string,
+  prompt?: string,
 ): { ok: true } | { ok: false; error: string } {
   if (admitFn === null) return { ok: true };
-  const verdict = admitFn(sidecarFootprintGB(op, resolution));
+  const verdict = admitFn(sidecarFootprintGB(op, resolution, prompt));
   if (verdict.ok) return { ok: true };
   return {
     ok: false,
@@ -992,7 +1042,7 @@ const handlers: IpcHandlers<Gen3dInvokeMap & DictationInvokeMap> = {
     return res;
   },
   'gen3d:stage': async (req) => {
-    const admitted = admitSidecarJob(req.op, req.resolution);
+    const admitted = admitSidecarJob(req.op, req.resolution, req.prompt);
     if (!admitted.ok) return { ok: false, error: admitted.error };
     startMemorySampling(`stage:${req.op}`);
     const res = await sidecarPost<{ ok: boolean; jobId?: string; error?: string }>('/stage', req);

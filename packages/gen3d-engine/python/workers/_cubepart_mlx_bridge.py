@@ -132,23 +132,81 @@ class MlxDiT(torch.nn.Module):
         return result
 
 
-def install(system, checkpoint_path: str | Path) -> MlxDiT:
-    """Replace `system.diffusion_model` with the MLX denoiser and free the torch one."""
-    from safetensors.torch import load_file
+class _StreamedTensors:
+    """The checkpoint as a read-on-demand mapping — one tensor in memory at a time.
 
+    The DiT is 8.6 GB of float32. `load_file` read all of it into a numpy dict
+    while the torch copy was still resident and the MLX copy was being built:
+    three DiTs, ~26 GB on a 24 GB Mac. MEASURED, that is the "swapping at
+    25–60k pages/s for twenty seconds" the memory guard now ends a job for.
+    `safe_open` hands back one tensor per key instead, and load_weights turns
+    each into an mx array before the next is read.
+    """
+
+    def __init__(self, path: Path) -> None:
+        from safetensors import safe_open
+
+        self._path = path
+        with safe_open(str(path), framework="pt") as f:
+            self._keys = list(f.keys())
+        self._file = None
+
+    def __contains__(self, key: str) -> bool:
+        return key in self._keys
+
+    def __iter__(self):
+        return iter(self._keys)
+
+    def __len__(self) -> int:
+        return len(self._keys)
+
+    def __getitem__(self, key: str) -> np.ndarray:
+        from safetensors import safe_open
+
+        if self._file is None:
+            self._file = safe_open(str(self._path), framework="pt").__enter__()
+        return self._file.get_tensor(key).float().numpy()
+
+
+def install(
+    system,
+    checkpoint_path: str | Path,
+    *,
+    num_layers: int | None = None,
+    multi_index: tuple[int, ...] | None = None,
+) -> MlxDiT:
+    """Replace `system.diffusion_model` with the MLX denoiser and free the torch one.
+
+    THE TORCH DiT GOES FIRST. It is only needed for two weightless parts
+    (pos_embed, time_proj) and its layer count; keeping its 8.6 GB alive while
+    the MLX copy was built was the memory doubling that put this stage into
+    swap on every 24 GB Mac.
+
+    `num_layers` / `multi_index` are the checkpoint's shape when the torch DiT
+    was built WITHOUT its blocks (cubepart_worker does that on the MLX path so
+    the 8.5 GB of block weights never enter torch at all); otherwise they are
+    read off the torch model as before.
+    """
     torch_dit = system.diffusion_model
-    model = CubePartDiT(
-        num_layers=len(torch_dit.transformer_blocks),
-        multi_index=tuple(int(i) for i in torch_dit.multi_attention_layer_index),
-    )
-    load_weights(model, {k: v.float().numpy() for k, v in load_file(str(checkpoint_path)).items()})
+    if num_layers is None:
+        num_layers = len(torch_dit.transformer_blocks)
+    if multi_index is None:
+        multi_index = tuple(int(i) for i in torch_dit.multi_attention_layer_index)
+    pos_embed = torch_dit.pos_embed
+    time_proj = torch_dit.time_text_embed.time_proj
+    system.diffusion_model = None
+    del torch_dit
+    gc.collect()
+    try:
+        torch.mps.empty_cache()
+    except Exception:  # noqa: BLE001 — no MPS, nothing to empty
+        pass
+
+    model = CubePartDiT(num_layers=num_layers, multi_index=multi_index)
+    load_weights(model, _StreamedTensors(Path(checkpoint_path)))
     mx.eval(model.parameters())
 
-    shim = MlxDiT(model, torch_dit.pos_embed, torch_dit.time_text_embed.time_proj)
-    # Assigning over the attribute drops the last reference to the torch blocks
-    # (pos_embed and time_proj are held by the shim and have no weights), which
-    # is worth several GB on a machine already holding the VAE and text encoder.
+    shim = MlxDiT(model, pos_embed, time_proj)
     system.diffusion_model = shim
-    del torch_dit
     gc.collect()
     return shim

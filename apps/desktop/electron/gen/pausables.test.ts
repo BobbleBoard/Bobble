@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createPausables, processTree } from './pausables';
+import { createPausables, processTree, processTreeWithDepth } from './pausables';
 
 describe('processTree', () => {
   it('walks every descendant of a root from one ps listing, root first', () => {
@@ -67,5 +67,30 @@ describe('the registry', () => {
     expect(kill).not.toHaveBeenCalledWith(process.pid, 'SIGKILL');
     expect(reg.list().map((e) => e.id)).toEqual(['pi:1']);
     kill.mockRestore();
+  });
+});
+
+describe('a run under a server', () => {
+  it('terminates only below the spared depth', async () => {
+    const kill = vi.spyOn(process, 'kill').mockImplementation(() => true);
+    const reg = createPausables();
+    reg.register({
+      id: 'gen3d:1',
+      label: 'the part split',
+      kind: 'gen3d',
+      pid: () => process.pid,
+      spareDepth: 1,
+    });
+    await reg.terminateAll('the wall');
+    expect(kill).not.toHaveBeenCalledWith(process.pid, 'SIGKILL');
+    kill.mockRestore();
+  });
+
+  it('reads depths off the listing: uv → server → worker', () => {
+    const ps = ['  1 0', ' 100 1', ' 200 100', ' 300 200', ' 301 300'].join('\n');
+    const tree = processTreeWithDepth(100, ps);
+    expect(tree.find((t) => t.pid === 200)?.depth).toBe(1);
+    expect(tree.find((t) => t.pid === 300)?.depth).toBe(2);
+    expect(tree.find((t) => t.pid === 301)?.depth).toBe(3);
   });
 });

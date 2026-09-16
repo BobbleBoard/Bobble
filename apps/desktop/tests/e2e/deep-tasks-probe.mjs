@@ -276,7 +276,11 @@ try {
         text,
         errors,
         presented: document.querySelectorAll('[data-testid="presented"]').length,
-        canvasError: document.querySelector('.pd-media-error')?.textContent ?? null,
+        // The canvas's own failure text (file-tabs.ts): a tab opened for a
+        // path that could not be read.
+        canvasError: document.body.innerText.includes('Could not read this file')
+          ? 'a canvas tab says "Could not read this file"'
+          : null,
         workspace: window.__pi_workspace?.() ?? null,
       };
     }, n);

@@ -125,6 +125,29 @@ def test_the_shipped_prebuilt_set_is_complete_and_named_by_the_manifest() -> Non
     assert manifest["torch"].count(".") == 2  # an exact pin, e.g. 2.13.0
 
 
+def test_every_shipped_extension_is_built_for_the_wheel_tag() -> None:
+    """The extension inside each wheel matches the wheel's Python tag.
+
+    The first motion_correction wheel was tagged cp312 but carried a
+    ``_motion_correction.cpython-314-darwin.so`` (the build picked the system
+    python) — Python 3.12 could not import it and every motion job died at
+    post-processing with "No module named motion_correction._motion_correction".
+    """
+    import zipfile
+
+    root = ENGINE.parent / "prebuilt" / "darwin-arm64"
+    manifest = json.loads((root / "manifest.json").read_text())
+    tag = manifest["python"]  # cp312
+    suffix = f".cpython-{tag[2:]}-darwin.so"
+    for wheel in [*manifest["wheels"], manifest["motionCorrection"]]:
+        assert f"-{tag}-{tag}-" in wheel, wheel
+        names = zipfile.ZipFile(root / wheel).namelist()
+        extensions = [n for n in names if n.endswith(".so")]
+        assert extensions, f"{wheel} ships no extension"
+        for ext in extensions:
+            assert ext.endswith(suffix), f"{wheel}: {ext} is not a {tag} build"
+
+
 def test_quadriflow_is_copied_from_the_prebuilt_tree() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         r = reg.Registry.__new__(reg.Registry)
@@ -175,6 +198,9 @@ def test_ardy_installs_from_the_tree_and_the_shipped_extension() -> None:
         assert "-e" not in install, install
         assert "torch>=2.4" in install and "peft>=0.19" in install, install
         assert any(a.endswith("motion_correction-1.0.0-cp312-cp312-macosx_11_0_arm64.whl") for a in install)
+        # The text encoder runs in MLX now (_llm2vec_mlx.py); the venv gets it.
+        assert envs.ARDY_MLX in install, install
+        assert "mlx.core" in envs.ARDY_IMPORTS
         pth = tool / ".venv" / "lib" / "python3.12" / "site-packages" / "ardy-checkout.pth"
         assert pth.read_text().strip() == str(tool)
 

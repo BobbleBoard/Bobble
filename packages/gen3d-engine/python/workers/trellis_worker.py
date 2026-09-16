@@ -880,18 +880,33 @@ def texture_from_image(args) -> None:
         f"(this machine allows about {budget_voxels:,})",
     )
     if occupied > budget_voxels:
-        # OVER THE COMFORTABLE BUDGET IS NOT A REFUSAL. With the allocator cap
-        # lifted (see the top of this file) the job completes by leaning on
-        # swap; it is slower, and saying so beats either failing or going quiet
-        # for several minutes. Retopologising first does NOT help and must not
-        # be suggested — MEASURED, it moved the astronaut from 697,472 voxels to
-        # 993,180, because a remesh's open edges add surface rather than remove
-        # it.
         over = occupied / max(budget_voxels, 1)
+        # OVER THE BUDGET BY MUCH IS A REFUSAL NOW. This used to lean on swap
+        # and finish "roughly Nx slower" — and it did, until the machine got a
+        # memory guard (2026-09-16, after the user's Mac restarted under exactly
+        # this stage): a job swapping at 6.7x over is what the guard pauses and
+        # then ends, and it ends it with the picture unpainted after three
+        # minutes of loading. Saying so before the load is the honest version.
+        # Retopologising first does NOT help and is not suggested — MEASURED, it
+        # moved the astronaut from 697,472 voxels to 993,180, because a remesh's
+        # open edges add surface rather than remove it. A little over still
+        # runs (the guard has the swap to watch).
+        if over > 1.5:
+            msg = (
+                f"This model's surface is {over:.1f}x what this Mac can encode for "
+                f"texturing ({occupied:,} voxels at {resolution}³, about "
+                f"{budget_voxels:,} fit) — it would swap hard and be stopped to keep the "
+                "Mac responsive. Generate the model with a Color or PBR finish instead, "
+                "or texture it on a Mac with more memory."
+            )
+            emit(event="error", message=msg)
+            del pipeline
+            empty_cache()
+            raise WorkerFailure(msg)
         progress(
             STAGE_TEXTURE,
-            f"That is past what fits in memory ({over:.1f}x), so this will use "
-            f"swap and take roughly {over:.0f}x longer than usual — it will finish.",
+            f"That is a little past what fits in memory ({over:.1f}x), so this will use "
+            f"some swap and take longer than usual.",
         )
 
     shape_slat = pipeline.encode_shape_slat(prepared, resolution)

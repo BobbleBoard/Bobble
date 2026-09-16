@@ -13,6 +13,7 @@ segmentation), so we default to a generic schema and say so in the message.
 from __future__ import annotations
 
 import argparse
+import gc
 import os
 import sys
 import time
@@ -160,6 +161,11 @@ def main() -> None:
     args = ap.parse_args()
 
     parts = [p.strip() for p in args.parts.split(",") if p.strip()] or DEFAULT_PARTS
+    # CubePart's pipeline has eight part slots (num_parts = 8 inside
+    # input_to_part_shape); a ninth name would index past its sample mask.
+    if len(parts) > 8:
+        progress(STAGE, f"Keeping the first 8 of {len(parts)} part names (CubePart's limit)")
+        parts = parts[:8]
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -173,9 +179,66 @@ def main() -> None:
     import torch
     import trimesh
 
+    # NO `torch.compile` HERE. cube_part decorates its autoencoder norm and
+    # attention with `@torch.compile(fullgraph=True)`; inductor builds those
+    # kernels with clang++, which a Mac without developer tools does not have
+    # (MEASURED on a fresh cache: "InvalidCxxCompiler: No working C++ compiler
+    # found" at "Encoding input mesh"), and TORCH_COMPILE_DISABLE left the
+    # fullgraph decorator raising "frame is in the Dynamo skipfiles list"
+    # instead. The decorator is replaced with the identity before cube_part is
+    # imported: the eager path is what every CubePart number here was measured
+    # on, and the encoder's few matmuls are not where the minutes go.
+    def _eager(*c_args, **c_kwargs):
+        if c_args and callable(c_args[0]):
+            return c_args[0]
+        return lambda fn: fn
+
+    torch.compile = _eager  # type: ignore[assignment]
+
     sys.path.insert(0, str(Path(args.cube_dir) / "cubepart"))
     from cube_part.pipelines import PartShapeDenoiserPipeline, ShapeInput
     from cube_part.utils.mesh import load_mesh, sample_surface
+
+    use_mlx = args.device == "mlx"
+    dit_shape: dict[str, object] = {}
+    if use_mlx:
+        # THE 8.5 GB OF DiT BLOCKS NEVER ENTER TORCH. Upstream's constructor
+        # builds the full transformer (8.6 GB of float32 parameters), then
+        # `load_file`s the whole checkpoint into a dict (another 8.6 GB) and
+        # copies it in — 17 GB of denoiser next to the 8.9 GB text encoder and
+        # the 1.3 GB VAE, before the MLX copy was even built. MEASURED on a
+        # fresh cache: "Loading CubePart pipeline" swapped at 22k pages/s and
+        # the stage was ended by the memory guard at "Encoding input mesh".
+        #
+        # On the MLX path the torch DiT is only ever asked for its two
+        # weightless parts (pos_embed, time_proj), so it is built with ZERO
+        # blocks and the state dict is read without them: 46 MB of embedders
+        # and norms instead of 8.6 GB. The blocks go straight from the
+        # safetensors into MLX (streamed, one tensor at a time) — see install.
+        import cube_part.systems.shape_denoiser as _system_module
+
+        _real_build = _system_module.build_qwenimage_multi_model
+
+        def _blockless_dit(
+            model_type, in_channels, condition_channels, num_layers, enable_mrope=False,
+            multi_attention_layer_index=None, **kw,
+        ):
+            dit_shape["num_layers"] = int(num_layers)
+            dit_shape["multi_index"] = tuple(int(i) for i in (multi_attention_layer_index or ()))
+            return _real_build(model_type, in_channels, condition_channels, 0, enable_mrope, [], **kw)
+
+        def _state_dict_without_blocks(path):
+            from safetensors import safe_open
+
+            out = {}
+            with safe_open(str(path), framework="pt") as f:
+                for key in f.keys():
+                    if "transformer_blocks." not in key:
+                        out[key] = f.get_tensor(key)
+            return out
+
+        _system_module.build_qwenimage_multi_model = _blockless_dit
+        _system_module.load_file = _state_dict_without_blocks
 
     # "mlx" runs the DiT in MLX and keeps every torch tensor on CPU.
     #
@@ -189,7 +252,6 @@ def main() -> None:
     # 7.5 amplifies a cond/uncond difference rather than cancelling it.
     # MPS also made the denoise SLOWER (7.40 vs 4.26 s/step): every step drags
     # the latents MPS -> CPU -> MLX -> CPU -> MPS with a sync at each hop.
-    use_mlx = args.device == "mlx"
     has_mps = torch.backends.mps.is_available()
     device = "cpu" if use_mlx or not has_mps else args.device
     if args.chunk_size is None:
@@ -289,16 +351,6 @@ def main() -> None:
         pipe.system._forward_diffusion_model = _fwd_lean
 
     if use_mlx:
-        # The denoise is 27 transformer blocks run `steps` times; everything
-        # else in this pipeline runs once. Moving just that to MLX is what
-        # turns ~25 min of CPU into ~2 min, without touching the VAE, the text
-        # encoder, the scheduler or the extraction.
-        progress(STAGE, "Swapping the denoiser to MLX (Metal)…")
-        import _cubepart_mlx_bridge
-
-        _cubepart_mlx_bridge.install(pipe.system, weights / "multi_part_dit.safetensors")
-
-    if use_mlx:
         # The text encoder is an 8.9 GB LLM run on CPU, and it is handed one
         # sequence per part SLOT — 9 of them, doubled to 18 by classifier-free
         # guidance. But CubePart pads to 8 parts with "", and the negative
@@ -337,7 +389,69 @@ def main() -> None:
                 idx = torch.tensor([order[p] for p in prompts], device=emb.device)
                 return emb[idx], mask[idx]
 
+        class _CachedEncoder(torch.nn.Module):
+            """The text encoder's one answer, standing in for the encoder.
+
+            Keeps what the pipeline reaches into besides forward() — the chat
+            template's `processor`, `prompt_template_encode`, `hidden_size` —
+            and holds NO weights. A different prompt list is a bug in the
+            replication above, and says so rather than encoding wrongly.
+            """
+
+            def __init__(self, encoder, prompts, states, mask) -> None:
+                super().__init__()
+                self.processor = encoder.processor
+                self.prompt_template_encode = encoder.prompt_template_encode
+                self.hidden_size = int(encoder.hidden_size)
+                self._prompts = list(prompts)
+                self._states = states
+                self._mask = mask
+
+            def forward(self, prompts, *a, **kw):
+                if list(prompts) != self._prompts:
+                    raise RuntimeError(
+                        "CubePart asked for prompts the worker did not pre-encode "
+                        f"({len(prompts)} vs {len(self._prompts)}); the text encoder "
+                        "was released to fit in memory"
+                    )
+                return self._states, self._mask
+
         pipe.system.base_model = _DedupEncoder(pipe.system.base_model)
+
+        # THE TEXT ENCODER IS READ AND DROPPED BEFORE THE DENOISER ARRIVES.
+        # It is an 8.9 GB Qwen3-VL run once per job, at the top of
+        # input_to_part_shape; the 8.6 GB MLX denoiser is needed for every
+        # step after. Holding both is 18.8 GB of weights on a 24 GB Mac —
+        # the number that put every segment run into swap. So the prompts are
+        # built here exactly as the pipeline builds them (pad to 8 parts, the
+        # chat template, the negative prompt doubled on for CFG), encoded now,
+        # and the encoder is replaced by its answer. The pipeline's own call
+        # then costs nothing, and the peak becomes max(encoder, denoiser) +
+        # VAE — MEASURED ~11 GB instead of ~27 GB.
+        progress(STAGE, "Reading the part names…")
+        num_parts = 8
+        padded = list(parts[:num_parts]) + [""] * (num_parts - min(len(parts), num_parts))
+        prompts = pipe.system.apply_part_text_template([padded])
+        if args.guidance_scale > 0.0:
+            prompts = prompts + [pipe.system.default_negative_prompt] * len(prompts)
+        with torch.no_grad():
+            text_states, text_mask = pipe.system.base_model(prompts)
+        pipe.system.base_model = _CachedEncoder(pipe.system.base_model, prompts, text_states, text_mask)
+        gc.collect()
+
+        # The denoise is 27 transformer blocks run `steps` times; everything
+        # else in this pipeline runs once. Moving just that to MLX is what
+        # turns ~25 min of CPU into ~2 min, without touching the VAE, the text
+        # encoder, the scheduler or the extraction.
+        progress(STAGE, "Loading the denoiser into MLX (Metal)…")
+        import _cubepart_mlx_bridge
+
+        _cubepart_mlx_bridge.install(
+            pipe.system,
+            weights / "multi_part_dit.safetensors",
+            num_layers=dit_shape["num_layers"],  # type: ignore[arg-type]
+            multi_index=dit_shape["multi_index"],  # type: ignore[arg-type]
+        )
 
     # Extraction is the largest phase left (~169s of a 335s run at 10 steps),
     # and it looked like the one place Metal was safe: it runs once, after the

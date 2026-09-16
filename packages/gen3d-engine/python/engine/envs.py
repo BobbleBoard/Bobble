@@ -523,7 +523,11 @@ MESHTOOLS_IMPORTS = [
 
 
 #: What the ardy venv must import before it counts as provisioned.
-ARDY_IMPORTS = ("ardy", "torch", "peft", "vector_quantize_pytorch")
+# mlx.core: the text encoder runs in MLX (workers/_llm2vec_mlx.py) — an ardy
+# venv from before that port lacks it and is re-provisioned by this probe.
+ARDY_IMPORTS = ("ardy", "torch", "peft", "vector_quantize_pytorch", "mlx.core")
+# The MLX the encoder was validated on (cosine 0.99993 against PyTorch fp32).
+ARDY_MLX = "mlx==0.32.0"
 
 
 def _provision_ardy(registry: Registry, log) -> None:
@@ -565,11 +569,15 @@ def _provision_ardy(registry: Registry, log) -> None:
     manifest = _prebuilt_manifest(registry)
     wheel = None if manifest is None else registry.prebuilt("darwin-arm64", manifest.get("motionCorrection", ""))
     if wheel is None:
-        _run([uv, "pip", "install", "--python", str(python), "-e", str(tool)], tool, log)
+        _run([uv, "pip", "install", "--python", str(python), "-e", str(tool), ARDY_MLX], tool, log)
         return
     deps = _project_dependencies(tool / "pyproject.toml")
     # pillow: the working venv had it by hand (the worker's texture pass-through).
-    _run([uv, "pip", "install", "--python", str(python), *deps, "pillow", str(wheel)], tool, log)
+    _run(
+        [uv, "pip", "install", "--python", str(python), *deps, "pillow", ARDY_MLX, str(wheel)],
+        tool,
+        log,
+    )
     site = next((tool / ".venv" / "lib").glob("python*/site-packages"), None)
     if site is None:
         raise RuntimeError("the ARDY venv has no site-packages")

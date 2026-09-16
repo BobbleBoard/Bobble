@@ -56,16 +56,30 @@ export interface Pausable {
   readonly neverTerminate?: boolean;
   /** Not heavy on its own: does not put the guard on its fast cadence. */
   readonly light?: boolean;
+  /**
+   * Terminate spares the root and this many levels below it. For a run that
+   * lives under a long-lived server the server is not the run: its own
+   * `cancel` ends the worker, and the signal that follows must not take the
+   * server with it. The 3D sidecar is `uv run` (the root) → the python server
+   * (one level down) → the stage's worker (two down): `spareDepth: 1`.
+   * MEASURED: the first cut killed the sidecar along with a CubePart stage —
+   * twice, the second time sparing only the uv wrapper — and every stage
+   * after it paid a restart.
+   */
+  readonly spareDepth?: number;
 }
 
-/** Every pid under `root`, root first — from one `ps` read. */
-export function processTree(root: number, psOutput?: string): number[] {
+/** Every pid under `root` with its depth (root = 0), root first — from one `ps` read. */
+export function processTreeWithDepth(
+  root: number,
+  psOutput?: string,
+): { pid: number; depth: number }[] {
   let out = psOutput;
   if (out === undefined) {
     try {
       out = execFileSync('ps', ['-axo', 'pid=,ppid='], { encoding: 'utf8', timeout: 2000 });
     } catch {
-      return [root];
+      return [{ pid: root, depth: 0 }];
     }
   }
   const children = new Map<number, number[]>();
@@ -78,19 +92,26 @@ export function processTree(root: number, psOutput?: string): number[] {
     if (list === undefined) children.set(ppid, [pid]);
     else list.push(pid);
   }
-  const seen: number[] = [];
-  const stack = [root];
+  const seen: { pid: number; depth: number }[] = [];
+  const stack = [{ pid: root, depth: 0 }];
   while (stack.length > 0) {
-    const pid = stack.pop() as number;
-    if (seen.includes(pid)) continue;
-    seen.push(pid);
-    for (const c of children.get(pid) ?? []) stack.push(c);
+    const next = stack.pop() as { pid: number; depth: number };
+    if (seen.some((s) => s.pid === next.pid)) continue;
+    seen.push(next);
+    for (const c of children.get(next.pid) ?? []) stack.push({ pid: c, depth: next.depth + 1 });
   }
   return seen;
 }
 
-function signalTree(root: number, signal: NodeJS.Signals): number[] {
-  const pids = processTree(root);
+/** Every pid under `root`, root first — from one `ps` read. */
+export function processTree(root: number, psOutput?: string): number[] {
+  return processTreeWithDepth(root, psOutput).map((s) => s.pid);
+}
+
+function signalTree(root: number, signal: NodeJS.Signals, spareDepth = -1): number[] {
+  const pids = processTreeWithDepth(root)
+    .filter((s) => s.depth > spareDepth)
+    .map((s) => s.pid);
   // Children first for a stop (so a parent cannot spawn a fresh, unstopped
   // child in the gap); the order is immaterial for a kill.
   const ordered = signal === 'SIGSTOP' ? [...pids].reverse() : pids;
@@ -202,7 +223,7 @@ export function createPausables(): PausablesRegistry {
         // uncatchable; a run that does not end here has already ended.
         if (root !== undefined) {
           await new Promise((r) => setTimeout(r, 400));
-          const hit = signalTree(root, 'SIGKILL');
+          const hit = signalTree(root, 'SIGKILL', e.spareDepth ?? -1);
           if (hit.length > 0) log.info('killed', { id: e.id, pids: hit, reason });
         }
         labels.push(e.label);

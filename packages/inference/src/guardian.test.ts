@@ -332,10 +332,37 @@ describe('settle — the pause', () => {
     expect(st.verdict).toBe('calm');
   });
 
-  it('a hold-grade reading keeps a paused job paused', () => {
-    const st = settle(at('hold'), 'pause', 0, AUTO, 0, 4);
-    expect(st.verdict).toBe('pause');
+  it('a hold-grade reading keeps a paused job paused only briefly, then resumes it', () => {
+    // MEASURED 2026-09-16: CubePart paused at "warn" with 27% free stayed in
+    // ps state T for five minutes — its own memory kept the kernel at warn,
+    // so "calm" never came. Hold means start nothing, not stop everything.
+    let st = settle(at('hold'), 'pause', 0, AUTO, 0, 4);
+    expect(st.verdict).toBe('pause'); // 1 of 3
     expect(st.pausedStreak).toBe(4);
+    st = settle(at('hold'), 'pause', st.calmStreak, AUTO, 0, st.pausedStreak);
+    expect(st.verdict).toBe('pause'); // 2 of 3
+    st = settle(at('hold'), 'pause', st.calmStreak, AUTO, 0, st.pausedStreak);
+    expect(st.verdict).toBe('hold'); // resumed; new work still held at the door
+    expect(st.pausedStreak).toBe(0);
+    expect(st.reason).toMatch(/resuming/);
+  });
+
+  it('a pause-line reading in the middle restarts the resume count', () => {
+    let st = settle(at('hold'), 'pause', 0, AUTO, 0, 2);
+    st = settle(at('hold'), 'pause', st.calmStreak, AUTO, 0, st.pausedStreak);
+    expect(st.calmStreak).toBe(2);
+    st = settle(at('pause'), 'pause', st.calmStreak, AUTO, 0, st.pausedStreak);
+    expect(st.verdict).toBe('pause');
+    expect(st.calmStreak).toBe(0);
+    expect(st.pausedStreak).toBe(3);
+  });
+
+  it('hold-grade and calm readings count together toward the resume', () => {
+    let st = settle(at('hold'), 'pause', 0, AUTO, 0, 1);
+    st = settle(at('calm'), 'pause', st.calmStreak, AUTO, 0, st.pausedStreak);
+    expect(st.verdict).toBe('pause'); // 2 of 3
+    st = settle(at('hold'), 'pause', st.calmStreak, AUTO, 0, st.pausedStreak);
+    expect(st.verdict).toBe('hold');
   });
 
   it('a pause that does not bring the memory back becomes a shed', () => {

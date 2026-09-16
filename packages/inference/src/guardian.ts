@@ -73,9 +73,11 @@ export interface GuardianLimits {
   /** Readings a pause may stand before it becomes a shed — the pause did not
    * bring the memory back, so the job goes. */
   readonly pausedReadingsBeforeShed: number;
-  /** Consecutive calm readings before a PAUSED job is resumed (shorter than a
-   * hold's recovery: a stopped process costs the person nothing to wait on,
-   * and a resume that turns out early just pauses again). */
+  /** Consecutive readings OFF the pause line (hold-grade or calm) before a
+   * PAUSED job is resumed — shorter than a hold's recovery: a stopped process
+   * costs the person nothing to wait on, and a resume that turns out early
+   * just pauses again. Not "calm": a paused job's own memory keeps the
+   * machine on hold, and waiting for calm was a pause that never lifted. */
   readonly resumeReadings: number;
   /**
    * "Tight" for the two corroborated sheds (heavy swap, a main-thread stall):
@@ -155,8 +157,17 @@ export function limitsFor(mode: PowerMode): GuardianLimits {
     stallMs: 1500,
     thrashingPagesPerSec: 2000,
     recoveryReadings: 4,
-    hotReadings: 4,
-    hotReadingsWithRoom: 20,
+    /*
+     * IN READINGS AT THE BUSY CADENCE (500 ms). These were 4 and 20 at one
+     * reading a second; halving the interval halved the seconds they stood
+     * for, and MEASURED: CubePart moving its 9.9 GB pipeline into MLX swaps at
+     * 25-33k pages/s for a good fifteen seconds with 40% free — a load, and
+     * it was ended at ten. The wall-clock meaning is what was calibrated, so
+     * the counts follow the cadence: a burst without room gets 4 s, one with
+     * room 20 s.
+     */
+    hotReadings: 8,
+    hotReadingsWithRoom: 40,
   };
 }
 
@@ -330,14 +341,36 @@ export function settle(
     };
   }
   if (next.verdict === 'hold') {
-    // A paused job stays paused through a hold-grade reading: not calm yet.
+    /*
+     * OFF THE PAUSE LINE IS ENOUGH TO RESUME. A hold means "start nothing
+     * heavy", never "stop what runs" — the job ran under hold-grade readings
+     * before it was paused, and it can again. Waiting for CALM here was a
+     * deadlock: the paused job's own memory is what keeps the kernel at
+     * "warn", so calm never comes while it is stopped. MEASURED (2026-09-16,
+     * CubePart through the app): paused at 27% free, "warn" for the next
+     * five minutes with 34% free, no resume, no shed — the stage sat in
+     * ps state T until the app was killed. The pause-line readings are the
+     * freeze signals; when they are gone for `resumeReadings` readings the
+     * job goes on, and if it drags the machine back onto the line it is
+     * paused again (and shed if the pause then does not lift).
+     */
     if (previous === 'pause') {
+      const streak = calmStreak + 1;
+      if (streak >= limits.resumeReadings) {
+        return {
+          verdict: 'hold',
+          calmStreak: 0,
+          hotStreak: 0,
+          pausedStreak: 0,
+          reason: `${next.reason}; off the pause line, resuming`,
+        };
+      }
       return {
         verdict: 'pause',
-        calmStreak: 0,
+        calmStreak: streak,
         hotStreak: 0,
         pausedStreak,
-        reason: `${next.reason}; still paused`,
+        reason: `${next.reason}; still paused (${streak}/${limits.resumeReadings})`,
       };
     }
     if (next.hot === true) {

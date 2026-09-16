@@ -27,6 +27,7 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  rmSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
@@ -41,7 +42,9 @@ const IMAGE =
   process.env.IMAGE ?? path.join(homedir(), 'Bobble/generated/a-blue-mug/cand0_seed602697309.png');
 const MANNEQUIN = process.env.MANNEQUIN ?? '';
 const STAGES = (process.env.STAGES ?? 'texture,segment,retopo,rig,motion').split(',');
-const MODELS = (process.env.MODELS ?? 'trellis2,cubepart,autoremesher,humanoid-rig,ardy-motion,mageflow')
+const MODELS = (
+  process.env.MODELS ?? 'trellis2,cubepart,autoremesher,humanoid-rig,ardy-motion,mageflow'
+)
   .split(',')
   .filter(Boolean);
 if (!existsSync(MODEL_GLB)) throw new Error(`no model at ${MODEL_GLB}`);
@@ -254,8 +257,8 @@ try {
       const v = which === 'source' ? asset?.versions?.[0] : asset?.versions?.at(-1);
       return asset && v ? { assetId: asset.id, versionId: v.id, diskPath: v.diskPath } : null;
     }, which);
-    check(origin !== null && origin.diskPath, `${op}: a loaded version on disk to act on`);
-    if (origin === null || !origin.diskPath) return null;
+    check(Boolean(origin?.diskPath), `${op}: a loaded version on disk to act on`);
+    if (!origin?.diskPath) return null;
     await page.evaluate(() => {
       window.__jobs = [];
       window.piDesktop.onEvent('gen3d:job', (u) => window.__jobs.push({ ...u, at: Date.now() }));
@@ -285,7 +288,7 @@ try {
       const latest = jobs.at(-1);
       if (latest && (last === null || latest.message !== last.message)) {
         console.log(
-          `  ${at()} ${label}: ${latest.stage} ${latest.message} ${Math.round((latest.overallPercent ?? 0) * 100)}%`,
+          `  ${at()} ${label}: ${latest.stage} ${latest.message} ${Math.round(latest.overallPercent ?? 0)}%`,
         );
         last = latest;
       }
@@ -381,4 +384,8 @@ try {
   console.log(`${at()} TOTAL`);
 } finally {
   await finish();
+  // THE HOME IS 10 GB (three torch venvs) AND IT GOES. Six of these left
+  // behind filled the disk to 181 MB free — a full disk is where swap stops
+  // growing, which is worse than any memory number. KEEP_HOME=1 to inspect.
+  if (process.env.KEEP_HOME !== '1') rmSync(home, { recursive: true, force: true });
 }
