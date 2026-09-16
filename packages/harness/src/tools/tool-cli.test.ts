@@ -518,6 +518,25 @@ describe('svg — a group whose one tool IS the command', () => {
       args: { prompt: 'a gear icon, single colour', out: 'assets/gear.svg' },
     });
   });
+
+  it('reads a file name among the positionals as the output', () => {
+    /* MEASURED on a 4B: `svg "--prompt=a bicycle" bicycle.svg` — the name it
+       gave was the prompt slot's, the file landed in Generated, and two cp
+       calls followed. A word with an extension is a path, not a prompt. */
+    expect(call('svg --prompt=a_bicycle bicycle.svg')).toMatchObject({
+      kind: 'call',
+      args: { prompt: 'a_bicycle', out: 'bicycle.svg' },
+    });
+    expect(call('svg a red heart heart.svg')).toMatchObject({
+      kind: 'call',
+      args: { prompt: 'a red heart', out: 'heart.svg' },
+    });
+    // On its own a file name is still the prompt slot's — nothing else fills it.
+    expect(call('svg bicycle.svg')).toMatchObject({
+      kind: 'call',
+      args: { prompt: 'bicycle.svg' },
+    });
+  });
 });
 
 describe('a one-command group named by its group word', () => {

@@ -38,7 +38,9 @@ from pathlib import Path
 HERE = Path(__file__).parent
 sys.path.insert(0, str(HERE))
 
-KINDS = ("pptx", "docx", "xlsx", "pdf")
+KINDS = ("pptx", "docx", "xlsx", "pdf", "chart")
+# A chart is an .svg (chart_render.py); every other kind's extension is its name.
+EXT = {"chart": "svg"}
 OUTLINE_LINES = 80
 
 
@@ -55,15 +57,41 @@ def fail(error: str, **extra) -> None:
     emit({"ok": False, "error": error, **extra}, 1)
 
 
+KIND_WORDS = (
+    ("pptx", r"\b(pptx|powerpoint|slides?|slide deck|deck|presentation|keynote)\b"),
+    ("docx", r"\b(docx|word document|word doc|word file|\.doc|memo|letter|report|document)\b"),
+    ("xlsx", r"\b(xlsx|excel|spreadsheet|workbook|sheet)\b"),
+    ("pdf", r"\bpdf\b"),
+    ("chart", r"\b(bar|line|pie|donut)\s*(chart|graph)|\bchart\b|\bgraph of\b"),
+)
+
+
+def infer_kind(brief: str, out: str | None) -> str | None:
+    """The kind an --out extension or the brief's own words name, else None."""
+    import re
+    if out:
+        ext = Path(out).suffix.lower().lstrip(".")
+        if ext == "svg":
+            return "chart"
+        if ext in KINDS:
+            return ext
+    low = brief.lower()
+    hits = [k for k, pat in KIND_WORDS if re.search(pat, low)]
+    # "chart" inside a deck brief is a slide, not the kind; the first explicit
+    # format word wins, and a lone chart word means a chart.
+    return hits[0] if hits else None
+
+
 def resolve_out(out: str | None, kind: str, brief: str) -> Path:
     """`--out` as given (extension corrected), else a name from the brief in cwd."""
+    ext = EXT.get(kind, kind)
     if out:
         p = Path(out).expanduser()
-        if p.suffix.lower() != f".{kind}":
-            p = p.with_suffix(f".{kind}")
+        if p.suffix.lower() != f".{ext}":
+            p = p.with_suffix(f".{ext}")
         return p.resolve()
     stem = "".join(c if c.isalnum() else "-" for c in brief.lower())[:48].strip("-") or "document"
-    return (Path.cwd() / f"{stem}.{kind}").resolve()
+    return (Path.cwd() / f"{stem}.{ext}").resolve()
 
 
 def outline_of(path: Path, kind: str) -> str:
@@ -103,6 +131,16 @@ def summary_of(kind: str, spec: dict) -> str:
                 line += f" [{_one(body, 80)}]"
             out.append(line)
         return "\n".join(out)
+    if kind == "chart":
+        series = spec.get("series") or []
+        pts = sum(len(s.get("points") or []) for s in series if isinstance(s, dict))
+        first = series[0] if series and isinstance(series[0], dict) else {}
+        labels = ", ".join(str(p.get("label")) for p in (first.get("points") or [])[:8] if isinstance(p, dict))
+        return "\n".join(x for x in [
+            f"{spec.get('type', 'bar')} chart: {_one(spec.get('title', ''), 70)}",
+            f"{len(series)} series, {pts} points — {labels}",
+            f"highlight: {spec.get('highlight')}" if spec.get("highlight") else "",
+        ] if x)
     if kind == "xlsx":
         kpis = ", ".join(f'{k.get("value")} {k.get("label")}' for k in spec.get("kpis", []) if isinstance(k, dict))
         headers = " | ".join(str(h) for h in spec.get("headers", []))
@@ -151,6 +189,25 @@ def slides_in(brief: str) -> int | None:
         heads = [int(x) for x in re.findall(r"\bslide\s+(\d{1,2})\b", brief, re.I)]
         if heads and max(heads) == len(set(heads)):
             n = max(heads)
+    if n is None:
+        # A STRUCTURED brief — {"slides": [ {...}, {...}, {...}, {...} ]} — is
+        # its own count. MEASURED on a 4B asked for a four-slide deck: it wrote
+        # exactly four slide objects, the default made eight, and it then
+        # spent twelve minutes editing the eight down. The objects are the ask.
+        t = brief.strip()
+        if t.startswith("{"):
+            try:
+                obj = json.loads(t)
+                slides = obj.get("slides") if isinstance(obj, dict) else None
+                if isinstance(slides, list) and slides:
+                    n = len(slides)
+            except json.JSONDecodeError:
+                pass
+        if n is None:
+            # …or a numbered list of slide-like headings ("1. Title", "4. Summary").
+            numbered = [int(x) for x in re.findall(r"^\s*(\d{1,2})[.)]\s+\S", brief, re.M)]
+            if numbered and max(numbered) == len(set(numbered)) and 3 <= max(numbered) <= 24:
+                n = max(numbered)
     return n if n and 3 <= n <= 24 else None
 
 
@@ -196,6 +253,17 @@ def make(kind: str, brief: str, out: Path, slides: int | None) -> dict:
         render_deck.build(spec, out)
         design = {"theme": spec["theme"]}
         items = len(filled)
+    elif kind == "chart":
+        # A chart of DATA: the brief's numbers, drawn (chart_render.py) — never
+        # a generated picture, which cannot put a value on an axis.
+        import chart_render
+        import make_chart
+        spec = retry(lambda: make_chart.spec_from_brief(brief), "chart")
+        info = chart_render.render(spec, out)
+        # The spec beside the file is what `office edit chart.svg` revises.
+        out.with_suffix(".chart.json").write_text(json.dumps(chart_render.normalise(spec), indent=1))
+        design = {"palette": spec.get("palette", {}), "chart": info["type"]}
+        items = info["points"]
     else:
         import make_doc
         spec = retry(lambda: make_doc.generate(kind, brief), "spec")
@@ -210,7 +278,7 @@ def make(kind: str, brief: str, out: Path, slides: int | None) -> dict:
         items = len(spec.get("blocks", spec.get("rows", [])))
     from scratch import scratch_dir
     (scratch_dir() / f"last_{kind}_spec.json").write_text(json.dumps(spec, indent=1))
-    if not out.exists() or out.stat().st_size < 1024:
+    if not out.exists() or out.stat().st_size < (512 if kind == "chart" else 1024):
         raise RuntimeError(f"the renderer wrote nothing usable at {out}")
     return {
         "ok": True,
@@ -226,7 +294,26 @@ def make(kind: str, brief: str, out: Path, slides: int | None) -> dict:
 
 
 # ── edit ─────────────────────────────────────────────────────────────────────
+def edit_chart(src: Path, instruction: str, out: Path | None) -> dict:
+    """Revise the spec beside the chart and draw it again."""
+    import chart_render
+    import make_chart
+    t0 = time.time()
+    side = src.with_suffix(".chart.json")
+    if not side.exists():
+        raise RuntimeError(f"{src.name} was not made by `office make chart` (no {side.name} beside it) — make it again with the changed brief")
+    spec = chart_render.normalise(json.loads(side.read_text()))
+    revised = retry(lambda: make_chart.revise(spec, instruction), "chart-edit")
+    dst = out or src
+    info = chart_render.render(revised, dst)
+    dst.with_suffix(".chart.json").write_text(json.dumps(chart_render.normalise(revised), indent=1))
+    return {"ok": True, "kind": "chart", "path": str(dst), "bytes": info["bytes"], "items": info["points"],
+            "seconds": round(time.time() - t0, 1), "summary": summary_of("chart", chart_render.normalise(revised))}
+
+
 def edit(src: Path, instruction: str, out: Path | None) -> dict:
+    if src.suffix.lower() == ".svg":
+        return edit_chart(src, instruction, out)
     import make_edit
     import office_edit
     t0 = time.time()
@@ -278,6 +365,11 @@ def edit(src: Path, instruction: str, out: Path | None) -> dict:
 
 # ── inspect ──────────────────────────────────────────────────────────────────
 def inspect(src: Path) -> dict:
+    if src.suffix.lower() == ".svg":
+        side = src.with_suffix(".chart.json")
+        if side.exists():
+            return {"ok": True, "kind": "chart", "path": str(src), "outline": summary_of("chart", json.loads(side.read_text()))}
+        raise RuntimeError(f"{src.name} is not a chart made here (no {side.name} beside it)")
     import office_edit
     kind = office_edit.kind_of(src)
     if kind not in office_edit.INSPECT:
@@ -289,7 +381,11 @@ def main(argv: list[str]) -> None:
     ap = argparse.ArgumentParser(prog="office", add_help=True)
     sub = ap.add_subparsers(dest="cmd", required=True)
     m = sub.add_parser("make")
-    m.add_argument("kind", choices=KINDS)
+    # The kind is a positional, but a brief that names the format ("a Word
+    # document (docx)", "a 4-slide deck") or an --out with an extension says it
+    # too — MEASURED, a 4B wrote `office make --brief="…docx…"` and was sent
+    # back for a word it had already given.
+    m.add_argument("kind", nargs="?", choices=KINDS)
     m.add_argument("--brief", required=True)
     m.add_argument("--out")
     m.add_argument("--slides", type=int)
@@ -306,7 +402,11 @@ def main(argv: list[str]) -> None:
             if len(brief) < 12:
                 fail("the brief is too short to make anything from — say what the document is "
                      "about and give it the real content: names, numbers, sections.")
-            emit(make(a.kind, brief, resolve_out(a.out, a.kind, brief), a.slides))
+            kind = a.kind or infer_kind(brief, a.out)
+            if kind is None:
+                fail("office make needs a kind: one of " + ", ".join(KINDS) +
+                     " — `office make docx --brief …` (or name it in --out: report.docx).")
+            emit(make(kind, brief, resolve_out(a.out, kind, brief), a.slides))
         elif a.cmd == "edit":
             src = Path(a.file).expanduser().resolve()
             if not src.is_file():

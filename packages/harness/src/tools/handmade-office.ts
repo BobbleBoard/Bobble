@@ -35,7 +35,7 @@
  * away and the heredoc is exactly the reflex this exists to interrupt.
  */
 
-export type OfficeKind = 'pptx' | 'docx' | 'xlsx' | 'pdf';
+export type OfficeKind = 'pptx' | 'docx' | 'xlsx' | 'pdf' | 'chart';
 
 /** Drives a library that writes the format — not one that merely reads it. */
 const OFFICE_LIBS = [
@@ -106,6 +106,7 @@ const NOUN: Record<OfficeKind, string> = {
   docx: 'a document',
   xlsx: 'a workbook',
   pdf: 'a PDF',
+  chart: 'a chart',
 };
 
 /**

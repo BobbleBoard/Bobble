@@ -31,6 +31,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ExtensionAPI } from '@mariozechner/pi-coding-agent';
+import { serverCanSeeImages } from '@pi-desktop/provider-llamacpp';
 import { Type } from '@sinclair/typebox';
 import { utilityEndpointFromEnv } from '../model-call/call-model.js';
 import type { PresentBridge } from './present.js';
@@ -49,7 +50,7 @@ export const OFFICE_GEN_SCRATCH_ENV = 'PI_OFFICE_GEN_SCRATCH';
 /** The model server, as the scripts read it. Derived from the utility endpoint. */
 export const OFFICE_GEN_SERVER_ENV = 'PI_OFFICE_GEN_SERVER';
 
-const KINDS = ['pptx', 'docx', 'xlsx', 'pdf'] as const;
+const KINDS = ['pptx', 'docx', 'xlsx', 'pdf', 'chart'] as const;
 export type OfficeKind = (typeof KINDS)[number];
 
 /** A 24-slide deck on a 9B is minutes, not seconds. */
@@ -64,6 +65,8 @@ export interface OfficeResult {
   bytes?: number;
   items?: number;
   theme?: string;
+  /** kind chart: bar | hbar | line | donut. */
+  chart?: string;
   palette?: { primary?: string; accent?: string };
   seconds?: number;
   warnings?: string[];
@@ -241,10 +244,32 @@ function resolveAgainst(root: string, p: string | undefined): string | undefined
   return path.isAbsolute(expanded) ? expanded : path.join(root, expanded);
 }
 
+/*
+ * THE CHECK IS AGAINST THE USER'S ASK, NOT AGAINST THE DRAFT. MEASURED on a
+ * 4B asked for a 4-slide deck: its `write deck.pptx` (slide text as content)
+ * made a good four-slide deck on the first call — and then, reading "wording
+ * wrong?" here, it spent twelve minutes and twenty-eight more calls editing
+ * the deck's outline to match the JSON it had drafted, never replied, and
+ * never showed the user anything. The pipeline's wording and structure ARE
+ * the deliverable; a difference from the model's own draft is the design
+ * doing its job. So the line names what to compare with (the request) and
+ * says that the draft is not it.
+ */
 const CHECK_LINE =
-  'Read the summary against what was asked — the numbers, the names, the order — and look at the capture as the user will. Wording wrong? `office edit` fixes wording, style, position, slide order. Content missing? Make it again with a fuller brief. Then tell the user where the file is.';
+  "Check the summary against what the USER asked for — the facts, the numbers, the names, the order (and the capture, when one is attached). The layout, headings and phrasing are the pipeline's design and will differ from your draft; that is not an error and is not to be edited back. If the ask is met, you are done: tell the user where the file is (it is already open for them). Only something the user asked for and is missing or wrong needs `office edit` (one precise change) or a fuller brief.";
 
-/** Show the file in the canvas and fetch its capture, when the app is there. */
+/**
+ * Show the file in the canvas and fetch its capture, when the app is there.
+ *
+ * THE CAPTURE ONLY WHEN THE MODEL CAN SEE IT. On a text-only server the
+ * provider swaps every image for a note telling the model to say it cannot
+ * see images — the right note for a screenshot it was counting on, and the
+ * wrong one here: MEASURED, three deep tasks in a row opened their reply to
+ * the user with "I cannot see images since I'm in text-only mode" about a
+ * file the user was already looking at. The capture is a courtesy check; a
+ * blind model is simply not sent one, and the check line stops asking it to
+ * look.
+ */
 async function presentFile(
   bridge: PresentBridge | null,
   filePath: string,
@@ -252,11 +277,13 @@ async function presentFile(
 ): Promise<{ shown: string; image?: { data: string; mimeType: string } }> {
   if (bridge === null) return { shown: '' };
   const shown = await bridge.show({ path: filePath, note });
+  const shownText = shown.ok
+    ? ' It is open in the canvas beside the chat.'
+    : ` (the canvas could not open it: ${shown.error ?? 'unknown'})`;
+  if (!serverCanSeeImages()) return { shown: shownText };
   const preview = await bridge.preview({ path: filePath, kind: 'office' });
   return {
-    shown: shown.ok
-      ? ' It is open in the canvas beside the chat.'
-      : ` (the canvas could not open it: ${shown.error ?? 'unknown'})`,
+    shown: shownText,
     ...(preview.imageBase64 !== undefined
       ? { image: { data: preview.imageBase64, mimeType: preview.mimeType ?? 'image/png' } }
       : {}),
@@ -335,6 +362,32 @@ function errorResult(text: string): { content: Content; isError: true; details: 
   return { content: [{ type: 'text', text }], isError: true, details: undefined };
 }
 
+/**
+ * The kind an `out` extension or the brief's own words name. MEASURED on a
+ * 4B: `office make --brief="One-page memo … as a Word document (docx) …"` —
+ * refused for a missing kind it had already written twice. The first format
+ * word wins, so a deck "with a bar chart" is a deck; a lone chart word is a
+ * chart. Mirrors infer_kind in tools/office-gen/office.py.
+ */
+const KIND_WORDS: readonly (readonly [OfficeKind, RegExp])[] = [
+  ['pptx', /\b(pptx|powerpoint|slides?|slide deck|deck|presentation|keynote)\b/],
+  ['docx', /\b(docx|word document|word doc|word file|memo|letter|report|document)\b/],
+  ['xlsx', /\b(xlsx|excel|spreadsheet|workbook|sheet)\b/],
+  ['pdf', /\bpdf\b/],
+  ['chart', /\b(bar|line|pie|donut)\s*(chart|graph)|\bchart\b|\bgraph of\b/],
+];
+
+export function inferOfficeKind(brief: string, out: string | undefined): OfficeKind | null {
+  if (out !== undefined) {
+    const ext = path.extname(out).toLowerCase().replace(/^\./, '');
+    if (ext === 'svg') return 'chart';
+    if ((KINDS as readonly string[]).includes(ext)) return ext as OfficeKind;
+  }
+  const low = brief.toLowerCase();
+  for (const [kind, re] of KIND_WORDS) if (re.test(low)) return kind;
+  return null;
+}
+
 export function registerOfficeTools(pi: ExtensionAPI, deps: OfficeToolDeps): void {
   const env = deps.env ?? process.env;
 
@@ -342,22 +395,29 @@ export function registerOfficeTools(pi: ExtensionAPI, deps: OfficeToolDeps): voi
     name: OFFICE_MAKE_TOOL,
     label: 'Office: make',
     description:
-      'Make a real .pptx slide deck, .docx document, .xlsx workbook or .pdf from a brief — designed ' +
-      'layouts, fitted type, charts drawn as shapes — through the on-device document pipeline. ' +
-      'Every request for a deck, a presentation, a report, a memo, a spreadsheet or a PDF goes here; ' +
-      'never write these with python-pptx, python-docx, openpyxl, reportlab or by assembling the XML. ' +
-      'The brief is the whole content: put in it every fact, number, name and section the file ' +
-      'should contain, in order — the pipeline writes only what the brief gives it and invents ' +
-      'nothing. It returns a slide-by-slide (or block-by-block) summary and opens the file in the ' +
-      'canvas. For changes to a file that exists, use office_edit.',
-    promptSnippet: 'office_make: a deck, document, workbook or PDF from a brief (on-device)',
+      'Make a real .pptx slide deck, .docx document, .xlsx workbook, .pdf — or a standalone chart ' +
+      '(.svg) of DATA — from a brief: designed layouts, fitted type, charts drawn from their ' +
+      'numbers, through the on-device document pipeline. Every request for a deck, a presentation, ' +
+      'a report, a memo, a spreadsheet, a PDF, or a bar/line/pie chart of some numbers goes here; ' +
+      'never write these with python-pptx, python-docx, openpyxl, reportlab, matplotlib or by ' +
+      'assembling the XML, and never ask image generation for a chart (a painted picture cannot ' +
+      'put a value on an axis). The brief is the whole content: put in it every fact, number, ' +
+      'name and section the file should contain, in order — the pipeline writes only what the ' +
+      'brief gives it and invents nothing. It returns a slide-by-slide (or block-by-block) summary ' +
+      'and opens the file in the canvas. For changes to a file that exists, use office_edit.',
+    promptSnippet:
+      'office_make: a deck, document, workbook, PDF or data chart from a brief (on-device)',
     promptGuidelines: [
       'Decks, reports, memos, spreadsheets and PDFs are made with office_make from a brief that carries all the content — never with python-pptx, python-docx, openpyxl or hand-written XML.',
+      'A chart of data (bars, a line, a pie) is office_make with kind chart and the numbers in the brief — it is drawn from them; never a generated image, never matplotlib.',
     ],
     parameters: Type.Object({
       kind: Type.Union(
         KINDS.map((k) => Type.Literal(k)),
-        { description: 'pptx (slides), docx (document), xlsx (workbook) or pdf.' },
+        {
+          description:
+            'pptx (slides), docx (document), xlsx (workbook), pdf, or chart (one bar/hbar/line/donut chart of data, as .svg).',
+        },
       ),
       brief: Type.String({
         description:
@@ -375,11 +435,16 @@ export function registerOfficeTools(pi: ExtensionAPI, deps: OfficeToolDeps): voi
     }),
     async execute(_id, params, signal, onUpdate, ctx) {
       const p = params as { kind?: unknown; brief?: unknown; out?: unknown; slides?: unknown };
-      const kind = typeof p.kind === 'string' ? p.kind.toLowerCase().replace(/^\./, '') : '';
-      if (!(KINDS as readonly string[]).includes(kind)) {
-        return errorResult(`office_make needs a kind: one of ${KINDS.join(', ')}.`);
-      }
       const brief = typeof p.brief === 'string' ? p.brief.trim() : '';
+      const given = typeof p.kind === 'string' ? p.kind.toLowerCase().replace(/^\./, '') : '';
+      const kind = (KINDS as readonly string[]).includes(given)
+        ? given
+        : inferOfficeKind(brief, typeof p.out === 'string' ? p.out : undefined);
+      if (kind === null) {
+        return errorResult(
+          `office_make needs a kind: one of ${KINDS.join(', ')} — or name it in the brief ("a Word document") or in out (report.docx).`,
+        );
+      }
       const thin = briefTooThin(brief);
       if (thin !== null) return errorResult(`office_make needs a brief. ${thin}`);
       const root = deps.root(ctx?.cwd);
@@ -416,7 +481,9 @@ export function registerOfficeTools(pi: ExtensionAPI, deps: OfficeToolDeps): voi
             ? 'a workbook'
             : kind === 'pdf'
               ? `a PDF (${r.items ?? '?'} blocks)`
-              : `a document (${r.items ?? '?'} blocks)`;
+              : kind === 'chart'
+                ? `a ${r.chart ?? ''} chart (${r.items ?? '?'} points)`
+                : `a document (${r.items ?? '?'} blocks)`;
       const shown = await presentFile(deps.bridge, r.path, `${what} — made from your brief`);
       const warn =
         r.warnings !== undefined && r.warnings.length > 0
@@ -436,7 +503,7 @@ export function registerOfficeTools(pi: ExtensionAPI, deps: OfficeToolDeps): voi
     name: OFFICE_EDIT_TOOL,
     label: 'Office: edit',
     description:
-      'Change an existing .pptx, .docx or .xlsx in place through the document pipeline: reword ' +
+      'Change an existing .pptx, .docx, .xlsx (or a chart .svg made here) in place through the document pipeline: reword ' +
       'text, restyle it (size, bold, colour), move or resize a shape, delete one, delete, duplicate ' +
       'or reorder slides, set cells and formats. Say WHICH slide, paragraph or cell and WHAT it ' +
       'should become — office_inspect shows the ids. It cannot add new slides or paragraphs of ' +
@@ -445,7 +512,7 @@ export function registerOfficeTools(pi: ExtensionAPI, deps: OfficeToolDeps): voi
     promptSnippet:
       'office_edit: change wording, style, layout or slide order in an existing office file',
     parameters: Type.Object({
-      file: Type.String({ description: 'The .pptx/.docx/.xlsx to change.' }),
+      file: Type.String({ description: 'The .pptx/.docx/.xlsx (or chart .svg) to change.' }),
       instruction: Type.String({
         description:
           'The change, precisely: which slide/paragraph/cell, and the new text or style.',
@@ -485,7 +552,10 @@ export function registerOfficeTools(pi: ExtensionAPI, deps: OfficeToolDeps): voi
       const content: Content = [
         {
           type: 'text',
-          text: `Applied ${r.ops ?? 0} change(s) to ${r.path}: ${(r.applied ?? []).join('; ')}.${shown.shown}${missed}\n\nWhat is in it now:\n${r.outline ?? ''}\n\n${CHECK_LINE}`,
+          text:
+            r.kind === 'chart'
+              ? `Redrew the chart at ${r.path} with that change.${shown.shown}\n\nWhat is in it now:\n${r.summary ?? ''}\n\n${CHECK_LINE}`
+              : `Applied ${r.ops ?? 0} change(s) to ${r.path}: ${(r.applied ?? []).join('; ')}.${shown.shown}${missed}\n\nWhat is in it now:\n${r.outline ?? ''}\n\n${CHECK_LINE}`,
         },
       ];
       if (shown.image !== undefined) {
@@ -499,7 +569,7 @@ export function registerOfficeTools(pi: ExtensionAPI, deps: OfficeToolDeps): voi
     name: OFFICE_INSPECT_TOOL,
     label: 'Office: inspect',
     description:
-      'Outline an existing .pptx, .docx or .xlsx: every slide, shape, paragraph or cell with its id, ' +
+      'Outline an existing .pptx, .docx, .xlsx or chart .svg made here: every slide, shape, paragraph or cell with its id, ' +
       'text, size and colour. This is how to READ an office file — never `read` it (that returns ' +
       'zip bytes) and never unzip it. The ids are what office_edit takes.',
     promptSnippet: 'office_inspect: read an office file as an outline with ids',
@@ -650,7 +720,7 @@ export function withOfficeFormats(
           r.path,
           `${NOUN[kind]} — made from what you wrote`,
         );
-        const text = `${raw} is ${NOUN[kind]}, so the text you wrote became the BRIEF and the document pipeline made the file: ${r.path} (${kb(r.bytes)}, ${r.items ?? '?'} ${kind === 'pptx' ? 'slides' : 'blocks'}, ${r.seconds ?? '?'}s).${shown.shown}\n\n${r.summary ?? ''}\n\n${CHECK_LINE} The file EXISTS now — do not write the same content again; a wording change is office_edit, and only a brief that says something different is worth making again.`;
+        const text = `${raw} is ${NOUN[kind]}, so the text you wrote became the BRIEF and the document pipeline made the file: ${r.path} (${kb(r.bytes)}, ${r.items ?? '?'} ${kind === 'pptx' ? 'slides' : 'blocks'}, ${r.seconds ?? '?'}s).${shown.shown}\n\n${r.summary ?? ''}\n\n${CHECK_LINE} The file EXISTS and is finished — do not write it again, and do not edit it to resemble the text you wrote: that text was the brief, and this designed file is what it became.`;
         lastMade.set(file, { brief: content, text });
         const content2: Content = [{ type: 'text', text }];
         if (shown.image !== undefined) content2.push({ type: 'image', ...shown.image });
@@ -695,4 +765,5 @@ const NOUN: Record<OfficeKind, string> = {
   docx: 'a document',
   xlsx: 'a workbook',
   pdf: 'a PDF',
+  chart: 'a chart',
 };

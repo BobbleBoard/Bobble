@@ -521,6 +521,25 @@ export function resolveCli(cli: CliModel, argv: readonly string[]): CliResolutio
       spare = spare.filter((a) => a !== bracketed);
     }
   }
+  /*
+   * A FILE NAME AMONG THE POSITIONALS IS THE OUTPUT. MEASURED on a 4B:
+   * `svg "--prompt=a bicycle…" bicycle.svg` — the name it gave was joined
+   * into the prompt slot, the drawing landed in Generated under the tool's
+   * own name, and two `cp` calls (the first to a folder that did not exist)
+   * moved it where the model had asked for it in the first place. A word
+   * ending in an extension is a path, never a prompt: where the tool has an
+   * `out` and something else fills the prompt, the path fills `out`.
+   */
+  if (props.out !== undefined && args.out === undefined) {
+    const looksLikePath = (a: string) => /^[^\s"']+\.[A-Za-z0-9]{2,5}$/.test(a);
+    const at = spare.findIndex(looksLikePath);
+    const firstKey = positionalKeys(schema, 1)[0];
+    const promptFilled = firstKey !== undefined && firstKey !== 'out' && args[firstKey] !== undefined;
+    if (at >= 0 && (promptFilled || spare.length > 1)) {
+      args.out = spare[at];
+      spare = spare.filter((_a, i) => i !== at);
+    }
+  }
   if (spare.length > 0) {
     const keys = positionalKeys(schema, spare.length).filter((k) => args[k] === undefined);
     const raw: Record<string, string> = {};

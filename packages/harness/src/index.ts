@@ -135,6 +135,7 @@ import { detectOpenedApp, openDidNotHappen, openedAppNote } from './tools/opened
 import { registerPlanTool } from './tools/plan-tool.js';
 import { PRESENT_TOOL_NAME, registerPresentTool } from './tools/present.js';
 import { presentBridgeFromEnv } from './tools/present-bridge.js';
+import { rawPageFetchRefusal, rawPageFetchUrl } from './tools/raw-page-fetch.js';
 import { withRepeatNotice } from './tools/repeat-notice.js';
 import {
   registerSandboxFileTools,
@@ -3763,6 +3764,19 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
             block: true,
             reason: handmadeOfficeRefusal(handmadeOffice, { cli: toolCliMode }),
           };
+        }
+        /*
+         * …AND A PAGE READ WITH curl WHILE `web fetch` IS ONE COMMAND AWAY —
+         * see raw-page-fetch.ts. MEASURED: four `curl … | grep height` calls
+         * on the Eiffel Tower's Wikipedia page, kilobytes of markup each, and
+         * a twelve-minute turn with no answer.
+         */
+        if (pi.getAllTools().some((t) => t.name === 'web_fetch')) {
+          const page = rawPageFetchUrl(cmd);
+          if (page !== null) {
+            pi.appendEntry(HARNESS_LOOP_ENTRY, { action: 'block', cause: 'raw-page-fetch' });
+            return { block: true, reason: rawPageFetchRefusal(page, { cli: toolCliMode }) };
+          }
         }
       }
     }

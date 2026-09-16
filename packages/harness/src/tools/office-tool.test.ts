@@ -3,6 +3,7 @@ import { CAPABILITIES } from '../presets/capabilities.js';
 import {
   editsAsInstruction,
   OFFICE_MAKE_TOOL,
+  inferOfficeKind,
   OFFICE_TOOL_NAMES,
   registerOfficeTools,
   runOffice,
@@ -345,5 +346,22 @@ describe('the same brief twice is not made twice', () => {
       content: `${content}\n## Slide 4: D — the Q4 plan: a second counter, a holiday menu, two hires\n## Slide 5: E — staff turnover 22% to 11%`,
     });
     expect(spawned).toHaveLength(2);
+  });
+});
+
+describe('inferOfficeKind — the kind the brief already names', () => {
+  it('reads the format out of the brief or the out path', () => {
+    // MEASURED on a 4B: `office make --brief="One-page memo … as a Word
+    // document (docx) …"` was refused for a missing kind it had written twice.
+    expect(inferOfficeKind('One-page memo to the team as a Word document (docx)', undefined)).toBe(
+      'docx',
+    );
+    expect(inferOfficeKind('a 4-slide presentation about solar with a bar chart', undefined)).toBe(
+      'pptx',
+    );
+    expect(inferOfficeKind('units sold by year, bar chart', undefined)).toBe('chart');
+    expect(inferOfficeKind('quarterly figures', 'q.xlsx')).toBe('xlsx');
+    expect(inferOfficeKind('anything', 'out/c.svg')).toBe('chart');
+    expect(inferOfficeKind('nothing that names a format', undefined)).toBeNull();
   });
 });

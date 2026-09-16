@@ -13,6 +13,7 @@ import {
   parseSize,
   registerGenTools,
   saveOutputs,
+  dataChartPrompt,
 } from './tools.ts';
 
 type Handler = (params: Record<string, unknown> | undefined) => unknown;
@@ -509,5 +510,21 @@ describe('saveOutputs', () => {
     expect(f.dirs[0]?.endsWith('/Pictures')).toBe(true);
     expect(r.error).toContain('EACCES');
     expect(r.paths).toEqual([]);
+  });
+});
+
+describe('dataChartPrompt — a chart of numbers is not a picture', () => {
+  it('refuses the prompt a 4B actually wrote for a bar chart of four figures', () => {
+    const p =
+      'A vertical bar chart showing units sold (in thousands) by year. Years on x-axis: 2021, 2022, ' +
+      '2023, 2024. Bar heights: 2021=12, 2022=19, 2023=27, 2024=35. Include title "Units Sold by Year".';
+    expect(dataChartPrompt(p)).toMatch(/office_make with kind "chart"/);
+  });
+
+  it('lets art through — chart words without data', () => {
+    expect(dataChartPrompt('a poster of a stock chart going up, flat illustration')).toBeNull();
+    expect(dataChartPrompt('a red fox in a forest, watercolour')).toBeNull();
+    // Two numbers is a size, not a dataset.
+    expect(dataChartPrompt('bar chart aesthetic wallpaper 1920x1080')).toBeNull();
   });
 });

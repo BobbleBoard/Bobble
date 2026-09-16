@@ -211,6 +211,8 @@ export function registerGenTools(pi: ExtensionAPI, options: GenToolsOptions): vo
           'generation bridge unavailable (the gen-tools extension must run inside Bobble)',
         );
       }
+      const chart = dataChartPrompt(params.prompt);
+      if (chart !== null) return errResult(chart);
       // Resolve + validate the model against the catalog.
       const modelId = params.model ?? defaultImageModel().id;
       const model = getModel(modelId);
@@ -566,6 +568,31 @@ export function registerAudioTools(pi: ExtensionAPI, options: GenToolsOptions): 
       n: Type.Optional(Type.Number({ description: 'How many variations to produce. Default 1.' })),
     },
     SOUND_MODEL_IDS,
+  );
+}
+
+/**
+ * A CHART OF NUMBERS IS NOT A PICTURE. MEASURED on a 4B asked for a bar chart
+ * of four figures: it ran image generation with "2021=12, 2022=19, 2023=27,
+ * 2024=35" in the prompt, got a chart-shaped painting whose bars mean
+ * nothing, and told the user it could not look at it. A diffusion model
+ * cannot put a value on an axis; the office pipeline's `chart` kind draws
+ * one from its numbers. The test is narrow on purpose — chart words AND at
+ * least three numbers — so "a poster of a stock chart going up" (art, no
+ * data) still paints.
+ */
+export function dataChartPrompt(prompt: string | undefined): string | null {
+  const text = prompt ?? '';
+  const chartWords =
+    /\b(bar|line|pie|donut|scatter|area|column|stacked)\s*(chart|graph|plot)s?\b|\bhistogram\b|\b(chart|graph|plot)\s+(of|showing|with)\b/i;
+  if (!chartWords.test(text)) return null;
+  const numbers = text.match(/(?<![\w.])\d+(?:[.,]\d+)?%?(?![\w])/g) ?? [];
+  if (numbers.length < 3) return null;
+  return (
+    'A chart of data is drawn from its numbers, not painted — image generation cannot put a value ' +
+    'on an axis. Make it with the document pipeline instead: office_make with kind "chart" and ' +
+    'the numbers, labels, title and unit in the brief (CLI: office make chart --brief "…" --out ' +
+    'name.svg). The result is an .svg that opens on the canvas and goes into a deck or document as-is.'
   );
 }
 

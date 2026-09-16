@@ -27,6 +27,7 @@ import {
   existsSync,
   mkdirSync,
   readdirSync,
+  readFileSync,
   statSync,
   writeFileSync,
 } from 'node:fs';
@@ -62,14 +63,16 @@ const TASKS = [
     id: 'table',
     prompt:
       'Make a comparison table of Python, Rust and Go with rows for typing, memory management, concurrency model and typical use.',
-    reply: [/\|.*\|.*\|/], // a markdown table in the reply itself
+    // A markdown table — in the reply, or in a file it wrote and presented
+    // (a 4B put it in comparison_table.md and opened it: also right).
+    replyOrFile: [/\|.*\|.*\|/],
   },
   {
     id: 'docx',
     prompt:
       'Write a one-page memo as a Word document (docx) to the team proposing we move our daily standups to async written updates, and open it for me.',
     files: [/\.docx$/i],
-    tools: [/\boffice\b/],
+    tools: [/\boffice\b|\.docx/], // `write x.docx` IS the pipeline (withOfficeFormats)
     present: true,
     forbid: [/python-docx|from docx import|import docx/],
   },
@@ -78,7 +81,7 @@ const TASKS = [
     prompt:
       'Make a 4-slide presentation (pptx) about the growth of solar power this decade, with one slide holding a bar chart of rough capacity numbers, and show it to me.',
     files: [/\.pptx$/i],
-    tools: [/\boffice\b/],
+    tools: [/\boffice\b|\.pptx/],
     present: true,
     forbid: [/python-pptx|from pptx import|import pptx/],
   },
@@ -110,7 +113,7 @@ const TASKS = [
     prompt:
       'Create a Word document called notes.docx with the title "Draft" and one short paragraph about tea. Then change its title to "Final" and show me the result.',
     files: [/notes\.docx$/i],
-    tools: [/\boffice\b/],
+    tools: [/\boffice\b|\.docx/],
     present: true,
   },
   {
@@ -306,6 +309,21 @@ try {
     if (task.present) ok('presented', tail.presented > 0, `${tail.presented} card(s)`);
     if (task.reply) {
       for (const re of task.reply) ok(`reply has ${re}`, re.test(tail.text), '');
+    }
+    if (task.replyOrFile) {
+      const written = files
+        .filter((f) => /\.(md|txt|html)$/i.test(f.rel))
+        .map((f) => {
+          try {
+            return readFileSync(path.join(tail.workspace ?? '', f.rel), 'utf8');
+          } catch {
+            return '';
+          }
+        })
+        .join('\n');
+      for (const re of task.replyOrFile) {
+        ok(`reply or a written file has ${re}`, re.test(tail.text) || re.test(written), '');
+      }
     }
     const toolErrors = tail.calls.filter((c) => c.error);
     ok(
