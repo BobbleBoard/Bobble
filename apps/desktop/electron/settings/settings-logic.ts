@@ -150,6 +150,7 @@ export const DEFAULT_SETTINGS: DesktopSettings = {
   // existed — each app asks once per session — so an installed setup does not
   // change under anyone's feet. Onboarding is where a fresh one decides.
   computerUse: { enabled: true, apps: [] },
+  memoryGuard: true,
   harnessId: 'pi-bundled',
   harnessConfigPath: '',
 };
@@ -410,6 +411,7 @@ export function clampSettings(raw: unknown): DesktopSettings {
     hideDeleteChatConfirm: bool(o.hideDeleteChatConfirm, d.hideDeleteChatConfirm),
     hideDeleteModelConfirm: bool(o.hideDeleteModelConfirm, d.hideDeleteModelConfirm),
     computerUse: clampComputerUse(o.computerUse, d.computerUse),
+    memoryGuard: bool(o.memoryGuard, d.memoryGuard),
   };
 }
 

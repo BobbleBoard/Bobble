@@ -13,6 +13,8 @@
     "mtldiffrast": "https://github.com/pedronaugusto/mtldiffrast (main as of 2026-07-25)",
     "flex_gemm": "https://github.com/pedronaugusto/mtlgemm (main as of 2026-07-25)",
     "o_voxel": "trellis2-apple 6055b868 o-voxel, CPU branch patched by python/patches/o_voxel_cpu.py",
-    "quadriflow": "https://github.com/hjwdzh/QuadriFlow (BSD-3), arm64 release build"
-  }
+    "quadriflow": "https://github.com/hjwdzh/QuadriFlow (BSD-3), arm64 release build",
+    "motion_correction": "ardy 693f74d1 MotionCorrection (Apache-2.0), built 2026-09-15 with the Command Line Tools' clang"
+  },
+  "motionCorrection": "motion_correction-1.0.0-cp312-cp312-macosx_11_0_arm64.whl"
 }

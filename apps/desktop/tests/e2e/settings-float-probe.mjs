@@ -226,7 +226,7 @@ try {
     );
 
     /* ------------------------------------------------------------- engines */
-    const engineNav = await page.$('[data-testid="settings-nav-engines"]');
+    const engineNav = await page.$('[data-testid="settings-nav-experimental"]');
     assert(engineNav !== null, 'no Engines section in the settings nav');
     await engineNav.click();
     await page.waitForSelector('[data-testid="engine-panel"]', { timeout: 10_000 });

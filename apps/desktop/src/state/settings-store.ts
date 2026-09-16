@@ -77,6 +77,7 @@ const DEFAULTS: DesktopSettings = {
   hideDeleteChatConfirm: false,
   hideDeleteModelConfirm: false,
   computerUse: { enabled: true, apps: [] },
+  memoryGuard: true,
   harnessId: 'pi-bundled',
   harnessConfigPath: '',
 };

@@ -44,7 +44,7 @@ import {
 import { createGenModules } from './gen/gen-modules-main';
 import { startGuardian } from './gen/guardian-main';
 import { genWorkerCandidates, resolveGenWorkerScript } from './gen/worker-path';
-import { registerGen3dIpc, setComfy3dRunner } from './gen3d/gen3d-main';
+import { registerGen3dIpc, setComfy3dRunner, setGen3dAdmission } from './gen3d/gen3d-main';
 import { registerImportIpc } from './import/import-main';
 import {
   getInferenceUtility,
@@ -78,7 +78,12 @@ import {
   renameSupportRoot,
   runLibraryMigration,
 } from './storage/storage-main';
-import { comfyOrigin, disposeStudio, registerStudioIpc } from './studio/studio-main';
+import {
+  comfyOrigin,
+  comfyServerPid,
+  disposeStudio,
+  registerStudioIpc,
+} from './studio/studio-main';
 import { disposeAllPtys, registerPtyIpc } from './terminal/pty-manager';
 import {
   isTrustedIpcEvent,
@@ -326,7 +331,7 @@ function createMainWindow(): BrowserWindow {
     webPreferences: SHARED_WEB_PREFERENCES,
   });
   if (isBackgroundMode() && !isHiddenMode()) {
-    // PI_E2E_VISIBLE — someone wants to watch. Inactive, so it still never
+    // PI_E2E_HEADED — someone wants to watch. Inactive, so it still never
     // takes focus.
     win.once('ready-to-show', () => win.showInactive());
   }
@@ -813,6 +818,11 @@ function registerAppIpc(): void {
       queue: () => genQueueRef,
       mode: () => readSettings().powerMode,
       reserveGB: () => readSettings().powerReserveGB,
+      // Settings → Experimental → Memory guard. Off: no pausing, no
+      // terminating — the older hold/shed behaviour of the queue alone.
+      guardEnabled: () => readSettings().memoryGuard !== false,
+      // At the wall with nothing else to end, the chat model is what goes.
+      parkChatModel: () => parkChatModel(),
       announce: (event) => {
         const wc = mainWindow?.webContents ?? null;
         if (wc !== null && !wc.isDestroyed()) events.send(wc, 'gen:guardian', event);
@@ -891,6 +901,7 @@ function registerAppIpc(): void {
       getWindow: () => (mainWindow !== null ? mainWindow.webContents : null),
       ...(genWorker !== undefined ? { workerScript: genWorker } : {}),
       comfyResolveOrigin: comfyOrigin,
+      comfyPid: () => comfyServerPid(),
       // gen event channels are a subset of AppEventMap; forward through the
       // app-wide sender (the cast only bridges the two generic key domains).
       sendEvent: (wc, channel, payload) =>
@@ -921,6 +932,8 @@ function registerAppIpc(): void {
     genQueueRef = genQueue;
     // Image → 3D on ComfyUI goes through this same queue (gen3d-main runComfy3d).
     setComfy3dRunner(genQueue.run3d);
+    // …and the engine's own stages ask the same guardian before they start.
+    setGen3dAdmission((gb) => guardian.admit(gb));
     log.info('experimental generation stack wired (gen bridge live)');
   }
 

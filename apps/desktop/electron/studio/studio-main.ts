@@ -107,6 +107,11 @@ function engineInstalled(): boolean {
  * starting it per job would put that on the clock of every generation. Memoized
  * here; the supervisor's own `resolveOrigin` memoizes the start beneath it.
  */
+/** The ComfyUI server's pid while it runs — the memory guard's handle on it. */
+export function comfyServerPid(): number | undefined {
+  return handle?.supervisor.pid;
+}
+
 function supervisor(): ComfySupervisorHandle {
   handle ??= createComfySupervisor({
     pythonPath: comfyVenvPython(),

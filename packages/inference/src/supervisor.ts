@@ -507,6 +507,10 @@ export class LlamaServerSupervisor {
   get running(): boolean {
     return this.child !== null && !this.disposed;
   }
+  /** The server process, for the memory guard to stop in place or end. */
+  get pid(): number | undefined {
+    return this.child?.pid;
+  }
   /** Stopped to make room, and able to come back on the same port. */
   get parked(): boolean {
     return this.isParked && !this.disposed;

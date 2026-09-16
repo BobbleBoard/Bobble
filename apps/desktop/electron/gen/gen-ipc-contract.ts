@@ -112,12 +112,17 @@ export type GenEventMap = {
 };
 
 export interface GuardianEvent {
-  readonly verdict: 'calm' | 'hold' | 'shed';
+  /** `pause`: the running heavy work is stopped in place until the machine
+   * breathes (see gen/pausables.ts); it resumes on the next calm verdict. */
+  readonly verdict: 'calm' | 'hold' | 'pause' | 'shed';
   readonly reason: string;
   /** The OS's own free fraction at the reading, 0..1, when it said. */
   readonly memoryFree?: number;
   /** Job ids cancelled by this verdict (shed only). */
   readonly shed?: readonly string[];
+  /** What is stopped in place (pause), or was let run again (the verdict after). */
+  readonly paused?: readonly string[];
+  readonly resumed?: readonly string[];
   /** Jobs waiting at the time — a hold with none waiting is not worth a banner. */
   readonly queued?: number;
 }

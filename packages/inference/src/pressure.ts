@@ -83,6 +83,19 @@ export interface SystemPressure {
   readonly swapIoPerSec?: number;
   /** Raw cumulative swap counters, so the next reading can difference them. */
   readonly swapCounters?: { readonly ins: number; readonly outs: number; readonly at: number };
+  /**
+   * The pages that are free RIGHT NOW (free + speculative, per `vm_stat`) as a
+   * fraction of the machine — a different number from `memoryFree`, which is
+   * what the kernel could reclaim.
+   *
+   * THE FREEZE IS THIS NUMBER, NOT THAT ONE. MEASURED 2026-09-15: a jetsam
+   * report written while a 3D job wired 9.5 GB shows 10,535 free pages —
+   * 165 MB, 0.7% of a 24 GB Mac — with `memorystatus_level` still reading in
+   * the forties, because file cache counts as reclaimable until the kernel
+   * has actually reclaimed it. The pointer stops moving while the kernel
+   * does that. So the guard reads both, and this one first.
+   */
+  readonly memoryFreeNow?: Load;
   /** Run-queue depth per core, clamped to 1. Undefined on Windows. */
   readonly cpu?: Load;
   /** GPU busy fraction, where the driver will say (NVIDIA anywhere, AMD on Linux). */
@@ -162,6 +175,16 @@ export function parseVmStatSwapCounters(out: string): { ins: number; outs: numbe
     ins: Number.parseInt(ins[1] ?? '0', 10),
     outs: Number.parseInt(outs[1] ?? '0', 10),
   };
+}
+
+/** `vm_stat` → the pages that are free right now, as a fraction of `totalBytes`. */
+export function parseVmStatFreeNow(out: string, totalBytes: number): Load | undefined {
+  const size = /page size of (\d+) bytes/.exec(out);
+  const free = /^Pages free:\s+(\d+)/m.exec(out);
+  const spec = /^Pages speculative:\s+(\d+)/m.exec(out);
+  if (size === null || free === null || !(totalBytes > 0)) return undefined;
+  const pages = Number.parseInt(free[1] ?? '0', 10) + Number.parseInt(spec?.[1] ?? '0', 10);
+  return clamp01((pages * Number.parseInt(size[1] ?? '0', 10)) / totalBytes);
 }
 
 /**
@@ -350,6 +373,7 @@ export async function samplePressure(probes: PressureProbes): Promise<SystemPres
     swapUsed?: Load;
     swapIoPerSec?: number;
     swapCounters?: { ins: number; outs: number; at: number };
+    memoryFreeNow?: Load;
     cpu?: Load;
     gpu?: Load;
     vram?: Load;
@@ -384,6 +408,11 @@ export async function samplePressure(probes: PressureProbes): Promise<SystemPres
     }
     // The FLOW, not the stock — see `swapIoPerSec`.
     const vmstat = await probes.run('vm_stat', []);
+    const freeNow = vmstat === null ? undefined : parseVmStatFreeNow(vmstat, probes.memory().total);
+    if (freeNow !== undefined) {
+      out.memoryFreeNow = freeNow;
+      sources.push('macos-free-pages');
+    }
     const counters = vmstat === null ? undefined : parseVmStatSwapCounters(vmstat);
     if (counters !== undefined) {
       out.swapCounters = { ...counters, at };

@@ -243,7 +243,6 @@ export function EnginePanel() {
  */
 function PowerSection() {
   const mode = useSettingsStore((st) => st.settings.powerMode);
-  const reserve = useSettingsStore((st) => st.settings.powerReserveGB);
   const update = useSettingsStore((st) => st.update);
   return (
     // Wrapped rather than passing a testid through SettingSection: that
@@ -273,27 +272,8 @@ function PowerSection() {
             ]}
           />
         </SettingRow>
-        <SettingRow
-          label="Keep free for me"
-          hint="Memory Bobble will not take, so your other apps keep theirs. Left alone it picks a sixth of this machine."
-        >
-          <input
-            type="number"
-            min={0}
-            max={64}
-            step={1}
-            className="pd-input w-24"
-            aria-label="Memory to keep free, in GB"
-            data-testid="settings-power-reserve"
-            value={reserve ?? ''}
-            placeholder="auto"
-            onChange={(e) => {
-              const n = Number.parseInt(e.target.value, 10);
-              // Blank / 0 means "you decide" — the same as never having set it.
-              void update({ powerReserveGB: Number.isFinite(n) && n > 0 ? n : undefined });
-            }}
-          />
-        </SettingRow>
+        {/* "Keep free for me" moved to the Memory guard section above this
+            panel (ExperimentalPanel) — it is the guard's own number. */}
       </SettingSection>
     </div>
   );

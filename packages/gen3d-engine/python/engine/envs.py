@@ -83,13 +83,31 @@ def _metal_compiler_present() -> bool:
 _METAL_SOURCE_PACKAGES = ("mtldiffrast", "cumesh", "flex_gemm")
 
 
+#: What the texturing pipeline needs that requirements_macos.txt does not
+#: name — MEASURED on a fresh cache (gen3d-ootb-probe): the BiRefNet
+#: background remover's remote code imports kornia and timm and the working
+#: environment had them (and onnxruntime, scikit-image) installed by hand.
+#: transformers is pinned to the version that environment runs; the file's
+#: `<5` bound is dropped for it.
+_MLX_TREE_EXTRAS = (
+    "transformers==5.14.1",
+    "kornia==0.8.3",
+    "timm==1.0.28",
+    "onnxruntime",
+    "scikit-image",
+)
+
+
 def _requirements_without_metal_sources(tool: Path) -> Path:
-    """requirements_macos.txt minus the `pkg @ https://…tar.gz` Metal lines."""
+    """requirements_macos.txt minus the `pkg @ https://…tar.gz` Metal lines and
+    the transformers bound (_MLX_TREE_EXTRAS pins it)."""
     src = tool / "requirements_macos.txt"
     kept = []
     for line in src.read_text().splitlines():
         head = line.split("@", 1)[0].strip().lower()
         if "@" in line and head in _METAL_SOURCE_PACKAGES:
+            continue
+        if line.strip().lower().startswith("transformers"):
             continue
         kept.append(line)
     out = tool / ".requirements_prebuilt.txt"
@@ -163,7 +181,7 @@ def _provision_trellis_mlx(registry: Registry, log) -> None:
             log("Installing the MLX TRELLIS requirements (prebuilt Metal wheels)…")
             _run(
                 [registry.uv_path, "pip", "install", "--python", str(py),
-                 f"torch=={manifest['torch']}",
+                 f"torch=={manifest['torch']}", *_MLX_TREE_EXTRAS,
                  "-r", str(_requirements_without_metal_sources(tool)), *wheels],
                 tool, log, env,
             )
@@ -245,7 +263,37 @@ def patch_gated_mirrors(registry: Registry, log) -> None:
                 log(f"patched {name} → public mirrors (no HF token)")
 
 
+#: The mflux release the image module runs (gen-service worker-command.ts).
+MFLUX_PIN = "0.18.0"
+
+
+def _provision_mflux(registry: Registry, log) -> None:
+    """The MLX image path — `mflux-generate-mage-flow` and its `-edit` twin.
+
+    jobs.py prefers this over the PyTorch Mage tree (11 s vs 71 s a picture,
+    and image EDITS exist only here) and it was a venv somebody made by hand:
+    a fresh Mac had no fast path and no edits at all. One venv, one wheel.
+    """
+    cli = registry.mflux_cli()
+    if cli.exists():
+        return
+    tool = registry.tool_dir("mflux")
+    tool.mkdir(parents=True, exist_ok=True)
+    uv = registry.uv_path
+    python = registry.venv_python("mflux")
+    if not python.exists():
+        log("Creating the MLX image venv…")
+        _run([uv, "venv", str(tool / ".venv"), "--python", "3.12"], tool, log)
+    log(f"Installing mflux {MFLUX_PIN}…")
+    _run([uv, "pip", "install", "--python", str(python), f"mflux=={MFLUX_PIN}"], tool, log)
+
+
 def _provision_mageflow(registry: Registry, log) -> None:
+    # The fast path first; a failure here leaves the PyTorch tree to carry it.
+    try:
+        _provision_mflux(registry, log)
+    except Exception as err:  # noqa: BLE001 — degraded, not fatal
+        log(f"mflux unavailable ({err}); images will run on the PyTorch tree")
     tool = registry.ensure_tool_clone("Mage", log)
     mage_flow = tool / "mage_flow"
     if not registry.venv_python("Mage").exists():
@@ -265,7 +313,18 @@ def _provision_cubepart(registry: Registry, log) -> None:
         log("Creating CubePart venv…")
         _run([uv, "venv", str(tool / ".venv"), "--python", "3.11"], tool, log)
         py = str(registry.venv_python("cube"))
-        _run([uv, "pip", "install", "--python", py, "-e", str(cubepart)], tool, log)
+        # fpsample pinned to 0.3.3: the last release with a macOS arm64 wheel
+        # (1.0.x is a source-only Rust/C++ build, which a fresh Mac cannot
+        # compile — MEASURED as the one thing in this env that needed a
+        # compiler). cubepart calls bucket_fps_kdline_sampling(pc, n, h=…),
+        # which 0.3.3 has with the same signature.
+        # mlx: cubepart_worker swaps the denoiser to MLX (_cubepart_mlx.py);
+        # the working environment had it by hand and a fresh one died on
+        # "No module named 'mlx'" after loading 9.9 GB of checkpoint.
+        _run(
+            [uv, "pip", "install", "--python", py, "-e", str(cubepart), "fpsample==0.3.3", "mlx"],
+            tool, log,
+        )
         # cubepart's loose `diffusers>=0.30` resolves to 0.39+, whose
         # QwenEmbedRope.forward reordered args and breaks the QwenImage hijack
         # ("got multiple values for argument 'device'" — reproduced here).
@@ -441,6 +500,13 @@ MESHTOOLS_PACKAGES = [
     # UV unwrapping, so retopology can bake the original's texture onto the new
     # topology instead of dropping it (see _texbake).
     "xatlas",
+    # trimesh reaches for these by name: marching cubes (make_manifold's closed
+    # surface) is scikit-image, spatial queries are rtree, booleans/repair are
+    # manifold3d. MEASURED on a fresh cache: the quad retopo died on
+    # "No module named 'skimage'" — the working venv had all three by hand.
+    "scikit-image",
+    "rtree",
+    "manifold3d",
 ]
 MESHTOOLS_IMPORTS = [
     "trimesh",
@@ -450,6 +516,9 @@ MESHTOOLS_IMPORTS = [
     "scipy",
     "fast_simplification",
     "xatlas",
+    "skimage",
+    "rtree",
+    "manifold3d",
 ]
 
 
@@ -485,10 +554,34 @@ def _provision_ardy(registry: Registry, log) -> None:
     if probe.returncode == 0:
         return
     log("Installing ARDY (torch + LLM2Vec text encoder)…")
-    # Editable, so the pinned checkout IS what runs — a wheel copy would let the
-    # skeleton assert in motion_worker.py pass against different source than the
-    # one the registry pinned.
-    _run([uv, "pip", "install", "--python", str(python), "-e", str(tool)], tool, log)
+    # THE CHECKOUT IS WHAT RUNS, both ways. An editable install is a .pth line
+    # pointing at the tree plus a build of MotionCorrection's C++ extension —
+    # and that build is a CMake run a fresh Mac cannot do. So the extension is
+    # shipped built (motion_correction-*.whl in the prebuilt tree, from this
+    # same pinned commit), the dependencies come from pyproject, and the .pth
+    # line is written by hand: the skeleton assert in motion_worker.py still
+    # reads the pinned source. A platform the manifest does not cover takes
+    # the editable build as before.
+    manifest = _prebuilt_manifest(registry)
+    wheel = None if manifest is None else registry.prebuilt("darwin-arm64", manifest.get("motionCorrection", ""))
+    if wheel is None:
+        _run([uv, "pip", "install", "--python", str(python), "-e", str(tool)], tool, log)
+        return
+    deps = _project_dependencies(tool / "pyproject.toml")
+    # pillow: the working venv had it by hand (the worker's texture pass-through).
+    _run([uv, "pip", "install", "--python", str(python), *deps, "pillow", str(wheel)], tool, log)
+    site = next((tool / ".venv" / "lib").glob("python*/site-packages"), None)
+    if site is None:
+        raise RuntimeError("the ARDY venv has no site-packages")
+    (site / "ardy-checkout.pth").write_text(str(tool) + "\n")
+
+
+def _project_dependencies(pyproject: Path) -> list[str]:
+    """`[project] dependencies` of a pyproject.toml, as pip requirement strings."""
+    import tomllib
+
+    data = tomllib.loads(pyproject.read_text())
+    return list(data.get("project", {}).get("dependencies", []))
 
 
 def _provision_meshtools(registry: Registry, log) -> None:

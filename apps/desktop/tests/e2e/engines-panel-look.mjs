@@ -16,7 +16,7 @@ try {
   await page.click('[data-testid="profile-button"]');
   await page.click('[data-testid="open-settings"]');
   await page.waitForSelector('[data-testid="settings-view"]', { timeout: 10_000 });
-  await page.click('[data-testid="settings-nav-engines"]');
+  await page.click('[data-testid="settings-nav-experimental"]');
   await page.waitForSelector('[data-testid="engine-panel"]', { timeout: 10_000 });
   await page.waitForTimeout(1500);
   const rows = await page.evaluate(() =>

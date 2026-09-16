@@ -356,6 +356,21 @@ export interface DesktopSettings {
    * than a fraction because that is what people mean by "leave me some room".
    */
   powerReserveGB?: number;
+  /**
+   * THE MEMORY GUARD (Settings → Experimental). the user (2026-09-16), after a
+   * restart under a 3D job: "these memory safeguards should just not let ooms
+   * happen for sure … always 100% reserve enough memory … if it does anyways,
+   * have safeguards in place to stop generations/runs of any sort ideally
+   * pausing them rather than terminating where possible … kernel level hangs
+   * are 100% unacceptable." On (the default): every heavy run — a picture, a
+   * video, a 3D stage, the ComfyUI server while a job is in it, a chat's
+   * tools — is paused in place the moment the machine crosses the pause
+   * line, resumed when it has breathed, and terminated if the pause does not
+   * bring the memory back; nothing heavy is admitted without its footprint
+   * fitting beside the reserve. Off: the older behaviour — admission holds
+   * and the generation queue sheds at the wall, nothing is paused.
+   */
+  memoryGuard: boolean;
   capabilities: GenerationCapabilities;
   /** User system-instructions prepended to the first prompt of each NEW session
    * (see pi-connect's session-instructions seam). Empty = none. */
@@ -499,6 +514,7 @@ export interface DesktopSettingsPatch {
   hideDeleteModelConfirm?: boolean;
   /** Full replacement (the chooser read-modify-writes the whole object). */
   computerUse?: ComputerUseSettings;
+  memoryGuard?: boolean;
 }
 
 /** Icon-stroke bounds — mirrors the IconStrokeControl slider range. */

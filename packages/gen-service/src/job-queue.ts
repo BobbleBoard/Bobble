@@ -153,6 +153,11 @@ export class JobQueue {
     return this.#entries.get(jobId)?.status;
   }
 
+  /** The job itself, for a listener that has only its id. */
+  jobOf(jobId: string): GenJob | undefined {
+    return this.#entries.get(jobId)?.job;
+  }
+
   /** Number of jobs currently running. */
   get runningCount(): number {
     return this.#running.size;

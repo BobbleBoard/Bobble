@@ -87,6 +87,12 @@ export interface GenServiceClientOptions {
   readonly spawnFn?: GenSpawnFn;
   /** Injectable uv resolver (tests). Default: PATH probe. */
   readonly resolveUv?: () => Promise<string>;
+  /**
+   * The worker just spawned for a job — its pid is what the app's memory guard
+   * stops in place (SIGSTOP) when the machine is tight, and ends if that does
+   * not help. Called once per `run`, before the first event.
+   */
+  readonly onChild?: (jobId: string, child: GenChildProcess) => void;
 }
 
 export interface RunJobOptions {
@@ -165,6 +171,7 @@ export class GenServiceClient {
         reject(err instanceof Error ? err : new Error(String(err)));
         return;
       }
+      this.#opts.onChild?.(job.id, child);
 
       const parser = new NdjsonParser();
       let settled = false;

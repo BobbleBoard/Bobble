@@ -86,6 +86,7 @@ import type {
   GenSurfacePayload,
 } from './gen-ipc-contract';
 import { type GenModulesManager, moduleForBackend, weightsModuleFor } from './gen-modules';
+import { guardRun } from './guardian-main';
 import { createStillRenderer } from './hyperframes-still';
 import { openStillWindow } from './hyperframes-window';
 import { createRoomKeeper, type RoomKeeper } from './make-room';
@@ -167,6 +168,9 @@ export interface GenManagerOptions {
    * and returns its `http://127.0.0.1:<port>` origin (or a remote host).
    */
   readonly comfyResolveOrigin?: () => Promise<string>;
+  /** The ComfyUI server's pid while it runs — the memory guard's handle on a
+   * comfy job (studio-main). */
+  readonly comfyPid?: () => number | undefined;
   /**
    * Node HyperFrames motion-graphics renderer (ffmpeg + headless Chrome). Default
    * emits a clear "not installed" error until the aux deps land.
@@ -366,6 +370,8 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
    * The PI_GEN_WORKER_PATH escape hatch existed for exactly this and nothing set
    * it.
    */
+  /** The uv worker's pid per running job — what the memory guard signals. */
+  const workerPids = new Map<string, number>();
   const client = new GenServiceClient({
     resolveUv: opts.resolveUv,
     ...(opts.workerScript !== undefined ? { workerScript: opts.workerScript } : {}),
@@ -374,6 +380,9 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
       const child = defaultGenSpawn(command, args, o);
       tierChild(child, 'gen worker');
       return child;
+    },
+    onChild: (jobId, child) => {
+      if (child.pid !== undefined) workerPids.set(jobId, child.pid);
     },
   });
   // Video routes to a persistent ComfyUI server (LTX/Wan) or the Node HyperFrames
@@ -446,6 +455,24 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
           busy: () => jobQueue.runningCount > 0 || jobQueue.queuedCount > 0,
           log: (message, extra) => log.info(`make room: ${message}`, extra ?? {}),
         });
+  /*
+   * UNDER THE MEMORY GUARD (gen/guardian-main.ts, gen/pausables.ts). Every
+   * running job is registered with the process it runs in: the uv worker's
+   * tree for mflux/audio, the ComfyUI server for a comfy job (the job IS that
+   * process while it runs — MEASURED 2026-09-15, a jetsam report with the
+   * ComfyUI python at 9.6 GB and 165 MB free). A pause stops that tree in
+   * place; a shed goes through the queue's own cancel so the job's bookkeeping
+   * ends cleanly and the person reads why.
+   */
+  const guarded = new Map<string, () => void>();
+  const jobLabel = (job: GenJob | undefined): string =>
+    job?.modality === 'video'
+      ? 'the video'
+      : job?.modality === 'audio'
+        ? 'the sound'
+        : job?.modality === '3d'
+          ? 'the 3D model'
+          : 'the picture';
   jobQueue.on((e) => {
     if (e.type === 'held') {
       noteSinks.get(e.jobId)?.(`Waiting for memory — ${e.reason}`);
@@ -455,11 +482,29 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
       if (keeper?.parked === true) {
         noteSinks.get(e.jobId)?.('Made room — the chat model is paused while this renders');
       }
+      const job = jobQueue.jobOf(e.jobId);
+      const comfy = job?.backend === 'comfyui';
+      guarded.get(e.jobId)?.();
+      guarded.set(
+        e.jobId,
+        guardRun({
+          id: `gen:${e.jobId}`,
+          label: jobLabel(job),
+          kind: 'gen',
+          pid: () => (comfy ? opts.comfyPid?.() : workerPids.get(e.jobId)),
+          cancel: (reason) => {
+            jobQueue.cancel(e.jobId, reason);
+          },
+        }),
+      );
     } else if (
       e.type === 'status' &&
       (e.status === 'done' || e.status === 'error' || e.status === 'canceled')
     ) {
       keeper?.finished(e.jobId);
+      guarded.get(e.jobId)?.();
+      guarded.delete(e.jobId);
+      workerPids.delete(e.jobId);
     }
   });
   /** The caller gets its answer only once a chat model we parked is back. */

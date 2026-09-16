@@ -33,7 +33,29 @@ describe('judge', () => {
     // Plenty free by the percentage, but the kernel says critical: it knows
     // something about wired and compressor pages that the percentage does not.
     expect(judge({ memoryFree: 0.4, memory: 'critical', sources: [] }, AUTO).verdict).toBe('shed');
+    // "warn" with memory to spare is the kernel reclaiming cache under a load
+    // (MEASURED: ten seconds of it at 40% free while a 10 GB model loads) —
+    // a hold at the door; with memory also tight it pauses running work.
     expect(judge({ memoryFree: 0.4, memory: 'warn', sources: [] }, AUTO).verdict).toBe('hold');
+    expect(judge({ memoryFree: 0.18, memory: 'warn', sources: [] }, AUTO).verdict).toBe('pause');
+  });
+
+  it('reads the pages ACTUALLY free only with the kernel already warning', () => {
+    // MEASURED on a calm Mac at 83% available: 2.4% of pages free. Normal —
+    // macOS keeps its free count low by design. Alone it means nothing…
+    expect(judge({ memoryFree: 0.83, memoryFreeNow: 0.024, sources: [] }, AUTO).verdict).toBe(
+      'calm',
+    );
+    // …with the kernel at "warn" the run is paused (a load takes macOS through
+    // warn at 0.6% free for a second; only "critical" or a pause that does
+    // not lift ends it), and the number rides along in the reason.
+    const j = judge({ memoryFree: 0.19, memory: 'warn', memoryFreeNow: 0.007, sources: [] }, AUTO);
+    expect(j.verdict).toBe('pause');
+    expect(j.reason).toMatch(/0\.7% of pages/);
+    expect(
+      judge({ memoryFree: 0.44, memory: 'critical', memoryFreeNow: 0.007, sources: [] }, AUTO)
+        .verdict,
+    ).toBe('shed');
   });
 
   it('reads heavy swap with memory to spare as a load burst — a hold, marked hot', () => {
@@ -66,17 +88,21 @@ describe('judge', () => {
     // 25% free: fine at full/auto, already held in low.
     expect(judge({ memoryFree: 0.25, sources: [] }, AUTO).verdict).toBe('calm');
     expect(judge({ memoryFree: 0.25, sources: [] }, LOW).verdict).toBe('hold');
-    // 12% free: held in both. the user: "low can't stop image generation requests"
-    // — a running job is stopped only where the OS itself would start killing.
-    expect(judge({ memoryFree: 0.12, sources: [] }, AUTO).verdict).toBe('hold');
-    expect(judge({ memoryFree: 0.12, sources: [] }, LOW).verdict).toBe('hold');
+    // 12% free: PAUSED in both — the job keeps what it has and takes no more
+    // until the machine breathes; it is stopped for good only where the OS
+    // itself would start killing. the user: "low can't stop image generation
+    // requests" — a pause is a wait, not a stop.
+    expect(judge({ memoryFree: 0.12, sources: [] }, AUTO).verdict).toBe('pause');
+    expect(judge({ memoryFree: 0.12, sources: [] }, LOW).verdict).toBe('pause');
     expect(judge({ memoryFree: 0.07, sources: [] }, LOW).verdict).toBe('shed');
     expect(LOW.shedFree).toBe(AUTO.shedFree);
-    // A load burst at 30% free — ComfyUI reading a 5 GB DiT in — is a hold in
-    // BOTH modes, not a shed in low: the tight line does not move with the mode.
+    expect(LOW.pauseFree).toBe(AUTO.pauseFree);
+    // A load burst at 30% free — ComfyUI reading a 5 GB DiT in — has room to
+    // land at auto (a hold) and is at low's own hold line, where it is paused
+    // for the length of the burst; in neither mode is it a shed.
     const burst = { memoryFree: 0.3, swapIoPerSec: 44506, sources: [] };
     expect(judge(burst, AUTO).verdict).toBe('hold');
-    expect(judge(burst, LOW).verdict).toBe('hold');
+    expect(judge(burst, LOW).verdict).toBe('pause');
     expect(LOW.tightFree).toBe(AUTO.tightFree);
     // With memory comfortable the burst is also marked as having ROOM, which
     // is what gives it the longer streak in settle().
@@ -266,8 +292,9 @@ describe('createGuardian', () => {
     h.g.heartbeat(1900);
     h.g.heartbeat(20);
     expect(await h.g.poke()).toBe('shed');
-    // …and clears it, so one old stall does not shed twice.
-    expect(await h.g.poke()).toBe('hold');
+    // …and clears it, so one old stall does not shed twice (15% free on its
+    // own is the pause line).
+    expect(await h.g.poke()).toBe('pause');
   });
 
   it('turns raw swap counters into a rate across two readings', async () => {
@@ -287,5 +314,43 @@ describe('createGuardian', () => {
     });
     expect(await g.poke()).toBe('calm'); // a rate needs two readings
     expect(await g.poke()).toBe('hold'); // 20,000 pages in one second with memory to spare: a burst
+  });
+});
+
+describe('settle — the pause', () => {
+  const at = (v, extra = {}) => ({ verdict: v, reason: 'r', ...extra });
+
+  it('pauses at once and resumes after a short calm streak', () => {
+    let st = settle(at('pause'), 'calm', 0, AUTO);
+    expect(st.verdict).toBe('pause');
+    expect(st.pausedStreak).toBe(1);
+    st = settle(at('calm'), 'pause', 0, AUTO, 0, st.pausedStreak);
+    expect(st.verdict).toBe('pause'); // 1 of 3
+    st = settle(at('calm'), 'pause', st.calmStreak, AUTO, 0, st.pausedStreak);
+    expect(st.verdict).toBe('pause'); // 2 of 3
+    st = settle(at('calm'), 'pause', st.calmStreak, AUTO, 0, st.pausedStreak);
+    expect(st.verdict).toBe('calm');
+  });
+
+  it('a hold-grade reading keeps a paused job paused', () => {
+    const st = settle(at('hold'), 'pause', 0, AUTO, 0, 4);
+    expect(st.verdict).toBe('pause');
+    expect(st.pausedStreak).toBe(4);
+  });
+
+  it('a pause that does not bring the memory back becomes a shed', () => {
+    let st = { verdict: 'calm', calmStreak: 0, hotStreak: 0, pausedStreak: 0, reason: '' };
+    for (let i = 0; i < AUTO.pausedReadingsBeforeShed - 1; i += 1) {
+      st = settle(at('pause'), st.verdict, st.calmStreak, AUTO, st.hotStreak, st.pausedStreak);
+      expect(st.verdict).toBe('pause');
+    }
+    st = settle(at('pause'), st.verdict, st.calmStreak, AUTO, st.hotStreak, st.pausedStreak);
+    expect(st.verdict).toBe('shed');
+    expect(st.reason).toMatch(/did not come back/);
+  });
+
+  it('a dip after a resume just pauses again — no streak carried over', () => {
+    const st = settle(at('pause'), 'calm', 0, AUTO, 0, 0);
+    expect(st.pausedStreak).toBe(1);
   });
 });

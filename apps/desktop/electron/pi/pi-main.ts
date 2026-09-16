@@ -20,6 +20,7 @@ import { MESSAGES_SEND_TOOL } from '@pi-desktop/mac-connectors/tool-names';
 import { createIpcEventSender, createLogger } from '@pi-desktop/shared';
 import { app, type IpcMainInvokeEvent, ipcMain, type WebContents } from 'electron';
 import { resolveBundledPackageAsset } from '../app-paths';
+import { guardRun } from '../gen/guardian-main';
 import { openStillWindow } from '../gen/hyperframes-window';
 import { omniSvgFiles } from '../gen/omnisvg';
 import { registerGen3dBridge } from '../gen3d/gen3d-bridge';
@@ -224,7 +225,7 @@ const sessions = createPiSessions<WebContents>({
     // project. An explicit request cwd (a fresh start already carrying the project)
     // still takes precedence.
     const cwd = resolveSessionCwd({ ...req, cwd: req.cwd ?? activeProjectPath() ?? undefined });
-    return new PiBridge(
+    const bridge = new PiBridge(
       {
         cwd,
         sessionPath: req.sessionPath,
@@ -271,6 +272,23 @@ const sessions = createPiSessions<WebContents>({
       },
       onEvent,
     );
+    /*
+     * UNDER THE MEMORY GUARD, lightly. A pi child and whatever its tools spawn
+     * (a script the model wrote, a build) are paused with the heavy runs when
+     * the machine is tight and never terminated by the guard — their memory
+     * is the model server's, which is parked on its own. `light`: a chat
+     * alone does not put the guard on its fast cadence.
+     */
+    const off = guardRun({
+      id: `pi:${bridge.pid}`,
+      label: 'the chat',
+      kind: 'agent',
+      light: true,
+      neverTerminate: true,
+      pid: () => (bridge.alive ? bridge.pid : undefined),
+    });
+    void bridge.whenExited().then(off, off);
+    return bridge;
   },
   sendEvent: (sender, event) => events.send(sender, 'pi:event', event),
   sendVisionWanted: (sender) => events.send(sender, 'llm:vision-wanted', {}),

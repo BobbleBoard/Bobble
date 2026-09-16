@@ -119,6 +119,11 @@ export interface Gen3dSidecarOptions {
 export class Gen3dSidecar {
   readonly baseUrl: string;
   private child: ChildProcess | null = null;
+
+  /** The sidecar process — the root of every worker it runs (memory guard). */
+  get pid(): number | undefined {
+    return this.child?.pid;
+  }
   private disposed = false;
   private restarts = 0;
   private starting: Promise<void> | null = null;

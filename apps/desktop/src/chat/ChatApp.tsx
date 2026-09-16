@@ -736,7 +736,20 @@ export function ChatApp({
                 /* The app's own state — starting up, getting ready — lives in
                    the middle of the bar, between the chat's name and the
                    canvas/advanced controls, on the chat and in the studios. */
-                center={contentTitle === undefined ? <TopBarStatus /> : null}
+                // THE NOTICE SLOT. A chat waiting for the person, then the
+                // machine's own state (paused / stopped / waiting for memory),
+                // then the ordinary model status — one slot, the most urgent
+                // wins; nothing floats over the page (the user: "overlap such as
+                // this must be fixed on sight").
+                center={
+                  <InputNeededBanner
+                    fallback={
+                      <GuardianBanner
+                        fallback={contentTitle === undefined ? <TopBarStatus /> : null}
+                      />
+                    }
+                  />
+                }
                 right={
                   // The canvas toggle (round-8 #11/#16) plus, for power users only,
                   // the brain/gear advanced-params entry to its left. In simple mode
@@ -920,8 +933,6 @@ export function ChatApp({
             </CanvasErrorBoundary>
 
             <UiRequestDialogs />
-            <InputNeededBanner />
-            <GuardianBanner />
             <WhyQueuedModal />
             <ToastHost />
             <WindowDropOverlay />

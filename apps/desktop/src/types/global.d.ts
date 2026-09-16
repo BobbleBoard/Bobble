@@ -18,6 +18,8 @@ declare global {
     /** The StoreSink the event router drives — probes raise notifications with it. */
     __pi_sink?: () => import('@pi-desktop/engine').StoreSink;
     __pi_restart?: (opts?: { cwd?: string; sessionPath?: string }) => Promise<unknown>;
+    /** The chat's working folder once the first send has made one (E2E). */
+    __pi_workspace?: () => string | null;
     /** Probe-only: stop the running turn (see pi-connect abortPi). */
     __pi_abort?: () => void;
     /** E2E hook: accessor for the canvas controller (open browser/terminal

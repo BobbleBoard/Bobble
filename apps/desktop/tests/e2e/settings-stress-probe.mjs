@@ -176,7 +176,7 @@ try {
   const strokeAfter = persisted()?.iconStroke;
   console.log(`   icon stroke ${strokeBefore} -> ${strokeAfter}`);
 
-  await page.click('[data-testid="settings-nav-engines"]');
+  await page.click('[data-testid="settings-nav-experimental"]');
   await page.waitForSelector('[data-testid="settings-power-mode"]', { timeout: 6000 });
   await page.selectOption('[data-testid="settings-power-mode"]', 'low').catch(async () => {
     // Not a <select>: click the segment that says so.
@@ -186,7 +186,7 @@ try {
 
   await closeSettings();
   await openSettings();
-  await page.click('[data-testid="settings-nav-engines"]');
+  await page.click('[data-testid="settings-nav-experimental"]');
   await page.waitForTimeout(250);
   const reopened = await page.evaluate(
     () => window.__settings_store().getState().settings?.powerMode ?? null,

@@ -48,6 +48,7 @@ import { ensureUv } from '@pi-desktop/web-tools';
 import { app, BrowserWindow, type IpcMain, type WebContents } from 'electron';
 import type { Run3dFn } from '../gen/gen-manager';
 import { GenModuleMissingError, moduleMissingMessage } from '../gen/gen-modules';
+import { guardRun } from '../gen/guardian-main';
 import { weightsPresent } from '../gen/weights-on-shelf';
 import { tieredSpawn } from '../inference/worker-tier';
 import type { AppEventMap } from '../ipc-contract';
@@ -382,6 +383,8 @@ function handleSidecarEvent(value: unknown): void {
     imageJobs.note(update);
     if (update.done) {
       jobPlans.delete(jobId);
+      guardedJobs.get(jobId)?.();
+      guardedJobs.delete(jobId);
       stopMemorySampling();
     }
     broadcast('gen3d:job', {
@@ -529,6 +532,7 @@ export async function runImageJob(
     return { ok: false, error: res.error ?? 'the engine refused the request' };
   }
   jobPlans.set(res.jobId, planGenerate('text', false));
+  guardSidecarJob(res.jobId, 'the picture');
   return imageJobs.wait(res.jobId, timeoutMs);
 }
 
@@ -588,6 +592,74 @@ function liveDictation(): DictationSession {
 let comfy3dRunner: Run3dFn | null = null;
 export function setComfy3dRunner(fn: Run3dFn): void {
   comfy3dRunner = fn;
+}
+
+/*
+ * THE SIDECAR'S JOBS UNDER THE MEMORY GUARD.
+ *
+ * The engine's own stages — geometry on the MLX tree, texturing from a
+ * picture, CubePart, the remesh, the riggers, ARDY — run in the sidecar's
+ * worker processes, outside gen-manager's queue. That is the path the restart
+ * of 2026-09-15 went through: nothing asked whether a 10 GB texturing job fit,
+ * nothing sampled the machine faster than every 15 s while it ran, and
+ * nothing could stop it. Now each accepted job is registered with the guard
+ * (the sidecar's process tree is what a pause stops; `/cancel` is how a shed
+ * ends the job in its own words), and a job is admitted only when the
+ * guardian says its footprint fits beside the reserve.
+ */
+type Admit = (footprintGB?: number) => { ok: boolean; reason?: string; never?: boolean };
+let admitFn: Admit | null = null;
+export function setGen3dAdmission(fn: Admit): void {
+  admitFn = fn;
+}
+const guardedJobs = new Map<string, () => void>();
+
+/** Rough resident footprints, GB, per sidecar op — the numbers admission is
+ * asked about (MEASURED: TRELLIS 512 ≈ 10–12 GB, CubePart's pipeline 9.9 GB). */
+function sidecarFootprintGB(op: string, resolution?: string): number {
+  switch (op) {
+    case 'generate':
+      return resolution === 'high' ? 20 : resolution === 'medium' ? 16 : 10;
+    case 'texture':
+      return 10;
+    case 'segment':
+      return 10;
+    case 'motion':
+      return 4;
+    case 'retopo':
+      return 2;
+    default:
+      return 1;
+  }
+}
+
+function guardSidecarJob(jobId: string, label: string): void {
+  guardedJobs.get(jobId)?.();
+  guardedJobs.set(
+    jobId,
+    guardRun({
+      id: `gen3d:${jobId}`,
+      label,
+      kind: 'gen3d',
+      pid: () => sidecar?.pid,
+      cancel: async () => {
+        await sidecarPost<{ ok: boolean }>('/cancel', { jobId });
+      },
+    }),
+  );
+}
+
+function admitSidecarJob(
+  op: string,
+  resolution?: string,
+): { ok: true } | { ok: false; error: string } {
+  if (admitFn === null) return { ok: true };
+  const verdict = admitFn(sidecarFootprintGB(op, resolution));
+  if (verdict.ok) return { ok: true };
+  return {
+    ok: false,
+    error: `Not enough memory free right now — ${verdict.reason ?? 'the machine is under pressure'}. Close something or wait a moment and try again.`,
+  };
 }
 
 /** The catalog id ComfyUI runs for a geometry model named on a request. */
@@ -905,6 +977,8 @@ const handlers: IpcHandlers<Gen3dInvokeMap & DictationInvokeMap> = {
     // A grey finish is an untextured run; colour/PBR decide what the bake writes.
     const finish: Gen3dFinish = req.finish ?? (req.texture ? 'pbr' : 'grey');
     const body = { ...req, texture: finish !== 'grey', finish };
+    const admitted = admitSidecarJob(req.imageOnly === true ? 'image' : 'generate', req.resolution);
+    if (!admitted.ok) return { ok: false, error: admitted.error };
     startMemorySampling(`generate:${req.kind}:${req.resolution}`);
     const res = await sidecarPost<{ ok: boolean; jobId?: string; error?: string }>(
       '/generate',
@@ -913,15 +987,30 @@ const handlers: IpcHandlers<Gen3dInvokeMap & DictationInvokeMap> = {
     if (res === null) return { ok: false, error: ENGINE_DOWN };
     if (res.ok && res.jobId !== undefined) {
       jobPlans.set(res.jobId, planGenerate(req.kind, body.texture));
+      guardSidecarJob(res.jobId, req.imageOnly === true ? 'the picture' : 'the 3D model');
     }
     return res;
   },
   'gen3d:stage': async (req) => {
+    const admitted = admitSidecarJob(req.op, req.resolution);
+    if (!admitted.ok) return { ok: false, error: admitted.error };
     startMemorySampling(`stage:${req.op}`);
     const res = await sidecarPost<{ ok: boolean; jobId?: string; error?: string }>('/stage', req);
     if (res === null) return { ok: false, error: ENGINE_DOWN };
     if (res.ok && res.jobId !== undefined) {
       jobPlans.set(res.jobId, planStageOp(req.op));
+      guardSidecarJob(
+        res.jobId,
+        req.op === 'texture'
+          ? 'the 3D texture'
+          : req.op === 'segment'
+            ? 'the part split'
+            : req.op === 'retopo'
+              ? 'the retopology'
+              : req.op === 'rig'
+                ? 'the rig'
+                : 'the motion clip',
+      );
     }
     return res;
   },

@@ -46,7 +46,15 @@
 import type { PowerMode } from './power-policy.js';
 import type { SystemPressure } from './pressure.js';
 
-export type GuardianVerdict = 'calm' | 'hold' | 'shed';
+/**
+ * `pause` is the verdict between hold and shed — the user (2026-09-16), after a
+ * restart: "runs should be paused and even totally terminated if pausing
+ * fails for some reason quickly … kernel level hangs are 100% unacceptable."
+ * Running heavy work is STOPPED IN PLACE (SIGSTOP) the reading it crosses the
+ * pause line, resumed when the machine has breathed, and terminated if the
+ * pause does not bring the memory back.
+ */
+export type GuardianVerdict = 'calm' | 'hold' | 'pause' | 'shed';
 
 /** What the guardian judges: the pressure reading plus what only the host process knows. */
 export interface GuardianReading extends SystemPressure {
@@ -57,8 +65,18 @@ export interface GuardianReading extends SystemPressure {
 export interface GuardianLimits {
   /** Below this fraction free (the OS's own number), nothing heavy starts. */
   readonly holdFree: number;
+  /** Below this, running heavy work is PAUSED in place. */
+  readonly pauseFree: number;
   /** Below this, running heavy work is cancelled. */
   readonly shedFree: number;
+
+  /** Readings a pause may stand before it becomes a shed — the pause did not
+   * bring the memory back, so the job goes. */
+  readonly pausedReadingsBeforeShed: number;
+  /** Consecutive calm readings before a PAUSED job is resumed (shorter than a
+   * hold's recovery: a stopped process costs the person nothing to wait on,
+   * and a resume that turns out early just pauses again). */
+  readonly resumeReadings: number;
   /**
    * "Tight" for the two corroborated sheds (heavy swap, a main-thread stall):
    * memory at or under this AND the other signal is a thrash. The same in
@@ -114,7 +132,16 @@ export function limitsFor(mode: PowerMode): GuardianLimits {
   const low = mode === 'low';
   return {
     holdFree: low ? 0.3 : 0.2,
+    /*
+     * THE PAUSE LINE. Between hold and shed: 15% by the kernel's reclaimable
+     * figure, or the kernel's own "warn". A paused job holds what it has and
+     * takes no more; the kernel gets the seconds it needs to reclaim cache,
+     * and the job resumes.
+     */
+    pauseFree: 0.15,
     shedFree: 0.08,
+    pausedReadingsBeforeShed: 20,
+    resumeReadings: 3,
     /*
      * NOT `holdFree`. The swap-and-tight shed read the mode's hold line, so in
      * 'low' — the DEFAULT — a job whose load burst dipped to 30% free was
@@ -149,6 +176,9 @@ export function judge(reading: GuardianReading, limits: GuardianLimits): Guardia
   const free = reading.memoryFree;
   const pct = free === undefined ? undefined : Math.round(free * 100);
 
+  const freeNow = reading.memoryFreeNow;
+  const pctNow = freeNow === undefined ? undefined : Math.round(freeNow * 1000) / 10;
+
   // The OS's own verdict outranks everything we could infer.
   if (reading.memory === 'critical') {
     return { verdict: 'shed', reason: 'the system reports critical memory pressure' };
@@ -156,6 +186,15 @@ export function judge(reading: GuardianReading, limits: GuardianLimits): Guardia
   if (free !== undefined && free <= limits.shedFree) {
     return { verdict: 'shed', reason: `only ${pct}% of memory is free` };
   }
+  /*
+   * NOT A SHED LINE: the pages actually free. MEASURED twice while wiring
+   * this — a 10 GB model LOADING takes macOS through "warn" with 0.6% of
+   * pages free for a second while the kernel reclaims cache, and the machine
+   * is fine (memorystatus_level 42%). A shed there kills every big model at
+   * load. The number rides along in the reason so the log says what the
+   * kernel saw; "warn" pauses, "critical" and a pause that does not lift are
+   * what end a run.
+   */
   /*
    * A SWAP BURST IS NOT YET A THRASH. Loading 10 GB of wired GPU memory on a
    * unified-memory Mac evicts that much file cache and compresses whatever is
@@ -185,12 +224,46 @@ export function judge(reading: GuardianReading, limits: GuardianLimits): Guardia
       reason: `the app stalled for ${Math.round((reading.stallMs ?? 0) / 100) / 10}s with ${pct}% of memory free`,
     };
   }
+  /*
+   * THE PAUSE LINES. The kernel saying "warn", the reclaimable figure under
+   * 15%, or the actually-free pages under 6%: running work stops in place,
+   * now, and the next reading decides whether it resumes or goes. A swap
+   * burst WITHOUT room to land pauses too (with room it stays a hold — a
+   * model loading on an idle machine is a burst, not a freeze).
+   */
+  const room = free !== undefined && free > limits.holdFree;
+  if (swapping && !room) {
+    return {
+      verdict: 'pause',
+      reason: `the machine is swapping (${Math.round(reading.swapIoPerSec ?? 0)} pages/s) with ${pct}% of memory free`,
+      hot: true,
+      room: false,
+    };
+  }
+  /*
+   * "WARN" IS NOT A PAUSE ON ITS OWN. MEASURED (2026-09-16, a 10 GB model
+   * loading on a 24 GB Mac): the kernel sits at "warn" for ten seconds and
+   * more while it reclaims cache, with memorystatus_level at 40% — the load,
+   * not a freeze — and a run paused on that reading never sees it lift and
+   * is ended for a burst that would have passed. Warn pauses when the
+   * reclaimable figure is ALSO tight (under the hold line); on its own it
+   * holds new work at the door.
+   */
+  if (reading.memory === 'warn' && free !== undefined && free <= limits.holdFree) {
+    return {
+      verdict: 'pause',
+      reason: `the system reports memory pressure with ${pct}% free${pctNow === undefined ? '' : ` (${pctNow}% of pages)`}`,
+    };
+  }
+  if (free !== undefined && free <= limits.pauseFree) {
+    return { verdict: 'pause', reason: `${pct}% of memory is free` };
+  }
   if (swapping) {
     return {
       verdict: 'hold',
       reason: `the machine is swapping (${Math.round(reading.swapIoPerSec ?? 0)} pages/s)`,
       hot: true,
-      room: free !== undefined && free > limits.holdFree,
+      room: true,
     };
   }
   if (reading.memory === 'warn') {
@@ -210,17 +283,63 @@ export function judge(reading: GuardianReading, limits: GuardianLimits): Guardia
  * `shed` is not sticky: once the heavy work is gone the reading will change,
  * and what remains is a hold that recovers on its own clock.
  */
+export interface Settled {
+  readonly verdict: GuardianVerdict;
+  readonly calmStreak: number;
+  readonly hotStreak: number;
+  /** Readings the pause has stood for; escalates to a shed at the limit. */
+  readonly pausedStreak: number;
+  readonly reason: string;
+}
+
 export function settle(
   next: GuardianJudgement,
   previous: GuardianVerdict,
   calmStreak: number,
   limits: GuardianLimits,
   hotStreak = 0,
-): { verdict: GuardianVerdict; calmStreak: number; hotStreak: number; reason: string } {
+  pausedStreak = 0,
+): Settled {
   if (next.verdict === 'shed') {
-    return { verdict: 'shed', calmStreak: 0, hotStreak: 0, reason: next.reason };
+    return { verdict: 'shed', calmStreak: 0, hotStreak: 0, pausedStreak: 0, reason: next.reason };
+  }
+  if (next.verdict === 'pause') {
+    /*
+     * A PAUSE THAT DOES NOT HELP IS A SHED. The job holds what it has; if
+     * the machine is still on the pause line after this many readings, its
+     * memory is what the machine needs back, and the only way to get it is
+     * to end the job. the user: "totally terminated if pausing fails for some
+     * reason quickly".
+     */
+    const paused = pausedStreak + 1;
+    if (paused >= limits.pausedReadingsBeforeShed) {
+      return {
+        verdict: 'shed',
+        calmStreak: 0,
+        hotStreak: 0,
+        pausedStreak: 0,
+        reason: `${next.reason} — paused for ${paused} readings and it did not come back`,
+      };
+    }
+    return {
+      verdict: 'pause',
+      calmStreak: 0,
+      hotStreak: 0,
+      pausedStreak: paused,
+      reason: next.reason,
+    };
   }
   if (next.verdict === 'hold') {
+    // A paused job stays paused through a hold-grade reading: not calm yet.
+    if (previous === 'pause') {
+      return {
+        verdict: 'pause',
+        calmStreak: 0,
+        hotStreak: 0,
+        pausedStreak,
+        reason: `${next.reason}; still paused`,
+      };
+    }
     if (next.hot === true) {
       const hot = hotStreak + 1;
       // A burst that will not end is a thrash, whatever the free figure says —
@@ -231,26 +350,37 @@ export function settle(
           verdict: 'shed',
           calmStreak: 0,
           hotStreak: 0,
+          pausedStreak: 0,
           reason: `${next.reason} for ${hot} readings running`,
         };
       }
-      return { verdict: 'hold', calmStreak: 0, hotStreak: hot, reason: next.reason };
+      return {
+        verdict: 'hold',
+        calmStreak: 0,
+        hotStreak: hot,
+        pausedStreak: 0,
+        reason: next.reason,
+      };
     }
-    return { verdict: 'hold', calmStreak: 0, hotStreak: 0, reason: next.reason };
+    return { verdict: 'hold', calmStreak: 0, hotStreak: 0, pausedStreak: 0, reason: next.reason };
   }
   // calm
   if (previous === 'calm') {
-    return { verdict: 'calm', calmStreak: 0, hotStreak: 0, reason: next.reason };
+    return { verdict: 'calm', calmStreak: 0, hotStreak: 0, pausedStreak: 0, reason: next.reason };
   }
   const streak = calmStreak + 1;
-  if (streak >= limits.recoveryReadings) {
-    return { verdict: 'calm', calmStreak: 0, hotStreak: 0, reason: next.reason };
+  // A paused job is resumed sooner than a held one is admitted: the stopped
+  // process cost nothing to wait on, and an early resume just pauses again.
+  const needed = previous === 'pause' ? limits.resumeReadings : limits.recoveryReadings;
+  if (streak >= needed) {
+    return { verdict: 'calm', calmStreak: 0, hotStreak: 0, pausedStreak: 0, reason: next.reason };
   }
   return {
-    verdict: 'hold',
+    verdict: previous === 'pause' ? 'pause' : 'hold',
     calmStreak: streak,
     hotStreak: 0,
-    reason: `${next.reason}; waiting for it to stay that way (${streak}/${limits.recoveryReadings})`,
+    pausedStreak: previous === 'pause' ? pausedStreak : 0,
+    reason: `${next.reason}; waiting for it to stay that way (${streak}/${needed})`,
   };
 }
 
@@ -319,8 +449,10 @@ export function fits(input: FitInput): { ok: boolean; reason: string; never?: bo
 
 // ─── the loop ────────────────────────────────────────────────────────────────
 
-/** How often to look while heavy work is running. A thrash builds in seconds. */
-export const BUSY_INTERVAL_MS = 1000;
+/** How often to look while heavy work is running. A thrash builds in seconds —
+ * MEASURED 2026-09-15, a 3D job took a 24 GB Mac from 48% free to 165 MB
+ * between two one-second readings. Half a second is the reaction a pause needs. */
+export const BUSY_INTERVAL_MS = 500;
 /** …and while nothing heavy is happening. Same as the power manager's own pace. */
 export const IDLE_INTERVAL_MS = 15_000;
 /** The cadence of the stall detector's own heartbeat. */
@@ -360,6 +492,7 @@ export function createGuardian(options: GuardianOptions): Guardian {
   let verdict: GuardianVerdict = 'calm';
   let calmStreak = 0;
   let hotStreak = 0;
+  let pausedStreak = 0;
   let last: GuardianReading | null = null;
   let timer: unknown = null;
   let running = false;
@@ -404,10 +537,18 @@ export function createGuardian(options: GuardianOptions): Guardian {
       worstStallMs = 0;
       last = reading;
       const limits = options.limits();
-      const settled = settle(judge(reading, limits), verdict, calmStreak, limits, hotStreak);
+      const settled = settle(
+        judge(reading, limits),
+        verdict,
+        calmStreak,
+        limits,
+        hotStreak,
+        pausedStreak,
+      );
       verdict = settled.verdict;
       calmStreak = settled.calmStreak;
       hotStreak = settled.hotStreak;
+      pausedStreak = settled.pausedStreak;
       options.onVerdict(verdict, settled.reason, reading);
       return verdict;
     } finally {
@@ -419,7 +560,12 @@ export function createGuardian(options: GuardianOptions): Guardian {
     if (!running) return;
     void poke().finally(() => {
       if (!running) return;
-      timer = schedule(tick, options.busy() ? BUSY_INTERVAL_MS : IDLE_INTERVAL_MS);
+      // A pause in force is watched at the busy cadence whatever the host
+      // says: the resume decision is the thing the person is waiting on.
+      timer = schedule(
+        tick,
+        options.busy() || verdict === 'pause' ? BUSY_INTERVAL_MS : IDLE_INTERVAL_MS,
+      );
     });
   };
 

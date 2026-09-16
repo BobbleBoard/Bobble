@@ -105,6 +105,13 @@ def test_metal_source_lines_are_dropped_from_the_requirements() -> None:
         out = envs._requirements_without_metal_sources(tool)
         lines = [l for l in out.read_text().splitlines() if l.strip()]
         assert lines == ["torch>=2.11.0", "trimesh"], lines
+        # …and the transformers bound goes too — the extras pin it.
+        (tool / "requirements_macos.txt").write_text("transformers>=4.40.0,<5\nnumpy\n")
+        out = envs._requirements_without_metal_sources(tool)
+        assert [l for l in out.read_text().splitlines() if l.strip()] == ["numpy"]
+        assert any(x.startswith("transformers==") for x in envs._MLX_TREE_EXTRAS)
+        assert any(x.startswith("kornia") for x in envs._MLX_TREE_EXTRAS)
+        assert any(x.startswith("timm") for x in envs._MLX_TREE_EXTRAS)
 
 
 def test_the_shipped_prebuilt_set_is_complete_and_named_by_the_manifest() -> None:
@@ -142,3 +149,89 @@ def test_installed_check_accepts_the_mlx_tree_alone() -> None:
 
     r.venv_python = venv_python
     assert r.env_present("trellis2") is True
+
+
+def test_ardy_installs_from_the_tree_and_the_shipped_extension() -> None:
+    """No CMake: deps from pyproject, the motion_correction wheel, a .pth line."""
+    with tempfile.TemporaryDirectory() as tmp:
+        tool = Path(tmp) / "ardy"
+        (tool / ".venv" / "bin").mkdir(parents=True)
+        (tool / ".venv" / "lib" / "python3.12" / "site-packages").mkdir(parents=True)
+        (tool / "pyproject.toml").write_text(
+            '[project]\nname = "ardy"\ndependencies = ["torch>=2.4", "peft>=0.19"]\n'
+        )
+        r = reg.Registry.__new__(reg.Registry)
+        r.uv_path = "uv"
+        r.src_dir = Path(tmp)
+        r.prebuilt_dir = ENGINE.parent / "prebuilt"
+        r.tool_dir = lambda name: tool
+        runs: list[list[str]] = []
+        with (
+            patch.object(envs, "_run", side_effect=lambda cmd, *a, **k: runs.append(cmd)),
+            patch.object(envs.subprocess, "run", return_value=MagicMock(returncode=1)),
+        ):
+            envs._provision_ardy(r, lambda m: None)
+        install = next(c for c in runs if c[:3] == ["uv", "pip", "install"])
+        assert "-e" not in install, install
+        assert "torch>=2.4" in install and "peft>=0.19" in install, install
+        assert any(a.endswith("motion_correction-1.0.0-cp312-cp312-macosx_11_0_arm64.whl") for a in install)
+        pth = tool / ".venv" / "lib" / "python3.12" / "site-packages" / "ardy-checkout.pth"
+        assert pth.read_text().strip() == str(tool)
+
+
+def test_cubepart_pins_the_wheel_only_fpsample() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        tool = Path(tmp) / "cube"
+        (tool / "cubepart").mkdir(parents=True)
+        r = reg.Registry.__new__(reg.Registry)
+        r.uv_path = "uv"
+        r.src_dir = Path(tmp)
+        r.tool_dir = lambda name: tool
+        r.venv_python = lambda name: tool / ".venv" / "bin" / "python"
+        runs: list[list[str]] = []
+        with patch.object(envs, "_run", side_effect=lambda cmd, *a, **k: runs.append(cmd)):
+            envs._provision_cubepart(r, lambda m: None)
+        install = next(c for c in runs if c[:3] == ["uv", "pip", "install"] and "-e" in c)
+        assert "fpsample==0.3.3" in install, install
+
+
+def test_the_meshtools_env_names_what_trimesh_reaches_for() -> None:
+    """scikit-image (marching cubes), rtree, manifold3d — the fresh-cache misses."""
+    for pkg in ("scikit-image", "rtree", "manifold3d"):
+        assert pkg in envs.MESHTOOLS_PACKAGES, pkg
+    for mod in ("skimage", "rtree", "manifold3d"):
+        assert mod in envs.MESHTOOLS_IMPORTS, mod
+
+
+def test_cubepart_gets_mlx_for_the_denoiser_swap() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        tool = Path(tmp) / "cube"
+        (tool / "cubepart").mkdir(parents=True)
+        r = reg.Registry.__new__(reg.Registry)
+        r.uv_path = "uv"
+        r.src_dir = Path(tmp)
+        r.tool_dir = lambda name: tool
+        r.venv_python = lambda name: tool / ".venv" / "bin" / "python"
+        runs: list[list[str]] = []
+        with patch.object(envs, "_run", side_effect=lambda cmd, *a, **k: runs.append(cmd)):
+            envs._provision_cubepart(r, lambda m: None)
+        install = next(c for c in runs if "-e" in c)
+        assert "mlx" in install, install
+
+
+def test_mflux_is_provisioned_before_the_pytorch_image_tree() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        r = reg.Registry.__new__(reg.Registry)
+        r.uv_path = "uv"
+        r.src_dir = Path(tmp)
+        r.tool_dir = lambda name: Path(tmp) / name
+        r.venv_python = lambda name: Path(tmp) / name / ".venv" / "bin" / "python"
+        r.mflux_cli = lambda: Path(tmp) / "mflux" / ".venv" / "bin" / "mflux-generate-mage-flow"
+        runs: list[list[str]] = []
+        with (
+            patch.object(envs, "_run", side_effect=lambda cmd, *a, **k: runs.append(cmd)),
+            patch.object(r, "ensure_tool_clone", side_effect=lambda name, log: (Path(tmp) / name)),
+        ):
+            (Path(tmp) / "Mage" / "mage_flow").mkdir(parents=True)
+            envs._provision_mageflow(r, lambda m: None)
+        assert any(f"mflux=={envs.MFLUX_PIN}" in c for c in runs), runs

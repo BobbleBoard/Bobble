@@ -29,7 +29,7 @@ import { AppearancePanel } from './panels/AppearancePanel';
 import { CapabilitiesPanel } from './panels/CapabilitiesPanel';
 import { ComputerUsePanel } from './panels/ComputerUsePanel';
 import { ConnectorsPanel } from './panels/ConnectorsPanel';
-import { EnginePanel } from './panels/EnginePanel';
+import { ExperimentalPanel } from './panels/ExperimentalPanel';
 import { HarnessPanel } from './panels/HarnessPanel';
 import { InterfacePanel } from './panels/InterfacePanel';
 import { PersonalizationPanel } from './panels/PersonalizationPanel';
@@ -46,12 +46,12 @@ export type SettingsSection =
   | 'search'
   | 'connectors'
   | 'capabilities'
-  | 'computer-use';
+  | 'computer-use'
+  | 'experimental';
 
 /** Sections this panel renders. `models` is deliberately absent — it is a view. */
 const NAV: Array<{ id: SettingsSection; label: string; icon: ReactNode }> = [
   { id: 'personalization', label: 'Custom instructions', icon: <IconPencil /> },
-  { id: 'engines', label: 'Engines', icon: <IconCpu /> },
   { id: 'harness', label: 'Harness', icon: <IconTerminal /> },
   { id: 'appearance', label: 'Appearance', icon: <IconSun /> },
   { id: 'interface', label: 'Interface', icon: <IconSlider /> },
@@ -60,6 +60,8 @@ const NAV: Array<{ id: SettingsSection; label: string; icon: ReactNode }> = [
   { id: 'search', label: 'Web search', icon: <IconSearch /> },
   { id: 'connectors', label: 'Connectors', icon: <IconConnector /> },
   { id: 'capabilities', label: 'Capabilities', icon: <IconPuzzle /> },
+  // The memory guard and the alternative inference engines — both experimental.
+  { id: 'experimental', label: 'Experimental', icon: <IconCpu /> },
 ];
 
 const TITLES: Record<SettingsSection, string> = {
@@ -74,6 +76,7 @@ const TITLES: Record<SettingsSection, string> = {
   connectors: 'Connectors',
   capabilities: 'Capabilities',
   'computer-use': 'Computer use',
+  experimental: 'Experimental',
 };
 
 function SectionBody({
@@ -88,9 +91,12 @@ function SectionBody({
   onRedoOnboarding?: () => void;
 }) {
   switch (section) {
+    // `engines` stays addressable (the composer's engine chip opens it) and
+    // lands on the Experimental page, where the engines now live.
     case 'models':
     case 'engines':
-      return <EnginePanel />;
+    case 'experimental':
+      return <ExperimentalPanel />;
     case 'harness':
       return <HarnessPanel />;
     case 'personalization':
@@ -220,11 +226,15 @@ export function SettingsView({
               key={item.id}
               type="button"
               data-testid={`settings-nav-${item.id}`}
-              aria-current={item.id === section ? 'page' : undefined}
+              aria-current={
+                item.id === section || (item.id === 'experimental' && section === 'engines')
+                  ? 'page'
+                  : undefined
+              }
               onClick={() => onSection(item.id)}
               className={cx(
                 'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-body',
-                item.id === section
+                item.id === section || (item.id === 'experimental' && section === 'engines')
                   ? 'bg-bg-active text-text-primary'
                   : 'text-text-secondary hover:bg-bg-hover',
               )}

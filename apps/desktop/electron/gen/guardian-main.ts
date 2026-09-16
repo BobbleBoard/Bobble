@@ -34,8 +34,28 @@ import {
   samplePressure,
 } from '@pi-desktop/inference';
 import type { GenQueueControl } from './gen-manager';
+import { createPausables, type Pausable, type PausablesRegistry } from './pausables';
 
 const execFileAsync = promisify(execFile);
+
+/**
+ * THE MEMORY GUARD'S HANDS, shared by every heavy run in the app.
+ *
+ * the user (2026-09-16): "runs should be paused and even totally terminated if
+ * pausing fails for some reason quickly … kernel level hangs are 100%
+ * unacceptable." A uv generation worker, the ComfyUI server while a job is
+ * in it, the 3D sidecar while a stage runs, a pi child mid-turn: each
+ * registers here for the length of its run (see pausables.ts), and the
+ * guardian's `pause` / `shed` reach them all — not only the queue's own jobs,
+ * which was the gap the restart went through (a 3D stage ran outside the
+ * queue, so the guardian sampled it at the idle cadence and could not shed).
+ */
+export const pausables: PausablesRegistry = createPausables();
+
+/** Register a heavy run with the guard for as long as it runs. */
+export function guardRun(entry: Pausable): () => void {
+  return pausables.register(entry);
+}
 
 export interface GuardianMainOptions {
   /** The queue's levers — from `registerGenIpc`. */
@@ -44,12 +64,27 @@ export interface GuardianMainOptions {
   readonly mode: () => PowerMode;
   /** The reserve the user named, if any; otherwise derived from the machine. */
   readonly reserveGB: () => number | undefined;
+  /**
+   * The memory guard's switch (Settings → Experimental). Off, the guard
+   * neither pauses nor terminates a run: admission and the queue's own shed
+   * behave as they did before the guard existed.
+   */
+  readonly guardEnabled?: () => boolean;
+  /**
+   * Unload the chat model. At the wall with nothing else to end, the model
+   * itself is what the machine needs back; a turn that dies with a clear
+   * error is better than a Mac that stops answering the trackpad.
+   */
+  readonly parkChatModel?: (reason: string) => Promise<unknown>;
   /** Tell the app. Every change of verdict, and every shed. */
   readonly announce: (event: {
     verdict: GuardianVerdict;
     reason: string;
     memoryFree?: number;
     shed?: readonly string[];
+    /** What was stopped in place (a pause), or let run again (a resume). */
+    paused?: readonly string[];
+    resumed?: readonly string[];
     queued?: number;
   }) => void;
   readonly log?: (line: string) => void;
@@ -101,7 +136,8 @@ export function startGuardian(opts: GuardianMainOptions): GuardianMain {
         },
         readFile: async () => null,
       }),
-    busy: () => opts.queue()?.running() === true,
+    // Heavy work anywhere in the app, not only the queue's own jobs.
+    busy: () => opts.queue()?.running() === true || pausables.active(),
     limits: () => {
       const limits = limitsFor(opts.mode());
       /*
@@ -113,32 +149,81 @@ export function startGuardian(opts: GuardianMainOptions): GuardianMain {
        */
       const shed = Number(process.env.PI_GUARDIAN_SHED_FREE);
       const hold = Number(process.env.PI_GUARDIAN_HOLD_FREE);
+      const pause = Number(process.env.PI_GUARDIAN_PAUSE_FREE);
       return {
         ...limits,
         ...(Number.isFinite(shed) && shed > 0 ? { shedFree: shed } : {}),
         ...(Number.isFinite(hold) && hold > 0 ? { holdFree: hold } : {}),
+        ...(Number.isFinite(pause) && pause > 0 ? { pauseFree: pause } : {}),
       };
     },
     onVerdict: (verdict, reason, reading) => {
       const changed = verdict !== lastVerdict || reason !== lastReason;
+      const wasPaused = lastVerdict === 'pause';
       lastVerdict = verdict;
       lastReason = reason;
       const q = opts.queue();
+      const guard = opts.guardEnabled?.() !== false;
       if (verdict === 'shed') {
         /*
-         * THE ONE MOMENT THIS FILE EXISTS FOR. Cancel the heavy job now, with
-         * the reason attached, and say so. Then the reading changes on its own
-         * and the guardian settles into a hold that lifts when the machine has
-         * stayed calm — nothing here retries the job; the person decides that.
+         * THE ONE MOMENT THIS FILE EXISTS FOR. End the heavy work now, with the
+         * reason attached, and say so. The queue's own jobs are cancelled
+         * through the queue (their bookkeeping ends cleanly); every other
+         * registered run is ended through its own cancel and then the signal.
+         * Then the reading changes on its own and the guardian settles into a
+         * hold that lifts when the machine has stayed calm — nothing here
+         * retries the job; the person decides that.
          */
-        const stopped = q?.shedRunning(`Stopped to keep your Mac responsive — ${reason}`) ?? [];
+        const why = `Stopped to keep your Mac responsive — ${reason}`;
+        const stopped = q?.shedRunning(why) ?? [];
         if (stopped.length > 0) log(`SHED ${stopped.join(', ')}: ${reason}`);
+        if (guard) {
+          void pausables.terminateAll(why).then((ended) => {
+            if (ended.length > 0) log(`TERMINATED ${ended.join(', ')}: ${reason}`);
+            // Nothing heavy to end but the machine is still at the wall: the
+            // chat model is the load, and it goes rather than the Mac.
+            if (stopped.length === 0 && ended.length === 0 && opts.parkChatModel !== undefined) {
+              log(`PARK the chat model: ${reason}`);
+              void opts.parkChatModel(why);
+            }
+          });
+        }
         opts.announce({
           verdict,
           reason,
           ...(reading.memoryFree !== undefined ? { memoryFree: reading.memoryFree } : {}),
           shed: stopped,
         });
+        return;
+      }
+      if (verdict === 'pause' && guard) {
+        // Stop every heavy run in place. Idempotent: a run already stopped
+        // stays stopped; one registered since is stopped now.
+        const paused = pausables.pauseAll(reason);
+        if (paused.length > 0) log(`PAUSE ${paused.join(', ')}: ${reason}`);
+        if (changed) {
+          opts.announce({
+            verdict,
+            reason,
+            ...(reading.memoryFree !== undefined ? { memoryFree: reading.memoryFree } : {}),
+            paused: pausables.list().map((e) => e.label),
+            queued: q?.queued() ?? 0,
+          });
+        }
+        return;
+      }
+      if (wasPaused && verdict !== 'pause') {
+        // The machine has breathed: let the stopped runs go on.
+        const resumed = pausables.resumeAll();
+        if (resumed.length > 0) log(`RESUME ${resumed.join(', ')}: ${reason}`);
+        opts.announce({
+          verdict,
+          reason,
+          ...(reading.memoryFree !== undefined ? { memoryFree: reading.memoryFree } : {}),
+          resumed,
+          queued: q?.queued() ?? 0,
+        });
+        if (verdict === 'calm') q?.reconsider();
         return;
       }
       if (changed) {
@@ -186,8 +271,9 @@ export function startGuardian(opts: GuardianMainOptions): GuardianMain {
         const ever = fits({ footprintGB, totalGB: TOTAL_GB, freeFraction: undefined, reserveGB });
         if (ever.never === true) return { ok: false, reason: ever.reason, never: true };
       }
-      // At the wall nothing starts, whatever its size.
-      if (verdict === 'shed') return { ok: false, reason: lastReason };
+      // At the wall nothing starts, whatever its size — and nothing while
+      // what is running is stopped in place.
+      if (verdict === 'shed' || verdict === 'pause') return { ok: false, reason: lastReason };
       // A job of unknown size is admitted only on a calm machine; one of known
       // size is admitted on the numbers, which is what makes a hold
       // proportionate — small things still go through.

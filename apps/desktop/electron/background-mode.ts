@@ -47,7 +47,8 @@
  * ## Opting out
  *
  * `PI_E2E_VISIBLE=1` turns the whole mode off — a normal, visible window — for
- * when someone actually wants to watch a run.
+ * when someone actually wants to watch a run. `PI_E2E_HEADED=1` is the middle:
+ * the window is on screen but inactive, and everything else stays quiet.
  */
 
 /**
@@ -76,6 +77,15 @@ export function isBackgroundMode(env: NodeJS.ProcessEnv = process.env): boolean 
  * unfocused-but-visible window, this is the one that changes.
  */
 export function isHiddenMode(env: NodeJS.ProcessEnv = process.env): boolean {
+  /*
+   * HEADED, NOT NOTICED. the user (2026-09-15): "run these deeper tests all
+   * headed." A visible window that never takes focus: the app stays an
+   * accessory (no dock tile, no activation, no notifications, the overlay
+   * headless) and the window is shown with `showInactive()`, so a run can be
+   * watched over a shoulder without the keyboard ever leaving what the person
+   * is doing. `PI_E2E_VISIBLE=1` remains the fully ordinary window.
+   */
+  if (env.PI_E2E_HEADED === '1') return false;
   return isBackgroundMode(env);
 }
 

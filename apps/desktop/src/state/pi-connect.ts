@@ -1598,4 +1598,7 @@ if (typeof window !== 'undefined' && new URLSearchParams(window.location.search)
   /* The deliberate respawn, for probes — the path that must re-apply the
      chat's working folder (see restartPi). */
   window.__pi_restart = (opts?: { cwd?: string; sessionPath?: string }) => restartPi(opts);
+  // The chat's working folder, once the first send has made one — a probe
+  // reads it to find what a task wrote.
+  window.__pi_workspace = () => resolvedWorkspace();
 }

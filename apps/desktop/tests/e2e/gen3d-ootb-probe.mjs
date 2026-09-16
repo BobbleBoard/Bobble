@@ -41,7 +41,7 @@ const IMAGE =
   process.env.IMAGE ?? path.join(homedir(), 'Bobble/generated/a-blue-mug/cand0_seed602697309.png');
 const MANNEQUIN = process.env.MANNEQUIN ?? '';
 const STAGES = (process.env.STAGES ?? 'texture,segment,retopo,rig,motion').split(',');
-const MODELS = (process.env.MODELS ?? 'trellis2,cubepart,autoremesher,humanoid-rig,ardy-motion')
+const MODELS = (process.env.MODELS ?? 'trellis2,cubepart,autoremesher,humanoid-rig,ardy-motion,mageflow')
   .split(',')
   .filter(Boolean);
 if (!existsSync(MODEL_GLB)) throw new Error(`no model at ${MODEL_GLB}`);
@@ -234,7 +234,10 @@ try {
 
   // Leave the gate if it is still up (View), then import the model.
   await page.click('[data-testid="tp-gate-view"]').catch(() => {});
-  await page.waitForSelector('[data-testid="tp-upload-card-input"]', { timeout: 30_000 });
+  await page.waitForSelector('[data-testid="tp-upload-card-input"]', {
+    state: 'attached',
+    timeout: 30_000,
+  });
   await page.setInputFiles('[data-testid="tp-upload-card-input"]', model);
   await page.waitForFunction(
     () => document.querySelectorAll('.tp-asset-card').length > 0,

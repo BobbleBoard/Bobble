@@ -19,6 +19,7 @@ import {
   parseNvidiaSmiUtil,
   parseProcVmstatSwapCounters,
   parsePsi,
+  parseVmStatFreeNow,
   parseVmStatSwapCounters,
   psiToVerdict,
   samplePressure,
@@ -236,5 +237,24 @@ describe('swap: the flow, not the stock', () => {
   it('gives up rather than lie when the counters went backwards (a reboot)', () => {
     const a = { ins: 500, outs: 500, at: 0 };
     expect(swapRate({ ins: 10, outs: 10, at: 1000 }, a)).toBeUndefined();
+  });
+});
+
+describe('parseVmStatFreeNow', () => {
+  it('turns free + speculative pages into a fraction of the machine', () => {
+    const out = [
+      'Mach Virtual Memory Statistics: (page size of 16384 bytes)',
+      'Pages free:                               10535.',
+      'Pages active:                            362534.',
+      'Pages speculative:                         3398.',
+      'Swapins:                                 101315.',
+      'Swapouts:                                229699.',
+    ].join('\n');
+    // The jetsam reading: 10,535 + 3,398 pages of 16 KB on a 24 GB Mac.
+    const total = 24 * 1024 ** 3;
+    const f = parseVmStatFreeNow(out, total);
+    expect(f).toBeDefined();
+    expect(Math.round((f ?? 0) * 1000) / 1000).toBe(0.009);
+    expect(parseVmStatFreeNow('nothing here', total)).toBeUndefined();
   });
 });
