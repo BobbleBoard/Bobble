@@ -5,38 +5,46 @@
  * the user (2026-09-16), Claude's inline card beside Bobble's static picture: "we
  * need parity on these datavisuals … this was way quicker and is a much
  * stronger result". What theirs has and a picture cannot: a hover band with
- * the value read out, a chart ⇄ table toggle in the corner, the app's own
- * type and colours, and a size that fits the thread. This renders a ChartSpec
- * (the same spec the `chart` tool wrote beside its SVG) from the shared
- * layout, so the bars here are the bars in the file.
+ * the value read out, a chart ⇄ table toggle in the corner, and a size that
+ * fits the thread. This renders a ChartSpec (the same spec the `chart` tool
+ * wrote beside its SVG) from the shared layout, so the bars here are the bars
+ * in the file.
+ *
+ * …and then: "square not rounded looks bad. can it style them on its own? …
+ * we CANNOT have 'all charts from bobble look the same generic'." So the card
+ * wears the spec's LOOK (@pi-desktop/charts style.ts): its palette, its bar
+ * radius and width, its grid, its line style, its type. A theme-following look
+ * takes ink and grid from the app's tokens (a dark chat, a dark chart); a
+ * fixed-ground look (slate, terminal, paper) paints its own ground inside the
+ * card, in any theme, on purpose.
  *
  * The same component serves the inline card (compact, capped height) and the
- * canvas tab (fills the tab); only the size differs. Colours are the app's
- * tokens so a dark chat gets a dark chart, and a highlight takes the warm
- * accent the office charts use.
+ * canvas tab (fills the tab); only the size differs.
  */
 import {
+  barRadius,
   type ChartLayout,
   type ChartSpec,
   chartToSvg,
   formatValue,
   layoutChart,
   normalizeChartSpec,
+  type ResolvedStyle,
+  resolveStyle,
+  roundedBarPath,
+  seriesColour,
 } from '@pi-desktop/charts';
-import { type CSSProperties, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  type CSSProperties,
+  useCallback,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import type { SurfaceProps } from '../registry.ts';
 import { IconChart, type IconProps, IconTable } from '../tab-icons.tsx';
-
-/** Series colours: the app's accent first, then a palette that reads on both grounds. */
-const SERIES_COLOURS = [
-  'var(--pd-accent-primary)',
-  '#E8863A',
-  '#3FB3AC',
-  '#D9B44A',
-  '#9AC05F',
-  '#97A3AD',
-];
-const HIGHLIGHT = '#E8863A';
 
 export interface ChartViewProps {
   readonly spec: ChartSpec;
@@ -64,12 +72,57 @@ export function specFromText(text: string): ChartSpec | { error: string } {
   }
 }
 
+/**
+ * The app's theme, as the theme sheet keys it (`data-mode` on the root), so a
+ * theme-following look can lift its darkest inks on a dark chat. Watched, so
+ * a theme switch re-resolves the look without a remount.
+ */
+function readAppTheme(): 'light' | 'dark' {
+  return typeof document !== 'undefined' &&
+    document.documentElement.getAttribute('data-mode') === 'dark'
+    ? 'dark'
+    : 'light';
+}
+
+function useAppTheme(): 'light' | 'dark' {
+  const [theme, setTheme] = useState<'light' | 'dark'>(readAppTheme);
+  useLayoutEffect(() => {
+    if (typeof MutationObserver === 'undefined') return;
+    const mo = new MutationObserver(() => setTheme(readAppTheme()));
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-mode'] });
+    return () => mo.disconnect();
+  }, []);
+  return theme;
+}
+
+/**
+ * The look as CSS custom properties on the card's root. A fixed ground sets
+ * the paper/ink/mute/grid the stylesheet otherwise takes from the app tokens;
+ * the font and title weight always come from the look.
+ */
+function styleVars(style: ResolvedStyle): CSSProperties {
+  const vars: Record<string, string> = {
+    '--chart-font': style.fontFamily,
+    '--chart-title-weight': String(style.titleWeight),
+  };
+  if (style.ground !== null) {
+    vars['--chart-paper'] = style.ground.paper;
+    vars['--chart-ink'] = style.ground.ink;
+    vars['--chart-mute'] = style.ground.mute;
+    vars['--chart-grid'] = style.ground.grid;
+  }
+  return vars as CSSProperties;
+}
+
 export function ChartView({ spec, fill = false, corner, className }: ChartViewProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
   const [boxHeight, setBoxHeight] = useState(0);
   const [view, setView] = useState<'chart' | 'table'>('chart');
   const [hover, setHover] = useState<Hover>(NO_HOVER);
+  const gradientId = useId();
+  const theme = useAppTheme();
+  const style = useMemo(() => resolveStyle(spec.style, 'clean', { theme }), [spec.style, theme]);
 
   useLayoutEffect(() => {
     const host = hostRef.current;
@@ -90,19 +143,18 @@ export function ChartView({ spec, fill = false, corner, className }: ChartViewPr
     ? Math.max(200, boxHeight)
     : Math.max(220, Math.min(380, Math.round(width * 0.56)));
   const layout = useMemo<ChartLayout | null>(
-    () => (width > 0 ? layoutChart(spec, { width, height, compact: !fill && width < 420 }) : null),
-    [spec, width, height, fill],
+    () =>
+      width > 0 ? layoutChart(spec, { width, height, compact: !fill && width < 420, style }) : null,
+    [spec, width, height, fill, style],
   );
-  // The larger view reads its values off the shapes, as the file does; the
-  // inline card stays clean and reads them on hover (Claude's card does too).
-  const valueLabels = fill;
+  // Values on the shapes: the look decides (on / off); `auto` means the larger
+  // view only — the inline card stays clean and reads them on hover.
+  const valueLabels = style.labels === 'on' || (style.labels === 'auto' && fill);
 
   const colour = useCallback(
     (series: number, highlighted: boolean): string =>
-      highlighted && spec.series.length === 1
-        ? HIGHLIGHT
-        : (SERIES_COLOURS[series % SERIES_COLOURS.length] ?? 'currentColor'),
-    [spec.series.length],
+      seriesColour(style, series, highlighted, spec.series.length),
+    [style, spec.series.length],
   );
 
   const hoveredCategory = hover.category !== null ? layout?.categories[hover.category] : undefined;
@@ -119,8 +171,8 @@ export function ChartView({ spec, fill = false, corner, className }: ChartViewPr
         rows: [
           {
             colour: s.highlighted
-              ? HIGHLIGHT
-              : (SERIES_COLOURS[s.point % SERIES_COLOURS.length] ?? ''),
+              ? style.accent
+              : (style.palette[s.point % style.palette.length] ?? ''),
             value: `${formatValue(s.value, spec.unit)}${spec.unit === '%' ? '' : ` · ${Math.round(s.fraction * 100)}%`}`,
             name: spec.series[0]?.name ?? '',
           },
@@ -164,9 +216,9 @@ export function ChartView({ spec, fill = false, corner, className }: ChartViewPr
       title: hoveredCategory.label,
       rows,
     };
-  }, [layout, spec, hover, hoveredCategory, colour]);
+  }, [layout, spec, hover, hoveredCategory, colour, style]);
 
-  const style: CSSProperties = fill ? { height: '100%' } : { height };
+  const boxStyle: CSSProperties = fill ? { height: '100%' } : { height };
   const tooltipStyle = (): CSSProperties => {
     if (tooltip === null || layout === null) return {};
     // Flip to the left of the band when the card would run off the right edge.
@@ -182,9 +234,12 @@ export function ChartView({ spec, fill = false, corner, className }: ChartViewPr
       className={['pd-chart', fill ? 'pd-chart--fill' : 'pd-chart--inline', className]
         .filter(Boolean)
         .join(' ')}
+      style={styleVars(style)}
       data-testid="chart-view"
       data-chart-type={spec.type}
       data-chart-view={view}
+      data-chart-look={style.look}
+      data-chart-ground={style.ground !== null || undefined}
     >
       <div className="pd-chart-head">
         <div className="pd-chart-titles">
@@ -232,7 +287,7 @@ export function ChartView({ spec, fill = false, corner, className }: ChartViewPr
         <div
           ref={hostRef}
           className="pd-chart-box"
-          style={style}
+          style={boxStyle}
           onMouseLeave={() => setHover(NO_HOVER)}
         >
           {layout !== null ? (
@@ -247,10 +302,12 @@ export function ChartView({ spec, fill = false, corner, className }: ChartViewPr
               <ChartShapes
                 spec={spec}
                 layout={layout}
+                style={style}
                 hover={hover}
                 colour={colour}
                 setHover={setHover}
                 valueLabels={valueLabels}
+                gradientId={gradientId}
               />
             </svg>
           ) : null}
@@ -276,23 +333,30 @@ export function ChartView({ spec, fill = false, corner, className }: ChartViewPr
 function ChartShapes({
   spec,
   layout: L,
+  style,
   hover,
   colour,
   setHover,
   valueLabels = false,
+  gradientId,
 }: {
   spec: ChartSpec;
   layout: ChartLayout;
+  style: ResolvedStyle;
   hover: Hover;
   colour: (series: number, highlighted: boolean) => string;
   setHover: (h: Hover) => void;
-  /** Write each value on its bar / point (the canvas view; the same rule as the SVG). */
+  /** Write each value on its bar / point (the look, or the canvas view). */
   valueLabels?: boolean;
+  gradientId: string;
 }) {
   const horizontal = spec.type === 'hbar';
   const shapes: React.ReactNode[] = [];
+  const defs: React.ReactNode[] = [];
   const barValues = valueLabels && spec.type !== 'stacked' && L.bars.length <= 24;
   const lineValues = valueLabels && L.lines.length === 1 && (L.lines[0]?.markers.length ?? 0) <= 16;
+  const swatchRx = style.radius === 0 ? 0 : 2;
+  const gridDash = style.grid === 'dots' ? '1 4' : undefined;
 
   if (L.legend.length > 0 && L.donut === undefined) {
     let lx = L.plot.x;
@@ -304,7 +368,7 @@ function ChartShapes({
             y={L.plot.y - 22}
             width={10}
             height={10}
-            rx={2}
+            rx={swatchRx}
             fill={colour(e.series, false)}
           />
           <text x={lx + 15} y={L.plot.y - 13} className="pd-chart-text pd-chart-text--mute">
@@ -318,16 +382,19 @@ function ChartShapes({
 
   if (L.donut !== undefined) {
     const shades =
-      spec.highlight !== undefined ? SERIES_COLOURS.filter((c) => c !== HIGHLIGHT) : SERIES_COLOURS;
+      spec.highlight !== undefined
+        ? style.palette.filter((c) => c !== style.accent)
+        : style.palette;
+    const sliceFill = (s: { highlighted: boolean; point: number }): string =>
+      s.highlighted ? style.accent : (shades[s.point % shades.length] ?? 'currentColor');
     for (const s of L.slices) {
-      const fill = s.highlighted ? HIGHLIGHT : (shades[s.point % shades.length] ?? 'currentColor');
       const dim = hover.point !== null && hover.point !== s.point;
       shapes.push(
         // biome-ignore lint/a11y/noStaticElementInteractions: hover read-out only — the table view carries the values
         <path
           key={`slice-${s.point}`}
           d={s.d}
-          fill={fill}
+          fill={sliceFill(s)}
           opacity={dim ? 0.45 : 1}
           className="pd-chart-slice"
           onMouseEnter={() => setHover({ category: null, series: 0, point: s.point })}
@@ -357,7 +424,6 @@ function ChartShapes({
     for (const c of L.categories) {
       const s = L.slices[c.index];
       if (s === undefined) continue;
-      const fill = s.highlighted ? HIGHLIGHT : (shades[s.point % shades.length] ?? 'currentColor');
       const y = c.band.y + c.band.h / 2;
       shapes.push(
         // biome-ignore lint/a11y/noStaticElementInteractions: hover read-out only — the table view carries the values
@@ -366,7 +432,14 @@ function ChartShapes({
           className="pd-chart-legend-row"
           onMouseEnter={() => setHover({ category: null, series: 0, point: s.point })}
         >
-          <rect x={c.band.x} y={y - 6} width={12} height={12} rx={3} fill={fill} />
+          <rect
+            x={c.band.x}
+            y={y - 6}
+            width={12}
+            height={12}
+            rx={swatchRx + 1}
+            fill={sliceFill(s)}
+          />
           <text
             x={c.band.x + 20}
             y={y + 4}
@@ -402,6 +475,7 @@ function ChartShapes({
           y={c.band.y}
           width={c.band.w}
           height={c.band.h}
+          rx={6}
           className="pd-chart-band"
           data-hover={hover.category === c.index || undefined}
           onMouseEnter={() => setHover({ category: c.index, series: null, point: null })}
@@ -411,16 +485,21 @@ function ChartShapes({
   }
   for (const tick of L.ticks) {
     const zero = tick.value === 0;
+    const drawLine = style.grid !== 'none' || zero;
     shapes.push(
       horizontal ? (
         <g key={`tick-${tick.value}`}>
-          <line
-            x1={tick.at}
-            y1={L.plot.y}
-            x2={tick.at}
-            y2={L.plot.y + L.plot.h}
-            className={zero ? 'pd-chart-axis' : 'pd-chart-grid'}
-          />
+          {drawLine ? (
+            <line
+              x1={tick.at}
+              y1={L.plot.y}
+              x2={tick.at}
+              y2={L.plot.y + L.plot.h}
+              className={zero ? 'pd-chart-axis' : 'pd-chart-grid'}
+              strokeDasharray={zero ? undefined : gridDash}
+              strokeLinecap={gridDash !== undefined ? 'round' : undefined}
+            />
+          ) : null}
           <text
             x={tick.at}
             y={L.plot.y + L.plot.h + 15}
@@ -432,13 +511,17 @@ function ChartShapes({
         </g>
       ) : (
         <g key={`tick-${tick.value}`}>
-          <line
-            x1={L.plot.x}
-            y1={tick.at}
-            x2={L.plot.x + L.plot.w}
-            y2={tick.at}
-            className={zero ? 'pd-chart-axis' : 'pd-chart-grid'}
-          />
+          {drawLine ? (
+            <line
+              x1={L.plot.x}
+              y1={tick.at}
+              x2={L.plot.x + L.plot.w}
+              y2={tick.at}
+              className={zero ? 'pd-chart-axis' : 'pd-chart-grid'}
+              strokeDasharray={zero ? undefined : gridDash}
+              strokeLinecap={gridDash !== undefined ? 'round' : undefined}
+            />
+          ) : null}
           <text
             x={L.plot.x - 8}
             y={tick.at + 4}
@@ -454,13 +537,16 @@ function ChartShapes({
   for (const tick of L.xTicks) {
     shapes.push(
       <g key={`xtick-${tick.value}`}>
-        <line
-          x1={tick.at}
-          y1={L.plot.y}
-          x2={tick.at}
-          y2={L.plot.y + L.plot.h}
-          className="pd-chart-grid"
-        />
+        {style.grid !== 'none' ? (
+          <line
+            x1={tick.at}
+            y1={L.plot.y}
+            x2={tick.at}
+            y2={L.plot.y + L.plot.h}
+            className="pd-chart-grid"
+            strokeDasharray={gridDash}
+          />
+        ) : null}
         <text
           x={tick.at}
           y={L.plot.y + L.plot.h + 15}
@@ -501,15 +587,12 @@ function ChartShapes({
   }
   for (const b of L.bars) {
     const dim = hover.category !== null && hover.category !== b.point;
+    const r = b.outer ? barRadius(style.radius, b.w, b.h) : 0;
     shapes.push(
       // biome-ignore lint/a11y/noStaticElementInteractions: hover read-out only — the table view carries the values
-      <rect
+      <path
         key={`bar-${b.series}-${b.point}`}
-        x={b.x}
-        y={b.y}
-        width={b.w}
-        height={b.h}
-        rx={Math.min(3, b.w / 3)}
+        d={roundedBarPath(b.x, b.y, b.w, b.h, r, b.side)}
         fill={colour(b.series, b.highlighted)}
         opacity={dim ? 0.55 : 1}
         className="pd-chart-bar"
@@ -543,8 +626,19 @@ function ChartShapes({
   }
   for (const l of L.lines) {
     const c = colour(l.series, false);
-    if (spec.type === 'area' && l.area !== '') {
-      shapes.push(<path key={`area-${l.series}`} d={l.area} fill={c} fillOpacity={0.14} />);
+    if (spec.type === 'area' && l.area !== '' && style.area !== 'none') {
+      if (style.area === 'gradient') {
+        const id = `${gradientId}-area-${l.series}`;
+        defs.push(
+          <linearGradient key={id} id={id} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor={c} stopOpacity={0.38} />
+            <stop offset="1" stopColor={c} stopOpacity={0.02} />
+          </linearGradient>,
+        );
+        shapes.push(<path key={`area-${l.series}`} d={l.area} fill={`url(#${id})`} />);
+      } else {
+        shapes.push(<path key={`area-${l.series}`} d={l.area} fill={c} fillOpacity={0.14} />);
+      }
     }
     if (l.markers.length > 1) {
       shapes.push(
@@ -553,7 +647,7 @@ function ChartShapes({
           d={l.d}
           fill="none"
           stroke={c}
-          strokeWidth={2.5}
+          strokeWidth={style.strokeWidth}
           strokeLinejoin="round"
           strokeLinecap="round"
         />,
@@ -561,19 +655,26 @@ function ChartShapes({
     }
     for (const m of l.markers) {
       const on = hover.category === m.point;
-      shapes.push(
-        // biome-ignore lint/a11y/noStaticElementInteractions: hover read-out only — the table view carries the values
-        <circle
-          key={`marker-${l.series}-${m.point}`}
-          cx={m.x}
-          cy={m.y}
-          r={on || m.highlighted ? 5.5 : 4}
-          className="pd-chart-marker"
-          stroke={m.highlighted ? HIGHLIGHT : c}
-          strokeWidth={2.5}
-          onMouseEnter={() => setHover({ category: m.point, series: l.series, point: m.point })}
-        />,
-      );
+      const ring = style.markers === 'ring';
+      const visible = style.markers !== 'none' || on || m.highlighted;
+      if (visible) {
+        shapes.push(
+          // biome-ignore lint/a11y/noStaticElementInteractions: hover read-out only — the table view carries the values
+          <circle
+            key={`marker-${l.series}-${m.point}`}
+            cx={m.x}
+            cy={m.y}
+            r={on || m.highlighted ? 5.5 : ring ? 4 : 3.5}
+            className="pd-chart-marker"
+            // The stylesheet fills a marker with the paper (a ring); a dot's
+            // fill is inline so it wins over that rule.
+            style={ring ? undefined : { fill: m.highlighted ? style.accent : c }}
+            stroke={m.highlighted ? style.accent : c}
+            strokeWidth={ring ? 2.5 : 0}
+            onMouseEnter={() => setHover({ category: m.point, series: l.series, point: m.point })}
+          />,
+        );
+      }
       if (lineValues) {
         shapes.push(
           <text
@@ -633,7 +734,12 @@ function ChartShapes({
       </text>,
     );
   }
-  return <>{shapes}</>;
+  return (
+    <>
+      {defs.length > 0 ? <defs>{defs}</defs> : null}
+      {shapes}
+    </>
+  );
 }
 
 /** The same data as rows — Claude's table toggle. */

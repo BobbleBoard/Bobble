@@ -5275,9 +5275,20 @@
   flex-direction: column;
   gap: var(--pd-space-xs);
   padding: var(--pd-space-md) var(--pd-space-md) var(--pd-space-sm);
-  color: var(--pd-text-primary);
+  /*
+   * The look's variables (chart-surface.tsx sets them on this root): a
+   * fixed-ground look paints its own paper and ink; a theme-following look
+   * leaves them unset and the app's tokens show through.
+   */
+  color: var(--chart-ink, var(--pd-text-primary));
+  background: var(--chart-paper, transparent);
+  font-family: var(--chart-font, inherit);
   font-size: var(--pd-font-size-caption);
   min-width: 0;
+}
+
+.pd-chart[data-chart-ground] {
+  border-radius: var(--pd-radius-lg);
 }
 
 .pd-chart--fill {
@@ -5303,12 +5314,12 @@
 
 .pd-chart-title {
   font-size: var(--pd-font-size-body);
-  font-weight: var(--pd-font-weight-medium);
+  font-weight: var(--chart-title-weight, var(--pd-font-weight-medium));
   line-height: 1.3;
 }
 
 .pd-chart-subtitle {
-  color: var(--pd-text-muted);
+  color: var(--chart-mute, var(--pd-text-muted));
   margin-top: 2px;
 }
 
@@ -5348,7 +5359,7 @@
   border: 0;
   border-radius: calc(var(--pd-radius-md) - 2px);
   background: transparent;
-  color: var(--pd-text-muted);
+  color: var(--chart-mute, var(--pd-text-muted));
   cursor: pointer;
   transition:
     background var(--pd-duration-fast) var(--pd-easing-standard),
@@ -5356,7 +5367,7 @@
 }
 
 .pd-chart-toggle-btn:hover {
-  color: var(--pd-text-primary);
+  color: var(--chart-ink, var(--pd-text-primary));
 }
 
 .pd-chart-toggle-btn[data-active] {
@@ -5382,13 +5393,13 @@
 }
 
 .pd-chart-text {
-  font-family: var(--pd-font-family, inherit);
+  font-family: var(--chart-font, var(--pd-font-family, inherit));
   font-size: 12px;
-  fill: var(--pd-text-primary);
+  fill: var(--chart-ink, var(--pd-text-primary));
 }
 
 .pd-chart-text--mute {
-  fill: var(--pd-text-muted);
+  fill: var(--chart-mute, var(--pd-text-muted));
 }
 
 .pd-chart-text--small {
@@ -5401,12 +5412,12 @@
 }
 
 .pd-chart-grid {
-  stroke: var(--pd-border-subtle);
+  stroke: var(--chart-grid, var(--pd-border-subtle));
   stroke-width: 1;
 }
 
 .pd-chart-axis {
-  stroke: var(--pd-text-ghost);
+  stroke: var(--chart-mute, var(--pd-text-ghost));
   stroke-width: 1;
 }
 
@@ -5427,7 +5438,7 @@
 }
 
 .pd-chart-marker {
-  fill: var(--pd-bg-raised);
+  fill: var(--chart-paper, var(--pd-bg-raised));
 }
 
 .pd-chart-legend-row {
@@ -5475,7 +5486,7 @@
 }
 
 .pd-chart-note {
-  color: var(--pd-text-ghost);
+  color: var(--chart-mute, var(--pd-text-ghost));
   font-size: var(--pd-font-size-footnote);
 }
 
@@ -5492,18 +5503,39 @@
 .pd-chart-table th {
   text-align: left;
   font-weight: var(--pd-font-weight-medium);
-  color: var(--pd-text-muted);
+  color: var(--chart-mute, var(--pd-text-muted));
   padding: var(--pd-space-xs) var(--pd-space-sm);
-  border-bottom: 1px solid var(--pd-border-subtle);
+  border-bottom: 1px solid var(--chart-grid, var(--pd-border-subtle));
 }
 
 .pd-chart-table td {
   padding: var(--pd-space-sm);
-  border-bottom: 1px solid var(--pd-border-subtle);
+  border-bottom: 1px solid var(--chart-grid, var(--pd-border-subtle));
 }
 
 .pd-chart-table tr:last-child td {
   border-bottom: 0;
+}
+
+/* On a fixed ground the toggle's chrome comes from the ground, not the app. */
+.pd-chart[data-chart-ground] .pd-chart-toggle {
+  border-color: var(--chart-grid);
+  background: color-mix(in srgb, var(--chart-ink) 8%, transparent);
+}
+
+.pd-chart[data-chart-ground] .pd-chart-toggle-btn[data-active] {
+  background: color-mix(in srgb, var(--chart-ink) 16%, transparent);
+  color: var(--chart-ink);
+}
+
+.pd-chart[data-chart-ground] .pd-chart-band[data-hover] {
+  fill: color-mix(in srgb, var(--chart-ink) 8%, transparent);
+}
+
+.pd-chart[data-chart-ground] .pd-chart-tooltip {
+  background: var(--chart-paper);
+  color: var(--chart-ink);
+  border-color: var(--chart-grid);
 }
 
 /* The inline widget holding a chart takes the thread's width (a chart is not a badge). */
@@ -5613,7 +5645,7 @@
 .pd-chart-text--value {
   font-size: 11px;
   font-weight: 600;
-  fill: var(--pd-text-primary);
+  fill: var(--chart-ink, var(--pd-text-primary));
 }
 
 /*

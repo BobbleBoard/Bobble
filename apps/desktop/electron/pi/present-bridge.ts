@@ -26,7 +26,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { createIpcEventSender, createLogger } from '@pi-desktop/shared';
-import type { WebContents } from 'electron';
+import { nativeImage, type WebContents } from 'electron';
 import { getInferenceVisionReady } from '../inference/llm-main';
 import { wantVision } from '../inference/vision-want';
 import type { AppEventMap } from '../ipc-contract';
@@ -63,7 +63,43 @@ interface Request {
   id: number;
   token: string;
   method: string;
-  params?: { path?: string; note?: string; kind?: string };
+  params?: { path?: string; note?: string; kind?: string; width?: number };
+}
+
+/** The most pixels a `pixels` reply carries per side (a palette needs few). */
+const PIXELS_MAX_SIDE = 96;
+
+/**
+ * A small decoded copy of an image, for the `chart` tool's "style it like this
+ * picture": Chromium decodes every format the user could drop in (PNG, JPEG,
+ * WebP, GIF, HEIC…), and a 64-px thumbnail is all a palette needs. RGBA, so
+ * the reader never has to know the platform's byte order.
+ */
+export async function decodePixels(
+  target: string,
+  width = 64,
+): Promise<{ width: number; height: number; rgba: string } | { error: string }> {
+  const image = nativeImage.createFromPath(target);
+  if (image.isEmpty()) return { error: `${target} could not be decoded as an image` };
+  const side = Math.max(8, Math.min(PIXELS_MAX_SIDE, Math.round(width)));
+  const size = image.getSize();
+  const scale = side / Math.max(size.width, size.height, 1);
+  const small = image.resize({
+    width: Math.max(1, Math.round(size.width * scale)),
+    height: Math.max(1, Math.round(size.height * scale)),
+    quality: 'good',
+  });
+  const { width: w, height: h } = small.getSize();
+  // toBitmap is BGRA on every platform Electron ships; swap to RGBA here.
+  const bgra = small.toBitmap();
+  const rgba = Buffer.alloc(bgra.length);
+  for (let i = 0; i + 3 < bgra.length; i += 4) {
+    rgba[i] = bgra[i + 2] as number;
+    rgba[i + 1] = bgra[i + 1] as number;
+    rgba[i + 2] = bgra[i] as number;
+    rgba[i + 3] = bgra[i + 3] as number;
+  }
+  return { width: w, height: h, rgba: rgba.toString('base64') };
 }
 
 /**
@@ -296,6 +332,9 @@ async function handle(req: Request): Promise<Record<string, unknown>> {
       svg: inline.svg !== undefined ? `${inline.svg.width}x${inline.svg.height}` : undefined,
     });
     return { ok: true };
+  }
+  if (req.method === 'pixels') {
+    return await decodePixels(target, req.params?.width);
   }
   if (req.method === 'preview') {
     const preview = await buildPreview(target, req.params?.kind ?? 'describe', { renderPage });

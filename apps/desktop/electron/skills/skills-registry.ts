@@ -135,6 +135,16 @@ export const BUNDLED_SKILLS: readonly BundledSkill[] = [
     source: 'pi-desktop',
   },
   {
+    id: 'data-visuals',
+    name: 'Data visuals',
+    description:
+      'Chart numbers with the chart tool — every kind of chart, a look that fits, and every edit a user asks for.',
+    category: 'data',
+    license: 'MIT',
+    source: 'pi-desktop',
+    recommended: true,
+  },
+  {
     id: 'spreadsheet-toolkit',
     name: 'Spreadsheet toolkit',
     description: 'Read, edit, format, and analyze .xlsx / .csv with openpyxl and pandas.',

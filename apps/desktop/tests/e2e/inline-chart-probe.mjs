@@ -212,9 +212,14 @@ try {
   const target = bands[1] ?? band;
   if (target) {
     const box = await target.boundingBox();
-    if (box) await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    if (box) {
+      // Two moves, so a pointer already resting on the spot still raises a mouseover.
+      await page.mouse.move(box.x + box.width / 2, box.y + 10);
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 4 });
+    }
   }
-  await sleep(400);
+  await page.waitForSelector('[data-testid="chart-tooltip"]', { timeout: 3000 }).catch(() => {});
+  await sleep(200);
   s = await state();
   note(
     'hovering a bar reads its value out',
@@ -429,11 +434,151 @@ try {
   }
   await page.mouse.move(5, 5);
 
-  // Small SVGs go inline too; a poster-sized drawing keeps its canvas tab.
-  // (Into the chat's own folder — the first message gave the chat a project
-  // folder of its own, which is where the charts above landed.)
+  // ── Looks and edits — the user: "square not rounded looks bad … we CANNOT have
+  // 'all charts from bobble look the same generic'" and "say the user asks for
+  // edits to the chart in any way … it all needs to work. styling from image".
+  const unitsFile = /Drew a bar chart[^:]*: (\S+\.svg)/.exec(out)?.[1] ?? '';
+  const cardShot = async (label, index = -1) => {
+    const cards = await page.$$('[data-testid="presented-chart"]');
+    const card = cards.at(index);
+    if (card === undefined) return;
+    await card.scrollIntoViewIfNeeded();
+    await sleep(350);
+    await card.screenshot({ path: path.join(SHOT_DIR, `${label}.png`) });
+    log(`shot ${label}`);
+  };
+  // The chat's own folder: the first message gave the chat a project folder,
+  // which is where the charts above landed.
   const chatDir = (await page.evaluate(() => window.__pi_workspace?.() ?? null)) ?? dir;
   log(`chat folder: ${chatDir}`);
+  const lastCard = (index = -1) =>
+    page.evaluate((i) => {
+      const cards = document.querySelectorAll('[data-testid="presented-chart"]');
+      const card = cards[i < 0 ? cards.length + i : i];
+      const view = card?.querySelector('[data-testid="chart-view"]');
+      const bars = [...(card?.querySelectorAll('.pd-chart-bar') ?? [])];
+      return {
+        look: view?.getAttribute('data-chart-look') ?? null,
+        ground: view?.hasAttribute('data-chart-ground') ?? false,
+        bars: bars.length,
+        fills: [...new Set(bars.map((b) => b.getAttribute('fill')))],
+        rounded: bars.some((b) => /a\d/.test(b.getAttribute('d') ?? '')),
+        barWidth: bars[0]?.getBBox?.().width ?? null,
+        font: view ? getComputedStyle(view).fontFamily : null,
+        legend: [...(card?.querySelectorAll('.pd-chart-svg text') ?? [])]
+          .map((t) => t.textContent)
+          .filter((t) => t === 'Cost' || t === 'Units Sold by Year'),
+      };
+    }, index);
+  // The units chart is the first card; an edit re-presents it at the end.
+  const before = await lastCard(0);
+  note(
+    'bars are rounded, not square',
+    before.rounded === true && before.bars === 4,
+    JSON.stringify(before),
+  );
+  // Edit 1: a second series for comparison, thinner bars, a new accent.
+  const e1 = await run(
+    `chart edit ${unitsFile} --add "Cost: 8, 12, 10, 14" --bars thin --accent coral`,
+  );
+  note(
+    'chart edit added a series, thinned the bars and recoloured',
+    /Changed added Cost, the look/.test(e1),
+    e1.split('\n')[0].slice(0, 140),
+  );
+  await sleep(1500);
+  const after1 = await lastCard();
+  note(
+    'the edited card shows grouped bars, thinner, with the new accent',
+    after1.bars === 8 &&
+      after1.barWidth !== null &&
+      before.barWidth !== null &&
+      after1.barWidth < before.barWidth * 0.75 &&
+      after1.legend.includes('Cost'),
+    JSON.stringify({
+      before: before.barWidth,
+      after: after1.barWidth,
+      bars: after1.bars,
+      legend: after1.legend,
+    }),
+  );
+  await cardShot('11-edit-add-series-thin-coral');
+  // Edit 2: a whole new look.
+  const e2 = await run(`chart edit ${unitsFile} --look sunset`);
+  note('chart edit changed the look', /Changed the look/.test(e2), e2.split('\n')[0].slice(0, 120));
+  await sleep(1500);
+  const after2 = await lastCard();
+  note(
+    'the card wears sunset (pill bars, its palette)',
+    after2.look === 'sunset' && after2.fills.includes('#F0563C'),
+    JSON.stringify({ look: after2.look, fills: after2.fills }),
+  );
+  await cardShot('12-edit-look-sunset');
+  // Edit 3: colours from a picture — a screenshot of this very window.
+  const shotPath = path.join(chatDir, 'reference.png');
+  await page.screenshot({ path: shotPath });
+  const e3 = await run(`chart edit ${unitsFile} --from_image reference.png`);
+  note(
+    'chart edit took its colours from an image',
+    /Colours from reference\.png/.test(e3),
+    e3
+      .split('\n')
+      .find((l) => l.startsWith('Colours from'))
+      ?.slice(0, 160) ?? e3.slice(0, 120),
+  );
+  await sleep(1500);
+  const after3 = await lastCard();
+  note(
+    'the card wears the picture\u2019s ground and colours',
+    after3.ground === true,
+    JSON.stringify({ fills: after3.fills, ground: after3.ground }),
+  );
+  await cardShot('13-edit-from-image');
+  // Edit 4: a value, a removed series, a sort into a ranking.
+  const e4 = await run(
+    `chart edit ${unitsFile} --set "2023: 30" --remove Cost --sort desc --type hbar --look mono`,
+  );
+  note(
+    'chart edit set a value, removed the series, sorted and re-typed',
+    /Changed type bar → hbar, removed Cost, the data, the look/.test(e4),
+    e4.split('\n')[0].slice(0, 140),
+  );
+  await sleep(1500);
+  await cardShot('14-edit-hbar-ranked-mono');
+  // A gallery: the same data in six looks, each its own card.
+  const GALLERY = ['soft', 'bold', 'editorial', 'slate', 'terminal', 'candy'];
+  for (const look of GALLERY) {
+    const g = await run(
+      `chart bar "Quarterly revenue (${look})" --labels "Q1, Q2, Q3, Q4" --values "Product: 4.2, 5.1, 6.4, 7.0; Services: 2.1, 2.6, 2.4, 3.3" --unit "$" --subtitle millions --look ${look} --out gallery-${look}.svg`,
+    );
+    if (!/Drew a bar chart/.test(g)) note(`gallery ${look} drew`, false, g.slice(0, 120));
+  }
+  await sleep(2500);
+  const gallery = await page.evaluate(() =>
+    [...document.querySelectorAll('[data-testid="presented-chart"] [data-testid="chart-view"]')]
+      .map((v) => v.getAttribute('data-chart-look'))
+      .filter((l) => l !== null),
+  );
+  note(
+    'six looks, six different cards',
+    GALLERY.every((l) => gallery.includes(l)),
+    gallery.join(', '),
+  );
+  for (let i = 0; i < GALLERY.length; i += 1) {
+    await cardShot(`15-look-${GALLERY[i]}`, i - GALLERY.length);
+  }
+  const areaOut = await run(
+    'chart area "Signups" --labels "Jan, Feb, Mar, Apr, May, Jun" --values "120, 180, 150, 260, 310, 290" --look ocean --out signups.svg',
+  );
+  note(
+    'a smooth gradient area chart drew',
+    /Drew an area chart/.test(areaOut),
+    areaOut.split('\n')[0].slice(0, 100),
+  );
+  await sleep(1200);
+  await cardShot('16-area-ocean-smooth');
+
+  // Small SVGs go inline too; a poster-sized drawing keeps its canvas tab.
   writeFileSync(
     path.join(chatDir, 'icon.svg'),
     '<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96"><circle cx="48" cy="48" r="40" fill="#2F6FE4"/><path d="M30 50l12 12 24-28" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
@@ -562,13 +707,17 @@ try {
       '',
     );
     note('the chart card appeared', tail.charts >= 1, `${tail.charts} card(s)`);
+    // A redundant `coordinate present` with no path after the chart (the card
+    // is already shown) is a stray the CLI answers with usage — noted, not a
+    // failure of the chart; an error on a chart call is.
+    const chartErrors = tail.calls.filter(
+      (c) => c.error && /\bchart\b/.test(`${c.name} ${c.command}`),
+    );
+    const strays = tail.calls.filter((c) => c.error && !/\bchart\b/.test(`${c.name} ${c.command}`));
     note(
-      'no tool errors',
-      tail.calls.every((c) => !c.error),
-      tail.calls
-        .filter((c) => c.error)
-        .map((c) => c.result.slice(0, 100))
-        .join(' | '),
+      'no chart tool errors',
+      chartErrors.length === 0,
+      `${chartErrors.map((c) => c.result.slice(0, 100)).join(' | ')}${strays.length > 0 ? ` (stray: ${strays.map((c) => c.command.slice(0, 40)).join(', ')})` : ''}`,
     );
     log(`reply: ${tail.text.slice(0, 300).replace(/\n/g, ' ')}`);
     await page.evaluate(() => {

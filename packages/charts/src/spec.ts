@@ -16,6 +16,8 @@
  * is the same four bars.
  */
 
+import { type ChartStyle, normalizeStyle } from './style.ts';
+
 export type ChartType = 'bar' | 'stacked' | 'hbar' | 'line' | 'area' | 'scatter' | 'donut';
 
 export const CHART_TYPES: readonly ChartType[] = [
@@ -55,6 +57,8 @@ export interface ChartSpec {
   readonly note?: string;
   /** Value prefix/suffix for tooltips and axes: "$", "%", "GW". */
   readonly unit?: string;
+  /** How it looks — a named look and/or its own knobs (style.ts). */
+  readonly style?: ChartStyle;
 }
 
 const TYPE_ALIASES: Readonly<Record<string, ChartType>> = {
@@ -244,6 +248,7 @@ export function normalizeChartSpec(input: unknown): ChartSpec {
       ? 'line'
       : 'bar');
   const highlight = str(o.highlight ?? o.emphasis ?? '');
+  const style = normalizeStyle(o);
   return {
     type: resolvedType,
     title: str(o.title ?? o.name ?? ''),
@@ -254,6 +259,7 @@ export function normalizeChartSpec(input: unknown): ChartSpec {
     ...(highlight !== '' ? { highlight } : {}),
     ...(str(o.note ?? o.source) !== '' ? { note: str(o.note ?? o.source) } : {}),
     ...(str(o.unit) !== '' ? { unit: str(o.unit) } : {}),
+    ...(style !== undefined ? { style } : {}),
   };
 }
 

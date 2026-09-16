@@ -161,6 +161,15 @@ export interface PresentBridge {
     path: string;
     kind: PreviewKind;
   }): Promise<{ imageBase64?: string; mimeType?: string; text?: string; error?: string }>;
+  /**
+   * A small decoded copy of an image (RGBA, base64), for reading colours off
+   * it — the app decodes every format Chromium does. Optional: a bridge
+   * without it means "styling from an image" is not available here.
+   */
+  pixels?(req: {
+    path: string;
+    width?: number;
+  }): Promise<{ width?: number; height?: number; rgba?: string; error?: string }>;
 }
 
 export interface PresentToolDeps {

@@ -425,19 +425,33 @@ export function resolveCli(cli: CliModel, argv: readonly string[]): CliResolutio
    * asking; a bare `svg` on its own still gets the help.
    */
   if (restWords.length === 0) {
-    const sole = group.commands.length === 1 ? group.commands[0] : undefined;
+    /*
+     * The ROOT command — the one whose path is the group name alone (`svg`,
+     * `chart`) — is what a line with flags and no sub-word is calling, whether
+     * or not the group has other commands beside it (`chart edit`): `chart
+     * --title … --values …` is a chart, not a request for the group page.
+     */
+    const rootCmd = group.commands.find((c) => c.path.length === 0);
     const hasFlags = Object.keys(parsed.flags).length > 0 || parsed.positionals.length > 0;
     /*
      * AND ITS `--help` IS THE COMMAND'S HELP. `svg --help` used to print the
      * group page — one line naming `svg` and "run `svg <command> --help` for
      * arguments" — for a command that HAS no sub-word to put there. MEASURED
      * by the tool surface probe: the one command whose help could not be
-     * reached was the one the preamble tells the model to read first.
+     * reached was the one the preamble tells the model to read first. With
+     * siblings, they are named under it.
      */
-    if (sole !== undefined && sole.path.length === 0 && parsed.wantsHelp) {
-      return { kind: 'text', text: renderCommandHelp(sole) };
+    if (rootCmd !== undefined && parsed.wantsHelp) {
+      const siblings = group.commands.filter((c) => c.path.length > 0);
+      return {
+        kind: 'text',
+        text:
+          siblings.length > 0
+            ? `${renderCommandHelp(rootCmd)}\n\nAlso in this group: ${siblings.map((c) => `${commandLine(c)} (run it with --help)`).join(', ')}`
+            : renderCommandHelp(rootCmd),
+      };
     }
-    if (sole === undefined || sole.path.length > 0 || !hasFlags) {
+    if (rootCmd === undefined || !hasFlags) {
       return { kind: 'text', text: renderGroupHelp(group) };
     }
   }

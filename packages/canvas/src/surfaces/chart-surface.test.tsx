@@ -64,12 +64,15 @@ describe('ChartView', () => {
     expect(container.querySelector('.pd-chart-subtitle')?.textContent).toBe('Annual totals');
     expect(container.querySelectorAll('.pd-chart-bar').length).toBe(4);
     expect(container.querySelector('.pd-chart-note')?.textContent).toBe('Source: the brief');
-    // The highlighted bar takes the accent, the rest the primary.
+    // The highlighted bar takes the look's accent, the rest its primary — and
+    // a bar is a path with rounded outer corners, not a square rect.
     const fills = [...container.querySelectorAll('.pd-chart-bar')].map((b) =>
       b.getAttribute('fill'),
     );
     expect(fills[3]).toBe('#E8863A');
-    expect(fills[0]).toBe('var(--pd-accent-primary)');
+    expect(fills[0]).toBe('#2F6FE4');
+    expect(container.querySelector('.pd-chart-bar')?.tagName.toLowerCase()).toBe('path');
+    expect(container.querySelector('.pd-chart-bar')?.getAttribute('d')).toContain('a6 6');
   });
 
   it('reads the hovered category out in a tooltip (Claude-style "2022 · 19")', async () => {
@@ -154,5 +157,48 @@ describe('ChartSurface', () => {
     expect(svg).toContain('<svg');
     expect(svg).toContain('Units Sold by Year');
     expect(chartArtifactSvg('not json')).toBeNull();
+  });
+});
+
+describe('the look', () => {
+  it('a fixed-ground look paints its own paper and ink on the card; a theme-following one does not', async () => {
+    const slate = specFromText(JSON.stringify({ ...UNITS, look: 'slate' }));
+    if ('error' in slate) throw new Error(slate.error);
+    const { container, unmount } = await render(<ChartView spec={slate} />);
+    const root = container.querySelector('[data-testid="chart-view"]') as HTMLElement;
+    expect(root.getAttribute('data-chart-look')).toBe('slate');
+    expect(root.hasAttribute('data-chart-ground')).toBe(true);
+    expect(root.style.getPropertyValue('--chart-paper')).toBe('#1C1F26');
+    expect(root.style.getPropertyValue('--chart-font')).toContain('Helvetica');
+    await unmount();
+    const soft = specFromText(JSON.stringify({ ...UNITS, look: 'soft' }));
+    if ('error' in soft) throw new Error(soft.error);
+    const { container: c2 } = await render(<ChartView spec={soft} />);
+    const r2 = c2.querySelector('[data-testid="chart-view"]') as HTMLElement;
+    expect(r2.hasAttribute('data-chart-ground')).toBe(false);
+    expect(r2.style.getPropertyValue('--chart-paper')).toBe('');
+    // Pill bars: the radius is half the bar's width.
+    const d = c2.querySelector('.pd-chart-bar')?.getAttribute('d') ?? '';
+    expect(/a(\d+(?:\.\d+)?) \1/.test(d)).toBe(true);
+  });
+
+  it('a bold look writes the values on the bars even inline; a grid-less look draws only the zero line', async () => {
+    const bold = specFromText(JSON.stringify({ ...UNITS, look: 'bold' }));
+    if ('error' in bold) throw new Error(bold.error);
+    const { container } = await render(<ChartView spec={bold} />);
+    expect(container.querySelectorAll('.pd-chart-text--value').length).toBe(4);
+    expect(container.querySelectorAll('.pd-chart-grid').length).toBe(0);
+    expect(container.querySelectorAll('.pd-chart-axis').length).toBe(1);
+  });
+
+  it('a smooth area chart draws a gradient under a curve', async () => {
+    const ocean = specFromText(JSON.stringify({ ...UNITS, type: 'area', look: 'ocean' }));
+    if ('error' in ocean) throw new Error(ocean.error);
+    const { container } = await render(<ChartView spec={ocean} />);
+    expect(container.querySelector('linearGradient')).not.toBeNull();
+    const line = [...container.querySelectorAll('path')].find(
+      (p) => p.getAttribute('stroke-width') === '3',
+    );
+    expect(line?.getAttribute('d')).toContain('C');
   });
 });

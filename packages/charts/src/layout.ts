@@ -8,6 +8,7 @@
  */
 
 import { type ChartSpec, categoryLabels, formatValue } from './spec.ts';
+import { areaPath, linePath, type ResolvedStyle, resolveStyle } from './style.ts';
 
 export interface Rect {
   readonly x: number;
@@ -38,6 +39,10 @@ export interface BarShape extends Rect {
   readonly label: string;
   readonly value: number;
   readonly highlighted: boolean;
+  /** The side that faces away from the axis — the one that gets the rounding. */
+  readonly side: 'top' | 'bottom' | 'right' | 'left';
+  /** Whether that side is the outer edge (a stacked segment under another is not). */
+  readonly outer: boolean;
 }
 
 export interface MarkerShape {
@@ -117,6 +122,8 @@ export interface LayoutOptions {
   readonly bottom?: number;
   /** Compact layouts drop the axis titles' reserved space. */
   readonly compact?: boolean;
+  /** The resolved look: bar width, line style, ring thickness. Default: the spec's own. */
+  readonly style?: ResolvedStyle;
 }
 
 /** A pleasant tick step for a span: 1, 2, 2.5, 5 × 10^k. */
@@ -167,6 +174,7 @@ function fmt(n: number): string {
 /** Compute every shape for `spec` at the given size. */
 export function layoutChart(spec: ChartSpec, opts: LayoutOptions): ChartLayout {
   const { width, height } = opts;
+  const style = opts.style ?? resolveStyle(spec.style);
   const compact = opts.compact === true;
   const top = opts.top ?? 0;
   const bottom = opts.bottom ?? 0;
@@ -205,7 +213,7 @@ export function layoutChart(spec: ChartSpec, opts: LayoutOptions): ChartLayout {
     const r = Math.min(plotH / 2 - 4, width * 0.22);
     const cx = Math.max(r + 12, width * 0.28);
     const cy = plotY + plotH / 2;
-    const ring = r * 0.36;
+    const ring = r * style.ring;
     let a0 = -Math.PI / 2;
     const slices: SliceShape[] = pts.map((p, i) => {
       const fraction = p.value / total;
@@ -276,7 +284,7 @@ export function layoutChart(spec: ChartSpec, opts: LayoutOptions): ChartLayout {
     const ticks = ticksFor(scale, unit, toPx);
     const zero = toPx(0);
     const row = plot.h / Math.max(labels.length, 1);
-    const groupH = row * 0.7;
+    const groupH = row * Math.min(0.9, style.barWidth + 0.1);
     const barH = groupH / Math.max(spec.series.length, 1);
     const bars: BarShape[] = [];
     const categories: Category[] = labels.map((label, i) => ({
@@ -301,6 +309,8 @@ export function layoutChart(spec: ChartSpec, opts: LayoutOptions): ChartLayout {
           label: p.label,
           value: p.value,
           highlighted: spec.highlight !== undefined && p.label === spec.highlight,
+          side: p.value >= 0 ? 'right' : 'left',
+          outer: true,
         });
       });
     });
@@ -354,7 +364,7 @@ export function layoutChart(spec: ChartSpec, opts: LayoutOptions): ChartLayout {
 
   if (spec.type === 'bar' || spec.type === 'stacked') {
     const bars: BarShape[] = [];
-    const gap = bandW * (n > 8 ? 0.2 : 0.3);
+    const gap = bandW * (1 - (n > 8 ? Math.min(0.85, style.barWidth + 0.1) : style.barWidth));
     const groupW = bandW - gap;
     const perSeries = spec.type === 'stacked' ? groupW : groupW / Math.max(spec.series.length, 1);
     const stackTop = labels.map(() => 0);
@@ -380,6 +390,12 @@ export function layoutChart(spec: ChartSpec, opts: LayoutOptions): ChartLayout {
             label: p.label,
             value: p.value,
             highlighted: spec.highlight !== undefined && p.label === spec.highlight,
+            side: p.value >= 0 ? 'top' : 'bottom',
+            // The outermost segment of the stack in this direction: none of the
+            // later series adds to it.
+            outer: !spec.series
+              .slice(si + 1)
+              .some((later) => (later.points[pi]?.value ?? 0) * (p.value >= 0 ? 1 : -1) > 0),
           });
         } else {
           const x = gx + si * perSeries;
@@ -395,6 +411,8 @@ export function layoutChart(spec: ChartSpec, opts: LayoutOptions): ChartLayout {
             label: p.label,
             value: p.value,
             highlighted: spec.highlight !== undefined && p.label === spec.highlight,
+            side: p.value >= 0 ? 'top' : 'bottom',
+            outer: true,
           });
         }
       });
@@ -413,13 +431,8 @@ export function layoutChart(spec: ChartSpec, opts: LayoutOptions): ChartLayout {
       value: p.value,
       highlighted: spec.highlight !== undefined && p.label === spec.highlight,
     }));
-    const d = markers.map((m, i) => `${i === 0 ? 'M' : 'L'}${fmt(m.x)} ${fmt(m.y)}`).join(' ');
-    const first = markers[0];
-    const last = markers[markers.length - 1];
-    const area =
-      first !== undefined && last !== undefined
-        ? `${d} L${fmt(last.x)} ${fmt(zero)} L${fmt(first.x)} ${fmt(zero)} Z`
-        : '';
+    const d = linePath(markers, style.line);
+    const area = markers.length > 0 ? areaPath(markers, style.line, zero) : '';
     return { series: si, d, area, markers };
   });
   return { ...empty, plot, ticks, categories, lines, zero };

@@ -25,6 +25,9 @@ interface Reply {
   imageBase64?: string;
   mimeType?: string;
   text?: string;
+  width?: number;
+  height?: number;
+  rgba?: string;
 }
 
 function call(
@@ -85,6 +88,15 @@ export function presentBridgeFromEnv(
         ...(r.imageBase64 !== undefined ? { imageBase64: r.imageBase64 } : {}),
         ...(r.mimeType !== undefined ? { mimeType: r.mimeType } : {}),
         ...(r.text !== undefined ? { text: r.text } : {}),
+        ...(r.error !== undefined ? { error: r.error } : {}),
+      };
+    },
+    pixels: async (req: { path: string; width?: number }) => {
+      const r = await call(socketPath, token, 'pixels', { ...req });
+      return {
+        ...(r.width !== undefined ? { width: r.width } : {}),
+        ...(r.height !== undefined ? { height: r.height } : {}),
+        ...(r.rgba !== undefined ? { rgba: r.rgba } : {}),
         ...(r.error !== undefined ? { error: r.error } : {}),
       };
     },

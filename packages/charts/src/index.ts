@@ -12,6 +12,7 @@ export {
   type SliceShape,
   type Tick,
 } from './layout.ts';
+export { type ImagePalette, paletteFromPixels, rgbaFromBase64, sortByHue } from './palette.ts';
 export {
   CHART_TYPES,
   type ChartPoint,
@@ -23,4 +24,34 @@ export {
   normalizeChartSpec,
   pointCount,
 } from './spec.ts';
-export { type ChartTheme, chartToSvg, drawBody, LIGHT_THEME, type SvgOptions } from './svg.ts';
+export {
+  type AreaFill,
+  areaPath,
+  barRadius,
+  type ChartStyle,
+  DARK_GROUND,
+  EVERYDAY_LOOKS,
+  FONT_STACKS,
+  type FontChoice,
+  type GridMode,
+  type Ground,
+  hue,
+  LIGHT_GROUND,
+  type LineStyle,
+  LOOK_NAMES,
+  LOOKS,
+  type Look,
+  type LookName,
+  liftForDark,
+  lightness,
+  linePath,
+  lookByName,
+  type MarkerStyle,
+  normalizeStyle,
+  pickLook,
+  type ResolvedStyle,
+  resolveStyle,
+  roundedBarPath,
+  type ValueLabelMode,
+} from './style.ts';
+export { chartToSvg, type DrawOptions, drawBody, type SvgOptions, seriesColour } from './svg.ts';
