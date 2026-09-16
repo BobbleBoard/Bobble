@@ -128,8 +128,8 @@ export const LOOKS: readonly Look[] = [
     about: 'the everyday one — the app blue, a thin grid, gently rounded bars',
     palette: ['#2F6FE4', '#E8863A', '#3FB3AC', '#D9B44A', '#9AC05F', '#97A3AD'],
     accent: '#E8863A',
-    radius: 6,
-    barWidth: 0.62,
+    radius: 8,
+    barWidth: 0.56,
     grid: 'lines',
     line: 'straight',
     markers: 'ring',
@@ -146,7 +146,7 @@ export const LOOKS: readonly Look[] = [
     palette: ['#7FB3F5', '#F5B48A', '#8FD3C9', '#F2D98A', '#B9D98A', '#C9B8A8'],
     accent: '#F08C5A',
     radius: 'pill',
-    barWidth: 0.5,
+    barWidth: 0.34,
     grid: 'dots',
     line: 'smooth',
     markers: 'dot',
@@ -163,7 +163,7 @@ export const LOOKS: readonly Look[] = [
     palette: ['#1F5EFF', '#FF6A3D', '#00B894', '#FFC400', '#FF3D7F', '#00A8E8'],
     accent: '#FF6A3D',
     radius: 10,
-    barWidth: 0.7,
+    barWidth: 0.6,
     grid: 'none',
     line: 'straight',
     markers: 'dot',
@@ -180,7 +180,7 @@ export const LOOKS: readonly Look[] = [
     palette: ['#1D4ED8', '#3B82F6', '#60A5FA', '#93C5FD', '#BFDBFE', '#DBEAFE'],
     accent: '#F59E0B',
     radius: 3,
-    barWidth: 0.66,
+    barWidth: 0.6,
     grid: 'lines',
     line: 'straight',
     markers: 'ring',
@@ -214,8 +214,8 @@ export const LOOKS: readonly Look[] = [
     about: 'deep blues to teal with a sand accent, smooth lines and a gradient under them',
     palette: ['#0B6E99', '#1BA3C6', '#5CC8D7', '#9EDCE0', '#F2B134', '#2C4A63'],
     accent: '#F2B134',
-    radius: 8,
-    barWidth: 0.6,
+    radius: 10,
+    barWidth: 0.56,
     grid: 'dots',
     line: 'smooth',
     markers: 'dot',
@@ -231,8 +231,8 @@ export const LOOKS: readonly Look[] = [
     about: 'greens and bark with a copper accent — nature, sustainability, growth',
     palette: ['#2F6B3A', '#5FA05C', '#9BC97A', '#D6C98A', '#B8722C', '#6F7F6A'],
     accent: '#B8722C',
-    radius: 6,
-    barWidth: 0.6,
+    radius: 8,
+    barWidth: 0.56,
     grid: 'lines',
     line: 'straight',
     markers: 'ring',
@@ -249,7 +249,7 @@ export const LOOKS: readonly Look[] = [
     palette: ['#F0563C', '#F5883D', '#F7B547', '#E56C8A', '#C25C6E', '#3B3A57'],
     accent: '#F7B547',
     radius: 'pill',
-    barWidth: 0.6,
+    barWidth: 0.34,
     grid: 'none',
     line: 'smooth',
     markers: 'dot',
@@ -266,7 +266,7 @@ export const LOOKS: readonly Look[] = [
     palette: ['#FF5C8A', '#FFB84C', '#4CD4B0', '#5CB8FF', '#C8E45C', '#FF8F5C'],
     accent: '#FF5C8A',
     radius: 'pill',
-    barWidth: 0.55,
+    barWidth: 0.34,
     grid: 'dots',
     line: 'smooth',
     markers: 'dot',
@@ -282,8 +282,8 @@ export const LOOKS: readonly Look[] = [
     about: 'its own charcoal ground with bright cyan/lime/amber — a dashboard tile, in any theme',
     palette: ['#4CC9F0', '#B5E48C', '#FFB703', '#F4978E', '#8ECAE6', '#A8DADC'],
     accent: '#FFB703',
-    radius: 4,
-    barWidth: 0.62,
+    radius: 6,
+    barWidth: 0.56,
     grid: 'lines',
     line: 'straight',
     markers: 'dot',
@@ -513,6 +513,9 @@ export function normalizeStyle(input: Record<string, unknown>): ChartStyle | und
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
+/** A pill bar's widest, in px: a capsule, not a slab. */
+export const PILL_MAX_PX = 30;
+
 /** Everything a renderer needs, with nothing left to decide. */
 export interface ResolvedStyle {
   readonly look: LookName;
@@ -520,6 +523,13 @@ export interface ResolvedStyle {
   readonly accent: string;
   readonly radius: number | 'pill';
   readonly barWidth: number;
+  /**
+   * The widest a bar may be, in px, or null. A pill-topped bar is a SKINNY
+   * thing — the user: "the totally rounded tops should be the really skinny ones
+   * by default" — so a pill look caps its bars at PILL_MAX_PX regardless of
+   * the band, unless the chart set its own bar width.
+   */
+  readonly maxBarPx: number | null;
   readonly grid: GridMode;
   readonly line: LineStyle;
   readonly markers: MarkerStyle;
@@ -585,6 +595,10 @@ export function resolveStyle(
     accent: onDark ? liftForDark(style?.accent ?? base.accent) : (style?.accent ?? base.accent),
     radius: style?.radius ?? base.radius,
     barWidth: style?.barWidth ?? base.barWidth,
+    maxBarPx:
+      (style?.radius ?? base.radius) === 'pill' && style?.barWidth === undefined
+        ? PILL_MAX_PX
+        : null,
     grid: style?.grid ?? base.grid,
     line: style?.line ?? base.line,
     markers: style?.markers ?? base.markers,

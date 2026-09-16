@@ -217,3 +217,38 @@ describe('a dark ground lifts the darkest inks', () => {
     );
   });
 });
+
+describe('pill bars are skinny; rounded-corner bars are thick', () => {
+  it('a pill look caps its bars in px and centres them; a rounded look fills most of the band', () => {
+    const data = { labels: ['a', 'b', 'c', 'd'], values: [1, 2, 3, 4] };
+    const pill = layoutChart(normalizeChartSpec({ ...data, look: 'candy' }), {
+      width: 960,
+      height: 400,
+    });
+    const rounded = layoutChart(normalizeChartSpec({ ...data, look: 'clean' }), {
+      width: 960,
+      height: 400,
+    });
+    const pillW = pill.bars[0]?.w ?? 0;
+    const roundW = rounded.bars[0]?.w ?? 0;
+    expect(pillW).toBeLessThanOrEqual(30);
+    expect(roundW).toBeGreaterThan(pillW * 3);
+    // Centred in its band.
+    const band = pill.categories[0]?.band;
+    const bar = pill.bars[0];
+    if (band === undefined || bar === undefined) throw new Error('no bar');
+    expect(Math.abs(bar.x + bar.w / 2 - (band.x + band.w / 2))).toBeLessThan(0.5);
+    // A chart that set its own bar width keeps it, pill or not.
+    const wide = layoutChart(normalizeChartSpec({ ...data, look: 'candy', bars: 'wide' }), {
+      width: 960,
+      height: 400,
+    });
+    expect(wide.bars[0]?.w ?? 0).toBeGreaterThan(100);
+    // The same cap sideways.
+    const hpill = layoutChart(normalizeChartSpec({ ...data, type: 'hbar', look: 'soft' }), {
+      width: 960,
+      height: 400,
+    });
+    expect(hpill.bars[0]?.h ?? 0).toBeLessThanOrEqual(30);
+  });
+});

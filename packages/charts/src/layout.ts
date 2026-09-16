@@ -296,14 +296,16 @@ export function layoutChart(spec: ChartSpec, opts: LayoutOptions): ChartLayout {
     spec.series.forEach((s, si) => {
       s.points.forEach((p, pi) => {
         if (pi >= labels.length) return;
-        const y = plot.y + pi * row + (row - groupH) / 2 + si * barH;
+        const slotH = Math.max(barH - 2, 2);
+        const h = style.maxBarPx !== null ? Math.min(slotH, style.maxBarPx) : slotH;
+        const y = plot.y + pi * row + (row - groupH) / 2 + si * barH + (slotH - h) / 2;
         const x0 = Math.min(zero, toPx(p.value));
         const w = Math.abs(toPx(p.value) - zero);
         bars.push({
           x: x0,
           y,
           w: Math.max(w, 1),
-          h: Math.max(barH - 2, 2),
+          h,
           series: si,
           point: pi,
           label: p.label,
@@ -367,6 +369,10 @@ export function layoutChart(spec: ChartSpec, opts: LayoutOptions): ChartLayout {
     const gap = bandW * (1 - (n > 8 ? Math.min(0.85, style.barWidth + 0.1) : style.barWidth));
     const groupW = bandW - gap;
     const perSeries = spec.type === 'stacked' ? groupW : groupW / Math.max(spec.series.length, 1);
+    // A pill look's bars are capped in px and centred in their slot.
+    const slotW = Math.max(perSeries - (spec.series.length > 1 ? 2 : 0), 2);
+    const barW = style.maxBarPx !== null ? Math.min(slotW, style.maxBarPx) : slotW;
+    const stackW = style.maxBarPx !== null ? Math.min(groupW, style.maxBarPx * 1.6) : groupW;
     const stackTop = labels.map(() => 0);
     const stackBottom = labels.map(() => 0);
     spec.series.forEach((s, si) => {
@@ -381,9 +387,9 @@ export function layoutChart(spec: ChartSpec, opts: LayoutOptions): ChartLayout {
           const y1 = toY(Math.max(from, to));
           const y2 = toY(Math.min(from, to));
           bars.push({
-            x: gx,
+            x: gx + (groupW - Math.max(stackW, 2)) / 2,
             y: y1,
-            w: Math.max(groupW, 2),
+            w: Math.max(stackW, 2),
             h: Math.max(y2 - y1, 0.5),
             series: si,
             point: pi,
@@ -398,13 +404,13 @@ export function layoutChart(spec: ChartSpec, opts: LayoutOptions): ChartLayout {
               .some((later) => (later.points[pi]?.value ?? 0) * (p.value >= 0 ? 1 : -1) > 0),
           });
         } else {
-          const x = gx + si * perSeries;
+          const x = gx + si * perSeries + (slotW - barW) / 2;
           const y1 = toY(Math.max(0, p.value));
           const y2 = toY(Math.min(0, p.value));
           bars.push({
             x,
             y: y1,
-            w: Math.max(perSeries - (spec.series.length > 1 ? 2 : 0), 2),
+            w: barW,
             h: Math.max(y2 - y1, 1),
             series: si,
             point: pi,

@@ -72,7 +72,7 @@ describe('ChartView', () => {
     expect(fills[3]).toBe('#E8863A');
     expect(fills[0]).toBe('#2F6FE4');
     expect(container.querySelector('.pd-chart-bar')?.tagName.toLowerCase()).toBe('path');
-    expect(container.querySelector('.pd-chart-bar')?.getAttribute('d')).toContain('a6 6');
+    expect(container.querySelector('.pd-chart-bar')?.getAttribute('d')).toContain('a8 8');
   });
 
   it('reads the hovered category out in a tooltip (Claude-style "2022 · 19")', async () => {
