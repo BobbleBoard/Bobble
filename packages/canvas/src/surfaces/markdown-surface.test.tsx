@@ -25,7 +25,10 @@ describe('MarkdownSurface', () => {
       <MarkdownSurface content={md('```js\nconst x = 1;\n```')} streaming={false} />,
     );
     expect(out).toContain('pd-code-block');
-    expect(out).toContain('const x = 1;');
+    // Highlighted now: the tokens are wrapped in hljs spans, so the text is
+    // checked with the tags stripped, and the colouring for itself.
+    expect(out.replace(/<[^>]+>/g, '')).toContain('const x = 1;');
+    expect(out).toContain('hljs-keyword');
   });
 
   it('escapes raw embedded HTML (no rehype-raw — script cannot inject)', () => {

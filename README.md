@@ -21,6 +21,7 @@ pnpm check      # lint + typecheck + test + build (what CI runs)
 | `apps/desktop` | Electron app (main, preload, React renderer) |
 | `packages/shared` | tsconfig base, typed IPC helpers, `Result`, logger |
 | `packages/themes` | semantic design tokens; claude/codex x light/dark |
+| `packages/code-themes` | code colour themes (the house Bobble pair + the well-known editor themes) with a WCAG contrast checker |
 | `packages/ui` | shared component library (design system) |
 | `packages/engine` | pi RPC bridge, event router, session rehydration |
 | `packages/inference` | llama.cpp binary/model management, server supervisor |

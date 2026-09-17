@@ -8,6 +8,7 @@
  *     runtime config path the frozen harness exposes)
  *   - search keys / mcp mode → handled main-side by settings:set
  */
+import { DEFAULT_CODE_THEME_IDS } from '@pi-desktop/code-themes';
 import { create } from 'zustand';
 import {
   type AdvancedSettings,
@@ -23,6 +24,7 @@ import {
   type WorkMode,
 } from '../../electron/settings/settings-contract';
 import { DEFAULT_QUICK_MENU, type QuickMenuConfig } from '../chat/quick-menu';
+import { applyCodeFont, applyCodeTheme } from '../store/code-theme';
 import { type ThemeFlavor, useThemeStore } from '../store/theme';
 import { applyHarnessConfig } from './pi-connect';
 
@@ -31,6 +33,8 @@ const ICON_STROKE_DEFAULT = 1.25;
 const DEFAULTS: DesktopSettings = {
   version: 1,
   theme: { flavor: 'bobble', mode: 'system' },
+  codeTheme: { light: DEFAULT_CODE_THEME_IDS.light, dark: DEFAULT_CODE_THEME_IDS.dark },
+  codeFont: '',
   permissionMode: 'reviewer',
   effort: 'medium',
   userMode: 'user',
@@ -107,6 +111,16 @@ function applyIconStroke(value: number): void {
   document.documentElement.style.setProperty('--pd-icon-stroke', String(value));
 }
 
+/**
+ * The code appearance: the chosen theme pair into `<style id="pd-code-theme">`
+ * (see store/code-theme.ts — scoped by data-mode, so it needs no re-apply on
+ * a mode change) and the custom code font as an inline `--pd-font-mono`.
+ */
+function applyCodeAppearance(s: DesktopSettings): void {
+  applyCodeTheme(s.codeTheme);
+  applyCodeFont(s.codeFont);
+}
+
 /** Drive the element-size scales: inline `--pd-sidebar-scale` / `--pd-menu-scale`
  * on the document root inherit down and multiply the tokenized `calc()` metrics
  * (sidebar rows + rail; the shared `.pd-menu` option rows). Default 1.0 = no-op.
@@ -146,6 +160,7 @@ export const useSettingsStore = create<SettingsStoreState>((set, get) => ({
       ...get().settings,
       ...patch,
       theme: { ...get().settings.theme, ...patch.theme },
+      codeTheme: { ...get().settings.codeTheme, ...patch.codeTheme },
       search: { ...get().settings.search, ...patch.search },
       capabilities: { ...get().settings.capabilities, ...patch.capabilities },
       advanced: {
@@ -166,12 +181,20 @@ export const useSettingsStore = create<SettingsStoreState>((set, get) => ({
     if (patch.theme !== undefined) applyTheme(optimistic);
     if (patch.iconStroke !== undefined) applyIconStroke(optimistic.iconStroke);
     applyUiScales(optimistic);
+    if (patch.codeTheme !== undefined || patch.codeFont !== undefined) {
+      applyCodeAppearance(optimistic);
+    }
 
     const settings = await window.piDesktop.invoke('settings:set', { patch });
     set({ settings });
     applyTheme(settings);
     applyIconStroke(settings.iconStroke);
     applyUiScales(settings);
+    // Again with what main actually kept: an id it did not recognise comes
+    // back as the house theme, and the document should say so too.
+    if (patch.codeTheme !== undefined || patch.codeFont !== undefined) {
+      applyCodeAppearance(settings);
+    }
 
     /*
      * Harness picks up permission/effort only via its slash commands — fire the
@@ -554,6 +577,10 @@ export function connectSettings(): void {
       // (default 1.0 = no-op), orthogonal to the theme probes for the same
       // reason — apply at boot so persisted scales survive a reload.
       applyUiScales(settings);
+      // The code theme and font, likewise: the defaults write nothing (the
+      // house pair IS the sheet's fallback), so the theme probes see the same
+      // document they always did, and a persisted choice survives a reload.
+      applyCodeAppearance(settings);
     });
 
   if (typeof window.matchMedia === 'function') {

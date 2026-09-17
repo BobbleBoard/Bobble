@@ -23,6 +23,11 @@ import { describe, expect, it } from 'vitest';
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
 const css = readFileSync(path.resolve(dir, '..', 'styles.css'), 'utf8');
+/* The theme sheet, for what the surface's variable resolves to by default. */
+const themesCss = readFileSync(
+  path.resolve(dir, '../../../themes/src/generated/themes.css'),
+  'utf8',
+);
 /* Cross-package on purpose: the invariant spans the two files. */
 const surfaces = readFileSync(
   path.resolve(dir, '../../../../apps/desktop/src/chat/canvas/native-surfaces.ts'),
@@ -36,8 +41,14 @@ function block(selector: string): string {
 }
 
 describe('the terminal surface is transparent, in both halves', () => {
-  it('the CSS surface paints no background', () => {
-    expect(block('.pd-terminal')).toMatch(/background:\s*transparent/);
+  it('the CSS surface paints the code theme’s ground, which is transparent by default', () => {
+    /* The variable is the seam a third-party code theme (Dracula, Nord) uses
+     * to bring its own ground; under the house themes it must stay transparent
+     * for every flavour, or the seam the user saw is back on a fresh install. */
+    expect(block('.pd-terminal')).toMatch(/background:\s*var\(--pd-terminal-bg\)/);
+    const declared = themesCss.match(/--pd-terminal-bg:\s*([^;]+);/g) ?? [];
+    expect(declared.length).toBeGreaterThanOrEqual(6);
+    for (const d of declared) expect(d).toMatch(/:\s*transparent;$/);
   });
 
   it('never goes back to painting the translucent code-block wash', () => {

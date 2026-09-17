@@ -4,6 +4,12 @@
  * diffs against the committed file.
  */
 
+import {
+  bobbleDark,
+  bobbleLight,
+  type CodeTheme,
+  houseFallbackVariables,
+} from '@pi-desktop/code-themes';
 import type { ThemeTokens } from './tokens.ts';
 import { parseThemeId, themeIds, themes } from './tokens.ts';
 
@@ -316,20 +322,6 @@ const REDUCED_MOTION = `/* Reduced motion: collapse transition/animation duratio
 }`;
 
 /*
- * SYNTAX PALETTE — the one part of the code surface that was not token-driven.
- *
- * It used CodeMirror's `defaultHighlightStyle`, built for a LIGHT editor: navy
- * keywords, dark purple constants. On the app's near-black code background they
- * all but vanished. the user: "why all so dark, especially the dark blue, absolutely
- * not."
- *
- * One pair for all flavors rather than six hand-authored sets: the hues carry
- * meaning (keyword, string, number) rather than brand, so they should read the
- * same everywhere; only lightness needs to follow the mode. Chosen for contrast
- * against the code background each mode actually uses, not for looking pretty in
- * isolation.
- */
-/*
  * TERMINAL CURSOR — a caret you can actually see.
  *
  * the user: "the cursor should be a single blinking | ... should be blue in this
@@ -361,37 +353,33 @@ const MENU_CURRENT: Record<string, string> = {
 };
 
 /*
+ * THE CODE PALETTE — syntax, diff rows, the terminal's sixteen ANSI colours.
+ *
+ * It used CodeMirror's `defaultHighlightStyle`, built for a LIGHT editor: navy
+ * keywords, dark purple constants. On the app's near-black code background they
+ * all but vanished. the user: "why all so dark, especially the dark blue, absolutely
+ * not." Then the terminal: xterm's default red on that same ground was "a dark
+ * red colour that's a bit unreadable".
+ *
+ * The palette lives in `@pi-desktop/code-themes` now, as the house themes
+ * Bobble Light and Bobble Dark, beside the well-known editor themes a person can
+ * pick instead. What is emitted HERE, into every flavour's block, is the house
+ * theme of that mode: the fallback every code surface resolves to before any
+ * choice is made, and the whole of what a house-theme choice means (the runtime
+ * writes no override for one). One source, so the sheet and the settings
+ * preview cannot disagree; `code-theme-fallback.test.ts` diffs them.
+ *
  * NO PURPLE, INCLUDING IN CODE. the user's rule is a rule about the whole product,
  * and the syntax palette was quietly the largest purple surface in it: keywords
  * and properties are on almost every line of every file the canvas shows, so a
- * violet keyword painted more pixels than any component. Keywords are rose now
- * — a hue the app's own mark already uses — and properties a desaturated blue
- * that stays clear of the saturated blue functions keep. `theme-no-purple.test`
- * enforces it so it cannot drift back.
+ * violet keyword painted more pixels than any component. Keywords are rose,
+ * properties a desaturated blue. The third-party themes may be as purple as
+ * their authors made them — they are applied at runtime and never enter this
+ * sheet; `no-purple.test` holds the line on what does.
  */
-const SYNTAX: Record<'light' | 'dark', Record<string, string>> = {
-  light: {
-    keyword: '#a3236b',
-    string: '#0a6b3d',
-    number: '#9a4600',
-    comment: '#5c6370',
-    function: '#1a52c4',
-    type: '#0f6f7a',
-    property: '#4a6fa5',
-    punctuation: '#4a5160',
-    invalid: '#c0392b',
-  },
-  dark: {
-    keyword: '#ff9ac8',
-    string: '#7ee2a8',
-    number: '#ffb27a',
-    comment: '#8b94a6',
-    function: '#82b8ff',
-    type: '#6fe0e0',
-    property: '#9fbcd8',
-    punctuation: '#b8c0d0',
-    invalid: '#ff8a80',
-  },
+const HOUSE_CODE_THEME: Record<'light' | 'dark', CodeTheme> = {
+  light: bobbleLight,
+  dark: bobbleDark,
 };
 
 export function emitThemesCss(): string {
@@ -401,6 +389,8 @@ export function emitThemesCss(): string {
   lines.push('/*');
   lines.push(' * GENERATED FILE — DO NOT EDIT.');
   lines.push(' * Source of truth: packages/themes/src/tokens.ts');
+  lines.push(' * (the code palette — --pd-syntax-*, --pd-code-*, --pd-diff-*, --pd-ansi-*,');
+  lines.push(' * --pd-terminal-* — from packages/code-themes, the house Bobble themes)');
   lines.push(' * Regenerate with: pnpm --filter @pi-desktop/themes generate');
   lines.push(' */');
   lines.push('');
@@ -416,8 +406,8 @@ export function emitThemesCss(): string {
     for (const [name, value] of flattenTheme(themes[id])) {
       lines.push(`  ${name}: ${value};`);
     }
-    for (const [name, value] of Object.entries(SYNTAX[mode])) {
-      lines.push(`  --pd-syntax-${name}: ${value};`);
+    for (const [name, value] of houseFallbackVariables(HOUSE_CODE_THEME[mode])) {
+      lines.push(`  ${name}: ${value};`);
     }
     lines.push(`  --pd-terminal-cursor: ${TERMINAL_CURSOR[flavor] ?? 'var(--pd-accent-primary)'};`);
     lines.push(`  --pd-menu-current: ${MENU_CURRENT[flavor] ?? 'var(--pd-accent-primary)'};`);
