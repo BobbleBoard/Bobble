@@ -259,6 +259,10 @@ export const CAPABILITIES: readonly Capability[] = [
       'or --from_image a picture for its colours. chart_edit changes a chart that exists — ' +
       '--add "Cost: 8, 12, 10, 14" for a second bar per category, --set "2023: 17", --remove, ' +
       '--sort desc, --bars thin, --accent coral, --look …, --from_image — and redraws it in place. ' +
+      'Several charts in one answer are fine — one call each. A chart goes INTO a document with ' +
+      'office_edit: `office edit deck.pptx --chart units.svg --slide 2` (a native, editable group ' +
+      'on the slide), `--after p3` for a .docx paragraph, `--anchor B12` for a .xlsx cell, ' +
+      '`--page 2` for a .pdf (it lands in free space on that page, or on a new page after it). ' +
       'Then say in one line what the chart shows; the values are in front of the user already.',
     /* Two tools: in CLI mode `chart` IS the command (tool-cli.ts maps it to an
        empty path under this group) and the other is `chart edit`. */
@@ -284,9 +288,14 @@ export const CAPABILITIES: readonly Capability[] = [
       'office_make takes a brief and returns the finished file, open in the canvas, with a ' +
       'slide-by-slide summary. Put EVERYTHING the file should say into the brief — the facts, the ' +
       'numbers, the names, the sections in order — because the pipeline writes only what it is ' +
-      'given. office_edit changes wording, style, position or slide order in a file that exists; ' +
-      'office_inspect reads one as an outline with ids. Never write these formats with a library ' +
-      'or by assembling XML: the pipeline owns the format so the file opens and stays editable.',
+      'given. office_edit changes wording, style, position or slide order in a file that exists, ' +
+      'and puts a chart in it: draw it with chart first, then `office edit file --chart <svg>` ' +
+      'with --slide N (pptx), --after <paragraph id> (docx), --anchor B12 (xlsx) or --page N ' +
+      '(pdf; free space on that page, else a new page after it). "Reformat to fit" is the same ' +
+      'call with an instruction — move/resize/shrink the shapes office_inspect names by id. ' +
+      'office_inspect reads a file as an outline with ids. Never write these formats with a ' +
+      'library or by assembling XML: the pipeline owns the format so the file opens and stays ' +
+      'editable. An open document reloads in the canvas by itself after every edit.',
     tools: ['office_make', 'office_edit', 'office_inspect'],
   },
   {

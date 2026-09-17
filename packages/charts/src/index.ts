@@ -1,4 +1,13 @@
 export {
+  type ChartElements,
+  chartToElements,
+  cssRgb,
+  type ElementsOptions,
+  linePoints,
+  type MeasuredElement,
+  over,
+} from './elements.ts';
+export {
   type BarShape,
   type Category,
   type ChartLayout,

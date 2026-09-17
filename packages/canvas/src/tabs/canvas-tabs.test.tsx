@@ -47,6 +47,26 @@ describe('CanvasTabs', () => {
     expect(container.querySelector('.pd-media')).toBeNull();
   });
 
+  it('pulses a tab whose file changed under it, once per change', async () => {
+    const c = seededController();
+    const { container } = await render(<CanvasTabs controller={c} />);
+    expect(container.querySelector('[data-testid="canvas-tab-updated"]')).toBeNull();
+    await act(async () => {
+      c.updateTab('t3', { updatedAt: 1000 });
+    });
+    const first = container.querySelector('[data-testid="canvas-tab-updated"]');
+    expect(first).toBeTruthy();
+    // A second change re-keys the element (so its animation replays); the
+    // old node is gone, a new one stands in the same place.
+    await act(async () => {
+      c.updateTab('t3', { updatedAt: 2000 });
+    });
+    const second = container.querySelector('[data-testid="canvas-tab-updated"]');
+    expect(second).toBeTruthy();
+    expect(second).not.toBe(first);
+    expect(container.querySelectorAll('[data-testid="canvas-tab-updated"]')).toHaveLength(1);
+  });
+
   it('closes a tab from its close control', async () => {
     const c = seededController();
     const { container } = await render(<CanvasTabs controller={c} />);

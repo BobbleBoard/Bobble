@@ -1021,6 +1021,37 @@ export default function App() {
     window.pdfApi.setDirty(dirty)
   }, [dirty])
 
+  // BOBBLE PATCH: view state across a host reload (see slides App.tsx). The
+  // host swaps in a fresh viewer when the file changes on disk; this keeps it
+  // on the page the person was reading, at the same scroll, and tells the host
+  // whether there are unsaved annotations to leave alone.
+  useEffect(() => {
+    ;(window as unknown as { __pdViewState?: unknown }).__pdViewState = {
+      get: () => ({
+        page: currentPage,
+        scrollTop: scrollRef.current?.scrollTop ?? 0,
+        dirty,
+        savedAt: (window as unknown as { __pdSavedAt?: number }).__pdSavedAt ?? 0,
+      }),
+      set: (s: { page?: number; scrollTop?: number } | null | undefined) => {
+        if (!s) return
+        // The document may still be opening when the host hands this over:
+        // keep trying for a few seconds, until there are pages to scroll.
+        let tries = 0
+        const apply = () => {
+          const el = scrollRef.current
+          if (!el || el.scrollHeight <= el.clientHeight) {
+            if (tries++ < 20) window.setTimeout(apply, 200)
+            return
+          }
+          if (typeof s.scrollTop === 'number') el.scrollTop = s.scrollTop
+          else if (typeof s.page === 'number') scrollToPage(s.page)
+        }
+        apply()
+      },
+    }
+  })
+
   // ── Undo/redo: push a full snapshot before each change; consecutive input on the same form field coalesces into one step ──
 
   const snapshot = (): EditSnapshot => ({
@@ -1308,6 +1339,8 @@ export default function App() {
         opFailed(result.error)
         return false
       }
+      // BOBBLE PATCH: the host watches the file; this change is our own save.
+      ;(window as unknown as { __pdSavedAt?: number }).__pdSavedAt = Date.now()
       // Reload: changes are in the file now, canvas renders directly, overlays/pending ops are cleared
       try {
         const el = scrollRef.current

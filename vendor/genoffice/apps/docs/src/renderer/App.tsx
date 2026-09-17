@@ -512,6 +512,35 @@ export function App() {
   const [lastPageNo, setLastPageNo] = useState<number | string | null>(null)
   const [, forceRender] = useReducer((x: number) => x + 1, 0)
   const dirtyRef = useRef(false)
+  // BOBBLE PATCH: view state across a host reload (see slides App.tsx). The
+  // host swaps in a fresh editor when the file changes on disk under an open
+  // tab; this keeps the reader's scroll, and tells the host about unsaved
+  // edits (leave them alone) and this editor's own saves (not a reload).
+  useEffect(() => {
+    ;(window as unknown as { __pdViewState?: unknown }).__pdViewState = {
+      get: () => ({
+        scrollTop: document.querySelector('.editor-scroll')?.scrollTop ?? 0,
+        dirty: dirtyRef.current,
+        savedAt: (window as unknown as { __pdSavedAt?: number }).__pdSavedAt ?? 0,
+      }),
+      set: (s: { scrollTop?: number } | null | undefined) => {
+        if (typeof s?.scrollTop !== 'number') return
+        const top = s.scrollTop
+        // The document may still be opening: keep trying for a few seconds,
+        // until the scroller is tall enough for the position to stick.
+        let tries = 0
+        const apply = () => {
+          const el = document.querySelector('.editor-scroll')
+          if (!el || el.scrollHeight - el.clientHeight < top) {
+            if (tries++ < 20) window.setTimeout(apply, 200)
+            return
+          }
+          el.scrollTop = top
+        }
+        apply()
+      },
+    }
+  }, [])
   // serializes save(): overlapping saves (Cmd+S vs autosave timer vs blur) would
   // otherwise race on the write + reparse + setContent sequence
   const saveInFlightRef = useRef(false)

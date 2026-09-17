@@ -37,6 +37,9 @@ const LIBS: ReadonlyArray<{ pip: string; mod: string }> = [
   { pip: 'openpyxl', mod: 'openpyxl' },
   { pip: 'reportlab', mod: 'reportlab' },
   { pip: 'pillow', mod: 'PIL' },
+  // A chart onto a page of an existing PDF (office_chart.py): pages are
+  // merged with pypdf, the chart drawn with reportlab.
+  { pip: 'pypdf', mod: 'pypdf' },
 ];
 
 export function officeGenDir(): string {

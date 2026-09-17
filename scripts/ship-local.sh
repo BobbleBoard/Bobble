@@ -47,6 +47,18 @@ else
   echo "ship-local: WARNING pi-mac helper not bundled at $MAC_HELPER" >&2
 fi
 
+# The sheets editor's Rust sidecar (vendored GenOffice, shipped as a resource
+# by electron-builder.yml) is a bare mach-o under Resources, which `--deep`
+# does not visit — unsigned, Gatekeeper refuses to exec it and every .xlsx tab
+# opens empty. Signed like the two helpers above.
+XLSX_SIDECAR="$APP_SRC/Contents/Resources/genoffice/apps/sheets/native/xlsx-engine/target/release/xlsx-sidecar"
+if [ -f "$XLSX_SIDECAR" ]; then
+  sign "$XLSX_SIDECAR"
+  echo "ship-local: signed xlsx-sidecar"
+else
+  echo "ship-local: WARNING xlsx-sidecar not bundled at $XLSX_SIDECAR" >&2
+fi
+
 sign --deep "$APP_SRC"
 # Print the requirement the TCC grants attach to. If this ever goes back to
 # reading `cdhash H"…"`, computer-use permissions are about to be revoked by

@@ -581,6 +581,13 @@ export class NativeSurfaces {
     }
   }
 
+  /** The editor behind an office tab swapped to the file's new bytes. */
+  applyOfficeReloaded(p: { tabId: string }): void {
+    const tab = this.#controller.getState().tabs.find((t) => t.id === p.tabId);
+    if (tab === undefined) return;
+    this.#controller.updateTab(tab.id, { updatedAt: Date.now() });
+  }
+
   applyBrowserState(patch: {
     tabId: string;
     url?: string;
@@ -894,11 +901,15 @@ export function useNativeSurfaces(controller: CanvasController): NativeSurfacesA
     const unsubBrowser = window.piDesktop.onEvent('browser:state', (p) =>
       manager.applyBrowserState(p),
     );
+    const unsubOffice = window.piDesktop.onEvent('office:reloaded', (p) =>
+      manager.applyOfficeReloaded(p),
+    );
     const unsubData = window.piDesktop.onEvent('pty:data', (p) => manager.applyPtyData(p));
     const unsubExit = window.piDesktop.onEvent('pty:exit', (p) => manager.applyPtyExit(p));
     return () => {
       unsubController();
       unsubBrowser();
+      unsubOffice();
       unsubData();
       unsubExit();
       manager.disposeAll();

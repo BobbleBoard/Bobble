@@ -143,6 +143,13 @@ export interface CanvasTab {
    * newest line as the file is written. Set while a write/edit is in flight.
    */
   streaming?: boolean;
+  /**
+   * When the tab's file last changed on disk UNDER an open surface and the
+   * surface reloaded it (an office editor swapped to the new bytes). The tab
+   * bar plays a short "updated" pulse keyed on it — the document changing is
+   * the point, this just says where to look.
+   */
+  updatedAt?: number;
 
   // file surface state (the per-tab operation bar reads these)
   /** Full path of the open file — drives the breadcrumb + open/reveal targeting. */

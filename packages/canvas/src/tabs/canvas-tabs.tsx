@@ -431,6 +431,16 @@ export function CanvasTabs({
                       >
                         <span className="pd-canvas-tab-icon">{tab.icon ?? <Icon size={14} />}</span>
                         <span className="pd-canvas-tab-label">{tab.title || meta.label}</span>
+                        {/* Re-keyed on every on-disk change, so the pulse replays
+                            for each edit that landed in the open document. */}
+                        {tab.updatedAt !== undefined ? (
+                          <span
+                            key={tab.updatedAt}
+                            className="pd-canvas-tab-updated"
+                            data-testid="canvas-tab-updated"
+                            aria-hidden="true"
+                          />
+                        ) : null}
                         {/* A tab whose name must stay put while its contents change
                             says what is inside here, quietly, instead of renaming
                             itself and shuffling the bar under the cursor. */}

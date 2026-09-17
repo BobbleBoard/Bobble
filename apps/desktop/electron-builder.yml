@@ -42,6 +42,36 @@ extraResources:
   - from: ../../tools/office-gen
     to: office-gen
     filter: ['*.py', 'README.md']
+  # The vendored GenOffice EDITORS — the live docx/xlsx/pptx/pdf tabs in the
+  # canvas. office-manager.ts resolves <Resources>/genoffice when packaged
+  # (vendorRoot), and until this entry existed nothing put anything there: an
+  # installed Bobble logged "office seam not built — office tabs unavailable"
+  # and every deck the model made opened as a generic file, while the dev tree
+  # showed the real editor. Three parts, all real files outside the asar:
+  #   embed/out — the seam (index.cjs main `require`s + harfbuzz.wasm beside it)
+  #   apps/<editor>/out/{preload,renderer} — what each editor's WebContentsView
+  #     loads (their out/main is NOT needed: the seam bundle replaces it)
+  #   the sheets Rust sidecar main spawns (ship-local.sh signs it, like pi-mac)
+  - from: ../../vendor/genoffice/embed/out
+    to: genoffice/embed/out
+    filter: ['**/*']
+  - from: ../../vendor/genoffice/apps/docs/out
+    to: genoffice/apps/docs/out
+    filter: ['preload/**/*', 'renderer/**/*']
+  - from: ../../vendor/genoffice/apps/sheets/out
+    to: genoffice/apps/sheets/out
+    filter: ['preload/**/*', 'renderer/**/*']
+  - from: ../../vendor/genoffice/apps/slides/out
+    to: genoffice/apps/slides/out
+    filter: ['preload/**/*', 'renderer/**/*']
+  - from: ../../vendor/genoffice/apps/pdf/out
+    to: genoffice/apps/pdf/out
+    filter: ['preload/**/*', 'renderer/**/*']
+  - from: ../../vendor/genoffice/apps/markdown/out
+    to: genoffice/apps/markdown/out
+    filter: ['preload/**/*', 'renderer/**/*']
+  - from: ../../vendor/genoffice/apps/sheets/native/xlsx-engine/target/release/xlsx-sidecar
+    to: genoffice/apps/sheets/native/xlsx-engine/target/release/xlsx-sidecar
 asarUnpack:
   # pi is spawned as a real child process (ELECTRON_RUN_AS_NODE). Its cli.js is
   # read through the asar shim, but its native transitive dep koffi (loaded via

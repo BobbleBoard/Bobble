@@ -296,6 +296,41 @@ export function App() {
     const t = window.setTimeout(() => setStatus(''), 4000)
     return () => window.clearTimeout(t)
   }, [status])
+  // BOBBLE PATCH: view state across a host reload.
+  //
+  // Bobble swaps this editor for a fresh one when the file changes on disk
+  // (the model's `office edit` while the deck is open in the canvas). A fresh
+  // editor opens on slide 1; the person was looking at the slide that changed.
+  // The host reads this before the swap and writes it into the new editor
+  // once the deck has loaded, so the view stays where it was. Also `dirty`,
+  // so the host can leave an edited deck alone.
+  // The host may ask before the deck has loaded (it hands the state over as
+  // soon as the page is up); the wish is kept and applied when the slides
+  // arrive — after applyOpen's own setCurrent(0), so it wins.
+  const pendingSlideRef = useRef<number | null>(null)
+  useEffect(() => {
+    ;(window as unknown as { __pdViewState?: unknown }).__pdViewState = {
+      get: () => ({
+        slide: current,
+        dirty,
+        savedAt: (window as unknown as { __pdSavedAt?: number }).__pdSavedAt ?? 0,
+      }),
+      set: (s: { slide?: number } | null | undefined) => {
+        if (typeof s?.slide !== 'number') return
+        const want = Math.max(0, Math.floor(s.slide))
+        if (slides.length === 0) {
+          pendingSlideRef.current = want
+          return
+        }
+        setCurrent(Math.min(want, slides.length - 1))
+      },
+    }
+  }, [current, dirty, slides.length])
+  useEffect(() => {
+    if (slides.length === 0 || pendingSlideRef.current === null) return
+    setCurrent(Math.min(pendingSlideRef.current, slides.length - 1))
+    pendingSlideRef.current = null
+  }, [slides.length])
   const [showThumbs, setShowThumbs] = useState(true)
   // ── Thumbnail sidebar width (drag the divider to resize; persisted) ─────────
   const [thumbsW, setThumbsW] = useState(loadThumbsW)
@@ -627,7 +662,13 @@ export function App() {
   editingActiveRef.current = !!editing || !!editingCell
 
   const save = useCallback(
-    (quiet = false): Promise<boolean> => fileActions.save(ctxRef.current, quiet),
+    (quiet = false): Promise<boolean> =>
+      fileActions.save(ctxRef.current, quiet).then((ok) => {
+        // BOBBLE PATCH: the host watches the file; a change it sees right
+        // after this stamp is this editor's own save, not a reason to reload.
+        if (ok) (window as unknown as { __pdSavedAt?: number }).__pdSavedAt = Date.now()
+        return ok
+      }),
     [],
   )
 

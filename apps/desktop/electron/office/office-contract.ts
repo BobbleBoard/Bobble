@@ -70,6 +70,30 @@ export type OfficeInvokeMap = {
   };
   /** Is the vendored seam actually present in this build? */
   'office:available': { request: Record<string, never>; response: { available: boolean } };
+  /**
+   * Re-open the tab's file from disk — the LIVE half of "see the deck being
+   * edited". The manager watches every open file itself (an `office edit`
+   * replaces the file; the view swaps to a fresh editor once the new one has
+   * painted), so this is only for a re-present: `force` reloads even when the
+   * editor has focus or the stamp looks unchanged.
+   */
+  'office:reload': {
+    request: { tabId: string; force?: boolean };
+    response: { ok: boolean; reloaded: boolean; reason?: string };
+  };
+  /** The editor's own view state (slide / page / scroll / sheet, dirty, last
+   * save) — what a reload carries over. With `state`, navigates the editor
+   * there (`{ slide: 1 }`, `{ page: 2 }`) and answers the state afterwards;
+   * the acceptance probes drive the editors with it. */
+  'office:view-state': {
+    request: { tabId: string; state?: Record<string, unknown> };
+    response: { state: Record<string, unknown> | null };
+  };
+};
+
+export type OfficeEventMap = {
+  /** The tab's file changed on disk and its editor now shows the new bytes. */
+  'office:reloaded': { tabId: string; filePath: string };
 };
 
 export const OFFICE_INVOKE_CHANNELS = [
@@ -81,4 +105,6 @@ export const OFFICE_INVOKE_CHANNELS = [
   'office:click',
   'office:set-theme',
   'office:available',
+  'office:reload',
+  'office:view-state',
 ] as const satisfies readonly (keyof OfficeInvokeMap)[];

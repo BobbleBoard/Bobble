@@ -382,6 +382,66 @@ export function App(): React.JSX.Element {
   useEffect(() => {
     localStorage.setItem('ai-sheets-auto-save', autoSave ? '1' : '0')
   }, [autoSave])
+  // BOBBLE PATCH: view state across a host reload (see slides App.tsx). The
+  // host swaps in a fresh editor when the workbook changes on disk under an
+  // open tab; this keeps the active sheet and the scrolled-to cell, and tells
+  // the host about unsaved edits (leave them alone) and this editor's own
+  // saves (not a reload). Everything through the facade, best effort.
+  useEffect(() => {
+    ;(window as unknown as { __pdViewState?: unknown }).__pdViewState = {
+      get: () => {
+        const state = lazyWorkbookRef.current
+        const out: Record<string, unknown> = {
+          dirty: state ? journalSize(state.editJournal) > 0 : false,
+          savedAt: (window as unknown as { __pdSavedAt?: number }).__pdSavedAt ?? 0,
+        }
+        try {
+          const ws = univerRef.current?.univerAPI.getActiveWorkbook()?.getActiveSheet()
+          if (ws) {
+            out.sheet = ws.getSheetName()
+            const vis = ws.getVisibleRange()
+            if (vis) {
+              out.row = vis.startRow
+              out.column = vis.startColumn
+            }
+          }
+        } catch {
+          /* the facade is not up yet; sheet/scroll stay unset */
+        }
+        return out
+      },
+      set: (s: { sheet?: string; row?: number; column?: number } | null | undefined) => {
+        if (!s) return
+        // The workbook may still be opening: keep trying for a few seconds.
+        let tries = 0
+        const apply = () => {
+          let wb: ReturnType<NonNullable<typeof univerRef.current>['univerAPI']['getActiveWorkbook']> = null
+          try {
+            wb = univerRef.current?.univerAPI.getActiveWorkbook() ?? null
+          } catch {
+            wb = null
+          }
+          if (!wb) {
+            if (tries++ < 20) window.setTimeout(apply, 200)
+            return
+          }
+          try {
+            const target = typeof s.sheet === 'string' ? wb.getSheetByName(s.sheet) : null
+            if (target) wb.setActiveSheet(target)
+            const ws = wb.getActiveSheet()
+            const scroll = (ws as unknown as { scrollToCell?: (r: number, c: number) => void }).scrollToCell
+            if (ws && typeof scroll === 'function' && typeof s.row === 'number' && typeof s.column === 'number') {
+              scroll.call(ws, Math.max(0, s.row), Math.max(0, s.column))
+            }
+          } catch {
+            /* best effort: a fresh sheet on A1 is the fallback */
+          }
+        }
+        apply()
+      },
+    }
+  }, [])
+
   // AutoSave tick (docs/slides parity): every 30 s and on window blur, flush
   // pending edits of the open workbook. The journal is read at tick time so
   // the interval stays stable; demo mode has no backing file and is skipped.

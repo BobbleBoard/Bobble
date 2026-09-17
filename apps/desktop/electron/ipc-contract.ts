@@ -47,7 +47,11 @@ import {
   type StoreEventMap,
   type StoreInvokeMap,
 } from './model-store/store-contract';
-import { OFFICE_INVOKE_CHANNELS, type OfficeInvokeMap } from './office/office-contract';
+import {
+  OFFICE_INVOKE_CHANNELS,
+  type OfficeEventMap,
+  type OfficeInvokeMap,
+} from './office/office-contract';
 import { PI_INVOKE_CHANNELS, type PiEventMap, type PiInvokeMap } from './pi/contract';
 import { PROJECT_INVOKE_CHANNELS, type ProjectInvokeMap } from './project/project-contract';
 import {
@@ -1283,6 +1287,7 @@ export type AppEventMap = {
    * is already open, so the standalone canvas re-renders without a reload. */
   'canvas:popout-artifact': CanvasArtifactPayload;
 } & BrowserEventMap &
+  OfficeEventMap &
   BrowserAgentEventMap &
   MacMonitorEventMap &
   PtyEventMap &

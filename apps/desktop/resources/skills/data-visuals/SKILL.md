@@ -80,6 +80,29 @@ second `chart` with everything retyped:
 
 The chart is redrawn in place and shown again.
 
+## Several charts, and charts in documents
+
+Several charts in one answer are one `chart` call each — a bar for the totals,
+a line for the trend, a donut for the share — with looks that vary.
+
+A chart goes INTO a document with `office_edit --chart <the .svg the chart
+tool reported>`; the chart's elements travel with the file, so it becomes
+native shapes or a picture of the right size, never a screenshot:
+
+- a slide: `office edit deck.pptx --chart units.svg --slide 2` (a native,
+  editable group; `--box "x,y,w,h"` in inches to place it)
+- a document: `office edit report.docx --chart units.svg --after p3` (after
+  the paragraph `office_inspect` lists as p3; `--width 5.5` inches)
+- a workbook: `office edit sales.xlsx --chart units.svg --anchor H2`
+- a PDF: `office edit brief.pdf --chart units.svg --page 2` — free space at the
+  foot of that page, else a new page right after it (`--place page`)
+
+"Slot a chart in with the data on the second page and reformat it to fit" is
+two edits on the same file: the chart (above) and an instruction on what to
+move, resize or shrink (`--instruction "make the table narrower…"`, using the
+ids `office_inspect` shows). The open document reloads in the canvas by
+itself after each one.
+
 ## After the chart
 
 One sentence: what it shows — the peak, the trend, the share. The values are on

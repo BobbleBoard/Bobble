@@ -110,12 +110,14 @@ OPS = {
 {"op":"delete_slide","slide":12}
 {"op":"duplicate_slide","slide":2}
 {"op":"reorder_slides","order":[1,3,2,4]}            must list EVERY slide exactly once
+{"op":"insert_chart","slide":2,"file":"units.svg","box":[6.8,1.4,6.0,4.4]}   a chart made by the chart tool (its .svg), box in inches x,y,w,h (omit box: the right half)
 """,
     "docx": """
 {"op":"set_text","id":"p3","text":"..."}             replace the wording, KEEPING its styling
 {"op":"set_style","id":"p3","size":19,"bold":true,"italic":false,"color":"#RRGGBB"}
 {"op":"insert_paragraph","after":"p5","text":"..."}
 {"op":"delete","id":"p7"}
+{"op":"insert_chart","after":"p5","file":"units.svg","width":6.0}   a chart made by the chart tool, after a paragraph, width in inches
 Table cells use their own ids: {"op":"set_text","id":"t0.r1.c2","text":"..."}
 """,
     "xlsx": """
@@ -124,6 +126,7 @@ Table cells use their own ids: {"op":"set_text","id":"t0.r1.c2","text":"..."}
 {"op":"set_style","id":"A16","bold":true,"color":"#RRGGBB","fill":"#RRGGBB"}
 {"op":"set_column_width","column":"A","width":30}
 {"op":"delete_row","row":9}
+{"op":"insert_chart","anchor":"H2","file":"units.svg"}   a native Excel chart from a chart made by the chart tool, top-left at a cell
 """,
 }
 

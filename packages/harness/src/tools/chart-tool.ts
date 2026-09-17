@@ -52,6 +52,7 @@ import {
   type ChartSpec,
   type ChartStyle,
   type ChartType,
+  chartToElements,
   chartToSvg,
   formatValue,
   LOOK_NAMES,
@@ -72,6 +73,12 @@ export const CHART_EDIT_TOOL = 'chart_edit';
 export const CHART_TOOL_NAMES = [CHART_TOOL, CHART_EDIT_TOOL] as const;
 /** The spec written beside the SVG: `<stem>.svg` + `<stem>.chart.json`. */
 export const CHART_SIDECAR_SUFFIX = '.chart.json';
+/**
+ * The chart as measured elements, beside the SVG: `<stem>.chart.elements.json`.
+ * The office pipeline reads it to put the chart INTO a deck, a document, a
+ * workbook or a PDF as native shapes (`office edit … --chart <svg>`).
+ */
+export const CHART_ELEMENTS_SUFFIX = '.chart.elements.json';
 
 export interface ChartToolDeps {
   readonly bridge: PresentBridge | null;
@@ -512,7 +519,7 @@ async function styleFromImage(
  * instruction, with the values named as the thing NOT to write.
  */
 const REPLY_LINE =
-  'Check that data against what the user asked for; if it is right, you are done. Your reply is ONE sentence saying what the chart shows — its peak, its trend, its share (e.g. "Sales climbed every year, peaking at 22 in 2024."). No list of the values, no description of the chart, the file or the look: the card in front of the user has all of that. It is already shown — do not present it again. To change anything about it later — a colour, thinner bars, another series, the look — use chart_edit on the file.';
+  'Check that data against what the user asked for; if it is right, you are done. Your reply is ONE sentence saying what the chart shows — its peak, its trend, its share (e.g. "Sales climbed every year, peaking at 22 in 2024."). No list of the values, no description of the chart, the file or the look: the card in front of the user has all of that. It is already shown — do not present it again. To change anything about it later — a colour, thinner bars, another series, the look — use chart_edit on the file. If the chart was asked for INSIDE a document, put it there now: office_edit with --chart <this .svg> and --slide N (pptx), --after <paragraph> (docx), --anchor B12 (xlsx) or --page N (pdf).';
 
 interface Written {
   readonly svgPath: string;
@@ -531,6 +538,11 @@ async function writeChart(
     // The spec first: the app reads it when the SVG is presented.
     await write(specPath, `${JSON.stringify(spec, null, 2)}\n`);
     await write(svgPath, chartToSvg(spec));
+    // …and the elements, for the office pipeline to embed as native shapes.
+    await write(
+      `${svgPath.slice(0, -4)}${CHART_ELEMENTS_SUFFIX}`,
+      `${JSON.stringify(chartToElements(spec))}\n`,
+    );
   } catch (err) {
     return {
       error: `could not write ${svgPath}: ${err instanceof Error ? err.message : String(err)}`,

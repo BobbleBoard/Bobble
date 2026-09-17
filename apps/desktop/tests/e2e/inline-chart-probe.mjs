@@ -21,7 +21,7 @@
  *   MODEL=qwen3.5-4b-mtp ENGINE=rapid-mlx/mtp SHOT_DIR=/tmp/inline-chart \
  *     node apps/desktop/tests/e2e/inline-chart-probe.mjs
  */
-import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { watchFlicker } from './flicker.mjs';
@@ -793,4 +793,8 @@ try {
   );
 } finally {
   await finish();
+  // launchApp only removes a home IT made; this one was made here (probeHome,
+  // so its path is known before launch) and holds the model's chat folder —
+  // MEASURED 277 such homes, 55 GB, the day the disk filled. Kept on request.
+  if (process.env.PI_E2E_KEEP_HOME !== '1') rmSync(home, { recursive: true, force: true });
 }

@@ -37,8 +37,15 @@ const GRID_W = 160;
 const CELL_DELTA = 14;
 /** …and a frame has changed when at least this many cells did. */
 const MIN_CELLS = 6;
-/** A change that comes back within this many frames is a flicker. */
+/** A change that comes back within this many frames is a flicker… */
 const REVERT_WITHIN = 4;
+/**
+ * …and within this much time. The screencast emits a frame only when
+ * something changed, so "four frames" can span seconds: a tab closed and the
+ * next one opened 1.3 s later read as a flicker (SEEN, office-embed probe —
+ * the canvas panel closing and coming back). A flicker is fast by definition.
+ */
+const REVERT_WITHIN_MS = 500;
 /** DOM mutations within this window of the flicker frame are attached. */
 const DOM_WINDOW_MS = 400;
 
@@ -122,6 +129,7 @@ export function findFlickers(frames, transitions = []) {
     }
     let revertedAt = -1;
     for (let j = i + 1; j <= Math.min(frames.length - 1, i + REVERT_WITHIN); j += 1) {
+      if (frames[j].at - cur.at > REVERT_WITHIN_MS) break;
       const back = gridDiff(prev.grid, frames[j].grid);
       const still = gridDiff(cur.grid, frames[j].grid);
       // Back to before (few cells differ from prev) after having been away
@@ -169,14 +177,28 @@ const DOM_LOG_SCRIPT = `(() => {
         const s = name(n);
         if (s) log.push({ at: Date.now(), kind: 'remove', node: s });
       }
-      if (m.type === 'attributes' && m.target instanceof Element && (m.attributeName === 'style' || m.attributeName === 'class' || (m.attributeName || '').startsWith('data-'))) {
+      if (m.type === 'attributes' && m.target instanceof Element) {
         const s = name(m.target);
-        if (s && /chart|present|inline|canvas/.test(s)) log.push({ at: Date.now(), kind: 'attr:' + m.attributeName, node: s });
+        // State attributes anywhere (a clamp, a reveal, a live flag); style
+        // and class only on the surfaces that animate, or the log is noise.
+        const stateAttr = (m.attributeName || '').startsWith('data-') || m.attributeName === 'aria-expanded';
+        if (s && (stateAttr || /chart|present|inline|canvas|chain|thought/.test(s))) {
+          log.push({ at: Date.now(), kind: 'attr:' + m.attributeName + '=' + (m.target.getAttribute(m.attributeName) ?? ''), node: s });
+        }
       }
-      if (log.length > 5000) log.splice(0, log.length - 5000);
+      // Keep the last minute, not the last N entries: a long turn's churn
+      // used to push the flicker's own mutations out of a fixed ring (SEEN:
+      // 18 flickers reported with an empty dom list).
+      const cutoff = Date.now() - 60000;
+      if (log.length > 20000 || (log.length > 0 && log[0].at < cutoff)) {
+        let k = 0;
+        while (k < log.length && log[k].at < cutoff) k += 1;
+        if (log.length - k > 20000) k = log.length - 20000;
+        if (k > 0) log.splice(0, k);
+      }
     }
   });
-  mo.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class', 'data-hover', 'data-chart-view', 'data-open'] });
+  mo.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class', 'data-hover', 'data-chart-view', 'data-open', 'data-clamped', 'data-expanded', 'data-live', 'data-active', 'aria-expanded'] });
   window.__flickerTransitions = [];
   if (typeof document.startViewTransition === 'function' && !document.__flickerPatched) {
     document.__flickerPatched = true;

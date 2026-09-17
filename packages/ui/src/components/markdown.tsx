@@ -222,7 +222,110 @@ export function widenUrlTransform(keep: RegExp): NonNullable<Options['urlTransfo
  * alone on the last line mean nothing anyway.
  */
 export function holdBackPartialTail(text: string): string {
-  return text.replace(/(^|\n)[ \t]{0,3}[-=*_#`~]{1,3}[ \t]*$/, '$1');
+  return (
+    text
+      .replace(/(^|\n)[ \t]{0,3}[-=*_#`~]{1,3}[ \t]*$/, '$1')
+      // A trailing "$" is either a price about to get its digits or a
+      // formula's closing delimiter — unknowable until the next byte, and the
+      // two render nothing alike (see guardCurrencyDollars).
+      .replace(/(^|[^\\])\$$/, '$1')
+  );
+}
+
+/**
+ * A DOLLAR AMOUNT IS NOT A FORMULA.
+ *
+ * remark-math reads `$…$` as inline TeX, so "Revenue was $412,000, up 14% on
+ * Q2, and margin $3" renders "412,000, up 14% on Q2, and margin" as an
+ * equation — in italics, spaces gone — which is most of what a business deck
+ * says. Pandoc's rule tells the two apart: a closing `$` may not be followed
+ * by a digit. So a `$…$` pair whose closer is followed by a digit is not
+ * math, and its opener is escaped; the closer is then free to open the next
+ * pair, which is how "$5 to $10" and "from $12 and $19 each" both come out
+ * as prices. Code spans and fences are left alone (a `$` in code is code).
+ * MEASURED by the flicker guard (2026-09-17): streamed text with stray `$`s
+ * rendered as KaTeX for a frame and snapped back — the same family.
+ */
+export function guardCurrencyDollars(text: string): string {
+  let out = '';
+  let i = 0;
+  let inFence = false;
+  const lines = text.split('\n');
+  for (let li = 0; li < lines.length; li += 1) {
+    const line = lines[li] as string;
+    if (/^\s{0,3}(```|~~~)/.test(line)) {
+      inFence = !inFence;
+      out += (li > 0 ? '\n' : '') + line;
+      continue;
+    }
+    if (inFence) {
+      out += (li > 0 ? '\n' : '') + line;
+      continue;
+    }
+    // Outside a fence: walk the line, skipping code spans, judging `$` pairs.
+    let res = '';
+    i = 0;
+    while (i < line.length) {
+      const ch = line[i] as string;
+      if (ch === '`') {
+        // A code span: copy through its matching backtick run verbatim.
+        let run = 0;
+        while (line[i + run] === '`') run += 1;
+        const ticks = '`'.repeat(run);
+        const close = line.indexOf(ticks, i + run);
+        if (close === -1) {
+          res += line.slice(i);
+          i = line.length;
+        } else {
+          res += line.slice(i, close + run);
+          i = close + run;
+        }
+        continue;
+      }
+      if (ch === '\\') {
+        res += line.slice(i, i + 2);
+        i += 2;
+        continue;
+      }
+      if (ch === '$' && line[i + 1] !== '$') {
+        // A candidate opener (remark-math pairs any two single `$`s, spaces
+        // or not — it is a code span with a different fence); find its closer.
+        let j = i + 1;
+        let close = -1;
+        while (j < line.length) {
+          if (line[j] === '\\') {
+            j += 2;
+            continue;
+          }
+          if (line[j] === '$' && line[j + 1] !== '$') {
+            close = j;
+            break;
+          }
+          if (line[j] === '$') {
+            j += 2;
+            continue;
+          }
+          j += 1;
+        }
+        if (close !== -1 && /\d/.test(line[close + 1] ?? '')) {
+          // Money, not math: the opener becomes literal, the scan resumes at
+          // the closer, which may open the next pair.
+          res += `\\$${line.slice(i + 1, close)}`;
+          i = close;
+          continue;
+        }
+        if (close !== -1) {
+          res += line.slice(i, close + 1);
+          i = close + 1;
+          continue;
+        }
+      }
+      res += ch;
+      i += 1;
+    }
+    out += (li > 0 ? '\n' : '') + res;
+  }
+  return out;
 }
 
 /**
@@ -247,7 +350,7 @@ export const Markdown = forwardRef<HTMLDivElement, MarkdownProps>(function Markd
         components={merged}
         {...(urlTransform === undefined ? {} : { urlTransform })}
       >
-        {holdBackPartialTail(children)}
+        {holdBackPartialTail(guardCurrencyDollars(children))}
       </ReactMarkdown>
     </div>
   );

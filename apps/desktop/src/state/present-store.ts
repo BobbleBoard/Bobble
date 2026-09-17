@@ -11,7 +11,7 @@ import type { OpenWithChoice } from '@pi-desktop/ui';
  * the tool must stay electron-free and the canvas surfaces live on this side.
  */
 
-import type { CanvasController, CanvasTabKind } from '@pi-desktop/canvas';
+import type { CanvasController, CanvasTab, CanvasTabKind } from '@pi-desktop/canvas';
 import { type ChartSpec, normalizeChartSpec } from '@pi-desktop/charts';
 import type { PresentKind } from '@pi-desktop/ui';
 import { create } from 'zustand';
@@ -313,12 +313,26 @@ export async function openPresented(
    * text-shaped kinds (a page, code, an SVG's markup) are read as text.
    */
   if (previewKindForExt(extOf(item.path)) !== null) {
-    await openFileInCanvas(controller as unknown as CanvasController, item.path);
-    const opened = (controller as unknown as CanvasController)
-      .getState()
-      .tabs.find((t) => t.filePath === item.path || t.key === fileTabKey(item.path));
+    const ctl = controller as unknown as CanvasController;
+    const findTab = (): CanvasTab | undefined =>
+      ctl.getState().tabs.find((t) => t.filePath === item.path || t.key === fileTabKey(item.path));
+    const already = findTab();
+    await openFileInCanvas(ctl, item.path);
+    const opened = findTab();
     if (opened !== undefined && item.note !== undefined) {
-      (controller as unknown as CanvasController).updateTab(opened.id, { subtitle: item.note });
+      ctl.updateTab(opened.id, { subtitle: item.note });
+    }
+    /*
+     * Re-presenting an OPEN document means "look at it now": the editor's
+     * file watcher has normally swapped the new bytes in already, but a
+     * present that lands inside the watcher's debounce, or while the editor
+     * itself had focus, would otherwise show the deck as it was. Forced, so
+     * the tab and the file agree the moment the card appears.
+     */
+    if (already !== undefined && opened !== undefined && opened.kind === 'office') {
+      void window.piDesktop
+        .invoke('office:reload', { tabId: opened.id, force: true })
+        .catch(() => undefined);
     }
     return;
   }

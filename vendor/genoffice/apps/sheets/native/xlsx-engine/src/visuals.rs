@@ -1001,18 +1001,55 @@ fn formula_ref(node: Node<'_, '_>) -> Option<String> {
 
 fn parse_anchor(anchor: Node<'_, '_>) -> Option<DrawingAnchor> {
     let from = direct_child(anchor, "from")?;
-    let to = direct_child(anchor, "to").unwrap_or(from);
-    Some(DrawingAnchor {
-        from_row: marker_value(from, "row")?,
-        from_column: marker_value(from, "col")?,
-        from_row_offset: marker_signed_value(from, "rowOff").unwrap_or(0),
-        from_column_offset: marker_signed_value(from, "colOff").unwrap_or(0),
-        to_row: marker_value(to, "row").unwrap_or_else(|| marker_value(from, "row").unwrap_or(0) + 20),
-        to_column: marker_value(to, "col")
-            .unwrap_or_else(|| marker_value(from, "col").unwrap_or(0) + 8),
-        to_row_offset: marker_signed_value(to, "rowOff").unwrap_or(0),
-        to_column_offset: marker_signed_value(to, "colOff").unwrap_or(0),
-    })
+    let from_row = marker_value(from, "row")?;
+    let from_column = marker_value(from, "col")?;
+    let from_row_offset = marker_signed_value(from, "rowOff").unwrap_or(0);
+    let from_column_offset = marker_signed_value(from, "colOff").unwrap_or(0);
+    if let Some(to) = direct_child(anchor, "to") {
+        return Some(DrawingAnchor {
+            from_row,
+            from_column,
+            from_row_offset,
+            from_column_offset,
+            to_row: marker_value(to, "row").unwrap_or(from_row + 20),
+            to_column: marker_value(to, "col").unwrap_or(from_column + 8),
+            to_row_offset: marker_signed_value(to, "rowOff").unwrap_or(0),
+            to_column_offset: marker_signed_value(to, "colOff").unwrap_or(0),
+        });
+    }
+    // A oneCellAnchor has no `to`: its size is the `ext` (EMU). Expressed as
+    // the `to` marker being the same cell plus the extent as an offset, which
+    // the renderer measures marker-to-marker in pixels. (Bobble: a picture
+    // openpyxl/Excel anchored to one cell used to collapse to that cell.)
+    let ext = direct_child(anchor, "ext");
+    let cx = ext
+        .and_then(|node| node.attribute("cx"))
+        .and_then(|value| value.parse::<i64>().ok());
+    let cy = ext
+        .and_then(|node| node.attribute("cy"))
+        .and_then(|value| value.parse::<i64>().ok());
+    match (cx, cy) {
+        (Some(cx), Some(cy)) if cx > 0 && cy > 0 => Some(DrawingAnchor {
+            from_row,
+            from_column,
+            from_row_offset,
+            from_column_offset,
+            to_row: from_row,
+            to_column: from_column,
+            to_row_offset: from_row_offset + cy,
+            to_column_offset: from_column_offset + cx,
+        }),
+        _ => Some(DrawingAnchor {
+            from_row,
+            from_column,
+            from_row_offset,
+            from_column_offset,
+            to_row: from_row + 20,
+            to_column: from_column + 8,
+            to_row_offset: 0,
+            to_column_offset: 0,
+        }),
+    }
 }
 
 fn parse_font(font: Node<'_, '_>, colors: &ColorContext) -> FontStyle {

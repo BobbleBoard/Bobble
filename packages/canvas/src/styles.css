@@ -557,6 +557,54 @@
   color: var(--pd-text-secondary);
 }
 
+/* "The file changed under this tab": a dot that swells and fades beside the
+   label once per on-disk edit (re-keyed per change — see canvas-tabs.tsx).
+   Ends invisible so the bar keeps its width; nothing shifts. */
+.pd-canvas-tab-updated {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--pd-accent-primary);
+  opacity: 0;
+  animation: pd-canvas-tab-updated 1.6s ease-out forwards;
+}
+
+@keyframes pd-canvas-tab-updated {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  15% {
+    opacity: 1;
+    transform: scale(1.35);
+  }
+  35% {
+    transform: scale(1);
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pd-canvas-tab-updated {
+    animation: pd-canvas-tab-updated-still 1.6s linear forwards;
+  }
+  @keyframes pd-canvas-tab-updated-still {
+    0%,
+    70% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+}
+
 .pd-canvas-tab-close {
   display: inline-flex;
   align-items: center;
@@ -1258,7 +1306,12 @@
 
 .pd-browser-slot {
   position: absolute;
-  inset: 0;
+  /* 1px in from the left: the native view the app floats over this slot
+     sits above EVERY DOM pixel, including the rail's divider line at its
+     left edge (.pd-canvas-rail-handle::before). Flush, the view hid the
+     border for its whole height — the user (2026-09-16): "the canvas border
+     seems obstructed or gone in this situation". Same for the office slot. */
+  inset: 0 0 0 1px;
 }
 
 .pd-browser-empty {
@@ -4299,7 +4352,9 @@
 
 .pd-office-slot {
   position: absolute;
-  inset: 0;
+  /* Leaves the rail's divider visible beside the native editor — see
+     .pd-browser-slot. */
+  inset: 0 0 0 1px;
 }
 
 .pd-office-empty {

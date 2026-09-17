@@ -207,12 +207,12 @@ export async function runOffice(
         }
       }
       const tail = stderr.trim().split('\n').slice(-6).join('\n');
-      const noLib = /No module named '(pptx|docx|openpyxl|reportlab|PIL)'/.exec(stderr);
+      const noLib = /No module named '(pptx|docx|openpyxl|reportlab|PIL|pypdf)'/.exec(stderr);
       done({
         ok: false,
         error:
           noLib !== null
-            ? `${python} is missing the library "${noLib[1]}" the pipeline needs (python-pptx, python-docx, openpyxl, reportlab, pillow). Nothing else can make this file.`
+            ? `${python} is missing the library "${noLib[1]}" the pipeline needs (python-pptx, python-docx, openpyxl, reportlab, pillow, pypdf). Nothing else can make this file.`
             : `the pipeline exited with code ${code ?? '?'}${tail.length > 0 ? `:\n${tail}` : ''}`,
       });
     });
@@ -392,6 +392,73 @@ export function inferOfficeKind(brief: string, out: string | undefined): OfficeK
   return null;
 }
 
+/**
+ * The `insert_chart` operation for a file, from the tool's flat params —
+ * placed by the format's own idea of "where": a slide, a paragraph, a cell,
+ * a page.
+ */
+export function insertChartOp(
+  file: string,
+  chart: string,
+  p: {
+    slide?: unknown;
+    after?: unknown;
+    anchor?: unknown;
+    page?: unknown;
+    box?: unknown;
+    width?: unknown;
+    place?: unknown;
+  },
+): Record<string, unknown> | { error: string } {
+  const ext = path.extname(file).toLowerCase().replace(/^\./, '');
+  const num = (v: unknown): number | undefined =>
+    typeof v === 'number' && Number.isFinite(v)
+      ? v
+      : typeof v === 'string' && /^\d+(\.\d+)?$/.test(v.trim())
+        ? Number(v)
+        : undefined;
+  const box = typeof p.box === 'string' && p.box.trim() !== '' ? p.box.trim() : undefined;
+  const width = num(p.width);
+  if (!/\.svg$/i.test(chart))
+    return { error: `chart must be the .svg the chart tool wrote, not ${path.basename(chart)}` };
+  switch (ext) {
+    case 'pptx':
+      return {
+        op: 'insert_chart',
+        slide: num(p.slide) ?? 1,
+        file: chart,
+        ...(box !== undefined ? { box } : {}),
+      };
+    case 'docx':
+      return {
+        op: 'insert_chart',
+        after: typeof p.after === 'string' && p.after.trim() !== '' ? p.after.trim() : 'end',
+        file: chart,
+        ...(width !== undefined ? { width } : {}),
+      };
+    case 'xlsx':
+      return {
+        op: 'insert_chart',
+        anchor:
+          typeof p.anchor === 'string' && p.anchor.trim() !== ''
+            ? p.anchor.trim().toUpperCase()
+            : 'H2',
+        file: chart,
+        ...(width !== undefined ? { width } : {}),
+      };
+    case 'pdf':
+      return {
+        op: 'insert_chart',
+        page: num(p.page) ?? 1,
+        file: chart,
+        ...(box !== undefined ? { box } : {}),
+        ...(typeof p.place === 'string' ? { place: p.place } : {}),
+      };
+    default:
+      return { error: `a chart can go into a .pptx, .docx, .xlsx or .pdf, not .${ext}` };
+  }
+}
+
 export function registerOfficeTools(pi: ExtensionAPI, deps: OfficeToolDeps): void {
   const env = deps.env ?? process.env;
 
@@ -511,48 +578,155 @@ export function registerOfficeTools(pi: ExtensionAPI, deps: OfficeToolDeps): voi
     name: OFFICE_EDIT_TOOL,
     label: 'Office: edit',
     description:
-      'Change an existing .pptx, .docx, .xlsx (or a chart .svg made here) in place through the document pipeline: reword ' +
+      'Change an existing .pptx, .docx, .xlsx or .pdf (or a chart .svg made here) in place through the document pipeline: reword ' +
       'text, restyle it (size, bold, colour), move or resize a shape, delete one, delete, duplicate ' +
-      'or reorder slides, set cells and formats. Say WHICH slide, paragraph or cell and WHAT it ' +
-      'should become — office_inspect shows the ids. It cannot add new slides or paragraphs of ' +
-      'new content; for that, make the file again with a fuller brief. Never edit these files ' +
-      'with python-pptx/docx/openpyxl or by touching the XML.',
+      'or reorder slides, set cells and formats — and PUT A CHART IN: `chart` names a chart the chart ' +
+      'tool made (its .svg) and it lands as native shapes on a slide (`slide`, optional `box` in ' +
+      'inches), as a picture after a paragraph (`after` a paragraph id), at a cell (`anchor`), or ' +
+      'drawn onto a PDF page in its free space or on a new page after it (`page`). Say WHICH slide, ' +
+      'paragraph or cell and WHAT it should become — office_inspect shows the ids. It cannot add ' +
+      'new slides or paragraphs of new content; for that, make the file again with a fuller brief. ' +
+      'Never edit these files with python-pptx/docx/openpyxl or by touching the XML.',
     promptSnippet:
-      'office_edit: change wording, style, layout or slide order in an existing office file',
+      'office_edit: change wording, style, layout or slide order in an existing office file, or put a chart into it',
     parameters: Type.Object({
-      file: Type.String({ description: 'The .pptx/.docx/.xlsx (or chart .svg) to change.' }),
-      instruction: Type.String({
-        description:
-          'The change, precisely: which slide/paragraph/cell, and the new text or style.',
-      }),
+      file: Type.String({ description: 'The .pptx/.docx/.xlsx/.pdf (or chart .svg) to change.' }),
+      instruction: Type.Optional(
+        Type.String({
+          description:
+            'The change, precisely: which slide/paragraph/cell, and the new text or style. Optional when `chart` is given.',
+        }),
+      ),
+      chart: Type.Optional(
+        Type.String({
+          description:
+            'A chart to put in: the .svg the chart tool wrote (the spec and elements beside it are read). Give WHERE with slide / after / anchor / page.',
+        }),
+      ),
+      slide: Type.Optional(
+        Type.Number({ description: 'pptx: the slide number (1-based) for the chart.' }),
+      ),
+      after: Type.Optional(
+        Type.String({
+          description:
+            'docx: the paragraph id (from office_inspect, e.g. p5) the chart goes after; "end" for the end.',
+        }),
+      ),
+      anchor: Type.Optional(
+        Type.String({ description: 'xlsx: the top-left cell for the chart, e.g. E2.' }),
+      ),
+      page: Type.Optional(
+        Type.Number({ description: 'pdf: the page number (1-based) the chart belongs with.' }),
+      ),
+      box: Type.Optional(
+        Type.String({
+          description:
+            'pptx/pdf: where exactly, in inches from the top-left: "x, y, w, h" (e.g. "6.8, 1.4, 6, 4.4"). Default: pptx the right half under the title; pdf the free space at the foot of the page, else a new page after it.',
+        }),
+      ),
+      width: Type.Optional(
+        Type.Number({
+          description: "docx/xlsx: the chart's width in inches (default: the text width / 5).",
+        }),
+      ),
+      place: Type.Optional(
+        Type.Union([Type.Literal('auto'), Type.Literal('below'), Type.Literal('new-page')], {
+          description: 'pdf: auto (free space on the page, else a new page), below, or new-page.',
+        }),
+      ),
       out: Type.Optional(
         Type.String({ description: 'Write the changed copy here instead of editing in place.' }),
       ),
     }),
     async execute(_id, params, signal, onUpdate, ctx) {
-      const p = params as { file?: unknown; instruction?: unknown; out?: unknown };
+      const p = params as {
+        file?: unknown;
+        instruction?: unknown;
+        out?: unknown;
+        chart?: unknown;
+        slide?: unknown;
+        after?: unknown;
+        anchor?: unknown;
+        page?: unknown;
+        box?: unknown;
+        width?: unknown;
+        place?: unknown;
+      };
       const root = deps.root(ctx?.cwd);
       const file = resolveAgainst(root, typeof p.file === 'string' ? p.file : undefined);
       const instruction = typeof p.instruction === 'string' ? p.instruction.trim() : '';
-      if (file === undefined || instruction.length === 0) {
-        return errorResult('office_edit needs the file and an instruction.');
+      const chart = resolveAgainst(root, typeof p.chart === 'string' ? p.chart : undefined);
+      if (file === undefined || (instruction.length === 0 && chart === undefined)) {
+        return errorResult(
+          'office_edit needs the file and an instruction — or a `chart` to put in (with slide / after / anchor / page).',
+        );
       }
       if (!existsSync(file)) return errorResult(`There is no file at ${file}.`);
       const out = resolveAgainst(root, typeof p.out === 'string' ? p.out : undefined);
-      const args = ['edit', file, '--instruction', instruction];
-      if (out !== undefined) args.push('--out', out);
-      const r = await runOffice(args, {
-        cwd: root,
-        env,
-        signal,
-        spawnImpl: deps.spawnImpl,
-        onProgress: (line) =>
-          onUpdate?.({ content: [{ type: 'text', text: line }], details: undefined } as never),
-      });
-      if (!r.ok || r.path === undefined) {
-        return errorResult(`office_edit could not apply that: ${r.error ?? 'unknown error'}`);
+      const progress = (line: string): void =>
+        onUpdate?.({ content: [{ type: 'text', text: line }], details: undefined } as never);
+      let r: OfficeResult | null = null;
+      /*
+       * A CHART GOES IN DETERMINISTICALLY. The chart tool wrote the spec and
+       * the measured elements beside its .svg; the pipeline turns those into
+       * native shapes (pptx), a picture (docx, xlsx) or vector drawing on the
+       * page (pdf) — no model in the loop, so "add the chart to slide 2" is
+       * exactly that. An instruction given alongside runs after it.
+       */
+      if (chart !== undefined) {
+        if (!existsSync(chart)) return errorResult(`There is no chart at ${chart}.`);
+        const op = insertChartOp(file, chart, p);
+        if ('error' in op) return errorResult(`office_edit: ${op.error}`);
+        const args = ['apply', file, '--ops', JSON.stringify([op])];
+        if (out !== undefined) args.push('--out', out);
+        r = await runOffice(args, {
+          cwd: root,
+          env,
+          signal,
+          spawnImpl: deps.spawnImpl,
+          onProgress: progress,
+        });
+        if (!r.ok || r.path === undefined) {
+          return errorResult(
+            `office_edit could not put the chart in: ${r.error ?? 'unknown error'}`,
+          );
+        }
       }
-      const shown = await presentFile(deps.bridge, r.path, 'edited');
+      if (instruction.length > 0) {
+        const target = r?.path ?? file;
+        const args = ['edit', target, '--instruction', instruction];
+        if (out !== undefined && r === null) args.push('--out', out);
+        const edited = await runOffice(args, {
+          cwd: root,
+          env,
+          signal,
+          spawnImpl: deps.spawnImpl,
+          onProgress: progress,
+        });
+        if (!edited.ok || edited.path === undefined) {
+          const placed =
+            r !== null
+              ? ` The chart is in (${(r.applied ?? []).join('; ')}), but the instruction failed:`
+              : '';
+          return errorResult(
+            `office_edit could not apply that:${placed} ${edited.error ?? 'unknown error'}`,
+          );
+        }
+        r =
+          r === null
+            ? edited
+            : {
+                ...edited,
+                applied: [...(r.applied ?? []), ...(edited.applied ?? [])],
+                ops: (r.ops ?? 0) + (edited.ops ?? 0),
+              };
+      }
+      if (r === null || r.path === undefined) return errorResult('office_edit did nothing.');
+      const shown = await presentFile(
+        deps.bridge,
+        r.path,
+        chart !== undefined ? 'with the chart in it' : 'edited',
+      );
       const missed =
         r.missed !== undefined && r.missed.length > 0
           ? `\nNOT applied: ${r.missed.join('; ')} — those ids were wrong; check office_inspect.`
@@ -577,12 +751,12 @@ export function registerOfficeTools(pi: ExtensionAPI, deps: OfficeToolDeps): voi
     name: OFFICE_INSPECT_TOOL,
     label: 'Office: inspect',
     description:
-      'Outline an existing .pptx, .docx, .xlsx or chart .svg made here: every slide, shape, paragraph or cell with its id, ' +
-      'text, size and colour. This is how to READ an office file — never `read` it (that returns ' +
-      'zip bytes) and never unzip it. The ids are what office_edit takes.',
-    promptSnippet: 'office_inspect: read an office file as an outline with ids',
+      'Outline an existing .pptx, .docx, .xlsx, .pdf or chart .svg made here: every slide, shape, paragraph or cell with its id, ' +
+      "text, size and colour; a PDF as its pages' text, numbered. This is how to READ an office file — never `read` it (that returns " +
+      'zip bytes) and never unzip it. The ids are what office_edit takes; the page numbers are what --page takes.',
+    promptSnippet: 'office_inspect: read an office file (or a PDF) as an outline with ids',
     parameters: Type.Object({
-      file: Type.String({ description: 'The .pptx/.docx/.xlsx to outline.' }),
+      file: Type.String({ description: 'The .pptx/.docx/.xlsx/.pdf to outline.' }),
     }),
     async execute(_id, params, signal, _onUpdate, ctx) {
       const p = params as { file?: unknown };
@@ -610,10 +784,25 @@ export function registerOfficeTools(pi: ExtensionAPI, deps: OfficeToolDeps): voi
 
 /** The formats that are zips. */
 const OFFICE_PATH = /\.(pptx|docx|xlsx)$/i;
+/** …and the one that is not, but is just as unreadable as bytes. */
+const READ_PATH = /\.(pptx|docx|xlsx|pdf)$/i;
 
 /** Which office kind a path names, or null. */
 export function officeKindOfPath(p: string): OfficeKind | null {
   const m = OFFICE_PATH.exec(p.trim());
+  if (m === null) return null;
+  return (m[1] as string).toLowerCase() as OfficeKind;
+}
+
+/**
+ * Which kind `read` should outline, or null. A PDF too: MEASURED (2026-09-17,
+ * office-embed probe), asked to put a chart on a PDF's second page, the 4B
+ * `read` the PDF, got its bytes, quoted "Gaa3~64OR_&~^/…" back, reasoned
+ * about "object 13" for two minutes and never edited anything. Its pages'
+ * text, numbered, is what it needed.
+ */
+export function readKindOfPath(p: string): OfficeKind | null {
+  const m = READ_PATH.exec(p.trim());
   if (m === null) return null;
   return (m[1] as string).toLowerCase() as OfficeKind;
 }
@@ -677,12 +866,23 @@ export function withOfficeFormats(
         { cwd?: string } | undefined,
       ];
       const raw = typeof params?.path === 'string' ? params.path : '';
-      const kind = officeKindOfPath(raw);
+      const kind = tool.name === 'write' ? officeKindOfPath(raw) : readKindOfPath(raw);
       if (kind === null || (deps.available !== undefined && !deps.available())) {
         return base.apply(tool, args);
       }
       const root = deps.root(ctx?.cwd);
-      const file = resolveAgainst(root, raw) ?? raw;
+      let file = resolveAgainst(root, raw) ?? raw;
+      // A dropped leading slash ("private/var/…/brief.pdf" — SEEN, the 4B,
+      // twice) names the same file; for a READ that is worth honouring, or the
+      // fenced tool underneath finds the bytes and hands them over.
+      if (
+        tool.name === 'read' &&
+        !existsSync(file) &&
+        !raw.startsWith('/') &&
+        existsSync(`/${raw}`)
+      ) {
+        file = `/${raw}`;
+      }
       const progress = (line: string): void =>
         onUpdate?.({ content: [{ type: 'text', text: line }], details: undefined });
       const run = (a: string[]): Promise<OfficeResult> =>
@@ -699,7 +899,10 @@ export function withOfficeFormats(
           content: [
             {
               type: 'text',
-              text: `${file} (${kind}) — its outline, with the ids office_edit takes:\n${r.outline ?? '(empty)'}`,
+              text:
+                kind === 'pdf'
+                  ? `${file} — its pages' text (a chart goes on a page with office_edit --chart <svg> --page N):\n${r.outline ?? '(empty)'}`
+                  : `${file} (${kind}) — its outline, with the ids office_edit takes:\n${r.outline ?? '(empty)'}`,
             },
           ],
           details: undefined,
@@ -743,6 +946,7 @@ export function withOfficeFormats(
       const edits = Array.isArray(params.edits)
         ? (params.edits as Array<{ oldText?: unknown; newText?: unknown }>)
         : [];
+      if (kind === 'pdf') return editPdf(file, raw, edits, run, deps.bridge);
       const instruction = editsAsInstruction(edits);
       if (instruction.length === 0) return errorResult('edit needs at least one replacement.');
       const r = await run(['edit', file, '--instruction', instruction]);
@@ -766,6 +970,75 @@ export function withOfficeFormats(
       return { content: content3, details: undefined };
     },
   };
+}
+
+/**
+ * `edit brief.pdf` — A PDF'S TEXT IS FIXED, BUT THE CALL STILL SAYS WHAT IS
+ * WANTED.
+ *
+ * MEASURED (office-embed probe, 2026-09-17): told "slot a bar chart of that
+ * data into the PDF on the second page", the 4B read the PDF (its pages'
+ * text, with the `office edit --chart` line at the top), found the chart's
+ * .svg in the folder, and then called `edit brief.pdf` with the table's
+ * heading as oldText and the chart as newText — thirty times, every one a
+ * refusal — until the turn cap. The call was not wrong about anything but
+ * the tool: the oldText names the PAGE (the one that text is on) and the
+ * newText names the CHART. So that is what it does. An edit that names no
+ * chart gets the two things a PDF can take, spelled out.
+ */
+async function editPdf(
+  file: string,
+  raw: string,
+  edits: ReadonlyArray<{ oldText?: unknown; newText?: unknown }>,
+  run: (a: string[]) => Promise<OfficeResult>,
+  bridge: OfficeToolDeps['bridge'],
+): Promise<{ content: Content; isError?: true; details: undefined }> {
+  const text = (v: unknown): string => (typeof v === 'string' ? v : '');
+  const joined = edits.map((e) => `${text(e.oldText)}\n${text(e.newText)}`).join('\n');
+  const svgs = [...joined.matchAll(/[^\s"'`()[\]<>]+\.svg\b/gi)].map((m) => m[0]);
+  const svg = svgs
+    .map((s) => resolveAgainst(path.dirname(file), s) ?? s)
+    .find((s) => existsSync(s));
+  if (svg === undefined) {
+    const wantsChart = /chart|graph|plot|\.svg/i.test(joined);
+    return errorResult(
+      `${raw} is a PDF: its text cannot be changed in place${wantsChart ? '' : ' (make the document again to change the wording: office_make with the full brief)'}. ` +
+        'What a PDF CAN take is a chart on a page: draw it first (chart bar "Title" --labels … --values …), then ' +
+        `office_edit ${raw} --chart <the .svg> --page N — or edit ${raw} again with the page's own text as oldText and the .svg as newText.`,
+    );
+  }
+  // The page: the one whose text contains the oldText (first words are enough).
+  const anchor = text(edits.find((e) => text(e.oldText).trim() !== '')?.oldText)
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 40)
+    .toLowerCase();
+  let page = 1;
+  const inspected = await run(['inspect', file]);
+  if (inspected.ok && anchor !== '') {
+    for (const line of (inspected.outline ?? '').split('\n')) {
+      const m = /^page (\d+): (.*)$/.exec(line);
+      if (m !== null && (m[2] ?? '').toLowerCase().includes(anchor)) {
+        page = Number(m[1]);
+        break;
+      }
+    }
+  }
+  const op = insertChartOp(file, svg, { page });
+  if ('error' in op) return errorResult(`edit ${raw}: ${op.error}`);
+  const r = await run(['apply', file, '--ops', JSON.stringify([op])]);
+  if (!r.ok || r.path === undefined) {
+    return errorResult(`${raw}: the chart could not go in: ${r.error ?? 'unknown error'}`);
+  }
+  const shown = await presentFile(bridge, r.path, 'with the chart in it');
+  const content: Content = [
+    {
+      type: 'text',
+      text: `${raw} is a PDF, so the chart ${path.basename(svg)} went onto page ${page} (the page with "${anchor}"): ${(r.applied ?? []).join('; ')}.${shown.shown}\n\n${CHECK_LINE}`,
+    },
+  ];
+  if (shown.image !== undefined) content.push({ type: 'image', ...shown.image });
+  return { content, details: undefined };
 }
 
 const NOUN: Record<OfficeKind, string> = {

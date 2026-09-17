@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import copy
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -148,9 +149,21 @@ def apply_pptx(path: Path, ops: list[dict], out: Path) -> list[str]:
     # the outline refers to the ORIGINAL numbering. Applying a delete first
     # would silently retarget every later shape op by one.
     shape_ops = [o for o in ops if o.get("op") not in
-                 ("delete_slide", "reorder_slides", "duplicate_slide")]
+                 ("delete_slide", "reorder_slides", "duplicate_slide", "insert_chart")]
     slide_ops = [o for o in ops if o.get("op") in
                  ("delete_slide", "reorder_slides", "duplicate_slide")]
+    # A chart lands on a slide by NUMBER (office_chart.py), before the
+    # slide-level ops renumber anything.
+    chart_ops = [o for o in ops if o.get("op") == "insert_chart"]
+
+    for o in chart_ops:
+        try:
+            import office_chart
+            r = office_chart.insert_pptx(prs, int(o.get("slide", 1)), Path(o["file"]).expanduser(),
+                                         _box(o))
+            report.append(f"ok insert_chart slide {r['slide']} box {r['box_in']} in ({r['made']})")
+        except Exception as err:  # noqa: BLE001
+            report.append(f"FAIL insert_chart: {err}")
 
     for o in shape_ops:
         op = o.get("op")
@@ -318,6 +331,12 @@ def apply_docx(path: Path, ops: list[dict], out: Path) -> list[str]:
                 el = target(pid)
                 el._p.getparent().remove(el._p)
                 report.append(f"ok delete {pid}")
+            elif op == "insert_chart":
+                import office_chart
+                r = office_chart.insert_docx(doc, o.get("after"), Path(o["file"]).expanduser(),
+                                             float(o["width"]) if o.get("width") is not None else None)
+                report.append(f"ok insert_chart after {r['after']} ({r['width_in']}x{r['height_in']} in, {r['made']})")
+                paras = doc.paragraphs
             elif op == "insert_paragraph":
                 anchor = paras[int(str(o["after"]).lstrip("p"))]
                 new = anchor.insert_paragraph_before(str(o.get("text", "")))
@@ -378,6 +397,14 @@ def apply_xlsx(path: Path, ops: list[dict], out: Path) -> list[str]:
         cid = o.get("id", "")
         try:
             ws = ws_for(o)
+            if op == "insert_chart":
+                import office_chart
+                r = office_chart.insert_xlsx(wb, o.get("sheet"), o.get("anchor") or (cid or None),
+                                             Path(o["file"]).expanduser(), bool(o.get("native")),
+                                             float(o["width"]) if o.get("width") is not None else None)
+                report.append(f"ok insert_chart {r['chart']} on {r['sheet']} at {r['anchor']}"
+                              + (f" (data on '{r['data_sheet']}')" if r.get("data_sheet") else ""))
+                continue
             if op == "set_cell":
                 v = o.get("value")
                 # A string starting with '=' is a FORMULA. Coercing it to text
@@ -414,17 +441,63 @@ def apply_xlsx(path: Path, ops: list[dict], out: Path) -> list[str]:
 
     out.parent.mkdir(parents=True, exist_ok=True)
     wb.save(str(out))
+    if any(o.get("op") == "insert_chart" for o in ops):
+        import office_chart
+        office_chart.fix_xlsx_drawings(out)
+    return report
+
+
+def _box(o: dict) -> tuple[float, float, float, float] | None:
+    """An op's box — x, y, w, h in inches — as four numbers, or None for the default."""
+    if o.get("box") is not None:
+        b = o["box"]
+        if isinstance(b, str):
+            b = [float(v) for v in re.findall(r"-?[\d.]+", b)]
+        if len(b) == 4:
+            return tuple(float(v) for v in b)  # type: ignore[return-value]
+        raise ValueError("box needs four numbers: x, y, w, h in inches")
+    if all(o.get(k) is not None for k in ("x", "y", "w", "h")):
+        return float(o["x"]), float(o["y"]), float(o["w"]), float(o["h"])
+    return None
+
+
+def apply_pdf(path: Path, ops: list[dict], out: Path) -> list[str]:
+    """A PDF has no document model; what CAN be done to one is drawing a chart
+    onto a page (in its free space) or giving the chart a page of its own."""
+    import shutil
+
+    report: list[str] = []
+    src = path
+    tmp_prev: Path | None = None
+    for o in ops:
+        op = o.get("op")
+        try:
+            if op == "insert_chart":
+                import office_chart
+                r = office_chart.insert_pdf(src, out, int(o.get("page", 1)), Path(o["file"]).expanduser(),
+                                            _box(o), str(o.get("place") or "auto"))
+                report.append(f"ok insert_chart page {r['page']} ({r['placed']}, box {r['box_in']} in; {r['pages']} pages now)")
+                # The next op reads what this one wrote.
+                src = out
+                tmp_prev = out
+            else:
+                report.append(f"UNKNOWN op {op!r} (a PDF takes insert_chart only)")
+        except Exception as err:  # noqa: BLE001
+            report.append(f"FAIL {op}: {err}")
+    if tmp_prev is None:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(path, out)
     return report
 
 
 INSPECT = {"pptx": inspect_pptx, "docx": inspect_docx, "xlsx": inspect_xlsx}
-APPLY = {"pptx": apply_pptx, "docx": apply_docx, "xlsx": apply_xlsx}
+APPLY = {"pptx": apply_pptx, "docx": apply_docx, "xlsx": apply_xlsx, "pdf": apply_pdf}
 
 
 def kind_of(path: Path) -> str:
     ext = path.suffix.lower().lstrip(".")
-    if ext not in INSPECT:
-        raise SystemExit(f"no edit model for .{ext} (pdf is page-level only — see module docstring)")
+    if ext not in APPLY:
+        raise SystemExit(f"no edit model for .{ext}")
     return ext
 
 

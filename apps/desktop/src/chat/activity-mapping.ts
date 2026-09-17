@@ -65,8 +65,10 @@ export function segmentBlocks(blocks: ContentBlock[]): ThreadSegment[] {
 
   for (const block of blocks) {
     if (block.type === 'text') {
+      // An EMPTY text block is not a boundary (see segmentGroup).
+      if (block.text.length === 0) continue;
       flush();
-      if (block.text.length > 0) segments.push({ kind: 'text', text: block.text });
+      segments.push({ kind: 'text', text: block.text });
     } else {
       buffer.push(block);
     }
@@ -107,10 +109,20 @@ export function segmentGroup(group: AssistantMsg[]): GroupSegment[] {
   for (const message of group) {
     for (const block of message.blocks) {
       if (block.type === 'text') {
-        flush();
         const text =
           message.isStreaming === true ? streamingTextWithoutWrittenCall(block.text) : block.text;
+        /*
+         * A text block with NOTHING to show is not a boundary. It used to
+         * flush the chain first and drop the text after, so a streamed block
+         * that was only a written tool call (the 4B types `<tool_call>` into
+         * its content; every byte before the opener is cut above) ended the
+         * chain for one render — its thought clamped to "Show more" — and the
+         * chain re-formed when the provider turned the markup into a real
+         * call. MEASURED by the flicker guard (office-embed probe,
+         * 2026-09-17): 18 such clamp-and-unclamp flashes in one turn.
+         */
         if (text.length === 0) continue;
+        flush();
         const start = fenceCounts.get(message.id) ?? 0;
         const { segments: parts, nextIndex } = segmentMessageText(
           text,

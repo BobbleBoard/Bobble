@@ -230,6 +230,9 @@ export async function handleSave(
       ctx.setMessage(t('appSaveCanceled'))
       return
     }
+    // BOBBLE PATCH: the host watches the file; a change it sees right after
+    // this stamp is this editor's own save (the sidecar's write), not a reload.
+    ;(window as unknown as { __pdSavedAt?: number }).__pdSavedAt = Date.now()
     if (!splitSave) {
       ctx.openLazyWorkbook(result.file)
       const saved = t('appSaved', {

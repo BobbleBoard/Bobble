@@ -15,8 +15,10 @@ import {
   isDirty,
   lastCaptureError,
   officeAvailable,
+  reloadView,
   setBoundsFor,
   setOfficeTheme,
+  viewStateOf,
 } from './office-manager';
 
 const log = createLogger('desktop:office');
@@ -60,6 +62,17 @@ export function registerOfficeIpc(): void {
 
   handle('office:click', (_owner, req) => ({
     ok: clickView(req.tabId as string, req.x as number, req.y as number),
+  }));
+
+  handle('office:reload', (_owner, req) =>
+    reloadView(req.tabId as string, { force: req.force === true }),
+  );
+
+  handle('office:view-state', async (_owner, req) => ({
+    state: await viewStateOf(
+      req.tabId as string,
+      (req.state ?? undefined) as Record<string, unknown> | undefined,
+    ),
   }));
 
   handle('office:capture', async (_owner, req) => {

@@ -70,6 +70,16 @@ describe('segmentBlocks (grouping rule)', () => {
   it('drops empty text blocks', () => {
     expect(segmentBlocks([text(''), call('c1', 'bash', {})]).map((s) => s.kind)).toEqual(['chain']);
   });
+
+  it('an empty text block between two tool calls does not split the chain', () => {
+    const segments = segmentBlocks([
+      think('planning'),
+      call('c1', 'bash', { command: 'ls' }),
+      text(''),
+      call('c2', 'edit', { path: 'a.txt' }),
+    ]);
+    expect(segments.map((s) => s.kind)).toEqual(['chain']);
+  });
 });
 
 const assistant = (id: string, blocks: ContentBlock[], streaming = false): AssistantMsg => ({
@@ -105,6 +115,16 @@ describe('segmentGroup (A1 — inline artifact interleaving)', () => {
       .filter((s): s is Extract<GroupSegment, { kind: 'artifact' }> => s.kind === 'artifact')
       .map((s) => s.artifact.id);
     expect(ids).toEqual(['m1-a0', 'm1-a1']);
+  });
+
+  it('a streamed text block that is only a written tool call does not end the chain', () => {
+    // The chain must stay the LAST segment (so it stays live and unclamped)
+    // while the model is typing its call into the content.
+    const seg = segmentGroup([
+      assistant('m1', [think('planning'), call('c1', 'bash', { command: 'ls' })]),
+      assistant('m2', [text('<tool_call>{"name":"edit"')], true),
+    ]);
+    expect(seg.map((s) => s.kind)).toEqual(['chain']);
   });
 
   it('holds a written tool call back while the message streams, shows it settled', () => {

@@ -691,6 +691,9 @@ async function saveOnce(ctx: FileActionContext, saveAs: boolean, auto: boolean):
     ctx.setProtection(reparsed.protection)
     ctx.setProtectionDirty(false)
     ctx.dirtyRef.current = false
+    // BOBBLE PATCH: the host watches the file; a change it sees right after
+    // this stamp is this editor's own save, not something to reload for.
+    ;(window as unknown as { __pdSavedAt?: number }).__pdSavedAt = Date.now()
     ctx.setStatus(
       auto ? t('appAutoSavedAt', { time: new Date().toLocaleTimeString() }) : t('appSaved'),
     )

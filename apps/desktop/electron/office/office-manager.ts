@@ -14,17 +14,25 @@
  * matters because the vendored tree is a fork of a fast-moving upstream, and a
  * broken vendor build should degrade the office feature, not brick the app.
  */
-import { existsSync } from 'node:fs';
+import { existsSync, type FSWatcher, watch as fsWatch, statSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { join, resolve as resolvePath } from 'node:path';
-import { createLogger } from '@pi-desktop/shared';
+import { basename, dirname, join, resolve as resolvePath } from 'node:path';
+import { createIpcEventSender, createLogger } from '@pi-desktop/shared';
 import { app, BrowserWindow, type WebContents, type WebContentsView } from 'electron';
+import type { AppEventMap } from '../ipc-contract';
 import { officeChromeCss, officeChromeScript } from './office-chrome';
 import type { OfficeBounds, OfficeKind } from './office-contract';
 import { type OfficeThemeTokens, officeThemeCss } from './office-theme';
 
 const log = createLogger('desktop:office');
 const requireCjs = createRequire(import.meta.url);
+const events = createIpcEventSender<AppEventMap>();
+
+/** mtime + size — enough to tell "the file was rewritten" from a no-op event. */
+interface FileStamp {
+  mtimeMs: number;
+  size: number;
+}
 
 interface Entry {
   view: WebContentsView;
@@ -36,6 +44,74 @@ interface Entry {
    * on the scroll/focus churn that also re-emits bounds. */
   lastW: number;
   lastH: number;
+  /** Last bounds pushed — re-applied to the fresh editor after a reload. */
+  lastBounds?: OfficeBounds;
+  /**
+   * Watcher on the file's DIRECTORY, not the file: every edit the pipeline
+   * makes is a temp file + `os.replace`, which swaps the inode out from under
+   * a watch on the file itself (the first edit would be the last one seen).
+   */
+  watcher?: FSWatcher;
+  /** The stamp of the file as the editor last loaded it. */
+  loaded?: FileStamp;
+  reloadTimer?: NodeJS.Timeout;
+  reloading?: boolean;
+  /** A change landed mid-reload: go again when this one has settled. */
+  reloadAgain?: boolean;
+}
+
+/** Change → reload debounce: a pipeline write is several events in a row. */
+const RELOAD_DEBOUNCE_MS = 400;
+/** Univer lays the document out AFTER did-finish-load; cut over after this. */
+const RELOAD_SETTLE_MS = 700;
+/** A change this soon after the editor's own save IS that save. */
+const OWN_SAVE_WINDOW_MS = 2_500;
+
+/**
+ * What the vendored editors expose as `window.__pdViewState` (a Bobble patch
+ * in each renderer App): where the reader is, whether the document has
+ * unsaved edits, and when the editor itself last wrote the file.
+ */
+interface EditorViewState {
+  dirty?: boolean;
+  savedAt?: number;
+  [k: string]: unknown;
+}
+
+async function readViewState(view: WebContentsView): Promise<EditorViewState | null> {
+  const wc = view.webContents;
+  if (!wc || wc.isDestroyed()) return null;
+  try {
+    const v = (await wc.executeJavaScript(
+      'window.__pdViewState?.get?.() ?? null',
+      true,
+    )) as EditorViewState | null;
+    return v !== null && typeof v === 'object' ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeViewState(view: WebContentsView, state: EditorViewState): void {
+  const wc = view.webContents;
+  if (!wc || wc.isDestroyed()) return;
+  const { dirty: _d, savedAt: _s, ...where } = state;
+  const js = `window.__pdViewState?.set?.(${JSON.stringify(where)})`;
+  // Twice: the editors lay out lazily and a scroll set before the pages exist
+  // is clamped to zero.
+  wc.executeJavaScript(js, true).catch(() => undefined);
+  setTimeout(() => {
+    if (!wc.isDestroyed()) wc.executeJavaScript(js, true).catch(() => undefined);
+  }, 500);
+}
+
+function stampOf(filePath: string): FileStamp | undefined {
+  try {
+    const st = statSync(filePath);
+    return { mtimeMs: st.mtimeMs, size: st.size };
+  } catch {
+    return undefined;
+  }
 }
 
 const entries = new Map<string, Entry>();
@@ -323,11 +399,42 @@ export function createOfficeView(
 
   let view: WebContentsView;
   try {
-    view = makeView(s, kind, filePath);
+    view = buildView(s, tabId, kind, filePath, win);
   } catch (err) {
     log.error('office view creation failed', { tabId, kind, err: String(err) });
     return { ok: false, error: String(err) };
   }
+
+  const entry: Entry = {
+    view,
+    owner,
+    visible: false,
+    kind,
+    filePath,
+    lastW: 0,
+    lastH: 0,
+    loaded: stampOf(filePath),
+  };
+  entries.set(tabId, entry);
+  watchFile(tabId, entry);
+  wireOwner(owner, win);
+  log.info('office view created', { tabId, kind, wcId: view.webContents.id });
+  return { ok: true, created: true };
+}
+
+/**
+ * One editor view: created, chromed, paint-forced and attached HIDDEN. The
+ * create path shows it through the first set-bounds; the reload path shows it
+ * once the fresh editor has painted, in the old one's place.
+ */
+function buildView(
+  s: OfficeSeam,
+  tabId: string,
+  kind: OfficeKind,
+  filePath: string,
+  win: BrowserWindow,
+): WebContentsView {
+  const view = makeView(s, kind, filePath);
 
   // Inject on EVERY load, not once: their editors navigate internally (new
   // document, reload after save) and a one-shot injection silently stops
@@ -360,21 +467,188 @@ export function createOfficeView(
   view.webContents.once('did-finish-load', () => {
     setTimeout(() => {
       const entry = entries.get(tabId);
-      if (entry === undefined || !entry.visible) return;
-      const wc = entry.view.webContents;
+      // Only the view the tab currently shows: a reload's incoming view is
+      // still hidden at this point and gets the same toggle when it is shown.
+      if (entry === undefined || entry.view !== view || !entry.visible) return;
+      const wc = view.webContents;
       if (!wc || wc.isDestroyed()) return;
-      entry.view.setVisible(false);
-      entry.view.setVisible(true);
+      view.setVisible(false);
+      view.setVisible(true);
       wc.invalidate();
     }, 120);
   });
 
   view.setVisible(false);
   win.contentView.addChildView(view);
-  entries.set(tabId, { view, owner, visible: false, kind, filePath, lastW: 0, lastH: 0 });
-  wireOwner(owner, win);
-  log.info('office view created', { tabId, kind, wcId: view.webContents.id });
-  return { ok: true, created: true };
+  return view;
+}
+
+/* ── live reload ─────────────────────────────────────────────────────────── */
+
+/**
+ * Watch the open file so an edit made OUTSIDE the editor — the model's
+ * `office edit deck.pptx --chart …`, a save from another app — shows up in the
+ * tab without anyone re-opening it. the user: "you should be able to see the pdf
+ * or any xlsx pptx docx being edited live".
+ *
+ * The directory is watched and events filtered to the file's own name: the
+ * pipeline writes `.deck.editing.pptx` beside the deck and `os.replace`s it in,
+ * so the deck's inode changes with every edit and a watch on the file itself
+ * would fire once and go deaf.
+ */
+function watchFile(tabId: string, entry: Entry): void {
+  const dir = dirname(entry.filePath);
+  const name = basename(entry.filePath);
+  try {
+    entry.watcher = fsWatch(dir, { persistent: false }, (_event, file) => {
+      if (file !== null && file !== undefined && file.toString() !== name) return;
+      scheduleReload(tabId);
+    });
+    entry.watcher.on('error', (err) => log.warn('office watch error', { tabId, err: String(err) }));
+  } catch (err) {
+    log.warn('office watch failed', { tabId, dir, err: String(err) });
+  }
+}
+
+function scheduleReload(tabId: string): void {
+  const entry = entries.get(tabId);
+  if (entry === undefined) return;
+  if (entry.reloadTimer !== undefined) clearTimeout(entry.reloadTimer);
+  entry.reloadTimer = setTimeout(() => {
+    entry.reloadTimer = undefined;
+    void reloadView(tabId, { force: false });
+  }, RELOAD_DEBOUNCE_MS);
+}
+
+function closeView(entry: Entry, view: WebContentsView, tabId: string): void {
+  try {
+    BrowserWindow.fromWebContents(entry.owner)?.contentView.removeChildView(view);
+  } catch {
+    /* window already gone */
+  }
+  try {
+    const wc = view.webContents;
+    // A destroyed WebContentsView leaves `webContents` UNDEFINED, not merely
+    // destroyed — guard the access itself, not just isDestroyed().
+    if (wc && !wc.isDestroyed()) {
+      if (entry.kind === 'docs') seam?.teardownDocsRenderer(wc);
+      wc.close();
+    }
+  } catch (err) {
+    log.warn('office view teardown', { tabId, err: String(err) });
+  }
+}
+
+/**
+ * Swap the tab's editor for a fresh one showing the file as it is on disk now.
+ *
+ * A fresh VIEW rather than a reload of the existing one: the editors take
+ * their file at construction (the sheets one through a queued path) and none
+ * exposes a "re-open" — and a page reload would show the ribbon with no
+ * document for a second. The new view loads HIDDEN behind the old one, is
+ * shown once its editor has laid the document out, and the old one goes; on
+ * screen that is a cut from the old page to the new, no blank in between.
+ *
+ * Skipped while the document has unsaved edits — never yank the user's work,
+ * forced or not; a re-present of a document someone is typing in is theirs to
+ * resolve. Not forced: a change landing while the editor itself has focus is
+ * its own save, adopted without a reload. Forced (a re-present): reloads even
+ * then — but only when the bytes on disk are not the ones already shown, so a
+ * present right after an edit the watcher has swapped in is one cut, not two.
+ */
+export async function reloadView(
+  tabId: string,
+  opts: { force: boolean },
+): Promise<{ ok: boolean; reloaded: boolean; reason?: string }> {
+  const entry = entries.get(tabId);
+  if (entry === undefined) return { ok: false, reloaded: false, reason: 'no such tab' };
+  if (entry.reloading) {
+    entry.reloadAgain = true;
+    return { ok: true, reloaded: false, reason: 'reload in flight' };
+  }
+  const stamp = stampOf(entry.filePath);
+  // Mid-replace (the temp file is about to be moved in): the next event brings
+  // the real stamp.
+  if (stamp === undefined) return { ok: true, reloaded: false, reason: 'file not readable' };
+  const same =
+    entry.loaded !== undefined &&
+    entry.loaded.mtimeMs === stamp.mtimeMs &&
+    entry.loaded.size === stamp.size;
+  if (same) return { ok: true, reloaded: false, reason: 'unchanged' };
+  // The editor's own account of itself: its scroll/slide/page to carry over,
+  // unsaved edits, its last save. The seam's docs dirty query is the fallback
+  // for a vendor build without the hook.
+  const state = await readViewState(entry.view);
+  if (state?.dirty === true || (await isDirty(tabId))) {
+    log.info('office reload skipped: unsaved edits', { tabId, forced: opts.force });
+    return { ok: true, reloaded: false, reason: 'unsaved edits' };
+  }
+  if (!opts.force) {
+    const savedAt = typeof state?.savedAt === 'number' ? state.savedAt : 0;
+    if (Date.now() - savedAt < OWN_SAVE_WINDOW_MS) {
+      entry.loaded = stamp;
+      return { ok: true, reloaded: false, reason: 'the editor just saved it' };
+    }
+    const wc = entry.view.webContents;
+    if (wc && !wc.isDestroyed() && wc.isFocused()) {
+      entry.loaded = stamp;
+      return { ok: true, reloaded: false, reason: 'editor has focus (its own save)' };
+    }
+  }
+  const s = loadSeam();
+  const win = BrowserWindow.fromWebContents(entry.owner);
+  if (s === null || win === null) return { ok: false, reloaded: false, reason: 'no window' };
+
+  entry.reloading = true;
+  entry.reloadAgain = false;
+  let next: WebContentsView;
+  try {
+    next = buildView(s, tabId, entry.kind, entry.filePath, win);
+  } catch (err) {
+    entry.reloading = false;
+    log.error('office reload failed', { tabId, err: String(err) });
+    return { ok: false, reloaded: false, reason: String(err) };
+  }
+  const wc = next.webContents;
+  await new Promise<void>((resolve) => {
+    const done = (): void => resolve();
+    wc.once('did-finish-load', done);
+    wc.once('did-fail-load', done);
+    setTimeout(done, 8_000);
+  });
+  await new Promise((r) => setTimeout(r, RELOAD_SETTLE_MS));
+
+  const current = entries.get(tabId);
+  if (current !== entry) {
+    // The tab closed while the new editor loaded.
+    closeView(entry, next, tabId);
+    return { ok: true, reloaded: false, reason: 'tab closed' };
+  }
+  const old = entry.view;
+  entry.view = next;
+  entry.loaded = stamp;
+  if (entry.lastBounds !== undefined) next.setBounds(entry.lastBounds);
+  // Same slide / page / scroll / sheet as before the cut.
+  if (state !== null) writeViewState(next, state);
+  if (entry.visible) {
+    next.setVisible(true);
+    // The same surface-allocating toggle the create path needs.
+    next.setVisible(false);
+    next.setVisible(true);
+    if (!wc.isDestroyed()) wc.invalidate();
+    reflow(entry);
+  }
+  closeView(entry, old, tabId);
+  entry.reloading = false;
+  log.info('office view reloaded', { tabId, kind: entry.kind, forced: opts.force });
+  if (!entry.owner.isDestroyed()) {
+    events.send(entry.owner, 'office:reloaded', { tabId, filePath: entry.filePath });
+  }
+  if (entry.reloadAgain) {
+    entry.reloadAgain = false;
+    scheduleReload(tabId);
+  }
+  return { ok: true, reloaded: true };
 }
 
 /**
@@ -419,6 +693,7 @@ export function setBoundsFor(tabId: string, bounds: OfficeBounds, visible: boole
   const grew = next.width !== entry.lastW || next.height !== entry.lastH;
   entry.lastW = next.width;
   entry.lastH = next.height;
+  entry.lastBounds = next;
   entry.view.setBounds(next);
   // MEASURED: dragging the canvas divider took the view from 440px to 760px
   // wide and Univer's grid canvas stayed at 458.5px — 300px of dead background
@@ -441,22 +716,13 @@ export function destroyView(tabId: string): void {
   const entry = entries.get(tabId);
   if (entry === undefined) return;
   entries.delete(tabId);
+  if (entry.reloadTimer !== undefined) clearTimeout(entry.reloadTimer);
   try {
-    BrowserWindow.fromWebContents(entry.owner)?.contentView.removeChildView(entry.view);
+    entry.watcher?.close();
   } catch {
-    /* window already gone */
+    /* already closed */
   }
-  try {
-    const wc = entry.view.webContents;
-    // A destroyed WebContentsView leaves `webContents` UNDEFINED, not merely
-    // destroyed — guard the access itself, not just isDestroyed().
-    if (wc && !wc.isDestroyed()) {
-      if (entry.kind === 'docs') seam?.teardownDocsRenderer(wc);
-      wc.close();
-    }
-  } catch (err) {
-    log.warn('office view teardown', { tabId, err: String(err) });
-  }
+  closeView(entry, entry.view, tabId);
   log.info('office view destroyed', { tabId });
 }
 
@@ -539,6 +805,24 @@ export async function captureViewForFile(
   wc.invalidate();
   await new Promise((r) => setTimeout(r, 600));
   return captureView(tabId);
+}
+
+/**
+ * The editor's `__pdViewState` for a tab, or null (no tab, no hook). With
+ * `set`, the editor is navigated there first (a slide, a page, a sheet) and
+ * given a moment to move before the state is read back.
+ */
+export async function viewStateOf(
+  tabId: string,
+  set?: Record<string, unknown>,
+): Promise<Record<string, unknown> | null> {
+  const entry = entries.get(tabId);
+  if (entry === undefined) return null;
+  if (set !== undefined) {
+    writeViewState(entry.view, set);
+    await new Promise((r) => setTimeout(r, 400));
+  }
+  return readViewState(entry.view);
 }
 
 export async function isDirty(tabId: string): Promise<boolean> {

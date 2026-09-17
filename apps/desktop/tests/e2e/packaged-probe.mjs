@@ -19,6 +19,23 @@ function assert(condition, message) {
 
 assert(existsSync(executable), `no executable at ${executable}`);
 
+// The vendored office editors ride along as resources (electron-builder.yml
+// extraResources → <Resources>/genoffice). A ship without them is silent: main
+// logs "office seam not built" and every docx/xlsx/pptx/pdf opens as a generic
+// file — which is exactly how the gap went unnoticed for weeks. Fail here.
+const resources = path.join(appBundle, 'Contents/Resources');
+for (const rel of [
+  'genoffice/embed/out/index.cjs',
+  'genoffice/embed/out/assets/harfbuzz.wasm',
+  'genoffice/apps/docs/out/renderer/index.html',
+  'genoffice/apps/sheets/out/renderer/index.html',
+  'genoffice/apps/slides/out/renderer/index.html',
+  'genoffice/apps/pdf/out/renderer/index.html',
+  'genoffice/apps/sheets/native/xlsx-engine/target/release/xlsx-sidecar',
+]) {
+  assert(existsSync(path.join(resources, rel)), `office editors not bundled: missing ${rel}`);
+}
+
 // Isolated user-data-dir: never touch the real single-instance lock, so this
 // probe can't be blocked by (or evict) a copy the user has open, and leaves no
 // zombie holding the lock.
@@ -48,7 +65,14 @@ try {
     { timeout: 10_000 },
   );
 
-  console.log(`packaged-probe OK — ${appBundle} boots (${flavor}/${mode}, boot event received)`);
+  // …and the seam actually LOADS from there (a bundle that is present but
+  // fails to require would degrade the same silent way).
+  const office = await page.evaluate(() => window.piDesktop.invoke('office:available', {}));
+  assert(office?.available === true, `office seam did not load from the bundle: ${JSON.stringify(office)}`);
+
+  console.log(
+    `packaged-probe OK — ${appBundle} boots (${flavor}/${mode}, boot event received, office editors bundled)`,
+  );
 } finally {
   await app.close();
 }

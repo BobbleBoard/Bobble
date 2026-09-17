@@ -319,6 +319,75 @@ def edit_chart(src: Path, instruction: str, out: Path | None) -> dict:
             "seconds": round(time.time() - t0, 1), "summary": summary_of("chart", chart_render.normalise(revised))}
 
 
+def apply(src: Path, ops: list[dict], out: Path | None) -> dict:
+    """Run explicit operations — no model in the loop. The harness builds these
+    for the changes it can state exactly (a chart onto slide 2)."""
+    import office_edit
+    t0 = time.time()
+    kind = office_edit.kind_of(src)
+    dst = out or src
+    tmp = dst.with_name(f".{dst.stem}.editing{dst.suffix}")
+    report = office_edit.APPLY[kind](src, ops, tmp)
+    failed = [line for line in report if line.startswith("FAIL") or line.startswith("UNKNOWN")]
+    if failed and len(failed) == len(report):
+        tmp.unlink(missing_ok=True)
+        raise RuntimeError("; ".join(failed))
+    os.replace(tmp, dst)
+    result = {
+        "ok": True,
+        "kind": kind,
+        "path": str(dst),
+        "bytes": dst.stat().st_size,
+        "ops": len(ops),
+        "applied": [line for line in report if line not in failed],
+        "missed": failed,
+        "seconds": round(time.time() - t0, 1),
+    }
+    if kind in office_edit.INSPECT:
+        result["outline"] = outline_of(dst, kind)
+    else:
+        result["outline"] = f"PDF, {_pdf_pages(dst)} pages"
+    return result
+
+
+def _pdf_pages(path: Path) -> int:
+    try:
+        import pypdf
+        return len(pypdf.PdfReader(str(path)).pages)
+    except Exception:  # noqa: BLE001
+        return 0
+
+
+PDF_PAGE_CHARS = 1500
+PDF_OUTLINE_PAGES = 30
+
+
+def pdf_outline(path: Path) -> str:
+    """The PDF as the model should see it: its pages' text, page by page.
+
+    A `read` on a PDF used to hand back the file's BYTES (SEEN: the 4B read
+    `brief-model.pdf`, quoted "Gaa3~64OR_&~^/\\gtX…" back and reasoned about
+    'object 13'), so the outline is the text with page numbers — the numbers
+    `office edit file.pdf --chart x.svg --page N` takes.
+    """
+    import pypdf
+    reader = pypdf.PdfReader(str(path))
+    n = len(reader.pages)
+    lines = [f"PDF, {n} page{'s' if n != 1 else ''}. A chart goes on a page with: office edit {path.name} --chart <svg> --page N"]
+    for i, page in enumerate(reader.pages[:PDF_OUTLINE_PAGES], 1):
+        try:
+            text = (page.extract_text() or "").strip()
+        except Exception:  # noqa: BLE001
+            text = ""
+        text = " ".join(text.split())
+        if len(text) > PDF_PAGE_CHARS:
+            text = text[: PDF_PAGE_CHARS - 1] + "…"
+        lines.append(f"page {i}: {text or '(no text — pictures or scans)'}")
+    if n > PDF_OUTLINE_PAGES:
+        lines.append(f"… ({n - PDF_OUTLINE_PAGES} more pages)")
+    return "\n".join(lines)
+
+
 def edit(src: Path, instruction: str, out: Path | None) -> dict:
     if src.suffix.lower() == ".svg":
         return edit_chart(src, instruction, out)
@@ -328,8 +397,9 @@ def edit(src: Path, instruction: str, out: Path | None) -> dict:
     kind = office_edit.kind_of(src)
     if kind not in office_edit.INSPECT:
         raise RuntimeError(
-            f"{src.suffix} cannot be edited in place — a PDF has no document model. "
-            "Make it again with `office make pdf` and the changed brief.")
+            f"{src.suffix} cannot be reworded in place — a PDF has no document model. "
+            "A chart CAN go into it: `office edit file.pdf --chart chart.svg --page 2`. "
+            "For other changes make it again with `office make pdf` and the changed brief.")
     dst = out or src
     o = office_edit.INSPECT[kind](src)
     text = make_edit.outline_text(o)
@@ -380,8 +450,10 @@ def inspect(src: Path) -> dict:
         raise RuntimeError(f"{src.name} is not a chart made here (no {side.name} beside it)")
     import office_edit
     kind = office_edit.kind_of(src)
+    if kind == "pdf":
+        return {"ok": True, "kind": "pdf", "path": str(src), "outline": pdf_outline(src)}
     if kind not in office_edit.INSPECT:
-        raise RuntimeError(f"{src.suffix} has no outline to inspect (PDF is placement, not structure)")
+        raise RuntimeError(f"{src.suffix} has no outline to inspect")
     return {"ok": True, "kind": kind, "path": str(src), "outline": outline_of(src, kind)}
 
 
@@ -401,6 +473,10 @@ def main(argv: list[str]) -> None:
     e.add_argument("file")
     e.add_argument("--instruction", required=True)
     e.add_argument("--out")
+    ap_ = sub.add_parser("apply")
+    ap_.add_argument("file")
+    ap_.add_argument("--ops", required=True, help="a JSON list of operations, or a path to one")
+    ap_.add_argument("--out")
     i = sub.add_parser("inspect")
     i.add_argument("file")
     a = ap.parse_args(argv)
@@ -420,6 +496,17 @@ def main(argv: list[str]) -> None:
             if not src.is_file():
                 fail(f"no file at {src}")
             emit(edit(src, a.instruction.strip(), Path(a.out).expanduser().resolve() if a.out else None))
+        elif a.cmd == "apply":
+            src = Path(a.file).expanduser().resolve()
+            if not src.is_file():
+                fail(f"no file at {src}")
+            raw = a.ops
+            if not raw.strip().startswith("[") and Path(raw).expanduser().is_file():
+                raw = Path(raw).expanduser().read_text()
+            ops = json.loads(raw)
+            if isinstance(ops, dict):
+                ops = ops.get("ops", [])
+            emit(apply(src, ops, Path(a.out).expanduser().resolve() if a.out else None))
         else:
             src = Path(a.file).expanduser().resolve()
             if not src.is_file():

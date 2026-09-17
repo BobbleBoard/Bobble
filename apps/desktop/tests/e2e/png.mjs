@@ -146,3 +146,37 @@ export function cropPng(buf, { x, y, width, height }) {
   }
   return encodePng({ width: w, height: h, channels: png.channels, data: out });
 }
+
+/**
+ * Paste `overlay` (a PNG) onto `base` (a PNG) with its top-left at (x, y)
+ * pixels — the DOM screenshot with a native view's capture laid over its
+ * bounds is what the screen actually shows, since Playwright cannot see a
+ * WebContentsView and `office:capture` / `browser:capture` cannot see the DOM.
+ * Nearest-neighbour scaled when the overlay's size differs from the box.
+ */
+export function compositePng(base, overlay, { x, y, width, height }) {
+  const a = decodePng(base);
+  const b = decodePng(overlay);
+  const out = Buffer.from(a.data);
+  const w = Math.round(width ?? b.width);
+  const h = Math.round(height ?? b.height);
+  const x0 = Math.round(x);
+  const y0 = Math.round(y);
+  for (let row = 0; row < h; row += 1) {
+    const ty = y0 + row;
+    if (ty < 0 || ty >= a.height) continue;
+    const sy = Math.min(b.height - 1, Math.floor((row * b.height) / h));
+    for (let col = 0; col < w; col += 1) {
+      const tx = x0 + col;
+      if (tx < 0 || tx >= a.width) continue;
+      const sx = Math.min(b.width - 1, Math.floor((col * b.width) / w));
+      const si = (sy * b.width + sx) * b.channels;
+      const ti = (ty * a.width + tx) * a.channels;
+      for (let c = 0; c < Math.min(3, a.channels); c += 1) {
+        out[ti + c] = b.channels >= 3 ? b.data[si + c] : b.data[si];
+      }
+      if (a.channels === 4) out[ti + 3] = 255;
+    }
+  }
+  return encodePng({ width: a.width, height: a.height, channels: a.channels, data: out });
+}

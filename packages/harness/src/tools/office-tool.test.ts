@@ -302,6 +302,130 @@ describe('withOfficeFormats — the natural call does the right thing', () => {
     };
     expect(r.content[0]?.text).toBe('base wrote it');
   });
+
+  it("turns `read brief.pdf` into its pages' text, never the bytes", async () => {
+    const { spawnImpl, calls: spawned } = fakeSpawn({
+      ok: true,
+      kind: 'pdf',
+      outline: 'PDF, 2 pages.\npage 1: Solar brief …\npage 2: Units sold by year 2021 12 2022 19',
+    });
+    const readTool = { ...baseTool, name: 'read' };
+    const w = withOfficeFormats(readTool, { bridge, root: () => __dirname, env: ENV, spawnImpl });
+    // An existing file with a .pdf name: this test file's own path would not
+    // end in .pdf, so point at a file that exists under a .pdf name.
+    const { mkdtempSync, writeFileSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const path = await import('node:path');
+    const dir = mkdtempSync(path.join(tmpdir(), 'pd-office-read-'));
+    const pdf = path.join(dir, 'brief.pdf');
+    writeFileSync(pdf, '%PDF-1.4 not really');
+    const r = (await w.execute('t', { path: pdf })) as {
+      content: Array<{ text?: string }>;
+      isError?: boolean;
+    };
+    expect(r.isError).toBeUndefined();
+    expect(spawned[0]?.args.slice(1, 3)).toEqual(['inspect', pdf]);
+    expect(r.content[0]?.text).toMatch(/pages' text/);
+    expect(r.content[0]?.text).toContain('page 2: Units sold by year');
+    expect(r.content[0]?.text).toMatch(/--page N/);
+  });
+});
+
+describe('`edit brief.pdf` does what the call means', () => {
+  const baseTool = {
+    name: 'edit',
+    description: 'x',
+    parameters: {},
+    execute: async () => ({ content: [{ type: 'text', text: 'base edited' }], details: undefined }),
+  };
+  const bridge = {
+    show: vi.fn(async () => ({ ok: true })),
+    preview: vi.fn(async () => ({ imageBase64: 'QUJD', mimeType: 'image/png' })),
+  };
+  /** A pipeline that answers `inspect` with page texts and `apply` with the insert. */
+  const pdfSpawn = () => {
+    const calls: Array<{ args: string[] }> = [];
+    const spawnImpl = ((cmd: string, args: string[]) => {
+      calls.push({ args });
+      const listeners: Record<string, Array<(...a: unknown[]) => void>> = {};
+      const on = (ev: string, fn: (...a: unknown[]) => void) => {
+        (listeners[ev] ??= []).push(fn);
+      };
+      const child = {
+        stdout: { on: (ev: string, fn: (d: Buffer) => void) => on(`out:${ev}`, fn as never) },
+        stderr: { on: (ev: string, fn: (d: Buffer) => void) => on(`err:${ev}`, fn as never) },
+        on,
+        kill: vi.fn(),
+      };
+      const reply =
+        args[1] === 'inspect'
+          ? {
+              ok: true,
+              kind: 'pdf',
+              outline:
+                'PDF, 2 pages.\npage 1: Solar brief …\npage 2: Units sold by year Year Units 2021 12',
+            }
+          : {
+              ok: true,
+              kind: 'pdf',
+              path: args[2],
+              ops: 1,
+              applied: ['ok insert_chart page 2 (below)'],
+              missed: [],
+            };
+      setTimeout(() => {
+        for (const fn of listeners['out:data'] ?? []) fn(Buffer.from(`${JSON.stringify(reply)}\n`));
+        for (const fn of listeners.exit ?? []) fn(0);
+      }, 0);
+      return child;
+    }) as never;
+    return { spawnImpl, calls };
+  };
+  const setup = async () => {
+    const { mkdtempSync, writeFileSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const path = await import('node:path');
+    const dir = mkdtempSync(path.join(tmpdir(), 'pd-office-pdf-edit-'));
+    writeFileSync(path.join(dir, 'brief.pdf'), '%PDF-1.4');
+    writeFileSync(path.join(dir, 'units.svg'), '<svg/>');
+    return { dir, pdf: path.join(dir, 'brief.pdf') };
+  };
+
+  it('puts the chart the newText names on the page the oldText is on', async () => {
+    const { dir, pdf } = await setup();
+    const { spawnImpl, calls } = pdfSpawn();
+    const w = withOfficeFormats(baseTool, { bridge, root: () => dir, env: ENV, spawnImpl });
+    const r = (await w.execute('t', {
+      path: pdf,
+      edits: [{ oldText: 'Units sold by year', newText: 'Units sold by year\n[chart: units.svg]' }],
+    })) as { content: Array<{ text?: string }>; isError?: boolean };
+    expect(r.isError).toBeUndefined();
+    const apply = calls.find((c) => c.args[1] === 'apply');
+    expect(apply).toBeDefined();
+    const ops = JSON.parse(apply?.args[apply.args.indexOf('--ops') + 1] ?? '[]') as Array<{
+      op: string;
+      page: number;
+      file: string;
+    }>;
+    expect(ops[0]?.op).toBe('insert_chart');
+    expect(ops[0]?.page).toBe(2);
+    expect(ops[0]?.file).toContain('units.svg');
+    expect(r.content[0]?.text).toMatch(/went onto page 2/);
+  });
+
+  it('spells out the two things a PDF can take when no chart is named', async () => {
+    const { dir, pdf } = await setup();
+    const { spawnImpl, calls } = pdfSpawn();
+    const w = withOfficeFormats(baseTool, { bridge, root: () => dir, env: ENV, spawnImpl });
+    const r = (await w.execute('t', {
+      path: pdf,
+      edits: [{ oldText: 'Units sold by year', newText: 'Units sold by year (see chart below)' }],
+    })) as { content: Array<{ text?: string }>; isError?: boolean };
+    expect(r.isError).toBe(true);
+    expect(r.content[0]?.text).toMatch(/draw it first \(chart bar/);
+    expect(r.content[0]?.text).toMatch(/--chart <the \.svg> --page N/);
+    expect(calls).toHaveLength(0);
+  });
 });
 
 describe('the same brief twice is not made twice', () => {
@@ -392,5 +516,86 @@ describe('inferOfficeKind — the kind the brief already names', () => {
     expect(inferOfficeKind('quarterly figures', 'q.xlsx')).toBe('xlsx');
     expect(inferOfficeKind('anything', 'out/c.svg')).toBe('chart');
     expect(inferOfficeKind('nothing that names a format', undefined)).toBeNull();
+  });
+});
+
+describe('a chart into a document', () => {
+  it('builds the insert_chart operation by the file\u2019s format', async () => {
+    const { insertChartOp } = await import('./office-tool.js');
+    expect(
+      insertChartOp('/ws/deck.pptx', '/ws/units.svg', { slide: 2, box: '6.8, 1.4, 6, 4.4' }),
+    ).toEqual({
+      op: 'insert_chart',
+      slide: 2,
+      file: '/ws/units.svg',
+      box: '6.8, 1.4, 6, 4.4',
+    });
+    expect(insertChartOp('/ws/report.docx', '/ws/units.svg', { after: 'p5', width: 5.5 })).toEqual({
+      op: 'insert_chart',
+      after: 'p5',
+      file: '/ws/units.svg',
+      width: 5.5,
+    });
+    expect(insertChartOp('/ws/sales.xlsx', '/ws/units.svg', { anchor: 'e2' })).toEqual({
+      op: 'insert_chart',
+      anchor: 'E2',
+      file: '/ws/units.svg',
+    });
+    expect(insertChartOp('/ws/brief.pdf', '/ws/units.svg', { page: 2, place: 'auto' })).toEqual({
+      op: 'insert_chart',
+      page: 2,
+      file: '/ws/units.svg',
+      place: 'auto',
+    });
+    expect(insertChartOp('/ws/notes.md', '/ws/units.svg', {})).toEqual({
+      error: 'a chart can go into a .pptx, .docx, .xlsx or .pdf, not .md',
+    });
+    expect(insertChartOp('/ws/deck.pptx', '/ws/units.png', {})).toMatchObject({
+      error: expect.stringContaining('.svg'),
+    });
+  });
+
+  it('`office edit deck.pptx --chart units.svg --slide 2` runs apply with the op, no model', async () => {
+    const { pi, tools } = collect();
+    const calls: Array<{ args: string[] }> = [];
+    const spawnImpl = fakeSpawn({
+      ok: true,
+      kind: 'pptx',
+      path: '/ws/deck.pptx',
+      bytes: 100,
+      ops: 1,
+      applied: ['ok insert_chart slide 2'],
+      missed: [],
+      outline: '...',
+    }).spawnImpl as never;
+    registerOfficeTools(pi, {
+      bridge: null,
+      root: () => '/ws',
+      env: ENV,
+      spawnImpl: ((cmd: string, args: string[], opts: unknown) => {
+        calls.push({ args });
+        return (spawnImpl as (c: string, a: string[], o: unknown) => unknown)(cmd, args, opts);
+      }) as never,
+    });
+    const edit = tools.find((t) => t.name === 'office_edit')?.execute as Exec;
+    const { writeFileSync, mkdtempSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const path = await import('node:path');
+    const dir = mkdtempSync(path.join(tmpdir(), 'office-chart-'));
+    writeFileSync(path.join(dir, 'deck.pptx'), 'x');
+    writeFileSync(path.join(dir, 'units.svg'), '<svg/>');
+    const r = await edit('1', {
+      file: path.join(dir, 'deck.pptx'),
+      chart: path.join(dir, 'units.svg'),
+      slide: 2,
+    });
+    expect(r.isError).toBeFalsy();
+    const args = calls[0]?.args ?? [];
+    expect(args[1]).toBe('apply');
+    expect(args[3]).toBe('--ops');
+    expect(JSON.parse(args[4] ?? '[]')).toEqual([
+      { op: 'insert_chart', slide: 2, file: path.join(dir, 'units.svg') },
+    ]);
+    expect(r.content[0]?.text).toContain('ok insert_chart slide 2');
   });
 });
