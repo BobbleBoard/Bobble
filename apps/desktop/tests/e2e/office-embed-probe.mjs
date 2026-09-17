@@ -495,13 +495,21 @@ try {
 
   // ── 2. The model ───────────────────────────────────────────────────────
   if (!SKIP_MODEL) {
-    const turn = async (prompt, label) => {
+    const newChat = async () => {
       await page.click('[data-testid="new-chat"]').catch(() => {});
       await sleep(1500);
+    };
+    const turn = async (prompt, label, { fresh = true } = {}) => {
+      if (fresh) await newChat();
       const n = await page.evaluate(() => window.__pi_store().getState().messages.length);
       const g = await watchFlicker(page, { dir: SHOT_DIR, label });
       await page.click('[data-testid="composer-input"]');
-      await page.keyboard.type(prompt);
+      // Pasted, not typed: a "/" typed mid-sentence (an absolute path) opens
+      // the composer's reference menu for a frame, which a person pasting a
+      // path never sees — and the mouse parks over the sidebar, where a chart
+      // card appearing under it cannot raise a tooltip.
+      await page.keyboard.insertText(prompt);
+      await page.mouse.move(180, 700);
       await page.keyboard.press('Enter');
       const t0 = Date.now();
       const ended = await page
@@ -570,12 +578,15 @@ try {
     // until its first message, and this one's first message IS the ask.
     const modelPdf = path.join(dir, 'brief-model.pdf');
     copyFileSync(path.join(dir, 'brief.pdf'), modelPdf);
+    // The canvas is per chat: the new chat first, THEN the tab, then the ask.
+    await newChat();
     const pdfTab = await openOffice(modelPdf);
     await sleep(5000);
     const pdfSince = await tabUpdatedAt(pdfTab);
     const pdf = await turn(
       `Here is a PDF: ${modelPdf} — its second page has a units-sold-by-year table (2021: 12, 2022: 19, 2023: 15, 2024: 22). Slot a bar chart of that data into the PDF on the second page.`,
       'model-pdf',
+      { fresh: false },
     );
     note(
       'model turn (chart into the PDF) ended',

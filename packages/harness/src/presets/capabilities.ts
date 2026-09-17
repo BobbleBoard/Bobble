@@ -285,8 +285,9 @@ export const CAPABILITIES: readonly Capability[] = [
       'python-pptx, python-docx, openpyxl or hand-written XML, and never `read` on an office file. ' +
       '(A chart on its own is the chart capability.)',
     guidance:
-      'office_make takes a brief and returns the finished file, open in the canvas, with a ' +
-      'slide-by-slide summary. Put EVERYTHING the file should say into the brief — the facts, the ' +
+      'office_make takes a brief and returns a NEW file, open in the canvas, with a ' +
+      'slide-by-slide summary (a file that exists is changed with office_edit, never re-made). ' +
+      'Put EVERYTHING the file should say into the brief — the facts, the ' +
       'numbers, the names, the sections in order — because the pipeline writes only what it is ' +
       'given. office_edit changes wording, style, position or slide order in a file that exists, ' +
       'and puts a chart in it: draw it with chart first, then `office edit file --chart <svg>` ' +
