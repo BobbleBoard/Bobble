@@ -5,7 +5,7 @@
  * Recommended banner, and the Apple card) renders its attributes as larger,
  * COLORED pills instead of the old tiny grey text — one distinct hue per
  * attribute so a card's capabilities read at a glance:
- *   vision → violet · recommended → green · audio → amber · MTP → blue ·
+ *   vision → rose · recommended → green · audio → amber · MTP → blue ·
  *   EAGLE-3 → teal · DFlash → indigo · reliable → green · engine → slate ·
  *   gated → neutral/locked · size & quant → neutral.
  * (MTP + EAGLE-3 + DFlash are the speculative-decoding "fast" pills; all use the

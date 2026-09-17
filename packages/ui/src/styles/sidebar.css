@@ -76,6 +76,23 @@
   padding-top: 16px;
 }
 
+/*
+ * A SECTION LABEL MUST NOT LOOK LIKE A SMALLER ITEM.
+ *
+ * Measured in the built app (design audit 2026-09-16): "Workspace" /
+ * "Projects" / "Chats" rendered at 12px/400 in the muted grey with no tracking,
+ * directly above rows at 14px/400 — the same face, the same case, one step
+ * smaller. The eye files it as a dimmer row, so the sidebar read as one flat
+ * list of twelve things rather than three groups of four.
+ *
+ * Small, semibold, tracked and upper-cased is the label grammar every
+ * reference uses (claude.ai: 12px caption in --cds-text-muted; macOS sidebars:
+ * 11px semibold), and it is the grammar the Model Manager already uses for its
+ * "QWEN3.5" group labels — so this makes the app agree with itself. 11px is
+ * small enough that the label is unmistakably not an item; 600 keeps it
+ * legible at that size; 0.06em spreads the capitals so they read as a word
+ * mark rather than a shout. Colour stays muted: quieter than every row.
+ */
 .pd-sidebar-section-header {
   display: flex;
   align-items: center;
@@ -84,8 +101,11 @@
   height: calc(25px * var(--pd-sidebar-scale, 1));
   padding: 0 8px;
   color: var(--pd-text-muted);
-  font-size: calc(var(--pd-font-size-caption) * var(--pd-sidebar-scale, 1));
+  font-size: calc(11px * var(--pd-sidebar-scale, 1));
   line-height: var(--pd-leading-caption);
+  font-weight: var(--pd-font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .pd-sidebar-section-actions {

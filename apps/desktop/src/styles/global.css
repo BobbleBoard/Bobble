@@ -650,7 +650,11 @@ body {
   background: transparent;
   color: var(--pd-text-primary);
   font: inherit;
-  font-weight: var(--pd-font-weight-body);
+  /* Medium, not body weight: this is the NAME of what is on screen, and it
+   * was set exactly like a sidebar row (14px/400 — design audit 2026-09-16),
+   * so the top bar had no title in it, just another label. One weight step is
+   * enough; size would make it compete with the reply's headings. */
+  font-weight: var(--pd-font-weight-medium);
   cursor: text;
   overflow: hidden;
 }
@@ -1308,6 +1312,25 @@ body {
   }
 }
 
+/*
+ * A HEADING CARRIES ITS WEIGHT.
+ *
+ * `text-heading` is a Tailwind size utility (16px/21px) and nothing else, so
+ * every settings section title — "Models", "Interface", "Element size",
+ * "Advanced" — rendered at 16px REGULAR, two points above the card labels
+ * beneath it and the same weight as everything else on the page (design audit
+ * 2026-09-16, computed: `h2.text-heading` 16px/21px 400). Tailwind's preflight
+ * strips the browser's own h2 boldness, and no rule put it back.
+ *
+ * Weight on the element, not on the utility: `text-heading` also sizes chips
+ * and labels that must stay regular. Restricting it to <h2> gives the section
+ * titles (SettingSection, the stub card) a real heading voice and touches
+ * nothing that is not one.
+ */
+h2.text-heading {
+  font-weight: var(--pd-font-weight-semibold);
+}
+
 /* Onboarding wizard: each step fades/slides in on mount (keyed by step index).
  * Reduced-motion drops the animation entirely. */
 @keyframes pd-onboard-step-in {
@@ -1333,7 +1356,7 @@ body {
  * Round-10 Wave C (#20b): capability / attribute PILL TAGS for the Model
  * Manager. Larger, colored pills (vs. the old tiny grey text) with a distinct
  * hue per attribute so a model's traits read at a glance:
- *   vision = violet · recommended = green · audio = amber · MTP = blue ·
+ *   vision = rose · recommended = green · audio = amber · MTP = blue ·
  *   gated / size / quant = neutral.
  * App-local by design (NOT in @pi-desktop/ui — Wave B owns that). Each hue sets
  * its own bg / fg / border via the `--pill-*` locals, tuned for AA contrast of
@@ -1361,10 +1384,16 @@ body {
 }
 
 /* --- Light (default) hues ------------------------------------------------- */
+/* Vision was violet (#6d28d9, hue 263°) — squarely inside the 255-320° band
+ * the standing brief bans from every surface (tokens.ts: "NO violet/purple
+ * wash anywhere"; Viewer3D.tsx keeps the same rule). It was the one purple
+ * left in the UI, on the most-seen pill in the Model Manager (design audit
+ * 2026-09-16). Rose (hue 335°) keeps the pill a distinct hue from MTP-blue,
+ * Reliable-green and Audio-amber beside it, at 5.1:1 on its fill. */
 .pd-mm-pill--vision {
-  --pill-bg: #ede9fe;
-  --pill-fg: #6d28d9;
-  --pill-border: #c4b5fd;
+  --pill-bg: #fce7f3;
+  --pill-fg: #be185d;
+  --pill-border: #f9a8d4;
 }
 .pd-mm-pill--recommended {
   --pill-bg: #dcfce7;
@@ -1421,9 +1450,9 @@ body {
 
 /* --- Dark overrides ------------------------------------------------------- */
 :root[data-mode="dark"] .pd-mm-pill--vision {
-  --pill-bg: #251b3d;
-  --pill-fg: #cbb9ff;
-  --pill-border: #4a2f86;
+  --pill-bg: #3a1526;
+  --pill-fg: #f4a3c4;
+  --pill-border: #7a2a4d;
 }
 :root[data-mode="dark"] .pd-mm-pill--recommended {
   --pill-bg: #0f2a1a;
@@ -2038,18 +2067,18 @@ body {
   opacity: 0.75;
 }
 
-.pd-child-row-status[data-why='done'] {
+.pd-child-row-status[data-why="done"] {
   color: var(--pd-status-success-fg);
 }
-.pd-child-row-status[data-why='error'] {
+.pd-child-row-status[data-why="error"] {
   color: var(--pd-status-danger-fg);
 }
-.pd-child-row-status[data-why='paused'] {
+.pd-child-row-status[data-why="paused"] {
   color: var(--pd-status-warning-fg);
 }
 /* waiting/queued keeps the inherited muted colour — it is the normal state. */
 
-.pd-child-row-status[data-why='error'] .pd-child-row-dot,
-.pd-child-row-status[data-why='paused'] .pd-child-row-dot {
+.pd-child-row-status[data-why="error"] .pd-child-row-dot,
+.pd-child-row-status[data-why="paused"] .pd-child-row-dot {
   box-shadow: 0 0 5px currentColor;
 }

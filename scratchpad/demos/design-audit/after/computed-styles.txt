@@ -1,0 +1,698 @@
+
+=== empty/light ===
+  .pd-sidebar
+     "Search chatsNew chat⌘NWorkspaceModel man"
+     font 14px/20px 400 -apple-system  color rgb(29, 29, 31)  bg rgba(242, 242, 247, 0.65)  ls normal none
+     border none  shadow rgba(0, 0, 0, 0.05) -1px 0px 0px 0px inset  radius 0px  pad 0px  margin 0px  gap normal  op 1  272x900 @0,0
+  .pd-sidebar-section-header
+     "Workspace"
+     font 11px/16px 600 -apple-system  color rgb(134, 134, 139)  bg rgba(0, 0, 0, 0)  ls 0.66px uppercase
+     border none  shadow none  radius 0px  pad 0px 8px  margin 0px  gap 8px  op 1  246x25 @8,144
+  .pd-sidebar-row
+     "New chat⌘N"
+     font 14px/20px 400 -apple-system  color rgb(85, 85, 90)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 9px  pad 0px 8px  margin 0px  gap 8px  op 1  246x32 @8,96
+  .pd-sidebar-row[data-selected="true"]
+     "New chatnow"
+     font 14px/20px 400 -apple-system  color rgb(29, 29, 31)  bg rgba(120, 120, 128, 0.12)  ls normal none
+     border none  shadow none  radius 9px  pad 0px 8px  margin 0px  gap 8px  op 1  246x32 @8,551
+  .pd-sidebar-row-label
+     "New chat"
+     font 14px/20px 400 -apple-system  color rgb(85, 85, 90)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  182x20 @42,102
+  .pd-sidebar-row-meta
+     "⌘N"
+     font 12px/20px 400 -apple-system  color rgb(134, 134, 139)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  14x20 @232,102
+  [data-testid="new-chat"]
+     "New chat⌘N"
+     font 14px/20px 400 -apple-system  color rgb(85, 85, 90)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 9px  pad 0px 8px  margin 0px  gap 8px  op 1  246x32 @8,96
+  .pd-topbar
+     "New chat"
+     font 14px/20px 400 -apple-system  color rgb(29, 29, 31)  bg rgb(245, 245, 247)  ls normal none
+     border none  shadow none  radius 0px  pad 0px 8px  margin 0px  gap 4px  op 1  1168x48 @272,0
+  .pd-topbar-title  (missing)
+  .pd-chat-title, [data-testid="chat-title"]
+     "New chat"
+     font 14px/20px 500 -apple-system  color rgb(29, 29, 31)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 10px  pad 0px 8px  margin 0px  gap 4px  op 1  78x28 @280,10
+  .pd-main-surface
+     "New chatBobbleWhat are we building?Ask a"
+     font 14px/20px 400 -apple-system  color rgb(29, 29, 31)  bg rgb(245, 245, 247)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  1168x900 @272,0
+  [data-testid="footer-model-chip"]
+     "Auto · Qwen3.6 27B Q6"
+     font 12px/16px 500 -apple-system  color rgb(85, 85, 90)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 7.5px  pad 0px 10px  margin 0px  gap 6px  op 1  176x26 @988,493
+  h1.text-title
+     "Bobble"
+     font 22px/28px 400 -apple-system  color rgb(29, 29, 31)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  67x28 @822,349
+  h1.text-title + p
+     "What are we building?"
+     font 14px/20px 400 -apple-system  color rgb(134, 134, 139)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  142x20 @785,385
+  .pd-composer
+     "Ask anything…Auto · Qwen3.6 27B Q6"
+     font 14px/20px 400 -apple-system  color rgb(29, 29, 31)  bg color(srgb 1 1 1 / 0.78)  ls normal none
+     border none  shadow rgba(0, 0, 0, 0.1) 0px 0px 0px 0.5px, rgba(0, 0, 0, 0.09) 0px 4px 14px  radius 18px  pad 0px  margin 0px  gap normal  op 1  700x99 @506,429
+  .pd-composer-input
+     ""
+     font 18.88px/28.32px 400 -apple-system  color rgb(29, 29, 31)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  662x28 @525,446
+  [data-testid="composer-send"]  (missing)
+  [data-testid="composer-bar"]
+     "No projectEffort · Adaptive"
+     font 14px/20px 400 -apple-system  color rgb(29, 29, 31)  bg rgba(242, 242, 247, 0.65)  ls normal none
+     border none  shadow rgba(0, 0, 0, 0.1) 0px 0px 0px 0.5px, rgba(0, 0, 0, 0.07) 0px 1px 3px   radius 0px 0px 18px 18px  pad 23px 12px 6px  margin -18px 14px 0px  gap 10px  op 1  672x53 @520,510
+  [data-testid="composer-effort"]
+     "Effort · Adaptive"
+     font 12px/20px 400 -apple-system  color rgb(85, 85, 90)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 9999px  pad 0px 8px  margin 0px  gap 5px  op 1  127x24 @1053,533
+  [data-testid="composer-hints"]
+     "@ files/ commands! bash"
+     font 13px/20px 400 -apple-system  color rgb(134, 134, 139)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 10px 0px 0px  gap 14px  op 1  700x20 @506,573
+
+=== thread/light ===
+  .pd-sidebar
+     "Search chatsNew chat⌘NWorkspaceModel man"
+     font 14px/20px 400 -apple-system  color rgb(29, 29, 31)  bg rgba(242, 242, 247, 0.65)  ls normal none
+     border none  shadow rgba(0, 0, 0, 0.05) -1px 0px 0px 0px inset  radius 0px  pad 0px  margin 0px  gap normal  op 1  272x900 @0,0
+  .pd-sidebar-section-header
+     "Workspace"
+     font 11px/16px 600 -apple-system  color rgb(134, 134, 139)  bg rgba(0, 0, 0, 0)  ls 0.66px uppercase
+     border none  shadow none  radius 0px  pad 0px 8px  margin 0px  gap 8px  op 1  246x25 @8,144
+  .pd-sidebar-row
+     "New chat⌘N"
+     font 14px/20px 400 -apple-system  color rgb(85, 85, 90)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 9px  pad 0px 8px  margin 0px  gap 8px  op 1  246x32 @8,96
+  .pd-sidebar-row[data-selected="true"]
+     "Add a drag-and-drop zone to the converte"
+     font 14px/20px 400 -apple-system  color rgb(29, 29, 31)  bg rgba(120, 120, 128, 0.12)  ls normal none
+     border none  shadow none  radius 9px  pad 0px 8px  margin 0px  gap 8px  op 1  231x32 @23,446
+  .pd-sidebar-row-label
+     "New chat"
+     font 14px/20px 400 -apple-system  color rgb(85, 85, 90)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  182x20 @42,102
+  .pd-sidebar-row-meta
+     "⌘N"
+     font 12px/20px 400 -apple-system  color rgb(134, 134, 139)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  14x20 @232,102
+  [data-testid="new-chat"]
+     "New chat⌘N"
+     font 14px/20px 400 -apple-system  color rgb(85, 85, 90)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 9px  pad 0px 8px  margin 0px  gap 8px  op 1  246x32 @8,96
+  .pd-topbar
+     "Chat"
+     font 14px/20px 400 -apple-system  color rgb(29, 29, 31)  bg rgb(245, 245, 247)  ls normal none
+     border none  shadow none  radius 0px  pad 0px 8px  margin 0px  gap 4px  op 1  728x48 @272,0
+  .pd-topbar-title  (missing)
+  .pd-chat-title, [data-testid="chat-title"]
+     "Chat"
+     font 14px/20px 500 -apple-system  color rgb(29, 29, 31)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 10px  pad 0px 8px  margin 0px  gap 4px  op 1  47x28 @280,10
+  .pd-main-surface
+     "ChatAdd a drag-and-drop zone to the conv"
+     font 14px/20px 400 -apple-system  color rgb(29, 29, 31)  bg rgb(245, 245, 247)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  728x900 @272,0
+  [data-testid="footer-model-chip"]
+     "Auto · Qwen3.6 27B Q6"
+     font 12px/16px 500 -apple-system  color rgb(85, 85, 90)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 7.5px  pad 0px 10px  margin 0px  gap 6px  op 1  176x26 @766,808
+  .pd-thread
+     "Add a drag-and-drop zone to the converte"
+     font 14px/20px 400 -apple-system  color rgb(29, 29, 31)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 16px 20px 0px  margin 0px 9px  gap 16px  op 1  700x1993 @281,48
+  .pd-msg-bubble
+     "Add a drag-and-drop zone to the converte"
+     font 14px/20px 400 -apple-system  color rgb(29, 29, 31)  bg rgba(120, 120, 128, 0.12)  ls normal none
+     border none  shadow none  radius 16px  pad 10px 16px  margin 0px  gap normal  op 1  528x60 @433,64
+  .pd-msg--assistant
+     "Worked for 5sThoughtThe user wants three"
+     font 15px/23px 400 -apple-system  color rgb(29, 29, 31)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap 4px  op 1  620x1290 @301,175
+  .pd-prose p
+     "The user wants three things: a drop zone"
+     font 13px/18px 400 -apple-system  color rgb(85, 85, 90)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px 0px 12px  gap normal  op 1  590x54 @331,233
+  .pd-prose h2
+     "Converter drag-and-drop: what I changed"
+     font 20.25px/25.3125px 600 -apple-system  color rgb(29, 29, 31)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px 0px 10px  gap normal  op 1  620x25 @301,631
+  .pd-prose h3
+     "The fix"
+     font 17.25px/21.5625px 600 -apple-system  color rgb(29, 29, 31)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 20px 0px 10px  gap normal  op 1  620x22 @301,884
+  .pd-prose li
+     "Read src/convert/drop.ts"
+     font 13px/18px 400 -apple-system  color rgb(85, 85, 90)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  566x18 @355,329
+  .pd-prose strong
+     "The dragover handler never called preven"
+     font 15px/23px 700 -apple-system  color rgb(29, 29, 31)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  410x18 @325,727
+  .pd-prose th
+     "Input"
+     font 14.25px/23px 600 -apple-system  color rgb(29, 29, 31)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 6px 24px 6px 0px  margin 0px  gap normal  op 1  166x36 @301,1113
+  .pd-prose td
+     "12 × HEIC (iPhone 15)"
+     font 14.25px/23px 400 -apple-system  color rgb(29, 29, 31)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 6px 24px 6px 0px  margin 0px  gap normal  op 1  166x36 @301,1148
+  .pd-code-block
+     "tsexport async function onDrop(e: DragEv"
+     font 13px/18px 400 ui-monospace  color rgb(29, 29, 31)  bg rgb(255, 255, 255)  ls normal none
+     border 1px rgba(0, 0, 0, 0.06)  shadow none  radius 10px  pad 0px  margin 0px 0px 14px  gap normal  op 1  620x148 @301,916
+  .pd-code-block-lang
+     "ts"
+     font 12px/16px 400 -apple-system  color rgb(134, 134, 139)  bg color(srgb 0.92549 0.92549 0.933333 / 0.7)  ls normal none
+     border none  shadow none  radius 0px  pad 0px 14px  margin 0px  gap normal  op 1  618x32 @302,917
+  .pd-code-block code
+     "export async function onDrop(e: DragEven"
+     font 13px/18px 400 ui-monospace  color rgb(29, 29, 31)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  501x87 @316,962
+  .pd-chain
+     "Worked for 5sThoughtThe user wants three"
+     font 15px/23px 400 -apple-system  color rgb(29, 29, 31)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap 2px  op 1  620x448 @301,175
+  .pd-chain-summary
+     "Worked for 5s"
+     font 14px/20px 400 -apple-system  color rgb(134, 134, 139)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 5px  pad 2px 4px  margin 0px  gap 4px  op 1  117x24 @301,175
+  .pd-chain-step-row
+     "Thought"
+     font 13px/18px 400 -apple-system  color rgb(85, 85, 90)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 2px 4px 2px 0px  margin 0px  gap 8px  op 1  620x26 @301,205
+  .pd-chain-step-label
+     "Thought"
+     font 13px/18px 400 -apple-system  color rgb(85, 85, 90)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  51x18 @331,209
+  .pd-chain-step-detail
+     "rg -n "heic" src/ --type ts"
+     font 12px/16px 400 ui-monospace  color rgb(134, 134, 139)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  195x16 @436,436
+  .pd-chain-step-subline
+     "drop.ts"
+     font 12px/16px 400 ui-monospace  color rgb(134, 134, 139)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  63x16 @331,405
+  .pd-chain-thought
+     "The user wants three things: a drop zone"
+     font 13px/18px 400 -apple-system  color rgb(85, 85, 90)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  590x141 @331,233
+  .pd-msg-actions
+     ""
+     font 14px/20px 400 -apple-system  color rgb(29, 29, 31)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap 2px  op 0  65x31 @896,128
+  .pd-present-card  (missing)
+  .pd-present-title, .pd-present-name  (missing)
+  .pd-composer
+     "Ask anything…Auto · Qwen3.6 27B Q6"
+     font 14px/20px 400 -apple-system  color rgb(29, 29, 31)  bg color(srgb 1 1 1 / 0.78)  ls normal none
+     border none  shadow rgba(0, 0, 0, 0.1) 0px 0px 0px 0.5px, rgba(0, 0, 0, 0.09) 0px 4px 14px  radius 18px  pad 0px  margin 0px  gap normal  op 1  696x99 @288,744
+  .pd-composer-input
+     ""
+     font 18.88px/28.32px 400 -apple-system  color rgb(29, 29, 31)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  658x28 @307,761
+  [data-testid="composer-send"]  (missing)
+  [data-testid="composer-bar"]
+     "No projectEffort · Adaptive"
+     font 14px/20px 400 -apple-system  color rgb(29, 29, 31)  bg rgba(242, 242, 247, 0.65)  ls normal none
+     border none  shadow rgba(0, 0, 0, 0.1) 0px 0px 0px 0.5px, rgba(0, 0, 0, 0.07) 0px 1px 3px   radius 0px 0px 18px 18px  pad 23px 12px 6px  margin -18px 14px 0px  gap 10px  op 1  668x53 @302,825
+  [data-testid="composer-effort"]
+     "Effort · Adaptive"
+     font 12px/20px 400 -apple-system  color rgb(85, 85, 90)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 9999px  pad 0px 8px  margin 0px  gap 5px  op 1  127x24 @831,848
+  [data-testid="composer-hints"]  (missing)
+
+=== model-menu/light ===
+  .pd-menu
+     "AutoPicks the best model for each taskFa"
+     font 14px/20px 400 -apple-system  color rgb(29, 29, 31)  bg rgba(251, 251, 253, 0.85)  ls normal none
+     border none  shadow rgba(0, 0, 0, 0.1) 0px 0px 0px 0.5px, rgba(0, 0, 0, 0.22) 0px 18px 50p  radius 14px  pad 5px  margin 1px  gap normal  op 1  263x231 @767,572
+  .pd-menu-item
+     "AutoPicks the best model for each task"
+     font 14px/20px 400 -apple-system  color rgb(29, 29, 31)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 7px  pad 8px 10px  margin 0px  gap 8px  op 1  253x53 @772,577
+  .pd-menu-label, .pd-menu-section-label  (missing)
+  .pd-menu-item[data-current="true"], .pd-menu-item[aria-checked="true"]  (missing)
+
+=== canvas/light ===
+  .pd-canvas-tabs
+     "drop.tssniff.tsdrop.tsNOTES.mdsrcconvert"
+     font 14px/20px 400 -apple-system  color rgb(29, 29, 31)  bg rgb(255, 255, 255)  ls normal none
+     border none  shadow none  radius 18px  pad 0px  margin 0px  gap normal  op 1  440x900 @1000,0
+  .pd-canvas-tabbar
+     "drop.tssniff.tsdrop.tsNOTES.md"
+     font 14px/20px 400 -apple-system  color rgb(29, 29, 31)  bg rgb(236, 236, 238)  ls normal none
+     border none  shadow none  radius 0px  pad 0px 4px  margin 0px  gap 4px  op 1  440x40 @1000,0
+  .pd-canvas-tab
+     "drop.ts"
+     font 14px/20px 500 -apple-system  color rgb(29, 29, 31)  bg rgb(255, 255, 255)  ls normal none
+     border 1px rgba(0, 0, 0, 0.06)  shadow none  radius 10px 10px 0px 0px  pad 0px 4px 0px 10px  margin 0px  gap 2px  op 1  99x32 @1008,8
+  .pd-canvas-tab[aria-selected="true"]  (missing)
+  .pd-canvas-tab-label
+     "drop.ts"
+     font 12px/20px 500 -apple-system  color rgb(29, 29, 31)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  41x20 @1039,14
+  .pd-canvas-tab-subtitle  (missing)
+  .pd-canvas-tabpanel
+     "91"
+     font 14px/20px 400 -apple-system  color rgb(29, 29, 31)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  440x824 @1000,76
+  .pd-canvas-code
+     "91"
+     font 14px/20px 400 -apple-system  color rgb(29, 29, 31)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  440x824 @1000,76
+  .cm-content
+     ""
+     font 13px/18px 400 ui-monospace  color rgb(29, 29, 31)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 4px 0px  margin 0px  gap normal  op 1  420x824 @1020,76
+  .pd-canvas-breadcrumb, .pd-canvas-tab-subtitle  (missing)
+
+=== newtab-menu/light ===
+  .pd-menu
+     "Files⌘PBrowser⌘TTerminalSubagents"
+     font 14px/20px 400 -apple-system  color rgb(29, 29, 31)  bg rgba(251, 251, 253, 0.85)  ls normal none
+     border none  shadow rgba(0, 0, 0, 0.1) 0px 0px 0px 0.5px, rgba(0, 0, 0, 0.22) 0px 18px 50p  radius 14px  pad 5px  margin 1px  gap normal  op 1  200x130 @1233,45
+  .pd-menu-item
+     "Files⌘P"
+     font 14px/20px 400 -apple-system  color rgb(29, 29, 31)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 7px  pad 4px 10px  margin 0px  gap 8px  op 1  190x30 @1238,50
+  [role="menuitem"]
+     "Files⌘P"
+     font 14px/20px 400 -apple-system  color rgb(29, 29, 31)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 7px  pad 4px 10px  margin 0px  gap 8px  op 1  190x30 @1238,50
+
+=== settings-models/light ===
+  [data-testid="settings-nav-appearance"]
+     "Appearance"
+     font 14px/20px 400 -apple-system  color rgb(85, 85, 90)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 14px  pad 8px 12px  margin 0px  gap 10px  op 1  191x36 @8,186
+  [data-testid="settings-nav-appearance"][aria-current="page"], [data-testid="settings-nav-models"]
+     "Models"
+     font 14px/20px 400 -apple-system  color rgb(29, 29, 31)  bg rgba(0, 0, 0, 0.08)  ls normal none
+     border none  shadow none  radius 14px  pad 8px 12px  margin 0px  gap 10px  op 1  191x36 @8,150
+  .text-heading
+     "Models"
+     font 16px/21px 600 -apple-system  color rgb(29, 29, 31)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  184x21 @471,72
+  .text-body.font-medium
+     "Gemma 4 12B Instruct"
+     font 14px/20px 500 -apple-system  color rgb(29, 29, 31)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  146x20 @621,249
+  .text-footnote.text-text-muted
+     "Local · signed out"
+     font 13px/18px 400 -apple-system  color rgb(134, 134, 139)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  107x18 @58,80
+  .text-footnote.font-medium.uppercase
+     "Qwen3.5"
+     font 13px/18px 500 -apple-system  color rgb(134, 134, 139)  bg rgba(0, 0, 0, 0)  ls 0.325px uppercase
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  696x18 @471,555
+  .text-caption.text-text-muted
+     "—33K context·Apache-2.0·unsloth"
+     font 12px/16px 400 -apple-system  color rgb(134, 134, 139)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 6px 0px 0px  gap 4px 8px  op 1  330x22 @488,630
+
+=== settings-appearance/light ===
+  [data-testid="settings-nav-appearance"]
+     "Appearance"
+     font 14px/20px 400 -apple-system  color rgb(29, 29, 31)  bg rgba(0, 0, 0, 0.08)  ls normal none
+     border none  shadow none  radius 14px  pad 8px 12px  margin 0px  gap 10px  op 1  191x36 @8,186
+  [data-testid="settings-nav-appearance"][aria-current="page"], [data-testid="settings-nav-appearance"]
+     "Appearance"
+     font 14px/20px 400 -apple-system  color rgb(29, 29, 31)  bg rgba(0, 0, 0, 0.08)  ls normal none
+     border none  shadow none  radius 14px  pad 8px 12px  margin 0px  gap 10px  op 1  191x36 @8,186
+  .text-heading
+     "Appearance"
+     font 16px/21px 600 -apple-system  color rgb(29, 29, 31)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  696x21 @471,72
+  .text-body.font-medium  (missing)
+  .text-footnote.text-text-muted
+     "Local · signed out"
+     font 13px/18px 400 -apple-system  color rgb(134, 134, 139)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  107x18 @58,80
+  .text-footnote.font-medium.uppercase  (missing)
+  .text-caption.text-text-muted  (missing)
+
+=== studio-3d/light ===
+  .tp-topbar, .tp-top-bar
+     "ChatBobble 3DSend ToExport"
+     font 14px/20px 400 -apple-system  color rgb(29, 29, 31)  bg rgb(245, 245, 247)  ls normal none
+     border none  shadow none  radius 0px  pad 0px 14px 0px 84px  margin 0px  gap 12px  op 1  1440x48 @0,0
+  .tp-back-btn
+     "Chat"
+     font 13px/20px 400 -apple-system  color rgb(85, 85, 90)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 10px  pad 0px 10px 0px 6px  margin 0px  gap 4px  op 1  65x30 @84,9
+  .tp-stage, [data-testid="tp-canvas-host"]  (missing)
+  [data-testid="tp-stage-empty-copy"]  (missing)
+
+=== empty/dark ===
+  .pd-sidebar
+     "Search chatsNew chat⌘NWorkspaceModel man"
+     font 14px/20px 400 -apple-system  color rgb(245, 245, 247)  bg rgba(28, 28, 31, 0.55)  ls normal none
+     border none  shadow rgba(255, 255, 255, 0.06) -1px 0px 0px 0px inset  radius 0px  pad 0px  margin 0px  gap normal  op 1  272x900 @0,0
+  .pd-sidebar-section-header
+     "Workspace"
+     font 11px/16px 600 -apple-system  color rgb(152, 152, 159)  bg rgba(0, 0, 0, 0)  ls 0.66px uppercase
+     border none  shadow none  radius 0px  pad 0px 8px  margin 0px  gap 8px  op 1  246x25 @8,144
+  .pd-sidebar-row
+     "New chat⌘N"
+     font 14px/20px 400 -apple-system  color rgb(192, 192, 198)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 9px  pad 0px 8px  margin 0px  gap 8px  op 1  246x32 @8,96
+  .pd-sidebar-row[data-selected="true"]
+     "New chatnow"
+     font 14px/20px 400 -apple-system  color rgb(245, 245, 247)  bg rgba(255, 255, 255, 0.09)  ls normal none
+     border none  shadow none  radius 9px  pad 0px 8px  margin 0px  gap 8px  op 1  246x32 @8,551
+  .pd-sidebar-row-label
+     "New chat"
+     font 14px/20px 400 -apple-system  color rgb(192, 192, 198)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  182x20 @42,102
+  .pd-sidebar-row-meta
+     "⌘N"
+     font 12px/20px 400 -apple-system  color rgb(152, 152, 159)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  14x20 @232,102
+  [data-testid="new-chat"]
+     "New chat⌘N"
+     font 14px/20px 400 -apple-system  color rgb(192, 192, 198)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 9px  pad 0px 8px  margin 0px  gap 8px  op 1  246x32 @8,96
+  .pd-topbar
+     "New chat"
+     font 14px/20px 400 -apple-system  color rgb(245, 245, 247)  bg rgb(21, 21, 23)  ls normal none
+     border none  shadow none  radius 0px  pad 0px 8px  margin 0px  gap 4px  op 1  1168x48 @272,0
+  .pd-topbar-title  (missing)
+  .pd-chat-title, [data-testid="chat-title"]
+     "New chat"
+     font 14px/20px 500 -apple-system  color rgb(245, 245, 247)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 10px  pad 0px 8px  margin 0px  gap 4px  op 1  78x28 @280,10
+  .pd-main-surface
+     "New chatBobbleWhat are we building?Ask a"
+     font 14px/20px 400 -apple-system  color rgb(245, 245, 247)  bg rgb(21, 21, 23)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  1168x900 @272,0
+  [data-testid="footer-model-chip"]
+     "Auto · Qwen3.6 27B Q6"
+     font 12px/16px 500 -apple-system  color rgb(192, 192, 198)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 7.5px  pad 0px 10px  margin 0px  gap 6px  op 1  176x26 @988,493
+  h1.text-title
+     "Bobble"
+     font 22px/28px 400 -apple-system  color rgb(245, 245, 247)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  67x28 @822,349
+  h1.text-title + p
+     "What are we building?"
+     font 14px/20px 400 -apple-system  color rgb(152, 152, 159)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  142x20 @785,385
+  .pd-composer
+     "Ask anything…Auto · Qwen3.6 27B Q6"
+     font 14px/20px 400 -apple-system  color rgb(245, 245, 247)  bg color(srgb 0.117647 0.117647 0.129412 / 0.78)  ls normal none
+     border none  shadow rgba(255, 255, 255, 0.14) 0px 0px 0px 0.5px, rgba(0, 0, 0, 0.34) 0px 4  radius 18px  pad 0px  margin 0px  gap normal  op 1  700x99 @506,429
+  .pd-composer-input
+     ""
+     font 18.88px/28.32px 400 -apple-system  color rgb(245, 245, 247)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  662x28 @525,446
+  [data-testid="composer-send"]  (missing)
+  [data-testid="composer-bar"]
+     "No projectEffort · Adaptive"
+     font 14px/20px 400 -apple-system  color rgb(245, 245, 247)  bg rgba(28, 28, 31, 0.55)  ls normal none
+     border none  shadow rgba(255, 255, 255, 0.14) 0px 0px 0px 0.5px, rgba(0, 0, 0, 0.28) 0px 1  radius 0px 0px 18px 18px  pad 23px 12px 6px  margin -18px 14px 0px  gap 10px  op 1  672x53 @520,510
+  [data-testid="composer-effort"]
+     "Effort · Adaptive"
+     font 12px/20px 400 -apple-system  color rgb(192, 192, 198)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 9999px  pad 0px 8px  margin 0px  gap 5px  op 1  127x24 @1053,533
+  [data-testid="composer-hints"]
+     "@ files/ commands! bash"
+     font 13px/20px 400 -apple-system  color rgb(152, 152, 159)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 10px 0px 0px  gap 14px  op 1  700x20 @506,573
+
+=== thread/dark ===
+  .pd-sidebar
+     "Search chatsNew chat⌘NWorkspaceModel man"
+     font 14px/20px 400 -apple-system  color rgb(245, 245, 247)  bg rgba(28, 28, 31, 0.55)  ls normal none
+     border none  shadow rgba(255, 255, 255, 0.06) -1px 0px 0px 0px inset  radius 0px  pad 0px  margin 0px  gap normal  op 1  272x900 @0,0
+  .pd-sidebar-section-header
+     "Workspace"
+     font 11px/16px 600 -apple-system  color rgb(152, 152, 159)  bg rgba(0, 0, 0, 0)  ls 0.66px uppercase
+     border none  shadow none  radius 0px  pad 0px 8px  margin 0px  gap 8px  op 1  246x25 @8,144
+  .pd-sidebar-row
+     "New chat⌘N"
+     font 14px/20px 400 -apple-system  color rgb(192, 192, 198)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 9px  pad 0px 8px  margin 0px  gap 8px  op 1  246x32 @8,96
+  .pd-sidebar-row[data-selected="true"]
+     "Add a drag-and-drop zone to the converte"
+     font 14px/20px 400 -apple-system  color rgb(245, 245, 247)  bg rgba(255, 255, 255, 0.09)  ls normal none
+     border none  shadow none  radius 9px  pad 0px 8px  margin 0px  gap 8px  op 1  231x32 @23,446
+  .pd-sidebar-row-label
+     "New chat"
+     font 14px/20px 400 -apple-system  color rgb(192, 192, 198)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  182x20 @42,102
+  .pd-sidebar-row-meta
+     "⌘N"
+     font 12px/20px 400 -apple-system  color rgb(152, 152, 159)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  14x20 @232,102
+  [data-testid="new-chat"]
+     "New chat⌘N"
+     font 14px/20px 400 -apple-system  color rgb(192, 192, 198)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 9px  pad 0px 8px  margin 0px  gap 8px  op 1  246x32 @8,96
+  .pd-topbar
+     "Chat"
+     font 14px/20px 400 -apple-system  color rgb(245, 245, 247)  bg rgb(21, 21, 23)  ls normal none
+     border none  shadow none  radius 0px  pad 0px 8px  margin 0px  gap 4px  op 1  728x48 @272,0
+  .pd-topbar-title  (missing)
+  .pd-chat-title, [data-testid="chat-title"]
+     "Chat"
+     font 14px/20px 500 -apple-system  color rgb(245, 245, 247)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 10px  pad 0px 8px  margin 0px  gap 4px  op 1  47x28 @280,10
+  .pd-main-surface
+     "ChatAdd a drag-and-drop zone to the conv"
+     font 14px/20px 400 -apple-system  color rgb(245, 245, 247)  bg rgb(21, 21, 23)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  728x900 @272,0
+  [data-testid="footer-model-chip"]
+     "Auto · Qwen3.6 27B Q6"
+     font 12px/16px 500 -apple-system  color rgb(192, 192, 198)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 7.5px  pad 0px 10px  margin 0px  gap 6px  op 1  176x26 @766,808
+  .pd-thread
+     "Add a drag-and-drop zone to the converte"
+     font 14px/20px 400 -apple-system  color rgb(245, 245, 247)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 16px 20px 0px  margin 0px 9px  gap 16px  op 1  700x1993 @281,48
+  .pd-msg-bubble
+     "Add a drag-and-drop zone to the converte"
+     font 14px/20px 400 -apple-system  color rgb(245, 245, 247)  bg rgba(120, 120, 128, 0.18)  ls normal none
+     border none  shadow none  radius 16px  pad 10px 16px  margin 0px  gap normal  op 1  528x60 @433,64
+  .pd-msg--assistant
+     "Worked for 5sThoughtThe user wants three"
+     font 15px/23px 400 -apple-system  color rgb(245, 245, 247)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap 4px  op 1  620x1290 @301,175
+  .pd-prose p
+     "The user wants three things: a drop zone"
+     font 13px/18px 400 -apple-system  color rgb(192, 192, 198)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px 0px 12px  gap normal  op 1  590x54 @331,233
+  .pd-prose h2
+     "Converter drag-and-drop: what I changed"
+     font 20.25px/25.3125px 600 -apple-system  color rgb(245, 245, 247)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px 0px 10px  gap normal  op 1  620x25 @301,631
+  .pd-prose h3
+     "The fix"
+     font 17.25px/21.5625px 600 -apple-system  color rgb(245, 245, 247)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 20px 0px 10px  gap normal  op 1  620x22 @301,884
+  .pd-prose li
+     "Read src/convert/drop.ts"
+     font 13px/18px 400 -apple-system  color rgb(192, 192, 198)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  566x18 @355,329
+  .pd-prose strong
+     "The dragover handler never called preven"
+     font 15px/23px 700 -apple-system  color rgb(245, 245, 247)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  410x18 @325,727
+  .pd-prose th
+     "Input"
+     font 14.25px/23px 600 -apple-system  color rgb(245, 245, 247)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 6px 24px 6px 0px  margin 0px  gap normal  op 1  166x36 @301,1113
+  .pd-prose td
+     "12 × HEIC (iPhone 15)"
+     font 14.25px/23px 400 -apple-system  color rgb(245, 245, 247)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 6px 24px 6px 0px  margin 0px  gap normal  op 1  166x36 @301,1148
+  .pd-code-block
+     "tsexport async function onDrop(e: DragEv"
+     font 13px/18px 400 ui-monospace  color rgb(245, 245, 247)  bg rgb(30, 30, 33)  ls normal none
+     border 1px rgba(255, 255, 255, 0.06)  shadow none  radius 10px  pad 0px  margin 0px 0px 14px  gap normal  op 1  620x148 @301,916
+  .pd-code-block-lang
+     "ts"
+     font 12px/16px 400 -apple-system  color rgb(152, 152, 159)  bg color(srgb 0.0705882 0.0705882 0.0784314 / 0.7)  ls normal none
+     border none  shadow none  radius 0px  pad 0px 14px  margin 0px  gap normal  op 1  618x32 @302,917
+  .pd-code-block code
+     "export async function onDrop(e: DragEven"
+     font 13px/18px 400 ui-monospace  color rgb(245, 245, 247)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  501x87 @316,962
+  .pd-chain
+     "Worked for 5sThoughtThe user wants three"
+     font 15px/23px 400 -apple-system  color rgb(245, 245, 247)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap 2px  op 1  620x448 @301,175
+  .pd-chain-summary
+     "Worked for 5s"
+     font 14px/20px 400 -apple-system  color rgb(152, 152, 159)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 5px  pad 2px 4px  margin 0px  gap 4px  op 1  117x24 @301,175
+  .pd-chain-step-row
+     "Thought"
+     font 13px/18px 400 -apple-system  color rgb(192, 192, 198)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 2px 4px 2px 0px  margin 0px  gap 8px  op 1  620x26 @301,205
+  .pd-chain-step-label
+     "Thought"
+     font 13px/18px 400 -apple-system  color rgb(192, 192, 198)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  51x18 @331,209
+  .pd-chain-step-detail
+     "rg -n "heic" src/ --type ts"
+     font 12px/16px 400 ui-monospace  color rgb(152, 152, 159)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  195x16 @436,436
+  .pd-chain-step-subline
+     "drop.ts"
+     font 12px/16px 400 ui-monospace  color rgb(152, 152, 159)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  63x16 @331,405
+  .pd-chain-thought
+     "The user wants three things: a drop zone"
+     font 13px/18px 400 -apple-system  color rgb(192, 192, 198)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  590x141 @331,233
+  .pd-msg-actions
+     ""
+     font 14px/20px 400 -apple-system  color rgb(245, 245, 247)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap 2px  op 0  65x31 @896,128
+  .pd-present-card  (missing)
+  .pd-present-title, .pd-present-name  (missing)
+  .pd-composer
+     "Ask anything…Auto · Qwen3.6 27B Q6"
+     font 14px/20px 400 -apple-system  color rgb(245, 245, 247)  bg color(srgb 0.117647 0.117647 0.129412 / 0.78)  ls normal none
+     border none  shadow rgba(255, 255, 255, 0.14) 0px 0px 0px 0.5px, rgba(0, 0, 0, 0.34) 0px 4  radius 18px  pad 0px  margin 0px  gap normal  op 1  696x99 @288,744
+  .pd-composer-input
+     ""
+     font 18.88px/28.32px 400 -apple-system  color rgb(245, 245, 247)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  658x28 @307,761
+  [data-testid="composer-send"]  (missing)
+  [data-testid="composer-bar"]
+     "No projectEffort · Adaptive"
+     font 14px/20px 400 -apple-system  color rgb(245, 245, 247)  bg rgba(28, 28, 31, 0.55)  ls normal none
+     border none  shadow rgba(255, 255, 255, 0.14) 0px 0px 0px 0.5px, rgba(0, 0, 0, 0.28) 0px 1  radius 0px 0px 18px 18px  pad 23px 12px 6px  margin -18px 14px 0px  gap 10px  op 1  668x53 @302,825
+  [data-testid="composer-effort"]
+     "Effort · Adaptive"
+     font 12px/20px 400 -apple-system  color rgb(192, 192, 198)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 9999px  pad 0px 8px  margin 0px  gap 5px  op 1  127x24 @831,848
+  [data-testid="composer-hints"]  (missing)
+
+=== model-menu/dark ===
+  .pd-menu
+     "AutoPicks the best model for each taskFa"
+     font 14px/20px 400 -apple-system  color rgb(245, 245, 247)  bg rgba(35, 35, 39, 0.85)  ls normal none
+     border none  shadow rgba(255, 255, 255, 0.14) 0px 0px 0px 0.5px, rgba(0, 0, 0, 0.55) 0px 1  radius 14px  pad 5px  margin 1px  gap normal  op 1  263x231 @767,572
+  .pd-menu-item
+     "AutoPicks the best model for each task"
+     font 14px/20px 400 -apple-system  color rgb(245, 245, 247)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 7px  pad 8px 10px  margin 0px  gap 8px  op 1  253x53 @772,577
+  .pd-menu-label, .pd-menu-section-label  (missing)
+  .pd-menu-item[data-current="true"], .pd-menu-item[aria-checked="true"]  (missing)
+
+=== canvas/dark ===
+  .pd-canvas-tabs
+     "drop.tssniff.tsdrop.tsNOTES.mdsrcconvert"
+     font 14px/20px 400 -apple-system  color rgb(245, 245, 247)  bg rgb(30, 30, 33)  ls normal none
+     border none  shadow none  radius 18px  pad 0px  margin 0px  gap normal  op 1  440x900 @1000,0
+  .pd-canvas-tabbar
+     "drop.tssniff.tsdrop.tsNOTES.md"
+     font 14px/20px 400 -apple-system  color rgb(245, 245, 247)  bg rgb(18, 18, 20)  ls normal none
+     border none  shadow none  radius 0px  pad 0px 4px  margin 0px  gap 4px  op 1  440x40 @1000,0
+  .pd-canvas-tab
+     "drop.ts"
+     font 14px/20px 500 -apple-system  color rgb(245, 245, 247)  bg rgb(30, 30, 33)  ls normal none
+     border 1px rgba(255, 255, 255, 0.08)  shadow none  radius 10px 10px 0px 0px  pad 0px 4px 0px 10px  margin 0px  gap 2px  op 1  99x32 @1008,8
+  .pd-canvas-tab[aria-selected="true"]  (missing)
+  .pd-canvas-tab-label
+     "drop.ts"
+     font 12px/20px 500 -apple-system  color rgb(245, 245, 247)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  41x20 @1039,14
+  .pd-canvas-tab-subtitle  (missing)
+  .pd-canvas-tabpanel
+     "91"
+     font 14px/20px 400 -apple-system  color rgb(245, 245, 247)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  440x824 @1000,76
+  .pd-canvas-code
+     "91"
+     font 14px/20px 400 -apple-system  color rgb(245, 245, 247)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  440x824 @1000,76
+  .cm-content
+     ""
+     font 13px/18px 400 ui-monospace  color rgb(245, 245, 247)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 4px 0px  margin 0px  gap normal  op 1  420x824 @1020,76
+  .pd-canvas-breadcrumb, .pd-canvas-tab-subtitle  (missing)
+
+=== newtab-menu/dark ===
+  .pd-menu
+     "Files⌘PBrowser⌘TTerminalSubagents"
+     font 14px/20px 400 -apple-system  color rgb(245, 245, 247)  bg rgba(35, 35, 39, 0.85)  ls normal none
+     border none  shadow rgba(255, 255, 255, 0.14) 0px 0px 0px 0.5px, rgba(0, 0, 0, 0.55) 0px 1  radius 14px  pad 5px  margin 1px  gap normal  op 1  200x130 @1233,45
+  .pd-menu-item
+     "Files⌘P"
+     font 14px/20px 400 -apple-system  color rgb(245, 245, 247)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 7px  pad 4px 10px  margin 0px  gap 8px  op 1  190x30 @1238,50
+  [role="menuitem"]
+     "Files⌘P"
+     font 14px/20px 400 -apple-system  color rgb(245, 245, 247)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 7px  pad 4px 10px  margin 0px  gap 8px  op 1  190x30 @1238,50
+
+=== settings-models/dark ===
+  [data-testid="settings-nav-appearance"]
+     "Appearance"
+     font 14px/20px 400 -apple-system  color rgb(192, 192, 198)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 14px  pad 8px 12px  margin 0px  gap 10px  op 1  191x36 @8,186
+  [data-testid="settings-nav-appearance"][aria-current="page"], [data-testid="settings-nav-models"]
+     "Models"
+     font 14px/20px 400 -apple-system  color rgb(245, 245, 247)  bg rgba(255, 255, 255, 0.1)  ls normal none
+     border none  shadow none  radius 14px  pad 8px 12px  margin 0px  gap 10px  op 1  191x36 @8,150
+  .text-heading
+     "Models"
+     font 16px/21px 600 -apple-system  color rgb(245, 245, 247)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  184x21 @471,72
+  .text-body.font-medium
+     "Gemma 4 12B Instruct"
+     font 14px/20px 500 -apple-system  color rgb(245, 245, 247)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  146x20 @621,249
+  .text-footnote.text-text-muted
+     "Local · signed out"
+     font 13px/18px 400 -apple-system  color rgb(152, 152, 159)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  107x18 @58,80
+  .text-footnote.font-medium.uppercase
+     "Qwen3.5"
+     font 13px/18px 500 -apple-system  color rgb(152, 152, 159)  bg rgba(0, 0, 0, 0)  ls 0.325px uppercase
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  696x18 @471,555
+  .text-caption.text-text-muted
+     "—33K context·Apache-2.0·unsloth"
+     font 12px/16px 400 -apple-system  color rgb(152, 152, 159)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 6px 0px 0px  gap 4px 8px  op 1  330x22 @488,630
+
+=== settings-appearance/dark ===
+  [data-testid="settings-nav-appearance"]
+     "Appearance"
+     font 14px/20px 400 -apple-system  color rgb(245, 245, 247)  bg rgba(255, 255, 255, 0.1)  ls normal none
+     border none  shadow none  radius 14px  pad 8px 12px  margin 0px  gap 10px  op 1  191x36 @8,186
+  [data-testid="settings-nav-appearance"][aria-current="page"], [data-testid="settings-nav-appearance"]
+     "Appearance"
+     font 14px/20px 400 -apple-system  color rgb(245, 245, 247)  bg rgba(255, 255, 255, 0.1)  ls normal none
+     border none  shadow none  radius 14px  pad 8px 12px  margin 0px  gap 10px  op 1  191x36 @8,186
+  .text-heading
+     "Appearance"
+     font 16px/21px 600 -apple-system  color rgb(245, 245, 247)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  696x21 @471,72
+  .text-body.font-medium  (missing)
+  .text-footnote.text-text-muted
+     "Local · signed out"
+     font 13px/18px 400 -apple-system  color rgb(152, 152, 159)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 0px  pad 0px  margin 0px  gap normal  op 1  107x18 @58,80
+  .text-footnote.font-medium.uppercase  (missing)
+  .text-caption.text-text-muted  (missing)
+
+=== studio-3d/dark ===
+  .tp-topbar, .tp-top-bar
+     "ChatBobble 3DSend ToExport"
+     font 14px/20px 400 -apple-system  color rgb(245, 245, 247)  bg rgb(21, 21, 23)  ls normal none
+     border none  shadow none  radius 0px  pad 0px 14px 0px 84px  margin 0px  gap 12px  op 1  1440x48 @0,0
+  .tp-back-btn
+     "Chat"
+     font 13px/20px 400 -apple-system  color rgb(192, 192, 198)  bg rgba(0, 0, 0, 0)  ls normal none
+     border none  shadow none  radius 10px  pad 0px 10px 0px 6px  margin 0px  gap 4px  op 1  65x30 @84,9
+  .tp-stage, [data-testid="tp-canvas-host"]  (missing)
+  [data-testid="tp-stage-empty-copy"]  (missing)
