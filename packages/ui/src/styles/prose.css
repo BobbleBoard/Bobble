@@ -257,13 +257,40 @@
   opacity: 1;
 }
 
+/*
+ * THE LANGUAGE LABEL IS A HEADER STRIP, NOT A CAPTION FLOATING IN THE CODE.
+ *
+ * It was 12px muted text padded into the top-left corner of the block, with
+ * the copy button hovering somewhere to its right — nothing held them
+ * together, and the block read as a paragraph in a slightly different grey
+ * (design audit 2026-09-16: the block's fill measured 1.01:1 against the
+ * page). Every reference gives a code block a distinct top bar carrying the
+ * language and the actions; that bar is what makes it a THING rather than
+ * text. The inset tone is a step down from the block's raised fill, so the
+ * bar is drawn by tone and one hairline, not by a box.
+ *
+ * 32px matches the copy rail's height so the button — which floats at the
+ * block's top-right regardless of this element — lands centred in the bar.
+ */
 .pd-code-block-lang {
-  padding: 12px 14px 0;
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--pd-code-block-border);
+  background: color-mix(in srgb, var(--pd-bg-inset) 70%, transparent);
   color: var(--pd-text-muted);
   font-family: var(--pd-font-sans);
   font-size: var(--pd-font-size-caption);
   line-height: var(--pd-leading-caption);
   user-select: none;
+}
+
+/* The copy button is a 26px control (.pd-btn--sm); centre it in the 32px bar
+ * when there is one. Without a language there is no bar and it keeps its
+ * original corner position over the code. */
+.pd-code-block:has(.pd-code-block-lang) .pd-code-block-copy {
+  top: 3px;
 }
 
 .pd-code-block pre {

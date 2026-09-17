@@ -961,7 +961,11 @@ body {
   background: transparent;
   color: var(--pd-text-primary);
   font: inherit;
-  font-weight: var(--pd-font-weight-body);
+  /* Medium, not body weight: this is the NAME of what is on screen, and it
+   * was set exactly like a sidebar row (14px/400 — design audit 2026-09-16),
+   * so the top bar had no title in it, just another label. One weight step is
+   * enough; size would make it compete with the reply's headings. */
+  font-weight: var(--pd-font-weight-medium);
   cursor: text;
   overflow: hidden;
 }
@@ -1880,6 +1884,25 @@ body {
   box-shadow: inset 0 0 0 0.5px var(--pd-border-subtle);
 }
 
+/*
+ * A HEADING CARRIES ITS WEIGHT.
+ *
+ * `text-heading` is a Tailwind size utility (16px/21px) and nothing else, so
+ * every settings section title — "Models", "Interface", "Element size",
+ * "Advanced" — rendered at 16px REGULAR, two points above the card labels
+ * beneath it and the same weight as everything else on the page (design audit
+ * 2026-09-16, computed: `h2.text-heading` 16px/21px 400). Tailwind's preflight
+ * strips the browser's own h2 boldness, and no rule put it back.
+ *
+ * Weight on the element, not on the utility: `text-heading` also sizes chips
+ * and labels that must stay regular. Restricting it to <h2> gives the section
+ * titles (SettingSection, the stub card) a real heading voice and touches
+ * nothing that is not one.
+ */
+h2.text-heading {
+  font-weight: var(--pd-font-weight-semibold);
+}
+
 /* Onboarding wizard: each step fades/slides in on mount (keyed by step index).
  * Reduced-motion drops the animation entirely. */
 @keyframes pd-onboard-step-in {
@@ -1905,7 +1928,7 @@ body {
  * Round-10 Wave C (#20b): capability / attribute PILL TAGS for the Model
  * Manager. Larger, colored pills (vs. the old tiny grey text) with a distinct
  * hue per attribute so a model's traits read at a glance:
- *   vision = violet · recommended = green · audio = amber · MTP = blue ·
+ *   vision = rose · recommended = green · audio = amber · MTP = blue ·
  *   gated / size / quant = neutral.
  * App-local by design (NOT in @pi-desktop/ui — Wave B owns that). Each hue sets
  * its own bg / fg / border via the `--pill-*` locals, tuned for AA contrast of

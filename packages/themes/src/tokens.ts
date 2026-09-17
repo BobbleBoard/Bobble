@@ -1058,7 +1058,23 @@ const bobbleLight: ThemeTokens = {
   },
   text: {
     primary: '#1d1d1f', // Apple ink
-    secondary: '#424245',
+    /*
+     * THE MIDDLE RUNG OF THE TEXT LADDER, restored (design audit 2026-09-16).
+     *
+     * This was #424245 — 9.2:1 against the page, with primary at 15.5:1: a
+     * 1.68x step, where claude.ai measures 2.48x (#0b0b0b -> #52514e) and
+     * chatgpt.com 2.95x (#0d0d0d -> #5d5d5d). Sidebar rows, tool-chain step
+     * labels and thought text are all set in this colour, so "secondary" and
+     * "primary" rendered as the same ink and nothing on the screen was
+     * quieter than the reply. the user's "a lack of hierarchy" is this number.
+     *
+     * #55555a is 6.8:1 on the page (7.4:1 on a raised card): primary:secondary
+     * 2.27x and secondary:muted 2.04x — an even ladder between the two
+     * references rather than a copy of either. `muted` stays where it was
+     * because it already IS Apple's secondaryLabel (60% #3c3c43 over #f5f5f7
+     * composites to exactly #86868b).
+     */
+    secondary: '#55555a',
     muted: '#86868b',
     inverse: '#ffffff',
     onAccent: '#ffffff',
@@ -1096,7 +1112,15 @@ const bobbleLight: ThemeTokens = {
     inlineBg: '#7878801f',
     inlineFg: '#1d1d1f', // neutral — no claude red
     inlineBorder: '#00000000',
-    blockBg: '#f6f6f8',
+    /*
+     * A code block is a RAISED surface, like the composer and the canvas.
+     * It was #f6f6f8 on a #f5f5f7 page — a 1.01:1 step, i.e. no step; the
+     * 1px hairline was the only thing drawing the block (design audit
+     * 2026-09-16; chatgpt.com's layer steps measure 1.10-1.11). White gives
+     * the same 1.09 lift the canvas pane already has, so the three content
+     * surfaces share one rule: white sits on grey.
+     */
+    blockBg: '#ffffff',
     blockBorder: '#0000000f',
   },
   diff: {
@@ -1146,7 +1170,11 @@ const bobbleDark: ThemeTokens = {
   },
   text: {
     primary: '#f5f5f7',
-    secondary: '#d6d6db',
+    /* Same audit as the light value: #d6d6db was 12.6:1 on graphite with
+     * primary at 16.8:1 (a 1.33x step; claude 1.56x, chatgpt 1.59x). #c0c0c6 is
+     * 10.1:1 — claude's dark secondary measures 10.2, chatgpt's 10.1 — giving
+     * 1.66x down from primary and 1.58x down to muted. */
+    secondary: '#c0c0c6',
     muted: '#98989f',
     inverse: '#1d1d1f',
     onAccent: '#ffffff',
@@ -1184,7 +1212,10 @@ const bobbleDark: ThemeTokens = {
     inlineBg: '#78788033',
     inlineFg: '#f5f5f7',
     inlineBorder: '#00000000',
-    blockBg: '#ffffff0a',
+    /* Raised, as in light: 4% white over #151517 composited to ~1.05:1, which
+     * the eye cannot separate from the page. bg.raised is the 1.10 step the
+     * composer and canvas already stand on. */
+    blockBg: '#1e1e21',
     blockBorder: '#ffffff0f',
   },
   diff: {

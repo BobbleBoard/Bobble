@@ -100,7 +100,10 @@
   padding: 4px 0;
 }
 
-/* The left connector line; step icons sit on it (their bg cuts it into links). */
+/* The left connector line; step icons sit on it (their bg cuts it into links).
+ * `default` (10% ink), not `strong` (22%): the line threads the steps, it does
+ * not need to be read — at 22% it was the darkest mark in the chain, darker
+ * than the step text beside it (design audit 2026-09-16). */
 .pd-chain-steps::before {
   content: "";
   position: absolute;
@@ -108,14 +111,29 @@
   bottom: 16px;
   left: 11px;
   width: 1px;
-  background: var(--pd-border-strong);
+  background: var(--pd-border-default);
 }
 
 .pd-chain-step {
   position: relative;
 }
 
-/* The row is a plain div for inline/pill steps; only canvas steps are buttons. */
+/*
+ * PROCESS SITS ONE STEP BELOW THE ANSWER.
+ *
+ * Measured in the built app (design audit 2026-09-16): "Read a file" / "Ran a
+ * command" / "Edited a file" rendered at 14px in --pd-text-secondary, which at
+ * the time was #424245 — one point smaller than the 15px reply and, to the
+ * eye, the same ink. Six of those rows stacked above the reply's heading were
+ * the loudest block in the turn, and the thing they describe is the part the
+ * reader least needs to read. Both references collapse process to a muted
+ * line and keep the expanded steps a size below body copy.
+ *
+ * Footnote (13px) puts the step label on the same size as the thought text it
+ * sits beside, and two below the reply; the collapsed "Worked for 5s" summary
+ * stays at body size, so summary > step > detail is a real ladder. The colour
+ * is still `secondary` — that token is now a genuine second tier (tokens.ts).
+ */
 .pd-chain-step-row {
   display: flex;
   align-items: center;
@@ -128,8 +146,8 @@
   background: transparent;
   color: var(--pd-text-secondary);
   font-family: var(--pd-font-sans);
-  font-size: var(--pd-font-size-body);
-  line-height: var(--pd-leading-body);
+  font-size: var(--pd-font-size-footnote);
+  line-height: var(--pd-leading-footnote);
   text-align: left;
 }
 
