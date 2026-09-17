@@ -1,0 +1,135 @@
+/*
+ * Syntax colours for the chat's code fences: highlight.js classes → the code
+ * theme's `--pd-syntax-*` slots. The slots are the SAME variables the canvas
+ * editor's CodeMirror highlight style reads, so a fence in a reply and the
+ * file on the canvas are coloured from one place — the code theme chosen in
+ * Appearance → Code appearance, with the house palette as every flavour's
+ * fallback (packages/themes emits it from @pi-desktop/code-themes).
+ *
+ * hljs has more scopes than there are slots; each is folded onto the slot it
+ * reads as (a built-in is a function, a class name a type, a tag name a
+ * keyword, an attribute a property), rather than inventing colours no theme
+ * defines.
+ */
+
+/* ── keyword ──────────────────────────────────────────────────────────── */
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-doctag,
+.hljs-template-tag,
+.hljs-meta,
+.hljs-meta .hljs-keyword,
+.hljs-variable.language_,
+.hljs-tag .hljs-name {
+  color: var(--pd-syntax-keyword);
+}
+
+/* ── string ───────────────────────────────────────────────────────────── */
+.hljs-string,
+.hljs-regexp,
+.hljs-char.escape_,
+.hljs-meta .hljs-string,
+.hljs-code,
+.hljs-formula,
+.hljs-link {
+  color: var(--pd-syntax-string);
+}
+
+/* ── number / constant ────────────────────────────────────────────────── */
+.hljs-number,
+.hljs-literal,
+.hljs-symbol,
+.hljs-variable.constant_ {
+  color: var(--pd-syntax-number);
+}
+
+/* ── comment ──────────────────────────────────────────────────────────── */
+.hljs-comment,
+.hljs-quote,
+.hljs-meta.prompt_ {
+  color: var(--pd-syntax-comment);
+  font-style: italic;
+}
+
+/* ── function ─────────────────────────────────────────────────────────── */
+.hljs-title,
+.hljs-title.function_,
+.hljs-title.function_.invoke__,
+.hljs-built_in {
+  color: var(--pd-syntax-function);
+}
+
+/* ── type ─────────────────────────────────────────────────────────────── */
+.hljs-type,
+.hljs-class,
+.hljs-title.class_,
+.hljs-title.class_.inherited__,
+.hljs-section {
+  color: var(--pd-syntax-type);
+}
+
+/* ── property / attribute ─────────────────────────────────────────────── */
+.hljs-attr,
+.hljs-attribute,
+.hljs-property,
+.hljs-selector-attr,
+.hljs-selector-class,
+.hljs-selector-id,
+.hljs-selector-pseudo,
+.hljs-template-variable {
+  color: var(--pd-syntax-property);
+}
+
+/* ── punctuation / operator ───────────────────────────────────────────── */
+.hljs-punctuation,
+.hljs-operator,
+.hljs-tag,
+.hljs-bullet {
+  color: var(--pd-syntax-punctuation);
+}
+
+/* ── variable / parameter ─────────────────────────────────────────────── */
+.hljs-variable,
+.hljs-params,
+.hljs-subst {
+  color: var(--pd-syntax-variable);
+}
+
+/* Markdown fences: the emphasis scopes are typography, not colour. */
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: var(--pd-font-weight-bold);
+}
+
+/* Diff marks anywhere (a markdown fence quoting a patch) are colour only… */
+.hljs-addition {
+  color: var(--pd-diff-added-marker);
+}
+
+.hljs-deletion {
+  color: var(--pd-diff-removed-marker);
+}
+
+/*
+ * …and in a diff fence they get the theme's row tints behind them, edge to
+ * edge. hljs marks each changed line as one span, so the span is made a block
+ * that fills the row; a line wider than the panel still scrolls with the rest.
+ */
+.pd-code-block--diff .hljs-addition,
+.pd-code-block--diff .hljs-deletion {
+  display: inline-block;
+  min-width: 100%;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.pd-code-block--diff .hljs-addition {
+  background: var(--pd-diff-added-bg);
+}
+
+.pd-code-block--diff .hljs-deletion {
+  background: var(--pd-diff-removed-bg);
+}

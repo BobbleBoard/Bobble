@@ -1354,13 +1354,19 @@
  * The surface is transparent now and the panel behind it shows through, so there
  * is no rectangle to have edges. xterm is transparent to match (allowTransparency
  * in native-surfaces.ts) — the two must change together or the seam comes back.
+ *
+ * `--pd-terminal-bg` IS `transparent` under the house code themes (the theme
+ * sheet says so), which keeps all of the above. A third-party code theme —
+ * Dracula, Nord — brings its own ground, and it is painted HERE, on the
+ * surface the panel clips to its rounded corners, never on xterm's own canvas,
+ * so a themed terminal still has no rectangle of its own.
  */
 .pd-terminal {
   display: flex;
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  background: transparent;
+  background: var(--pd-terminal-bg);
 }
 
 .pd-terminal-header {

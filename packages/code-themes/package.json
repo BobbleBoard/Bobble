@@ -1,0 +1,23 @@
+{
+  "name": "@pi-desktop/code-themes",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "GPL-3.0-or-later",
+  "description": "Code colour themes — the house Bobble pair plus the well-known editor themes — as typed palettes (editor, syntax, diff, terminal ANSI) with a WCAG contrast checker. Pure: no DOM, unit-testable.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "biome check .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.2",
+    "@pi-desktop/shared": "workspace:*",
+    "@types/node": "^24.10.9",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.10"
+  }
+}

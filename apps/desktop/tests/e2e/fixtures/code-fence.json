@@ -1,0 +1,1119 @@
+{
+  "name": "code-fence",
+  "state": {
+    "model": {
+      "id": "qwen3.6-27b",
+      "name": "Qwen3.6 27B Q6",
+      "api": "openai-completions",
+      "provider": "llamacpp",
+      "baseUrl": "http://127.0.0.1:8080/v1",
+      "reasoning": true,
+      "input": ["text", "image"],
+      "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "contextWindow": 131072,
+      "maxTokens": 16384
+    },
+    "sessionFile": "/tmp/mock-pi/sessions/code-fence.jsonl",
+    "sessionId": "mock-session-code-fence"
+  },
+  "models": [
+    {
+      "id": "qwen3.6-27b",
+      "name": "Qwen3.6 27B Q6",
+      "api": "openai-completions",
+      "provider": "llamacpp",
+      "baseUrl": "http://127.0.0.1:8080/v1",
+      "reasoning": true,
+      "input": ["text", "image"],
+      "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "contextWindow": 131072,
+      "maxTokens": 16384
+    }
+  ],
+  "prompts": [
+    {
+      "response": {
+        "success": true
+      },
+      "steps": [
+        {
+          "emit": {
+            "type": "agent_start"
+          }
+        },
+        {
+          "delayMs": 5,
+          "emit": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "emit": {
+            "type": "message_start",
+            "message": {
+              "role": "assistant",
+              "content": []
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": ""
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_start",
+              "contentIndex": 0,
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": ""
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 20,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by n"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by n",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by n"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 20,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[]"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "ame.\nexport function greet(name: string, times = 1): string {\n  const lines: string[]",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[]"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 20,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[] = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  "
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": " = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  ",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[] = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  "
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 20,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[] = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  return lines.join(\"\\n\");\n}\n```\n\n```diff\n--- a/greet.ts\n+++ b/greet.ts\n@@ -1,3 +1,3 @@"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "return lines.join(\"\\n\");\n}\n```\n\n```diff\n--- a/greet.ts\n+++ b/greet.ts\n@@ -1,3 +1,3 @@",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[] = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  return lines.join(\"\\n\");\n}\n```\n\n```diff\n--- a/greet.ts\n+++ b/greet.ts\n@@ -1,3 +1,3 @@"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 20,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[] = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  return lines.join(\"\\n\");\n}\n```\n\n```diff\n--- a/greet.ts\n+++ b/greet.ts\n@@ -1,3 +1,3 @@\n function greet(name: string) {\n-  return \"Hello, \" + name;\n+  return `Hello, ${nam"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "\n function greet(name: string) {\n-  return \"Hello, \" + name;\n+  return `Hello, ${nam",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[] = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  return lines.join(\"\\n\");\n}\n```\n\n```diff\n--- a/greet.ts\n+++ b/greet.ts\n@@ -1,3 +1,3 @@\n function greet(name: string) {\n-  return \"Hello, \" + name;\n+  return `Hello, ${nam"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 20,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[] = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  return lines.join(\"\\n\");\n}\n```\n\n```diff\n--- a/greet.ts\n+++ b/greet.ts\n@@ -1,3 +1,3 @@\n function greet(name: string) {\n-  return \"Hello, \" + name;\n+  return `Hello, ${name}!`;\n }\n```\n\nAnd to run it:\n\n```bash\nnpx tsx greet.ts --name \"Ada\" # prints once\n```"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "e}!`;\n }\n```\n\nAnd to run it:\n\n```bash\nnpx tsx greet.ts --name \"Ada\" # prints once\n```",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[] = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  return lines.join(\"\\n\");\n}\n```\n\n```diff\n--- a/greet.ts\n+++ b/greet.ts\n@@ -1,3 +1,3 @@\n function greet(name: string) {\n-  return \"Hello, \" + name;\n+  return `Hello, ${name}!`;\n }\n```\n\nAnd to run it:\n\n```bash\nnpx tsx greet.ts --name \"Ada\" # prints once\n```"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[] = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  return lines.join(\"\\n\");\n}\n```\n\n```diff\n--- a/greet.ts\n+++ b/greet.ts\n@@ -1,3 +1,3 @@\n function greet(name: string) {\n-  return \"Hello, \" + name;\n+  return `Hello, ${name}!`;\n }\n```\n\nAnd to run it:\n\n```bash\nnpx tsx greet.ts --name \"Ada\" # prints once\n```"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_end",
+              "contentIndex": 0,
+              "content": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[] = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  return lines.join(\"\\n\");\n}\n```\n\n```diff\n--- a/greet.ts\n+++ b/greet.ts\n@@ -1,3 +1,3 @@\n function greet(name: string) {\n-  return \"Hello, \" + name;\n+  return `Hello, ${name}!`;\n }\n```\n\nAnd to run it:\n\n```bash\nnpx tsx greet.ts --name \"Ada\" # prints once\n```",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[] = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  return lines.join(\"\\n\");\n}\n```\n\n```diff\n--- a/greet.ts\n+++ b/greet.ts\n@@ -1,3 +1,3 @@\n function greet(name: string) {\n-  return \"Hello, \" + name;\n+  return `Hello, ${name}!`;\n }\n```\n\nAnd to run it:\n\n```bash\nnpx tsx greet.ts --name \"Ada\" # prints once\n```"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "message_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[] = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  return lines.join(\"\\n\");\n}\n```\n\n```diff\n--- a/greet.ts\n+++ b/greet.ts\n@@ -1,3 +1,3 @@\n function greet(name: string) {\n-  return \"Hello, \" + name;\n+  return `Hello, ${name}!`;\n }\n```\n\nAnd to run it:\n\n```bash\nnpx tsx greet.ts --name \"Ada\" # prints once\n```"
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "qwen3.6-27b",
+              "usage": {
+                "input": 24,
+                "output": 160,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 184,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 1770000000000
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "turn_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[] = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  return lines.join(\"\\n\");\n}\n```\n\n```diff\n--- a/greet.ts\n+++ b/greet.ts\n@@ -1,3 +1,3 @@\n function greet(name: string) {\n-  return \"Hello, \" + name;\n+  return `Hello, ${name}!`;\n }\n```\n\nAnd to run it:\n\n```bash\nnpx tsx greet.ts --name \"Ada\" # prints once\n```"
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "qwen3.6-27b",
+              "usage": {
+                "input": 24,
+                "output": 160,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 184,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 1770000000000
+            },
+            "toolResults": []
+          }
+        },
+        {
+          "emit": {
+            "type": "agent_end",
+            "messages": [
+              {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[] = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  return lines.join(\"\\n\");\n}\n```\n\n```diff\n--- a/greet.ts\n+++ b/greet.ts\n@@ -1,3 +1,3 @@\n function greet(name: string) {\n-  return \"Hello, \" + name;\n+  return `Hello, ${name}!`;\n }\n```\n\nAnd to run it:\n\n```bash\nnpx tsx greet.ts --name \"Ada\" # prints once\n```"
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "llamacpp",
+                "model": "qwen3.6-27b",
+                "usage": {
+                  "input": 24,
+                  "output": 160,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 184,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "stop",
+                "timestamp": 1770000000000
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "response": {
+        "success": true
+      },
+      "steps": [
+        {
+          "emit": {
+            "type": "agent_start"
+          }
+        },
+        {
+          "delayMs": 5,
+          "emit": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "emit": {
+            "type": "message_start",
+            "message": {
+              "role": "assistant",
+              "content": []
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": ""
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_start",
+              "contentIndex": 0,
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": ""
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 20,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by n"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by n",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by n"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 20,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[]"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "ame.\nexport function greet(name: string, times = 1): string {\n  const lines: string[]",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[]"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 20,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[] = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  "
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": " = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  ",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[] = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  "
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 20,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[] = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  return lines.join(\"\\n\");\n}\n```\n\n```diff\n--- a/greet.ts\n+++ b/greet.ts\n@@ -1,3 +1,3 @@"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "return lines.join(\"\\n\");\n}\n```\n\n```diff\n--- a/greet.ts\n+++ b/greet.ts\n@@ -1,3 +1,3 @@",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[] = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  return lines.join(\"\\n\");\n}\n```\n\n```diff\n--- a/greet.ts\n+++ b/greet.ts\n@@ -1,3 +1,3 @@"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 20,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[] = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  return lines.join(\"\\n\");\n}\n```\n\n```diff\n--- a/greet.ts\n+++ b/greet.ts\n@@ -1,3 +1,3 @@\n function greet(name: string) {\n-  return \"Hello, \" + name;\n+  return `Hello, ${nam"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "\n function greet(name: string) {\n-  return \"Hello, \" + name;\n+  return `Hello, ${nam",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[] = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  return lines.join(\"\\n\");\n}\n```\n\n```diff\n--- a/greet.ts\n+++ b/greet.ts\n@@ -1,3 +1,3 @@\n function greet(name: string) {\n-  return \"Hello, \" + name;\n+  return `Hello, ${nam"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 20,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[] = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  return lines.join(\"\\n\");\n}\n```\n\n```diff\n--- a/greet.ts\n+++ b/greet.ts\n@@ -1,3 +1,3 @@\n function greet(name: string) {\n-  return \"Hello, \" + name;\n+  return `Hello, ${name}!`;\n }\n```\n\nAnd to run it:\n\n```bash\nnpx tsx greet.ts --name \"Ada\" # prints once\n```"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "e}!`;\n }\n```\n\nAnd to run it:\n\n```bash\nnpx tsx greet.ts --name \"Ada\" # prints once\n```",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[] = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  return lines.join(\"\\n\");\n}\n```\n\n```diff\n--- a/greet.ts\n+++ b/greet.ts\n@@ -1,3 +1,3 @@\n function greet(name: string) {\n-  return \"Hello, \" + name;\n+  return `Hello, ${name}!`;\n }\n```\n\nAnd to run it:\n\n```bash\nnpx tsx greet.ts --name \"Ada\" # prints once\n```"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[] = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  return lines.join(\"\\n\");\n}\n```\n\n```diff\n--- a/greet.ts\n+++ b/greet.ts\n@@ -1,3 +1,3 @@\n function greet(name: string) {\n-  return \"Hello, \" + name;\n+  return `Hello, ${name}!`;\n }\n```\n\nAnd to run it:\n\n```bash\nnpx tsx greet.ts --name \"Ada\" # prints once\n```"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_end",
+              "contentIndex": 0,
+              "content": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[] = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  return lines.join(\"\\n\");\n}\n```\n\n```diff\n--- a/greet.ts\n+++ b/greet.ts\n@@ -1,3 +1,3 @@\n function greet(name: string) {\n-  return \"Hello, \" + name;\n+  return `Hello, ${name}!`;\n }\n```\n\nAnd to run it:\n\n```bash\nnpx tsx greet.ts --name \"Ada\" # prints once\n```",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[] = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  return lines.join(\"\\n\");\n}\n```\n\n```diff\n--- a/greet.ts\n+++ b/greet.ts\n@@ -1,3 +1,3 @@\n function greet(name: string) {\n-  return \"Hello, \" + name;\n+  return `Hello, ${name}!`;\n }\n```\n\nAnd to run it:\n\n```bash\nnpx tsx greet.ts --name \"Ada\" # prints once\n```"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "message_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[] = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  return lines.join(\"\\n\");\n}\n```\n\n```diff\n--- a/greet.ts\n+++ b/greet.ts\n@@ -1,3 +1,3 @@\n function greet(name: string) {\n-  return \"Hello, \" + name;\n+  return `Hello, ${name}!`;\n }\n```\n\nAnd to run it:\n\n```bash\nnpx tsx greet.ts --name \"Ada\" # prints once\n```"
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "qwen3.6-27b",
+              "usage": {
+                "input": 24,
+                "output": 160,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 184,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 1770000000000
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "turn_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[] = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  return lines.join(\"\\n\");\n}\n```\n\n```diff\n--- a/greet.ts\n+++ b/greet.ts\n@@ -1,3 +1,3 @@\n function greet(name: string) {\n-  return \"Hello, \" + name;\n+  return `Hello, ${name}!`;\n }\n```\n\nAnd to run it:\n\n```bash\nnpx tsx greet.ts --name \"Ada\" # prints once\n```"
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "qwen3.6-27b",
+              "usage": {
+                "input": 24,
+                "output": 160,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 184,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 1770000000000
+            },
+            "toolResults": []
+          }
+        },
+        {
+          "emit": {
+            "type": "agent_end",
+            "messages": [
+              {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[] = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  return lines.join(\"\\n\");\n}\n```\n\n```diff\n--- a/greet.ts\n+++ b/greet.ts\n@@ -1,3 +1,3 @@\n function greet(name: string) {\n-  return \"Hello, \" + name;\n+  return `Hello, ${name}!`;\n }\n```\n\nAnd to run it:\n\n```bash\nnpx tsx greet.ts --name \"Ada\" # prints once\n```"
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "llamacpp",
+                "model": "qwen3.6-27b",
+                "usage": {
+                  "input": 24,
+                  "output": 160,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 184,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "stop",
+                "timestamp": 1770000000000
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "response": {
+        "success": true
+      },
+      "steps": [
+        {
+          "emit": {
+            "type": "agent_start"
+          }
+        },
+        {
+          "delayMs": 5,
+          "emit": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "emit": {
+            "type": "message_start",
+            "message": {
+              "role": "assistant",
+              "content": []
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": ""
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_start",
+              "contentIndex": 0,
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": ""
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 20,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by n"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by n",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by n"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 20,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[]"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "ame.\nexport function greet(name: string, times = 1): string {\n  const lines: string[]",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[]"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 20,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[] = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  "
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": " = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  ",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[] = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  "
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 20,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[] = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  return lines.join(\"\\n\");\n}\n```\n\n```diff\n--- a/greet.ts\n+++ b/greet.ts\n@@ -1,3 +1,3 @@"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "return lines.join(\"\\n\");\n}\n```\n\n```diff\n--- a/greet.ts\n+++ b/greet.ts\n@@ -1,3 +1,3 @@",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[] = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  return lines.join(\"\\n\");\n}\n```\n\n```diff\n--- a/greet.ts\n+++ b/greet.ts\n@@ -1,3 +1,3 @@"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 20,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[] = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  return lines.join(\"\\n\");\n}\n```\n\n```diff\n--- a/greet.ts\n+++ b/greet.ts\n@@ -1,3 +1,3 @@\n function greet(name: string) {\n-  return \"Hello, \" + name;\n+  return `Hello, ${nam"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "\n function greet(name: string) {\n-  return \"Hello, \" + name;\n+  return `Hello, ${nam",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[] = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  return lines.join(\"\\n\");\n}\n```\n\n```diff\n--- a/greet.ts\n+++ b/greet.ts\n@@ -1,3 +1,3 @@\n function greet(name: string) {\n-  return \"Hello, \" + name;\n+  return `Hello, ${nam"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 20,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[] = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  return lines.join(\"\\n\");\n}\n```\n\n```diff\n--- a/greet.ts\n+++ b/greet.ts\n@@ -1,3 +1,3 @@\n function greet(name: string) {\n-  return \"Hello, \" + name;\n+  return `Hello, ${name}!`;\n }\n```\n\nAnd to run it:\n\n```bash\nnpx tsx greet.ts --name \"Ada\" # prints once\n```"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "e}!`;\n }\n```\n\nAnd to run it:\n\n```bash\nnpx tsx greet.ts --name \"Ada\" # prints once\n```",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[] = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  return lines.join(\"\\n\");\n}\n```\n\n```diff\n--- a/greet.ts\n+++ b/greet.ts\n@@ -1,3 +1,3 @@\n function greet(name: string) {\n-  return \"Hello, \" + name;\n+  return `Hello, ${name}!`;\n }\n```\n\nAnd to run it:\n\n```bash\nnpx tsx greet.ts --name \"Ada\" # prints once\n```"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[] = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  return lines.join(\"\\n\");\n}\n```\n\n```diff\n--- a/greet.ts\n+++ b/greet.ts\n@@ -1,3 +1,3 @@\n function greet(name: string) {\n-  return \"Hello, \" + name;\n+  return `Hello, ${name}!`;\n }\n```\n\nAnd to run it:\n\n```bash\nnpx tsx greet.ts --name \"Ada\" # prints once\n```"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_end",
+              "contentIndex": 0,
+              "content": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[] = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  return lines.join(\"\\n\");\n}\n```\n\n```diff\n--- a/greet.ts\n+++ b/greet.ts\n@@ -1,3 +1,3 @@\n function greet(name: string) {\n-  return \"Hello, \" + name;\n+  return `Hello, ${name}!`;\n }\n```\n\nAnd to run it:\n\n```bash\nnpx tsx greet.ts --name \"Ada\" # prints once\n```",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[] = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  return lines.join(\"\\n\");\n}\n```\n\n```diff\n--- a/greet.ts\n+++ b/greet.ts\n@@ -1,3 +1,3 @@\n function greet(name: string) {\n-  return \"Hello, \" + name;\n+  return `Hello, ${name}!`;\n }\n```\n\nAnd to run it:\n\n```bash\nnpx tsx greet.ts --name \"Ada\" # prints once\n```"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "message_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[] = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  return lines.join(\"\\n\");\n}\n```\n\n```diff\n--- a/greet.ts\n+++ b/greet.ts\n@@ -1,3 +1,3 @@\n function greet(name: string) {\n-  return \"Hello, \" + name;\n+  return `Hello, ${name}!`;\n }\n```\n\nAnd to run it:\n\n```bash\nnpx tsx greet.ts --name \"Ada\" # prints once\n```"
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "qwen3.6-27b",
+              "usage": {
+                "input": 24,
+                "output": 160,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 184,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 1770000000000
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "turn_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[] = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  return lines.join(\"\\n\");\n}\n```\n\n```diff\n--- a/greet.ts\n+++ b/greet.ts\n@@ -1,3 +1,3 @@\n function greet(name: string) {\n-  return \"Hello, \" + name;\n+  return `Hello, ${name}!`;\n }\n```\n\nAnd to run it:\n\n```bash\nnpx tsx greet.ts --name \"Ada\" # prints once\n```"
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "qwen3.6-27b",
+              "usage": {
+                "input": 24,
+                "output": 160,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 184,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 1770000000000
+            },
+            "toolResults": []
+          }
+        },
+        {
+          "emit": {
+            "type": "agent_end",
+            "messages": [
+              {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Here is the greeting, typed, with the change as a diff:\n\n```ts\n// Greet someone by name.\nexport function greet(name: string, times = 1): string {\n  const lines: string[] = [];\n  for (let i = 0; i < times; i++) {\n    lines.push(`Hello, ${name}!`);\n  }\n  return lines.join(\"\\n\");\n}\n```\n\n```diff\n--- a/greet.ts\n+++ b/greet.ts\n@@ -1,3 +1,3 @@\n function greet(name: string) {\n-  return \"Hello, \" + name;\n+  return `Hello, ${name}!`;\n }\n```\n\nAnd to run it:\n\n```bash\nnpx tsx greet.ts --name \"Ada\" # prints once\n```"
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "llamacpp",
+                "model": "qwen3.6-27b",
+                "usage": {
+                  "input": 24,
+                  "output": 160,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 184,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "stop",
+                "timestamp": 1770000000000
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -290,3 +290,13 @@ export {
   isNavigationKey,
   nextFocusRingMode,
 } from './focus-ring.ts';
+
+/* Syntax highlighting for code fences — highlight.js with a fixed grammar set,
+   emitting hljs-* classes that styles/syntax.css maps onto --pd-syntax-*. */
+export type { Highlighted } from './highlight.ts';
+export {
+  escapeHtml,
+  highlightCode,
+  highlightLanguage,
+  splitHighlightedLines,
+} from './highlight.ts';

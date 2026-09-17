@@ -223,7 +223,11 @@
   margin: 0 0 14px;
   border: 1px solid var(--pd-code-block-border);
   border-radius: var(--pd-radius-md);
-  background: var(--pd-code-block-bg);
+  /* The CODE THEME's surface (Appearance → Code appearance). For the house
+     themes it resolves to the flavour's own --pd-code-block-bg; a third-party
+     theme brings its own ground, the way its editor would. Same for the text,
+     the line numbers and the selection below — see syntax.css for the tokens. */
+  background: var(--pd-code-bg);
   font-family: var(--pd-font-mono);
   font-size: var(--pd-font-size-code);
   line-height: var(--pd-leading-code);
@@ -270,7 +274,7 @@
 
 .pd-code-block code {
   font: inherit;
-  color: var(--pd-text-primary);
+  color: var(--pd-code-fg);
 }
 
 /* Copy-safe line numbers: rendered from a data attribute, never selectable
@@ -280,12 +284,14 @@
   display: inline-block;
   width: 3ch;
   margin-right: 14px;
-  color: var(--pd-text-ghost);
+  color: var(--pd-code-line-number);
   text-align: right;
   user-select: none;
 }
 
+/* A translucent wash, so every token keeps its colour under the selection. It
+   was the solid link blue with inverted text, which cannot work once a theme
+   brings its own selection colour (Dracula's is a dark grey). */
 .pd-code-block ::selection {
-  background: var(--pd-text-link);
-  color: var(--pd-text-inverse);
+  background: var(--pd-code-selection);
 }

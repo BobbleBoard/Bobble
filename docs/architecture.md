@@ -126,3 +126,14 @@ restyles everything live, no reload. The Zustand theme store writes the attribut
 `@pi-desktop/ui` primitives style exclusively through `--pd-*` tokens (plus the shared
 `pd-*` keyframes emitted alongside them); consumers load `@pi-desktop/themes/themes.css`
 and `@pi-desktop/ui/styles.css` once at the root.
+
+Code has a theme of its own on top of that: `@pi-desktop/code-themes` holds the house pair
+(Bobble Light / Bobble Dark, checked to WCAG 4.5:1 on every surface the app paints code on,
+and never purple) and the well-known editor themes as typed palettes — syntax slots, diff
+rows, the terminal's sixteen ANSI colours. The generated theme sheet emits the house pair as
+every flavour's `--pd-syntax-*` / `--pd-code-*` / `--pd-diff-*` / `--pd-ansi-*` fallback;
+Settings → Appearance → Code appearance picks one theme per mode, and
+`apps/desktop/src/store/code-theme.ts` writes a chosen third-party theme into
+`<style id="pd-code-theme">` scoped by `data-mode`. The canvas editor (CodeMirror), the
+chat's fences (highlight.js, `packages/ui/src/styles/syntax.css`) and the terminal (xterm,
+reading the computed variables) all consume those names and nothing else.

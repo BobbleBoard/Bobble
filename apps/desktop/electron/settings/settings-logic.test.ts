@@ -308,3 +308,47 @@ describe('the tool interface a fresh install gets', () => {
     expect(clampSettings({ toolInterface: 'schemas' }).toolInterface).toBe('schemas');
   });
 });
+
+describe('code appearance', () => {
+  const house = { light: 'bobble-light', dark: 'bobble-dark' };
+
+  it('defaults to the house pair and no custom font', () => {
+    expect(DEFAULT_SETTINGS.codeTheme).toEqual(house);
+    expect(DEFAULT_SETTINGS.codeFont).toBe('');
+    expect(clampSettings({}).codeTheme).toEqual(house);
+  });
+
+  it('keeps a real theme per slot and refuses one of the wrong mode', () => {
+    const real = { light: 'github-light', dark: 'dracula' };
+    expect(clampSettings({ codeTheme: real }).codeTheme).toEqual(real);
+    // A dark theme in the light slot was never checked on a light ground.
+    const swapped = { light: 'dracula', dark: 'github-light' };
+    expect(clampSettings({ codeTheme: swapped }).codeTheme).toEqual(house);
+    expect(clampSettings({ codeTheme: { light: 42, dark: 'vaporwave' } }).codeTheme).toEqual(house);
+    expect(clampSettings({ codeTheme: 'nord' }).codeTheme).toEqual(house);
+  });
+
+  it('merges one slot at a time', () => {
+    const current = clampSettings({ codeTheme: { light: 'one-light', dark: 'nord' } });
+    expect(mergeSettingsPatch(current, { codeTheme: { dark: 'monokai' } }).codeTheme).toEqual({
+      light: 'one-light',
+      dark: 'monokai',
+    });
+    expect(mergeSettingsPatch(current, { codeTheme: { light: 'min-light' } }).codeTheme).toEqual({
+      light: 'min-light',
+      dark: 'nord',
+    });
+  });
+
+  it('keeps a font NAME and nothing that could escape a font-family value', () => {
+    expect(clampSettings({ codeFont: 'JetBrains Mono' }).codeFont).toBe('JetBrains Mono');
+    expect(clampSettings({ codeFont: '  Fira   Code  ' }).codeFont).toBe('Fira Code');
+    expect(clampSettings({ codeFont: 'Menlo"; } body { display: none' }).codeFont).toBe(
+      'Menlo body display: none',
+    );
+    expect(clampSettings({ codeFont: 42 }).codeFont).toBe('');
+    expect(clampSettings({ codeFont: 'x'.repeat(200) }).codeFont).toHaveLength(80);
+    const withFont = clampSettings({ codeFont: 'Menlo' });
+    expect(mergeSettingsPatch(withFont, { codeFont: '' }).codeFont).toBe('');
+  });
+});

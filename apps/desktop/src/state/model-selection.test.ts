@@ -12,6 +12,8 @@ import {
 const base: DesktopSettings = {
   version: 1,
   theme: { flavor: 'claude', mode: 'system' },
+  codeTheme: { light: 'bobble-light', dark: 'bobble-dark' },
+  codeFont: '',
   permissionMode: 'reviewer',
   effort: 'medium',
   userMode: 'user',

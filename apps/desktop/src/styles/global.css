@@ -8457,3 +8457,187 @@ body[data-media-expanded="true"] .pd-studio-compose {
     opacity: 0.5;
   }
 }
+
+/*
+ * ── CODE APPEARANCE (Settings → Appearance) ─────────────────────────────────
+ *
+ * Two pickers side by side — a light code theme, a dark one — each with the
+ * live preview under it, then the code-font field. The layout is Claude's
+ * desktop settings, which the user pointed at; the surfaces are the app's own
+ * (`.pd-menu` rows in the dropdown, `.pd-btn--outline` for the trigger).
+ */
+.pd-code-theme-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+@media (max-width: 720px) {
+  .pd-code-theme-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.pd-code-theme-column {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+/* The trigger fills its column: a settings card otherwise shrinks every
+   .pd-btn to its label (see the .pd-setting-row rule above), and a dropdown
+   whose width changes with the chosen name would jump on every pick. */
+.pd-setting-row .pd-code-theme-column .pd-code-theme-trigger {
+  align-self: stretch;
+  width: 100%;
+  justify-content: flex-start;
+  gap: 8px;
+  padding-inline: 10px;
+}
+.pd-code-theme-trigger-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pd-code-theme-trigger .pd-select-chevron {
+  flex: 0 0 auto;
+  color: var(--pd-text-muted);
+}
+
+/* Five swatches per theme: its ground with four syntax colours on it. */
+.pd-code-theme-swatch {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 2px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: var(--pd-radius-xs);
+  box-shadow: inset 0 0 0 1px var(--pd-border-default);
+}
+.pd-code-theme-swatch > span {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--pd-radius-full);
+}
+
+/* The list: as wide as its trigger, a filter box pinned at the top. */
+.pd-code-theme-menu {
+  width: var(--radix-popover-trigger-width);
+  min-width: 220px;
+  padding-top: 0;
+}
+.pd-code-theme-search {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--pd-space-xs);
+  margin: 0 calc(-1 * var(--pd-menu-padding)) var(--pd-space-xs);
+  padding: var(--pd-space-sm) var(--pd-space-md);
+  border-bottom: 1px solid var(--pd-border-subtle);
+  background: linear-gradient(var(--pd-bg-overlay), var(--pd-bg-overlay)), var(--pd-bg-raised);
+  color: var(--pd-text-muted);
+}
+.pd-code-theme-search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none;
+  background: none;
+  color: var(--pd-text-primary);
+  font: inherit;
+  font-size: var(--pd-font-size-body);
+  outline: none;
+}
+.pd-code-theme-search-input::placeholder {
+  color: var(--pd-text-placeholder);
+}
+.pd-code-theme-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The house themes carry a small mark: they are the ones checked against
+   every surface the app paints code on. */
+.pd-code-theme-house {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border-radius: var(--pd-radius-full);
+  background: var(--pd-accent-subtle);
+  color: var(--pd-accent-primary);
+  font-size: var(--pd-font-size-caption);
+  font-weight: var(--pd-font-weight-medium);
+}
+.pd-code-theme-empty {
+  margin: 0;
+  padding: var(--pd-space-sm) var(--pd-space-md);
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-caption);
+  text-align: center;
+}
+
+/*
+ * The preview. Its colours are the THEME's, set inline (the theme's own
+ * ground and text, its variables for the highlighter), never the app's — a
+ * light theme previews light while the app is dark. Only geometry lives here.
+ */
+.pd-code-preview {
+  overflow: hidden;
+  border: 1px solid;
+  border-radius: var(--pd-radius-md);
+  font-family: var(--pd-font-mono);
+  font-size: var(--pd-font-size-code);
+  line-height: 1.7;
+  font-variant-ligatures: none;
+}
+.pd-code-preview-code {
+  padding: 8px 0;
+  overflow-x: auto;
+}
+.pd-code-preview-line {
+  display: flex;
+  align-items: baseline;
+  min-width: max-content;
+  padding: 0 12px 0 8px;
+  white-space: pre;
+}
+.pd-code-preview-number {
+  flex: 0 0 auto;
+  width: 2ch;
+  text-align: right;
+  user-select: none;
+}
+.pd-code-preview-mark {
+  flex: 0 0 auto;
+  width: 2ch;
+  text-align: center;
+  font-weight: var(--pd-font-weight-semibold);
+  user-select: none;
+}
+.pd-code-preview-line code {
+  font: inherit;
+}
+/* The terminal's sixteen, as words in their own colour, so "is the red
+   readable" is answered by looking rather than by trusting a number. */
+.pd-code-preview-terminal {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 10px;
+  margin: 0;
+  padding: 6px 10px 8px;
+  border-top: 1px solid;
+  font-size: var(--pd-font-size-caption);
+  line-height: 1.6;
+  list-style: none;
+}
+.pd-code-preview-ansi {
+  white-space: nowrap;
+}
+
+.pd-code-font-input {
+  width: min(100%, 320px);
+  font-family: var(--pd-font-mono);
+}

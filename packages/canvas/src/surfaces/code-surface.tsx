@@ -22,6 +22,12 @@ import type { OffscreenProbe } from './use-edit-animation.ts';
  * Every colour is a --pd-syntax-* variable now, so light, dark and all three
  * flavors resolve from the same place the rest of the UI does, and no palette
  * can go stale against a background it was never checked on.
+ *
+ * Those variables are the CODE THEME's (Appearance → Code appearance): the
+ * house palette is what the theme sheet carries by default, and a chosen
+ * third-party theme overrides the same names at runtime — so this surface, the
+ * chat's fences and the settings preview all change together, and this file
+ * still names no colour.
  */
 const pdHighlight = HighlightStyle.define([
   {
@@ -42,16 +48,18 @@ const pdHighlight = HighlightStyle.define([
   { tag: [t.typeName, t.className, t.namespace, t.self], color: 'var(--pd-syntax-type)' },
   { tag: [t.propertyName, t.attributeName], color: 'var(--pd-syntax-property)' },
   { tag: [t.operator, t.punctuation, t.bracket], color: 'var(--pd-syntax-punctuation)' },
-  { tag: [t.definition(t.variableName), t.variableName], color: 'var(--pd-text-primary)' },
+  { tag: [t.definition(t.variableName), t.variableName], color: 'var(--pd-syntax-variable)' },
   { tag: t.invalid, color: 'var(--pd-syntax-invalid)' },
 ]);
 
-/** Base viewer theme — styled entirely through --pd-* tokens. */
+/** Base viewer theme — styled entirely through --pd-* tokens. The surface,
+ * text, line numbers and selection are the code theme's (`--pd-code-*`), which
+ * resolve to the flavour's own tokens under the house themes. */
 const codeTheme = EditorView.theme({
   '&': {
     height: '100%',
-    backgroundColor: 'var(--pd-code-block-bg)',
-    color: 'var(--pd-text-primary)',
+    backgroundColor: 'var(--pd-code-bg)',
+    color: 'var(--pd-code-fg)',
     fontSize: 'var(--pd-font-size-code)',
   },
   '&.cm-focused': { outline: 'none' },
@@ -74,16 +82,15 @@ const codeTheme = EditorView.theme({
    */
   '.cm-gutters': {
     /*
-     * `--pd-code-block-bg` is a TINT (#ffffff0a here), not a fill, so setting it
+     * `--pd-code-bg` is a TINT under the house themes (#ffffff0a), not a fill, so setting it
      * alone left the gutter 96% see-through — the assertion "not transparent"
      * went green while the screen still showed code through the digits. The
      * layer under it is the canvas panel, `--pd-bg-raised`, which is what the
      * editor root is really sitting on; painting both in that order gives the
      * gutter the editor's own colour AND full opacity.
      */
-    background:
-      'linear-gradient(var(--pd-code-block-bg), var(--pd-code-block-bg)), var(--pd-bg-raised)',
-    color: 'var(--pd-text-ghost)',
+    background: 'linear-gradient(var(--pd-code-bg), var(--pd-code-bg)), var(--pd-bg-raised)',
+    color: 'var(--pd-code-line-number)',
     border: 'none',
     /* Room for the rule to sit in, rather than against the code. */
     paddingRight: '12px',
@@ -117,6 +124,15 @@ const codeTheme = EditorView.theme({
   },
   '.cm-content': { caretColor: 'transparent' },
   '.cm-activeLine, .cm-activeLineGutter': { backgroundColor: 'transparent' },
+  /* The selection is the code theme's wash — translucent, so every token keeps
+   * its colour under it. Both the native selection (this viewer) and
+   * CodeMirror's drawn one, should an extension add it. */
+  '.cm-line::selection, .cm-line ::selection': {
+    backgroundColor: 'var(--pd-code-selection)',
+  },
+  '.cm-selectionBackground, &.cm-focused .cm-selectionBackground': {
+    backgroundColor: 'var(--pd-code-selection)',
+  },
 });
 
 /**
@@ -160,7 +176,7 @@ const gutterRuleHeight = ViewPlugin.fromClass(
  * raw source reads like an editor, not a static viewer. Applied AFTER codeTheme
  * (later extensions win) only when `editable`. */
 const editableTheme = EditorView.theme({
-  '.cm-content': { caretColor: 'var(--pd-text-primary)' },
+  '.cm-content': { caretColor: 'var(--pd-code-cursor)' },
   '.cm-activeLine': { backgroundColor: 'var(--pd-code-active-line, rgba(127,127,127,0.08))' },
 });
 

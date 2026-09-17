@@ -303,9 +303,29 @@ export interface ComputerUseSettings {
   apps: ComputerUseApp[];
 }
 
+/**
+ * The code colour theme, one per mode — the light one applies while the app
+ * is light, the dark one while it is dark, so the mode toggle switches both.
+ * Ids are `@pi-desktop/code-themes` registry ids (`bobble-dark`, `dracula`);
+ * an id of the wrong mode or of no theme resolves to the house theme.
+ */
+export interface CodeThemeChoice {
+  light: string;
+  dark: string;
+}
+
 export interface DesktopSettings {
   version: 1;
   theme: { flavor: ThemeFlavor; mode: ThemeModePref };
+  /** Code appearance (Settings → Appearance): the code theme per mode. */
+  codeTheme: CodeThemeChoice;
+  /**
+   * A custom monospace font for code and the terminal, by family name
+   * ("JetBrains Mono"). Empty = the flavour's own stack. Applied as an inline
+   * `--pd-font-mono` on the document root, ahead of the same stack as a
+   * fallback, so a name that is not installed costs nothing.
+   */
+  codeFont: string;
   permissionMode: PermissionMode;
   effort: EffortLevel;
   /** Experience level driving the model-selection UI (default `user`). */
@@ -466,6 +486,9 @@ export interface DesktopSettings {
  * nested `theme` / `search` / `capabilities` objects). */
 export interface DesktopSettingsPatch {
   theme?: Partial<DesktopSettings['theme']>;
+  /** One slot or both; the other keeps its current theme. */
+  codeTheme?: Partial<CodeThemeChoice>;
+  codeFont?: string;
   permissionMode?: PermissionMode;
   effort?: EffortLevel;
   userMode?: UserMode;

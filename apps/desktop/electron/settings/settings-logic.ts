@@ -4,11 +4,13 @@
  * Every field is guarded on read so a hand-edited or partially-written
  * settings.json can never brick the app; unknown values fall back to defaults.
  */
+import { DEFAULT_CODE_THEME_IDS, isCodeThemeId } from '@pi-desktop/code-themes';
 import type { OnboardingChoices } from '../import/import-contract';
 import {
   type AdvancedSettings,
   type ChatOrganization,
   type ChatProject,
+  type CodeThemeChoice,
   type ComputerUseApp,
   type ComputerUseSettings,
   DEFAULT_ADVANCED,
@@ -112,6 +114,8 @@ function clampModelSelection(value: unknown, fallback: ModelSelection): ModelSel
 export const DEFAULT_SETTINGS: DesktopSettings = {
   version: 1,
   theme: { flavor: 'bobble', mode: 'system' },
+  codeTheme: { light: DEFAULT_CODE_THEME_IDS.light, dark: DEFAULT_CODE_THEME_IDS.dark },
+  codeFont: '',
   permissionMode: 'reviewer',
   effort: 'medium',
   userMode: 'user',
@@ -353,6 +357,8 @@ export function clampSettings(raw: unknown): DesktopSettings {
       flavor: oneOf(theme.flavor, FLAVORS, d.theme.flavor),
       mode: oneOf(theme.mode, MODES, d.theme.mode),
     },
+    codeTheme: clampCodeTheme(o.codeTheme, d.codeTheme),
+    codeFont: codeFontName(o.codeFont),
     permissionMode: oneOf(o.permissionMode, PERMISSION_MODES, d.permissionMode),
     effort: oneOf(o.effort, EFFORT_LEVELS, d.effort),
     userMode: oneOf(o.userMode, USER_MODES, d.userMode),
@@ -415,6 +421,33 @@ export function clampSettings(raw: unknown): DesktopSettings {
   };
 }
 
+/**
+ * A code theme per mode, each validated against the registry FOR THAT MODE:
+ * a dark theme in the light slot was never checked on a light ground, and a
+ * theme removed in an update should not leave the slot naming nothing.
+ */
+function clampCodeTheme(value: unknown, fallback: CodeThemeChoice): CodeThemeChoice {
+  const o = (typeof value === 'object' && value !== null ? value : {}) as Record<string, unknown>;
+  return {
+    light: isCodeThemeId(o.light, 'light') ? o.light : fallback.light,
+    dark: isCodeThemeId(o.dark, 'dark') ? o.dark : fallback.dark,
+  };
+}
+
+/**
+ * A font family NAME, and nothing else: it lands in a CSS `font-family`
+ * value, so quotes, semicolons and braces are stripped rather than trusted,
+ * and a novel of a value is cut to something a font name could be.
+ */
+export function codeFontName(value: unknown): string {
+  if (typeof value !== 'string') return '';
+  return value
+    .replace(/["'`;{}\\]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 80);
+}
+
 /** `{ enabled, apps[] }` with each app an `{ id, name }` pair; junk drops out. */
 function clampComputerUse(value: unknown, fallback: ComputerUseSettings): ComputerUseSettings {
   if (typeof value !== 'object' || value === null) return fallback;
@@ -444,6 +477,7 @@ export function mergeSettingsPatch(
     ...current,
     ...patch,
     theme: { ...current.theme, ...patch.theme },
+    codeTheme: { ...current.codeTheme, ...patch.codeTheme },
     search: { ...current.search, ...patch.search },
     capabilities: { ...current.capabilities, ...patch.capabilities },
     // Deep-merge the two advanced groups so a patch touching one sampling field

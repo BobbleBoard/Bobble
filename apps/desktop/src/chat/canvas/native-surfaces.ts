@@ -31,6 +31,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import type { BrowserBounds } from '../../../electron/canvas/browser-contract';
 import { officeKindForExt } from '../../../electron/office/office-contract';
 import { usePiStore } from '../../state/pi-slice';
+import { useSettingsStore } from '../../state/settings-store';
 import { useThemeStore } from '../../store/theme';
 import { browserBoundsForPanel, rectToBounds } from './browser-bounds';
 import { isDarkColor } from './color-luma';
@@ -49,33 +50,75 @@ function cssVar(name: string, fallback: string): string {
 }
 
 /**
- * xterm theme derived from the app's `--pd-*` tokens (round-10 #5) so the
- * terminal reads as part of the app instead of a raw black box: background +
- * foreground + a subtle accent cursor + selection all come from the theme.
+ * A token value xterm can parse. Its colour parser takes hex (3–8 digits) and
+ * comma `rgb()`/`rgba()`, and THROWS on anything else — including the
+ * keyword `transparent` and a `color-mix()` — which is why the theme sheet
+ * keeps the terminal's tokens as plain hex, and why anything else here falls
+ * back rather than taking the whole theme down with it.
+ */
+function xtermColor(name: string, fallback: string): string {
+  const value = cssVar(name, fallback);
+  if (value === 'transparent') return 'rgba(0, 0, 0, 0)';
+  if (/^#[0-9a-f]{3,8}$/i.test(value) || /^rgba?\(/.test(value)) return value;
+  return fallback;
+}
+
+/**
+ * xterm theme from the CODE THEME's variables — the `--pd-ansi-*` sixteen,
+ * the terminal foreground, caret and selection — which the theme sheet
+ * carries for the house themes and Appearance → Code appearance overrides for
+ * a chosen one. Read as COMPUTED values, so a theme change lands here by
+ * re-reading rather than by mirroring a palette in TypeScript.
+ *
+ * the user: "in terminal in the canvas in dark mode there's a dark red color
+ * that's a bit unreadable" — xterm's own default red (#cd3131) on the app's
+ * near-black ground, at 3:1. The house palette's red clears 5:1; every ANSI
+ * colour of the house themes is held to 4.5:1 by test.
  */
 function terminalTheme(): ITheme {
   /* Transparent, so the terminal has no rectangle of its own to draw edges on —
    * `.pd-terminal` is transparent too and the rounded canvas panel shows through.
    * MEASURED: this token is `rgba(255,255,255,0.04)`, a wash rather than a solid,
    * so painting it here AND on the container double-applied it over the grid. The
-   * two must stay in step or the seam the user called "that akward border" returns. */
+   * two must stay in step or the seam the user called "that akward border" returns.
+   * A third-party theme's ground is painted by `.pd-terminal` (the surface the
+   * panel clips), never here. */
   const bg = 'rgba(0, 0, 0, 0)';
-  const fg = cssVar('--pd-text-primary', '#e6e6ea');
+  const fg = xtermColor('--pd-terminal-fg', cssVar('--pd-text-primary', '#e6e6ea'));
   const accent = cssVar('--pd-accent-primary', '#8aa2ff');
   // The caret has its own token: two flavors say the right thing with their
   // accent (bobble blue, claude orange) but codex's accent is a near-black that
   // would be invisible against the terminal background.
-  const caret = cssVar('--pd-terminal-cursor', accent);
-  const muted = cssVar('--pd-text-muted', '#9aa0a6');
-  const selection = cssVar('--pd-bg-selected', 'rgba(138,162,255,0.28)');
+  const caret = xtermColor('--pd-terminal-cursor', accent);
+  const selection = xtermColor('--pd-terminal-selection', 'rgba(138,162,255,0.28)');
+  // The character under a block caret is drawn in the ground's colour: the
+  // theme's own when it has one, the app's code surface when it is transparent.
+  const ground = xtermColor('--pd-terminal-bg', bg);
+  const cursorAccent = ground === bg ? xtermColor('--pd-code-block-bg', '#1e1e24') : ground;
+  const ansi = (name: string, fallback: string): string =>
+    xtermColor(`--pd-ansi-${name}`, fallback);
   return {
     background: bg,
     foreground: fg,
     cursor: caret,
-    cursorAccent: cssVar('--pd-code-block-bg', '#1e1e24'),
+    cursorAccent,
     selectionBackground: selection,
-    black: cssVar('--pd-code-block-bg', '#1e1e24'),
-    brightBlack: muted,
+    black: ansi('black', '#5c5c64'),
+    red: ansi('red', '#ff7a72'),
+    green: ansi('green', '#5fd68a'),
+    yellow: ansi('yellow', '#f5c542'),
+    blue: ansi('blue', '#6ab0ff'),
+    magenta: ansi('magenta', '#ff8ac8'),
+    cyan: ansi('cyan', '#5fd6d6'),
+    white: ansi('white', '#e8e8ec'),
+    brightBlack: ansi('bright-black', '#8e8e96'),
+    brightRed: ansi('bright-red', '#ff9d96'),
+    brightGreen: ansi('bright-green', '#8ff0b0'),
+    brightYellow: ansi('bright-yellow', '#ffd866'),
+    brightBlue: ansi('bright-blue', '#8fc4ff'),
+    brightMagenta: ansi('bright-magenta', '#ffa8d6'),
+    brightCyan: ansi('bright-cyan', '#8ff0f0'),
+    brightWhite: ansi('bright-white', '#ffffff'),
   };
 }
 
@@ -732,6 +775,24 @@ export class NativeSurfaces {
     }
   }
 
+  /**
+   * Re-read the theme into every live terminal — after the app's mode or
+   * flavour changes, or the code theme or code font does. xterm re-renders on
+   * an `options.theme` assignment; the font needs a refit, since the cell
+   * size changed under the grid.
+   */
+  retheme(): void {
+    const theme = terminalTheme();
+    const fontFamily = cssVar('--pd-font-mono', MONO_STACK);
+    for (const [tabId, entry] of this.#terminals) {
+      entry.term.options.theme = theme;
+      if (entry.term.options.fontFamily !== fontFamily) {
+        entry.term.options.fontFamily = fontFamily;
+        if (entry.container.isConnected) this.#fitTerminal(tabId);
+      }
+    }
+  }
+
   #detachTerminal(tabId: string): void {
     const entry = this.#terminals.get(tabId);
     if (entry?.container.parentNode) entry.container.parentNode.removeChild(entry.container);
@@ -847,6 +908,11 @@ export function useNativeSurfaces(controller: CanvasController): NativeSurfacesA
   // a hardcoded copy would drift silently and only show up in a screenshot.
   const flavor = useThemeStore((s) => s.flavor);
   const mode = useThemeStore((s) => s.mode);
+  // The code theme and font are two more triggers for the same reason: the
+  // terminal reads its sixteen colours and its font off the computed style.
+  const codeThemeLight = useSettingsStore((s) => s.settings.codeTheme.light);
+  const codeThemeDark = useSettingsStore((s) => s.settings.codeTheme.dark);
+  const codeFont = useSettingsStore((s) => s.settings.codeFont);
   /* `flavor` and `mode` are TRIGGERS, not values: the effect reads the computed
      CSS rather than these, which is the point (a theme edit lands in the
      editors for free). Dropping them, as the rule suggests, would stop the
@@ -854,6 +920,7 @@ export function useNativeSurfaces(controller: CanvasController): NativeSurfacesA
   // biome-ignore lint/correctness/useExhaustiveDependencies: theme change is the trigger.
   useEffect(() => {
     const push = (): void => {
+      manager.retheme();
       const cs = getComputedStyle(document.documentElement);
       const read = (name: string): string => cs.getPropertyValue(name).trim();
       const tokens = {
@@ -877,7 +944,7 @@ export function useNativeSurfaces(controller: CanvasController): NativeSurfacesA
     // reading computed styles in the same tick can catch the previous palette.
     const id = requestAnimationFrame(push);
     return () => cancelAnimationFrame(id);
-  }, [flavor, mode]);
+  }, [flavor, mode, codeThemeLight, codeThemeDark, codeFont]);
 
   // Ask ONCE whether this build shipped the vendored office editors, and let
   // the extension routing know. Until this resolves, docx/pptx/pdf keep opening
