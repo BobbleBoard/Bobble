@@ -77,7 +77,7 @@ export function mirrorCommandText(
   output: string,
   running: boolean,
   cwd?: string,
-  opts: { failed?: boolean } = {},
+  opts: { failed?: boolean; executing?: boolean } = {},
 ): string {
   /*
    * A REAL PROMPT LINE, not a bare `$`. the user: "would be appreciated if you can
@@ -114,10 +114,24 @@ export function mirrorCommandText(
    * 2026-09-13 as four half-typed `$ echo …` lines stacked up for one command.
    * Left open, the next characters append, exactly as typing does.
    */
-  if (running && output.length === 0) return line;
-  const head = `${line}${SGR.reset}\n\n`;
+  if (running && output.length === 0 && opts.executing !== true) return line;
+  /*
+   * ENTER, THE MOMENT THE COMMAND IS COMPLETE. the user (2026-09-17): "when the
+   * model's command finishes streaming in the terminal move the cursor down a
+   * line and stream in the response … as it would appear in a terminal, this
+   * immediate moving down a line as if the user pressed enter is purely
+   * aesthetic." So a command whose arguments have arrived and which is now
+   * executing closes its line at once — the cursor sits at the start of the
+   * next one while the output is still on its way — and the output, when it
+   * comes, lands right under the prompt line the way a shell prints it (no
+   * blank line in between; a terminal has none). While it is still coming
+   * the text ends where the output ends, so each chunk extends the last.
+   */
+  const head = `${line}${SGR.reset}\n`;
+  if (running && output.length === 0) return head;
   if (output.length > 0) {
-    return opts.failed === true ? `${head}${SGR.red}${output}${SGR.reset}\n` : `${head}${output}\n`;
+    const body = opts.failed === true ? `${SGR.red}${output}${SGR.reset}` : output;
+    return running ? `${head}${body}` : `${head}${body}\n`;
   }
   return `${head}${SGR.dim}(no output)${SGR.reset}\n`;
 }

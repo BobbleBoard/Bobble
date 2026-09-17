@@ -48,13 +48,34 @@ describe('a mirror only ever grows', () => {
     // Distinct from "still going" — the corp's old copy reported every quiet
     // mkdir as running forever.
     expect(plainMirrorText(mirrorCommandText('mkdir -p out', '', false))).toBe(
-      '$ mkdir -p out\n\n(no output)\n',
+      '$ mkdir -p out\n(no output)\n',
     );
     expect(
       mirrorCommandText('mkdir -p out', '', false).startsWith(
         mirrorCommandText('mkdir -p out', '', true),
       ),
     ).toBe(true);
+  });
+
+  it('presses Enter the moment the command is complete and executing', () => {
+    // the user (2026-09-17): "when the model's command finishes streaming in the
+    // terminal move the cursor down a line … as if the user pressed enter".
+    const typing = mirrorCommandText('npm test', '', true, '/w/proj');
+    const entered = mirrorCommandText('npm test', '', true, '/w/proj', { executing: true });
+    expect(typing.endsWith('\n')).toBe(false);
+    expect(entered.endsWith('\n')).toBe(true);
+    expect(entered.startsWith(typing)).toBe(true);
+    // The output then lands right under the prompt line, no blank line, and
+    // each chunk extends the last — as a shell prints it.
+    const chunk = mirrorCommandText('npm test', 'PASS a.te', true, '/w/proj', { executing: true });
+    const more = mirrorCommandText('npm test', 'PASS a.test.ts\nPASS b', true, '/w/proj', {
+      executing: true,
+    });
+    const done = mirrorCommandText('npm test', 'PASS a.test.ts\nPASS b.test.ts', false, '/w/proj');
+    expect(chunk.startsWith(entered)).toBe(true);
+    expect(more.startsWith(chunk)).toBe(true);
+    expect(done.startsWith(more)).toBe(true);
+    expect(plainMirrorText(done)).toBe('bobble proj $ npm test\nPASS a.test.ts\nPASS b.test.ts\n');
   });
 
   it('a second command extends the transcript rather than replacing it', () => {
@@ -74,7 +95,7 @@ describe('the mirror is colour-coded like the shell it mirrors', () => {
     expect(out).toContain('\x1b[1m\x1b[32mbobble\x1b[0m');
     expect(out).toContain('\x1b[1m\x1b[34mproj\x1b[0m');
     expect(out).toContain('\x1b[2m$\x1b[0m \x1b[1mls\x1b[0m');
-    expect(plainMirrorText(out)).toBe('bobble proj $ ls\n\na\n');
+    expect(plainMirrorText(out)).toBe('bobble proj $ ls\na\n');
   });
 
   it('paints a failed command’s output red, and a quiet one dim', () => {

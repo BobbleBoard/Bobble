@@ -126,6 +126,21 @@ function terminalTheme(): ITheme {
 const IS_E2E = new URLSearchParams(window.location.search).has('piE2E');
 
 /**
+ * MAKE THE MIRROR'S CURSOR EXIST.
+ *
+ * xterm draws no cursor until the terminal has been focused or typed into
+ * (`isCursorInitialized`, set on focus, on a key, or when the alternate screen
+ * is entered) — and a mirror is never focused and never typed into, so the
+ * Activity terminal showed no cursor at all, which made "move the cursor down
+ * a line when the command is complete" (the user, 2026-09-17) invisible. Entering
+ * and leaving the alternate screen (DECSET/DECRST 1049 — content and cursor
+ * restored) is the one way in through the write stream; every full rewrite
+ * (ESC c, which un-initialises it again) writes it right after the reset —
+ * and a mirror's first paint IS a full rewrite (#mountTerminal).
+ */
+const MIRROR_CURSOR_ON = '\x1b[?1049h\x1b[?1049l';
+
+/**
  * Invoke a canvas shell-out channel (open-with / reveal / open-external). Under
  * the E2E opt-in it records the call to `window.__pi_canvas_ipc` and SKIPS the
  * real shell-out, so probes can assert the wiring without popping Finder /
@@ -163,7 +178,10 @@ function canvasShellInvoke(channel: string, req: unknown): void {
 function disposeTerminalSafely(entry: TerminalEntry): void {
   entry.container.parentNode?.removeChild(entry.container);
   const { term } = entry;
+  let disposed = false;
   const dispose = (): void => {
+    if (disposed) return;
+    disposed = true;
     try {
       term.dispose();
     } catch {
@@ -174,7 +192,29 @@ function disposeTerminalSafely(entry: TerminalEntry): void {
     dispose();
     return;
   }
-  requestAnimationFrame(() => requestAnimationFrame(dispose));
+  /*
+   * AFTER THE WRITES HAVE BEEN PARSED, then two frames. Two frames alone was
+   * not enough: xterm parses a large write in slices, yielding between them,
+   * so a burst of mirror text was still being parsed when the frames were up,
+   * and its viewport refresh then ran against a disposed renderer ("reading
+   * 'dimensions'" — activity-burst-probe, REPRODUCED again 2026-09-17 on a
+   * build that had the two-frame wait). An empty write's callback runs once
+   * everything queued before it has been parsed; the frames after that are for
+   * the renderer's own callbacks. A deadline in case the callback never comes.
+   */
+  const afterFrames = (): void => {
+    requestAnimationFrame(() => requestAnimationFrame(dispose));
+  };
+  const deadline = setTimeout(afterFrames, 2000);
+  try {
+    term.write('', () => {
+      clearTimeout(deadline);
+      afterFrames();
+    });
+  } catch {
+    clearTimeout(deadline);
+    afterFrames();
+  }
 }
 
 interface BrowserEntry {
@@ -763,7 +803,8 @@ export class NativeSurfaces {
      * BEFORE the previous tick's text had been parsed — that text then landed
      * after the reset, under the new text, and every rewrite stacked up.
      */
-    const chunk = grew ? text.slice(previous.length) : `\x1bc${text}`;
+    // A full reset also un-initialises xterm's cursor (see MIRROR_CURSOR_ON).
+    const chunk = grew ? text.slice(previous.length) : `\x1bc${MIRROR_CURSOR_ON}${text}`;
     entry.term.write(chunk.replace(/\r?\n/g, '\r\n'));
   }
 

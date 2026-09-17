@@ -88,6 +88,9 @@ export interface ActivityCommand {
   running: boolean;
   /** The tool reported an error (non-zero exit, refused) — its output paints red. */
   failed: boolean;
+  /** The arguments have all arrived and the tool is running the command — the
+   * mirror presses Enter (see mirrorCommandText). */
+  executing?: boolean;
 }
 
 /**
@@ -217,6 +220,8 @@ export interface DetectActivityOptions {
    * actually made or shown.
    */
   readonly settled?: boolean;
+  /** Call ids the harness reports as executing (the store's runningToolCalls). */
+  readonly executing?: ReadonlyArray<string>;
 }
 
 export function detectActivity(
@@ -271,6 +276,7 @@ export function detectActivity(
         output: output ?? partials[block.id] ?? '',
         running: output === undefined,
         failed: failedCalls.has(block.id),
+        executing: output === undefined && (opts.executing ?? []).includes(block.id),
       };
       commands.push(entry);
       terminalFocus = { kind: 'terminal', at, command: entry };
@@ -322,7 +328,12 @@ export function detectActivity(
  */
 export function activityMirrorText(commands: readonly ActivityCommand[], cwd?: string): string {
   return commands
-    .map((c) => mirrorCommandText(c.command, c.output, c.running, cwd, { failed: c.failed }))
+    .map((c) =>
+      mirrorCommandText(c.command, c.output, c.running, cwd, {
+        failed: c.failed,
+        executing: c.executing,
+      }),
+    )
     .join('\n');
 }
 
@@ -543,6 +554,7 @@ export function morphActivityTab(
 export function useActivityCanvasRouting(controller: CanvasController): void {
   const messages = usePiStore((s) => s.messages) as ChatMsg[];
   const partials = usePiStore((s) => s.toolOutputPartials);
+  const executing = usePiStore((s) => s.runningToolCalls);
   // The folder the TOOLS resolve a relative path against — the chat's working
   // folder, published by the harness — not pi's cwd, which can be its parent.
   const piCwd = usePiStore((s) => s.session?.cwd ?? undefined);
@@ -621,7 +633,7 @@ export function useActivityCanvasRouting(controller: CanvasController): void {
         opened.current = false;
     }
 
-    const stream = detectActivity(messages, partials, cwd, { settled: !streaming });
+    const stream = detectActivity(messages, partials, cwd, { settled: !streaming, executing });
     const pure = activitySpec(stream, cwd);
     /*
      * THE MONITOR RIDES THE ACTIVITY TAB. The frames come from the app-wide
@@ -783,5 +795,15 @@ export function useActivityCanvasRouting(controller: CanvasController): void {
     }
     // (`sessionEpoch` is deliberately NOT a dependency here: the reset effect
     // above owns it, and a session boundary always hands us a new `messages`.)
-  }, [messages, partials, cwd, corpActive, bgStreaming, streaming, controller, baseTick]);
+  }, [
+    messages,
+    partials,
+    executing,
+    cwd,
+    corpActive,
+    bgStreaming,
+    streaming,
+    controller,
+    baseTick,
+  ]);
 }

@@ -70,10 +70,13 @@ export function activitySpec(blocks: readonly CorpBlock[]): CanvasTabSpec | unde
   if (lastCommand !== undefined && lastBashAt > lastFileAt) {
     // Everything the agent has run, in one mirror — the shell it would have if
     // you were sitting next to it, not one terminal per command.
+    // A corp step appears once its command is already running, so the last
+    // one without output has its Enter pressed straight away.
     const mirrorText = bash
-      .map((s, i) =>
-        mirrorCommandText(s.command, s.output, i === bash.length - 1 && s.output === ''),
-      )
+      .map((s, i) => {
+        const running = i === bash.length - 1 && s.output === '';
+        return mirrorCommandText(s.command, s.output, running, undefined, { executing: running });
+      })
       .join('\n');
     return {
       kind: 'terminal',

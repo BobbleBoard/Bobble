@@ -70,7 +70,14 @@ describe('detectActivity — which bash is bash', () => {
       CWD,
     );
     expect(stream.commands).toEqual([
-      { callId: 'c1', command: 'ls -la', output: 'total 8', running: false, failed: false },
+      {
+        callId: 'c1',
+        command: 'ls -la',
+        output: 'total 8',
+        running: false,
+        failed: false,
+        executing: false,
+      },
     ]);
     expect(stream.focus?.kind).toBe('terminal');
   });
@@ -100,7 +107,23 @@ describe('detectActivity — which bash is bash', () => {
       output: 'vite v7…',
       running: true,
       failed: false,
+      executing: false,
     });
+  });
+
+  it('knows when a running command is executing (its Enter has been pressed)', () => {
+    const msgs = [assistant('a1', [call('c1', 'bash', { command: 'npm run build' })])];
+    expect(detectActivity(msgs, {}, CWD).commands[0]?.executing).toBe(false);
+    expect(detectActivity(msgs, {}, CWD, { executing: ['c1'] }).commands[0]?.executing).toBe(true);
+    // The mirror text closes the line the moment it is executing.
+    const typing = activityMirrorText(detectActivity(msgs, {}, CWD).commands, CWD);
+    const entered = activityMirrorText(
+      detectActivity(msgs, {}, CWD, { executing: ['c1'] }).commands,
+      CWD,
+    );
+    expect(typing.endsWith('\n')).toBe(false);
+    expect(entered.endsWith('\n')).toBe(true);
+    expect(entered.startsWith(typing)).toBe(true);
   });
 
   it('shows a command while its arguments are still streaming', () => {

@@ -28,6 +28,9 @@ export interface BashTerminalEvent {
   command: string;
   output: string;
   running: boolean;
+  /** The arguments have all arrived and the tool is running the command — the
+   * mirror presses Enter (see mirrorCommandText). */
+  executing: boolean;
 }
 
 function str(value: unknown): string | undefined {
@@ -49,7 +52,10 @@ export function detectBashTerminals(
    * precisely because they do not finish.
    */
   partials: Readonly<Record<string, string>> = {},
+  /** Call ids the harness reports as executing (the store's runningToolCalls). */
+  executing: ReadonlyArray<string> = [],
 ): BashTerminalEvent[] {
+  const executingIds = new Set(executing);
   const resultByCall = new Map<string, string>();
   for (const m of messages) {
     if (m.kind === 'toolResult') resultByCall.set(m.toolCallId, m.text);
@@ -67,6 +73,7 @@ export function detectBashTerminals(
         command,
         output: output ?? partials[block.id] ?? '',
         running: output === undefined,
+        executing: output === undefined && executingIds.has(block.id),
       });
     }
   }
@@ -81,7 +88,7 @@ const terminalTabKey = (callId: string): string => `term:${callId}`;
  * browser-only code to module scope ("window is not defined"). The hook below
  * reads it, where a browser is guaranteed. */
 function mirrorText(ev: BashTerminalEvent, cwd?: string): string {
-  return mirrorCommandText(ev.command, ev.output, ev.running, cwd);
+  return mirrorCommandText(ev.command, ev.output, ev.running, cwd, { executing: ev.executing });
 }
 
 /**
@@ -96,10 +103,11 @@ export function useBashTerminalCanvasRouting(): void {
   const { controller } = useCanvasTabs();
   const messages = usePiStore((s) => s.messages) as ChatMsg[];
   const partials = usePiStore((s) => s.toolOutputPartials);
+  const executing = usePiStore((s) => s.runningToolCalls);
   const opened = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    for (const ev of detectBashTerminals(messages, partials)) {
+    for (const ev of detectBashTerminals(messages, partials, executing)) {
       const key = terminalTabKey(ev.callId);
       const data: CanvasTab['data'] = { mirror: true, mirrorText: mirrorText(ev, cwd) };
       const existing = controller.getState().tabs.find((t) => t.key === key);
@@ -130,5 +138,5 @@ export function useBashTerminalCanvasRouting(): void {
         controller.updateTab(existing.id, { data });
       }
     }
-  }, [messages, partials, controller, cwd]);
+  }, [messages, partials, executing, controller, cwd]);
 }
