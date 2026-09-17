@@ -29,7 +29,11 @@ export const bobbleLight: CodeTheme = {
   mode: 'light',
   firstParty: true,
   editor: {
-    bg: '#f6f6f8',
+    // The bobble flavour's code-block surface (themes/tokens.ts
+    // codeSurface.blockBg): white on the grey page since the design audit
+    // (2026-09-16) — the old #f6f6f8 sat 1.01:1 over #f5f5f7 and the hairline
+    // was the whole box. Kept in step by code-theme-fallback.test.ts.
+    bg: '#ffffff',
     fg: '#1d1d1f',
     lineNumber: '#1d1d1f4d',
     selection: '#0071e340',
@@ -88,7 +92,8 @@ export const bobbleDark: CodeTheme = {
   mode: 'dark',
   firstParty: true,
   editor: {
-    bg: '#27272a',
+    // Dark: the same token, now an opaque step below the raised panel.
+    bg: '#1e1e21',
     fg: '#f5f5f7',
     lineNumber: '#f5f5f74d',
     selection: '#0a84ff40',

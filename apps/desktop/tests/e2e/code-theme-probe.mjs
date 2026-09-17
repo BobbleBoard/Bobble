@@ -129,13 +129,15 @@ try {
     };
   });
   // The LIGHT preview stays light while the app is dark: that is the point.
+  // The grounds are the bobble code surface (white on light, #1e1e21 on dark
+  // since the design audit's token change; code-themes/themes/bobble.ts).
   check(
-    previews.light === rgb('#f6f6f8'),
-    `light preview ground is ${previews.light}, wanted #f6f6f8`,
+    previews.light === rgb('#ffffff'),
+    `light preview ground is ${previews.light}, wanted #ffffff`,
   );
   check(
-    previews.dark === rgb('#27272a'),
-    `dark preview ground is ${previews.dark}, wanted #27272a`,
+    previews.dark === rgb('#1e1e21'),
+    `dark preview ground is ${previews.dark}, wanted #1e1e21`,
   );
   check(
     previews.lightAnsi === 16 && previews.darkAnsi === 16,

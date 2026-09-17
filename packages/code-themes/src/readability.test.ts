@@ -16,8 +16,11 @@ import { ANSI_NAMES, type CodeTheme, SYNTAX_SLOTS } from './types.ts';
  * are the measured composites, so this package stays dependency-free.
  */
 const APP_GROUNDS = {
-  light: ['#f6f6f8', flatten('#f6f6f8', '#f5f5f7'), '#ffffff'],
-  dark: ['#27272a', flatten('#ffffff0a', '#151517'), flatten('#ffffff0a', '#1e1e21')],
+  // The code surface is white on light (design audit 2026-09-16) and the
+  // #1e1e21 step on dark; the older grounds stay in the list so the house
+  // colours keep reading on every surface they have ever been drawn on.
+  light: ['#ffffff', '#f6f6f8', flatten('#f6f6f8', '#f5f5f7')],
+  dark: ['#1e1e21', '#27272a', flatten('#ffffff0a', '#151517'), flatten('#ffffff0a', '#1e1e21')],
 };
 
 /**
