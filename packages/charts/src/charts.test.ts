@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { chartToElements } from './elements.ts';
 import { layoutChart, niceStep } from './layout.ts';
 import { formatValue, normalizeChartSpec, pointCount } from './spec.ts';
 import { chartToSvg } from './svg.ts';
@@ -47,7 +48,11 @@ describe('normalizeChartSpec — every shape a model actually writes', () => {
     expect(s.type).toBe('bar');
     expect(s.series.map((x) => x.name)).toEqual(['Revenue', 'Cost']);
     expect(s.series[1]?.points[2]?.value).toBe(3.9);
-    expect(normalizeChartSpec({ type: 'pie', ...UNITS }).type).toBe('donut');
+    // A pie is its own type now (a donut with no hole; the user wants pies that
+    // "expand smoothly"); a radar has three spellings.
+    expect(normalizeChartSpec({ type: 'pie', ...UNITS }).type).toBe('pie');
+    expect(normalizeChartSpec({ type: 'doughnut', ...UNITS }).type).toBe('donut');
+    expect(normalizeChartSpec({ type: 'spider', ...UNITS }).type).toBe('radar');
     expect(normalizeChartSpec({ type: 'horizontal', ...UNITS }).type).toBe('hbar');
   });
 
@@ -169,5 +174,49 @@ describe('the donut hole', () => {
       { width: 600, height: 300 },
     );
     expect(highlighted.donut?.centre).toEqual({ big: '38%', small: 'Globex' });
+  });
+});
+
+describe('pie and radar', () => {
+  const skills = {
+    title: 'Profile',
+    labels: ['Speed', 'Power', 'Range', 'Cost', 'Style'],
+    values: ['Ours: 8, 6, 9, 4, 7', 'Theirs: 5, 8, 6, 7, 5'],
+  };
+
+  it('a pie is a donut with no hole and nothing written in the middle', () => {
+    const spec = normalizeChartSpec({ type: 'pie', labels: ['a', 'b', 'c'], values: [1, 2, 3] });
+    const L = layoutChart(spec, { width: 600, height: 360 });
+    expect(L.donut?.ring).toBe(L.donut?.r);
+    expect(L.donut?.centre).toEqual({ big: '', small: '' });
+    // Every slice path closes at the centre, not on an inner arc.
+    for (const s of L.slices) expect(s.d).toMatch(/L300(\.\d)? \d+(\.\d)? Z$|A\d/);
+    const svg = chartToSvg(spec);
+    expect(svg).not.toContain('>6<');
+  });
+
+  it('a radar lays one polygon per series round a spoke per category', () => {
+    const spec = normalizeChartSpec({ type: 'radar', ...skills });
+    expect(spec.type).toBe('radar');
+    const L = layoutChart(spec, { width: 600, height: 400 });
+    expect(L.radar?.axes.map((a) => a.label)).toEqual(['Speed', 'Power', 'Range', 'Cost', 'Style']);
+    expect(L.radar?.shapes).toHaveLength(2);
+    expect(L.radar?.shapes[0]?.points).toHaveLength(5);
+    // The first spoke points straight up; the strongest value sits on the rim.
+    const top = L.radar?.axes[0];
+    expect(top?.x).toBeCloseTo(L.radar?.cx ?? 0, 3);
+    expect((top?.y ?? 0) < (L.radar?.cy ?? 0)).toBe(true);
+    const range = L.radar?.shapes[0]?.points[2];
+    const d = Math.hypot(
+      (range?.x ?? 0) - (L.radar?.cx ?? 0),
+      (range?.y ?? 0) - (L.radar?.cy ?? 0),
+    );
+    expect(d).toBeCloseTo(L.radar?.r ?? 0, 3);
+    const svg = chartToSvg(spec);
+    expect(svg).toContain('Speed');
+    expect((svg.match(/<circle/g) ?? []).length).toBe(10);
+    const els = chartToElements(spec);
+    expect(els.elements.some((e) => e.tag === 'polygon')).toBe(true);
+    expect(els.elements.filter((e) => e.tag === 'circle')).toHaveLength(10);
   });
 });

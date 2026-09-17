@@ -79,3 +79,21 @@ describe("Chrome's own set reads as connector usage", () => {
     expect(cliCommandLabel('ls -la /tmp')).toBeNull();
   });
 });
+
+describe('a chart command is the chart tool in CLI clothes', () => {
+  it('names the kind of chart and carries the title', () => {
+    expect(cliCommandLabel('chart bar "Units Sold by Year" --labels "a" --values "1"')).toEqual({
+      running: 'Rendering a bar chart',
+      done: 'Rendered a bar chart',
+      chart: { type: 'bar', title: 'Units Sold by Year' },
+    });
+    expect(cliCommandLabel('chart --type hbar --title "Top 5" --labels a --values 1')?.running).toBe(
+      'Rendering a horizontal bar chart',
+    );
+    expect(cliCommandLabel('chart edit units.svg --look sunset')).toEqual({
+      running: 'Redrawing the chart',
+      done: 'Redrew the chart',
+      chart: { type: 'chart', title: 'units.svg' },
+    });
+  });
+});

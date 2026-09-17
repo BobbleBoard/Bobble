@@ -58,6 +58,7 @@ import { corpChatView } from './corp/corp-thread-view';
 import { HarnessChecklistPanel, ThreadStatusIndicator } from './HarnessStatus';
 import { HistoryPole } from './HistoryPole';
 import { MessageErrorBoundary } from './MessageErrorBoundary';
+import { type PendingChartArgs, PendingChartCard, pendingChartArgs } from './PendingChartCard';
 import { PresentedInline } from './PresentedInline';
 import { awaitingReplyAfterLatestTurn, sentAttachmentsPrefilling } from './sent-prefill';
 import { BlindImageNote, UserImage } from './UserImage';
@@ -274,34 +275,86 @@ export function ChatThread() {
     return useDropStore.getState().claimDrops((files) => void addEditFiles(files));
   }, [editingId]);
 
+  /*
+   * THE CHARTS STILL BEING MADE, in the slot their cards will take. A chart
+   * call whose tool has not answered yet draws as a PendingChartCard — the
+   * skeleton, then the chart building as its values stream — under the same
+   * message its finished card will hang from (present:show anchors to the
+   * streaming assistant message, which is this one). When the result lands
+   * the pending card goes and the real one appears in the same container.
+   */
+  type Slot =
+    | { kind: 'record'; record: PresentedRecord }
+    | { kind: 'pending'; args: PendingChartArgs };
+  const slotsFor = (
+    group: readonly AssistantMsg[],
+    records: readonly PresentedRecord[],
+  ): Slot[] => {
+    const live = group.some((g) => g.isStreaming === true);
+    const placed = new Set<PresentedRecord>();
+    const out: Slot[] = [];
+    // In the order the calls were written: a finished call's card, a pending
+    // call's building card — so a card never moves when its result lands.
+    for (const m of group) {
+      for (const b of m.blocks) {
+        if (b.type !== 'toolCall') continue;
+        const args = pendingChartArgs(b);
+        if (args === null) continue;
+        const result = resultByCallId.get(`${m.id}:${b.id}`) ?? resultByCallId.get(b.id);
+        if (result === undefined) {
+          if (live) out.push({ kind: 'pending', args: { ...args, id: b.id } });
+          continue;
+        }
+        const record = records.find((r) => !placed.has(r) && result.text.includes(r.path));
+        if (record !== undefined) {
+          placed.add(record);
+          out.push({ kind: 'record', record });
+        }
+      }
+    }
+    for (const record of records) {
+      if (!placed.has(record)) out.push({ kind: 'record', record });
+    }
+    return out;
+  };
+
   /* One card, wherever it is drawn — anchored to its turn or at the foot. */
-  const renderPresented = (records: readonly PresentedRecord[]): ReactNode => (
+  const renderPresented = (
+    records: readonly PresentedRecord[],
+    slots?: readonly Slot[],
+  ): ReactNode => (
     <div className="flex flex-col gap-2 px-1 pt-2" data-testid="presented">
-      {records.map((item) =>
-        /* A chart, or a small SVG, IS shown here — the card is the thing, not
-         * a row pointing at the canvas (PresentedInline). */
-        isInlinePresented(item) ? (
-          <PresentedInline key={item.path} item={item} />
+      {(slots ?? records.map((record): Slot => ({ kind: 'record', record }))).map((slot) =>
+        slot.kind === 'pending' ? (
+          <PendingChartCard key={`pending-${slot.args.id ?? ''}`} args={slot.args} />
         ) : (
-          <PresentCard
-            key={item.path}
-            item={item}
-            /* Body AND the blue Open → the canvas (the user: "by default it opens
-             * in the canvas or it should"). The dropdown is "Open with": every
-             * application, the OS default among them. */
-            onActivate={() => void openPresented(canvasController, item)}
-            onOpen={() => void openPresented(canvasController, item)}
-            onOpenWith={(_it, appId) => {
-              void window.piDesktop.invoke('canvas:open-with', { path: item.path, appId });
-            }}
-            onReveal={() => {
-              void window.piDesktop.invoke('canvas:reveal', { path: item.path });
-            }}
-          />
+          renderRecord(slot.record)
         ),
       )}
     </div>
   );
+  /* A chart, or a small SVG, IS shown here — the card is the thing, not a
+   * row pointing at the canvas (PresentedInline). */
+  const renderRecord = (item: PresentedRecord): ReactNode =>
+    isInlinePresented(item) ? (
+      <PresentedInline key={item.path} item={item} />
+    ) : (
+      <PresentCard
+        key={item.path}
+        item={item}
+        /* Body AND the blue Open → the canvas (the user: "by default it opens
+         * in the canvas or it should"). The dropdown is "Open with": every
+         * application, the OS default among them. */
+        onActivate={() => void openPresented(canvasController, item)}
+        onOpen={() => void openPresented(canvasController, item)}
+        onOpenWith={(_it, appId) => {
+          void window.piDesktop.invoke('canvas:open-with', { path: item.path, appId });
+        }}
+        onReveal={() => {
+          void window.piDesktop.invoke('canvas:reveal', { path: item.path });
+        }}
+      />
+    );
 
   const copyText = (text: string) => {
     void writeClipboardText(text);
@@ -579,6 +632,7 @@ export function ChatThread() {
              * thread still falls to the foot, which is where it used to live.
              */
             const cards = presentedByAnchor.get(threadItemId(item));
+            const slots = item.kind === 'assistant' ? slotsFor(item.group, cards ?? []) : undefined;
             const node = ((): ReactNode => {
               if (item.kind === 'notice') {
                 /* The harness saying something the user needs — a model too small
@@ -827,11 +881,11 @@ export function ChatThread() {
                 </ActivityRow>
               );
             })();
-            if (cards === undefined) return node;
+            if (cards === undefined && (slots === undefined || slots.length === 0)) return node;
             return (
               <Fragment key={`anchored-${threadItemId(item)}`}>
                 {node}
-                {renderPresented(cards)}
+                {renderPresented(cards ?? [], slots)}
               </Fragment>
             );
           })}

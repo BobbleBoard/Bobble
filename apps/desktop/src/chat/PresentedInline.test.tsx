@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 /**
  * The inline chart card and its canvas twin are ONE thing: the card's corner
- * control lifts it into a chart tab and leaves a stub; the stub's "Show here"
- * (and the tab's own Show-in-chat) closes the tab and the card is back.
+ * control lifts it into a chart tab and leaves nothing behind; the tab's own
+ * Show-in-chat closes the tab and the card is back.
  */
 import { CanvasProvider, createCanvasController } from '@pi-desktop/canvas';
 import type { ReactNode } from 'react';
@@ -104,18 +104,26 @@ describe('PresentedInline', () => {
     const card = container.querySelector('.pd-inline-chart') as HTMLElement;
     expect(card.style.getPropertyValue('view-transition-name')).toMatch(/^pd-inline-/);
 
-    // Corner → the canvas: a chart tab keyed as the card, the panel opened, the card a stub.
+    // No file name under the card (the user: "don't show a little thing below it
+    // that say the filename").
+    expect(container.querySelector('.pd-inline-file')).toBeNull();
+    expect(container.textContent).not.toContain('units.svg');
+
+    // Corner → the canvas: a chart tab keyed as the card, the panel opened, and
+    // NOTHING left in the thread — no stub row (the user: "don't show the thin
+    // cards that say 'showing charts in canvas' at all").
     await click(container.querySelector('[data-testid="inline-chart-move"]'));
     const tab = controller.getState().tabs.find((t) => t.key === presentTabKey('/ws/units.svg'));
     expect(tab).toMatchObject({ kind: 'chart', inline: true, filePath: '/ws/units.svg' });
     expect(useCanvasStore.getState().canvasOpen).toBe(true);
-    const stub = container.querySelector('[data-testid="inline-stub"]');
-    expect(stub?.textContent).toContain('Units Sold by Year');
-    expect(stub?.textContent).toContain('in the canvas');
+    expect(container.querySelector('[data-testid="inline-stub"]')).toBeNull();
     expect(container.querySelector('.pd-chart-bar')).toBeNull();
+    expect(container.textContent).toBe('');
 
-    // Show here → the tab closes and the card is back where it was.
-    await click(container.querySelector('[data-testid="inline-stub-show"]'));
+    // The tab's Show-in-chat (closing the tab) → the card is back where it was.
+    await act(async () => {
+      controller.closeTab(tab?.id ?? '');
+    });
     expect(controller.getState().tabs).toHaveLength(0);
     expect(container.querySelectorAll('.pd-chart-bar').length).toBe(4);
   });
@@ -136,6 +144,7 @@ describe('PresentedInline', () => {
     expect(container.querySelector('[data-testid="inline-widget"]')).not.toBeNull();
     await click(container.querySelector('.pd-inline-widget-move'));
     expect(controller.getState().tabs[0]).toMatchObject({ kind: 'svg', inline: true });
-    expect(container.querySelector('[data-testid="inline-stub"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="inline-stub"]')).toBeNull();
+    expect(container.textContent).toBe('');
   });
 });

@@ -402,7 +402,7 @@ function resolveOut(root: string, out: string | undefined, slug: string): string
 }
 
 const TYPES_LINE =
-  'bar (values by category), stacked (parts of each category), hbar (ranked names, long labels), line (a trend), area, scatter (x/y points), donut (shares of a whole)';
+  'bar (values by category), stacked (parts of each category), hbar (ranked names, long labels), line (a trend), area, scatter (x/y points), donut (shares of a whole), pie (the same, no hole), radar (several measures on spokes — a profile, ratings)';
 
 const LOOKS_LINE = LOOKS.map((l) => `${l.name} — ${l.about}`).join('; ');
 
@@ -573,7 +573,7 @@ export function registerChartTool(pi: ExtensionAPI, deps: ChartToolDeps): void {
     name: CHART_TOOL,
     label: 'Chart',
     description:
-      'Draw a data visual — bar, stacked, horizontal bar, line, area, scatter or donut — from the ' +
+      'Draw a data visual — bar, stacked, horizontal bar, line, area, scatter, donut, pie or radar — from the ' +
       'numbers, straight into the chat as an interactive card (hover reads the values, a chart/table ' +
       'toggle, Open in canvas). Every request to chart, plot, graph or visualise data goes here: ' +
       'sales by year, shares of a total, a trend, a comparison of two series. It draws in under a ' +
@@ -588,7 +588,7 @@ export function registerChartTool(pi: ExtensionAPI, deps: ChartToolDeps): void {
       'chart: an interactive chart of data in the chat (bar, line, donut, …), with a look',
     promptGuidelines: [
       'A chart, plot or graph of numbers is the chart tool with the labels and values — it appears in the chat instantly; never image generation, matplotlib or hand-written SVG.',
-      "Give each chart a look that fits its subject (finance → clean/editorial/mono, consumer → bold/candy/sunset, engineering → terminal/slate, nature → forest/ocean) and vary between charts; a user's colour, thickness or series change is chart_edit on the file.",
+      "Give each chart a look that fits its subject (finance → clean/editorial/mono, consumer → bold/candy/sunset, engineering → slate/mono, nature → forest/ocean) and vary between charts; a user's colour, thickness or series change is chart_edit on the file.",
       'After a chart, say ONE line of what it shows (the peak, the trend, the share) — the user is looking at the values, so do not list them again.',
     ],
     parameters: Type.Object({

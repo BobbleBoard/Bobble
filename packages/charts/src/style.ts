@@ -17,10 +17,13 @@
  * Looks come in two families. THEME-FOLLOWING looks (clean, soft, bold, …)
  * bring a palette and a shape and take ink, grid and ground from wherever they
  * are drawn — a light chat, a dark chat, white paper. FIXED-GROUND looks
- * (slate, terminal, paper) bring their own ground and ink and wear them
- * anywhere: a slate chart in a light chat is a dark card, on purpose.
+ * (slate, paper) bring their own ground and ink and wear them anywhere: a
+ * slate chart in a light chat is a dark card, on purpose.
  *
- * No purple anywhere in the presets — the user's design brief for the app.
+ * No purple anywhere in the presets — the user's design brief for the app. And no
+ * phosphor-green "terminal" look: there was one, and the first thing a model
+ * picked it for was a market-share donut — the user (2026-09-17): "remove the green
+ * styling preset at all, it shouldn't be there."
  */
 
 export type LookName =
@@ -34,7 +37,6 @@ export type LookName =
   | 'sunset'
   | 'candy'
   | 'slate'
-  | 'terminal'
   | 'paper';
 
 export type GridMode = 'lines' | 'dots' | 'none';
@@ -294,25 +296,6 @@ export const LOOKS: readonly Look[] = [
     strokeWidth: 2.5,
     ring: 0.38,
     ground: { paper: '#1C1F26', ink: '#E6E8EE', mute: '#9AA3B2', grid: '#2C313C' },
-  }),
-  look({
-    name: 'terminal',
-    about:
-      'black ground, phosphor green and amber, monospace, square bars — for anything engineering',
-    palette: ['#39FF14', '#FFB000', '#00E5FF', '#FF5C5C', '#C8FF6E', '#8AA5FF'],
-    accent: '#FFB000',
-    radius: 0,
-    barWidth: 0.7,
-    grid: 'dots',
-    line: 'step',
-    markers: 'none',
-    area: 'flat',
-    font: 'mono',
-    labels: 'on',
-    titleWeight: 700,
-    strokeWidth: 2,
-    ring: 0.5,
-    ground: { paper: '#0B0F0A', ink: '#B7F5A1', mute: '#6E9B62', grid: '#1E2A1B' },
   }),
   look({
     name: 'paper',

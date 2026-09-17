@@ -277,15 +277,14 @@ describe('chart — the tool', () => {
       title: 'Styled',
       labels: 'a, b',
       values: '1, 2',
-      look: 'terminal',
+      look: 'slate',
       radius: 'pill',
       out: 'styled.svg',
     });
     expect(r.isError).toBeFalsy();
     const svg = readFileSync(path.join(root, 'styled.svg'), 'utf8');
-    expect(svg).toContain('fill="#0B0F0A"');
-    expect(svg).toContain('Menlo');
-    expect(r.content[0]?.text).toContain('Look: look terminal, radius pill');
+    expect(svg).toContain('fill="#1C1F26"');
+    expect(r.content[0]?.text).toContain('Look: look slate, radius pill');
   });
 
   it('styles from an image through the app\u2019s decoder: the picture\u2019s colours become the palette', async () => {

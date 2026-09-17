@@ -283,6 +283,70 @@ function drawBody(
     }
   }
 
+  if (L.radar !== undefined) {
+    const R = L.radar;
+    const ringPts = (k: number): { x: number; y: number }[] =>
+      R.axes.map((ax) => ({
+        x: ox + R.cx + R.r * k * Math.cos(ax.angle),
+        y: oy + R.cy + R.r * k * Math.sin(ax.angle),
+      }));
+    for (const k of [0.25, 0.5, 0.75, 1]) {
+      const pts = ringPts(k);
+      if (pts.length < 2) continue;
+      out.push({
+        tag: 'polyline',
+        ...bbox([...pts, pts[0] as { x: number; y: number }]),
+        points: pointsAttr([...pts, pts[0] as { x: number; y: number }]),
+        stroke: cssRgb(ground.grid),
+        strokeWidth: 1,
+      });
+    }
+    for (const ax of R.axes) {
+      const pts = [
+        { x: ox + R.cx, y: oy + R.cy },
+        { x: ox + ax.x, y: oy + ax.y },
+      ];
+      out.push({
+        tag: 'polyline',
+        ...bbox(pts),
+        points: pointsAttr(pts),
+        stroke: cssRgb(ground.grid),
+        strokeWidth: 1,
+      });
+      push(label(ox + ax.labelX, oy + ax.labelY, ax.label, 12, mute, font, { anchor: ax.anchor }));
+    }
+    for (const sh of R.shapes) {
+      const c = colour(sh.series, false);
+      const pts = sh.points.map((p) => ({ x: ox + p.x, y: oy + p.y }));
+      if (pts.length > 2) {
+        out.push({
+          tag: 'polygon',
+          ...bbox(pts),
+          points: pointsAttr(pts),
+          fillC: over(c, ground.paper, 0.18),
+          stroke: cssRgb(c),
+          strokeWidth: style.strokeWidth,
+        });
+      }
+      for (const p of sh.points) {
+        const rr = 3.5;
+        out.push({
+          tag: 'circle',
+          x: ox + p.x - rr,
+          y: oy + p.y - rr,
+          w: 2 * rr,
+          h: 2 * rr,
+          cx: ox + p.x,
+          cy: oy + p.y,
+          rr,
+          bg: cssRgb(p.highlighted ? style.accent : c),
+          radius: rr,
+        });
+      }
+    }
+    return;
+  }
+
   if (L.donut !== undefined) {
     const shades =
       spec.highlight !== undefined
@@ -313,13 +377,17 @@ function drawBody(
         strokeWidth: 1.5,
       });
     }
-    push(
-      label(ox + cx, oy + cy + 8, L.donut.centre.big, 22, ink, font, {
-        weight: style.titleWeight,
-        anchor: 'middle',
-      }),
-    );
-    push(label(ox + cx, oy + cy + 26, L.donut.centre.small, 11, mute, font, { anchor: 'middle' }));
+    if (L.donut.centre.big !== '') {
+      push(
+        label(ox + cx, oy + cy + 8, L.donut.centre.big, 22, ink, font, {
+          weight: style.titleWeight,
+          anchor: 'middle',
+        }),
+      );
+      push(
+        label(ox + cx, oy + cy + 26, L.donut.centre.small, 11, mute, font, { anchor: 'middle' }),
+      );
+    }
     for (const c of L.categories) {
       const s = L.slices[c.index];
       if (s === undefined) continue;

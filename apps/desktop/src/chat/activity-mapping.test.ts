@@ -281,6 +281,76 @@ describe('mapToolStep — the generate family keeps its own kind', () => {
   });
 });
 
+describe('mapToolStep — a chart row names the kind of chart, and a written call waits its turn', () => {
+  /*
+   * the user (2026-09-17), on four rows reading "Chart" beside spinners: "show
+   * something more informative, eg. '<Datavisualization connector icon>
+   * Rendering <type> Chart'" — and "why is there a seemingly bunch of command
+   * executing all at once sequentially".
+   */
+  it('reads the type and title out of the arguments', () => {
+    const running = mapToolStep(
+      call('c1', 'chart', { type: 'bar', title: 'Units Sold by Year', labels: 'a', values: '1' }),
+      undefined,
+      true,
+    ).data;
+    expect(running.kind).toBe('chart');
+    expect(running.label).toBe('Rendering a bar chart');
+    expect(running.detail).toBe('Units Sold by Year');
+    expect(running.status).toBe('running');
+    const done = mapToolStep(
+      call('c1', 'chart', { type: 'donut', title: 'Share' }),
+      result('c1', 'Drew a donut chart "Share": /w/share.svg'),
+      false,
+    ).data;
+    expect(done.label).toBe('Rendered a donut chart');
+    expect(done.status).toBe('done');
+  });
+
+  it('reads the type while the arguments are still streaming', () => {
+    const step = mapToolStep(
+      { type: 'toolCall', id: 'c1', name: 'chart', arguments: {}, argsText: '{"type": "line", "title": "Sign' },
+      undefined,
+      true,
+    ).data;
+    expect(step.label).toBe('Rendering a line chart');
+    expect(step.detail).toBe('Sign');
+  });
+
+  it('the CLI form (`chart bar "Title" …` through bash) is the same row', () => {
+    const step = mapToolStep(
+      call('c1', 'bash', { command: 'chart bar "Units Sold by Year" --labels "a, b" --values "1, 2"' }),
+      undefined,
+      true,
+    ).data;
+    expect(step.kind).toBe('chart');
+    expect(step.label).toBe('Rendering a bar chart');
+    expect(step.detail).toBe('Units Sold by Year');
+    const edit = mapToolStep(
+      call('c2', 'bash', { command: 'chart edit units.svg --look sunset' }),
+      result('c2', 'Redrew it'),
+      false,
+    ).data;
+    expect(edit.kind).toBe('chart');
+    expect(edit.label).toBe('Redrew the chart');
+  });
+
+  it('a call written in full but not started is QUEUED, still, present tense', () => {
+    const step = mapToolStep(call('c3', 'chart', { type: 'bar', title: 'T' }), undefined, true, true)
+      .data;
+    expect(step.status).toBe('queued');
+    expect(step.label).toBe('Rendering a bar chart');
+  });
+
+  it('the collapsed summary counts charts as charts', () => {
+    const steps = [
+      mapToolStep(call('c1', 'chart', { type: 'bar' }), result('c1', 'ok'), false).data,
+      mapToolStep(call('c2', 'chart', { type: 'line' }), result('c2', 'ok'), false).data,
+    ];
+    expect(summarizeActivity(steps)).toBe('Drew 2 charts');
+  });
+});
+
 describe('mapToolStep (R14 new kinds)', () => {
   it('reminders_create renders "Set a reminder" with the connector brand SVG + reveal', () => {
     const step = mapToolStep(

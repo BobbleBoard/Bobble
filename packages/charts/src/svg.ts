@@ -138,6 +138,32 @@ export function drawBody(
     }
   }
 
+  if (L.radar !== undefined) {
+    const R = L.radar;
+    // The web: rings, then spokes, then the labels round the rim.
+    for (const ring of R.rings) {
+      out.push(`<path d="${ring}" fill="none" stroke="${ground.grid}" stroke-width="1"/>`);
+    }
+    for (const ax of R.axes) {
+      out.push(
+        `<line x1="${f(R.cx)}" y1="${f(R.cy)}" x2="${f(ax.x)}" y2="${f(ax.y)}" stroke="${ground.grid}" stroke-width="1"/>`,
+      );
+      out.push(text(ax.labelX, ax.labelY, ax.label, 12, ground.mute, font, { anchor: ax.anchor }));
+    }
+    for (const sh of R.shapes) {
+      const c = colour(sh.series, false);
+      out.push(
+        `<path d="${sh.d}" fill="${c}" fill-opacity="0.18" stroke="${c}" stroke-width="${style.strokeWidth}" stroke-linejoin="round"/>`,
+      );
+      for (const p of sh.points) {
+        out.push(
+          `<circle cx="${f(p.x)}" cy="${f(p.y)}" r="3.5" fill="${p.highlighted ? style.accent : c}" stroke="${ground.paper}" stroke-width="1.5"/>`,
+        );
+      }
+    }
+    return { defs, body: out };
+  }
+
   if (L.donut !== undefined) {
     // With a highlight, the accent is the highlight's alone — the other slices
     // stay in the rest of the palette (a second accent slice read as two).
@@ -152,17 +178,20 @@ export function drawBody(
         `<path d="${s.d}" fill="${sliceFill(s)}" stroke="${ground.paper}" stroke-width="2"/>`,
       );
     }
-    out.push(
-      text(L.donut.cx, L.donut.cy + 8, L.donut.centre.big, 22, ground.ink, font, {
-        weight: style.titleWeight,
-        anchor: 'middle',
-      }),
-    );
-    out.push(
-      text(L.donut.cx, L.donut.cy + 26, L.donut.centre.small, 11, ground.mute, font, {
-        anchor: 'middle',
-      }),
-    );
+    // A pie has nothing to say in the middle (centre.big is '').
+    if (L.donut.centre.big !== '') {
+      out.push(
+        text(L.donut.cx, L.donut.cy + 8, L.donut.centre.big, 22, ground.ink, font, {
+          weight: style.titleWeight,
+          anchor: 'middle',
+        }),
+      );
+      out.push(
+        text(L.donut.cx, L.donut.cy + 26, L.donut.centre.small, 11, ground.mute, font, {
+          anchor: 'middle',
+        }),
+      );
+    }
     for (const c of L.categories) {
       const s = L.slices[c.index];
       if (s === undefined) continue;

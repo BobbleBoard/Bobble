@@ -70,6 +70,23 @@ function resolveAbsPath(path: string, cwd: string | undefined): string {
  * it drives BOTH the per-step running state AND the chain's `active` (expanded +
  * live) state, so the chain collapses to its summary the instant the run ends.
  */
+/**
+ * A call the model has finished writing: its arguments are parsed (the engine
+ * finalises them at toolcall_end), or its raw text closes as JSON. A call
+ * still being typed is neither — it is generating, which is a kind of running.
+ */
+function callIsWritten(block: { arguments?: Record<string, unknown>; argsText?: string }): boolean {
+  if (block.arguments !== undefined && Object.keys(block.arguments).length > 0) return true;
+  const raw = (block.argsText ?? '').trim();
+  if (raw === '') return false;
+  try {
+    JSON.parse(raw);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function ThreadActivityChain({
   blocks: allBlocks,
   resultForBlock,
@@ -255,6 +272,17 @@ export function ThreadActivityChain({
                   } satisfies ToolResultMsg)
                 : undefined),
             running,
+            /*
+             * QUEUED: written in full, not started, nothing back. The model puts
+             * several calls in one message; the harness runs them one at a time
+             * and names the one it is on (runningToolCalls). The others are not
+             * "executing all at once" (the user) — they are waiting their turn, and
+             * the row says so instead of spinning.
+             */
+            running &&
+              !runningToolCalls.includes(block.id) &&
+              resultForBlock.get(block.id) === undefined &&
+              callIsWritten(block),
           );
     // Give each step an identity that outlives its LABEL. ActivityChain keys its
     // rows on `id`, falling back to `kind:label` — and the label flips tense the

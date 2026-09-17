@@ -344,11 +344,11 @@ try {
     }),
   );
   note(
-    'Open in canvas lifts the card into a chart tab and leaves a stub',
+    'Open in canvas lifts the card into a chart tab and leaves nothing behind',
     s.tabs.length === 1 &&
       s.tabs[0].kind === 'chart' &&
       s.tabs[0].inline &&
-      s.stubs === 1 &&
+      s.stubs === 0 &&
       s.charts === 0 &&
       s.railOpen === 'true' &&
       s.canvasChartBars === 4,
@@ -586,7 +586,7 @@ try {
   await sleep(1500);
   await cardShot('14-edit-hbar-ranked-mono');
   // A gallery: the same data in six looks, each its own card.
-  const GALLERY = ['soft', 'bold', 'editorial', 'slate', 'terminal', 'candy'];
+  const GALLERY = ['soft', 'bold', 'editorial', 'slate', 'paper', 'candy'];
   for (const look of GALLERY) {
     const g = await run(
       `chart bar "Quarterly revenue (${look})" --labels "Q1, Q2, Q3, Q4" --values "Product: 4.2, 5.1, 6.4, 7.0; Services: 2.1, 2.6, 2.4, 3.3" --unit "$" --subtitle millions --look ${look} --out gallery-${look}.svg`,

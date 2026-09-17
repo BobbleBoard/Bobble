@@ -37,6 +37,7 @@ import {
 import {
   type CSSProperties,
   useCallback,
+  useEffect,
   useId,
   useLayoutEffect,
   useMemo,
@@ -123,6 +124,20 @@ export function ChartView({ spec, fill = false, corner, className }: ChartViewPr
   const gradientId = useId();
   const theme = useAppTheme();
   const style = useMemo(() => resolveStyle(spec.style, 'clean', { theme }), [spec.style, theme]);
+  /*
+   * THE CHART BUILDS ITSELF ON ARRIVAL. the user (2026-09-17): "bar ones have
+   * bars go up, pie expand smoothly, radar charts show dots going out from
+   * the center … all smooth live building." The first paint carries
+   * `data-enter`, which the stylesheet reads to run the per-shape entrance
+   * (bars scale up from the axis, slices grow from the centre, lines draw,
+   * markers pop); it is dropped once the animation has had its second, so a
+   * hover or a redraw never replays it. Reduced motion skips it (CSS).
+   */
+  const [entering, setEntering] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setEntering(false), 1100);
+    return () => clearTimeout(t);
+  }, []);
 
   useLayoutEffect(() => {
     const host = hostRef.current;
@@ -160,7 +175,24 @@ export function ChartView({ spec, fill = false, corner, className }: ChartViewPr
   const hoveredCategory = hover.category !== null ? layout?.categories[hover.category] : undefined;
   const tooltip = useMemo(() => {
     if (layout === null) return null;
-    if (spec.type === 'donut') {
+    if (spec.type === 'radar') {
+      if (hover.series === null || hover.point === null || layout.radar === undefined) return null;
+      const m = layout.radar.shapes[hover.series]?.points[hover.point];
+      if (m === undefined) return null;
+      return {
+        x: m.x + 10,
+        y: m.y - 10,
+        title: m.label,
+        rows: [
+          {
+            colour: colour(m.series, m.highlighted),
+            value: formatValue(m.value, spec.unit),
+            name: spec.series[m.series]?.name ?? '',
+          },
+        ],
+      };
+    }
+    if (spec.type === 'donut' || spec.type === 'pie') {
       if (hover.point === null) return null;
       const s = layout.slices[hover.point];
       if (s === undefined) return null;
@@ -240,6 +272,7 @@ export function ChartView({ spec, fill = false, corner, className }: ChartViewPr
       data-chart-view={view}
       data-chart-look={style.look}
       data-chart-ground={style.ground !== null || undefined}
+      data-enter={entering || undefined}
     >
       <div className="pd-chart-head">
         <div className="pd-chart-titles">
@@ -380,6 +413,80 @@ function ChartShapes({
     }
   }
 
+  if (L.radar !== undefined) {
+    const R = L.radar;
+    // The web: rings, spokes, labels round the rim.
+    shapes.push(
+      <g key="radar-web" className="pd-chart-radar-web">
+        {R.rings.map((d) => (
+          <path key={d} d={d} className="pd-chart-grid" fill="none" />
+        ))}
+        {R.axes.map((ax) => (
+          <line
+            key={`spoke-${ax.index}`}
+            x1={R.cx}
+            y1={R.cy}
+            x2={ax.x}
+            y2={ax.y}
+            className="pd-chart-grid"
+          />
+        ))}
+        {R.axes.map((ax) => (
+          <text
+            key={`spoke-label-${ax.index}`}
+            x={ax.labelX}
+            y={ax.labelY}
+            textAnchor={ax.anchor}
+            className="pd-chart-text pd-chart-text--mute"
+          >
+            {ax.label}
+          </text>
+        ))}
+      </g>,
+    );
+    // The series, each a polygon with a dot at every vertex — the group
+    // scales out from the centre on arrival (the stylesheet's radar entrance).
+    for (const sh of R.shapes) {
+      const c = colour(sh.series, false);
+      const dimmed = hover.series !== null && hover.series !== sh.series;
+      shapes.push(
+        <g
+          key={`radar-${sh.series}`}
+          className="pd-chart-radar-series"
+          style={{ transformOrigin: `${R.cx}px ${R.cy}px` }}
+          opacity={dimmed ? 0.35 : 1}
+        >
+          <path
+            d={sh.d}
+            fill={c}
+            fillOpacity={0.18}
+            stroke={c}
+            strokeWidth={style.strokeWidth}
+            strokeLinejoin="round"
+          />
+          {sh.points.map((p) => {
+            const on = hover.series === sh.series && hover.point === p.point;
+            return (
+              // biome-ignore lint/a11y/noStaticElementInteractions: hover read-out only — the table view carries the values
+              <circle
+                key={`radar-pt-${sh.series}-${p.point}`}
+                cx={p.x}
+                cy={p.y}
+                r={on || p.highlighted ? 5.5 : 3.5}
+                className="pd-chart-marker pd-chart-radar-dot"
+                style={{ fill: p.highlighted ? style.accent : c }}
+                stroke={p.highlighted ? style.accent : c}
+                strokeWidth={0}
+                onMouseEnter={() => setHover({ category: null, series: sh.series, point: p.point })}
+              />
+            );
+          })}
+        </g>,
+      );
+    }
+    return <>{shapes}</>;
+  }
+
   if (L.donut !== undefined) {
     const shades =
       spec.highlight !== undefined
@@ -397,30 +504,35 @@ function ChartShapes({
           fill={sliceFill(s)}
           opacity={dim ? 0.45 : 1}
           className="pd-chart-slice"
+          style={{
+            transformOrigin: `${L.donut.cx}px ${L.donut.cy}px`,
+            animationDelay: `${s.point * 45}ms`,
+          }}
           onMouseEnter={() => setHover({ category: null, series: 0, point: s.point })}
         />,
       );
     }
-    shapes.push(
-      <g key="donut-centre">
-        <text
-          x={L.donut.cx}
-          y={L.donut.cy + 7}
-          textAnchor="middle"
-          className="pd-chart-text pd-chart-text--big"
-        >
-          {L.donut.centre.big}
-        </text>
-        <text
-          x={L.donut.cx}
-          y={L.donut.cy + 24}
-          textAnchor="middle"
-          className="pd-chart-text pd-chart-text--mute"
-        >
-          {L.donut.centre.small}
-        </text>
-      </g>,
-    );
+    if (L.donut.centre.big !== '')
+      shapes.push(
+        <g key="donut-centre">
+          <text
+            x={L.donut.cx}
+            y={L.donut.cy + 7}
+            textAnchor="middle"
+            className="pd-chart-text pd-chart-text--big"
+          >
+            {L.donut.centre.big}
+          </text>
+          <text
+            x={L.donut.cx}
+            y={L.donut.cy + 24}
+            textAnchor="middle"
+            className="pd-chart-text pd-chart-text--mute"
+          >
+            {L.donut.centre.small}
+          </text>
+        </g>,
+      );
     for (const c of L.categories) {
       const s = L.slices[c.index];
       if (s === undefined) continue;
@@ -596,6 +708,20 @@ function ChartShapes({
         fill={colour(b.series, b.highlighted)}
         opacity={dim ? 0.55 : 1}
         className="pd-chart-bar"
+        data-side={b.side}
+        // The entrance grows the bar from its axis: the origin is the side
+        // that touches it, and each bar starts a beat after the last.
+        style={{
+          transformOrigin:
+            b.side === 'top'
+              ? `${b.x + b.w / 2}px ${b.y + b.h}px`
+              : b.side === 'bottom'
+                ? `${b.x + b.w / 2}px ${b.y}px`
+                : b.side === 'right'
+                  ? `${b.x}px ${b.y + b.h / 2}px`
+                  : `${b.x + b.w}px ${b.y + b.h / 2}px`,
+          animationDelay: `${Math.min(b.point, 24) * 35}ms`,
+        }}
         onMouseEnter={() => setHover({ category: b.point, series: b.series, point: b.point })}
       />,
     );
@@ -635,9 +761,24 @@ function ChartShapes({
             <stop offset="1" stopColor={c} stopOpacity={0.02} />
           </linearGradient>,
         );
-        shapes.push(<path key={`area-${l.series}`} d={l.area} fill={`url(#${id})`} />);
+        shapes.push(
+          <path
+            key={`area-${l.series}`}
+            d={l.area}
+            fill={`url(#${id})`}
+            className="pd-chart-area"
+          />,
+        );
       } else {
-        shapes.push(<path key={`area-${l.series}`} d={l.area} fill={c} fillOpacity={0.14} />);
+        shapes.push(
+          <path
+            key={`area-${l.series}`}
+            d={l.area}
+            fill={c}
+            fillOpacity={0.14}
+            className="pd-chart-area"
+          />,
+        );
       }
     }
     if (l.markers.length > 1) {
@@ -650,6 +791,9 @@ function ChartShapes({
           strokeWidth={style.strokeWidth}
           strokeLinejoin="round"
           strokeLinecap="round"
+          className="pd-chart-line"
+          // pathLength=1 makes the drawing entrance one rule for every length.
+          pathLength={1}
         />,
       );
     }
@@ -668,7 +812,11 @@ function ChartShapes({
             className="pd-chart-marker"
             // The stylesheet fills a marker with the paper (a ring); a dot's
             // fill is inline so it wins over that rule.
-            style={ring ? undefined : { fill: m.highlighted ? style.accent : c }}
+            style={{
+              ...(ring ? {} : { fill: m.highlighted ? style.accent : c }),
+              transformOrigin: `${m.x}px ${m.y}px`,
+              animationDelay: `${Math.min(m.point, 30) * 30}ms`,
+            }}
             stroke={m.highlighted ? style.accent : c}
             strokeWidth={ring ? 2.5 : 0}
             onMouseEnter={() => setHover({ category: m.point, series: l.series, point: m.point })}
@@ -702,6 +850,10 @@ function ChartShapes({
         fill={colour(m.series, m.highlighted)}
         fillOpacity={on ? 1 : 0.85}
         className="pd-chart-dot"
+        style={{
+          transformOrigin: `${m.x}px ${m.y}px`,
+          animationDelay: `${Math.min(m.point, 40) * 18}ms`,
+        }}
         onMouseEnter={() => setHover({ category: null, series: m.series, point: m.point })}
       />,
     );

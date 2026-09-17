@@ -2,6 +2,7 @@ import { clsx } from 'clsx';
 import type { HTMLAttributes, ReactNode } from 'react';
 import { forwardRef } from 'react';
 import {
+  IconChart,
   IconClock,
   IconCode,
   IconCompass,
@@ -79,6 +80,11 @@ export type ToolIconKind =
   | 'skill'
   | 'image'
   | 'pdf'
+  // A chart drawn by the `chart` tool (or `chart_edit`): the data-visuals
+  // mark, and a label that names the kind of chart — the user (2026-09-17):
+  // "'<Datavisualization connector icon> Rendering <type> Chart'", not four
+  // rows that all said "Chart" beside a spinner.
+  | 'chart'
   | 'canvas-open'
   // Browser-action steps (round-10 #17): each carries its own glyph.
   | 'browser-navigate'
@@ -184,6 +190,8 @@ export function toolIcon(
       return <ConnectorGlyph iconSvg={iconSvg} size={size} />;
     case 'tool':
       return <IconPuzzle size={size} />;
+    case 'chart':
+      return <IconChart size={size} />;
     case 'skill':
       // The sparkle is the app's established "skills" mark (the add-menu Skills
       // entry uses it), so a skill read reads as a skill everywhere.

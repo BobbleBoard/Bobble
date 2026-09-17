@@ -1601,4 +1601,7 @@ if (typeof window !== 'undefined' && new URLSearchParams(window.location.search)
   // The chat's working folder, once the first send has made one — a probe
   // reads it to find what a task wrote.
   window.__pi_workspace = () => resolvedWorkspace();
+  // Open a chat by its session file — the sidebar click, for probes that
+  // check what a chat looks like when you come back to it.
+  window.__pi_switch_session = (sessionPath: string) => switchSession(sessionPath);
 }

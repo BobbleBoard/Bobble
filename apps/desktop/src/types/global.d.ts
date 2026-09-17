@@ -20,6 +20,7 @@ declare global {
     __pi_restart?: (opts?: { cwd?: string; sessionPath?: string }) => Promise<unknown>;
     /** The chat's working folder once the first send has made one (E2E). */
     __pi_workspace?: () => string | null;
+    __pi_switch_session?: (sessionPath: string) => Promise<unknown>;
     /** Probe-only: stop the running turn (see pi-connect abortPi). */
     __pi_abort?: () => void;
     /** E2E hook: accessor for the canvas controller (open browser/terminal

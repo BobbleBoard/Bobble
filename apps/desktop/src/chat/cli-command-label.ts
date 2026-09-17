@@ -23,6 +23,12 @@ export interface CliCommandLabel {
   /** The app this acted on, when there is one — the row shows its real icon. */
   readonly app?: string;
   /**
+   * The row is a CHART, not a command: `chart bar "Units" …` is the chart tool
+   * in its CLI clothes, and the row shows the data-visuals mark with the kind
+   * of chart named, the same as the native call would.
+   */
+  readonly chart?: { readonly type: string; readonly title?: string };
+  /**
    * The ACTION alone, with the app's name taken out of it.
    *
    * the user wants the row read as "<connectors icon> Used <app icon> <app name>
@@ -158,5 +164,77 @@ export function cliCommandLabel(command: string | undefined): CliCommandLabel | 
     return { running: pair[0], done: pair[1] };
   }
 
+  /*
+   * `chart bar "Units Sold" --labels … --values …` and `chart edit units.svg
+   * --look sunset`. the user (2026-09-17): four rows reading "Chart" beside a
+   * spinner; "show something more informative, eg. '<Datavisualization
+   * connector icon> Rendering <type> Chart'". The type is the first bare word
+   * (or `--type x`); the title the first quoted argument after it.
+   */
+  if (group === 'chart') {
+    const bare = rest.filter((w) => !w.startsWith('-'));
+    if (bare[0] === 'edit') {
+      return {
+        running: 'Redrawing the chart',
+        done: 'Redrew the chart',
+        chart: { type: 'chart', ...(bare[1] === undefined ? {} : { title: bare[1] }) },
+      };
+    }
+    const typeFlag = rest.findIndex((w) => w === '--type');
+    const rawType =
+      (typeFlag >= 0 ? rest[typeFlag + 1] : undefined) ??
+      bare.find((w) => CHART_TYPE_WORDS.has(w.toLowerCase()));
+    const type = chartTypeWord(rawType);
+    const title = bare.find((w) => w !== rawType && /\s|[A-Z]/.test(w));
+    return {
+      running: `Rendering a ${type} chart`,
+      done: `Rendered a ${type} chart`,
+      chart: { type, ...(title === undefined ? {} : { title }) },
+    };
+  }
+
   return null;
+}
+
+const CHART_TYPE_WORDS = new Set([
+  'bar',
+  'bars',
+  'column',
+  'stacked',
+  'hbar',
+  'horizontal',
+  'line',
+  'area',
+  'scatter',
+  'donut',
+  'doughnut',
+  'pie',
+  'radar',
+]);
+
+/** The chart type as a person would say it in "a … chart". */
+export function chartTypeWord(raw: string | undefined): string {
+  const t = (raw ?? '').toLowerCase().trim();
+  switch (t) {
+    case 'bar':
+    case 'bars':
+    case 'column':
+      return 'bar';
+    case 'stacked':
+      return 'stacked bar';
+    case 'hbar':
+    case 'horizontal':
+      return 'horizontal bar';
+    case 'line':
+    case 'area':
+    case 'scatter':
+    case 'donut':
+    case 'pie':
+    case 'radar':
+      return t;
+    case 'doughnut':
+      return 'donut';
+    default:
+      return t === '' ? 'chart' : t;
+  }
 }

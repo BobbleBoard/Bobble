@@ -16,8 +16,8 @@ import {
 import { chartToSvg } from './svg.ts';
 
 describe('the looks', () => {
-  it('are twelve, each with a six-colour palette and an accent', () => {
-    expect(LOOK_NAMES.length).toBe(12);
+  it('are eleven, each with a six-colour palette and an accent', () => {
+    expect(LOOK_NAMES.length).toBe(11);
     for (const l of LOOKS) {
       expect(l.palette.length).toBe(6);
       expect(l.accent).toMatch(/^#[0-9A-F]{6}$/i);
@@ -115,7 +115,7 @@ describe('resolveStyle', () => {
   });
 
   it('a fixed-ground look brings its ground; a background of its own picks an ink for contrast', () => {
-    expect(resolveStyle({ look: 'terminal' }).ground?.paper).toBe('#0B0F0A');
+    expect(resolveStyle({ look: 'slate' }).ground?.paper).toBe('#1C1F26');
     expect(resolveStyle({ look: 'clean' }).ground).toBeNull();
     expect(resolveStyle({ background: '#102030' }).ground?.ink).toBe('#F2F2F5');
     expect(resolveStyle({ background: '#FAF3E0' }).ground?.ink).toBe('#1D1D1F');
@@ -189,11 +189,13 @@ describe('the SVG wears the look', () => {
       normalizeChartSpec({ labels: ['a', 'b'], values: [1, 2], look: 'bold' }),
     );
     expect(bars).toContain('a10 10 0 0 1');
-    const terminal = chartToSvg(
-      normalizeChartSpec({ labels: ['a'], values: [1], look: 'terminal' }),
-    );
-    expect(terminal).toContain('fill="#0B0F0A"');
-    expect(terminal).toContain('Menlo');
+    const paper = chartToSvg(normalizeChartSpec({ labels: ['a'], values: [1], look: 'paper' }));
+    expect(paper).toContain('Georgia');
+    // The green "terminal" look is gone (the user: "it shouldn't be there") — a
+    // chart that names it gets the fallback look, never a black-and-phosphor one.
+    const gone = chartToSvg(normalizeChartSpec({ labels: ['a'], values: [1], look: 'terminal' }));
+    expect(gone).not.toContain('#0B0F0A');
+    expect(gone).not.toContain('#39FF14');
   });
 
   it('a chart with no look takes the caller’s fallback, so the file matches the card', () => {

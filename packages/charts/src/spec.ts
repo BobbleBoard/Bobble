@@ -18,7 +18,16 @@
 
 import { type ChartStyle, normalizeStyle } from './style.ts';
 
-export type ChartType = 'bar' | 'stacked' | 'hbar' | 'line' | 'area' | 'scatter' | 'donut';
+export type ChartType =
+  | 'bar'
+  | 'stacked'
+  | 'hbar'
+  | 'line'
+  | 'area'
+  | 'scatter'
+  | 'donut'
+  | 'pie'
+  | 'radar';
 
 export const CHART_TYPES: readonly ChartType[] = [
   'bar',
@@ -28,6 +37,8 @@ export const CHART_TYPES: readonly ChartType[] = [
   'area',
   'scatter',
   'donut',
+  'pie',
+  'radar',
 ];
 
 export interface ChartPoint {
@@ -83,8 +94,16 @@ const TYPE_ALIASES: Readonly<Record<string, ChartType>> = {
   xy: 'scatter',
   donut: 'donut',
   doughnut: 'donut',
-  pie: 'donut',
   ring: 'donut',
+  // A pie is its own type — a donut with no hole — because the user asked for
+  // pies that "expand smoothly", and the reading in the hole has nowhere to
+  // go on one.
+  pie: 'pie',
+  // Several measures on spokes: strengths, ratings, a profile.
+  radar: 'radar',
+  spider: 'radar',
+  web: 'radar',
+  polar: 'radar',
 };
 
 function num(v: unknown): number | null {

@@ -76,9 +76,14 @@ function fakeSpawn(reply: Record<string, unknown> | null, stderrLines: string[] 
   const spawnImpl = ((cmd: string, args: string[], opts: { env: Record<string, string> }) => {
     calls.push({ cmd, args, env: opts.env });
     const listeners: Record<string, Array<(...a: unknown[]) => void>> = {};
+    const listen = (ev: string, fn: (...a: unknown[]) => void): void => {
+      const list = listeners[ev] ?? [];
+      listeners[ev] = list;
+      list.push(fn);
+    };
     const stream = () => ({
       on: (ev: string, fn: (...a: unknown[]) => void) => {
-        (listeners[ev] ??= []).push(fn);
+        listen(ev, fn);
       },
     });
     const stdout = stream();
@@ -87,7 +92,7 @@ function fakeSpawn(reply: Record<string, unknown> | null, stderrLines: string[] 
       stdout: { on: (ev: string, fn: (d: Buffer) => void) => stdout.on(`out:${ev}`, fn as never) },
       stderr: { on: (ev: string, fn: (d: Buffer) => void) => stderr.on(`err:${ev}`, fn as never) },
       on: (ev: string, fn: (...a: unknown[]) => void) => {
-        (listeners[ev] ??= []).push(fn);
+        listen(ev, fn);
       },
       kill: vi.fn(),
     };
@@ -345,11 +350,13 @@ describe('`edit brief.pdf` does what the call means', () => {
   /** A pipeline that answers `inspect` with page texts and `apply` with the insert. */
   const pdfSpawn = () => {
     const calls: Array<{ args: string[] }> = [];
-    const spawnImpl = ((cmd: string, args: string[]) => {
+    const spawnImpl = ((_cmd: string, args: string[]) => {
       calls.push({ args });
       const listeners: Record<string, Array<(...a: unknown[]) => void>> = {};
       const on = (ev: string, fn: (...a: unknown[]) => void) => {
-        (listeners[ev] ??= []).push(fn);
+        const list = listeners[ev] ?? [];
+        listeners[ev] = list;
+        list.push(fn);
       };
       const child = {
         stdout: { on: (ev: string, fn: (d: Buffer) => void) => on(`out:${ev}`, fn as never) },

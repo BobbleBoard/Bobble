@@ -134,6 +134,14 @@ interface PresentState {
   }) => PresentedRecord;
   /** Attach the apps that can open a presented artefact (async, best-effort). */
   setApps: (path: string, apps: OpenWithChoice[], defaultAppId: string | null) => void;
+  /**
+   * The chat that had no session file has one now: its cards move under it.
+   * The first turn of a new chat presents into the '' bucket; the moment pi
+   * names the session the thread reads a different key and every card of that
+   * turn vanished (SEEN, the user 2026-09-17: "I just went back to a chat I
+   * earlier made some visuals in and it didn't have them there").
+   */
+  claimUnsaved: (chat: string) => void;
   clear: () => void;
 }
 
@@ -229,8 +237,92 @@ export const usePresentStore = create<PresentState>((set, get) => ({
         ]),
       ),
     })),
+  claimUnsaved: (chat) =>
+    set((s) => {
+      const unsaved = s.byChat[UNSAVED_CHAT];
+      if (chat === UNSAVED_CHAT || unsaved === undefined || unsaved.length === 0) return {};
+      const { [UNSAVED_CHAT]: _moved, ...rest } = s.byChat;
+      return { byChat: { ...rest, [chat]: [...(rest[chat] ?? []), ...unsaved] } };
+    }),
   clear: () => set({ byChat: {} }),
 }));
+
+/* ── the cards come back with the chat ─────────────────────────────────── */
+
+/** The chart files a thread's tool results name, with the message each was made in. */
+export function chartsInTranscript(
+  messages: ReadonlyArray<{
+    kind: string;
+    id: string;
+    blocks?: ReadonlyArray<{ type: string; id?: string; name?: string; arguments?: Record<string, unknown> }>;
+    toolCallId?: string;
+    toolName?: string;
+    text?: string;
+    isError?: boolean;
+  }>,
+): Array<{ path: string; afterMessageId: string }> {
+  const out: Array<{ path: string; afterMessageId: string }> = [];
+  const owner = new Map<string, string>();
+  for (const m of messages) {
+    if (m.kind !== 'assistant') continue;
+    for (const b of m.blocks ?? []) {
+      if (b.type === 'toolCall' && b.id !== undefined) owner.set(b.id, m.id);
+    }
+  }
+  const seen = new Set<string>();
+  for (const m of messages) {
+    if (m.kind !== 'toolResult' || m.isError === true || m.toolCallId === undefined) continue;
+    const anchor = owner.get(m.toolCallId);
+    if (anchor === undefined) continue;
+    // "Drew a bar chart …: /abs/units.svg (the spec beside it: …)" and
+    // "Changed … → a bar chart …: /abs/units.svg." — the chart tool's own
+    // reply, native or through bash — and "Presented /abs/x.svg to the user".
+    const text = m.text ?? '';
+    const match = /^(?:Drew|Changed)\b[^\n]*?:\s+(\/\S+\.svg)\b/.exec(text) ?? /^Presented (\/\S+\.svg) to the user/.exec(text);
+    const path = match?.[1];
+    if (path === undefined) continue;
+    const key = `${path}@${anchor}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ path, afterMessageId: anchor });
+  }
+  return out;
+}
+
+/**
+ * REBUILD A CHAT'S CARDS FROM ITS TRANSCRIPT. The store is memory; a chat
+ * reopened after the app restarted had none of the charts it made (the user,
+ * 2026-09-17). The transcript names every chart file the tool wrote, and the
+ * spec beside each (<stem>.chart.json) is what the card draws — so a chat that
+ * is opened with no cards recorded reads them back off disk.
+ */
+export async function rehydratePresented(
+  chat: string,
+  messages: Parameters<typeof chartsInTranscript>[0],
+): Promise<number> {
+  const bridge = typeof window === 'undefined' ? undefined : window.piDesktop;
+  if (bridge === undefined) return 0;
+  let added = 0;
+  for (const { path, afterMessageId } of chartsInTranscript(messages)) {
+    const sidecar = `${path.slice(0, -4)}.chart.json`;
+    let chart: Record<string, unknown> | undefined;
+    try {
+      const read = (await bridge.invoke('fs:read-file', { path: sidecar })) as { text?: string };
+      if (typeof read?.text === 'string' && read.text.trim() !== '') {
+        chart = JSON.parse(read.text) as Record<string, unknown>;
+      }
+    } catch {
+      chart = undefined;
+    }
+    if (chart === undefined) continue;
+    // The chat may have been opened elsewhere while the sidecars were read.
+    const have = presentedFor(usePresentStore.getState(), chat);
+    if (have.some((r) => r.path === path && r.afterMessageId === afterMessageId)) continue;
+    usePresentStore.getState().add({ path, chat, afterMessageId, chart });
+    added += 1;
+  }
+  return added;
+}
 
 /**
  * Wire `present:show` → record it, and OPEN it in the canvas.
@@ -385,7 +477,40 @@ export function connectPresent(): () => void {
   if (new URLSearchParams(window.location.search).has('piE2E')) {
     (window as unknown as { __present_store?: unknown }).__present_store = () => usePresentStore;
   }
-  return window.piDesktop.onEvent('present:show', ({ path, note, chart, svg }) => {
+  /*
+   * THE CARDS FOLLOW THE CHAT. Two things the event above cannot cover:
+   *  - a chat that gets its session file mid-conversation (the first turn of a
+   *    new chat) keeps the cards it made while it had none — claimUnsaved;
+   *  - a chat opened with no cards recorded (the app restarted; the store is
+   *    memory) gets them back from its transcript — rehydratePresented.
+   * Both key off the pi store: the session file, and the epoch that bumps on
+   * every session boundary (new chat, switch, rehydrate).
+   */
+  let lastFile = usePiStore.getState().session?.sessionFile ?? UNSAVED_CHAT;
+  let lastEpoch = usePiStore.getState().sessionEpoch;
+  const rehydrated = new Set<string>();
+  const unsubStore = usePiStore.subscribe((state) => {
+    const file = state.session?.sessionFile ?? UNSAVED_CHAT;
+    const epoch = state.sessionEpoch;
+    if (file !== lastFile) {
+      if (epoch === lastEpoch && lastFile === UNSAVED_CHAT && file !== UNSAVED_CHAT) {
+        usePresentStore.getState().claimUnsaved(file);
+      }
+      lastFile = file;
+    }
+    lastEpoch = epoch;
+    if (
+      file !== UNSAVED_CHAT &&
+      !rehydrated.has(file) &&
+      state.messages.length > 0 &&
+      state.agent.isStreaming !== true &&
+      presentedFor(usePresentStore.getState(), file).length === 0
+    ) {
+      rehydrated.add(file);
+      void rehydratePresented(file, state.messages as Parameters<typeof rehydratePresented>[1]);
+    }
+  });
+  const unsubShow = window.piDesktop.onEvent('present:show', ({ path, note, chart, svg }) => {
     // Anchor it to the turn that produced it — see `afterMessageId` — in the
     // chat that is RUNNING: the one in the background if a turn is going there,
     // else the one on screen. Read lazily off the live store so this module
@@ -411,6 +536,10 @@ export function connectPresent(): () => void {
       void openPresented(getCanvasController() as never, record);
     }
   });
+  return () => {
+    unsubStore();
+    unsubShow();
+  };
 }
 
 /** Canvas tab kind → the artifact kind its surface expects. */

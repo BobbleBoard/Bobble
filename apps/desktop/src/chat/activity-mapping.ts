@@ -25,7 +25,7 @@ import type {
 import { connectorIconSvg } from '../../../../packages/mcp-lite/src/connector-icons.ts';
 import { type DetectedArtifact, segmentMessageText } from './canvas/artifacts';
 import { pdFileUrl } from './canvas/file-preview';
-import { cliCommandLabel } from './cli-command-label';
+import { chartTypeWord, cliCommandLabel } from './cli-command-label';
 import { editDiffFile } from './edit-diff';
 import { COMMAND_KEYS, CONTENT_KEYS, PATH_KEYS, partialJsonString } from './partial-json';
 import { reportedWritePath } from './reported-path';
@@ -235,6 +235,7 @@ const STEP_LABELS: Record<ActivityStepKind, [running: string, done: string]> = {
   music: ['Composing music', 'Composed music'],
   sfx: ['Making a sound effect', 'Made a sound effect'],
   pdf: ['Creating a PDF', 'Created a PDF'],
+  chart: ['Rendering a chart', 'Rendered a chart'],
   'canvas-open': ['Opening the canvas', 'Opened the canvas'],
 };
 
@@ -349,6 +350,10 @@ const TOOL_REGISTRY: Record<string, ToolResolution> = {
   // OmniSVG through the `svg` command — a drawing, so the image glyph, but the
   // words say what kind: a vector file, not a render.
   generate_svg: { kind: 'image', label: ['Making an SVG', 'Made an SVG'] },
+  // The data-visuals tools. The chart arm below names the KIND of chart from
+  // the call's own arguments ("Rendering a bar chart"); this is the fallback.
+  chart: { kind: 'chart' },
+  chart_edit: { kind: 'chart', label: ['Redrawing the chart', 'Redrew the chart'] },
   // web search
   web_search: { kind: 'search' },
   brave_search: { kind: 'search' },
@@ -985,8 +990,17 @@ export function mapToolStep(
   block: ToolCallBlock,
   result: ToolResultMsg | undefined,
   running: boolean,
+  /**
+   * The call is written in full and has NOT started: the model put several
+   * calls in one message and the harness is still on an earlier one. The row
+   * keeps its present-tense label but sits still, marked "Queued" — no spinner,
+   * no ticking clock (the user: "a seemingly bunch of command executing all at
+   * once"). Only a running step is running.
+   */
+  queued = false,
 ): MappedStep {
-  const step = mapToolStepData(block, result, running);
+  const mapped = mapToolStepData(block, result, running);
+  const step = queued ? { ...mapped, data: { ...mapped.data, status: 'queued' as const } } : mapped;
   /*
    * A MEASURED duration, when the corp bridge attached one. The chain sums these
    * for its collapsed line, and corp steps had none — so a forty-step corp turn
@@ -1068,6 +1082,21 @@ function mapToolStepData(
        * opening the row still shows exactly what was typed.
        */
       const cli = cliCommandLabel(command);
+      /* `chart …` in CLI clothes is the chart tool: the data-visuals mark, the
+         kind of chart in the label, the title as the detail, the tool's own
+         answer behind the row. */
+      if (cli?.chart !== undefined) {
+        return {
+          data: {
+            kind: 'chart',
+            label: status === 'running' ? cli.running : cli.done,
+            status,
+            ...(cli.chart.title === undefined ? {} : { detail: cli.chart.title }),
+            argsText: command,
+            output: str(result?.text),
+          },
+        };
+      }
       /* When the line names an app, the row becomes "Used <icon> <app>
          <action>" and the raw command moves behind the disclosure — see the
          connector-row note in activity-chain. `detail` still carries it, which
@@ -1246,6 +1275,28 @@ function mapToolStepData(
           output: str(result?.text),
         },
       };
+    case 'chart': {
+      /*
+       * "Rendering a bar chart · Units Sold by Year" — the kind of chart from
+       * the call's own arguments, read out of the raw text while they stream
+       * so the row says what it is the moment the model has typed the type.
+       */
+      const rawType =
+        str(args.type) ?? partialJsonString(block.argsText ?? '', ['type'])?.value;
+      const title = str(args.title) ?? partialJsonString(block.argsText ?? '', ['title'])?.value;
+      const typed = resolution.label === undefined && rawType !== undefined;
+      const word = chartTypeWord(rawType);
+      return {
+        data: {
+          kind,
+          label: typed ? (running ? `Rendering a ${word} chart` : `Rendered a ${word} chart`) : label,
+          status,
+          ...(title === undefined || title === '' ? {} : { detail: title }),
+          argsText: formatArgs(args),
+          output: str(result?.text),
+        },
+      };
+    }
     case 'tool-search':
     case 'tool':
     /*

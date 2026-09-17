@@ -243,7 +243,7 @@ export const CAPABILITIES: readonly Capability[] = [
        once and to the office pipeline once before either was told otherwise. */
     summary:
       'Draw an interactive chart of numbers in the chat — bar, stacked, horizontal bar, line, ' +
-      'area, scatter, donut — from the labels and values, in a second, in a look you choose; ' +
+      'area, scatter, donut, pie, radar — from the labels and values, in a second, in a look you choose; ' +
       'and change a chart that exists (colour, bar thickness, a second series, a new style, ' +
       'colours from a picture). Every request to chart, plot, graph or visualise data, and every ' +
       'change to a chart, goes here; never image generation, matplotlib or hand-written SVG.',
@@ -254,7 +254,7 @@ export const CAPABILITIES: readonly Capability[] = [
       '— it draws exactly what it is given. Give it a LOOK that fits the subject and vary between ' +
       'charts: clean (everyday), soft (pastel pills), bold (loud, values on), mono (one hue, ' +
       'rankings), editorial (serif, muted — reports), ocean, forest, sunset, candy (playful), ' +
-      'slate (its own dark ground — dashboards), terminal (black + green mono — engineering), ' +
+      'slate (its own dark ground — dashboards), ' +
       'paper (cream, book-like); or set --palette/--accent/--radius/--bars/--grid/--line/--font, ' +
       'or --from_image a picture for its colours. chart_edit changes a chart that exists — ' +
       '--add "Cost: 8, 12, 10, 14" for a second bar per category, --set "2023: 17", --remove, ' +

@@ -1,6 +1,6 @@
 ---
 name: data-visuals
-description: Draw and change charts of data with Bobble's `chart` and `chart_edit` tools — bar, stacked, horizontal bar, line, area, scatter, donut — each with a look that fits its subject, never a generic default. Use whenever the user wants numbers charted, plotted, graphed or visualised, or asks to change a chart (colours, bar thickness, another series, a style, "make it look like this picture").
+description: Draw and change charts of data with Bobble's `chart` and `chart_edit` tools — bar, stacked, horizontal bar, line, area, scatter, donut, pie, radar — each with a look that fits its subject, never a generic default. Use whenever the user wants numbers charted, plotted, graphed or visualised, or asks to change a chart (colours, bar thickness, another series, a style, "make it look like this picture").
 license: MIT (© 2026 Pi Desktop contributors)
 ---
 
@@ -28,6 +28,9 @@ chart edit units-sold-by-year.svg --add "Cost: 8, 12, 10, 14" --bars thin --acce
 - **area** — the same, when the volume under the line is the point.
 - **scatter** — two measures per item (x/y).
 - **donut** — shares of one whole, few slices; `--unit %` when the values are shares.
+- **pie** — the same, no hole; when the whole is the point rather than the total.
+- **radar** — several measures on spokes: a profile, ratings, a comparison of
+  two things across the same criteria (`--values "Ours: 8, 6, 9; Theirs: 5, 8, 6"`).
 
 Several series only when the user compares things. One `--highlight` when
 they single something out. A `--unit` whenever the values have one.
@@ -49,7 +52,6 @@ show three of the same. Match the subject, then vary:
 | sunset | coral to amber to rose, pill bars, no grid | warm, loud, marketing |
 | candy | pink, tangerine, mint, sky; rounded type; values on | playful, kids, games |
 | slate | its own charcoal ground, cyan/lime/amber | dashboards, monitoring, any theme |
-| terminal | black ground, phosphor green, monospace, square bars | engineering, latency, builds |
 | paper | cream ground, ink lines, serif | a chart from a book, history |
 
 Knobs on top of any look, or on their own: `--palette "#264653, #2a9d8f, #e9c46a"`

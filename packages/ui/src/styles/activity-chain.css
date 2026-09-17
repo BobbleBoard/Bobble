@@ -300,6 +300,13 @@ button.pd-chain-step-row:hover .pd-chain-step-detail {
   color: var(--pd-text-secondary);
 }
 
+/* A chart's detail is its TITLE — words, not a command or a path — so it
+   reads in the UI face, a size under the label, not in monospace. */
+.pd-chain-step[data-kind="chart"] .pd-chain-step-detail {
+  font-family: inherit;
+  font-size: var(--pd-font-size-footnote, 13px);
+}
+
 /* ±stat beside the step label (round-5 #12): slightly smaller than the label,
  * never shrinks, sits just after the text (row gap does the spacing). */
 .pd-chain-step-diffstat {
@@ -662,7 +669,9 @@ button.pd-chain-step-row:hover .pd-chain-step-chevron {
 }
 
 /* WAITING — parked on someone else's reply. Deliberately quiet: it is the
-   normal state of half a corporation at any moment, not a problem. */
+   normal state of half a corporation at any moment, not a problem. QUEUED —
+   a call written but not started — is the same quiet. */
+.pd-chain-step[data-status="queued"] .pd-chain-step-state,
 .pd-chain-step[data-status="waiting"] .pd-chain-step-state {
   color: var(--pd-text-secondary);
   background: color-mix(in srgb, var(--pd-text-secondary) 12%, transparent);
@@ -692,6 +701,7 @@ button.pd-chain-step-row:hover .pd-chain-step-chevron {
 
 /* A STILL ROW MUST NOT LOOK BUSY. Whatever else is going on, an agent that is
    not generating gets no shimmer — the animation is what reads as "working". */
+.pd-chain-step[data-status="queued"] .pd-shimmer-text,
 .pd-chain-step[data-status="waiting"] .pd-shimmer-text,
 .pd-chain-step[data-status="stopped"] .pd-shimmer-text,
 .pd-chain-step[data-status="error"] .pd-shimmer-text {

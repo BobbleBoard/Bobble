@@ -171,6 +171,15 @@ export function IconSidebar(props: IconProps) {
   );
 }
 
+/** A bar chart — the data-visuals mark (a `chart` tool step, the chart card). */
+export function IconChart(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M2 13.5h12M4 11V7.5M7.5 11V4M11 11V6" />
+    </Icon>
+  );
+}
+
 export function IconTerminal(props: IconProps) {
   return (
     <Icon {...props}>

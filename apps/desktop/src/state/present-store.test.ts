@@ -1,12 +1,14 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  chartsInTranscript,
   classifyPresented,
   extOf,
   isInlinePresented,
   openPresented,
   presentedFor,
   presentTabKey,
+  rehydratePresented,
   UNSAVED_CHAT,
   usePresentStore,
 } from './present-store';
@@ -259,5 +261,88 @@ describe('a chart, or a small SVG, is shown IN the thread', () => {
     void openPresented(c as never, item as never);
     expect(tabs[0]).toMatchObject({ kind: 'svg', inline: true, filePath: '/ws/icon.svg' });
     expect((tabs[0]?.artifact as { content: { text: string } }).content.text).toBe('<svg/>');
+  });
+});
+
+/*
+ * THE CARDS FOLLOW THE CHAT. the user (2026-09-17): "I just went back to a chat I
+ * earlier made some visuals in and it didn't have them there."
+ */
+describe('the cards follow the chat', () => {
+  beforeEach(() => usePresentStore.getState().clear());
+
+  it('a chat that gets its session file keeps the cards it made while unsaved', () => {
+    const s = usePresentStore.getState();
+    s.add({ path: '/w/units.svg', chart: { labels: ['a'], values: [1] } });
+    expect(presentedFor(usePresentStore.getState(), UNSAVED_CHAT)).toHaveLength(1);
+    usePresentStore.getState().claimUnsaved('/sessions/2026-09-17.jsonl');
+    expect(presentedFor(usePresentStore.getState(), UNSAVED_CHAT)).toHaveLength(0);
+    expect(presentedFor(usePresentStore.getState(), '/sessions/2026-09-17.jsonl')).toHaveLength(1);
+  });
+
+  it('finds the charts a transcript names, anchored to the message that made them', () => {
+    const messages = [
+      { kind: 'user', id: 'u1' },
+      {
+        kind: 'assistant',
+        id: 'a1',
+        blocks: [
+          { type: 'toolCall', id: 'c1', name: 'chart', arguments: { type: 'bar' } },
+          { type: 'toolCall', id: 'c2', name: 'bash', arguments: { command: 'chart line "Trend"' } },
+          { type: 'toolCall', id: 'c3', name: 'chart_edit', arguments: {} },
+        ],
+      },
+      {
+        kind: 'toolResult',
+        id: 'tr1',
+        toolCallId: 'c1',
+        toolName: 'chart',
+        text: 'Drew a bar chart "Units" (4 points, look clean): /w/units.svg (the spec beside it: units.chart.json). Shown.',
+      },
+      {
+        kind: 'toolResult',
+        id: 'tr2',
+        toolCallId: 'c2',
+        toolName: 'bash',
+        text: 'Drew a line chart "Trend" (6 points, look ocean): /w/trend.svg (the spec beside it: trend.chart.json).',
+      },
+      {
+        kind: 'toolResult',
+        id: 'tr3',
+        toolCallId: 'c3',
+        toolName: 'chart_edit',
+        text: 'Changed look → a bar chart "Units" (4 points, look sunset): /w/units.svg. Shown.',
+      },
+      { kind: 'toolResult', id: 'tr4', toolCallId: 'c9', toolName: 'chart', text: 'Drew x: /w/orphan.svg' },
+    ];
+    expect(chartsInTranscript(messages)).toEqual([
+      { path: '/w/units.svg', afterMessageId: 'a1' },
+      { path: '/w/trend.svg', afterMessageId: 'a1' },
+    ]);
+  });
+
+  it('rebuilds a reopened chat\'s cards from the specs beside its chart files', async () => {
+    const invoke = vi.fn(async (channel: string, req: { path: string }) => {
+      if (channel === 'fs:read-file') {
+        if (req.path === '/w/units.chart.json')
+          return { text: JSON.stringify({ title: 'Units', labels: ['a', 'b'], values: [1, 2] }) };
+        throw new Error('no such file');
+      }
+      return {};
+    });
+    (window as unknown as { piDesktop: unknown }).piDesktop = { invoke, onEvent: () => () => {} };
+    const messages = [
+      { kind: 'assistant', id: 'a1', blocks: [{ type: 'toolCall', id: 'c1', name: 'chart', arguments: {} }, { type: 'toolCall', id: 'c2', name: 'chart', arguments: {} }] },
+      { kind: 'toolResult', id: 'tr1', toolCallId: 'c1', toolName: 'chart', text: 'Drew a bar chart: /w/units.svg (the spec beside it: units.chart.json).' },
+      { kind: 'toolResult', id: 'tr2', toolCallId: 'c2', toolName: 'chart', text: 'Drew a bar chart: /w/gone.svg (the spec beside it: gone.chart.json).' },
+    ];
+    const n = await rehydratePresented('/sessions/x.jsonl', messages);
+    expect(n).toBe(1);
+    const cards = presentedFor(usePresentStore.getState(), '/sessions/x.jsonl');
+    expect(cards).toHaveLength(1);
+    expect(cards[0]).toMatchObject({ path: '/w/units.svg', kind: 'chart', afterMessageId: 'a1' });
+    expect(cards[0]?.chart?.title).toBe('Units');
+    // Twice is still once.
+    expect(await rehydratePresented('/sessions/x.jsonl', messages)).toBe(0);
   });
 });

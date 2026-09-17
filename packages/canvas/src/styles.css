@@ -460,6 +460,19 @@
 .pd-canvas-tab-slot {
   isolation: isolate;
 }
+/*
+ * …AND THE SELECTED TAB STAYS ABOVE THE SEAM. That isolation makes the slot a
+ * stacking context, so the selected tab's own z-index stops at the slot's
+ * edge and the slot itself paints in tree order — BEFORE the strip's seam
+ * (`.pd-canvas-tabbar::after`, a later box). MEASURED at the tab's centre
+ * column: the seam's 1px ran across the selected tab's bottom row (dark
+ * 57,57,60 over a 30,30,33 fill; light 229 over 255) — the "flat line under
+ * the selected tab" the user circled (2026-09-17), which the fold was written to
+ * break. Lifting the selected slot puts the tab's fill over the seam.
+ */
+.pd-canvas-tab-slot:has(.pd-canvas-tab[data-active]) {
+  z-index: 1;
+}
 .pd-canvas-tab-slot::after {
   content: "";
   position: absolute;
@@ -5502,6 +5515,107 @@
   fill: var(--chart-paper, var(--pd-bg-raised));
 }
 
+/*
+ * THE CHART BUILDS ITSELF ON ARRIVAL. the user (2026-09-17): "bar ones have bars
+ * go up, pie expand smoothly, radar charts show dots going out from the
+ * center … all smooth live building." `data-enter` is on the card for its
+ * first second (chart-surface.tsx); each shape has its own entrance, with the
+ * origin set inline where the geometry is known (a bar grows from the axis
+ * it stands on, a slice from the centre, a marker from its own spot) and a
+ * small stagger so the shapes arrive in reading order. Reduced motion: none
+ * of it — the chart is simply there.
+ */
+.pd-chart[data-enter] .pd-chart-bar {
+  animation: pd-chart-grow 620ms var(--pd-easing-standard, ease-out) both;
+}
+.pd-chart[data-enter] .pd-chart-bar[data-side="right"],
+.pd-chart[data-enter] .pd-chart-bar[data-side="left"] {
+  animation-name: pd-chart-grow-x;
+}
+.pd-chart[data-enter] .pd-chart-slice {
+  animation: pd-chart-expand 640ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.pd-chart[data-enter] .pd-chart-line {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: pd-chart-draw 900ms cubic-bezier(0.4, 0, 0.2, 1) 80ms forwards;
+}
+.pd-chart[data-enter] .pd-chart-area {
+  animation: pd-chart-fade 700ms ease-out 350ms both;
+}
+.pd-chart[data-enter] .pd-chart-marker,
+.pd-chart[data-enter] .pd-chart-dot {
+  animation: pd-chart-pop 420ms cubic-bezier(0.2, 0.8, 0.2, 1) 500ms both;
+}
+.pd-chart[data-enter] .pd-chart-radar-series {
+  animation: pd-chart-expand 760ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.pd-chart[data-enter] .pd-chart-radar-series .pd-chart-radar-dot {
+  /* The dots ride the polygon out from the centre; no second pop. */
+  animation: none;
+}
+
+@keyframes pd-chart-grow {
+  from {
+    transform: scaleY(0.02);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+@keyframes pd-chart-grow-x {
+  from {
+    transform: scaleX(0.02);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+@keyframes pd-chart-expand {
+  from {
+    transform: scale(0.08);
+    opacity: 0.4;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@keyframes pd-chart-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes pd-chart-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes pd-chart-pop {
+  from {
+    transform: scale(0);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pd-chart[data-enter] .pd-chart-bar,
+  .pd-chart[data-enter] .pd-chart-slice,
+  .pd-chart[data-enter] .pd-chart-line,
+  .pd-chart[data-enter] .pd-chart-area,
+  .pd-chart[data-enter] .pd-chart-marker,
+  .pd-chart[data-enter] .pd-chart-dot,
+  .pd-chart[data-enter] .pd-chart-radar-series {
+    animation: none;
+    stroke-dasharray: none;
+    stroke-dashoffset: 0;
+  }
+}
+
 .pd-chart-legend-row {
   cursor: default;
 }
@@ -5620,6 +5734,98 @@
   overflow: hidden;
 }
 
+/*
+ * THE CHART WHILE IT IS BEING MADE (PendingChartCard). The same frame the
+ * finished card takes, so the hand-over is a swap in place: a skeleton of the
+ * right shape until the numbers arrive, the real chart dimmed and redrawn as
+ * each value lands, a sheen sweeping over either — the user (2026-09-17):
+ * "a skeleton card with shimmering items as a preview that builds live".
+ */
+.pd-inline-chart--pending {
+  border-style: dashed;
+}
+.pd-inline-chart--pending .pd-chart--building {
+  opacity: 0.72;
+}
+.pd-inline-chart--pending .pd-chart-controls {
+  visibility: hidden;
+}
+.pd-chart--skeleton .pd-chart-head {
+  align-items: center;
+}
+.pd-chart-skeleton-title {
+  width: 11em;
+  height: 0.9em;
+  border-radius: var(--pd-radius-xs);
+  background: var(--pd-bg-hover);
+}
+.pd-chart-skeleton-mark {
+  display: inline-flex;
+  color: var(--pd-text-tertiary);
+}
+.pd-chart-skeleton-box {
+  height: 220px;
+  padding: 12px 8px 4px;
+}
+.pd-chart-skeleton-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.pd-chart-skeleton-shape {
+  fill: var(--pd-bg-hover);
+  stroke: var(--pd-bg-hover);
+  animation: pd-chart-skeleton-breathe 1.6s ease-in-out infinite;
+}
+.pd-chart-skeleton-line {
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+.pd-chart-skeleton-ring {
+  stroke-width: 22;
+}
+.pd-chart-skeleton-web {
+  stroke-width: 2.5;
+}
+/* The sheen: one soft band crossing the card, the way a thinking label
+   shimmers — motion says "working" better than any spinner would. */
+.pd-chart-building-sheen {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    color-mix(in srgb, var(--pd-text-primary) 7%, transparent) 50%,
+    transparent 70%
+  );
+  background-size: 250% 100%;
+  animation: pd-chart-sheen 1.8s var(--pd-easing-standard, ease-in-out) infinite;
+}
+@keyframes pd-chart-skeleton-breathe {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes pd-chart-sheen {
+  from {
+    background-position: 120% 0;
+  }
+  to {
+    background-position: -120% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pd-chart-skeleton-shape,
+  .pd-chart-building-sheen {
+    animation: none;
+  }
+}
+
 /* The corner control beside the chart ⇄ table toggle. */
 .pd-inline-chart-move {
   color: var(--pd-text-secondary);
@@ -5629,63 +5835,9 @@
   color: var(--pd-text-primary);
 }
 
-/* A quiet line under the card: the file on disk. */
-.pd-inline-file {
-  display: flex;
-  align-items: center;
-  gap: var(--pd-space-xs);
-  padding: 0 var(--pd-space-xs);
-  color: var(--pd-text-tertiary);
-  font-size: var(--pd-font-size-caption);
-}
-
-.pd-inline-file button {
-  color: inherit;
-  background: none;
-  border: 0;
-  padding: 0;
-  font: inherit;
-  cursor: pointer;
-  text-decoration: underline dotted;
-  text-underline-offset: 3px;
-}
-
-.pd-inline-file button:hover {
-  color: var(--pd-text-primary);
-}
-
-/* The card, collapsed to a row while it is showing in the canvas. */
-.pd-inline-stub {
-  display: flex;
-  align-items: center;
-  gap: var(--pd-space-sm);
-  width: 100%;
-  max-width: min(100%, 44rem);
-  padding: var(--pd-space-sm) var(--pd-space-md);
-  border: 1px dashed var(--pd-border-subtle);
-  border-radius: var(--pd-radius-lg);
-  color: var(--pd-text-secondary);
-  font-size: var(--pd-font-size-caption);
-  background: transparent;
-}
-
-.pd-inline-stub-icon {
-  display: inline-flex;
-  color: var(--pd-text-tertiary);
-}
-
-.pd-inline-stub-title {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--pd-text-primary);
-}
-
-.pd-inline-stub-where {
-  color: var(--pd-text-tertiary);
-}
+/* No line under the card and no stub row while it is in the canvas — the user
+   (2026-09-17): the tab IS the card; the title is on it; the file is the
+   tab's business. */
 
 /* The canvas half of the move: a Show-in-chat button in the operation bar. */
 .pd-canvas-show-inline {

@@ -30,6 +30,7 @@ import { useCanvasStore } from '../../state/canvas-store';
 import { useChildAgentStore } from '../../state/child-agent-store';
 import { useCorpStore } from '../../state/corp-store';
 import { usePiStore } from '../../state/pi-slice';
+import { useHarnessStatus } from '../harness-status';
 import { useActivityCanvasRouting } from './activity-routing';
 import { artifactToPayload } from './artifacts';
 import { useBrowserAgent } from './browser-agent';
@@ -127,7 +128,17 @@ export function CanvasTabsPanel({ suppressed = false }: { suppressed?: boolean }
   const setCanvasOpen = useCanvasStore((s) => s.setCanvasOpen);
   // The active project / session cwd — where a new terminal or the Files tree
   // surface should be rooted (round-10 #4/#5).
-  const cwd = usePiStore((s) => s.session?.cwd ?? undefined);
+  const piCwd = usePiStore((s) => s.session?.cwd ?? undefined);
+  /*
+   * THE FOLDER THE TOOLS WRITE IN, not pi's cwd. The chat's working folder
+   * (~/Bobble/<chat>) is published by the harness; pi's own cwd can be its
+   * parent, or the home directory. `+ › Files` rooted there showed a tree the
+   * chat's charts were not in — the user (2026-09-17): "nor in the canvas when I
+   * went to files, they weren't there either". Same rule activity-routing
+   * uses for where a relative path lands.
+   */
+  const workspaceRoot = useHarnessStatus()?.workspaceRoot ?? null;
+  const cwd = workspaceRoot ?? piCwd;
   const prevTabCount = useRef(tabs.length);
 
   // Phase 2b: the real WebContentsView / PTY handlers for the live surfaces, plus

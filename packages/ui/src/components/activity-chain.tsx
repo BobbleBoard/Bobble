@@ -53,10 +53,11 @@ export type ActivityStepKind = ToolIconKind;
  * Only `running` gets the ticking timer. The rest hold a frozen elapsed time if
  * they have one, which is a fact, rather than a counter, which is a claim.
  */
-export type ActivityStatus = 'running' | 'waiting' | 'stopped' | 'error' | 'done';
+export type ActivityStatus = 'running' | 'queued' | 'waiting' | 'stopped' | 'error' | 'done';
 
 /** States where the agent is NOT generating — no shimmer, no ticking clock. */
 export const STILL_STATUSES: ReadonlySet<ActivityStatus> = new Set<ActivityStatus>([
+  'queued',
   'waiting',
   'stopped',
   'error',
@@ -66,6 +67,15 @@ export const STILL_STATUSES: ReadonlySet<ActivityStatus> = new Set<ActivityStatu
 /** The word shown beside a still agent, so "why is nothing happening" has an answer. */
 export function statusWord(status: ActivityStatus): string | null {
   switch (status) {
+    /*
+     * QUEUED — a call the model wrote that has not started yet. the user, on four
+     * chart rows each with a spinner and a ticking clock: "why is there a
+     * seemingly bunch of command executing all at once". The model writes its
+     * calls in one go and the harness runs them one after another; only the
+     * one it is on is running. The rest are still, with this word on them.
+     */
+    case 'queued':
+      return 'Queued';
     case 'waiting':
       return 'Waiting';
     case 'stopped':
@@ -207,6 +217,9 @@ export type ActivityStepData =
       argsText?: string;
       output?: string;
     })
+  /* A chart drawn by the `chart` tool: the title rides as the detail, and
+   * the row reveals the tool's own answer (the file it wrote, the look). */
+  | (ActivityStepCommon & { kind: 'chart'; argsText?: string; output?: string })
   | (ActivityStepCommon & {
       kind: 'connector';
       /** The connector's inline brand SVG (mcp-lite connector-icons), if resolved. */
@@ -315,6 +328,7 @@ const VERBS: Record<ActivityStepKind, VerbSpec> = {
   music: { verb: 'Composed', singular: 'music', plural: 'pieces', attempt: 'piece' },
   sfx: { verb: 'Made', singular: 'a sound effect', plural: 'sound effects', attempt: 'sound' },
   pdf: { verb: 'Created', singular: 'a PDF', plural: 'PDFs', attempt: 'PDF' },
+  chart: { verb: 'Drew', singular: 'a chart', plural: 'charts', attempt: 'chart' },
   'canvas-open': { verb: 'Opened', singular: 'the canvas', plural: '' },
 };
 
@@ -365,6 +379,7 @@ const KIND_ORDER: ActivityStepKind[] = [
   'music',
   'sfx',
   'pdf',
+  'chart',
   'canvas-open',
 ];
 
@@ -535,6 +550,7 @@ const RUNNING_PHRASE: Record<ActivityStepKind, string> = {
   music: 'Composing music',
   sfx: 'Making a sound effect',
   pdf: 'Creating a PDF',
+  chart: 'Rendering a chart',
   'canvas-open': 'Opening the canvas',
 };
 
@@ -882,6 +898,7 @@ function StepContent({ step, live = false }: { step: ActivityStepData; live?: bo
     case 'tool-search':
     case 'tool':
     case 'connector':
+    case 'chart':
       return <TerminalBlock output={step.output} />;
     case 'talk':
     case 'manager':
@@ -1246,6 +1263,7 @@ export function hasInlineContent(step: ActivityStepData): boolean {
     case 'tool-search':
     case 'tool':
     case 'connector':
+    case 'chart':
       // Only the result opens a reveal now — the raw args JSON is no longer shown,
       // so args alone must not produce an empty reveal.
       return step.output !== undefined && step.output.length > 0;

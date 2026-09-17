@@ -11,57 +11,34 @@
  * dropping out and becoming an inline card."
  *
  * The card and its canvas tab are ONE thing: the tab's key is the card's, so
- * while the tab is open the card collapses to a stub ("Units Sold by Year —
- * in the canvas · Show here"), and closing the tab — from the stub, or from
- * the tab's own Show-in-chat — brings the card back. The move either way runs
+ * while the tab is open the card is NOT in the thread at all — the canvas tab
+ * IS the card — and closing the tab (the tab's own Show-in-chat) brings it
+ * back. It used to leave a one-line stub behind ("Units Sold by Year — in the
+ * canvas · Show here"); with several charts up that was a stack of thin rows
+ * saying the same thing, and the user (2026-09-17): "don't show the thin cards
+ * that say 'showing charts in canvas' at all." The move either way runs
  * inside a view transition (view-transition.ts) under the shared name, so the
  * card grows into the panel and the panel shrinks back into the card.
+ *
+ * Nor a file name under the card: the chart's title is on it and the file is
+ * the canvas tab's business ("don't show a little thing below it that say
+ * the filename").
  */
 import {
   ChartView,
-  IconChart,
   IconExpand,
-  IconInline,
   InlineWidget,
   inlineTransitionStyle,
   useCanvasTabs,
 } from '@pi-desktop/canvas';
 import { IconButton } from '@pi-desktop/ui';
-import type { CSSProperties, ReactNode } from 'react';
+import type { CSSProperties } from 'react';
 import { useCanvasStore } from '../state/canvas-store';
 import { openPresented, type PresentedRecord, presentTabKey } from '../state/present-store';
 import { withViewTransition } from './canvas/view-transition';
 
 function baseName(p: string): string {
   return p.split(/[\\/]/).pop() ?? p;
-}
-
-/** The row a card leaves behind while it is showing in the canvas. */
-function InlineStub({
-  icon,
-  title,
-  onShowHere,
-}: {
-  icon: ReactNode;
-  title: string;
-  onShowHere: () => void;
-}) {
-  return (
-    <div className="pd-inline-stub" data-testid="inline-stub">
-      <span className="pd-inline-stub-icon">{icon}</span>
-      <span className="pd-inline-stub-title">{title}</span>
-      <span className="pd-inline-stub-where">in the canvas</span>
-      <button
-        type="button"
-        className="pd-btn pd-btn--secondary pd-btn--sm"
-        data-testid="inline-stub-show"
-        onClick={onShowHere}
-      >
-        <IconInline size={14} />
-        Show here
-      </button>
-    </div>
-  );
 }
 
 export function PresentedInline({ item }: { item: PresentedRecord }) {
@@ -79,23 +56,8 @@ export function PresentedInline({ item }: { item: PresentedRecord }) {
       useCanvasStore.getState().setCanvasOpen(true);
     });
   };
-  const showHere = (): void => {
-    if (open === undefined) return;
-    withViewTransition(() => controller.closeTab(open.id));
-  };
-  const reveal = (): void => {
-    void window.piDesktop.invoke('canvas:reveal', { path: item.path });
-  };
-
-  if (open !== undefined) {
-    return (
-      <InlineStub
-        icon={item.chart !== undefined ? <IconChart size={14} /> : <IconExpand size={14} />}
-        title={name}
-        onShowHere={showHere}
-      />
-    );
-  }
+  // In the canvas: the tab is the card. Nothing stands in for it here.
+  if (open !== undefined) return null;
 
   const transition = inlineTransitionStyle(key) as CSSProperties;
 
@@ -119,11 +81,6 @@ export function PresentedInline({ item }: { item: PresentedRecord }) {
             }
           />
         </div>
-        <div className="pd-inline-file">
-          <button type="button" onClick={reveal} title={item.path}>
-            {baseName(item.path)}
-          </button>
-        </div>
       </div>
     );
   }
@@ -140,11 +97,6 @@ export function PresentedInline({ item }: { item: PresentedRecord }) {
         }}
         onMoveToCanvas={moveToCanvas}
       />
-      <div className="pd-inline-file">
-        <button type="button" onClick={reveal} title={item.path}>
-          {baseName(item.path)}
-        </button>
-      </div>
     </div>
   );
 }

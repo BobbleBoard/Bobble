@@ -75,6 +75,14 @@ export interface SliceShape {
   readonly midAngle: number;
 }
 
+/** One series drawn round a radar's spokes. */
+export interface RadarShape {
+  readonly series: number;
+  /** The closed polygon through the series' points. */
+  readonly d: string;
+  readonly points: readonly MarkerShape[];
+}
+
 export interface LegendEntry {
   readonly series: number;
   readonly name: string;
@@ -111,6 +119,27 @@ export interface ChartLayout {
   readonly xTicks: readonly Tick[];
   /** Where the value axis' zero line sits. */
   readonly zero: number;
+  /** Radar geometry, when a radar: the spokes, the rings, a polygon per series. */
+  readonly radar?: {
+    readonly cx: number;
+    readonly cy: number;
+    readonly r: number;
+    /** One spoke per category: its angle and where its label sits. */
+    readonly axes: readonly {
+      readonly index: number;
+      readonly label: string;
+      readonly angle: number;
+      readonly x: number;
+      readonly y: number;
+      readonly labelX: number;
+      readonly labelY: number;
+      readonly anchor: 'start' | 'middle' | 'end';
+    }[];
+    /** Concentric grid polygons, as path data, innermost first. */
+    readonly rings: readonly string[];
+    readonly shapes: readonly RadarShape[];
+    readonly max: number;
+  };
 }
 
 export interface LayoutOptions {
@@ -180,8 +209,9 @@ export function layoutChart(spec: ChartSpec, opts: LayoutOptions): ChartLayout {
   const bottom = opts.bottom ?? 0;
   const unit = spec.unit;
   const isHorizontal = spec.type === 'hbar';
-  const isDonut = spec.type === 'donut';
+  const isDonut = spec.type === 'donut' || spec.type === 'pie';
   const isScatter = spec.type === 'scatter';
+  const isRadar = spec.type === 'radar';
   const legend: LegendEntry[] =
     spec.series.length > 1
       ? spec.series.map((s, i) => ({ series: i, name: s.name || `Series ${i + 1}` }))
@@ -202,6 +232,74 @@ export function layoutChart(spec: ChartSpec, opts: LayoutOptions): ChartLayout {
     zero: 0,
   };
 
+  if (isRadar) {
+    const labels = categoryLabels(spec);
+    const n = labels.length;
+    const plotY = top + legendH + 6;
+    const plotH = Math.max(80, height - plotY - bottom - 8);
+    // Room for the spoke labels outside the web.
+    const r = Math.max(24, Math.min(plotH / 2 - 22, width / 2 - 64));
+    const cx = width / 2;
+    const cy = plotY + plotH / 2;
+    const max = Math.max(
+      1,
+      ...spec.series.flatMap((sr) => sr.points.map((p) => Math.max(0, p.value))),
+    );
+    const angleOf = (i: number): number => -Math.PI / 2 + (i / Math.max(n, 1)) * 2 * Math.PI;
+    const axes = labels.map((label, i) => {
+      const a = angleOf(i);
+      const [x, y] = polar(cx, cy, r, a);
+      const [lx, ly] = polar(cx, cy, r + 14, a);
+      const c = Math.cos(a);
+      const anchor: 'start' | 'middle' | 'end' = c > 0.2 ? 'start' : c < -0.2 ? 'end' : 'middle';
+      return { index: i, label, angle: a, x, y, labelX: lx, labelY: ly + 4, anchor };
+    });
+    const ringAt = (k: number): string =>
+      n === 0
+        ? ''
+        : `${axes
+            .map((ax, i) => {
+              const [x, y] = polar(cx, cy, r * k, ax.angle);
+              return `${i === 0 ? 'M' : 'L'}${fmt(x)} ${fmt(y)}`;
+            })
+            .join(' ')} Z`;
+    const rings = [0.25, 0.5, 0.75, 1].map(ringAt);
+    const shapes: RadarShape[] = spec.series.map((sr, si) => {
+      const points: MarkerShape[] = axes.map((ax, i) => {
+        const p = sr.points[i];
+        const v = Math.max(0, p?.value ?? 0);
+        const [x, y] = polar(cx, cy, (r * v) / max, ax.angle);
+        return {
+          x,
+          y,
+          series: si,
+          point: i,
+          label: ax.label,
+          value: v,
+          highlighted: spec.highlight !== undefined && ax.label === spec.highlight,
+        };
+      });
+      const d =
+        points.length === 0
+          ? ''
+          : `${points.map((pt, i) => `${i === 0 ? 'M' : 'L'}${fmt(pt.x)} ${fmt(pt.y)}`).join(' ')} Z`;
+      return { series: si, d, points };
+    });
+    return {
+      ...empty,
+      plot: { x: cx - r, y: cy - r, w: 2 * r, h: 2 * r },
+      categories: axes.map((ax) => ({
+        index: ax.index,
+        label: ax.label,
+        at: ax.x,
+        // A hover band per spoke: a wedge would be honest; a box round the
+        // vertex is what the hover code can use.
+        band: { x: ax.x - 14, y: ax.y - 14, w: 28, h: 28 },
+      })),
+      radar: { cx, cy, r, axes, rings, shapes, max },
+    };
+  }
+
   if (isDonut) {
     const s0 = spec.series[0];
     const pts = (s0?.points ?? []).filter((p) => p.value > 0);
@@ -213,7 +311,8 @@ export function layoutChart(spec: ChartSpec, opts: LayoutOptions): ChartLayout {
     const r = Math.min(plotH / 2 - 4, width * 0.22);
     const cx = Math.max(r + 12, width * 0.28);
     const cy = plotY + plotH / 2;
-    const ring = r * style.ring;
+    // A pie is a donut with no hole: the ring is the whole radius.
+    const ring = spec.type === 'pie' ? r : r * style.ring;
     let a0 = -Math.PI / 2;
     const slices: SliceShape[] = pts.map((p, i) => {
       const fraction = p.value / total;
@@ -226,8 +325,12 @@ export function layoutChart(spec: ChartSpec, opts: LayoutOptions): ChartLayout {
       const [xi1, yi1] = polar(cx, cy, ri, a0);
       const d =
         fraction >= 0.999
-          ? `M${fmt(cx + r)} ${fmt(cy)} A${fmt(r)} ${fmt(r)} 0 1 1 ${fmt(cx - r)} ${fmt(cy)} A${fmt(r)} ${fmt(r)} 0 1 1 ${fmt(cx + r)} ${fmt(cy)} M${fmt(cx + ri)} ${fmt(cy)} A${fmt(ri)} ${fmt(ri)} 0 1 0 ${fmt(cx - ri)} ${fmt(cy)} A${fmt(ri)} ${fmt(ri)} 0 1 0 ${fmt(cx + ri)} ${fmt(cy)} Z`
-          : `M${fmt(x0)} ${fmt(y0)} A${fmt(r)} ${fmt(r)} 0 ${large} 1 ${fmt(x1)} ${fmt(y1)} L${fmt(xi0)} ${fmt(yi0)} A${fmt(ri)} ${fmt(ri)} 0 ${large} 0 ${fmt(xi1)} ${fmt(yi1)} Z`;
+          ? ri <= 0
+            ? `M${fmt(cx + r)} ${fmt(cy)} A${fmt(r)} ${fmt(r)} 0 1 1 ${fmt(cx - r)} ${fmt(cy)} A${fmt(r)} ${fmt(r)} 0 1 1 ${fmt(cx + r)} ${fmt(cy)} Z`
+            : `M${fmt(cx + r)} ${fmt(cy)} A${fmt(r)} ${fmt(r)} 0 1 1 ${fmt(cx - r)} ${fmt(cy)} A${fmt(r)} ${fmt(r)} 0 1 1 ${fmt(cx + r)} ${fmt(cy)} M${fmt(cx + ri)} ${fmt(cy)} A${fmt(ri)} ${fmt(ri)} 0 1 0 ${fmt(cx - ri)} ${fmt(cy)} A${fmt(ri)} ${fmt(ri)} 0 1 0 ${fmt(cx + ri)} ${fmt(cy)} Z`
+          : ri <= 0
+            ? `M${fmt(x0)} ${fmt(y0)} A${fmt(r)} ${fmt(r)} 0 ${large} 1 ${fmt(x1)} ${fmt(y1)} L${fmt(cx)} ${fmt(cy)} Z`
+            : `M${fmt(x0)} ${fmt(y0)} A${fmt(r)} ${fmt(r)} 0 ${large} 1 ${fmt(x1)} ${fmt(y1)} L${fmt(xi0)} ${fmt(yi0)} A${fmt(ri)} ${fmt(ri)} 0 ${large} 0 ${fmt(xi1)} ${fmt(yi1)} Z`;
       const mid = (a0 + a1) / 2;
       a0 = a1;
       return {
@@ -244,7 +347,15 @@ export function layoutChart(spec: ChartSpec, opts: LayoutOptions): ChartLayout {
       ...empty,
       plot: { x: cx - r, y: cy - r, w: 2 * r, h: 2 * r },
       slices,
-      donut: { cx, cy, r, ring, total, centre: donutCentre(spec, slices, total) },
+      donut: {
+        cx,
+        cy,
+        r,
+        ring,
+        total,
+        // A pie has no hole for the reading to sit in.
+        centre: spec.type === 'pie' ? { big: '', small: '' } : donutCentre(spec, slices, total),
+      },
       legend: pts.map((p, i) => ({ series: i, name: p.label })),
       // The legend column starts at the ring's right; rows are `legendRows`.
       categories: pts.map((p, i) => ({
