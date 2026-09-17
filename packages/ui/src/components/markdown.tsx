@@ -209,6 +209,23 @@ export function widenUrlTransform(keep: RegExp): NonNullable<Options['urlTransfo
 }
 
 /**
+ * A STREAMED LINE THAT IS NOT FINISHED YET must not be read as structure.
+ *
+ * MEASURED by the flicker guard (tests/e2e/flicker.mjs, 2026-09-16) on a 4B's
+ * streamed reply: "I have the data:" followed by a lone "-" — the first byte
+ * of "- 2021: 12" — is, to CommonMark, a setext underline, so the paragraph
+ * above it became an <h2> for one frame and snapped back to a <p> when the
+ * next byte arrived. Every bulleted list that follows a paragraph flashed
+ * its lead-in as a heading. The same trailing fragment can open an empty
+ * code fence ("`") or a thematic break ("--"). Such a tail is held back
+ * until the line has more in it; on a finished message the same characters
+ * alone on the last line mean nothing anyway.
+ */
+export function holdBackPartialTail(text: string): string {
+  return text.replace(/(^|\n)[ \t]{0,3}[-=*_#`~]{1,3}[ \t]*$/, '$1');
+}
+
+/**
  * Render a markdown string into flavor-voiced prose. Drop-in for a text run:
  * pass the raw string as children; it renders its OWN `.pd-prose` container, so
  * hosts should not double-wrap it in `<Prose>`.
@@ -230,7 +247,7 @@ export const Markdown = forwardRef<HTMLDivElement, MarkdownProps>(function Markd
         components={merged}
         {...(urlTransform === undefined ? {} : { urlTransform })}
       >
-        {children}
+        {holdBackPartialTail(children)}
       </ReactMarkdown>
     </div>
   );

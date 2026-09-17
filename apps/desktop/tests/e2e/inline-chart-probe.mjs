@@ -24,7 +24,9 @@
 import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
+import { watchFlicker } from './flicker.mjs';
 import { launchApp, probeHome } from './harness.mjs';
+import { cropPng } from './png.mjs';
 
 const MODEL = process.env.MODEL ?? 'qwen3.5-4b-mtp';
 const ENGINE = process.env.ENGINE ?? 'rapid-mlx/mtp';
@@ -171,6 +173,23 @@ try {
     log(`$ ${cmd.slice(0, 70)}…\n  ${out.split('\n')[0].slice(0, 160)}`);
     return out;
   };
+  // FLICKER GUARD (flicker.mjs): film every stretch that is not a filmed
+  // transition; a change that reverts within a few frames is a flicker and
+  // fails the probe with its frames and the DOM mutations attached.
+  const flickerNote = (report, what) =>
+    note(
+      `no flicker while ${what}`,
+      report.flickers.length === 0,
+      report.flickers.length === 0
+        ? `${report.frames} frames clean`
+        : report.flickers
+            .map(
+              (f) =>
+                `${f.frames.during} (${f.revertedAfterMs}ms, ${f.changedCells} cells): ${f.dom.slice(0, 4).join('; ')}`,
+            )
+            .join(' | '),
+    );
+  let guard = await watchFlicker(page, { dir: SHOT_DIR, label: 'first-chart' });
   const out = await run(
     'chart bar "Units Sold by Year" --labels "2021, 2022, 2023, 2024" --values "12, 19, 15, 22" --highlight 2024 --unit units --note "Source: the brief"',
   );
@@ -247,6 +266,8 @@ try {
   await shot('03-table');
   await page.click('[data-testid="presented-chart"] button[aria-label="Chart"]');
   await sleep(300);
+
+  flickerNote(await guard.stop(), 'the first chart landed, was hovered and toggled');
 
   // The transition, measured: every startViewTransition is recorded with the
   // animations that ran under it (the named group is the morph), and a CDP
@@ -394,6 +415,8 @@ try {
   });
   await sleep(400);
 
+  guard = await watchFlicker(page, { dir: SHOT_DIR, label: 'charts-edits' });
+
   // Not just bars: a two-series line and a donut, each its own card.
   const lineOut = await run(
     'chart line "Revenue vs Cost" --labels "Q1, Q2, Q3, Q4" --values "Revenue: 4.2, 5.1, 6.4, 7.0; Cost: 3.1, 3.4, 3.9, 4.2" --unit "$" --subtitle "millions"',
@@ -438,13 +461,30 @@ try {
   // 'all charts from bobble look the same generic'" and "say the user asks for
   // edits to the chart in any way … it all needs to work. styling from image".
   const unitsFile = /Drew a bar chart[^:]*: (\S+\.svg)/.exec(out)?.[1] ?? '';
+  // A card's picture is CUT OUT OF A FULL-PAGE SHOT. An element screenshot on
+  // an Electron page captures beyond the viewport, which re-lays the document
+  // out to the clip for a frame — the window flashes (MEASURED by the flicker
+  // guard: one flash per card screenshot). See png.mjs.
   const cardShot = async (label, index = -1) => {
     const cards = await page.$$('[data-testid="presented-chart"]');
     const card = cards.at(index);
     if (card === undefined) return;
     await card.scrollIntoViewIfNeeded();
     await sleep(350);
-    await card.screenshot({ path: path.join(SHOT_DIR, `${label}.png`) });
+    const box = await card.boundingBox();
+    const dpr = await page.evaluate(() => window.devicePixelRatio);
+    const full = await page.screenshot();
+    if (box) {
+      writeFileSync(
+        path.join(SHOT_DIR, `${label}.png`),
+        cropPng(full, {
+          x: box.x * dpr,
+          y: box.y * dpr,
+          width: box.width * dpr,
+          height: box.height * dpr,
+        }),
+      );
+    }
     log(`shot ${label}`);
   };
   // The chat's own folder: the first message gave the chat a project folder,
@@ -626,6 +666,8 @@ try {
   });
   await sleep(400);
   await shot('09b-small-svg-inline-poster-canvas');
+  flickerNote(await guard.stop(), 'more charts were drawn, edited, restyled and SVGs presented');
+
   // Leave the canvas closed for the model half.
   await page.evaluate(() => {
     const c = window.__pi_canvas?.();
@@ -640,6 +682,7 @@ try {
     const n = await page.evaluate(() => window.__pi_store().getState().messages.length);
     const prompt =
       'Here are units sold (thousands) by year: 2021: 12, 2022: 19, 2023: 27, 2024: 35. Make a bar chart of it and show me.';
+    guard = await watchFlicker(page, { dir: SHOT_DIR, label: 'model-turn' });
     await page.click('[data-testid="composer-input"]');
     await page.keyboard.type(prompt);
     await page.keyboard.press('Enter');
@@ -661,6 +704,7 @@ try {
       .then(() => true)
       .catch(() => false);
     await sleep(5000);
+    flickerNote(await guard.stop(), 'the model drew its chart');
     const secs = Math.round((Date.now() - t0) / 1000);
     const tail = await page.evaluate((k) => {
       const s = window.__pi_store().getState();
