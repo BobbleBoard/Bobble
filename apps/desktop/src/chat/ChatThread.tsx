@@ -332,7 +332,7 @@ export function ChatThread() {
     records: readonly PresentedRecord[],
     slots?: readonly Slot[],
   ): ReactNode => (
-    <div className="flex flex-col gap-2 px-1 pt-2" data-testid="presented">
+    <div className="flex flex-col gap-2 pt-2" data-testid="presented">
       {(slots ?? records.map((record): Slot => ({ kind: 'record', record }))).map((slot) =>
         slot.kind === 'pending' ? (
           <PendingChartCard key={`pending-${slot.args.id ?? ''}`} args={slot.args} />

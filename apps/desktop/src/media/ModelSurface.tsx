@@ -23,7 +23,7 @@
  */
 import { GLTFLoader, OrbitControls, RoomEnvironment, THREE } from '@pi-desktop/canvas/three';
 import { type JSX, useEffect, useMemo, useRef, useState } from 'react';
-import { disableMipmaps } from '../tripo/atlas-textures';
+import { disableMipmaps } from '../tripo/generated-mesh';
 import { countParts, createModelView, fileFacts, type ModelView } from './model-view';
 
 export interface ModelSurfaceProps {
@@ -229,7 +229,7 @@ export function ModelSurface({ src, testid, view: given }: ModelSurfaceProps): J
              inside of the surface behind it: the black and white specks.
              MEASURED by ablation 2026-09-18: this line alone took every fleck
              off a clean-atlas bake (385fa85ad18b); the environment above only
-             changed the brightness. And NO MIP CHAIN (atlas-textures.ts): a
+             changed the brightness. And NO MIP CHAIN (generated-mesh.ts): a
              TRELLIS atlas is a chart per triangle, and at a size where each
              triangle is a pixel the GPU sits on a mip level where every texel
              averages hundreds of unrelated charts — the studio's measured case. */
@@ -243,7 +243,8 @@ export function ModelSurface({ src, testid, view: given }: ModelSurfaceProps): J
           /* A mesh with no NORMAL attribute is BLACK under Normals and Grey —
              there is nothing to light — while the file's own unlit material
              hid it. SEEN on an engine bake: a black silhouette the moment the
-             strip left Color. The studio computes them too (Viewer3D). */
+             strip left Color. The studio computes them too (Viewer3D); per
+             index is enough — see generated-mesh.ts on why not per position. */
           if (mesh.geometry.getAttribute('normal') === undefined) {
             mesh.geometry.computeVertexNormals();
           }

@@ -161,6 +161,71 @@ try {
     c.code !== null && c.code.lang === 'ts' && c.code.copyVisible === '1',
     `the code block: type at the left, copy visible at rest: ${JSON.stringify(c.code)}`,
   );
+  // A chart card in the same reply: the same drawn border as the other two.
+  // the user (2026-09-18): "same card borders for dataviz please".
+  await page.evaluate(() => {
+    window
+      .__present_store()
+      .getState()
+      .add({
+        path: '/w/units.svg',
+        chat: '',
+        afterMessageId: 'a1',
+        chart: {
+          type: 'bar',
+          title: 'Units sold',
+          labels: ['2021', '2022', '2023', '2024'],
+          values: ['Units: 12, 19, 23, 31'],
+          look: 'clean',
+        },
+      });
+  });
+  await sleep(900);
+  const chart = await page.evaluate(() => {
+    const el = document.querySelector('.pd-inline-chart');
+    const code = document.querySelector('.pd-code-block');
+    const cs = el ? getComputedStyle(el) : null;
+    const r = el?.getBoundingClientRect();
+    const c = code?.getBoundingClientRect();
+    const chain = (node) => {
+      const out = [];
+      let n = node?.parentElement ?? null;
+      for (let i = 0; n && i < 6; i += 1) {
+        const b = n.getBoundingClientRect();
+        const st = getComputedStyle(n);
+        out.push(
+          `${n.className.toString().slice(0, 40)}|${Math.round(b.left)}-${Math.round(b.right)}|p${st.paddingLeft}/${st.paddingRight}|mw${st.maxWidth}`,
+        );
+        n = n.parentElement;
+      }
+      return out;
+    };
+    return el && code && r && c
+      ? {
+          chartChain: chain(el),
+          codeChain: chain(code),
+          border: cs.borderTopColor,
+          radius: cs.borderTopLeftRadius,
+          codeBorder: getComputedStyle(code).borderTopColor,
+          codeRadius: getComputedStyle(code).borderTopLeftRadius,
+          left: Math.round(r.left),
+          right: Math.round(r.right),
+          codeLeft: Math.round(c.left),
+          codeRight: Math.round(c.right),
+        }
+      : null;
+  });
+  await shot('3b-cards-with-chart-dark');
+  check(
+    chart !== null && chart.border === chart.codeBorder && chart.radius === chart.codeRadius,
+    `the chart card wears the code block's border and corner: ${JSON.stringify(chart)}`,
+  );
+  check(
+    chart !== null &&
+      Math.abs(chart.left - chart.codeLeft) <= 2 &&
+      Math.abs(chart.right - chart.codeRight) <= 2,
+    `…and its edges are the code block's edges: ${JSON.stringify(chart)}`,
+  );
   // Raw view of the svg card.
   await page.click('[data-testid="inline-widget"] [aria-label="Raw"]');
   await sleep(400);

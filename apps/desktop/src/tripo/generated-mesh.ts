@@ -1,6 +1,11 @@
 /**
- * Turn OFF mipmapping on a baked material's maps — for the studio's viewer AND
- * the chat's card, which is why it lives on its own.
+ * WHAT A GENERATED MESH NEEDS FROM A VIEWER — for the studio's viewer AND the
+ * chat's card, which is why it lives on its own: the same file must look the
+ * same in both rooms. Its baked atlas must not be mipmapped
+ * ({@link disableMipmaps}); its normals are fine as they are (the note at the
+ * foot says why, with numbers).
+ *
+ * ── Mipmaps ──────────────────────────────────────────────────────────────
  *
  * A TRELLIS surface is stair-stepped voxel faces, so xatlas splits the atlas at
  * nearly every edge: MEASURED on a 199,999-face helicopter, the exported GLB has
@@ -49,3 +54,22 @@ export function hasTextureMaps(mat: AnyMaterial): boolean {
   };
   return m.map != null || m.metalnessMap != null || m.roughnessMap != null || m.emissiveMap != null;
 }
+
+/*
+ * ── Normals ──────────────────────────────────────────────────────────────
+ *
+ * the user (2026-09-18): "recalculate / smooth normals help?" MEASURED, no. A
+ * bake is split at every chart edge — 52% of the mannequin's vertices and 49%
+ * of the astronaut's are duplicates of a seam position — so per-index normals
+ * (three's computeVertexNormals; trimesh's vertex_normals, which the engine
+ * exports) only ever see the faces on one side of a seam. Recomputing them per
+ * POSITION was tried in both rooms: mean pixel difference in the Grey render,
+ * card size, 0.12/255 on a 30k-face retopo and 0.18/255 on the 300k-face
+ * astronaut — invisible, because a half-neighbourhood of a dense smooth surface
+ * gives the same normal as the whole one. And the naive version HURT: flipped
+ * triangles cluster by chart, so averaging across a seam mixed an outward
+ * normal with an inward one and the astronaut came out grainy; the winding-
+ * safe version merely matched per-index at a cost of a Map over every vertex.
+ * So a file with no normals gets computeVertexNormals and a file with them
+ * keeps them — in both rooms.
+ */

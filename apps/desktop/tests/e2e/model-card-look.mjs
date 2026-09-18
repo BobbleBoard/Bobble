@@ -45,7 +45,7 @@ const OLD_SANDBOX = path.join(homedir(), '.cache', 'bobble', 'gen3d', 'sandbox')
    file by flipping V if it is missing. */
 const FIXTURES = path.join(process.cwd(), 'scratchpad', 'fixtures', 'gen3d');
 const SOURCES = {
-  model: path.join(SANDBOX, '385fa85ad18b', 'model.glb'),
+  model: process.env.MODEL_FIXTURE ?? path.join(SANDBOX, '385fa85ad18b', 'model.glb'),
   rigged:
     process.env.RIG_FIXTURE ??
     (existsSync(path.join(FIXTURES, 'rigged-v-fixed.glb'))

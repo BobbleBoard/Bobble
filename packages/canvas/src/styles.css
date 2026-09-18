@@ -5426,7 +5426,9 @@
 }
 
 .pd-chart[data-chart-ground] {
-  border-radius: var(--pd-radius-lg);
+  /* The card's own corner (.pd-inline-chart), so a look that paints its own
+     paper meets the drawn border without a sliver of the card behind it. */
+  border-radius: 12px;
 }
 
 .pd-chart--fill {
@@ -5796,9 +5798,16 @@
 .pd-inline-chart {
   position: relative;
   width: 100%;
-  max-width: min(100%, 44rem);
-  border: 1px solid var(--pd-border-subtle);
-  border-radius: var(--pd-radius-lg);
+  /* The prose column's width, so the card's edges are the code block's edges
+     (MEASURED before: 4px in from the left and 36px past the right of the
+     code block above it — the presented wrapper's px-1 and a 44rem cap that
+     the thread's 700px let through). */
+  max-width: min(100%, var(--pd-thread-prose-width, 44rem));
+  /* The same drawn border and corner as every other card in the thread — the
+     code block, the svg card (prose.css / .pd-inline-widget). the user
+     (2026-09-18): "same card borders for dataviz please". */
+  border: 1px solid color-mix(in srgb, var(--pd-text-primary) 14%, transparent);
+  border-radius: 12px;
   background: var(--pd-bg-raised);
   overflow: hidden;
 }

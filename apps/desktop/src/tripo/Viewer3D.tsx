@@ -44,7 +44,7 @@ import type { JSX } from 'react';
 import { useEffect, useRef } from 'react';
 import { ensureModelBytes } from './asset-registry';
 import { HERO_MESH_GLB_B64, HERO_RIG_GLB_B64 } from './assets/hero-glb';
-import { disableMipmaps, hasTextureMaps } from './atlas-textures';
+import { disableMipmaps, hasTextureMaps } from './generated-mesh';
 import { buildPresetClip } from './preset-motions';
 import { useTripoStore } from './store';
 import {
@@ -157,7 +157,7 @@ function paintSegmentColors(geo: InstanceType<typeof THREE.BufferGeometry>): num
   return parts;
 }
 
-// disableMipmaps / hasTextureMaps live in atlas-textures.ts — shared with the
+// disableMipmaps / hasTextureMaps live in generated-mesh.ts — shared with the
 // chat's card (media/ModelSurface.tsx), which showed the same static until it
 // treated a baked atlas the way this viewer does.
 
@@ -751,6 +751,9 @@ export default function Viewer3D({ gizmoRef }: Viewer3DProps): JSX.Element {
       // A mesh with no NORMAL attribute renders BLACK under a standard material
       // — there is nothing to light. AutoRemesher's OBJ has none, and plenty of
       // user files don't either, so compute them rather than trusting the file.
+      // Per index is enough — generated-mesh.ts says why per position was
+      // tried and measured as no better (the user: "recalculate / smooth normals
+      // help?").
       for (const { mesh } of importedBodies) {
         if (mesh.geometry.getAttribute('normal') === undefined) {
           mesh.geometry.computeVertexNormals();

@@ -260,6 +260,13 @@ try {
     );
   }
 
+  /* Keep today's engine output as a fixture for the card probe (untracked). */
+  if (retopo.ok) {
+    const keep = path.join(process.cwd(), 'scratchpad', 'fixtures', 'gen3d');
+    mkdirSync(keep, { recursive: true });
+    copyFileSync(retopo.path, path.join(keep, 'retopo.glb'));
+  }
+
   /* ── 2. refine_3d rig, on the astronaut ── */
   const t1 = Date.now();
   const rig = await client.call('refine_3d', { op: 'rig', modelPath });
@@ -271,6 +278,9 @@ try {
       rig.path !== modelPath && existsSync(rig.path),
       `the rig is a NEW file beside the original (${rig.path})`,
     );
+    const keep = path.join(process.cwd(), 'scratchpad', 'fixtures', 'gen3d');
+    mkdirSync(keep, { recursive: true });
+    copyFileSync(rig.path, path.join(keep, 'rigged.glb'));
     thread.push(
       { kind: 'user', id: 'u3', text: 'rig it', timestamp: 7 },
       call('g3', 'refine_3d', { model_path: path.relative(home, modelPath), op: 'rig' }, 8),
