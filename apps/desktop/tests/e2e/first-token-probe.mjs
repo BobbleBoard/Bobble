@@ -17,9 +17,16 @@ import { launchApp, probeHome } from './harness.mjs';
 
 const MODEL = process.env.MODEL ?? 'qwen3.5-4b-mtp';
 const home = probeHome('first-token');
+/* EXTRA_SETTINGS='{"moduleConnectors":{"3d":true}}' — the same turn with a
+   connector on, so a tool that grows the prompt is measured, not assumed. */
+const extra = process.env.EXTRA_SETTINGS ? JSON.parse(process.env.EXTRA_SETTINGS) : {};
 writeFileSync(
   path.join(home, '.pi', 'desktop', 'settings.json'),
-  `${JSON.stringify({ userMode: 'power', modelSelection: { mode: 'model', modelId: MODEL } }, null, 2)}\n`,
+  `${JSON.stringify(
+    { userMode: 'power', modelSelection: { mode: 'model', modelId: MODEL }, ...extra },
+    null,
+    2,
+  )}\n`,
 );
 const LOG = process.env.LOG ?? '/tmp/first-token.log';
 const { app, page, check, finish } = await launchApp('first-token', {
