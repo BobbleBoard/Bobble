@@ -216,13 +216,18 @@
 /* the user round-5 #6: the frame + radius live on this container (overflow clipped);
  * the <pre> inside owns the horizontal scroll, so a real 1px border stays crisp
  * on ALL sides regardless of scroll — an outset box-shadow could be clipped by
- * an ancestor's own overflow. Border weight rides the lightened box token. */
+ * an ancestor's own overflow.
+ *
+ * THE BORDER IS DRAWN. the user (2026-09-17, with a reference): "make borders more
+ * defined as shown in the example code block" — the reference's frame is ~15%
+ * of the ink on white; the token was 6%. Ink at 14% follows the flavour and
+ * the mode without a token per theme. */
 .pd-code-block {
   position: relative;
   overflow: hidden;
   margin: 0 0 14px;
-  border: 1px solid var(--pd-code-block-border);
-  border-radius: var(--pd-radius-md);
+  border: 1px solid color-mix(in srgb, var(--pd-text-primary) 14%, transparent);
+  border-radius: 12px;
   /* The CODE THEME's surface (Appearance → Code appearance). For the house
      themes it resolves to the flavour's own --pd-code-block-bg; a third-party
      theme brings its own ground, the way its editor would. Same for the text,
@@ -234,68 +239,47 @@
   font-variant-ligatures: none;
 }
 
-.pd-code-block-rail {
-  position: sticky;
-  top: 8px;
-  float: right;
-  width: 0;
-  height: 32px;
-}
-
-.pd-code-block-copy {
-  position: absolute;
-  right: 8px;
-  top: 0;
-  opacity: 0;
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
-  transition: opacity var(--pd-duration-base) var(--pd-easing-standard);
-}
-
-.pd-code-block:hover .pd-code-block-copy,
-.pd-code-block:focus-within .pd-code-block-copy {
-  opacity: 1;
-}
-
 /*
- * THE LANGUAGE LABEL IS A HEADER STRIP, NOT A CAPTION FLOATING IN THE CODE.
- *
- * It was 12px muted text padded into the top-left corner of the block, with
- * the copy button hovering somewhere to its right — nothing held them
- * together, and the block read as a paragraph in a slightly different grey
- * (design audit 2026-09-16: the block's fill measured 1.01:1 against the
- * page). Every reference gives a code block a distinct top bar carrying the
- * language and the actions; that bar is what makes it a THING rather than
- * text. The inset tone is a step down from the block's raised fill, so the
- * bar is drawn by tone and one hairline, not by a box.
- *
- * 32px matches the copy rail's height so the button — which floats at the
- * block's top-right regardless of this element — lands centred in the bar.
+ * THE HEAD: type at the top left, actions at the top right, on the card's own
+ * surface — the reference's shape (the user, 2026-09-17). It replaced a tinted
+ * strip with a hairline under it (design audit 2026-09-16): with a drawn
+ * border the block is already a thing, and the strip was a second frame.
  */
-.pd-code-block-lang {
+.pd-code-block-head {
   display: flex;
   align-items: center;
-  min-height: 32px;
-  padding: 0 14px;
-  border-bottom: 1px solid var(--pd-code-block-border);
-  background: color-mix(in srgb, var(--pd-bg-inset) 70%, transparent);
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 36px;
+  padding: 4px 6px 0 14px;
+  user-select: none;
+}
+
+.pd-code-block-lang {
   color: var(--pd-text-muted);
   font-family: var(--pd-font-sans);
   font-size: var(--pd-font-size-caption);
   line-height: var(--pd-leading-caption);
-  user-select: none;
 }
 
-/* The copy button is a 26px control (.pd-btn--sm); centre it in the 32px bar
- * when there is one. Without a language there is no bar and it keeps its
- * original corner position over the code. */
-.pd-code-block:has(.pd-code-block-lang) .pd-code-block-copy {
-  top: 3px;
+.pd-code-block-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--pd-text-muted);
+}
+
+.pd-code-block-copy {
+  color: var(--pd-text-muted);
+}
+
+.pd-code-block-copy:hover {
+  color: var(--pd-text-primary);
 }
 
 .pd-code-block pre {
   margin: 0;
-  padding: 12px 14px;
+  padding: 4px 14px 14px;
   overflow-x: auto;
 }
 

@@ -286,6 +286,12 @@ export function ChatThread() {
   type Slot =
     | { kind: 'record'; record: PresentedRecord }
     | { kind: 'pending'; args: PendingChartArgs };
+  const resultNames = (text: string, absPath: string): boolean => {
+    if (text.includes(absPath)) return true;
+    const said = /^(?:Drew|Changed)\b[^\n]*?:\s+(\S+\.svg)\b/.exec(text)?.[1];
+    if (said === undefined) return false;
+    return absPath === said || absPath.endsWith(`/${said}`);
+  };
   const slotsFor = (
     group: readonly AssistantMsg[],
     records: readonly PresentedRecord[],
@@ -305,7 +311,10 @@ export function ChatThread() {
           if (live) out.push({ kind: 'pending', args: { ...args, id: b.id } });
           continue;
         }
-        const record = records.find((r) => !placed.has(r) && result.text.includes(r.path));
+        // The reply names the file relative to the working folder (2026-09-17),
+        // the record has it absolute: match on the file's own name, then on
+        // the path the reply said ending the record's.
+        const record = records.find((r) => !placed.has(r) && resultNames(result.text, r.path));
         if (record !== undefined) {
           placed.add(record);
           out.push({ kind: 'record', record });

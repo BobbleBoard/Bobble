@@ -1,6 +1,14 @@
 import { normalizeChartSpec, pointCount } from '@pi-desktop/charts';
-import { IconButton } from '@pi-desktop/ui';
-import { type ReactNode, useCallback, useLayoutEffect, useRef, useState } from 'react';
+import {
+  highlightCode,
+  IconButton,
+  IconCheck,
+  IconCode,
+  IconCopy,
+  IconEye,
+  useCopyFeedback,
+} from '@pi-desktop/ui';
+import { type ReactNode, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Artifact } from './model.ts';
 import { defaultSurfaceRegistry, type SurfaceRegistry } from './registry.ts';
 import { ensureDefaultSurfaces } from './surfaces/register-builtins.tsx';
@@ -103,7 +111,33 @@ export function InlineWidget({
     };
   }, [measure]);
 
+  /*
+   * THE CARD'S HEAD — the reference the user sent (2026-09-17): the type at the
+   * top left; at the top right a rendered ⇄ raw toggle when the kind can be
+   * read either way, the copy, and the way out to the canvas. All visible at
+   * rest (the expand used to appear on hover, and the card had no name).
+   */
+  const kind = artifact.content.kind;
+  const toggles = kind === 'svg' || kind === 'html';
+  const [view, setView] = useState<'rendered' | 'raw'>('rendered');
+  const { copied, copy } = useCopyFeedback();
+  const raw = useMemo(
+    () => (toggles && view === 'raw' ? highlightCode(artifact.content.text, kind) : null),
+    [toggles, view, artifact.content.text, kind],
+  );
+
   let body: ReactNode = children;
+  if (body === undefined && raw !== null) {
+    body = (
+      <pre className="pd-inline-widget-raw pd-scroll">
+        <code
+          className="hljs"
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: highlight.js output — the source is escaped, the only markup is its class spans
+          dangerouslySetInnerHTML={{ __html: raw.html }}
+        />
+      </pre>
+    );
+  }
   if (body === undefined) {
     const resolved = activeRegistry.resolve(artifact);
     if (resolved) {
@@ -117,17 +151,59 @@ export function InlineWidget({
     <div
       className={rootClass}
       data-overflowing={overflowing || undefined}
-      data-kind={artifact.content.kind}
+      data-kind={kind}
+      data-view={toggles ? view : undefined}
       data-testid="inline-widget"
     >
-      <IconButton
-        size="sm"
-        className="pd-inline-widget-move"
-        aria-label="Move to canvas"
-        onClick={() => onMoveToCanvas?.(artifact)}
-      >
-        <IconExpand size={14} />
-      </IconButton>
+      {kind === 'chart' ? null : (
+        <div className="pd-inline-widget-head">
+          <span className="pd-inline-widget-kind">{kind}</span>
+          <span className="pd-inline-widget-actions">
+            {toggles ? (
+              <span className="pd-inline-widget-toggle">
+                <button
+                  type="button"
+                  className="pd-inline-widget-toggle-btn pd-focusable"
+                  aria-pressed={view === 'rendered'}
+                  aria-label="Rendered"
+                  title="Rendered"
+                  onClick={() => setView('rendered')}
+                >
+                  <IconEye size={14} />
+                </button>
+                <button
+                  type="button"
+                  className="pd-inline-widget-toggle-btn pd-focusable"
+                  aria-pressed={view === 'raw'}
+                  aria-label="Raw"
+                  title="Raw"
+                  onClick={() => setView('raw')}
+                >
+                  <IconCode size={14} />
+                </button>
+              </span>
+            ) : null}
+            <IconButton
+              size="sm"
+              className="pd-inline-widget-copy"
+              aria-label={copied ? 'Copied' : 'Copy'}
+              title={copied ? 'Copied' : 'Copy'}
+              onClick={() => copy(artifact.content.text)}
+            >
+              {copied ? <IconCheck size={14} /> : <IconCopy size={14} />}
+            </IconButton>
+            <IconButton
+              size="sm"
+              className="pd-inline-widget-move"
+              aria-label="Open in canvas"
+              title="Open in canvas"
+              onClick={() => onMoveToCanvas?.(artifact)}
+            >
+              <IconExpand size={14} />
+            </IconButton>
+          </span>
+        </div>
+      )}
       <div ref={boxRef} className="pd-inline-widget-box" style={{ maxHeight, overflow: 'hidden' }}>
         {body}
       </div>

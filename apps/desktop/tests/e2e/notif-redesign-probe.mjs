@@ -165,8 +165,8 @@ try {
     });
   });
   await page.waitForSelector('[data-testid="queued-message"]', { timeout: 8000 });
-  const homeShown = await page.evaluate(() =>
-    document.body.textContent.includes('How can I help you today?'),
+  const homeShown = await page.evaluate(
+    () => document.querySelector('[data-testid="home-lead"]') !== null,
   );
   assert(!homeShown, 'a queued message must show the thread (queued bubble), not the empty home');
   await page.screenshot({ path: path.join(OUT_DIR, '04-queued-thread.png') });

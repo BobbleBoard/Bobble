@@ -331,6 +331,16 @@ const SCHEMA_ONLY_LINES: readonly RegExp[] = [
  * in a FRESH shell whose cwd is the working folder. So `cd <folder> &&` is
  * never needed to get there, and a `cd` never carries to the next command.
  */
+/** "the chat's working folder `name`" — the folder said by name, never by its full path. */
+export function workingFolderLine(root: string | undefined): string {
+  const own = root === undefined ? '' : root.replace(/\/+$/, '').split('/').filter(Boolean).at(-1);
+  const named = own === undefined || own === '' ? '' : ` \`${own}\``;
+  return (
+    `the chat's working folder${named}. Every path you write or read is relative to it ` +
+    '(`notes.md`, `assets/logo.svg`); say paths that way too. `pwd` prints where it is on disk.'
+  );
+}
+
 export const SHELL_CWD_TRUTH =
   'Every shell command already starts in that folder, in a fresh shell: run `<command>` ' +
   'as it is, never `cd <that folder> && <command>`. A `cd` lasts only for the one command ' +
@@ -440,12 +450,18 @@ export function augmentSystemPrompt(
   } = {},
 ): string {
   let trimmed = stripPiIdentity(stripToolCatalog((base ?? '').trim()));
-  if (opts.workingDirectory !== undefined && opts.workingDirectory.length > 0) {
-    trimmed = trimmed.replace(
-      /^Current working directory: .*$/m,
-      `Current working directory: ${opts.workingDirectory}\n${SHELL_CWD_TRUTH}`,
-    );
-  }
+  /*
+   * THE FOLDER BY NAME, NEVER BY ITS FULL PATH. the user (2026-09-17): the model
+   * "should only know the relative path from the chat workspace's root by
+   * default" — it read the absolute folder off this line and repeated it in
+   * replies ("The file is located at /Users/user/Bobble/…/sample.svg"). The
+   * line now says which folder it is in by its own name, and how paths work
+   * inside it; `pwd` is the model looking for itself, and still answers.
+   */
+  trimmed = trimmed.replace(
+    /^Current working directory: .*$/m,
+    `Current working directory: ${workingFolderLine(opts.workingDirectory)}\n${SHELL_CWD_TRUTH}`,
+  );
   if (opts.guidelines !== undefined) {
     const cmd = opts.commandFor;
     trimmed = attributeGuidelines(trimmed, opts.guidelines.sources, {

@@ -271,21 +271,33 @@ describe('bash-CLI prompt is about commands, not tools', () => {
 });
 
 describe('the working directory the model is told', () => {
-  it('is the tools’ root, not the directory pi was launched in', () => {
+  it('is the tools’ root BY NAME — never the launch dir, never the full path', () => {
+    // the user (2026-09-17): the model read the absolute folder off this line and
+    // told the person "The file is located at /Users/user/Bobble/…/sample.svg".
     const base =
       'Guidelines:\n- Be concise\n\nCurrent date: 2026-09-12\nCurrent working directory: /Users/user';
     const out = augmentSystemPrompt(base, {
       workingDirectory: '/Users/user/Bobble/lighthouse-story',
     });
-    expect(out).toContain('Current working directory: /Users/user/Bobble/lighthouse-story');
-    expect(out).not.toContain('Current working directory: /Users/user\n');
+    expect(out).toContain(
+      "Current working directory: the chat's working folder `lighthouse-story`.",
+    );
+    expect(out).not.toContain('/Users/user');
+    expect(out).toMatch(/relative to it/);
+  });
+
+  it('names no path at all before the folder exists', () => {
+    const base = 'Current date: 2026-09-13\nCurrent working directory: /Users/user';
+    const out = augmentSystemPrompt(base, {});
+    expect(out).toContain("Current working directory: the chat's working folder.");
+    expect(out).not.toContain('/Users/user');
   });
 
   it('says that every shell command already starts there, so `cd` is never the first word', () => {
     // the user: the model kept typing `cd <working> && <command>` on every command.
     const base = 'Current date: 2026-09-13\nCurrent working directory: /Users/user';
     const out = augmentSystemPrompt(base, { workingDirectory: '/Users/user/Bobble/x' });
-    expect(out).toContain(`Current working directory: /Users/user/Bobble/x\n${SHELL_CWD_TRUTH}`);
+    expect(out).toContain(`\n${SHELL_CWD_TRUTH}`);
     expect(SHELL_CWD_TRUTH).toMatch(/fresh shell/);
     expect(SHELL_CWD_TRUTH).toMatch(/never `cd <that folder> && <command>`/);
   });

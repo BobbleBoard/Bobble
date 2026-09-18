@@ -1132,6 +1132,8 @@ function mapToolStepData(
       // relative to a root only the tools know (SEEN 2026-09-13: `hi-8/x.md`
       // in a working folder that was …/hi-8 — the row opened a tab one folder
       // up, "Could not read this file", for every file of the chat).
+      // (Relative to the working folder since 2026-09-17; the row opens it
+      // through resolveAbsPath, the way a relative call path already opened.)
       const reportedPath = result === undefined ? undefined : reportedWritePath(result.text);
       let editPath = reportedPath ?? path;
       let editName = reportedPath === undefined ? filename : baseName(reportedPath);

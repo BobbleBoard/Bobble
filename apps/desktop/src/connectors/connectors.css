@@ -305,8 +305,8 @@
 .pdc-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  column-gap: 40px;
-  row-gap: 4px;
+  column-gap: 24px;
+  row-gap: 8px;
 }
 @container pdc (min-width: 760px) {
   .pdc-grid {
@@ -319,6 +319,9 @@
    hover fill paints, so the list is rows and not hanging text (the user). The 8px
    the fill reaches past the column is a negative margin, so the mark's left
    edge sits on the heading's. */
+/* the user (2026-09-17): a DRAWN border, like the code block's (ink at 14%); the
+   resting wash much subtler than the universal `.pd-row-rest`; and the add
+   control tall on the right (below). */
 .pdc-row {
   display: flex;
   align-items: center;
@@ -326,12 +329,22 @@
   min-height: 64px;
   margin: 0 -8px;
   padding: 6px 6px 6px 8px;
-  border-radius: var(--pd-radius-lg);
+  border: 1px solid color-mix(in srgb, var(--pd-text-primary) 14%, transparent);
+  border-radius: 12px;
   transition: background-color var(--pd-duration-base) var(--pd-easing-standard);
 }
-.pdc-row:hover {
+.pdc-row.pd-row-rest {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--pd-bg-hover) 18%, transparent),
+    color-mix(in srgb, var(--pd-bg-hover) 6%, transparent)
+  );
+}
+.pdc-row:hover,
+.pdc-row.pd-row-rest:hover {
   background: var(--pd-bg-hover);
 }
+
 .pdc-open {
   display: flex;
   flex: 1;
@@ -392,6 +405,20 @@
 /* A model download in flight: the percentage sits where the button was, at the
    button's size, so the row does not reflow as it counts. Numbers are tabular
    so "9%" → "10%" does not jitter. */
+/* The add: a tall control on the card's right edge, nearly its full height,
+   centred — a target, not a glyph in a corner (the user, 2026-09-17). */
+.pdc-ctl--add {
+  width: 44px;
+  height: 50px;
+  border: 1px solid color-mix(in srgb, var(--pd-text-primary) 12%, transparent);
+  border-radius: 10px;
+  color: var(--pd-text-primary);
+}
+.pdc-ctl--add:hover {
+  background: var(--pd-bg-active);
+  border-color: color-mix(in srgb, var(--pd-text-primary) 22%, transparent);
+}
+
 .pdc-ctl--progress {
   width: auto;
   min-width: 28px;

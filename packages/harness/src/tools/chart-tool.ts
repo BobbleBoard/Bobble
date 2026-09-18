@@ -67,6 +67,7 @@ import {
 } from '@pi-desktop/charts';
 import { Type } from '@sinclair/typebox';
 import type { PresentBridge } from './present.js';
+import { pathForModel } from './workspace-relative.js';
 
 export const CHART_TOOL = 'chart';
 export const CHART_EDIT_TOOL = 'chart_edit';
@@ -680,7 +681,7 @@ export function registerChartTool(pi: ExtensionAPI, deps: ChartToolDeps): void {
       const what = whatIs(spec);
       const shown = await present(deps.bridge, written.svgPath, what);
       const text = [
-        `Drew ${what}: ${written.svgPath} (the spec beside it: ${path.basename(written.specPath)}).${shown}`,
+        `Drew ${what}: ${pathForModel(written.svgPath, root)} (the spec beside it: ${path.basename(written.specPath)}).${shown}`,
         `Data: ${describeData(spec)}`,
         `Look: ${describeLook(spec)}${imageNote}`,
         '',
@@ -798,7 +799,7 @@ export function registerChartTool(pi: ExtensionAPI, deps: ChartToolDeps): void {
       const what = whatIs(next);
       const shown = await present(deps.bridge, written.svgPath, `${what} — ${changed.join(', ')}`);
       const text = [
-        `Changed ${changed.join(', ')} → ${what}: ${written.svgPath}.${shown}`,
+        `Changed ${changed.join(', ')} → ${what}: ${pathForModel(written.svgPath, root)}.${shown}`,
         `Data: ${describeData(next)}`,
         `Look: ${describeLook(next)}${imageNote}`,
         '',

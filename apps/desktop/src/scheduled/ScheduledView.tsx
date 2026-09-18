@@ -246,7 +246,7 @@ function Suggestions({
             <span className="sd-row-when">{describeTemplateSchedule(t)}</span>
           </span>
           <span className="sd-row-plus" aria-hidden="true">
-            <IconPlus size={16} />
+            <IconPlus size={18} />
           </span>
         </button>
       ))}

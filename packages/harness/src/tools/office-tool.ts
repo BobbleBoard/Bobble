@@ -35,6 +35,7 @@ import { serverCanSeeImages } from '@pi-desktop/provider-llamacpp';
 import { Type } from '@sinclair/typebox';
 import { utilityEndpointFromEnv } from '../model-call/call-model.js';
 import type { PresentBridge } from './present.js';
+import { pathForModel } from './workspace-relative.js';
 
 export const OFFICE_MAKE_TOOL = 'office_make';
 export const OFFICE_EDIT_TOOL = 'office_edit';
@@ -564,7 +565,7 @@ export function registerOfficeTools(pi: ExtensionAPI, deps: OfficeToolDeps): voi
         r.warnings !== undefined && r.warnings.length > 0
           ? `\nWarnings: ${r.warnings.join('; ')}`
           : '';
-      const text = `Made ${what}: ${r.path} (${kb(r.bytes)}, ${r.seconds ?? '?'}s).${shown.shown}${warn}\n\n${r.summary ?? ''}\n\n${CHECK_LINE}`;
+      const text = `Made ${what}: ${pathForModel(r.path, root)} (${kb(r.bytes)}, ${r.seconds ?? '?'}s).${shown.shown}${warn}\n\n${r.summary ?? ''}\n\n${CHECK_LINE}`;
       lastMade.set(memoKey, { brief, text });
       const content: Content = [{ type: 'text', text }];
       if (shown.image !== undefined) {

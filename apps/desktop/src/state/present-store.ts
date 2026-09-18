@@ -254,12 +254,19 @@ export function chartsInTranscript(
   messages: ReadonlyArray<{
     kind: string;
     id: string;
-    blocks?: ReadonlyArray<{ type: string; id?: string; name?: string; arguments?: Record<string, unknown> }>;
+    blocks?: ReadonlyArray<{
+      type: string;
+      id?: string;
+      name?: string;
+      arguments?: Record<string, unknown>;
+    }>;
     toolCallId?: string;
     toolName?: string;
     text?: string;
     isError?: boolean;
   }>,
+  /** The chat's working folder — what a relative path in a reply is relative to. */
+  root?: string,
 ): Array<{ path: string; afterMessageId: string }> {
   const out: Array<{ path: string; afterMessageId: string }> = [];
   const owner = new Map<string, string>();
@@ -277,10 +284,16 @@ export function chartsInTranscript(
     // "Drew a bar chart …: /abs/units.svg (the spec beside it: …)" and
     // "Changed … → a bar chart …: /abs/units.svg." — the chart tool's own
     // reply, native or through bash — and "Presented /abs/x.svg to the user".
+    // Relative to the working folder since 2026-09-17 ("Drew …: units.svg");
+    // the caller resolves against the root it knows.
     const text = m.text ?? '';
-    const match = /^(?:Drew|Changed)\b[^\n]*?:\s+(\/\S+\.svg)\b/.exec(text) ?? /^Presented (\/\S+\.svg) to the user/.exec(text);
-    const path = match?.[1];
-    if (path === undefined) continue;
+    const match =
+      /^(?:Drew|Changed)\b[^\n]*?:\s+(\S+\.svg)\b/.exec(text) ??
+      /^Presented (\S+\.svg) to the user/.exec(text);
+    const said = match?.[1];
+    if (said === undefined) continue;
+    const path =
+      said.startsWith('/') || root === undefined ? said : `${root.replace(/\/+$/, '')}/${said}`;
     const key = `${path}@${anchor}`;
     if (seen.has(key)) continue;
     seen.add(key);
@@ -299,11 +312,12 @@ export function chartsInTranscript(
 export async function rehydratePresented(
   chat: string,
   messages: Parameters<typeof chartsInTranscript>[0],
+  root?: string,
 ): Promise<number> {
   const bridge = typeof window === 'undefined' ? undefined : window.piDesktop;
   if (bridge === undefined) return 0;
   let added = 0;
-  for (const { path, afterMessageId } of chartsInTranscript(messages)) {
+  for (const { path, afterMessageId } of chartsInTranscript(messages, root)) {
     const sidecar = `${path.slice(0, -4)}.chart.json`;
     let chart: Record<string, unknown> | undefined;
     try {
@@ -507,7 +521,23 @@ export function connectPresent(): () => void {
       presentedFor(usePresentStore.getState(), file).length === 0
     ) {
       rehydrated.add(file);
-      void rehydratePresented(file, state.messages as Parameters<typeof rehydratePresented>[1]);
+      // The working folder the tools used, as the harness publishes it — a
+      // reply names its chart relative to it since 2026-09-17.
+      let root: string | undefined = state.session?.cwd ?? undefined;
+      try {
+        const raw = state.extensionStatus?.harness;
+        const parsed = raw === undefined ? null : (JSON.parse(raw) as { workspaceRoot?: string });
+        if (typeof parsed?.workspaceRoot === 'string' && parsed.workspaceRoot !== '') {
+          root = parsed.workspaceRoot;
+        }
+      } catch {
+        /* the status is not for us to parse strictly */
+      }
+      void rehydratePresented(
+        file,
+        state.messages as Parameters<typeof rehydratePresented>[1],
+        root,
+      );
     }
   });
   const unsubShow = window.piDesktop.onEvent('present:show', ({ path, note, chart, svg }) => {

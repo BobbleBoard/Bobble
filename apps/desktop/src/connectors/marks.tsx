@@ -313,14 +313,14 @@ export function RowControl({
       <Tooltip label="Download the model — about 5 GB, once">
         <button
           type="button"
-          className="pdc-ctl pd-focusable"
+          className="pdc-ctl pdc-ctl--add pd-focusable"
           aria-label={label}
           data-testid={`connector-download-${item.id}`}
           onClick={() => {
             if (item.kind === 'connector') void actions.add(item);
           }}
         >
-          <IconDownload size={16} />
+          <IconDownload size={18} />
         </button>
       </Tooltip>
     );
@@ -337,7 +337,7 @@ export function RowControl({
       <Tooltip label={item.kind === 'skill' ? 'Turn on' : asks ? 'Set up and add' : 'Add'}>
         <button
           type="button"
-          className="pdc-ctl pd-focusable"
+          className="pdc-ctl pdc-ctl--add pd-focusable"
           aria-label={label}
           data-testid={asks ? `connector-setup-${item.id}` : `connector-add-${item.id}`}
           onClick={() => {
@@ -346,7 +346,7 @@ export function RowControl({
             else if (item.kind === 'connector') void actions.add(item);
           }}
         >
-          <IconPlus size={16} />
+          <IconPlus size={18} />
         </button>
       </Tooltip>
     );

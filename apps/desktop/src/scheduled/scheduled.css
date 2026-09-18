@@ -117,19 +117,27 @@
 .sd-list {
   display: flex;
   flex-direction: column;
+  gap: 6px;
   /* The hover fill bleeds past the text edge; the text stays on the gutter. */
   margin: 0 -12px;
 }
 
+/* the user (2026-09-17): the same drawn border and subtle wash as a Connectors
+   card; the template's + tall on the right. */
 .sd-row {
+  position: relative;
   display: flex;
   width: 100%;
   align-items: center;
   gap: 14px;
-  padding: 10px 12px;
-  border: 0;
-  border-radius: var(--pd-radius-row);
-  background: transparent;
+  padding: 8px 8px 8px 12px;
+  border: 1px solid color-mix(in srgb, var(--pd-text-primary) 14%, transparent);
+  border-radius: 12px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--pd-bg-hover) 18%, transparent),
+    color-mix(in srgb, var(--pd-bg-hover) 6%, transparent)
+  );
   color: var(--pd-text-primary);
   font: inherit;
   text-align: left;
@@ -140,6 +148,7 @@
 .sd-row:hover {
   background: var(--pd-bg-hover);
 }
+
 
 /* The app's focus ring, drawn inside the row so a scroll area cannot clip it. */
 .sd-row.pd-focusable,
@@ -199,15 +208,33 @@
 }
 
 /* The "+" that says what a click on a suggestion does. */
+/* Absolute, not `align-self: stretch`: a <button> flex container does not
+   stretch its items in WebKit, so the box is pinned to the card's top and
+   bottom edges instead — nearly its full height, centred by construction. */
+.sd-row:has(> .sd-row-plus) {
+  padding-right: 60px;
+}
 .sd-row-plus {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  bottom: 8px;
   display: inline-flex;
-  flex: none;
-  color: var(--pd-text-muted);
-  transition: color var(--pd-duration-fast) var(--pd-easing-standard);
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  min-height: 44px;
+  border: 1px solid color-mix(in srgb, var(--pd-text-primary) 12%, transparent);
+  border-radius: 10px;
+  color: var(--pd-text-primary);
+  transition:
+    background-color var(--pd-duration-fast) var(--pd-easing-standard),
+    border-color var(--pd-duration-fast) var(--pd-easing-standard);
 }
 
 .sd-row:hover .sd-row-plus {
-  color: var(--pd-text-primary);
+  background: var(--pd-bg-active);
+  border-color: color-mix(in srgb, var(--pd-text-primary) 22%, transparent);
 }
 
 /* The clause that is a warning, inside a line that is not. */
@@ -244,6 +271,7 @@
 .sd-suggest-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
+  gap: 6px 10px;
   margin: 0 -12px;
 }
 
@@ -257,7 +285,7 @@
 }
 
 .sd-suggest-grid .sd-row-plus {
-  margin-top: 8px;
+  margin-top: 0;
 }
 
 /* ---- the empty page ------------------------------------------------------- */

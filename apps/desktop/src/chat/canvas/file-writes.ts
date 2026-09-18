@@ -321,7 +321,9 @@ export function detectFileWrites(messages: ChatMsg[], cwd: string | undefined): 
        * keyed one folder up, and "Could not read this file" for every file of
        * the chat. The tool's own word is the truth of the disk.
        */
-      const path = reported.get(block.id) ?? resolvePath(cwd, write.path);
+      // …said relative to the working folder since 2026-09-17, so it resolves
+      // against the same root the call's own path does.
+      const path = resolvePath(cwd, reported.get(block.id) ?? write.path);
       byPath.set(path, {
         callId: block.id,
         path,

@@ -85,6 +85,13 @@ export const CodeBlock = forwardRef<HTMLDivElement, CodeBlockProps>(function Cod
       );
   }
 
+  /*
+   * THE CARD'S HEAD: the type at the top left, the actions at the top right —
+   * the shape of the reference the user sent (2026-09-17): "type in top left and
+   * copy in top right". Always visible, not revealed on hover; the same head
+   * the inline svg/html card wears (canvas InlineWidget), so a fence and a
+   * drawing read as the same kind of thing.
+   */
   return (
     <div
       ref={ref}
@@ -96,17 +103,20 @@ export const CodeBlock = forwardRef<HTMLDivElement, CodeBlockProps>(function Cod
       data-language={highlighted?.language ?? undefined}
       {...rest}
     >
-      <div className="pd-code-block-rail">
-        <button
-          type="button"
-          className="pd-btn pd-btn--ghost pd-icon-btn pd-btn--sm pd-code-block-copy"
-          aria-label={copied ? 'Copied' : 'Copy code'}
-          onClick={handleCopy}
-        >
-          {copied ? <IconCheck size={14} /> : <IconCopy size={14} />}
-        </button>
+      <div className="pd-code-block-head">
+        <span className="pd-code-block-lang">{language ?? ''}</span>
+        <span className="pd-code-block-actions">
+          <button
+            type="button"
+            className="pd-btn pd-btn--ghost pd-icon-btn pd-btn--sm pd-code-block-copy"
+            aria-label={copied ? 'Copied' : 'Copy code'}
+            title={copied ? 'Copied' : 'Copy'}
+            onClick={handleCopy}
+          >
+            {copied ? <IconCheck size={14} /> : <IconCopy size={14} />}
+          </button>
+        </span>
       </div>
-      {language !== undefined ? <div className="pd-code-block-lang">{language}</div> : null}
       <pre className="pd-scroll">
         <code className={highlighted !== null ? 'hljs' : undefined}>{body}</code>
       </pre>

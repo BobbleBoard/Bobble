@@ -1121,7 +1121,9 @@ const bobbleLight: ThemeTokens = {
      * surfaces share one rule: white sits on grey.
      */
     blockBg: '#ffffff',
-    blockBorder: '#0000000f',
+    /* Drawn, not implied: the user (2026-09-17) "make borders more defined as shown
+     * in the example code block" — the reference frames at ~15% of the ink. */
+    blockBorder: '#00000024',
   },
   diff: {
     addedFg: '#248a3d', // Apple system green (light)
@@ -1216,7 +1218,7 @@ const bobbleDark: ThemeTokens = {
      * the eye cannot separate from the page. bg.raised is the 1.10 step the
      * composer and canvas already stand on. */
     blockBg: '#1e1e21',
-    blockBorder: '#ffffff0f',
+    blockBorder: '#ffffff24',
   },
   diff: {
     addedFg: '#30d158',

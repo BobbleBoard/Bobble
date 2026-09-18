@@ -27,8 +27,21 @@ describe('InlineWidget', () => {
         <div>widget</div>
       </InlineWidget>,
     );
-    await click(container.querySelector('[aria-label="Move to canvas"]'));
+    await click(container.querySelector('[aria-label="Open in canvas"]'));
     expect(onMoveToCanvas).toHaveBeenCalledWith(svg);
+  });
+
+  it('wears the card head: the kind at the left, rendered ⇄ raw, copy and the way out at the right', async () => {
+    // the user (2026-09-17, with a reference): "type in top left and copy in top right".
+    const { container } = await render(<InlineWidget artifact={svg} />);
+    expect(container.querySelector('.pd-inline-widget-kind')?.textContent).toBe('svg');
+    const toggle = container.querySelectorAll('.pd-inline-widget-toggle-btn');
+    expect(toggle.length).toBe(2);
+    expect(container.querySelector('[aria-label="Copy"]')).not.toBeNull();
+    expect(container.querySelector('.pd-inline-widget')?.getAttribute('data-view')).toBe('rendered');
+    await click(toggle[1] ?? null);
+    expect(container.querySelector('.pd-inline-widget')?.getAttribute('data-view')).toBe('raw');
+    expect(container.querySelector('.pd-inline-widget-raw')).not.toBeNull();
   });
 
   it('is size-capped and never scrollable', async () => {

@@ -288,7 +288,12 @@ describe('the cards follow the chat', () => {
         id: 'a1',
         blocks: [
           { type: 'toolCall', id: 'c1', name: 'chart', arguments: { type: 'bar' } },
-          { type: 'toolCall', id: 'c2', name: 'bash', arguments: { command: 'chart line "Trend"' } },
+          {
+            type: 'toolCall',
+            id: 'c2',
+            name: 'bash',
+            arguments: { command: 'chart line "Trend"' },
+          },
           { type: 'toolCall', id: 'c3', name: 'chart_edit', arguments: {} },
         ],
       },
@@ -313,7 +318,13 @@ describe('the cards follow the chat', () => {
         toolName: 'chart_edit',
         text: 'Changed look → a bar chart "Units" (4 points, look sunset): /w/units.svg. Shown.',
       },
-      { kind: 'toolResult', id: 'tr4', toolCallId: 'c9', toolName: 'chart', text: 'Drew x: /w/orphan.svg' },
+      {
+        kind: 'toolResult',
+        id: 'tr4',
+        toolCallId: 'c9',
+        toolName: 'chart',
+        text: 'Drew x: /w/orphan.svg',
+      },
     ];
     expect(chartsInTranscript(messages)).toEqual([
       { path: '/w/units.svg', afterMessageId: 'a1' },
@@ -321,7 +332,31 @@ describe('the cards follow the chat', () => {
     ]);
   });
 
-  it('rebuilds a reopened chat\'s cards from the specs beside its chart files', async () => {
+  it('resolves the relative path a reply says (2026-09-17) against the working folder', () => {
+    const messages = [
+      {
+        kind: 'assistant',
+        id: 'a1',
+        blocks: [{ type: 'toolCall', id: 'c1', name: 'chart', arguments: { type: 'bar' } }],
+      },
+      {
+        kind: 'toolResult',
+        id: 'tr1',
+        toolCallId: 'c1',
+        toolName: 'chart',
+        text: 'Drew a bar chart "Units" (4 points, look clean): charts/units.svg (the spec beside it: units.chart.json). Shown.',
+      },
+    ];
+    expect(chartsInTranscript(messages, '/w/chat/')).toEqual([
+      { path: '/w/chat/charts/units.svg', afterMessageId: 'a1' },
+    ]);
+    // Without a root a relative name stays as said — never invented.
+    expect(chartsInTranscript(messages)).toEqual([
+      { path: 'charts/units.svg', afterMessageId: 'a1' },
+    ]);
+  });
+
+  it("rebuilds a reopened chat's cards from the specs beside its chart files", async () => {
     const invoke = vi.fn(async (channel: string, req: { path: string }) => {
       if (channel === 'fs:read-file') {
         if (req.path === '/w/units.chart.json')
@@ -332,9 +367,28 @@ describe('the cards follow the chat', () => {
     });
     (window as unknown as { piDesktop: unknown }).piDesktop = { invoke, onEvent: () => () => {} };
     const messages = [
-      { kind: 'assistant', id: 'a1', blocks: [{ type: 'toolCall', id: 'c1', name: 'chart', arguments: {} }, { type: 'toolCall', id: 'c2', name: 'chart', arguments: {} }] },
-      { kind: 'toolResult', id: 'tr1', toolCallId: 'c1', toolName: 'chart', text: 'Drew a bar chart: /w/units.svg (the spec beside it: units.chart.json).' },
-      { kind: 'toolResult', id: 'tr2', toolCallId: 'c2', toolName: 'chart', text: 'Drew a bar chart: /w/gone.svg (the spec beside it: gone.chart.json).' },
+      {
+        kind: 'assistant',
+        id: 'a1',
+        blocks: [
+          { type: 'toolCall', id: 'c1', name: 'chart', arguments: {} },
+          { type: 'toolCall', id: 'c2', name: 'chart', arguments: {} },
+        ],
+      },
+      {
+        kind: 'toolResult',
+        id: 'tr1',
+        toolCallId: 'c1',
+        toolName: 'chart',
+        text: 'Drew a bar chart: /w/units.svg (the spec beside it: units.chart.json).',
+      },
+      {
+        kind: 'toolResult',
+        id: 'tr2',
+        toolCallId: 'c2',
+        toolName: 'chart',
+        text: 'Drew a bar chart: /w/gone.svg (the spec beside it: gone.chart.json).',
+      },
     ];
     const n = await rehydratePresented('/sessions/x.jsonl', messages);
     expect(n).toBe(1);

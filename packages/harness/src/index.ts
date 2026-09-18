@@ -2798,6 +2798,11 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
         }
       }
     }
+    // The prompt names the folder it was built with (by name, not path); the
+    // seeds below used to read the path back off the prompt line.
+    if (runtime.workspaceRoot !== null && runtime.announcedWorkspace === null) {
+      runtime.announcedWorkspace = runtime.workspaceRoot;
+    }
     const augmented = augmentSystemPrompt(base, {
       toolInterface: toolCliMode ? 'bash-cli' : 'schemas',
       // In CLI mode, pi's own guidance names tools by their TOOL name — it
@@ -3450,10 +3455,12 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
      * the folder's real name, so there is nothing to translate.
      */
     const own = basename(root);
+    // By name, never by its full path (see workingFolderLine): the model says
+    // paths the way it hears them.
     return (
-      `Working folder: ${root} — this is your current directory now. Relative paths ` +
+      `Working folder: \`${own}\` — this is your current directory now. Relative paths ` +
       `resolve inside it (write \`notes.md\`, not \`${own}/notes.md\`), and that is where ` +
-      `files belong unless the user names somewhere else. ${SHELL_CWD_TRUTH}`
+      `files belong unless the user names somewhere else; say paths that way too. ${SHELL_CWD_TRUTH}`
     );
   }
 

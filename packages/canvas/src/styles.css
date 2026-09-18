@@ -1768,35 +1768,99 @@
  * Inline widget (THEME 2 — size-capped, NEVER scrollable)
  * ────────────────────────────────────────────────────────────────────── */
 
+/* the user (2026-09-17, with a reference): full width, the same card as a code
+ * block — a drawn border, the type at the top left, rendered ⇄ raw, copy and
+ * the way to the canvas at the top right. It used to shrink to the drawing's
+ * width with one hover-only expand button in its corner. */
 .pd-inline-widget {
   position: relative;
-  border: 1px solid var(--pd-border-subtle);
-  border-radius: var(--pd-radius-lg);
+  border: 1px solid color-mix(in srgb, var(--pd-text-primary) 14%, transparent);
+  border-radius: 12px;
   background: var(--pd-bg-raised);
   overflow: hidden;
-  /* A2: shrink to the widget's intrinsic width (a small badge stays a badge)
-   * and never fill the whole ~800px column; cap the growth at a modest max. */
-  width: fit-content;
-  max-width: min(100%, 40rem);
+  width: 100%;
+  max-width: 100%;
+}
+
+.pd-inline-widget-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 36px;
+  padding: 4px 6px 0 14px;
+  user-select: none;
+}
+
+.pd-inline-widget-kind {
+  color: var(--pd-text-muted);
+  font-family: var(--pd-font-sans);
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+}
+
+.pd-inline-widget-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.pd-inline-widget-actions .pd-icon-btn,
+.pd-inline-widget-copy,
+.pd-inline-widget-move {
+  color: var(--pd-text-muted);
+}
+
+.pd-inline-widget-actions .pd-icon-btn:hover {
+  color: var(--pd-text-primary);
+}
+
+/* The rendered ⇄ raw toggle: two glyphs in one small track, the pressed one lifted. */
+.pd-inline-widget-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-right: 4px;
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--pd-bg-inset);
+}
+
+.pd-inline-widget-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 20px;
+  border-radius: 6px;
+  color: var(--pd-text-muted);
+  transition:
+    background-color var(--pd-duration-fast) var(--pd-easing-standard),
+    color var(--pd-duration-fast) var(--pd-easing-standard);
+}
+
+.pd-inline-widget-toggle-btn[aria-pressed="true"] {
+  background: var(--pd-bg-raised);
+  color: var(--pd-text-primary);
+  box-shadow: var(--pd-shadow-hairline);
 }
 
 .pd-inline-widget-box {
   /* overflow:hidden + max-height set inline; NEVER scrollable by design. */
   width: 100%;
+  padding: 0 14px 14px;
+  box-sizing: border-box;
 }
 
-.pd-inline-widget-move {
-  position: absolute;
-  top: var(--pd-space-xs);
-  right: var(--pd-space-xs);
-  z-index: 2;
-  opacity: 0;
-  transition: opacity var(--pd-duration-fast) var(--pd-easing-standard);
-}
-
-.pd-inline-widget:hover .pd-inline-widget-move,
-.pd-inline-widget:focus-within .pd-inline-widget-move {
-  opacity: 1;
+.pd-inline-widget-raw {
+  margin: 0;
+  font-family: var(--pd-font-mono);
+  font-size: var(--pd-font-size-code);
+  line-height: var(--pd-leading-code);
+  color: var(--pd-code-fg, var(--pd-text-primary));
+  /* Markup is one long line more often than not; wrap it, do not scroll it. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .pd-inline-widget-overflow {
@@ -5717,6 +5781,11 @@
 .pd-inline-widget[data-kind="chart"] {
   width: 100%;
   max-width: min(100%, 44rem);
+}
+
+/* A chart card has its own head and its own padding (ChartView). */
+.pd-inline-widget[data-kind="chart"] > .pd-inline-widget-box {
+  padding: 0;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────

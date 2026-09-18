@@ -275,7 +275,14 @@ export function AssistantGroup({
      * gave the whole conversation a horizontal scrollbar. MEASURED at a 720px
      * viewport: the message box 398px, this child 430px.
      */
-    <div className="flex min-w-0 max-w-full flex-col gap-2">
+    /*
+     * w-full as well (the user, 2026-09-17: "the shown card for the svg should be
+     * larger, full width"): `.pd-msg` sizes this child to its content, so a
+     * card, a code block or a table was only ever as wide as the longest line
+     * of prose beside it. The reply takes the whole reading column, as the
+     * references' do; the text inside still wraps where it did.
+     */
+    <div className="flex w-full min-w-0 max-w-full flex-col gap-2">
       {segments.map((seg) => {
         if (seg.kind === 'text') {
           return <Markdown key={`${groupId}-t${textN++}`} text={seg.text} />;

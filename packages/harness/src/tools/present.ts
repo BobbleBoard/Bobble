@@ -31,6 +31,7 @@ import { homedir } from 'node:os';
 import { dirname, isAbsolute, join } from 'node:path';
 import type { ExtensionAPI } from '@mariozechner/pi-coding-agent';
 import { Type } from '@sinclair/typebox';
+import { pathForModel } from './workspace-relative.js';
 
 export const PRESENT_TOOL_NAME = 'present';
 
@@ -298,7 +299,7 @@ export function registerPresentTool(pi: ExtensionAPI, deps: PresentToolDeps): vo
 
       const content: Array<Record<string, unknown>> = [];
       const head = [
-        `Presented ${resolved} to the user${shown.ok ? '' : ` (the canvas could not open it: ${shown.error ?? 'unknown'})`}.`,
+        `Presented ${pathForModel(resolved, deps.resolvePath?.('.'))} to the user${shown.ok ? '' : ` (the canvas could not open it: ${shown.error ?? 'unknown'})`}.`,
         `Preview: ${plan.because}.`,
       ].join(' ');
       content.push({ type: 'text', text: head });

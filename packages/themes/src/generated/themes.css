@@ -824,7 +824,7 @@
   --pd-inline-code-fg: #1d1d1f;
   --pd-inline-code-border: #00000000;
   --pd-code-block-bg: #ffffff;
-  --pd-code-block-border: #0000000f;
+  --pd-code-block-border: #00000024;
   --pd-diff-added-fg: #248a3d;
   --pd-diff-deleted-fg: #d70015;
   --pd-diff-modified-fg: #c04c00;
@@ -1015,7 +1015,7 @@
   --pd-inline-code-fg: #f5f5f7;
   --pd-inline-code-border: #00000000;
   --pd-code-block-bg: #1e1e21;
-  --pd-code-block-border: #ffffff0f;
+  --pd-code-block-border: #ffffff24;
   --pd-diff-added-fg: #30d158;
   --pd-diff-deleted-fg: #ff453a;
   --pd-diff-modified-fg: #ff9f0a;

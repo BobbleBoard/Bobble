@@ -128,7 +128,9 @@ describe('registerPresentTool', () => {
     const r = await exec('t', { path: 'notes/probe-note.md' });
     expect(seen).toEqual(['/work/notes/probe-note.md']);
     expect(bridge.show).toHaveBeenLastCalledWith({ path: '/work/notes/probe-note.md' });
-    expect(r.content[0]?.text).toContain('Presented /work/notes/probe-note.md');
+    // The canvas got the absolute path; the model hears it relative to the
+    // working folder (the user, 2026-09-17).
+    expect(r.content[0]?.text).toContain('Presented notes/probe-note.md');
     // An absolute path and a ~ path are left where they point.
     await exec('t', { path: '/abs/x.png' });
     expect(seen.at(-1)).toBe('/abs/x.png');

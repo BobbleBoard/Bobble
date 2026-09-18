@@ -51,6 +51,7 @@ import { applySavedHarnessConfig, useUserMode } from '../state/settings-store';
 import { useStudioUiStore } from '../studio/studio-ui-store';
 import { AdvancedParamsPanel } from './AdvancedParamsPanel';
 import { preloadFastestModel } from './auto-router';
+import { BobbleMark } from './BobbleMark';
 import { ChatComposer } from './ChatComposer';
 import { ChatThread } from './ChatThread';
 import { ChatTitle } from './ChatTitle';
@@ -793,12 +794,24 @@ export function ChatApp({
               state centers the greeting + composer vertically. */
                 <div
                   className={`flex min-h-0 flex-1 flex-col ${
-                    empty ? 'items-center justify-center gap-6 px-6' : ''
+                    empty ? 'pd-home items-center px-6' : ''
                   }`}
                 >
+                  {/*
+                    THE EMPTY SCREEN SITS HIGH, NOT CENTRED. the user (2026-09-17):
+                    "move the chat area upward so it's ~45% height to the bottom
+                    of the screen and then place just a single line larger than
+                    currently that has the app logo and then 'Bobble'". Two
+                    spacers split the free height 45:55 around the block, which
+                    leaves ~45% of the window under the composer.
+                  */}
+                  {empty ? <div key="space-top" aria-hidden className="pd-home-space-top" /> : null}
                   {empty ? (
-                    <div key="lead" className="flex flex-col items-center gap-2">
-                      <h1 className="text-title">Bobble</h1>
+                    <div key="lead" className="flex flex-col items-center">
+                      <div className="pd-home-lead" data-testid="home-lead">
+                        <BobbleMark size={30} />
+                        <span className="pd-home-lead-name">Bobble</span>
+                      </div>
                       {/*
                         NOT "What are we building?".
 
@@ -815,16 +828,12 @@ export function ChatApp({
                         Fixing one layer would just have moved the tell, so all
                         three moved together.
                       */}
-                      <p className="text-body text-text-muted">How can I help you today?</p>
                       {/*
-                        THE CLAIM, WHERE THE DECISION IS MADE. It admits the
-                        exception, which is what makes it worth believing: "Your
-                        chats stay on this Mac" is passive and can be read as a
-                        storage claim, and web search does send words out.
+                        "How can I help you today?" and the privacy claim
+                        ("Nothing you type here leaves this Mac. Only web
+                        searches do.") used to sit under the name; the user asked
+                        for the one line, so they are gone from here.
                       */}
-                      <p className="mt-1 text-caption text-text-muted" data-testid="privacy-line">
-                        Nothing you type here leaves this Mac. Only web searches do.
-                      </p>
                       {/*
                         ROOM FOR THE PILL. It floats 8px above the input card and
                         landed on top of this line — the user drew an arrow at it.
@@ -855,6 +864,9 @@ export function ChatApp({
                   input (mounted inside ChatComposer). */}
                     {composer}
                   </div>
+                  {empty ? (
+                    <div key="space-bottom" aria-hidden className="pd-home-space-bottom" />
+                  ) : null}
                 </div>
               )}
             </MainSurface>

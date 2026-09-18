@@ -245,7 +245,10 @@ describe('chart — the tool', () => {
     expect(r.isError).toBeFalsy();
     const text = r.content[0]?.text ?? '';
     const svgPath = path.join(root, 'units-sold-by-year.svg');
-    expect(text).toContain(svgPath);
+    // Said relative to the working folder (the user, 2026-09-17: the model must
+    // not learn the absolute path from a reply), and never the absolute one.
+    expect(text).toContain(': units-sold-by-year.svg (');
+    expect(text).not.toContain(svgPath);
     expect(text).toContain('Data: 2021 12 units, 2022 19 units, 2023 15 units, 2024 22 units');
     expect(text).toContain('ONE sentence');
     expect(show).toHaveBeenCalledWith({
@@ -347,7 +350,7 @@ describe('chart — the tool', () => {
     });
     expect(r.isError).toBeFalsy();
     const svgPath = path.join(root, 'charts', 'share.svg');
-    expect(r.content[0]?.text).toContain(svgPath);
+    expect(r.content[0]?.text).toContain(': charts/share.svg (');
     expect(readFileSync(svgPath, 'utf8')).toContain('<svg');
   });
 

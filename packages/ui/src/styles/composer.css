@@ -18,11 +18,11 @@
   display: flex;
   flex-direction: column;
   width: 100%;
-  /* Round-10 (#12): scale the input area ~1.18x (font, padding, min-height, the
-   * placeholder offsets). Kept as ONE token so the whole input bar grows
-   * proportionally (and the user can retune the single number). Inherited by the
-   * editor / input / placeholder below. */
-  --pd-composer-scale: 1.18;
+  /* ONE token scales the input area (font, padding, min-height, the placeholder
+   * offsets), inherited by the editor / input / placeholder below. It was 1.18
+   * (an 18.88px input); the user (2026-09-17): "the text is way too big in the input
+   * bar" — the references' inputs are 16px (Claude 16, ChatGPT 16), so 1.0. */
+  --pd-composer-scale: 1;
   border-radius: var(--pd-radius-surface);
   background: color-mix(
     in srgb,
