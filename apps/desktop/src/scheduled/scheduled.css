@@ -149,7 +149,6 @@
   background: var(--pd-bg-hover);
 }
 
-
 /* The app's focus ring, drawn inside the row so a scroll area cannot clip it. */
 .sd-row.pd-focusable,
 .sd-run-head.pd-focusable,
