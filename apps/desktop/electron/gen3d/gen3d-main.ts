@@ -625,7 +625,7 @@ export async function run3dJob(
   if (!res.ok || res.jobId === undefined) {
     return { ok: false, error: res.error ?? 'the engine refused the request' };
   }
-  return imageJobs.wait(res.jobId, timeoutMs, 'model-glb');
+  return withEndReason(res.jobId, await imageJobs.wait(res.jobId, timeoutMs, 'model-glb'));
 }
 
 export async function runStage3dJob(
@@ -651,7 +651,7 @@ export async function runStage3dJob(
   if (!res.ok || res.jobId === undefined) {
     return { ok: false, error: res.error ?? 'the engine refused the request' };
   }
-  return imageJobs.wait(res.jobId, timeoutMs, 'model-glb');
+  return withEndReason(res.jobId, await imageJobs.wait(res.jobId, timeoutMs, 'model-glb'));
 }
 
 /** Is the 3D module — an engine that can make a mesh — on this machine? */
@@ -782,6 +782,23 @@ function motionPromptCached(prompt: string): boolean {
   );
 }
 
+/**
+ * Why the guardian ended a job, by job id. The engine reports a job it was
+ * told to cancel as "cancelled" and nothing more — which, relayed to the chat
+ * as a tool result, read "generate_3d failed: cancelled" (SEEN 2026-09-18: a
+ * grey build shed at 102 s on this 24 GB Mac). The guardian's own sentence is
+ * the one worth passing on — it names the memory and what would change it.
+ */
+const endedBy = new Map<string, string>();
+
+/** A tracker result, with the guardian's reason in place of a bare "cancelled". */
+function withEndReason(jobId: string, res: ImageJobResult): ImageJobResult {
+  const why = endedBy.get(jobId);
+  endedBy.delete(jobId);
+  if (why !== undefined && !res.ok && /^cancel/i.test(res.error)) return { ok: false, error: why };
+  return res;
+}
+
 function guardSidecarJob(jobId: string, label: string): void {
   guardedJobs.get(jobId)?.();
   guardedJobs.set(
@@ -797,7 +814,8 @@ function guardSidecarJob(jobId: string, label: string): void {
       // tree BELOW the server (uv → python server → worker), so the server
       // stays up for the next stage.
       spareDepth: 1,
-      cancel: async () => {
+      cancel: async (reason) => {
+        endedBy.set(jobId, reason);
         await sidecarPost<{ ok: boolean }>('/cancel', { jobId });
       },
     }),
