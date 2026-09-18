@@ -149,8 +149,14 @@ export function unreadableFileArtifact(absPath: string): Artifact {
     id: fileTabKey(absPath),
     title: filename,
     filename,
+    /*
+     * A NOTICE, NOT A DOCUMENT. As `kind: 'text'` this sentence went into the
+     * code editor — line numbers down the left, a Rendered|Raw toggle above —
+     * and read as the file's contents. The `notice` kind renders it as what it
+     * is: a message about the file, with the path it looked up in mono.
+     */
     content: {
-      kind: 'text',
+      kind: 'notice',
       text:
         `Could not read this file.\n\n${absPath}\n\n` +
         'It may have been written somewhere else, moved, or removed since it was ' +
@@ -224,8 +230,8 @@ function hintArtifact(absPath: string, text: string): Artifact {
  * live-follow. The header shows the filename (the operation-bar breadcrumb
  * already carries the full path).
  */
-function buildEditDiff(absPath: string, edit: EditHunk): DiffFileData[] {
-  return [editDiffFile(basename(absPath), edit.oldText, edit.newText)];
+function buildEditDiff(absPath: string, edit: EditHunk, baseText?: string): DiffFileData[] {
+  return [editDiffFile(basename(absPath), edit.oldText, edit.newText, { baseText })];
 }
 
 /** How a tab should show an edit: as the motion, or as the fallback diff. */
@@ -259,7 +265,7 @@ export function presentEdit(
     );
     if (plan !== null) return { kind: 'animate', plan };
   }
-  return { kind: 'diff', diff: buildEditDiff(absPath, fallback) };
+  return { kind: 'diff', diff: buildEditDiff(absPath, fallback, baseText) };
 }
 
 async function readFile(absPath: string): Promise<ReadFileResult | null> {
@@ -610,6 +616,27 @@ export function useFileWriteCanvasRouting(): void {
 
       const preview = previewKindForExt(extname(basename(ev.path)));
       const existing = controller.getState().tabs.find((t) => t.key === key);
+
+      /*
+       * THE WRITE WAS REFUSED: THERE IS NO FILE. The tab opened above while the
+       * content streamed in, and left alone it outlives the refusal — first as
+       * a frozen "streaming" view, then (once anything re-reads the path) as
+       * "Could not read this file" set in a code editor with line numbers, as
+       * if that sentence were the file's content (the user, 2026-09-17: "absolute
+       * nonsense"). The thread's row keeps the content and says why it was
+       * refused; the canvas closes the tab that was only ever a promise.
+       */
+      if (ev.failed === true) {
+        if (
+          existing !== undefined &&
+          opened.current.has(key) &&
+          !finalized.current.has(ev.callId)
+        ) {
+          finalized.current.add(ev.callId);
+          controller.closeTab(existing.id);
+        }
+        continue;
+      }
 
       if (preview !== null) {
         // A binary modality write (image/pdf/3D/doc): there's no partial text to

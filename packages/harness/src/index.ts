@@ -3983,7 +3983,13 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
           if (
             event.toolName === 'write' &&
             svgCommandAvailable &&
-            isHandwrittenSvg({ path: input.path, content: body, exists, svgCommandAvailable })
+            isHandwrittenSvg({
+              path: input.path,
+              content: body,
+              exists,
+              svgCommandAvailable,
+              request: runtime.lastPrompt,
+            })
           ) {
             svgRefused.set(abs, body);
             pi.appendEntry(HARNESS_LOOP_ENTRY, { action: 'block', cause: 'handwritten-svg' });

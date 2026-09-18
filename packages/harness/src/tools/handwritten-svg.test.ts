@@ -122,3 +122,92 @@ describe('refusals', () => {
     expect(handwrittenInlineSvgRefusal('index.html', 1, true)).toContain('Not edited');
   });
 });
+
+describe('isHandwrittenSvg — when the markup is what was asked for', () => {
+  // The exact shape of the user's sample.svg (2026-09-17): a prolog, a comment
+  // block that titles itself, then the markup — the file WAS the answer.
+  const lesson = [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<!--',
+    '  SVG File Format Examples',
+    '  ------------------------',
+    '  Common formatting conventions for SVG files.',
+    '-->',
+    '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">',
+    '  <rect x="10" y="10" width="50" height="50"/>',
+    '</svg>',
+  ].join('\n');
+  const bare = svg;
+
+  it('lets a self-explaining file through, whatever it is called', () => {
+    expect(
+      isHandwrittenSvg({
+        path: 'shapes.svg',
+        content: lesson,
+        exists: false,
+        svgCommandAvailable: true,
+      }),
+    ).toBe(false);
+  });
+
+  it('lets a sample/template/fixture through by its name', () => {
+    for (const path of [
+      'sample.svg',
+      'examples/icon-template.svg',
+      'fixtures/tiny.svg',
+      'demo.svg',
+    ]) {
+      expect(
+        isHandwrittenSvg({ path, content: bare, exists: false, svgCommandAvailable: true }),
+      ).toBe(false);
+    }
+  });
+
+  it('lets bare markup through when the person asked about SVG as a format', () => {
+    for (const request of [
+      'show me how svg is generlaly formatted',
+      'what does the syntax of an SVG look like?',
+      'give me an example svg file',
+      'explain svg markup',
+    ]) {
+      expect(
+        isHandwrittenSvg({
+          path: 'shapes.svg',
+          content: bare,
+          exists: false,
+          svgCommandAvailable: true,
+          request,
+        }),
+      ).toBe(false);
+    }
+  });
+
+  it('still catches a hand-drawn picture asked for as a picture', () => {
+    for (const request of [
+      'make me an svg icon of a red heart',
+      'draw a logo for my coffee shop',
+    ]) {
+      expect(
+        isHandwrittenSvg({
+          path: 'heart.svg',
+          content: bare,
+          exists: false,
+          svgCommandAvailable: true,
+          request,
+        }),
+      ).toBe(true);
+    }
+  });
+
+  it('a one-word comment is not a lesson', () => {
+    expect(
+      isHandwrittenSvg({
+        path: 'heart.svg',
+        content: '<!-- heart --><svg xmlns="http://www.w3.org/2000/svg"><path d="M1 1"/></svg>',
+        exists: false,
+        svgCommandAvailable: true,
+        request: 'make me an svg icon of a red heart',
+      }),
+    ).toBe(true);
+  });
+});

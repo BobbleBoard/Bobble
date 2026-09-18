@@ -5917,3 +5917,40 @@
     animation-duration: 0s;
   }
 }
+
+/* A notice about a file — "Could not read this file" — set as prose, not as
+ * source (it used to land in the code editor with line numbers). */
+.pd-file-notice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 100%;
+  padding: 32px 24px;
+  text-align: center;
+  color: var(--pd-text-secondary);
+  font-size: var(--pd-font-size-body);
+}
+
+.pd-file-notice-title {
+  color: var(--pd-text-primary);
+  font-weight: var(--pd-font-weight-medium, 500);
+}
+
+.pd-file-notice-path {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  padding: 4px 8px;
+  border-radius: var(--pd-radius-sm, 6px);
+  background: var(--pd-bg-inset);
+  font-family: var(--pd-font-mono);
+  font-size: var(--pd-font-size-caption);
+  color: var(--pd-text-secondary);
+}
+
+.pd-file-notice-hint {
+  max-width: 44ch;
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-footnote);
+}

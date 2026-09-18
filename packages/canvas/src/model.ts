@@ -6,7 +6,16 @@
  * any string so future surfaces (image | video | 3d | browser | …) register
  * without a breaking change to this union or to the registry.
  */
-export type KnownArtifactKind = 'code' | 'markdown' | 'html' | 'svg' | 'image' | 'pdf' | 'file';
+export type KnownArtifactKind =
+  | 'code'
+  | 'markdown'
+  | 'html'
+  | 'svg'
+  | 'image'
+  | 'pdf'
+  | 'file'
+  /** A message ABOUT a file (it could not be read) — prose, never an editor. */
+  | 'notice';
 
 // The `& {}` intersection is the canonical "open string union" trick: it preserves
 // literal autocomplete for the known kinds while still accepting any future string

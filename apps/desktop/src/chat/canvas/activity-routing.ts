@@ -285,6 +285,9 @@ export function detectActivity(
 
   let fileFocus: ActivityFocus | undefined;
   for (const write of detectFileWrites(messages, cwd)) {
+    // A refused write is not a file (it is flagged so the file-tab hook can
+    // close what it opened); the Activity tab has nothing to show for it.
+    if (write.failed === true) continue;
     const pos = positionOf.get(write.callId) ?? 0;
     if (fileFocus === undefined || pos >= fileFocus.at) {
       fileFocus = { kind: 'file', at: pos, write };

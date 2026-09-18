@@ -42,16 +42,61 @@ const SVG_OPEN = /<svg[\s>]/i;
 const INLINE_DRAWN_SVG =
   /<svg[\s>][\s\S]*?<(?:path|circle|rect|polygon|ellipse|line|polyline)\b[\s\S]*?<\/svg>/i;
 
+/*
+ * WHEN THE MARKUP IS THE THING ASKED FOR.
+ *
+ * SEEN (the user, 2026-09-17): "show me how svg is generally formatted" — the model
+ * wrote `sample.svg`, eighty-eight lines opening with `<?xml …?>` and a
+ * comment block titled "SVG File Format Examples", and the guard refused it as
+ * a hand-drawn graphic. Nothing was drawn; the file WAS the answer, and the
+ * person got a red row and a canvas tab for a file that did not exist. The
+ * guard exists for "make me an icon of a heart" typed as `<circle>`s; it has
+ * no business between a person and the SVG syntax they asked to see. Three
+ * signals say the markup is wanted for itself, any one of which lets it pass:
+ *
+ *   the REQUEST talks about SVG as a format (how it is written, its syntax,
+ *   an example of it), not about a picture;
+ *   the FILE is named as a sample, a template, a fixture, a placeholder;
+ *   the CONTENT explains itself — a comment of a few words, a <title>/<desc>,
+ *   a DOCTYPE: teaching material, which a drawing model never emits.
+ */
+const MARKUP_REQUEST =
+  /\b(?:format(?:ted|ting)?|markup|syntax|structure|anatomy|example|sample|template|boilerplate|skeleton|spec(?:ification)?|tutorial|explain|teach|learn|cheat ?sheet|how (?:is|are|does|do|to write|to structure|to format)|xml|source|code)\b/i;
+const SAMPLE_WORDS =
+  'sample|example|template|demo|test|fixture|format|skeleton|boilerplate|placeholder|tutorial';
+const SAMPLE_NAME = new RegExp(
+  `(?:${SAMPLE_WORDS})[^/\\\\]*\\.svg$|(?:^|[/\\\\])(?:${SAMPLE_WORDS})s?[/\\\\].*\\.svg$`,
+  'i',
+);
+// `\S+\s+` word by word — no ambiguity for the engine to backtrack through.
+const EXPLAINS_ITSELF =
+  /<!--\s*(?:(?:(?!-->)\S)+\s+){3,}(?!-->)\S|<(?:title|desc)\b[^>]*>\s*\S|<!DOCTYPE/i;
+
+/** Is this `.svg` wanted as markup — a sample, a lesson, a fixture — rather than as a picture? */
+export function isMarkupTheDeliverable(input: {
+  path: string;
+  content: string;
+  request?: string;
+}): boolean {
+  if (SAMPLE_NAME.test(input.path.trim())) return true;
+  if (EXPLAINS_ITSELF.test(input.content)) return true;
+  const request = input.request ?? '';
+  return /\bsvgs?\b/i.test(request) && MARKUP_REQUEST.test(request);
+}
+
 /** Would this `write` produce a hand-made `.svg` that `svg` should be drawing? */
 export function isHandwrittenSvg(input: {
   path: string;
   content: string;
   exists: boolean;
   svgCommandAvailable: boolean;
+  /** The person's latest message — what they actually asked for. */
+  request?: string;
 }): boolean {
   if (!input.svgCommandAvailable || input.exists) return false;
   if (!/\.svg$/i.test(input.path.trim())) return false;
-  return SVG_OPEN.test(input.content);
+  if (!SVG_OPEN.test(input.content)) return false;
+  return !isMarkupTheDeliverable(input);
 }
 
 /** How many hand-drawn inline graphics a page's markup carries. */

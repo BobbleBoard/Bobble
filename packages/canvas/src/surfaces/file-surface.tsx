@@ -292,6 +292,20 @@ export function FileSurface({
   );
 
   const rootClass = ['pd-file', className].filter(Boolean).join(' ');
+  // A notice about the file (it could not be read) is prose, not source: no
+  // editor, no line numbers, no toggle — a title, the path it tried, the hint.
+  if (content.kind === 'notice') {
+    const [title = '', path = '', ...rest] = content.text.split('\n\n');
+    return (
+      <div className={rootClass}>
+        <div className="pd-file-notice" role="status">
+          <div className="pd-file-notice-title">{title}</div>
+          {path !== '' ? <code className="pd-file-notice-path">{path}</code> : null}
+          {rest.length > 0 ? <div className="pd-file-notice-hint">{rest.join(' ')}</div> : null}
+        </div>
+      </div>
+    );
+  }
   return (
     <div className={rootClass} data-edit-phase={anim?.phase}>
       <FileDiffBadge added={addedLines} removed={removedLines} />

@@ -1154,6 +1154,21 @@ function mapToolStepData(
           deleted = 0;
         }
       }
+      /*
+       * WHY IT FAILED, ON THE ROW. A refused write used to open on its diff —
+       * eighty-eight green lines under a red "Could not write the file" (the user,
+       * 2026-09-17: "failed what exactly?") — because the reason lived only in
+       * the tool result. The reveal now leads with that text; the content
+       * follows it as what WOULD have been written. And a refused whole-file
+       * write names a file that does not exist: the row must not offer to open
+       * it in the canvas.
+       */
+      const refusal =
+        result?.isError === true && result.text.trim().length > 0 ? result.text.trim() : undefined;
+      const noFile =
+        result?.isError === true &&
+        block.name !== 'edit' &&
+        str(args.old_string ?? args.oldText ?? args.old ?? args.oldStr) === undefined;
       return {
         data: {
           kind,
@@ -1164,6 +1179,8 @@ function mapToolStepData(
           ...(diff !== undefined ? { diff } : {}),
           ...(added !== undefined ? { added } : {}),
           ...(deleted !== undefined ? { deleted } : {}),
+          ...(refusal !== undefined ? { error: refusal } : {}),
+          ...(noFile ? { noFile: true } : {}),
         },
       };
     }
@@ -1281,15 +1298,18 @@ function mapToolStepData(
        * the call's own arguments, read out of the raw text while they stream
        * so the row says what it is the moment the model has typed the type.
        */
-      const rawType =
-        str(args.type) ?? partialJsonString(block.argsText ?? '', ['type'])?.value;
+      const rawType = str(args.type) ?? partialJsonString(block.argsText ?? '', ['type'])?.value;
       const title = str(args.title) ?? partialJsonString(block.argsText ?? '', ['title'])?.value;
       const typed = resolution.label === undefined && rawType !== undefined;
       const word = chartTypeWord(rawType);
       return {
         data: {
           kind,
-          label: typed ? (running ? `Rendering a ${word} chart` : `Rendered a ${word} chart`) : label,
+          label: typed
+            ? running
+              ? `Rendering a ${word} chart`
+              : `Rendered a ${word} chart`
+            : label,
           status,
           ...(title === undefined || title === '' ? {} : { detail: title }),
           argsText: formatArgs(args),

@@ -309,7 +309,13 @@ describe('mapToolStep — a chart row names the kind of chart, and a written cal
 
   it('reads the type while the arguments are still streaming', () => {
     const step = mapToolStep(
-      { type: 'toolCall', id: 'c1', name: 'chart', arguments: {}, argsText: '{"type": "line", "title": "Sign' },
+      {
+        type: 'toolCall',
+        id: 'c1',
+        name: 'chart',
+        arguments: {},
+        argsText: '{"type": "line", "title": "Sign',
+      },
       undefined,
       true,
     ).data;
@@ -319,7 +325,9 @@ describe('mapToolStep — a chart row names the kind of chart, and a written cal
 
   it('the CLI form (`chart bar "Title" …` through bash) is the same row', () => {
     const step = mapToolStep(
-      call('c1', 'bash', { command: 'chart bar "Units Sold by Year" --labels "a, b" --values "1, 2"' }),
+      call('c1', 'bash', {
+        command: 'chart bar "Units Sold by Year" --labels "a, b" --values "1, 2"',
+      }),
       undefined,
       true,
     ).data;
@@ -336,8 +344,12 @@ describe('mapToolStep — a chart row names the kind of chart, and a written cal
   });
 
   it('a call written in full but not started is QUEUED, still, present tense', () => {
-    const step = mapToolStep(call('c3', 'chart', { type: 'bar', title: 'T' }), undefined, true, true)
-      .data;
+    const step = mapToolStep(
+      call('c3', 'chart', { type: 'bar', title: 'T' }),
+      undefined,
+      true,
+      true,
+    ).data;
     expect(step.status).toBe('queued');
     expect(step.label).toBe('Rendering a bar chart');
   });
@@ -1303,5 +1315,57 @@ describe('a failed write says it could not write', () => {
       false,
     );
     expect(ran.data.label).toBe('Ran a command');
+  });
+});
+
+describe('a refused write says why, and names no file', () => {
+  const refused = (id: string, out: string): ToolResultMsg => ({
+    ...result(id, out),
+    isError: true,
+  });
+  const reason =
+    'Not written: sample.svg is hand-written SVG markup, and drawing SVGs is what the `svg` command is for.';
+
+  /*
+   * the user (2026-09-17, screenshot): "Could not write the file · sample.svg
+   * +88" over eighty-eight green lines — "failed what exactly?" The reason was
+   * in the tool result and nowhere on the row.
+   */
+  it("a refused whole-file write carries the tool's reason and no file", () => {
+    const step = mapToolStep(
+      call('w1', 'write', { path: 'sample.svg', content: '<svg>\n</svg>' }),
+      refused('w1', reason),
+      false,
+    );
+    expect(step.data.kind).toBe('edit');
+    if (step.data.kind !== 'edit') return;
+    expect(step.data.failed).toBe(true);
+    expect(step.data.label).toBe('Could not write the file');
+    expect(step.data.error).toBe(reason);
+    expect(step.data.noFile).toBe(true);
+    // The content is still there for the reveal — under the reason.
+    expect(step.data.diff?.[0]?.lines.length).toBe(2);
+  });
+
+  it('a refused str_replace edit keeps its file: the file exists, the edit did not land', () => {
+    const step = mapToolStep(
+      call('e1', 'edit', { path: '/w/app.py', old_string: 'a', new_string: 'b' }),
+      refused('e1', 'old_string not found'),
+      false,
+    );
+    if (step.data.kind !== 'edit') return;
+    expect(step.data.error).toBe('old_string not found');
+    expect(step.data.noFile).toBeUndefined();
+  });
+
+  it('a write that landed carries neither', () => {
+    const step = mapToolStep(
+      call('w2', 'write', { path: 'a.txt', content: 'x' }),
+      result('w2', 'Successfully wrote 1 bytes to /w/a.txt'),
+      false,
+    );
+    if (step.data.kind !== 'edit') return;
+    expect(step.data.error).toBeUndefined();
+    expect(step.data.noFile).toBeUndefined();
   });
 });

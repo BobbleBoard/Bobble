@@ -87,6 +87,8 @@ export function isMarkdownFile(tab: CanvasTab): boolean {
 export function isRenderableFile(tab: CanvasTab): boolean {
   const kind = tab.artifact?.content.kind;
   if (kind === 'markdown' || kind === 'html' || kind === 'svg') return true;
+  // A notice about the file has no source to show raw and nothing to render.
+  if (kind === 'notice') return false;
   const name = tab.filePath ?? tab.artifact?.filename ?? tab.title ?? '';
   return /\.(md|markdown|mdx|html?|svg)$/i.test(name);
 }

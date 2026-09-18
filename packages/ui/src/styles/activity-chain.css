@@ -631,6 +631,12 @@ button.pd-chain-step-row:hover .pd-chain-step-chevron {
   background: color-mix(in srgb, var(--pd-status-danger-fg) 8%, transparent);
 }
 
+/* The content that would have been written sits a breath under the reason. */
+.pd-chain-error + .pd-diff,
+.pd-chain-error + .pd-terminal {
+  margin-top: 8px;
+}
+
 .pd-chain-error-text {
   margin: 0;
   white-space: pre-wrap;

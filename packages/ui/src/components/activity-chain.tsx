@@ -155,6 +155,10 @@ export type ActivityStepData =
       /** Explicit change counts for the label stat; derived from `diff` when omitted. */
       added?: number;
       deleted?: number;
+      /** The tool's own words for a refused edit — shown first when `failed`. */
+      error?: string;
+      /** A refused whole-file write: the path names a file that does not exist. */
+      noFile?: boolean;
     })
   /*
    * `folder` belongs here, and did not exist at all.
@@ -795,6 +799,10 @@ function StepContent({ step, live = false }: { step: ActivityStepData; live?: bo
         {step.kind === 'bash' || step.kind === 'python' ? (
           <TerminalBlock command={(step as { command?: string }).command} />
         ) : null}
+        {step.kind === 'edit' && step.diff !== undefined && step.diff.length > 0 ? (
+          // What WOULD have been written, under the reason it was not.
+          <DiffView files={step.diff} />
+        ) : null}
       </>
     );
   }
@@ -1202,6 +1210,7 @@ export function hasInlineContent(step: ActivityStepData): boolean {
        */
       return (
         (step.diff !== undefined && step.diff.length > 0) ||
+        nonEmpty(step.error) ||
         (settled &&
           (nonEmpty(step.detail) || step.added !== undefined || step.deleted !== undefined))
       );
@@ -1403,7 +1412,12 @@ export const ActivityStep = forwardRef<HTMLDivElement, ActivityStepProps>(functi
           : detail;
   const argHeader = disclosable && detail !== undefined && ARG_HEADER_KINDS.has(data.kind);
   // A file-op row (read/edit/skill with a path) can open that file in the canvas.
-  const canOpen = onOpenFile !== undefined && SUBLINE_KINDS.has(data.kind) && detail !== undefined;
+  const canOpen =
+    onOpenFile !== undefined &&
+    SUBLINE_KINDS.has(data.kind) &&
+    detail !== undefined &&
+    // A refused whole-file write names no file; the row discloses the reason instead.
+    !(data.kind === 'edit' && data.noFile === true);
 
   /* The app's own icon when this step acted on an app and the host could find
      one — otherwise the generic tool glyph, which is still better than a wrong
@@ -1507,13 +1521,16 @@ export const ActivityStep = forwardRef<HTMLDivElement, ActivityStepProps>(functi
       </>
     );
 
-  const editStatEl = editStat ? (
-    <DiffStat
-      className="pd-chain-step-diffstat"
-      added={editStat.added}
-      deleted={editStat.deleted}
-    />
-  ) : null;
+  // No ±stat on a refused edit: "+88" beside "Could not write the file" reads
+  // as eighty-eight lines that landed. The reveal still shows the content.
+  const editStatEl =
+    editStat && data.failed !== true ? (
+      <DiffStat
+        className="pd-chain-step-diffstat"
+        added={editStat.added}
+        deleted={editStat.deleted}
+      />
+    ) : null;
   const chevronEl = (
     <span className="pd-chain-step-chevron" data-expanded={expanded}>
       <IconChevronRight size={12} />

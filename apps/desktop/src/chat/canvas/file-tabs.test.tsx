@@ -15,8 +15,10 @@ import { fileArtifact, presentEdit, unreadableFileArtifact } from './file-tabs';
 describe('unreadableFileArtifact', () => {
   const art = unreadableFileArtifact('/Users/user/bobble-testbed/run/report.md');
 
-  it('says it could not read the file, rather than showing nothing', () => {
-    expect(art.content.kind).toBe('text');
+  it('says it could not read the file, rather than showing nothing — as a notice, not as source', () => {
+    // the user (2026-09-17): the sentence used to land in the code editor, line
+    // numbers and all, "as if the error is what's written to the file".
+    expect(art.content.kind).toBe('notice');
     expect((art.content as { text: string }).text).toContain('Could not read this file');
   });
 

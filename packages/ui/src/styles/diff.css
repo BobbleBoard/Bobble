@@ -1,29 +1,26 @@
 /*
- * Diff view — spec-diff-view.md. ONE renderer with the codex variable API:
- * the row-tint math is formula-driven, so each flavor supplies exactly the
- * 6 knobs (surface, fg, added/deleted/modified hues) — all from --pd-* tokens.
- * CLAUDE flavor composition is DERIVED (no source diff UI — _gaps.md §5);
- * its token values are HIGH (own status ramps + code-block chrome).
+ * Diff view — the references' shape (the user, 2026-09-17, with a picture): a
+ * number gutter, a −/+ marker, the whole row tinted, the code syntax-coloured
+ * inside the tint, and a stronger tint on the stretch that actually changed.
+ * No bar down the left edge, no header strip. Flavors supply the hues via
+ * --pd-* tokens; the tint math lives here.
  */
 
 .pd-diff {
-  --pd-diff-surface: var(--pd-bg-raised);
+  --pd-diff-surface: var(--pd-code-block-bg);
   overflow: hidden;
-  border-radius: var(--pd-radius-md);
-  background: var(--pd-code-block-bg);
+  border-radius: 10px;
+  background: var(--pd-diff-surface);
   box-shadow: 0 0 0 0.5px var(--pd-code-block-border);
+  padding: 6px 0;
   font-family: var(--pd-font-mono);
   font-size: var(--pd-font-size-code);
-  /* Codex readability signature for diffs. */
-  line-height: 1.8;
+  line-height: 1.6;
   font-variant-ligatures: none;
 }
 
-/* Claude flavor drops to its code-block leading-relaxed (spec ADAPTATION). */
-:root[data-flavor="claude"] .pd-diff {
-  line-height: 1.625;
-}
-
+/* The optional file strip (off by default — the row that opened the diff
+ * already names the file). */
 .pd-diff-file-header {
   position: sticky;
   top: 0;
@@ -31,29 +28,31 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 12px;
-  background: color-mix(in srgb, var(--pd-diff-surface) 98%, var(--pd-text-primary));
-  border-bottom: 1px solid color-mix(in srgb, var(--pd-diff-surface) 95%, var(--pd-text-primary));
+  padding: 6px 12px 8px;
+  margin-top: -6px;
+  background: var(--pd-diff-surface);
+  border-bottom: 1px solid color-mix(in srgb, var(--pd-diff-surface) 92%, var(--pd-text-primary));
   font-family: var(--pd-font-sans);
   font-size: var(--pd-font-size-footnote);
-  font-weight: var(--pd-font-weight-bold);
+  font-weight: var(--pd-font-weight-medium, 500);
 }
 
 .pd-diff-body {
   overflow-x: auto;
 }
 
-/* Grid: number column + code (codex layout). */
+/* number · marker · code */
 .pd-diff-row {
   display: grid;
-  grid-template-columns: minmax(4ch, max-content) 1fr;
+  grid-template-columns: minmax(3ch, max-content) 2ch 1fr;
+  align-items: baseline;
 }
 
-/* Copy-safe line numbers (claude ::after + attr() idiom). */
+/* Copy-safe line numbers (::after + attr()): muted, right-aligned. */
 .pd-diff-gutter {
-  padding: 0 10px;
+  padding: 0 4px 0 12px;
   text-align: right;
-  color: color-mix(in srgb, var(--pd-text-primary) 65%, var(--pd-diff-surface));
+  color: color-mix(in srgb, var(--pd-text-primary) 38%, transparent);
   user-select: none;
 }
 
@@ -61,58 +60,11 @@
   content: attr(data-line-number);
 }
 
-/* The ported color math: rows tint at bg 88% / hue 12%. */
-.pd-diff-row--add {
-  background: color-mix(in lab, var(--pd-diff-surface) 94%, var(--pd-diff-added-fg));
-}
-
-.pd-diff-row--del {
-  background: color-mix(in lab, var(--pd-diff-surface) 94%, var(--pd-diff-deleted-fg));
-}
-
-/* Left edge bars on changed rows (observed in the codex popover). */
-.pd-diff-row--add .pd-diff-gutter {
-  box-shadow: inset 2px 0 0 var(--pd-diff-added-fg);
-}
-
-.pd-diff-row--del .pd-diff-gutter {
-  box-shadow: inset 2px 0 0 var(--pd-diff-deleted-fg);
-}
-
-@media (pointer: fine) {
-  .pd-diff-row--context:hover {
-    background: color-mix(in lab, var(--pd-diff-surface) 94%, var(--pd-text-primary));
-  }
-}
-
-.pd-diff-row--hunk {
-  padding: 4px 12px;
-  color: var(--pd-text-muted);
-  background: color-mix(in srgb, var(--pd-diff-surface) 96%, var(--pd-text-primary));
-  grid-template-columns: 1fr;
-}
-
-/* the user: "that color scheme is terrible for the text coloring in the canvas ...
- * I think that's an error that can't be intentional."
- *
- * A newly written file is 100% additions, so EVERY row is `--add` and the whole
- * canvas becomes a green field. The row tint is fine on a handful of changed
- * lines and awful as a full-page background, and the code itself was inheriting
- * a hue from it rather than reading as text. Pin the code to the primary text
- * colour so the tint stays a BACKGROUND signal and never a foreground one.
- *
- * Both of these resolve through theme tokens, so light/dark and all three
- * flavors follow automatically — no per-theme special-casing to drift. */
-.pd-diff-text {
-  padding-right: 12px;
-  white-space: pre;
-  color: var(--pd-text-primary);
-}
-
 .pd-diff-marker {
-  display: inline-block;
-  width: 2ch;
+  padding-left: 6px;
+  text-align: left;
   user-select: none;
+  color: color-mix(in srgb, var(--pd-text-primary) 38%, transparent);
 }
 
 .pd-diff-row--add .pd-diff-marker {
@@ -123,13 +75,54 @@
   color: var(--pd-diff-deleted-fg);
 }
 
-/* Intra-line emphasis: hue at 15% alpha. */
+/* Whole rows tint — surface 88% / hue 12% — gutter included. */
+.pd-diff-row--add {
+  background: color-mix(in lab, var(--pd-diff-surface) 88%, var(--pd-diff-added-fg));
+}
+
+.pd-diff-row--del {
+  background: color-mix(in lab, var(--pd-diff-surface) 88%, var(--pd-diff-deleted-fg));
+}
+
+/* A new file is a listing, not a diff: numbered, untinted, unmarked. */
+section[data-new-file] .pd-diff-row--add {
+  background: transparent;
+}
+
+@media (pointer: fine) {
+  .pd-diff-row--context:hover {
+    background: color-mix(in lab, var(--pd-diff-surface) 94%, var(--pd-text-primary));
+  }
+}
+
+.pd-diff-row--hunk {
+  padding: 3px 12px;
+  color: var(--pd-text-muted);
+  background: color-mix(in srgb, var(--pd-diff-surface) 96%, var(--pd-text-primary));
+  grid-template-columns: 1fr;
+  font-size: var(--pd-font-size-caption);
+}
+
+/* The code keeps the reading ink; the syntax spans colour their own tokens.
+ * (the user, earlier: the code itself was inheriting a hue from the row tint.) */
+.pd-diff-text {
+  padding: 0 12px 0 8px;
+  white-space: pre;
+  color: var(--pd-text-primary);
+}
+
+/* Within-line emphasis: the stretch that changed, the hue at 22% over the row. */
+.pd-diff-emph {
+  border-radius: 3px;
+  padding: 1px 0;
+}
+
 .pd-diff-emph--add {
-  background: color-mix(in srgb, var(--pd-diff-added-fg) 15%, transparent);
+  background: color-mix(in srgb, var(--pd-diff-added-fg) 26%, transparent);
 }
 
 .pd-diff-emph--del {
-  background: color-mix(in srgb, var(--pd-diff-deleted-fg) 15%, transparent);
+  background: color-mix(in srgb, var(--pd-diff-deleted-fg) 26%, transparent);
 }
 
 .pd-diff ::selection {

@@ -87,15 +87,27 @@ function linesOf(text: string | undefined): string[] {
 export function editDiffLines(
   oldText: string | undefined,
   newText: string | undefined,
+  options: EditDiffOptions = {},
 ): { lines: DiffLine[]; added: number; deleted: number } {
   const a = linesOf(oldText);
   const b = linesOf(newText);
+  /*
+   * LINE NUMBERS, WHEN THEY ARE KNOWN. A whole-file write starts at 1. A
+   * str_replace hunk sits somewhere in a file only the caller may have in
+   * hand: given the pre-edit `baseText`, the hunk's first line is found by
+   * locating `oldText` in it; without it the gutter stays blank rather than
+   * counting from 1 as if the hunk were the file (the references number file
+   * lines, and a wrong number is worse than none).
+   */
+  const start = startLineOf(oldText, options.baseText, a.length === 0);
+  const oldNo = (i: number): number | undefined => (start === undefined ? undefined : start + i);
+  const newNo = oldNo;
   // One side only (a whole-file write, or an edit whose replacement has not
   // streamed in yet): every line is genuinely new or genuinely gone.
   if (a.length === 0 || b.length === 0 || a.length > LCS_LINE_CAP || b.length > LCS_LINE_CAP) {
     const lines: DiffLine[] = [
-      ...a.map((text): DiffLine => ({ kind: 'del', text })),
-      ...b.map((text): DiffLine => ({ kind: 'add', text })),
+      ...a.map((text, i): DiffLine => ({ kind: 'del', text, oldNumber: oldNo(i) })),
+      ...b.map((text, i): DiffLine => ({ kind: 'add', text, newNumber: newNo(i) })),
     ];
     return { lines, added: b.length, deleted: a.length };
   }
@@ -107,36 +119,55 @@ export function editDiffLines(
   let bi = 0;
   let added = 0;
   let deleted = 0;
-  const emitCommon = (text: string): void => {
-    rows.push({ kind: 'context', text });
+  const emitCommon = (text: string, oi: number, ni: number): void => {
+    rows.push({ kind: 'context', text, oldNumber: oldNo(oi), newNumber: newNo(ni) });
   };
   for (const [pa, pb] of pairs) {
     while (ai < pa) {
-      rows.push({ kind: 'del', text: a[ai] ?? '' });
+      rows.push({ kind: 'del', text: a[ai] ?? '', oldNumber: oldNo(ai) });
       deleted += 1;
       ai += 1;
     }
     while (bi < pb) {
-      rows.push({ kind: 'add', text: b[bi] ?? '' });
+      rows.push({ kind: 'add', text: b[bi] ?? '', newNumber: newNo(bi) });
       added += 1;
       bi += 1;
     }
-    emitCommon(a[pa] ?? '');
+    emitCommon(a[pa] ?? '', pa, pb);
     ai = pa + 1;
     bi = pb + 1;
   }
   while (ai < a.length) {
-    rows.push({ kind: 'del', text: a[ai] ?? '' });
+    rows.push({ kind: 'del', text: a[ai] ?? '', oldNumber: oldNo(ai) });
     deleted += 1;
     ai += 1;
   }
   while (bi < b.length) {
-    rows.push({ kind: 'add', text: b[bi] ?? '' });
+    rows.push({ kind: 'add', text: b[bi] ?? '', newNumber: newNo(bi) });
     added += 1;
     bi += 1;
   }
 
   return { lines: trimContext(rows), added, deleted };
+}
+
+export interface EditDiffOptions {
+  /** The file as it was BEFORE a str_replace edit, when the caller has it —
+   * the only way a hunk can carry the file's own line numbers. */
+  baseText?: string;
+}
+
+/** 1-based line the hunk starts on, or undefined when nobody can know. */
+function startLineOf(
+  oldText: string | undefined,
+  baseText: string | undefined,
+  wholeFile: boolean,
+): number | undefined {
+  if (wholeFile) return 1;
+  if (oldText === undefined || oldText === '' || baseText === undefined) return undefined;
+  const at = baseText.indexOf(oldText);
+  if (at === -1) return undefined;
+  return baseText.slice(0, at).split('\n').length;
 }
 
 /**
@@ -179,7 +210,8 @@ export function editDiffFile(
   path: string,
   oldText: string | undefined,
   newText: string | undefined,
+  options: EditDiffOptions = {},
 ): DiffFileData {
-  const { lines, added, deleted } = editDiffLines(oldText, newText);
+  const { lines, added, deleted } = editDiffLines(oldText, newText, options);
   return { path, added, deleted, lines };
 }

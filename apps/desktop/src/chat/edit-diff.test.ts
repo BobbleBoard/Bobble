@@ -88,3 +88,25 @@ describe('editDiffFile', () => {
     expect(file.deleted).toBe(1);
   });
 });
+
+describe('line numbers', () => {
+  it('a whole-file write counts from 1', () => {
+    const { lines } = editDiffLines(undefined, 'a\nb\nc');
+    expect(lines.map((l) => l.newNumber)).toEqual([1, 2, 3]);
+  });
+
+  it('a hunk carries the file line numbers when the base text is known', () => {
+    const base = 'one\ntwo\nthree\nfour\nfive';
+    const { lines } = editDiffLines('three\nfour', 'three\nFOUR', { baseText: base });
+    expect(lines.map((l) => [l.kind, l.oldNumber, l.newNumber])).toEqual([
+      ['context', 3, 3],
+      ['del', 4, undefined],
+      ['add', undefined, 4],
+    ]);
+  });
+
+  it('a hunk without a base has no numbers — better none than wrong ones', () => {
+    const { lines } = editDiffLines('three\nfour', 'three\nFOUR');
+    expect(lines.every((l) => l.oldNumber === undefined && l.newNumber === undefined)).toBe(true);
+  });
+});

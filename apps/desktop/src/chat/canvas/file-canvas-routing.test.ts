@@ -276,7 +276,15 @@ describe('detectFileWrites — a refused write is not a file', () => {
         timestamp: 0,
       } as ChatMsg,
     ];
-    const paths = detectFileWrites(msgs, '/proj').map((e) => e.path);
-    expect(paths).toEqual(['/proj/app.py']);
+    /*
+     * …reported but FLAGGED, not dropped (2026-09-17): the file-tab hook opened
+     * a tab for the write while its content streamed, and only the event that
+     * opened it can close it. Every other consumer skips `failed`.
+     */
+    const events = detectFileWrites(msgs, '/proj');
+    expect(events.map((e) => [e.path, e.failed])).toEqual([
+      ['/proj/create_illustrations.py', true],
+      ['/proj/app.py', undefined],
+    ]);
   });
 });

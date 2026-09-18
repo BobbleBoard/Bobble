@@ -58,6 +58,8 @@ export interface FileWriteEvent {
    * this a three-hunk edit would animate only the first.
    */
   hunks?: EditHunk[];
+  /** The tool refused this whole-file write — there is no file at `path`. */
+  failed?: boolean;
 }
 
 function str(value: unknown): string | undefined {
@@ -310,7 +312,7 @@ export function detectFileWrites(messages: ChatMsg[], cwd: string | undefined): 
        * said why. A failed whole-file write is not a file; a failed EDIT still
        * names a file that exists, so that one stays.
        */
-      if (failed.has(block.id) && write.edit === undefined && write.hunks === undefined) continue;
+      const refused = failed.has(block.id) && write.edit === undefined && write.hunks === undefined;
       /*
        * WHERE THE TOOL SAID IT WROTE, when it has said. The call's own path is
        * whatever the model typed, relative to a root only the tools know for
@@ -328,6 +330,14 @@ export function detectFileWrites(messages: ChatMsg[], cwd: string | undefined): 
         contentHint: write.contentHint,
         edit: write.edit,
         hunks: write.hunks,
+        /*
+         * …but a refused write is still REPORTED, flagged, rather than dropped:
+         * the tab this write opened while its content streamed (the user's
+         * screenshot, 2026-09-17: `sample.svg` reading "Could not read this
+         * file" in a code editor, line numbers and all) has to be told the
+         * file never came to be, and only the event that opened it can say so.
+         */
+        ...(refused ? { failed: true } : {}),
       });
     }
   }
