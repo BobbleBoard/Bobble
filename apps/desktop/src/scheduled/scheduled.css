@@ -209,32 +209,33 @@
 
 /* The "+" that says what a click on a suggestion does. */
 /* Absolute, not `align-self: stretch`: a <button> flex container does not
-   stretch its items in WebKit, so the box is pinned to the card's top and
-   bottom edges instead — nearly its full height, centred by construction. */
+   stretch its items in WebKit, so the square is placed against the card's
+   right edge and centred with a transform. */
 .sd-row:has(> .sd-row-plus) {
   padding-right: 60px;
 }
+/* the user (2026-09-18): "+ buttons on connectors and scheduled and such must be
+   square and not bordered, just a rounded-corner box on hover" — the same
+   square the connectors' add is (connectors.css .pdc-ctl--add), centred on
+   the card's right, the glyph alone at rest. */
 .sd-row-plus {
   position: absolute;
-  top: 8px;
-  right: 8px;
-  bottom: 8px;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  min-height: 44px;
-  border: 1px solid color-mix(in srgb, var(--pd-text-primary) 12%, transparent);
+  width: 40px;
+  height: 40px;
+  border: 0;
   border-radius: 10px;
   color: var(--pd-text-primary);
-  transition:
-    background-color var(--pd-duration-fast) var(--pd-easing-standard),
-    border-color var(--pd-duration-fast) var(--pd-easing-standard);
+  transition: background-color var(--pd-duration-fast) var(--pd-easing-standard);
 }
 
 .sd-row:hover .sd-row-plus {
   background: var(--pd-bg-active);
-  border-color: color-mix(in srgb, var(--pd-text-primary) 22%, transparent);
 }
 
 /* The clause that is a warning, inside a line that is not. */

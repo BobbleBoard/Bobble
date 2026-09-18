@@ -31,6 +31,20 @@ const setTheme = async (mode) => {
   });
 };
 const shot = (label) => page.screenshot({ path: `${SHOT_DIR}/${label}.png` });
+const clip = async (label, selector) => {
+  const box = await page.locator(selector).first().boundingBox();
+  if (box) {
+    await page.screenshot({
+      path: `${SHOT_DIR}/${label}.png`,
+      clip: {
+        x: Math.max(0, box.x - 16),
+        y: Math.max(0, box.y - 16),
+        width: box.width + 32,
+        height: box.height + 32,
+      },
+    });
+  } else await shot(label);
+};
 const measure = () =>
   page.evaluate(() => {
     const px = (el, prop) => (el ? Number.parseFloat(getComputedStyle(el)[prop]) : null);
@@ -242,57 +256,91 @@ try {
   // 3. Connectors: the list with its add controls.
   await page.click('[data-testid="nav-connectors"]');
   await sleep(1500);
-  const conn = await page.evaluate(() => {
-    const row = document.querySelector('.pdc-row');
-    const add = document.querySelector('.pdc-ctl--add');
-    const rb = row?.getBoundingClientRect();
-    const ab = add?.getBoundingClientRect();
-    return {
-      rows: document.querySelectorAll('.pdc-row').length,
-      border: row ? getComputedStyle(row).borderTopColor : null,
-      rowH: rb ? Math.round(rb.height) : null,
-      addH: ab ? Math.round(ab.height) : null,
-      addW: ab ? Math.round(ab.width) : null,
-      addRight: rb && ab ? Math.round(rb.right - ab.right) : null,
-      addCentred: rb && ab ? Math.abs(rb.top + rb.height / 2 - (ab.top + ab.height / 2)) < 2 : null,
-    };
-  });
+  const readAdd = () =>
+    page.evaluate(() => {
+      const row = document.querySelector('.pdc-row');
+      const add = document.querySelector('.pdc-ctl--add');
+      const rb = row?.getBoundingClientRect();
+      const ab = add?.getBoundingClientRect();
+      const cs = add ? getComputedStyle(add) : null;
+      return {
+        rows: document.querySelectorAll('.pdc-row').length,
+        border: row ? getComputedStyle(row).borderTopColor : null,
+        rowH: rb ? Math.round(rb.height) : null,
+        addH: ab ? Math.round(ab.height) : null,
+        addW: ab ? Math.round(ab.width) : null,
+        addBorder: cs ? cs.borderTopWidth : null,
+        addBg: cs ? cs.backgroundColor : null,
+        addRadius: cs ? cs.borderTopLeftRadius : null,
+        addCentred:
+          rb && ab ? Math.abs(rb.top + rb.height / 2 - (ab.top + ab.height / 2)) < 2 : null,
+      };
+    });
+  const conn = await readAdd();
   await shot('6-connectors-light');
   check(conn.rows > 0, `connector rows on screen (${conn.rows})`);
+  /* the user (2026-09-18): "+ buttons … must be square and not bordered, just a
+     rounded-corner box on hover". */
   check(
     conn.addH !== null &&
-      conn.rowH !== null &&
-      conn.addH >= conn.rowH - 16 &&
+      conn.addW === conn.addH &&
+      conn.addBorder === '0px' &&
+      /rgba\(0, 0, 0, 0\)|transparent/.test(conn.addBg ?? '') &&
       conn.addCentred === true,
-    `the add control is nearly the card's height and centred: ${JSON.stringify(conn)}`,
+    `the add control is a square, unbordered and unfilled at rest, centred: ${JSON.stringify(conn)}`,
+  );
+  await page.hover('.pdc-ctl--add');
+  await sleep(400);
+  const connHover = await readAdd();
+  await clip('6b-connectors-add-hover', '.pdc-row');
+  check(
+    connHover.addBg !== conn.addBg && Number.parseFloat(connHover.addRadius ?? '0') >= 8,
+    `…and a rounded box appears under the pointer: ${JSON.stringify({ rest: conn.addBg, hover: connHover.addBg, radius: connHover.addRadius })}`,
   );
 
   // 4. Scheduled: the templates with their + and (seeded) the task list.
   await page.click('[data-testid="nav-scheduled"]');
   await sleep(1500);
-  const sched = await page.evaluate(() => {
-    const row = document.querySelector('.sd-row');
-    const plus = document.querySelector('.sd-row-plus');
-    const rb = row?.getBoundingClientRect();
-    const pb = plus?.getBoundingClientRect();
-    return {
-      rows: document.querySelectorAll('.sd-row').length,
-      border: row ? getComputedStyle(row).borderTopColor : null,
-      rowH: rb ? Math.round(rb.height) : null,
-      plusH: pb ? Math.round(pb.height) : null,
-      plusW: pb ? Math.round(pb.width) : null,
-      plusCentred:
-        rb && pb ? Math.abs(rb.top + rb.height / 2 - (pb.top + pb.height / 2)) < 2 : null,
-    };
-  });
+  const readPlus = () =>
+    page.evaluate(() => {
+      const row = document.querySelector('.sd-row');
+      const plus = document.querySelector('.sd-row-plus');
+      const rb = row?.getBoundingClientRect();
+      const pb = plus?.getBoundingClientRect();
+      const cs = plus ? getComputedStyle(plus) : null;
+      return {
+        rows: document.querySelectorAll('.sd-row').length,
+        border: row ? getComputedStyle(row).borderTopColor : null,
+        rowH: rb ? Math.round(rb.height) : null,
+        plusH: pb ? Math.round(pb.height) : null,
+        plusW: pb ? Math.round(pb.width) : null,
+        plusBorder: cs ? cs.borderTopWidth : null,
+        plusBg: cs ? cs.backgroundColor : null,
+        plusRadius: cs ? cs.borderTopLeftRadius : null,
+        plusCentred:
+          rb && pb ? Math.abs(rb.top + rb.height / 2 - (pb.top + pb.height / 2)) < 2 : null,
+      };
+    });
+  await page.mouse.move(2, 2);
+  await sleep(300);
+  const sched = await readPlus();
   await shot('7-scheduled-light');
   check(sched.rows > 0, `scheduled rows on screen (${sched.rows})`);
   check(
     sched.plusH !== null &&
-      sched.rowH !== null &&
-      sched.plusH >= sched.rowH - 18 &&
+      sched.plusW === sched.plusH &&
+      sched.plusBorder === '0px' &&
+      /rgba\(0, 0, 0, 0\)|transparent/.test(sched.plusBg ?? '') &&
       sched.plusCentred === true,
-    `the + is nearly the card's height and centred: ${JSON.stringify(sched)}`,
+    `the + is a square, unbordered and unfilled at rest, centred: ${JSON.stringify(sched)}`,
+  );
+  await page.hover('.sd-row');
+  await sleep(400);
+  const schedHover = await readPlus();
+  await clip('7b-scheduled-plus-hover', '.sd-row');
+  check(
+    schedHover.plusBg !== sched.plusBg && Number.parseFloat(schedHover.plusRadius ?? '0') >= 8,
+    `…and a rounded box appears on hover: ${JSON.stringify({ rest: sched.plusBg, hover: schedHover.plusBg, radius: schedHover.plusRadius })}`,
   );
   await setTheme('dark');
   await sleep(400);

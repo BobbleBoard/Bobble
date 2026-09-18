@@ -407,16 +407,19 @@
    so "9%" → "10%" does not jitter. */
 /* The add: a tall control on the card's right edge, nearly its full height,
    centred — a target, not a glyph in a corner (the user, 2026-09-17). */
+/* THE ADD. the user (2026-09-18): "+ buttons on connectors and scheduled and such
+   must be square and not bordered, just a rounded-corner box on hover." A
+   square, larger than the row's other controls, drawn by nothing at rest —
+   the glyph alone — and a rounded fill under the pointer. */
 .pdc-ctl--add {
-  width: 44px;
-  height: 50px;
-  border: 1px solid color-mix(in srgb, var(--pd-text-primary) 12%, transparent);
+  width: 40px;
+  height: 40px;
+  border: 0;
   border-radius: 10px;
   color: var(--pd-text-primary);
 }
 .pdc-ctl--add:hover {
   background: var(--pd-bg-active);
-  border-color: color-mix(in srgb, var(--pd-text-primary) 22%, transparent);
 }
 
 .pdc-ctl--progress {
