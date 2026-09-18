@@ -246,9 +246,12 @@ export async function launchApp(name, options = {}) {
   mkdirSync(path.join(home, '.pi', 'agent', 'sessions', 'proj'), { recursive: true });
 
   const before = frontmostApp();
+  // The user-data-dir is ours too (Chromium's caches, a few MB a run): 968 of
+  // them were sitting in $TMPDIR on 2026-09-18 because only the home was removed.
+  const userDataDir = mkdtempSync(path.join(tmpdir(), `pd-${name}-`));
   const app = await electron.launch({
     executablePath: require('electron'),
-    args: [APP_ROOT, `--user-data-dir=${mkdtempSync(path.join(tmpdir(), `pd-${name}-`))}`, ...args],
+    args: [APP_ROOT, `--user-data-dir=${userDataDir}`, ...args],
     env: {
       ...process.env,
       // Before PI_BIN and friends so an explicit `env.HOME` still wins, and
@@ -309,6 +312,9 @@ export async function launchApp(name, options = {}) {
      */
     if (throwaway && process.env.PI_E2E_KEEP_HOME !== '1') {
       rmSync(home, { recursive: true, force: true });
+    }
+    if (process.env.PI_E2E_KEEP_HOME !== '1') {
+      rmSync(userDataDir, { recursive: true, force: true });
     }
     if (process.exitCode === 1) {
       console.error(`${name}: ${failures.length} failure(s)`);
