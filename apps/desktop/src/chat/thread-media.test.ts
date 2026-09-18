@@ -53,6 +53,20 @@ describe('mounting the media a turn produced', () => {
     const twice = '  1. /a/b/c.wav\nsaved to /a/b/c.wav';
     expect(mediaFromToolResult('generate_music', twice)).toHaveLength(1);
   });
+
+  /* VERBATIM the shape of a generate_3d / refine_3d result (harness
+     model-tools.ts): the URL, the path, and the RELATIVE name the model is
+     told to say. The tail of that name (`/fox.glb`) is not a path. */
+  const MODEL = `pd-file://f/w/out/fox.glb
+Generated 3D model saved at /w/out/fox.glb
+Refer to it as "out/fox.glb" — the path relative to the working folder; the model is shown in the chat as a card the user can turn.`;
+
+  it('mounts a generated 3D model once, as a model, and not its relative name', () => {
+    for (const tool of ['generate_3d', 'refine_3d']) {
+      const items = mediaFromToolResult(tool, MODEL);
+      expect(items.map((i) => [i.kind, i.path])).toEqual([['model', '/w/out/fox.glb']]);
+    }
+  });
 });
 
 describe('a picture saved where the user asked', () => {

@@ -471,6 +471,16 @@ export interface DesktopSettings {
    */
   computerUse: ComputerUseSettings;
   /**
+   * The studios' engines the CHAT may use as tools — the module connectors
+   * (Connectors → Bobble 3D), keyed by gen module id (`'3d'`). A studio module
+   * installs an engine; turning its connector on is what puts the engine's
+   * tools in every chat (read at pi's spawn, like a model connector's). Off
+   * by default, so installing the 3D studio changes nothing in the chat until
+   * the person says so. the user (2026-09-17): "3d should be a connector that gets
+   * recommended for install upon installing the 3d studio module".
+   */
+  moduleConnectors: Record<string, boolean>;
+  /**
    * Which pi drives the chat (Settings -> Harness). `pi-bundled` is the default
    * and means "whatever ships in the app"; `pi-system` resolves the one on PATH;
    * `pi-custom` uses {@link harnessConfigPath}. External agents (Claude Code,
@@ -538,6 +548,8 @@ export interface DesktopSettingsPatch {
   /** Full replacement (the chooser read-modify-writes the whole object). */
   computerUse?: ComputerUseSettings;
   memoryGuard?: boolean;
+  /** Per-id map: a patch names the modules it changes and leaves the rest. */
+  moduleConnectors?: Record<string, boolean>;
 }
 
 /** Icon-stroke bounds — mirrors the IconStrokeControl slider range. */

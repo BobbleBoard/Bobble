@@ -64,6 +64,7 @@ import type {
   Gen3dInvokeMap,
   Gen3dModelId,
   Gen3dModelInfo,
+  Gen3dResolution,
 } from './gen3d-contract';
 import { type ImageJobResult, ImageJobTracker } from './image-jobs';
 import { installRendererHealth, startMemorySampling, stopMemorySampling } from './renderer-health';
@@ -555,6 +556,107 @@ export async function runImageJob(
   jobPlans.set(res.jobId, planGenerate('text', false));
   guardSidecarJob(res.jobId, 'the picture');
   return imageJobs.wait(res.jobId, timeoutMs);
+}
+
+/**
+ * A 3D MODEL FOR THE CHAT — the studio's own pipeline, awaited like the image
+ * tools await theirs. the user (2026-09-17): "3d should be a connector". The
+ * connector's tools reach here over the gen3d bridge (gen3d-bridge.ts): a
+ * generation (a description, or a picture the model has) runs the same
+ * `gen3d:generate` the 3D studio runs and resolves with the LAST `model-glb`
+ * the job pushed (textured geometry replaces the untextured on the same job);
+ * a refinement runs `gen3d:stage` (texture / segment / rig / retopo) on a
+ * model the chat already has. The studio's panels watch the same broadcast,
+ * so a job started from a chat shows up there too.
+ */
+export interface Model3dJobRequest {
+  readonly prompt?: string;
+  readonly imagePath?: string;
+  readonly finish?: Gen3dFinish;
+  readonly resolution?: Gen3dResolution;
+}
+
+export type Stage3dOp = 'texture' | 'segment' | 'rig' | 'retopo';
+
+export interface Stage3dJobRequest {
+  readonly op: Stage3dOp;
+  readonly modelPath: string;
+  readonly prompt?: string;
+}
+
+const MODEL_JOB_TIMEOUT_MS = 40 * 60_000;
+
+function refuseIfBusy(): ImageJobResult | null {
+  if (jobPlans.size > 0) {
+    return {
+      ok: false,
+      error:
+        'the generation engine is already running a job — only one runs at a time on this machine. Try again once it finishes.',
+    };
+  }
+  return null;
+}
+
+export async function run3dJob(
+  req: Model3dJobRequest,
+  timeoutMs: number = MODEL_JOB_TIMEOUT_MS,
+): Promise<ImageJobResult> {
+  const prompt = req.prompt?.trim() ?? '';
+  const imagePath = req.imagePath?.trim() ?? '';
+  if (prompt === '' && imagePath === '')
+    return { ok: false, error: 'a prompt or an image is required' };
+  if (imagePath !== '') {
+    if (!path.isAbsolute(imagePath)) {
+      return { ok: false, error: `image_path must be an absolute path (got "${imagePath}")` };
+    }
+    if (!existsSync(imagePath)) return { ok: false, error: `no image at ${imagePath}` };
+  }
+  const busy = refuseIfBusy();
+  if (busy !== null) return busy;
+  const finish = req.finish ?? 'pbr';
+  const res = await handlers['gen3d:generate']({
+    kind: imagePath !== '' ? 'image' : 'text',
+    ...(prompt !== '' ? { prompt } : {}),
+    ...(imagePath !== '' ? { imagePaths: [imagePath] } : {}),
+    resolution: req.resolution ?? 'medium',
+    texture: finish !== 'grey',
+    finish,
+  });
+  if (!res.ok || res.jobId === undefined) {
+    return { ok: false, error: res.error ?? 'the engine refused the request' };
+  }
+  return imageJobs.wait(res.jobId, timeoutMs, 'model-glb');
+}
+
+export async function runStage3dJob(
+  req: Stage3dJobRequest,
+  timeoutMs: number = MODEL_JOB_TIMEOUT_MS,
+): Promise<ImageJobResult> {
+  const modelPath = req.modelPath.trim();
+  if (modelPath === '') return { ok: false, error: 'model_path is required' };
+  if (!path.isAbsolute(modelPath)) {
+    return { ok: false, error: `model_path must be an absolute path (got "${modelPath}")` };
+  }
+  if (!existsSync(modelPath)) return { ok: false, error: `no model at ${modelPath}` };
+  const busy = refuseIfBusy();
+  if (busy !== null) return busy;
+  const res = await handlers['gen3d:stage']({
+    op: req.op,
+    modelPath,
+    ...(req.prompt !== undefined && req.prompt.trim() !== '' ? { prompt: req.prompt.trim() } : {}),
+    // A rig from the chat: the engine measures the shape and picks the rigger;
+    // the studio is where a person answers "humanoid?" by hand.
+    ...(req.op === 'retopo' ? { method: 'quick' as const } : {}),
+  });
+  if (!res.ok || res.jobId === undefined) {
+    return { ok: false, error: res.error ?? 'the engine refused the request' };
+  }
+  return imageJobs.wait(res.jobId, timeoutMs, 'model-glb');
+}
+
+/** Is the 3D module — an engine that can make a mesh — on this machine? */
+export function model3dReady(): boolean {
+  return sidecarCoreInstalled() || comfy3dInfo().ready;
 }
 
 // ---------------------------------------------------------------------------

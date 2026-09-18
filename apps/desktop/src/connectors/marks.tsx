@@ -23,10 +23,13 @@ import {
   Tooltip,
 } from '@pi-desktop/ui';
 import type { JSX, ReactNode } from 'react';
+import { useConnectorsStore } from '../state/connectors-store';
+import { useGenModule } from '../state/gen-modules-store';
 import { useLlmStore } from '../state/llm-store';
 import { ConnectorIcon } from './ConnectorIcon';
 import {
   type Actions,
+  type ConnectorItem,
   commandLine,
   failing,
   hasKeys,
@@ -305,8 +308,13 @@ export function RowControl({
    * bar the model screen draws, because it is the same download.
    */
   if (isModel && busy) return <ModelDownloadMark modelId={item.connector.modelId ?? ''} />;
+  const isModule = item.kind === 'connector' && item.connector.kind === 'module';
+  if (isModule && busy) return <ModuleInstallMark moduleId={item.connector.moduleId ?? ''} />;
   if (busy) return <Spinner size={16} />;
   if (item.state === 'builtin') return null;
+  if (isModule && item.state === 'available') {
+    return <ModuleAddMark item={item} onAdd={() => void actions.add(item)} />;
+  }
   if (isModel && item.state === 'available') {
     const label = `Download ${item.name} (about 5 GB, once)`;
     return (
@@ -443,6 +451,51 @@ function RowMenu({
  * here and the number there can never disagree. A spinner until the first
  * byte, because "0%" sitting still reads as stuck.
  */
+/**
+ * A MODULE CONNECTOR'S ADD: instant when its engine is here, a download when it
+ * is not — and the mark says which, the way the model connector's does, so a
+ * person deciding whether to click knows what the click costs.
+ */
+function ModuleAddMark({ item, onAdd }: { item: ConnectorItem; onAdd: () => void }): JSX.Element {
+  const state = useConnectorsStore((s) => s.moduleConnectors[item.id]);
+  const ready = state?.ready === true;
+  const gb = state?.approxGB ?? 0;
+  const size = gb > 0 ? ` (about ${gb} GB, once)` : '';
+  const label = ready ? `Add ${item.name}` : `Install the 3D engine and add ${item.name}${size}`;
+  return (
+    <Tooltip label={ready ? 'Add' : `Installs the 3D engine${size}, then adds`}>
+      <button
+        type="button"
+        className="pdc-ctl pdc-ctl--add pd-focusable"
+        aria-label={label}
+        data-testid={ready ? `connector-add-${item.id}` : `connector-download-${item.id}`}
+        onClick={onAdd}
+      >
+        {ready ? <IconPlus size={18} /> : <IconDownload size={18} />}
+      </button>
+    </Tooltip>
+  );
+}
+
+/** The engine install's own progress, from the gen modules store (`gen:module`). */
+function ModuleInstallMark({ moduleId }: { moduleId: string }): JSX.Element {
+  const mod = useGenModule(moduleId as never);
+  const pct = mod?.percent == null ? null : Math.round(mod.percent * 100);
+  if (mod === undefined || !mod.installing || pct === null) return <Spinner size={16} />;
+  return (
+    <Tooltip label={`${mod.detail ?? 'Installing the 3D engine'} — ${pct}%`}>
+      <span
+        className="pdc-ctl pdc-ctl--progress"
+        role="status"
+        aria-live="polite"
+        aria-label={`Installing, ${pct}%`}
+      >
+        {pct}%
+      </span>
+    </Tooltip>
+  );
+}
+
 function ModelDownloadMark({ modelId }: { modelId: string }): JSX.Element {
   const download = useLlmStore((s) => s.download);
   const mine = download !== null && download.modelId === modelId ? download : null;
@@ -452,6 +505,7 @@ function ModelDownloadMark({ modelId }: { modelId: string }): JSX.Element {
     <Tooltip label={`Downloading ${mine?.file ?? modelId} — ${pct}%`}>
       <span
         className="pdc-ctl pdc-ctl--progress"
+        role="status"
         aria-live="polite"
         aria-label={`Downloading, ${pct}%`}
       >

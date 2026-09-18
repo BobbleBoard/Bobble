@@ -25,6 +25,7 @@ import {
 } from '@pi-desktop/ui';
 import { type CSSProperties, type JSX, type ReactNode, useEffect, useState } from 'react';
 import { cx } from '../onboarding/cx';
+import { useConnectorsStore } from '../state/connectors-store';
 import { ItemMark, StateDot } from './marks';
 import {
   type Actions,
@@ -147,10 +148,16 @@ export function DetailHeader({
   // reversible), and a server that is on or off. Never a server waiting for a
   // key — the card below is how it gets turned on — nor a built-in.
   const isModel = item.kind === 'connector' && item.connector.kind === 'model';
+  /* A module connector (Bobble 3D): on, or not added — its Remove turns the
+     chat tools off and leaves the studio's engine alone. */
+  const isModule = item.kind === 'connector' && item.connector.kind === 'module';
+  const moduleState = useConnectorsStore((s) =>
+    item.kind === 'connector' ? s.moduleConnectors[item.id] : undefined,
+  );
   /* A model connector has no "off": it is downloaded or it is not, and the
      menu's Remove is what deletes it. A switch here would flip and snap back. */
   const switchable =
-    !isModel && (item.kind === 'skill' || item.state === 'on' || item.state === 'off');
+    !isModel && !isModule && (item.kind === 'skill' || item.state === 'on' || item.state === 'off');
   const failed = failing(item);
   const menu = onEdit !== undefined || onRemove !== undefined;
   const prompt = examplePrompt(item, tools);
@@ -175,17 +182,27 @@ export function DetailHeader({
                 ? item.state === 'on'
                   ? 'Downloaded · ready'
                   : 'Not downloaded (about 5 GB, once)'
-                : item.state === 'available'
-                  ? item.kind === 'skill'
-                    ? 'Not enabled'
-                    : 'Not added'
-                  : item.state === 'builtin'
-                    ? 'Built in, always on'
-                    : item.state === 'on'
-                      ? 'On'
-                      : item.state === 'off'
-                        ? 'Off'
-                        : 'Needs setup'}
+                : isModule
+                  ? item.state === 'on'
+                    ? 'On · the 3D engine is installed'
+                    : moduleState?.ready === true
+                      ? 'Not added · the 3D engine is installed'
+                      : `Not added · installs the 3D engine${
+                          (moduleState?.approxGB ?? 0) > 0
+                            ? ` (about ${moduleState?.approxGB} GB, once)`
+                            : ''
+                        }`
+                  : item.state === 'available'
+                    ? item.kind === 'skill'
+                      ? 'Not enabled'
+                      : 'Not added'
+                    : item.state === 'builtin'
+                      ? 'Built in, always on'
+                      : item.state === 'on'
+                        ? 'On'
+                        : item.state === 'off'
+                          ? 'Off'
+                          : 'Needs setup'}
           </p>
         </div>
         <div className="pdc-detail-actions">
@@ -232,7 +249,13 @@ export function DetailHeader({
               onClick={() => void actions.add(item)}
               data-testid={`connector-detail-add-${item.id}`}
             >
-              {isModel ? 'Download (about 5 GB)' : 'Add to Bobble'}
+              {isModel
+                ? 'Download (about 5 GB)'
+                : isModule && moduleState?.ready !== true
+                  ? `Install the 3D engine and add${
+                      (moduleState?.approxGB ?? 0) > 0 ? ` (about ${moduleState?.approxGB} GB)` : ''
+                    }`
+                  : 'Add to Bobble'}
             </Button>
           ) : usable(item) && onTry !== undefined ? (
             <Button
@@ -616,7 +639,10 @@ export function ToolsSection({
           reaching the model as a schema — Lite/Native cost is not its axis. */}
       {tools.length > 0 &&
       item.state !== 'available' &&
-      !(item.kind === 'connector' && item.connector.kind === 'model') ? (
+      !(
+        item.kind === 'connector' &&
+        (item.connector.kind === 'model' || item.connector.kind === 'module')
+      ) ? (
         <p className="mb-2 text-caption text-text-muted" data-testid="connector-tool-cost">
           {offCount > 0 ? `${String(cost.on)} on · ` : ''}
           {mode === 'lite'
@@ -870,7 +896,9 @@ export function AboutSection({
               ? 'Built into Bobble'
               : c.kind === 'model'
                 ? 'On-device model — runs under its own llama-server'
-                : 'MCP server'}
+                : c.kind === 'module'
+                  ? "On-device engine — the 3D studio's, offered to the chat"
+                  : 'MCP server'}
           </dd>
           <dt>By</dt>
           <dd>{developerOf(c)}</dd>
@@ -1074,6 +1102,9 @@ export function RemoveRow({
 }): JSX.Element | null {
   if (item.state === 'available' || item.state === 'builtin') return null;
   const custom = item.kind === 'custom';
+  /* A module connector's Remove takes its tools out of the chat and nothing
+     else — the engine is the 3D studio's, and the studio keeps working. */
+  const module = item.kind === 'connector' && item.connector.kind === 'module';
   const keys = hasKeys(item) || (custom && Object.keys(item.server.env ?? {}).length > 0);
   return (
     <div
@@ -1087,9 +1118,11 @@ export function RemoveRow({
             <span className="text-text-muted">
               {custom
                 ? 'Its command is forgotten; nothing else keeps it.'
-                : keys
-                  ? 'Its key is forgotten; the catalog entry stays.'
-                  : 'The catalog entry stays.'}
+                : module
+                  ? 'Its tools leave the chat; the 3D studio and its engine stay.'
+                  : keys
+                    ? 'Its key is forgotten; the catalog entry stays.'
+                    : 'The catalog entry stays.'}
             </span>
           </span>
           <span className="flex shrink-0 items-center gap-1.5">
@@ -1114,9 +1147,11 @@ export function RemoveRow({
           <span className="text-caption text-text-muted">
             {custom
               ? 'Removing forgets the command; nothing else keeps it.'
-              : keys
-                ? 'Removing forgets its key; the catalog entry stays.'
-                : 'The catalog entry stays; add it again any time.'}
+              : module
+                ? 'Removing takes its tools out of the chat; the 3D studio keeps its engine.'
+                : keys
+                  ? 'Removing forgets its key; the catalog entry stays.'
+                  : 'The catalog entry stays; add it again any time.'}
           </span>
           <Button
             size="sm"

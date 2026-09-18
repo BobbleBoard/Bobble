@@ -154,6 +154,8 @@ describe('a shell call running a media command IS the generation (bash-CLI mode)
     expect(mediaToolOfCommand('media generate music "lofi"')).toBe('generate_music');
     expect(mediaToolOfCommand('media generate sfx "door"')).toBe('generate_sfx');
     expect(mediaToolOfCommand('media edit image --path a.png "make it red"')).toBe('edit_image');
+    expect(mediaToolOfCommand('3d generate "a low-poly fox"')).toBe('generate_3d');
+    expect(mediaToolOfCommand('cd /w && 3d refine out/fox.glb rig')).toBe('refine_3d');
     expect(mediaToolOfCommand('media --help')).toBeNull();
     expect(mediaToolOfCommand('ls ~/Pictures/media')).toBeNull();
     expect(mediaToolOfCommand(undefined)).toBeNull();

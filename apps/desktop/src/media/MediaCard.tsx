@@ -24,19 +24,30 @@
  * behind it — so it reads as looking closer at something rather than leaving.
  */
 import { useCopyFeedback } from '@pi-desktop/ui';
-import { type JSX, useEffect, useState } from 'react';
+import { type JSX, useEffect, useMemo, useState } from 'react';
 import { pdFileUrl } from '../chat/canvas/file-preview';
 import { ThreadAudio } from '../chat/ThreadAudio';
 import { humanSize, type ThreadMediaItem } from '../chat/thread-media';
 import { useModalityStore } from '../state/modality-store';
 import { studioFor, useStudioHandoff } from '../state/studio-handoff';
 import { ExpandedScrim } from './ExpandedScrim';
+import { ModelControls } from './ModelControls';
 import { ModelSurface } from './ModelSurface';
 import { copyFile, exportFile, revealFile, startFileDrag } from './media-actions';
+import { createModelView, type ModelView } from './model-view';
 import { VideoSurface } from './VideoSurface';
 
 /** The media itself, at whatever size the frame around it gives. */
-function Surface({ item, large }: { item: ThreadMediaItem; large: boolean }): JSX.Element {
+function Surface({
+  item,
+  large,
+  view,
+}: {
+  item: ThreadMediaItem;
+  large: boolean;
+  /** A 3D card's controls state — shared by its frame and its expanded stage. */
+  view?: ModelView;
+}): JSX.Element {
   const src = pdFileUrl(item.path);
   if (item.kind === 'image') {
     return (
@@ -50,7 +61,9 @@ function Surface({ item, large }: { item: ThreadMediaItem; large: boolean }): JS
     );
   }
   if (item.kind === 'video') return <VideoSurface src={src} large={large} testid="media-video" />;
-  if (item.kind === 'model') return <ModelSurface src={src} testid="media-model" />;
+  if (item.kind === 'model') {
+    return <ModelSurface src={src} testid="media-model" {...(view ? { view } : {})} />;
+  }
   return <ThreadAudio src={src} name={item.name} />;
 }
 
@@ -247,7 +260,15 @@ function Controls({
  * INPUT media (an attachment in the composer, a pasted-text card in a user
  * message) and two near-identical overlays is how they drift apart.
  */
-function Expanded({ item, onClose }: { item: ThreadMediaItem; onClose: () => void }): JSX.Element {
+function Expanded({
+  item,
+  onClose,
+  view,
+}: {
+  item: ThreadMediaItem;
+  onClose: () => void;
+  view?: ModelView;
+}): JSX.Element {
   return (
     <ExpandedScrim label={item.name} onClose={onClose} stageKind={item.kind}>
       {/*
@@ -257,7 +278,7 @@ function Expanded({ item, onClose }: { item: ThreadMediaItem; onClose: () => voi
         card you opened it from says the same thing two inches away. The
         controls float on the media instead.
       */}
-      <Surface item={item} large />
+      <Surface item={item} large {...(view ? { view } : {})} />
       <Controls item={item} onExpand={undefined} />
     </ExpandedScrim>
   );
@@ -272,6 +293,15 @@ export interface MediaCardProps {
 export function MediaCard({ item }: MediaCardProps): JSX.Element {
   const [open, setOpen] = useState(false);
   const [bytes, setBytes] = useState<number | undefined>(undefined);
+  /*
+   * A 3D CARD'S FEW CONTROLS (model-view.ts) — made once per card, so the
+   * strip under the viewport and the expanded stage show the same shading,
+   * and a rig turned on stays on when you look closer.
+   */
+  const modelView = useMemo(
+    () => (item.kind === 'model' ? createModelView() : undefined),
+    [item.kind],
+  );
 
   /*
    * Size is read from the served response rather than passed in: the tool result
@@ -311,7 +341,7 @@ export function MediaCard({ item }: MediaCardProps): JSX.Element {
       onDragStart={(e) => startFileDrag(e, item.path)}
       title={`Drag to save · ${item.path}`}
     >
-      <Surface item={item} large={false} />
+      <Surface item={item} large={false} {...(modelView ? { view: modelView } : {})} />
       {beside ? null : <Controls item={item} onExpand={() => setOpen(true)} />}
     </div>
   );
@@ -327,6 +357,9 @@ export function MediaCard({ item }: MediaCardProps): JSX.Element {
       ) : (
         frame
       )}
+      {/* the user: "below the card itself show some basic controls" — the strip
+          sits between the viewport and the caption, as wide as the frame. */}
+      {modelView !== undefined ? <ModelControls view={modelView} /> : null}
       <figcaption className="pd-media-caption">
         <button
           type="button"
@@ -342,7 +375,13 @@ export function MediaCard({ item }: MediaCardProps): JSX.Element {
           {bytes !== undefined ? ` · ${humanSize(bytes)}` : ''}
         </span>
       </figcaption>
-      {open ? <Expanded item={item} onClose={() => setOpen(false)} /> : null}
+      {open ? (
+        <Expanded
+          item={item}
+          onClose={() => setOpen(false)}
+          {...(modelView ? { view: modelView } : {})}
+        />
+      ) : null}
     </figure>
   );
 }

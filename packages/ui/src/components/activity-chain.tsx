@@ -242,7 +242,16 @@ export type ActivityStepData =
        * ["Thought", "Read it aloud", "Thought", "Done"] collapsed to the summary
        * "Thought for 2s, read a file", describing a read that never happened.
        */
-      kind: 'image' | 'pdf' | 'canvas-open' | 'video' | 'speech' | 'music' | 'sfx';
+      kind:
+        | 'image'
+        | 'pdf'
+        | 'canvas-open'
+        | 'video'
+        | 'speech'
+        | 'music'
+        | 'sfx'
+        | 'model3d'
+        | 'model3d-refine';
       /**
        * What the tool said it made, in ITS words. The fallback for a generator
        * whose result this app cannot parse — losing the only account of a job
@@ -331,6 +340,13 @@ const VERBS: Record<ActivityStepKind, VerbSpec> = {
   speech: { verb: 'Read', singular: 'it aloud', plural: 'passages', attempt: 'read-aloud' },
   music: { verb: 'Composed', singular: 'music', plural: 'pieces', attempt: 'piece' },
   sfx: { verb: 'Made', singular: 'a sound effect', plural: 'sound effects', attempt: 'sound' },
+  model3d: { verb: 'Built', singular: 'a 3D model', plural: '3D models', attempt: '3D model' },
+  'model3d-refine': {
+    verb: 'Refined',
+    singular: 'a 3D model',
+    plural: '3D models',
+    attempt: '3D refinement',
+  },
   pdf: { verb: 'Created', singular: 'a PDF', plural: 'PDFs', attempt: 'PDF' },
   chart: { verb: 'Drew', singular: 'a chart', plural: 'charts', attempt: 'chart' },
   'canvas-open': { verb: 'Opened', singular: 'the canvas', plural: '' },
@@ -382,6 +398,8 @@ const KIND_ORDER: ActivityStepKind[] = [
   'speech',
   'music',
   'sfx',
+  'model3d',
+  'model3d-refine',
   'pdf',
   'chart',
   'canvas-open',
@@ -553,6 +571,8 @@ const RUNNING_PHRASE: Record<ActivityStepKind, string> = {
   speech: 'Reading it aloud',
   music: 'Composing music',
   sfx: 'Making a sound effect',
+  model3d: 'Building a 3D model',
+  'model3d-refine': 'Refining a 3D model',
   pdf: 'Creating a PDF',
   chart: 'Rendering a chart',
   'canvas-open': 'Opening the canvas',
@@ -899,6 +919,8 @@ function StepContent({ step, live = false }: { step: ActivityStepData; live?: bo
     case 'speech':
     case 'music':
     case 'sfx':
+    case 'model3d':
+    case 'model3d-refine':
       return <GeneratedReveal src={step.src} note={step.preview} facts={step.facts} />;
     // Generic tool / connector / tool_search: show ONLY the tool's result, as one
     // clean block — never the raw args JSON (that's the schema noise the user called
@@ -1092,7 +1114,16 @@ function MediaReveal({
   filename,
   detail,
 }: {
-  kind: 'image' | 'pdf' | 'canvas-open' | 'video' | 'speech' | 'music' | 'sfx';
+  kind:
+    | 'image'
+    | 'pdf'
+    | 'canvas-open'
+    | 'video'
+    | 'speech'
+    | 'music'
+    | 'sfx'
+    | 'model3d'
+    | 'model3d-refine';
   src?: string;
   filename?: string;
   detail?: string;
@@ -1107,6 +1138,8 @@ function MediaReveal({
     speech: 'recording',
     music: 'track',
     sfx: 'sound',
+    model3d: '3D model',
+    'model3d-refine': '3D model',
     'canvas-open': 'canvas tab',
   };
   const noun = NOUNS[kind] ?? 'file';
@@ -1262,6 +1295,8 @@ export function hasInlineContent(step: ActivityStepData): boolean {
     case 'speech':
     case 'music':
     case 'sfx':
+    case 'model3d':
+    case 'model3d-refine':
       return (
         settled &&
         (nonEmpty(step.src) ||

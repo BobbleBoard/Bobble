@@ -23,7 +23,7 @@ import { type PendingKind, PendingMediaCard } from '../media/PendingMediaCard';
 import { abortPi } from '../state/pi-connect';
 import { segmentGroup } from './activity-mapping';
 import { InlineArtifact } from './canvas/InlineArtifacts';
-import { useGeneratingJob } from './GeneratingMedia';
+import { useGeneratingJob, useModel3dLive } from './GeneratingMedia';
 import { jobSamples, recordJobDuration } from './job-history';
 import { LongJobCard } from './LongJobCard';
 import { effectiveToolName, estimateFor, type JobKind, jobKindForTool, jobView } from './long-job';
@@ -182,6 +182,8 @@ export function AssistantGroup({
    * without it.
    */
   const generating = useGeneratingJob(runningJob?.kind ?? null);
+  // A 3D build reports through the studio's own broadcast, not the gen stream.
+  const live3d = useModel3dLive(runningJob?.kind === 'model3d');
 
   /*
    * LEARNING WHAT THIS MAC ACTUALLY DOES.
@@ -367,6 +369,7 @@ export function AssistantGroup({
                 label={`Generating ${jobHere.kind}`}
                 note={
                   generating?.note ??
+                  live3d?.note ??
                   jobView(
                     jobHere.kind,
                     Math.max(0, Date.now() - jobHere.startedAt),
@@ -377,7 +380,9 @@ export function AssistantGroup({
                 generating.total !== undefined &&
                 generating.total > 0
                   ? { progress: generating.step / generating.total }
-                  : {})}
+                  : live3d?.progress !== undefined
+                    ? { progress: live3d.progress }
+                    : {})}
                 {...(generating?.aspect !== undefined ? { aspect: generating.aspect } : {})}
               />
             ) : jobHere !== null ? (

@@ -73,6 +73,13 @@ export type ToolIconKind =
   | 'speech'
   | 'music'
   | 'sfx'
+  // A 3D model built or refined by the Bobble 3D connector (generate_3d /
+  // refine_3d): the GLB badge, "Built a 3D model" — never "Used a tool"
+  // beside a mesh the user can turn.
+  | 'model3d'
+  // …and a pass over one that exists (refine_3d: texture / segment / rig /
+  // retopo), so the collapsed line says "Refined", not "Built", about a rig.
+  | 'model3d-refine'
   | 'file'
   // A SKILL / tool-instructions read (a SKILL.md under the pi skills dir):
   // reads distinctly as "Read a skill" with its own sparkle glyph — NOT the
@@ -241,6 +248,9 @@ export function toolIcon(
     case 'music':
     case 'sfx':
       return <FileExtIcon ext={fileExt(filename) || 'WAV'} size={size + 4} />;
+    case 'model3d':
+    case 'model3d-refine':
+      return <FileExtIcon ext={fileExt(filename) || 'GLB'} size={size + 4} />;
     case 'pdf':
       return <FileExtIcon ext={fileExt(filename) || 'PDF'} size={size + 4} />;
     default:

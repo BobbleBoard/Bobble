@@ -207,6 +207,21 @@ describe('mergeSettingsPatch', () => {
       },
     );
   });
+
+  /* The module connectors (Bobble 3D): a per-id map, off by default, patched
+     by id — turning one on must not forget another, and junk values drop. */
+  it('module connectors default off, merge by id, and keep only booleans', () => {
+    expect(DEFAULT_SETTINGS.moduleConnectors).toEqual({});
+    const on = mergeSettingsPatch(DEFAULT_SETTINGS, { moduleConnectors: { '3d': true } });
+    expect(on.moduleConnectors).toEqual({ '3d': true });
+    const two = mergeSettingsPatch(on, { moduleConnectors: { audio: true } });
+    expect(two.moduleConnectors).toEqual({ '3d': true, audio: true });
+    const off = mergeSettingsPatch(two, { moduleConnectors: { '3d': false } });
+    expect(off.moduleConnectors).toEqual({ '3d': false, audio: true });
+    expect(
+      clampSettings({ moduleConnectors: { '3d': 'yes', comfy: true, '': true } }).moduleConnectors,
+    ).toEqual({ comfy: true });
+  });
 });
 
 describe('seedFromOnboarding', () => {

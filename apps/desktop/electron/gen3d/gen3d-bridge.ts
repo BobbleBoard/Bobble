@@ -28,8 +28,23 @@ const log = createLogger('desktop:gen3d-bridge');
 /** Runs one image job. Injected (gen3d-main's `runImageJob` in the app) so this
  * module stays electron-free and testable over a real socket. */
 export type RunImageJob = (req: { prompt: string; editFrom?: string }) => Promise<ImageJobResult>;
+/** The 3D side (gen3d-main run3dJob / runStage3dJob), wired beside the image runner. */
+export interface ModelRunners {
+  readonly generate: (req: {
+    prompt?: string;
+    imagePath?: string;
+    finish?: 'grey' | 'color' | 'pbr';
+    resolution?: 'low' | 'medium' | 'high';
+  }) => Promise<ImageJobResult>;
+  readonly stage: (req: {
+    op: 'texture' | 'segment' | 'rig' | 'retopo';
+    modelPath: string;
+    prompt?: string;
+  }) => Promise<ImageJobResult>;
+}
 
 let runJob: RunImageJob | null = null;
+let runModel: ModelRunners | null = null;
 
 /** Env keys the harness's bridge client reads (keep in sync with
  * packages/harness src/tools/image-bridge-client.ts). */
@@ -43,7 +58,15 @@ interface BridgeRequest {
   id: number;
   token: string;
   method: string;
-  params?: { prompt?: string; imagePath?: string; instruction?: string };
+  params?: {
+    prompt?: string;
+    imagePath?: string;
+    instruction?: string;
+    finish?: string;
+    resolution?: string;
+    op?: string;
+    modelPath?: string;
+  };
 }
 
 function fail(error: string): ImageJobResult {
@@ -54,7 +77,35 @@ export async function handleMethod(
   method: string,
   params: BridgeRequest['params'],
   run: RunImageJob | null = runJob,
+  models: ModelRunners | null = runModel,
 ): Promise<ImageJobResult> {
+  /* THE 3D METHODS — the connector's tools (harness model-tools.ts). */
+  if (method === 'generate_3d') {
+    if (models === null) return fail('the 3D engine is not available');
+    const prompt = typeof params?.prompt === 'string' ? params.prompt : '';
+    const imagePath = typeof params?.imagePath === 'string' ? params.imagePath.trim() : '';
+    const finish = params?.finish;
+    const resolution = params?.resolution;
+    return models.generate({
+      ...(prompt !== '' ? { prompt } : {}),
+      ...(imagePath !== '' ? { imagePath } : {}),
+      ...(finish === 'grey' || finish === 'color' || finish === 'pbr' ? { finish } : {}),
+      ...(resolution === 'low' || resolution === 'medium' || resolution === 'high'
+        ? { resolution }
+        : {}),
+    });
+  }
+  if (method === 'refine_3d') {
+    if (models === null) return fail('the 3D engine is not available');
+    const op = params?.op;
+    const modelPath = typeof params?.modelPath === 'string' ? params.modelPath.trim() : '';
+    if (op !== 'texture' && op !== 'segment' && op !== 'rig' && op !== 'retopo') {
+      return fail(`unknown 3D refinement "${String(op)}" — texture, segment, rig or retopo`);
+    }
+    if (modelPath === '') return fail('model_path is required');
+    const prompt = typeof params?.prompt === 'string' ? params.prompt : undefined;
+    return models.stage({ op, modelPath, ...(prompt !== undefined ? { prompt } : {}) });
+  }
   if (run === null) return fail('the image engine is not available');
   if (method === 'generate_image') {
     const prompt = typeof params?.prompt === 'string' ? params.prompt : '';
@@ -122,8 +173,9 @@ async function handleLine(socket: net.Socket, line: string): Promise<void> {
  * Called from pi-main's registerPiIpc, beside {@link registerSubagentBridge} and
  * for the same reason: the env must exist BEFORE the first pi spawn reads it.
  */
-export function registerGen3dBridge(run: RunImageJob): void {
+export function registerGen3dBridge(run: RunImageJob, models: ModelRunners | null = null): void {
   runJob = run;
+  runModel = models;
   if (server !== null) return;
   const socketPath = process.env[SOCK_ENV] ?? defaultSocketPath();
   token = process.env[TOKEN_ENV] ?? randomBytes(24).toString('hex');
@@ -144,6 +196,7 @@ export function disposeGen3dBridge(): void {
   server?.close();
   server = null;
   runJob = null;
+  runModel = null;
 }
 
 /** Test hook: the env a child would read (undefined before the bridge starts). */

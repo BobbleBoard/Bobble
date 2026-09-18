@@ -129,6 +129,7 @@ import {
 import { wouldHang } from './tools/hang-guard.js';
 import { registerImageTools } from './tools/image-tools.js';
 import { applyBias, lastAssistantThought, planBias } from './tools/intent-bias.js';
+import { registerModelTools } from './tools/model-tools.js';
 import {
   OFFICE_MAKE_TOOL,
   officeGenDir,
@@ -2525,6 +2526,10 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   // bridge. Registers NOTHING outside Pi Desktop (no bridge env → no tools), so
   // a plain CLI pi never sees a capability this machine can't honour.
   registerImageTools(pi);
+  // The Bobble 3D connector's tools (generate_3d / refine_3d), on the same
+  // bridge — registered only when the app says the connector is on and an
+  // engine that can make a mesh is on this Mac (PI_BOBBLE_3D_READY).
+  registerModelTools(pi);
 
   // Real subagents: `spawn_subagent` runs an isolated child pi and returns ONLY
   // its summary. Spawns are memory-scheduled (concurrency bounded by detected
@@ -4917,6 +4922,13 @@ export {
   pdFileUrl,
   registerImageTools,
 } from './tools/image-tools.js';
+export {
+  BOBBLE_3D_READY_ENV,
+  GENERATE_3D_TOOL,
+  modelToolResult,
+  REFINE_3D_TOOL,
+  registerModelTools,
+} from './tools/model-tools.js';
 export {
   normalizePlan,
   PLAN_TOOL_NAME,

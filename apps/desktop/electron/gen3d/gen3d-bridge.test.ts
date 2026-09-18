@@ -10,6 +10,7 @@ import {
   disposeGen3dBridge,
   gen3dBridgeEnv,
   handleMethod,
+  type ModelRunners,
   type RunImageJob,
   registerGen3dBridge,
 } from './gen3d-bridge';
@@ -17,10 +18,10 @@ import {
 const SOCK_ENV = 'PI_DESKTOP_GEN3D_SOCK';
 const TOKEN_ENV = 'PI_DESKTOP_GEN3D_TOKEN';
 
-function startBridge(run: RunImageJob) {
+function startBridge(run: RunImageJob, models: ModelRunners | null = null) {
   delete process.env[SOCK_ENV];
   delete process.env[TOKEN_ENV];
-  registerGen3dBridge(run);
+  registerGen3dBridge(run, models);
   const { sock, token } = gen3dBridgeEnv();
   return { sock: sock ?? '', token: token ?? '' };
 }
@@ -117,5 +118,89 @@ describe('handleMethod', () => {
   it('reports no engine rather than throwing when nothing is wired', async () => {
     const res = await handleMethod('generate_image', { prompt: 'x' }, null);
     expect(res.ok).toBe(false);
+  });
+});
+
+/*
+ * THE 3D METHODS — the Bobble 3D connector's tools (harness model-tools.ts)
+ * ride the same socket through the client's generic `call`.
+ */
+describe('bridge ↔ harness client — 3D', () => {
+  it('carries generate_3d through with prompt, image and finish', async () => {
+    const generate = vi.fn<ModelRunners['generate']>(async () => ({
+      ok: true,
+      path: '/out/fox/model.glb',
+    }));
+    const stage = vi.fn<ModelRunners['stage']>(async () => ({ ok: true, path: '/x.glb' }));
+    const { sock, token } = startBridge(async () => ({ ok: true, path: '/a.png' }), {
+      generate,
+      stage,
+    });
+    const res = await clientFor(sock, token).call('generate_3d', {
+      prompt: 'a fox',
+      imagePath: '/pics/fox.png',
+      finish: 'grey',
+      resolution: 'low',
+    });
+    expect(generate).toHaveBeenCalledWith({
+      prompt: 'a fox',
+      imagePath: '/pics/fox.png',
+      finish: 'grey',
+      resolution: 'low',
+    });
+    expect(res).toEqual({ ok: true, path: '/out/fox/model.glb' });
+  });
+
+  it('carries refine_3d through with op, model path and prompt', async () => {
+    const generate = vi.fn<ModelRunners['generate']>(async () => ({ ok: true, path: '/x.glb' }));
+    const stage = vi.fn<ModelRunners['stage']>(async () => ({
+      ok: true,
+      path: '/out/fox/rigged.glb',
+    }));
+    const { sock, token } = startBridge(async () => ({ ok: true, path: '/a.png' }), {
+      generate,
+      stage,
+    });
+    const res = await clientFor(sock, token).call('refine_3d', {
+      op: 'rig',
+      modelPath: '/out/fox/model.glb',
+    });
+    expect(stage).toHaveBeenCalledWith({ op: 'rig', modelPath: '/out/fox/model.glb' });
+    expect(res).toEqual({ ok: true, path: '/out/fox/rigged.glb' });
+  });
+});
+
+describe('handleMethod — 3D', () => {
+  const models: ModelRunners = {
+    generate: vi.fn(async () => ({ ok: true as const, path: '/m.glb' })),
+    stage: vi.fn(async () => ({ ok: true as const, path: '/s.glb' })),
+  };
+
+  it('says the 3D engine is not available when no runners are wired', async () => {
+    const res = await handleMethod('generate_3d', { prompt: 'x' }, null, null);
+    expect(res).toEqual({ ok: false, error: 'the 3D engine is not available' });
+  });
+
+  it('drops an unknown finish or resolution rather than forwarding it', async () => {
+    await handleMethod(
+      'generate_3d',
+      { prompt: 'x', finish: 'shiny', resolution: 'huge' },
+      null,
+      models,
+    );
+    expect(models.generate).toHaveBeenLastCalledWith({ prompt: 'x' });
+  });
+
+  it('refuses an unknown refinement and an empty model path', async () => {
+    const bad = await handleMethod(
+      'refine_3d',
+      { op: 'polish', modelPath: '/m.glb' },
+      null,
+      models,
+    );
+    expect(bad.ok).toBe(false);
+    const none = await handleMethod('refine_3d', { op: 'rig', modelPath: '' }, null, models);
+    expect(none).toEqual({ ok: false, error: 'model_path is required' });
+    expect(models.stage).not.toHaveBeenCalled();
   });
 });

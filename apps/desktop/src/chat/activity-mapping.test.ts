@@ -254,6 +254,8 @@ describe('mapToolStep — the generate family keeps its own kind', () => {
     ['generate_music', 'music'],
     ['generate_sfx', 'sfx'],
     ['generate_video', 'video'],
+    ['generate_3d', 'model3d'],
+    ['refine_3d', 'model3d-refine'],
   ] as const;
 
   for (const [tool, kind] of CASES) {

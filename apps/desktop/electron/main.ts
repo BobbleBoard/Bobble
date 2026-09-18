@@ -41,6 +41,7 @@ import {
   registerGenCatalogIpc,
   registerGenIpc,
 } from './gen/gen-manager';
+import type { GenModulesManager } from './gen/gen-modules';
 import { createGenModules } from './gen/gen-modules-main';
 import { startGuardian } from './gen/guardian-main';
 import { genWorkerCandidates, resolveGenWorkerScript } from './gen/worker-path';
@@ -134,6 +135,8 @@ registerCanvasSchemesAsPrivileged();
 
 let mainWindow: BrowserWindow | null = null;
 let canvasPopoutWindow: BrowserWindow | null = null;
+/** The gen modules manager, once the generation block below has made it. */
+let genModulesRef: GenModulesManager | null = null;
 
 // The "Pi caret" app mark (build/icon.png). Packaged builds get their bundle
 // icon from build/icon.icns (electron-builder mac.icon), but that does not set
@@ -852,6 +855,7 @@ function registerAppIpc(): void {
       const wc = mainWindow?.webContents ?? null;
       if (wc !== null && !wc.isDestroyed()) events.send(wc, 'gen:module', states);
     });
+    genModulesRef = genModules;
     const genQueue = registerGenIpc({
       /*
        * uv, FOUND THE WAY THE REST OF THE APP FINDS IT. The client's own probe
@@ -983,7 +987,11 @@ function registerAppIpc(): void {
   // Connectors gallery: catalog + registry read/mutate + /Applications scan.
   // Owns ~/.pi/desktop/mcp-connectors.json (the file the mcp-lite pi extension
   // reads); the model sees changes on the next pi session/spawn.
-  registerConnectorsIpc(ipcMain, allowSender);
+  registerConnectorsIpc(ipcMain, allowSender, {
+    // A module connector (Bobble 3D) installs its engine through the same
+    // manager the studio's Download card presses.
+    modules: () => genModulesRef,
+  });
 
   // Skills: bundled catalog + install/remove into ~/.pi/agent/skills (the dir
   // the pi engine auto-discovers skills from); copies from app resources.

@@ -82,6 +82,7 @@ const DEFAULTS: DesktopSettings = {
   hideDeleteModelConfirm: false,
   computerUse: { enabled: true, apps: [] },
   memoryGuard: true,
+  moduleConnectors: {},
   harnessId: 'pi-bundled',
   harnessConfigPath: '',
 };

@@ -155,6 +155,7 @@ export const DEFAULT_SETTINGS: DesktopSettings = {
   // change under anyone's feet. Onboarding is where a fresh one decides.
   computerUse: { enabled: true, apps: [] },
   memoryGuard: true,
+  moduleConnectors: {},
   harnessId: 'pi-bundled',
   harnessConfigPath: '',
 };
@@ -418,7 +419,18 @@ export function clampSettings(raw: unknown): DesktopSettings {
     hideDeleteModelConfirm: bool(o.hideDeleteModelConfirm, d.hideDeleteModelConfirm),
     computerUse: clampComputerUse(o.computerUse, d.computerUse),
     memoryGuard: bool(o.memoryGuard, d.memoryGuard),
+    moduleConnectors: clampModuleConnectors(o.moduleConnectors),
   };
+}
+
+/** `{ '3d': true }` — only string keys with boolean values; anything else is dropped. */
+function clampModuleConnectors(value: unknown): Record<string, boolean> {
+  if (typeof value !== 'object' || value === null) return {};
+  const out: Record<string, boolean> = {};
+  for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof v === 'boolean' && k !== '') out[k] = v;
+  }
+  return out;
 }
 
 /**
@@ -497,6 +509,7 @@ export function mergeSettingsPatch(
       ),
     ),
     modelSpec: { ...current.modelSpec, ...patch.modelSpec },
+    moduleConnectors: { ...current.moduleConnectors, ...patch.moduleConnectors },
     ...(patch.modelsRoot === undefined ? {} : { modelsRoot: patch.modelsRoot }),
   });
 }

@@ -234,6 +234,8 @@ const STEP_LABELS: Record<ActivityStepKind, [running: string, done: string]> = {
   speech: ['Reading it aloud', 'Read it aloud'],
   music: ['Composing music', 'Composed music'],
   sfx: ['Making a sound effect', 'Made a sound effect'],
+  model3d: ['Building a 3D model', 'Built a 3D model'],
+  'model3d-refine': ['Refining a 3D model', 'Refined a 3D model'],
   pdf: ['Creating a PDF', 'Created a PDF'],
   chart: ['Rendering a chart', 'Rendered a chart'],
   'canvas-open': ['Opening the canvas', 'Opened the canvas'],
@@ -346,6 +348,9 @@ const TOOL_REGISTRY: Record<string, ToolResolution> = {
   generate_speech: { kind: 'speech' },
   generate_music: { kind: 'music' },
   generate_sfx: { kind: 'sfx' },
+  // The Bobble 3D connector: a build, and a pass over a model the chat has.
+  generate_3d: { kind: 'model3d' },
+  refine_3d: { kind: 'model3d-refine' },
   edit_image: { kind: 'image', label: ['Editing an image', 'Edited an image'] },
   // OmniSVG through the `svg` command — a drawing, so the image glyph, but the
   // words say what kind: a vector file, not a render.
@@ -946,7 +951,7 @@ export function generatedImageSrc(
  * they are one behaviour; it lived inside a `case` and image could not reach it.
  */
 function producedArtifactStep(
-  kind: 'image' | 'video' | 'speech' | 'music' | 'sfx',
+  kind: 'image' | 'video' | 'speech' | 'music' | 'sfx' | 'model3d' | 'model3d-refine',
   label: string,
   status: 'running' | 'done',
   filename: string | undefined,
@@ -1373,6 +1378,8 @@ function mapToolStepData(
     case 'speech':
     case 'music':
     case 'sfx':
+    case 'model3d':
+    case 'model3d-refine':
       return producedArtifactStep(kind, label, status, filename, path, result);
     default:
       /*

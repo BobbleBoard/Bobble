@@ -24,7 +24,7 @@ import { guardRun } from '../gen/guardian-main';
 import { openStillWindow } from '../gen/hyperframes-window';
 import { omniSvgFiles } from '../gen/omnisvg';
 import { registerGen3dBridge } from '../gen3d/gen3d-bridge';
-import { runImageJob } from '../gen3d/gen3d-main';
+import { model3dReady, run3dJob, runImageJob, runStage3dJob } from '../gen3d/gen3d-main';
 import { detectHarnesses } from '../inference/harness-main';
 import {
   getInferenceUtility,
@@ -192,6 +192,12 @@ function buildPiEnv(cwd: string | undefined): Record<string, string | undefined>
        connector install restarts pi so the change is live at once. */
     PI_DESKTOP_GEN_MEDIA: generationExperimentEnabled() ? '1' : '0',
     PI_OMNISVG_READY: omniSvgFiles().ready ? '1' : '0',
+    /* The 3D connector's tools: only once an engine that can make a mesh is on
+       this machine AND the connector is on (Connectors → Bobble 3D). the user
+       (2026-09-17): "3d should be a connector that gets recommended for
+       install upon installing the 3d studio module". */
+    PI_BOBBLE_3D_READY:
+      model3dReady() && readSettings().moduleConnectors['3d'] === true ? '1' : '0',
     /* The document pipeline — where `office.py` is, a Python that has its
        libraries, and a scratch dir — so the harness's `office` tool registers
        and runs in every chat, not only inside a corp run. See office-gen-env.ts. */
@@ -534,7 +540,7 @@ export function registerPiIpc(
   // same timing constraint as the subagent one: its env must be published
   // BEFORE the first pi spawn, or the harness sees no bridge and (by design)
   // never registers the tools.
-  registerGen3dBridge(runImageJob);
+  registerGen3dBridge(runImageJob, { generate: run3dJob, stage: runStage3dJob });
 
   installPiQuitHold(app, {
     // Reap child-agent pi instances in the same held quit window as the main

@@ -202,6 +202,9 @@ export function mediaToolOfCommand(command: string | undefined): string | null {
   const gen = /(?:^|[\s;&|(`])media\s+generate\s+(image|video|speech|music|sfx)\b/.exec(command);
   if (gen !== null) return `generate_${gen[1]}`;
   if (/(?:^|[\s;&|(`])media\s+edit\s+image\b/.test(command)) return 'edit_image';
+  // The Bobble 3D connector's commands: `3d generate …` and `3d refine …`.
+  const model = /(?:^|[\s;&|(`])3d\s+(generate|refine)\b/.exec(command);
+  if (model !== null) return `${model[1]}_3d`;
   return null;
 }
 

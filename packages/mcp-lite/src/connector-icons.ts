@@ -216,6 +216,11 @@ const NEUTRAL_ICON_SVGS: Record<string, string> = {
       '<circle cx="4.5" cy="18.5" r="1.5"/><circle cx="19.5" cy="5.5" r="1.5"/><circle cx="9.5" cy="12.5" r="1.25"/><circle cx="13.5" cy="8.5" r="1.25"/>',
     'orange',
   ),
+  // A cube seen from a corner, lit — the mesh a chat can now turn.
+  'bobble-3d': neutralSvg(
+    '<path d="M12 3.5 20 8v8l-8 4.5L4 16V8z"/><path d="M4 8l8 4.5L20 8"/><path d="M12 12.5V20.5"/><path d="M8 6.25l8 4.5"/>',
+    'teal',
+  ),
   // Scissors (a typed ffmpeg cut/edit façade).
   // Three bars on a baseline — the chart card's own glyph.
   'data-visuals': neutralSvg(

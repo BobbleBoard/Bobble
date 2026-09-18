@@ -16,13 +16,18 @@ import type {
   McpServerConfig,
 } from '@pi-desktop/mcp-lite';
 import { create } from 'zustand';
-import type { ConnectorToolListing } from '../../electron/connectors/connectors-contract';
+import type {
+  ConnectorToolListing,
+  ModuleConnectorState,
+} from '../../electron/connectors/connectors-contract';
 
 interface ConnectorsStoreState {
   registry: McpRegistryConfig;
   catalog: KnownConnector[];
   /** Ids of model connectors whose files are on disk — their installed state. */
   installedModels: string[];
+  /** Module connectors (Bobble 3D) by id: engine on disk, switch on, engine size. */
+  moduleConnectors: Record<string, ModuleConnectorState>;
   recommended: ConnectorSuggestion[];
   detected: ConnectorSuggestion[];
   loaded: boolean;
@@ -60,6 +65,7 @@ export const useConnectorsStore = create<ConnectorsStoreState>((set, get) => ({
   registry: EMPTY_REGISTRY,
   catalog: [],
   installedModels: [],
+  moduleConnectors: {},
   recommended: [],
   detected: [],
   loaded: false,
@@ -74,6 +80,7 @@ export const useConnectorsStore = create<ConnectorsStoreState>((set, get) => ({
       registry: list.registry,
       catalog: list.catalog,
       installedModels: list.installedModels ?? [],
+      moduleConnectors: list.moduleConnectors ?? {},
       recommended: scan.recommended,
       detected: scan.detected,
       loaded: true,
@@ -101,14 +108,24 @@ export const useConnectorsStore = create<ConnectorsStoreState>((set, get) => ({
       /* A model connector's install is a download; its state is the files, which
          only a fresh list reports. Re-list rather than guess. */
       const list = await window.piDesktop.invoke('connectors:list', undefined);
-      set({ registry, installedModels: list.installedModels ?? [] });
+      set({
+        registry,
+        installedModels: list.installedModels ?? [],
+        moduleConnectors: list.moduleConnectors ?? {},
+      });
       if (error !== undefined && error !== '') throw new Error(error);
       /* A model connector's tool is registered at pi's spawn (PI_OMNISVG_READY),
          so the download has to be followed by a respawn for `svg` to exist in
          the running session — same reason the search panel restarts pi after
          a key changes the env. the user: "download the connector and then have it
-         used in a new chat" — this is what makes the new chat have it. */
-      if (isModelConnector(get(), id)) await restartForModelChange();
+         used in a new chat" — this is what makes the new chat have it. A
+         module connector (PI_BOBBLE_3D_READY) is gated the same way. */
+      if (isSpawnGatedConnector(get(), id)) {
+        await restartForModelChange();
+        /* The engine's own install just ran: the recommendation that offered
+           the connector is now stale, and the scan is what removes it. */
+        await get().rescan();
+      }
     } finally {
       set({ busyId: null });
     }
@@ -119,8 +136,15 @@ export const useConnectorsStore = create<ConnectorsStoreState>((set, get) => ({
     try {
       const { registry } = await window.piDesktop.invoke('connectors:remove', { id });
       const list = await window.piDesktop.invoke('connectors:list', undefined);
-      set({ registry, installedModels: list.installedModels ?? [] });
-      if (isModelConnector(get(), id)) await restartForModelChange();
+      set({
+        registry,
+        installedModels: list.installedModels ?? [],
+        moduleConnectors: list.moduleConnectors ?? {},
+      });
+      if (isSpawnGatedConnector(get(), id)) {
+        await restartForModelChange();
+        await get().rescan();
+      }
     } finally {
       set({ busyId: null });
     }
@@ -171,9 +195,10 @@ export function isEnabled(registry: McpRegistryConfig, id: string): boolean {
   return server !== undefined && server.enabled !== false;
 }
 
-/** Is this catalog id a model connector (one whose tool is gated at pi's spawn)? */
-function isModelConnector(state: { catalog: KnownConnector[] }, id: string): boolean {
-  return state.catalog.find((c) => c.id === id)?.kind === 'model';
+/** Is this catalog id a model or module connector (one whose tools are gated at pi's spawn)? */
+function isSpawnGatedConnector(state: { catalog: KnownConnector[] }, id: string): boolean {
+  const kind = state.catalog.find((c) => c.id === id)?.kind;
+  return kind === 'model' || kind === 'module';
 }
 
 /** Respawn pi so a tool gated on the model's presence appears (or disappears). */

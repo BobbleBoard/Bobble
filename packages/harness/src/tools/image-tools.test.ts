@@ -27,7 +27,8 @@ function captureTools() {
 function okBridge(path: string) {
   const generateImage = vi.fn(async () => ({ ok: true as const, path }));
   const editImage = vi.fn(async () => ({ ok: true as const, path }));
-  return { bridge: { generateImage, editImage } as ImageBridge, generateImage, editImage };
+  const call = vi.fn(async () => ({ ok: true as const, path }));
+  return { bridge: { generateImage, editImage, call } as ImageBridge, generateImage, editImage };
 }
 
 const ctx = { hasUI: true } as unknown as ExtensionContext;
@@ -117,6 +118,7 @@ describe('generate_image', () => {
     const bridge = {
       generateImage: async () => ({ ok: false as const, error: 'Mage-Flow is not installed yet' }),
       editImage: async () => ({ ok: false as const, error: 'nope' }),
+      call: async () => ({ ok: false as const, error: 'nope' }),
     } as ImageBridge;
     registerImageTools(pi, bridge);
 

@@ -21,7 +21,10 @@ import type {
   McpServerConfig,
 } from '@pi-desktop/mcp-lite';
 import { useEffect, useMemo, useSyncExternalStore } from 'react';
-import type { ConnectorToolListing } from '../../electron/connectors/connectors-contract';
+import type {
+  ConnectorToolListing,
+  ModuleConnectorState,
+} from '../../electron/connectors/connectors-contract';
 import type { SkillListItem } from '../../electron/skills/skills-contract';
 import { installedServer, useConnectorsStore } from '../state/connectors-store';
 import { useSettingsStore } from '../state/settings-store';
@@ -110,10 +113,18 @@ function connectorState(
   c: KnownConnector,
   server: McpServerConfig | undefined,
   installedModels: ReadonlySet<string> = new Set(),
+  moduleConnectors: Readonly<Record<string, ModuleConnectorState>> = {},
 ): ItemState {
   if (c.kind === 'builtin') return 'builtin';
   /* A model connector is never in the registry; its files are its install. */
   if (c.kind === 'model') return installedModels.has(c.id) ? 'on' : 'available';
+  /* A module connector is on when its engine is here AND it was turned on —
+     the same condition its tools register on. Anything less is "available",
+     which is what puts it under "Recommended for you" with its reason. */
+  if (c.kind === 'module') {
+    const m = moduleConnectors[c.id];
+    return m !== undefined && m.ready && m.on ? 'on' : 'available';
+  }
   if (server === undefined) return 'available';
   if (server.enabled !== false) return 'on';
   return unfilled(c, server).length > 0 ? 'needs-setup' : 'off';
@@ -437,6 +448,7 @@ export function isRemote(server: Pick<McpServerConfig, 'args'>): boolean {
  */
 const EXAMPLE_PROMPT: Record<string, string> = {
   omnisvg: 'Make me an SVG icon of a red heart with smooth curved edges, centered.',
+  'bobble-3d': 'Make me a 3D model of a low-poly fox sitting, then rig it.',
   filesystem: 'List the files in my Projects folder and summarise what each project is.',
   git: 'What changed in this repo in the last week? Summarise the commits.',
   memory:
@@ -538,6 +550,7 @@ const ACRONYMS: Record<string, string> = {
   ip: 'IP',
   mcp: 'MCP',
   cli: 'CLI',
+  '3d': '3D',
 };
 
 /**
@@ -1106,6 +1119,7 @@ export function useCatalog(): Catalog {
   const registry = useConnectorsStore((s) => s.registry);
   const catalog = useConnectorsStore((s) => s.catalog);
   const installedModels = useConnectorsStore((s) => s.installedModels);
+  const moduleConnectors = useConnectorsStore((s) => s.moduleConnectors);
   const recommended = useConnectorsStore((s) => s.recommended);
   const loaded = useConnectorsStore((s) => s.loaded);
   const busy = useConnectorsStore((s) => s.busyId);
@@ -1140,7 +1154,7 @@ export function useCatalog(): Catalog {
         description: c.description,
         connector: c,
         server,
-        state: connectorState(c, server, installedModelIds),
+        state: connectorState(c, server, installedModelIds, moduleConnectors),
         reason: reasons.get(c.id),
         failure: server !== undefined ? failureOf(server) : undefined,
       };
@@ -1188,6 +1202,7 @@ export function useCatalog(): Catalog {
     registry,
     catalog,
     installedModels,
+    moduleConnectors,
     recommended,
     loaded,
     busy,

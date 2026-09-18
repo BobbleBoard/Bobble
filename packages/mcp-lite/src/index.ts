@@ -25,7 +25,12 @@ export {
   renderHelp,
 } from './bash-cli';
 export { BUILTIN_CONNECTOR_IDS, BUILTIN_CONNECTORS, MAC_CONNECTORS } from './builtin-connectors';
-export { MODEL_CONNECTORS, OMNISVG_CONNECTOR } from './builtin-connectors.js';
+export {
+  BOBBLE_3D_CONNECTOR,
+  MODEL_CONNECTORS,
+  MODULE_CONNECTORS,
+  OMNISVG_CONNECTOR,
+} from './builtin-connectors.js';
 export {
   type CatalogServerEntry,
   type CatalogToolEntry,

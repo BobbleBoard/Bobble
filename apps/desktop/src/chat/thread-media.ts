@@ -37,6 +37,10 @@ export const MEDIA_TOOLS: ReadonlySet<string> = new Set([
   'generate_speech',
   'generate_music',
   'generate_sfx',
+  // The Bobble 3D connector's two: a build, and a refinement — both a .glb
+  // the thread mounts as the turnable card.
+  'generate_3d',
+  'refine_3d',
 ]);
 
 /**
@@ -123,8 +127,13 @@ const EXT: Readonly<Record<string, MediaKind>> = {
  * limitation and the right trade here — the generated-output directories are
  * ours and slug-named, and a greedy pattern that allowed spaces would swallow
  * the rest of the sentence (" (seed 7)") into the filename on every line.
+ *
+ * And it must START a token: the 3D tools' result also names the file the way
+ * the model should say it — `out/fox.glb`, relative to the working folder —
+ * and the tail of that, `/fox.glb`, is an absolute path to nothing. Same guard
+ * as {@link reportedOutputPath} in activity-mapping.
  */
-const PATH_RX = /(\/[^\s()]+\.([A-Za-z0-9]+))/g;
+const PATH_RX = /(?<![:\w/])(\/[^\s()]+\.([A-Za-z0-9]+))/g;
 
 /**
  * Every media file a generate-tool result mentions, in the order it listed them.

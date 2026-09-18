@@ -134,6 +134,10 @@ const COMMAND_PATH_OVERRIDES: Readonly<Record<string, readonly string[]>> = {
   /* The same shape: the `chart` group's one tool IS the command —
      `chart bar "Units Sold by Year" --labels … --values …`. */
   chart: [],
+  /* `3d generate` / `3d refine` — derived, `generate_3d` under `3d` would
+     read "3d generate 3d" (the group name is a suffix here, not a prefix). */
+  generate_3d: ['generate'],
+  refine_3d: ['refine'],
 };
 
 export function pathFor(group: string, toolName: string): string[] {

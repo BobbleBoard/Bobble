@@ -22,6 +22,10 @@ const CONNECT_TIMEOUT_MS = 5_000;
 /** The app enforces the real per-job cap; this is a generous backstop so a dead
  * main process can never leave a tool call hanging forever. */
 const REPLY_TIMEOUT_MS = 20 * 60_000;
+/** A 3D build is a text-to-image pass, a structure pass, a shape pass and a
+ * texture bake — MEASURED 225 s at 512 on this M5 Pro, several times that at
+ * 1024 — so its backstop is the app's own 40-minute cap plus a margin. */
+const MODEL_REPLY_TIMEOUT_MS = 45 * 60_000;
 
 export type ImageBridgeResult =
   | { readonly ok: true; readonly path: string }
@@ -32,6 +36,18 @@ export interface ImageBridge {
   editImage(
     imagePath: string,
     instruction: string,
+    signal?: AbortSignal,
+  ): Promise<ImageBridgeResult>;
+  /**
+   * Any other method the app's bridge answers with a path — the 3D tools
+   * (`generate_3d`, `refine_3d`; see model-tools.ts) ride the same socket, the
+   * same engine owner and the same reply shape, so they need no second
+   * transport. The reply's timeout is the app's own per-job cap; the client's
+   * backstop is generous because a mesh takes minutes.
+   */
+  call(
+    method: string,
+    params: Record<string, unknown>,
     signal?: AbortSignal,
   ): Promise<ImageBridgeResult>;
 }
@@ -46,6 +62,7 @@ function request(
   method: string,
   params: Record<string, unknown>,
   signal: AbortSignal | undefined,
+  replyTimeoutMs: number = REPLY_TIMEOUT_MS,
 ): Promise<ImageBridgeResult> {
   return new Promise<ImageBridgeResult>((resolve) => {
     const socket = net.connect(socketPath);
@@ -66,8 +83,8 @@ function request(
     );
     connectTimer.unref?.();
     const replyTimer = setTimeout(
-      () => done(failed('the image engine did not answer in time')),
-      REPLY_TIMEOUT_MS,
+      () => done(failed('the generation engine did not answer in time')),
+      replyTimeoutMs,
     );
     replyTimer.unref?.();
     const onAbort = (): void => done(failed('cancelled'));
@@ -116,5 +133,14 @@ export function imageBridgeFromEnv(env: NodeJS.ProcessEnv = process.env): ImageB
       request(socketPath, token, 'generate_image', { prompt }, signal),
     editImage: (imagePath, instruction, signal) =>
       request(socketPath, token, 'edit_image', { imagePath, instruction }, signal),
+    call: (method, params, signal) =>
+      request(
+        socketPath,
+        token,
+        method,
+        params,
+        signal,
+        method.endsWith('_3d') ? MODEL_REPLY_TIMEOUT_MS : REPLY_TIMEOUT_MS,
+      ),
   };
 }

@@ -3680,6 +3680,15 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
 }
 .pd-media-card[data-kind="model"] .pd-media-frame {
   height: 240px;
+  /* A canvas has no intrinsic width for `fit-content` to fit, so the frame
+     states its own — the same 330px the waiting card below states, so the
+     handover does not change the card's size. A plain length, not
+     `min(330px, 100%)`: inside a shrink-to-fit figure that percentage is
+     cyclic and the frame came out the width of the caption's text (MEASURED:
+     288px waiting, 330px finished — a 42px step at the handover). the user: "a
+     little embedded viewport rotatable". */
+  width: 330px;
+  max-width: 100%;
 }
 .pd-media-card[data-kind="audio"] .pd-media-frame {
   min-height: 0;
@@ -4156,6 +4165,28 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
 }
 .pd-media-model-note[data-error="true"] {
   color: var(--pd-status-danger-fg, #e5484d);
+}
+/*
+ * THE FEW CONTROLS UNDER A 3D CARD. the user (2026-09-17): "below the card itself
+ * show some basic controls eg. coloring/normals/grey, if rig, skeleton and if
+ * segment, then explode." The app's own segmented control, sized down to the
+ * caption's scale, as wide as the viewport above it; a toggle stands in its
+ * own track beside the shading so an on/off does not read as a fourth shading.
+ */
+.pd-media-model-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-self: stretch;
+  padding-inline: 2px;
+  --pd-segment-height: 24px;
+  --pd-segment-padding-x: 10px;
+  --pd-segment-font-size: var(--pd-font-size-caption);
+  --pd-segment-track-padding: 2px;
+}
+.pd-media-model-controls .pd-segment {
+  font-weight: var(--pd-font-weight-semibold);
 }
 
 /* ── the expanded view ───────────────────────────────────────────────────── */
@@ -6705,10 +6736,13 @@ body[data-media-expanded="true"] .pd-studio-compose {
 }
 
 /* 3D results are a fixed-height viewport rather than an aspect box (see
-   .pd-media-card[data-kind="model"]), so the pending one is the same height. */
+   .pd-media-card[data-kind="model"]), so the pending one is the same box:
+   the same 330px stated as a length, for the reason given there. */
 .pd-media-card--pending[data-kind="model"] .pd-media-frame {
   aspect-ratio: auto;
   height: 240px;
+  width: 330px;
+  max-width: 100%;
 }
 
 /* The mark fills the frame; the canvas is sized by the loader itself. */

@@ -4,6 +4,7 @@ import {
   BUILTIN_CONNECTORS,
   MAC_CONNECTORS,
   MODEL_CONNECTORS,
+  MODULE_CONNECTORS,
 } from './builtin-connectors';
 import { BRANDED_CONNECTOR_IDS } from './connector-icons';
 import { isBuiltinConnector, KNOWN_CONNECTORS, KNOWN_CONNECTORS_BY_ID } from './detect-apps';
@@ -129,5 +130,29 @@ describe('model connectors', () => {
   it('is NOT a builtin: it must be installable', () => {
     expect(BUILTIN_CONNECTOR_IDS).not.toContain('omnisvg');
     expect(MODEL_CONNECTORS.map((c) => c.id)).toEqual(['omnisvg']);
+  });
+});
+
+describe('module connectors', () => {
+  /* the user (2026-09-17): "3d should be a connector that gets recommended for
+     install upon installing the 3d studio module". The card is the chat's use
+     of the studio's engine: its own kind, so the app can answer install /
+     state / recommendation from the module rather than from a model file or
+     a server in the registry. */
+  it('Bobble 3D is in the exported catalog, as a module connector on the 3d module', () => {
+    const c = KNOWN_CONNECTORS.find((k) => k.id === 'bobble-3d');
+    expect(c).toBeDefined();
+    expect(c?.kind).toBe('module');
+    expect(c?.moduleId).toBe('3d');
+    expect(c?.firstParty).toBe(true);
+    expect(c?.tools?.map((t) => t.name)).toEqual(['generate_3d', 'refine_3d']);
+    expect(c?.iconSvg).toContain('<svg');
+  });
+
+  it('is neither a builtin nor a model connector: it is installable and switchable', () => {
+    expect(BUILTIN_CONNECTOR_IDS).not.toContain('bobble-3d');
+    expect(MODEL_CONNECTORS.map((c) => c.id)).not.toContain('bobble-3d');
+    expect(MODULE_CONNECTORS.map((c) => c.id)).toEqual(['bobble-3d']);
+    expect(isBuiltinConnector('bobble-3d')).toBe(false);
   });
 });

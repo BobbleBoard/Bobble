@@ -321,3 +321,63 @@ export const BUILTIN_CONNECTOR_IDS: readonly string[] = BUILTIN_CONNECTORS.map((
  * of the catalog beside the builtins.
  */
 export const MODEL_CONNECTORS: KnownConnector[] = [OMNISVG_CONNECTOR];
+
+const BOBBLE_3D_DESCRIPTION =
+  'Make 3D models in the chat — a mesh from a description or a picture, then texture, ' +
+  "split into parts, rig or retopologise it — on the 3D studio's own engine, on-device. " +
+  'The result turns right in the conversation.';
+
+/**
+ * Bobble 3D — a MODULE connector (`kind:'module'`): the 3D studio's engine,
+ * offered to the CHAT. the user (2026-09-17): "3d should be a connector that gets
+ * recommended for install upon installing the 3d studio module, the card for
+ * during generation/texturing/segmentation/rigging … should just be a little
+ * embedded viewport rotatable".
+ *
+ * The engine belongs to the studio (gen module `3d`); this card is the chat's
+ * use of it. It has its own on/off — a person who installed the studio finds
+ * it under "Recommended for you" rather than finding two new tools in every
+ * chat — and installing it from a Mac with no engine installs the engine first
+ * (the same download the studio's card runs). Its two tools register at pi's
+ * spawn (PI_BOBBLE_3D_READY), like OmniSVG's `svg`; in CLI mode they are
+ * `3d generate` and `3d refine`.
+ */
+export const BOBBLE_3D_CONNECTOR: KnownConnector = {
+  id: 'bobble-3d',
+  name: 'Bobble 3D',
+  icon: '🧊',
+  category: 'creative',
+  description: BOBBLE_3D_DESCRIPTION,
+  kind: 'module',
+  moduleId: '3d',
+  firstParty: true,
+  official: true,
+  popular: true,
+  tools: [
+    {
+      name: 'generate_3d',
+      description:
+        '3d generate <prompt> --image <path> — a textured mesh from a description, a picture, or both.',
+    },
+    {
+      name: 'refine_3d',
+      description:
+        '3d refine <model> --op texture|segment|rig|retopo — texture, split into parts, rig or retopologise a model the chat has.',
+    },
+  ],
+  template: {
+    id: 'bobble-3d',
+    name: 'Bobble 3D',
+    icon: '🧊',
+    description: "3D generation for the chat, on the studio's engine.",
+    command: '',
+  },
+};
+
+/**
+ * Module connectors — the studios' engines as chat tools. Installable (the
+ * engine, when it is missing) and switchable, never servers, never in the
+ * registry; their state lives in settings (`moduleConnectors`) beside the
+ * engine's own presence. Merged beside the model connectors.
+ */
+export const MODULE_CONNECTORS: KnownConnector[] = [BOBBLE_3D_CONNECTOR];

@@ -38,7 +38,18 @@ function log(record) {
     }
   }
 }
-log({ kind: 'spawn', argv: process.argv.slice(2), fixture: fixturePath });
+log({
+  kind: 'spawn',
+  argv: process.argv.slice(2),
+  fixture: fixturePath,
+  /* The tool gates the app decides at spawn (pi-main buildPiEnv): a probe
+     can read back what a respawn after a connector change actually said. */
+  gates: {
+    PI_BOBBLE_3D_READY: process.env.PI_BOBBLE_3D_READY,
+    PI_OMNISVG_READY: process.env.PI_OMNISVG_READY,
+    PI_DESKTOP_GEN_MEDIA: process.env.PI_DESKTOP_GEN_MEDIA,
+  },
+});
 
 function writeLine(obj) {
   process.stdout.write(`${JSON.stringify(obj)}\n`);

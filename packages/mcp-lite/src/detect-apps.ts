@@ -16,7 +16,7 @@
 import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { BUILTIN_CONNECTORS, MODEL_CONNECTORS } from './builtin-connectors';
+import { BUILTIN_CONNECTORS, MODEL_CONNECTORS, MODULE_CONNECTORS } from './builtin-connectors';
 import { CONNECTOR_ICON_SVGS } from './connector-icons';
 import type { McpMode, McpServerConfig } from './registry';
 
@@ -72,7 +72,7 @@ export interface KnownConnector {
    * that is always on and never spawns a server). Absent ⇒ `'mcp'`. A builtin is
    * not necessarily authored by us — see {@link firstParty}.
    */
-  kind?: 'mcp' | 'builtin' | 'model';
+  kind?: 'mcp' | 'builtin' | 'model' | 'module';
   /**
    * For `kind:'model'`: the catalog id of the model this connector IS. Such a
    * connector never runs a server and never enters the registry — installing it
@@ -82,6 +82,19 @@ export interface KnownConnector {
    * available as the 5 GB behind it.
    */
   modelId?: string;
+  /**
+   * For `kind:'module'`: the generation module (the engine a studio installs —
+   * gen-modules.ts) whose tools this connector hands the CHAT. The engine is the
+   * studio's; the connector is the chat's use of it, and it has its own on/off
+   * so a person who installed the 3D studio is RECOMMENDED the connector
+   * rather than handed two tools they did not ask for. Installing it installs
+   * the engine when that has not happened yet, then turns the tools on; its
+   * state is "engine on disk AND turned on"; removing it turns the tools off
+   * and leaves the studio's engine alone. the user (2026-09-17): "3d should be a
+   * connector that gets recommended for install upon installing the 3d studio
+   * module".
+   */
+  moduleId?: string;
   /**
    * Authored by us (Pi Desktop) — drives the gallery's "By us" section. Distinct
    * from both {@link official} (the vendor's own server, e.g. GitHub's) and
@@ -737,6 +750,7 @@ const CATALOG_BASE: KnownConnector[] = [
 export const KNOWN_CONNECTORS: KnownConnector[] = [
   ...BUILTIN_CONNECTORS,
   ...MODEL_CONNECTORS,
+  ...MODULE_CONNECTORS,
   ...CATALOG_BASE,
 ].map((c) => ({ ...c, iconSvg: CONNECTOR_ICON_SVGS[c.id] ?? c.iconSvg }));
 

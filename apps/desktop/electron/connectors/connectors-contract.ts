@@ -41,6 +41,16 @@ export interface ConnectorToolListing {
   stderr?: string[];
 }
 
+/** The state of one module connector (see `moduleConnectors` on the list). */
+export interface ModuleConnectorState {
+  /** The engine (gen module) is installed. */
+  readonly ready: boolean;
+  /** The person turned the connector on (settings `moduleConnectors`). */
+  readonly on: boolean;
+  /** Rough size of the engine download, GB — for the button copy. */
+  readonly approxGB: number;
+}
+
 export type ConnectorsInvokeMap = {
   /** The configured registry (mode + servers) plus the full catalog of cards. */
   'connectors:list': {
@@ -54,6 +64,14 @@ export type ConnectorsInvokeMap = {
        * installed state — the files ARE the install.
        */
       installedModels: string[];
+      /**
+       * `kind:'module'` connectors (Bobble 3D), by connector id: whether the
+       * engine behind one is on this Mac, whether the person has turned the
+       * connector on, and what the engine costs to fetch when it is missing.
+       * The connector is ON exactly when both are true; installing it from a
+       * Mac with no engine installs the engine first.
+       */
+      moduleConnectors?: Record<string, ModuleConnectorState>;
     };
   };
   /** Run the /Applications scan → recommended (app-mapped, pinned) + detected. */
