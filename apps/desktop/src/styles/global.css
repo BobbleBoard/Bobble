@@ -8679,16 +8679,18 @@ body[data-media-expanded="true"] .pd-studio-compose {
   min-height: 24px;
 }
 
+/* the user (2026-09-18, looking at 28px): "much much larger logo and text, and
+   less space between the text and input bar". */
 .pd-home-lead {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 14px;
+  gap: 16px;
+  margin-bottom: 0;
   color: var(--pd-text-primary);
-  font-size: 28px;
-  line-height: 36px;
-  font-weight: 500;
-  letter-spacing: -0.01em;
+  font-size: 46px;
+  line-height: 56px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
   user-select: none;
 }
 

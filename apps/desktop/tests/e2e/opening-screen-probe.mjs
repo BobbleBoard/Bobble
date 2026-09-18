@@ -73,7 +73,7 @@ try {
       view.lead !== null &&
       view.lead.name === 'Bobble' &&
       view.lead.mark &&
-      view.lead.size >= 26 &&
+      view.lead.size >= 40 &&
       view.lead.lines === 0,
     `the opening screen is one line, the mark and the name (got ${JSON.stringify(view.lead)}, privacy ${JSON.stringify(view.privacy)})`,
   );

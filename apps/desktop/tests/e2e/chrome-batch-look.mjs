@@ -80,7 +80,7 @@ try {
   await shot('1-home-light');
   check(m.inputPx === 16, `the input is 16px (${m.inputPx})`);
   check(
-    m.leadHasMark && m.leadText === 'Bobble' && (m.leadPx ?? 0) >= 26 && !m.privacy,
+    m.leadHasMark && m.leadText === 'Bobble' && (m.leadPx ?? 0) >= 40 && !m.privacy,
     `one lead line, the mark and the name, larger: ${JSON.stringify(m)}`,
   );
   check(

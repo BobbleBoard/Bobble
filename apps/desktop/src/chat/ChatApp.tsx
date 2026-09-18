@@ -809,7 +809,7 @@ export function ChatApp({
                   {empty ? (
                     <div key="lead" className="flex flex-col items-center">
                       <div className="pd-home-lead" data-testid="home-lead">
-                        <BobbleMark size={30} />
+                        <BobbleMark size={48} />
                         <span className="pd-home-lead-name">Bobble</span>
                       </div>
                       {/*
@@ -841,7 +841,7 @@ export function ChatApp({
                         keeps the rule that it never moves the card when it
                         appears, and it cannot collide with anything else later.
                       */}
-                      <div aria-hidden className="h-9" data-testid="pill-gutter" />
+                      <div aria-hidden className="h-7" data-testid="pill-gutter" />
                     </div>
                   ) : (
                     // The thread is ALWAYS the lead surface — a corp run renders
