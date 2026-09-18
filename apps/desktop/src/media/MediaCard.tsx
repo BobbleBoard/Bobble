@@ -23,6 +23,7 @@
  * app's own dialog treatment — large, centred, the transcript still visibly
  * behind it — so it reads as looking closer at something rather than leaving.
  */
+import { useCopyFeedback } from '@pi-desktop/ui';
 import { type JSX, useEffect, useState } from 'react';
 import { pdFileUrl } from '../chat/canvas/file-preview';
 import { ThreadAudio } from '../chat/ThreadAudio';
@@ -31,8 +32,7 @@ import { useModalityStore } from '../state/modality-store';
 import { studioFor, useStudioHandoff } from '../state/studio-handoff';
 import { ExpandedScrim } from './ExpandedScrim';
 import { ModelSurface } from './ModelSurface';
-import { exportFile, revealFile, startFileDrag } from './media-actions';
-import { sendToChat } from './send-to-chat';
+import { copyFile, exportFile, revealFile, startFileDrag } from './media-actions';
 import { VideoSurface } from './VideoSurface';
 
 /** The media itself, at whatever size the frame around it gives. */
@@ -93,21 +93,30 @@ function GlyphExport(): JSX.Element {
   );
 }
 
-/** Speech bubble with an arrow going INTO it — back to the conversation. */
-function GlyphToChat(): JSX.Element {
+/** Two sheets, one over the other — Copy, the same glyph the chat's bar uses. */
+function GlyphCopy(): JSX.Element {
   return (
     <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <title>Send to chat</title>
+      <title>Copy</title>
+      <rect x="5.5" y="5.5" width="8" height="8" rx="1.6" stroke="currentColor" strokeWidth="1.5" />
       <path
-        d="M2.4 5.1a1.6 1.6 0 011.6-1.6h8a1.6 1.6 0 011.6 1.6v4.2a1.6 1.6 0 01-1.6 1.6H7.1L4.2 13.3v-2.4h-.2a1.6 1.6 0 01-1.6-1.6z"
+        d="M10.5 5.5V3.9a1.4 1.4 0 00-1.4-1.4H3.9a1.4 1.4 0 00-1.4 1.4v5.2a1.4 1.4 0 001.4 1.4h1.6"
         stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinejoin="round"
+        strokeWidth="1.5"
+        strokeLinecap="round"
       />
+    </svg>
+  );
+}
+
+function GlyphCheck(): JSX.Element {
+  return (
+    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <title>Copied</title>
       <path
-        d="M8 4.6v3.6M6.3 6.7L8 8.4l1.7-1.7"
+        d="M3.2 8.4l3 3 6.6-6.8"
         stroke="currentColor"
-        strokeWidth="1.4"
+        strokeWidth="1.8"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
@@ -151,6 +160,7 @@ function Controls({
    * conversation is offered instead.
    */
   const inItsStudio = view === target;
+  const { copied, copy } = useCopyFeedback();
   return (
     <>
       {onExpand !== undefined ? (
@@ -194,25 +204,26 @@ function Controls({
         {inItsStudio ? 'Use as input' : 'Open in studio'}
       </button>
       {/*
-        BACK TO THE CONVERSATION. Only offered from inside a studio: in the
-        transcript this result is already there, and a button that sends a thing
-        to where it is teaches people the controls are decorative. A picture
-        goes as an attachment the model can see; anything else goes as its path,
-        which is what the model can actually act on. See send-to-chat.ts.
+        COPY. The top-right corner used to send the result to the conversation
+        (send-to-chat.ts still does that for the studios' "Use as input" flow);
+        the user (2026-09-17): "the 'take to a new chat' button in the top right of
+        each card should just be replaced with a copy button that instantly
+        copies it to clipboard." A picture goes as pixels, the rest as the file.
       */}
-      {inItsStudio ? (
-        <button
-          type="button"
-          className="pd-media-btn pd-media-btn--tr pd-focusable"
-          data-testid="media-send-chat"
-          aria-label={`Send ${item.name} to the conversation`}
-          onClick={() => {
-            void sendToChat({ path: item.path, name: item.name, kind: item.kind });
-          }}
-        >
-          <GlyphToChat />
-        </button>
-      ) : null}
+      <button
+        type="button"
+        className="pd-media-btn pd-media-btn--tr pd-focusable"
+        data-testid="media-copy"
+        aria-label={copied ? 'Copied' : `Copy ${item.name}`}
+        title={copied ? 'Copied' : 'Copy'}
+        onClick={() => {
+          void copyFile(item.path).then((ok) => {
+            if (ok) copy();
+          });
+        }}
+      >
+        {copied ? <GlyphCheck /> : <GlyphCopy />}
+      </button>
       <button
         type="button"
         className="pd-media-btn pd-media-btn--br pd-focusable"

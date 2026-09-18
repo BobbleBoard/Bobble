@@ -95,6 +95,40 @@ describe('fillWorkflow', () => {
     expect(at(graph, '3.inputs.steps')).toBe(50);
     expect(at(graph, '3.inputs.seed')).toBe(7);
   });
+
+  it('samples Stable Audio 3 small the way its template does: lcm, cfg 1, the length off the latent', () => {
+    // MEASURED 2026-09-18: euler / cfg 6 / a ConditioningStableAudio pinned to
+    // 8 s made noise of every prompt; ComfyUI's own template for the distilled
+    // checkpoints is lcm / 8 steps / cfg 1 / simple, and no conditioning node.
+    for (const [template, ckpt] of [
+      ['stable-audio-3-music', 'stable_audio_3_small_music.safetensors'],
+      ['stable-audio-3-sfx', 'stable_audio_3_small_sfx.safetensors'],
+    ] as const) {
+      const graph = fillWorkflow(
+        {
+          prompt: 'a wooden door creaking open',
+          modelId: template,
+          workflowTemplate: template,
+          inputs: {
+            prompt: 'a wooden door creaking open',
+            negativePrompt: '',
+            seconds: 5,
+            steps: 8,
+          },
+          seeds: [3],
+        },
+        3,
+      );
+      expect(at(graph, '1.inputs.ckpt_name')).toBe(ckpt);
+      expect(at(graph, '3.inputs.sampler_name')).toBe('lcm');
+      expect(at(graph, '3.inputs.scheduler')).toBe('simple');
+      expect(at(graph, '3.inputs.cfg')).toBe(1);
+      expect(at(graph, '3.inputs.steps')).toBe(8);
+      expect(at(graph, '5.inputs.seconds')).toBe(5);
+      expect(at(graph, '3.inputs.positive')).toEqual(['6', 0]);
+      expect(graph['10']).toBeUndefined();
+    }
+  });
 });
 
 describe('workflow registry ↔ catalog consistency', () => {

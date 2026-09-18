@@ -140,10 +140,19 @@ describe('defaults', () => {
     expect(speech?.modality).toBe('audio');
     expect(['mlx-audio', 'torch-tts']).toContain(speech?.backend);
 
+    // The SFX-tuned build for a sound, the music-tuned one for music — never
+    // the first ComfyUI audio row for both (SEEN: a door creak on the music
+    // model, 2026-09-17).
     const sfx = defaultAudioModel('sfx', MODALITY_CATALOG);
-    expect(sfx?.id).toBe('stable-audio-open-small');
+    expect(sfx?.id).toBe('stable-audio-3-sfx');
 
     const music = defaultAudioModel('music', MODALITY_CATALOG);
-    expect(music?.id).toBe('ace-step');
+    expect(music?.id).toBe('stable-audio-3-music');
+  });
+
+  it('falls through to the builds that exist when the newest is not on the machine', () => {
+    const without3 = MODALITY_CATALOG.filter((m) => !m.id.startsWith('stable-audio-3'));
+    expect(defaultAudioModel('sfx', without3)?.id).toBe('stable-audio-open-small');
+    expect(defaultAudioModel('music', without3)?.id).toBe('ace-step');
   });
 });

@@ -1020,6 +1020,17 @@ export type CanvasInvokeMap = {
   /** File operation bar "Open in folder" → shell.showItemInFolder. */
   'canvas:reveal': { request: { path: string }; response: { ok: boolean } };
   /**
+   * Put a generated file on the clipboard: a picture as its pixels (so it
+   * pastes into anything that takes an image) AND as a file, anything else as
+   * a file (+ its path as text). the user (2026-09-17): the media card's top-right
+   * "take to a new chat" button "should just be replaced with a copy button
+   * that instantly copies it to clipboard."
+   */
+  'canvas:copy-file': {
+    request: { path: string };
+    response: { ok: boolean; how?: 'image' | 'file'; error?: string };
+  };
+  /**
    * Start an OS drag carrying a real file, so it can be dropped into Finder,
    * Mail, Slack — anywhere that accepts a file.
    *
@@ -1077,6 +1088,7 @@ export const CANVAS_INVOKE_CHANNELS = [
   'canvas:open-with',
   'canvas:open-default',
   'canvas:reveal',
+  'canvas:copy-file',
   'canvas:start-drag',
   'canvas:save-as',
   'canvas:save-bytes',

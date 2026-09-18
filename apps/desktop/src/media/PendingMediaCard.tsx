@@ -35,6 +35,7 @@
  * the user allowed "a quick smooth resize", and this is it.
  */
 import { type CSSProperties, type JSX, useEffect, useRef, useState } from 'react';
+import { idleWave, peaksOf, WAVE_BUCKETS } from '../chat/audio-peaks';
 import { BobbleLoader } from '../chat/BobbleLoader';
 import type { LoaderVariant } from '../chat/bobble-anim';
 import { pdFileUrl } from '../chat/canvas/file-preview';
@@ -63,8 +64,81 @@ export const PENDING_PHASES: Record<PendingKind, readonly string[]> = {
   image: ['Warming up…', 'Creating your image…', 'Drafting…', 'Refining…', 'Finalizing…'],
   video: ['Warming up…', 'Creating your clip…', 'Drafting frames…', 'Refining…', 'Finalizing…'],
   model: ['Warming up…', 'Creating your model…', 'Shaping…', 'Texturing…', 'Finalizing…'],
-  audio: ['Warming up…', 'Creating your sound…', 'Composing…', 'Finalizing…'],
+  /* A strip, not a plate: three words that fit beside a waveform (the user,
+     2026-09-17: the audio wait "needs reword so it makes sense and fits the
+     dimensions and size of the card"). */
+  audio: ['Warming up…', 'Composing…', 'Mixing…', 'Finishing…'],
 };
+
+/** The stand-in shape the pulsing bars hold before there is a sound. */
+const IDLE_WAVE = idleWave(WAVE_BUCKETS);
+
+/**
+ * THE AUDIO WAIT IS A WAVEFORM. the user (2026-09-11): "for audio you can show some
+ * pulsing waveforms that eventually at the end form into a real waveform
+ * that's playable." The mark's board never fitted a 50px strip; this is the
+ * transport's own box with its bars pulsing at a stand-in shape and the phrase
+ * where the clock will be. When the clip lands the bars travel to its real
+ * peaks (`data-state="resolved"`, the swell damping out under them), and then
+ * the playable transport takes the same geometry — one card, two states.
+ */
+function AudioPending({
+  phrase,
+  item,
+  onResolved,
+}: {
+  phrase: string;
+  item: ThreadMediaItem | undefined;
+  onResolved: () => void;
+}): JSX.Element {
+  const [peaks, setPeaks] = useState<number[] | null>(null);
+  useEffect(() => {
+    if (item === undefined) return;
+    const ac = new AbortController();
+    let done = false;
+    const finish = (): void => {
+      if (done) return;
+      done = true;
+      // The bars' travel is 620ms (see .pd-audio-pending-bar); hand over after.
+      setTimeout(onResolved, 680);
+    };
+    peaksOf(pdFileUrl(item.path), WAVE_BUCKETS, ac.signal)
+      .then((p) => {
+        setPeaks(p);
+        finish();
+      })
+      /* A clip that will not decode still finished: hand over to the real
+         transport rather than pulsing forever over a file that exists. */
+      .catch(() => finish());
+    return () => ac.abort();
+  }, [item, onResolved]);
+  const heights = peaks ?? IDLE_WAVE;
+  return (
+    <div
+      className="pd-thread-audio pd-audio-pending"
+      data-state={peaks === null ? 'pulsing' : 'resolved'}
+      data-testid="audio-pending"
+    >
+      <span className="pd-thread-audio-play pd-audio-pending-play" aria-hidden="true" />
+      <div className="pd-thread-audio-wave" data-testid="audio-pending-wave">
+        {heights.map((h, i) => (
+          <span
+            // biome-ignore lint/suspicious/noArrayIndexKey: fixed-length bucket list
+            key={i}
+            className="pd-thread-audio-bar pd-audio-pending-bar"
+            style={{
+              height: `${Math.max(8, Math.round(h * 100))}%`,
+              ['--pd-wv-i' as string]: String(i),
+            }}
+          />
+        ))}
+      </div>
+      <span className="pd-audio-pending-phrase" data-testid="pending-phase" aria-live="polite">
+        <span className="pd-shimmer">{phrase}</span>
+      </span>
+    </div>
+  );
+}
 
 /** How long a phase holds when there is no counter to read it from. */
 const PHASE_CLOCK_MS = 7000;
@@ -216,7 +290,7 @@ export function PendingMediaCard({
   const furthest = useRef(0);
   const phaseNow = pendingPhase(phases.length, progress, elapsed, revealing);
   if (phaseNow > furthest.current) furthest.current = phaseNow;
-  const phrase = phases[furthest.current] ?? phases[0];
+  const phrase = phases[furthest.current] ?? phases[0] ?? '';
 
   return (
     <figure
@@ -242,7 +316,7 @@ export function PendingMediaCard({
         {/* Underneath from the moment it exists, so the sweep uncovers something
             that is already laid out and decoded rather than mounting a fresh
             element into the hole the blocks just left. */}
-        {item !== undefined ? (
+        {item !== undefined && (kind !== 'audio' || swept) ? (
           <div className="pd-pending-reveal">
             <RevealSurface item={item} />
           </div>
@@ -259,27 +333,37 @@ export function PendingMediaCard({
             />
           </div>
         ) : null}
-        {/* The phase, shimmering like a thought — at the top, inside the frame,
-            and gone with the loader the moment the picture starts to show. */}
-        {revealing ? null : (
-          <div className="pd-pending-phase" data-testid="pending-phase" aria-live="polite">
-            <span className="pd-shimmer">{phrase}</span>
-          </div>
+        {kind === 'audio' ? (
+          swept ? null : (
+            <AudioPending phrase={phrase} item={item} onResolved={() => setSwept(true)} />
+          )
+        ) : (
+          <>
+            {/* The phase, shimmering like a thought — at the top, inside the frame,
+                and gone with the loader the moment the picture starts to show. */}
+            {revealing ? null : (
+              <div className="pd-pending-phase" data-testid="pending-phase" aria-live="polite">
+                <span className="pd-shimmer">{phrase}</span>
+              </div>
+            )}
+            <BobbleLoader
+              fill
+              bare
+              variant={VARIANT[kind]}
+              label={label}
+              exit={revealing}
+              onSweep={(p) => {
+                /* Straight onto the element: this runs at display rate, and putting
+                   a mask position through React state would re-render the card a
+                   hundred times during a one-second reveal. */
+                frameRef.current?.style.setProperty('--pd-pending-sweep', p.toFixed(4));
+              }}
+              onExitDone={() => setSwept(true)}
+            />
+            {/* The soft edge a waiting picture wears — see .pd-pending-falloff. */}
+            <div className="pd-pending-falloff" aria-hidden="true" />
+          </>
         )}
-        <BobbleLoader
-          fill
-          bare
-          variant={VARIANT[kind]}
-          label={label}
-          exit={revealing}
-          onSweep={(p) => {
-            /* Straight onto the element: this runs at display rate, and putting
-               a mask position through React state would re-render the card a
-               hundred times during a one-second reveal. */
-            frameRef.current?.style.setProperty('--pd-pending-sweep', p.toFixed(4));
-          }}
-          onExitDone={() => setSwept(true)}
-        />
       </div>
       {/*
         THE BAR, AND NOTHING ELSE. No title (the prompt is already above), no

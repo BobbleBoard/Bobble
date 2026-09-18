@@ -30,6 +30,8 @@ export interface ComfyLaunchConfig {
   readonly extraModelPathsYaml?: string;
   /** `--force-upcast-attention` (macOS default ON; pass `false` to omit). */
   readonly forceUpcastAttention?: boolean;
+  /** `--fp32-vae`, on unless told otherwise — see buildComfyArgs. */
+  readonly fp32Vae?: boolean;
   /** Extra flags appended verbatim. */
   readonly extraArgs?: readonly string[];
 }
@@ -45,6 +47,18 @@ export function buildComfyArgs(cfg: ComfyLaunchConfig, port: number): string[] {
     args.push('--extra-model-paths-config', cfg.extraModelPathsYaml);
   }
   if (cfg.forceUpcastAttention !== false) args.push('--force-upcast-attention');
+  /*
+   * THE VAE IN fp32. MEASURED 2026-09-18 on the M5 (Stable Audio 3 small, the
+   * same graph, the same seed): ComfyUI picked bfloat16 for the audio VAE on
+   * MPS and every clip came out as broadband noise with a click train — the
+   * "sfx and music work 0, nada, nothing, random noise" the user reported. The
+   * diffusion model in fp16 vs fp32 made no difference at all (identical
+   * output); the VAE decode did: in fp32 a "solo piano" prompt shows its
+   * harmonics, a door creak its stick-slip pulses. bf16 on MPS is where the
+   * garbage comes from, so every VAE decodes in fp32 here (the image and
+   * video VAEs are tiled; the cost is memory, not correctness).
+   */
+  if (cfg.fp32Vae !== false) args.push('--fp32-vae');
   if (cfg.extraArgs !== undefined) args.push(...cfg.extraArgs);
   return args;
 }

@@ -76,13 +76,14 @@ describe('detectApps', () => {
       );
       // Branded marks fill in a brand color (a #rrggbb hex — bright brands
       // directly, near-black brands as the --pd-connector-ink fallback); neutral
-      // fallbacks stay monochrome via currentColor so they read on light + dark.
+      // fallbacks are two-tone line art in a mid-tone hue of their own (the user,
+      // 2026-09-17), legible on light + dark without a flip.
       if (BRANDED_CONNECTOR_IDS.includes(c.id)) {
         expect(svg, `${c.id} branded mark has no brand color`).toMatch(
           /fill="[^"]*#[0-9a-fA-F]{6}/,
         );
       } else {
-        expect(svg, `${c.id} neutral mark is not currentColor`).toContain('currentColor');
+        expect(svg, `${c.id} neutral mark has no hue`).toMatch(/stroke="#[0-9a-f]{6}"/);
       }
     }
   });
@@ -116,7 +117,8 @@ describe('detectApps', () => {
     for (const id of ['filesystem', 'playwright'] as const) {
       expect(BRANDED_CONNECTOR_IDS).not.toContain(id);
       const svg = KNOWN_CONNECTORS_BY_ID[id]?.iconSvg ?? '';
-      expect(svg).toContain('stroke="currentColor"');
+      expect(svg).toContain('stroke-width="1.75"');
+      expect(svg).toMatch(/stroke="#[0-9a-f]{6}"/);
     }
   });
 

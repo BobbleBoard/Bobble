@@ -352,7 +352,7 @@ export function StudioShell({
             */}
             <Button
               variant="accent"
-              className="pd-studio-run"
+              className="pd-studio-run-btn"
               data-testid="studio-run"
               disabled={!canRun && !stoppable}
               title={blocked}

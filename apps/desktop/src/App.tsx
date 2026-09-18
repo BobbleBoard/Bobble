@@ -179,6 +179,9 @@ export function App() {
     if (section === 'models') {
       setSettingsOpen(false);
       setView('models');
+      // Same content route as the studios — take the studio down (see the
+      // Connectors handler below).
+      exitModality();
       return;
     }
     setSettingsSection(section);
@@ -321,8 +324,19 @@ export function App() {
                   window takeover. */}
               <ChatApp
                 onOpenSettings={openSettings}
-                onOpenConnectors={() => setView('connectors')}
-                onOpenScheduled={() => setView('scheduled')}
+                /* A workspace screen comes down INTO the content route the
+                   studios also use, so it has to take the studio down first:
+                   SEEN 2026-09-18 in a probe — Connectors clicked from the
+                   Image studio lit the sidebar row and left the studio on
+                   screen (contentOverride puts the modality first). */
+                onOpenConnectors={() => {
+                  setView('connectors');
+                  exitModality();
+                }}
+                onOpenScheduled={() => {
+                  setView('scheduled');
+                  exitModality();
+                }}
                 /* Picking a chat takes the content route down. Without this the
                    hub (or Scheduled) stayed on screen while the session changed
                    underneath it — you clicked New chat and kept looking at the

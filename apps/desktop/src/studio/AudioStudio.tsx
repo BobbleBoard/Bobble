@@ -27,8 +27,9 @@
  *   this app already made — true for the person who wrote it, and for nobody
  *   else. It is a file picker and a drop target now.
  *
- *   SOUND EFFECTS MAKE FOUR. The mode whose whole thesis is "several at a time,
- *   keep the one that lands" shipped with its count defaulting to 1.
+ *   SOUND EFFECTS MAKE ONE, unless asked. "Several at a time, keep the one that
+ *   lands" was the thesis, and four identical-looking cards for one prompt read
+ *   as an accident next to the music mode's one (the user, 2026-09-17).
  */
 import { type JSX, useCallback, useMemo, useRef, useState } from 'react';
 import { ThreadMedia } from '../chat/ThreadMedia';
@@ -123,7 +124,9 @@ export function AudioStudio(): JSX.Element {
   const [voice, setVoice] = useState('');
   const [speed, setSpeed] = useState(1);
   const [seconds, setSeconds] = useState<number | undefined>(undefined);
-  const [count, setCount] = useState(4);
+  // One take by default (the user, 2026-09-17: four cards for one prompt read as
+  // "random amount of output"); the rail's Count still asks for more.
+  const [count, setCount] = useState(1);
   const [refAudio, setRefAudio] = useState('');
   const [steps, setSteps] = useState<number | ''>('');
   const [seed, setSeed] = useState<number | ''>('');
@@ -208,14 +211,16 @@ export function AudioStudio(): JSX.Element {
     },
   ];
 
-  const onRun = async (): Promise<void> => {
+  /** `override`: an edited prompt from a run's header, generated straight away. */
+  const onRun = async (override?: string): Promise<void> => {
+    const asked = override ?? prompt;
     /*
      * SPEECH IS NEVER ENHANCED. The prompt is not a description of the audio —
      * it IS the audio, read out. Rewriting it would put words in the user's
      * mouth, so the enhancer refuses this mode on both sides of the IPC and the
      * toggle is disabled here rather than silently doing nothing.
      */
-    const text = await enhancer.enhance(mode, prompt, model);
+    const text = await enhancer.enhance(mode, asked, model);
     await run({
       kind: 'audio',
       audioKind: mode,
@@ -572,7 +577,13 @@ export function AudioStudio(): JSX.Element {
       ) : (
         shown.map((r) => (
           <section key={r.at} className="pd-studio-run">
-            <RunHeader run={r} onAgain={() => setPrompt(r.prompt)} />
+            <RunHeader
+              run={r}
+              onAgain={(edited) => {
+                setPrompt(edited);
+                void onRun(edited);
+              }}
+            />
             <ThreadMedia items={r.items} layout="single" />
           </section>
         ))

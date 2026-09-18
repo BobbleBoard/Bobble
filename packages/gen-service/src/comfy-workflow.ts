@@ -509,15 +509,21 @@ function stableAudioGraph(): ComfyGraph {
 }
 
 /**
- * Stable Audio 3 small (music / SFX) — MEASURED working on this Mac: a 6s stereo
- * 44.1kHz clip in 6 seconds, from a 2.1GB checkpoint.
+ * Stable Audio 3 small (music / SFX). The `stable_audio_3_small_*` checkpoints
+ * are the DISTILLED variants (the `_base` files are the base models): ComfyUI's
+ * own template for the distilled medium samples with `lcm`, 8 steps, cfg 1,
+ * scheduler `simple`; the base template with lcm/50/cfg 7. MEASURED 2026-09-18:
+ * with euler / 25 steps / cfg 6 — this graph's first shape — every clip was
+ * noise; with the template's settings (and the VAE in fp32, see
+ * comfy-supervisor) a "solo piano" shows its harmonics and a door its creak.
  *
- * Unlike Stable Audio Open 1.0, the 3-small checkpoints carry NO text encoder:
+ * Unlike Stable Audio Open 1.0, the checkpoints carry NO text encoder:
  * `CheckpointLoaderSimple` returns a null CLIP and the first encode dies with
  * "your checkpoint does not contain a valid clip or text encoder model". The
- * t5gemma encoder is loaded separately, and the pair of conditionings must go
- * through `ConditioningStableAudio` to carry the clip length — without it the
- * model has no idea how long a sound it is making.
+ * t5gemma encoder is loaded separately. No `ConditioningStableAudio` node: SA3
+ * has only a `seconds_total` conditioner and ComfyUI derives it from the
+ * latent's length (model_base.StableAudio3.extra_conds); the node pinned it to
+ * 8 s whatever the clip was, which is what the template does not do.
  */
 function stableAudio3Graph(): ComfyGraph {
   return {
@@ -531,23 +537,19 @@ function stableAudio3Graph(): ComfyGraph {
     },
     '6': { class_type: 'CLIPTextEncode', inputs: { text: '', clip: ['2', 0] } },
     '7': { class_type: 'CLIPTextEncode', inputs: { text: '', clip: ['2', 0] } },
-    '10': {
-      class_type: 'ConditioningStableAudio',
-      inputs: { positive: ['6', 0], negative: ['7', 0], seconds_start: 0, seconds_total: 8 },
-    },
     '5': { class_type: 'EmptyLatentAudio', inputs: { seconds: 8, batch_size: 1 } },
     '3': {
       class_type: 'KSampler',
       inputs: {
         seed: 0,
-        steps: 25,
-        cfg: 6,
-        sampler_name: 'euler',
+        steps: 8,
+        cfg: 1,
+        sampler_name: 'lcm',
         scheduler: 'simple',
         denoise: 1,
         model: ['1', 0],
-        positive: ['10', 0],
-        negative: ['10', 1],
+        positive: ['6', 0],
+        negative: ['7', 0],
         latent_image: ['5', 0],
       },
     },
@@ -556,9 +558,8 @@ function stableAudio3Graph(): ComfyGraph {
   };
 }
 
-/** Stable Audio 3's splice points. `seconds` lands in TWO places — the empty
- * latent's length and the conditioning's `seconds_total` — and they have to
- * agree or the clip is padded with silence to the latent's length. */
+/** Stable Audio 3's splice points: the clip's length is the empty latent's
+ * (the model reads `seconds_total` off it). */
 const STABLE_AUDIO_3_PARAM_MAP = {
   prompt: '6.inputs.text',
   negativePrompt: '7.inputs.text',

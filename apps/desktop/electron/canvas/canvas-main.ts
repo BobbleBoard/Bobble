@@ -29,11 +29,13 @@ import {
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { Readable } from 'node:stream';
+import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { createIpcEventSender, createLogger } from '@pi-desktop/shared';
 import {
   app,
   BrowserWindow,
+  clipboard,
   dialog,
   type IpcMainInvokeEvent,
   ipcMain,
@@ -452,6 +454,37 @@ export function registerCanvasIpc(
     guard(event, 'canvas:reveal');
     shell.showItemInFolder(path.resolve(req.path));
     return { ok: true };
+  });
+
+  /*
+   * COPY A GENERATED FILE. A picture goes on as pixels — the thing every app
+   * with a paste target understands (a chat, a document, an editor). A clip, a
+   * sound or a model has no pixel form: on macOS it goes on as the file itself
+   * (`public.file-url`, which Finder, Mail and Messages paste), elsewhere as its
+   * path. Electron's clipboard writes ONE representation per call (a later
+   * write clears the earlier), so it is one or the other, chosen by kind.
+   */
+  ipcMain.handle('canvas:copy-file', (event, req: { path: string }) => {
+    guard(event, 'canvas:copy-file');
+    const file = path.resolve(req.path);
+    if (!existsSync(file)) return { ok: false, error: 'the file is not there any more' };
+    if (/\.(png|jpe?g|webp|gif|bmp|tiff?)$/i.test(file)) {
+      const image = nativeImage.createFromPath(file);
+      if (!image.isEmpty()) {
+        clipboard.writeImage(image);
+        return { ok: true, how: 'image' };
+      }
+    }
+    if (process.platform === 'darwin') {
+      clipboard.writeBuffer(
+        'public.file-url',
+        Buffer.from(pathToFileURL(file).href, 'utf8'),
+        'clipboard',
+      );
+    } else {
+      clipboard.writeText(file);
+    }
+    return { ok: true, how: 'file' };
   });
 
   /*

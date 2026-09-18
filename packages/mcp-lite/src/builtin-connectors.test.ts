@@ -61,12 +61,16 @@ describe('built-in connectors', () => {
     expect(KNOWN_CONNECTORS[3]?.id).toBe('video-editing');
   });
 
-  it('renders a neutral (non-brand, currentColor) inline SVG mark', () => {
+  it('renders a neutral (non-brand) inline SVG mark, in a hue of its own', () => {
+    // the user (2026-09-17): "a bit more colorful … simple still but with a bit of
+    // color, not so simple thin white lines only" — two tones of one mid-tone
+    // hue (the strokes, and a 16% wash on the closed shapes).
     for (const id of BUILTIN_CONNECTOR_IDS) {
       expect(BRANDED_CONNECTOR_IDS).not.toContain(id);
       const svg = KNOWN_CONNECTORS_BY_ID[id]?.iconSvg ?? '';
       expect(svg.startsWith('<svg')).toBe(true);
-      expect(svg).toContain('stroke="currentColor"');
+      expect(svg).toMatch(/stroke="#[0-9a-f]{6}"/);
+      expect(svg).toContain('fill-opacity="0.16"');
     }
   });
 

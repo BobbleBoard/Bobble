@@ -42,10 +42,16 @@ import {
  * perspective reads as depth rather than as a fisheye. */
 const CAMERA = 78;
 
-/** How much of a filled frame's short side the square board takes. Not 1: the
- * cascade's blocks bloom past their cells, and a board flush to the edge clips
- * them at the exact moment they are largest. */
-const BOARD_FILL = 0.82;
+/**
+ * How much of a filled frame's short side the square board takes — a range,
+ * read off the scene's `spread`. Compressed (0.82) while the four tiles slide
+ * and enlarge, out past the edges (1.12) for the dot field and the cascade,
+ * whose wave then runs off the card instead of stopping short of it (the user,
+ * 2026-09-17: "the cascade especially needs to seem to go off of it"). The
+ * frame clips what goes over; that is the point.
+ */
+const BOARD_FILL_TIGHT = 0.82;
+const BOARD_FILL_WIDE = 1.04;
 
 export interface BobbleLoaderProps {
   /** Rendered size in CSS px. */
@@ -238,7 +244,10 @@ export function BobbleLoader({
       /* One transform for the whole scene: board units in, device pixels out.
          The board is square and centred, so a wide frame gets a large centred
          mark rather than a stretched one. */
-      const board = Math.min(boxW, boxH) * (fill ? BOARD_FILL : 1);
+      const fillNow = fill
+        ? BOARD_FILL_TIGHT + (BOARD_FILL_WIDE - BOARD_FILL_TIGHT) * scene.spread
+        : 1;
+      const board = Math.min(boxW, boxH) * fillNow;
       const k = (board * dpr) / BOARD;
       ctx.setTransform(k, 0, 0, k, ((boxW - board) / 2) * dpr, ((boxH - board) / 2) * dpr);
       ctx.fillStyle = ink;

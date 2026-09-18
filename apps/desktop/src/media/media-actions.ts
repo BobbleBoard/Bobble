@@ -12,6 +12,14 @@ export function exportFile(path: string, suggestedName: string): void {
   void window.piDesktop.invoke('canvas:save-as', { path, suggestedName }).catch(() => undefined);
 }
 
+/** Put it on the clipboard — a picture as pixels, anything else as the file. */
+export function copyFile(path: string): Promise<boolean> {
+  return window.piDesktop
+    .invoke('canvas:copy-file', { path })
+    .then((r) => (r as { ok?: boolean }).ok === true)
+    .catch(() => false);
+}
+
 /** Show it in Finder. */
 export function revealFile(path: string): void {
   void window.piDesktop.invoke('canvas:reveal', { path }).catch(() => undefined);

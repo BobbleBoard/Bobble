@@ -1,7 +1,13 @@
-import type { JSX } from 'react';
+import { EditableMessage, MessageActions, MessageRow } from '@pi-desktop/ui';
+import { type JSX, useState } from 'react';
 import type { LoaderVariant } from '../chat/bobble-anim';
 import { type PendingKind, PendingMediaCard } from '../media/PendingMediaCard';
 import type { StudioJobState, StudioRun } from './use-studio';
+
+/** The prompt to the clipboard — the same gesture as a chat message's Copy. */
+function copyText(text: string): void {
+  void navigator.clipboard?.writeText(text).catch(() => undefined);
+}
 
 /** mm:ss, because "127s" is not how anyone reads a wait. */
 function _clock(ms: number): string {
@@ -84,7 +90,8 @@ export function StudioJob({
   /** The width they asked for, in px — the frame takes it, capped by the
    * column exactly as the finished card is, so the two are the same width. */
   width?: number;
-  /** The model they chose, when they chose one — the header's fact line. */
+  /** The model they chose, when they chose one (kept for the job record; the
+   * header no longer prints it — the user, 2026-09-17). */
   model?: string;
   /** Which closing act the loader plays — this studio's modality. */
   variant?: LoaderVariant;
@@ -111,6 +118,7 @@ export function StudioJob({
    */
   const hasSteps = job.total !== undefined && job.total > 0 && job.step !== undefined;
   const frac = hasSteps ? Math.min(1, (job.step ?? 0) / (job.total ?? 1)) : 0;
+  void model;
   const kind: PendingKind =
     variant === 'video'
       ? 'video'
@@ -131,12 +139,11 @@ export function StudioJob({
         engine's and arrives with the result.
       */}
       <header className="pd-studio-run-head" data-pending="true">
-        <p className="pd-studio-run-prompt">{job.prompt}</p>
-        <div className="pd-studio-run-meta">
-          <span className="pd-studio-run-facts">
-            {model !== undefined && model !== '' ? model : '\u00a0'}
+        <MessageRow kind="user" actions={<MessageActions onCopy={() => copyText(job.prompt)} />}>
+          <span className="pd-studio-run-prompt" data-testid="studio-run-prompt">
+            {job.prompt}
           </span>
-        </div>
+        </MessageRow>
       </header>
       <PendingMediaCard
         kind={kind}
@@ -153,32 +160,55 @@ export function StudioJob({
 }
 
 /**
- * The line above a finished run: what you asked for, what made it, and the way
- * back into iterating on it.
+ * The line above a finished run: what you asked for, as the chat shows what
+ * you asked for.
  *
- * The seed and model come back from the engine on every output and used to be
- * dropped at the boundary — which made "that one was great, give me more like
- * it" unanswerable. Putting the prompt back in the composer is the actual loop
- * this room exists for, and it previously required retyping the sentence.
+ * It used to print the model and the seed under the bubble with a blue "Edit
+ * prompt" link that put the sentence back in the composer. the user (2026-09-17):
+ * "editing prompt isn't reusing the already good and same ui from the chat
+ * interface" and "no showing model seed and blue edit prompt text below the
+ * message". So the bubble is the chat's own MessageRow — hover for Copy and
+ * Edit — and Edit turns the bubble into the chat's in-place editor; Save
+ * generates again with the edited prompt, the way saving an edited chat
+ * message re-sends it. The model and seed still ride with the run (the card's
+ * "Use as input" carries them); they are no longer a caption.
  */
-export function RunHeader({ run, onAgain }: { run: StudioRun; onAgain: () => void }): JSX.Element {
-  const facts = [run.model, run.seed !== undefined ? `seed ${run.seed}` : undefined]
-    .filter((v): v is string => v !== undefined && v !== '')
-    .join(' · ');
+export function RunHeader({
+  run,
+  onAgain,
+}: {
+  run: StudioRun;
+  /** Generate again with this prompt (the edited one when it was edited). */
+  onAgain: (prompt: string) => void;
+}): JSX.Element {
+  const [editing, setEditing] = useState(false);
   return (
-    <header className="pd-studio-run-head">
-      <p className="pd-studio-run-prompt">{run.prompt}</p>
-      <div className="pd-studio-run-meta">
-        {facts !== '' ? <span className="pd-studio-run-facts">{facts}</span> : null}
-        <button
-          type="button"
-          className="pd-studio-run-again pd-focusable"
-          data-testid="studio-again"
-          onClick={onAgain}
+    <header className="pd-studio-run-head" data-editing={editing ? 'true' : undefined}>
+      {editing ? (
+        <EditableMessage
+          data-testid="studio-editing-prompt"
+          value={run.prompt}
+          editing
+          saveLabel="Generate"
+          onSave={(text) => {
+            setEditing(false);
+            const next = text.trim();
+            if (next.length > 0) onAgain(next);
+          }}
+          onCancel={() => setEditing(false)}
+        />
+      ) : (
+        <MessageRow
+          kind="user"
+          actions={
+            <MessageActions onCopy={() => copyText(run.prompt)} onEdit={() => setEditing(true)} />
+          }
         >
-          Edit prompt
-        </button>
-      </div>
+          <span className="pd-studio-run-prompt" data-testid="studio-run-prompt">
+            {run.prompt}
+          </span>
+        </MessageRow>
+      )}
     </header>
   );
 }

@@ -144,8 +144,10 @@ export function VideoStudio(): JSX.Element {
     },
   ];
 
-  const onRun = async (): Promise<void> => {
-    const enhanced = await enhancer.enhance('video', prompt, model);
+  /** `override`: an edited prompt from a run's header, generated straight away. */
+  const onRun = async (override?: string): Promise<void> => {
+    const asked = override ?? prompt;
+    const enhanced = await enhancer.enhance('video', asked, model);
     await run({
       kind: 'video',
       prompt: enhanced,
@@ -353,7 +355,13 @@ export function VideoStudio(): JSX.Element {
       ) : (
         runs.map((r) => (
           <section key={r.at} className="pd-studio-run">
-            <RunHeader run={r} onAgain={() => setPrompt(r.prompt)} />
+            <RunHeader
+              run={r}
+              onAgain={(edited) => {
+                setPrompt(edited);
+                void onRun(edited);
+              }}
+            />
             <ThreadMedia items={r.items} layout="single" />
           </section>
         ))

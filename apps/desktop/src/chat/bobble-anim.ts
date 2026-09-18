@@ -91,6 +91,17 @@ export interface Scene {
   readonly pitch: number;
   /** 0 while flat, 1 fully solid — drives the renderer's extrusion. */
   readonly solidity: number;
+  /**
+   * How far the board reaches across the box it fills: 0 = the mark's own
+   * compressed size (the puzzle and the merge, where four big tiles enlarge and
+   * reassemble), 1 = out to the edges and past them (the dot field and the
+   * cascade, whose wave should seem to run off the card). the user (2026-09-17):
+   * "dot/cascade need to go much closer to the edge and the cascade especially
+   * needs to seem to go off of it, the enlarging can compress a bit more than
+   * the others". The split ramps it up, the merge ramps it down, so the board
+   * never jumps in size between acts.
+   */
+  readonly spread: number;
 }
 
 export type ActName =
@@ -428,7 +439,7 @@ export function exitSceneAt(p: number): Scene {
     });
   }
   /* `cascade`, because that is what it IS — the same act, not coming back. */
-  return { blocks, act: 'cascade', yaw: 0, pitch: 0, solidity: 0 };
+  return { blocks: expand(blocks, 1), act: 'cascade', yaw: 0, pitch: 0, solidity: 0, spread: 1 };
 }
 
 // ─── the scene ───────────────────────────────────────────────────────────────
@@ -675,5 +686,44 @@ export function sceneAt(ms: number, variant: LoaderVariant = 'image'): Scene {
     }
   }
 
-  return { blocks, act: current.act, yaw, pitch, solidity };
+  const spread = spreadAt(current.act, p);
+  return { blocks: expand(blocks, spread), act: current.act, yaw, pitch, solidity, spread };
+}
+
+/**
+ * THE GRID REACHES THE RIM. The grid is derived from the icon's own span (the
+ * tiles sit at 2.75 on a 32 board, so the outermost cells stop 2.75 short of
+ * each edge) — right for the split, which must land on the tiles, and wrong
+ * for the dot field, which the user wants "much closer to the edge". So the blocks
+ * are pushed outward from the board's centre by `spread`: at 1 the grid spans
+ * the whole board (32 / 26.5 = 1.21×), sizes scaled with it so the air between
+ * cells stays the icon's; at 0 nothing moves. Continuous in `spread`, so the
+ * split glides out and the merge glides back.
+ */
+const FULL_SPAN = BOARD / (BOBBLE_TILE.pitch + BOBBLE_TILE.size);
+function expand(blocks: Block[], spread: number): Block[] {
+  const k = 1 + clamp01(spread) * (FULL_SPAN - 1);
+  if (k <= 1.0001) return blocks;
+  const c = BOARD / 2;
+  return blocks.map((b) => ({
+    ...b,
+    cx: c + (b.cx - c) * k,
+    cy: c + (b.cy - c) * k,
+    size: b.size * k,
+    radius: b.radius * k,
+  }));
+}
+
+/** The board's reach for an act at progress `p` — see Scene.spread. */
+export function spreadAt(act: ActName, p: number): number {
+  switch (act) {
+    case 'puzzle':
+      return 0;
+    case 'split':
+      return smooth(p);
+    case 'merge':
+      return 1 - smooth(p);
+    default:
+      return 1;
+  }
 }

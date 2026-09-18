@@ -300,8 +300,10 @@ export function ImageStudio(): JSX.Element {
     },
   ];
 
-  const onRun = async (): Promise<void> => {
-    const base = await enhancer.enhance('image', prompt, model);
+  /** `override`: an edited prompt from a run's header, generated straight away. */
+  const onRun = async (override?: string): Promise<void> => {
+    const asked = override ?? prompt;
+    const base = await enhancer.enhance('image', asked, model);
     const suffix = STYLES.find((x) => x.value === style)?.suffix ?? '';
     /*
      * WITH AN INPUT, THIS IS AN EDIT — the model starts from those pixels
@@ -592,7 +594,13 @@ export function ImageStudio(): JSX.Element {
       ) : (
         runs.map((r) => (
           <section key={r.at} className="pd-studio-run">
-            <RunHeader run={r} onAgain={() => setPrompt(r.prompt)} />
+            <RunHeader
+              run={r}
+              onAgain={(edited) => {
+                setPrompt(edited);
+                void onRun(edited);
+              }}
+            />
             {/* Several candidates from one description are a SET — they exist to
                 be compared, which a single vertical column of full-width images
                 makes impossible (one fills the window; the second is below the

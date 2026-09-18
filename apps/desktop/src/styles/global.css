@@ -5087,14 +5087,21 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
  * a saturated blue block with unreadable blue-on-blue text.
  */
 /* Sized to the box it now lives in, not to a row of its own. */
-.pd-studio-run {
+/*
+ * THE GENERATE BUTTON — `-btn`, because `.pd-studio-run` was ALSO the class of
+ * every finished run's <section> in all three studios, which this rule then
+ * clamped to 34px: each run's card spilled over the run below it (the user,
+ * 2026-09-17, "images overlapping" — and the audio cards too). The sections
+ * keep the name and get a layout rule of their own below.
+ */
+.pd-studio-run-btn {
   flex: none;
   height: 34px;
   border-radius: 12px;
   padding: 0 14px;
   font-size: 0.8125rem;
 }
-.pd-studio-run:disabled {
+.pd-studio-run-btn:disabled {
   opacity: 1;
   --pd-btn-bg: var(--pd-bg-raised);
   --pd-btn-fg: var(--pd-text-muted);
@@ -5102,8 +5109,16 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
 }
 /* …but a BUSY button is not a disabled one. It is the only thing on screen
    saying work is happening, so it keeps its ink. */
-.pd-studio-run:disabled:has(.pd-spinner) {
+.pd-studio-run-btn:disabled:has(.pd-spinner) {
   --pd-btn-fg: var(--pd-text-secondary);
+}
+
+/* One run: the ask, then its answer, then air before the next. */
+.pd-studio-run {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 28px;
 }
 
 /*
@@ -5232,44 +5247,28 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
  * Same bubble grammar as a real user message (.pd-msg-bubble) rather than a
  * lookalike, so the two never drift apart.
  */
+/*
+ * THE CHAT'S OWN ROW, since 2026-09-17 (the user: "reusing the already good and
+ * same ui from the chat interface"): the header is a MessageRow — its bubble,
+ * its hover-revealed Copy/Edit, its in-place editor. It takes the column's
+ * whole width so the bubble sizes as a chat bubble does (right-aligned, up to
+ * 80%), not as a column squeezed to its narrowest word. No model·seed line,
+ * no blue link under it.
+ */
 .pd-studio-run-head {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: stretch;
   gap: 6px;
-  margin-bottom: 10px;
+  margin-bottom: 4px;
+}
+.pd-studio-run-head > .pd-msg {
+  width: 100%;
+  max-width: 100%;
 }
 .pd-studio-run-prompt {
-  max-width: min(80%, 40rem);
-  padding: 10px 16px;
-  border-radius: var(--pd-radius-bubble);
-  background: var(--pd-user-bubble-bg);
-  color: var(--pd-user-bubble-fg);
-  font-size: var(--pd-font-size-body);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-}
-.pd-studio-run-meta {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  flex: none;
-}
-.pd-studio-run-facts {
-  font-size: 0.75rem;
-  color: var(--pd-text-muted);
-  font-variant-numeric: tabular-nums;
-}
-.pd-studio-run-again {
-  font-size: 0.75rem;
-  color: var(--pd-accent-primary);
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-}
-.pd-studio-run-again:hover {
-  text-decoration: underline;
 }
 
 /* The job card sits where its result will sit, and turns into it. */
@@ -6696,6 +6695,13 @@ body[data-media-expanded="true"] .pd-studio-compose {
   /* The strip's own height — the transport is 48px tall in its frame — so the
      card that waits is the card that arrives, and no taller. */
   height: 50px;
+  /* …and about its width: a play button, ninety-six bars and a phrase. */
+  width: min(440px, 100%);
+}
+.pd-media-card--pending[data-kind="audio"] .pd-audio-pending {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
 }
 
 /* 3D results are a fixed-height viewport rather than an aspect box (see
@@ -6761,6 +6767,65 @@ body[data-media-expanded="true"] .pd-studio-compose {
   }
 }
 
+/* A sound has no sweep either: its bars resolved into place (AudioPending),
+   and the transport that replaces them is simply there. */
+.pd-media-card--pending[data-kind="audio"] .pd-pending-reveal {
+  -webkit-mask-image: none;
+  mask-image: none;
+  position: static;
+}
+
+/* The phrase sits where the transport's clock will — right of the bars,
+   never over them — and shimmers like a thought. */
+.pd-audio-pending-phrase {
+  flex: none;
+  min-width: 6.5em;
+  text-align: right;
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+  font-weight: var(--pd-font-weight-medium);
+  white-space: nowrap;
+}
+
+/*
+ * A WAITING PICTURE HAS NO EDGE. the user (2026-09-17): "image and I assume video
+ * generating animations need to be unbordered cards, just with some subtle but
+ * smooth falloff so it's not a hard unbordered edge." The frame's border goes
+ * while the mark plays; a layer over the plate fades its rim into the page
+ * (the page's own ground, so the plate melts rather than darkens), and both
+ * come back with the picture — the border returns, the layer fades out — so
+ * the card that arrives is the card every other picture wears.
+ */
+.pd-media-card--pending[data-kind="image"] .pd-media-frame,
+.pd-media-card--pending[data-kind="video"] .pd-media-frame {
+  border-color: transparent;
+  transition:
+    aspect-ratio 380ms var(--pd-easing-standard, ease),
+    width 380ms var(--pd-easing-standard, ease),
+    border-color 520ms var(--pd-easing-standard, ease);
+}
+.pd-media-card--pending[data-kind="image"][data-revealing="true"] .pd-media-frame,
+.pd-media-card--pending[data-kind="video"][data-revealing="true"] .pd-media-frame {
+  border-color: color-mix(in oklab, var(--pd-text-primary) 10%, transparent);
+}
+.pd-pending-falloff {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  --pd-falloff: var(--pd-bg-base);
+  background:
+    linear-gradient(to right, var(--pd-falloff), transparent 8%, transparent 92%, var(--pd-falloff)),
+    linear-gradient(to bottom, var(--pd-falloff), transparent 8%, transparent 92%, var(--pd-falloff));
+  transition: opacity 420ms var(--pd-easing-standard, ease);
+}
+.pd-media-card--pending[data-kind="model"] .pd-pending-falloff {
+  display: none;
+}
+.pd-media-card--pending[data-revealing="true"] .pd-pending-falloff {
+  opacity: 0;
+}
+
 /*
  * THE BAR. Floating — no trough card, no panel, no border. It is the only other
  * thing on screen while the card waits, and it leaves the moment the sweep
@@ -6770,9 +6835,16 @@ body[data-media-expanded="true"] .pd-studio-compose {
    shimmer (packages/ui shimmer.css). It goes with the loader at the reveal. */
 .pd-pending-phase {
   position: absolute;
-  top: 12px;
-  left: 14px;
-  z-index: 2;
+  top: 10px;
+  left: 12px;
+  z-index: 4;
+  padding: 2px 8px;
+  border-radius: 8px;
+  /* The dot field reaches the rim now (bobble-anim `expand`), so the words
+     sit on a soft plate of the frame's own ground instead of over the dots. */
+  background: color-mix(in srgb, var(--pd-bg-sunken, var(--pd-bg-raised)) 62%, transparent);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
   font-size: var(--pd-font-size-caption);
   line-height: var(--pd-leading-caption);
   font-weight: var(--pd-font-weight-medium);

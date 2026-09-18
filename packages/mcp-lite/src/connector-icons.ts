@@ -120,10 +120,32 @@ function brandSvg(pathD: string, color: string): string {
   );
 }
 
-/** Wrap neutral line-art shapes as a self-contained, monochrome stroked SVG. */
-function neutralSvg(shapes: string): string {
+/**
+ * THE FIRST-PARTY MARKS HAVE A COLOUR EACH. the user (2026-09-17): "all the first
+ * party connector icons make a bit more colorful and exciting, not over the
+ * top, they're icons, simple still but with a bit of color, not so simple thin
+ * white lines only". Same line-art, two tones: the strokes in a hue, and the
+ * closed shapes washed with the same hue at 16% — a folder with a folder-
+ * coloured body, a clock with a dial. Mid-tones, so they read on the light
+ * tile and the dark one alike (no near-black brand flip needed here).
+ */
+const HUES = {
+  amber: '#e0a23a',
+  orange: '#ee7d3b',
+  rose: '#e35d7a',
+  green: '#3fae5d',
+  teal: '#2aa7a0',
+  sky: '#3c9be6',
+  blue: '#3d78e5',
+  slate: '#6b7a8c',
+} as const;
+type Hue = keyof typeof HUES;
+
+/** Wrap neutral line-art shapes as a self-contained, two-tone stroked SVG. */
+function neutralSvg(shapes: string, hue: Hue = 'slate'): string {
+  const ink = HUES[hue];
   return (
-    '<svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" ' +
+    `<svg viewBox="0 0 24 24" width="100%" height="100%" fill="${ink}" fill-opacity="0.16" stroke="${ink}" ` +
     'stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" ' +
     `xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${shapes}</svg>`
   );
@@ -138,58 +160,71 @@ const NEUTRAL_ICON_SVGS: Record<string, string> = {
   // Folder.
   filesystem: neutralSvg(
     '<path d="M3.5 7.25a1.5 1.5 0 0 1 1.5-1.5h3.3l1.7 2h8.5a1.5 1.5 0 0 1 1.5 1.5v7.75a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5z"/>',
+    'amber',
   ),
   // Knowledge-graph nodes.
   memory: neutralSvg(
     '<circle cx="6" cy="7" r="2.15"/><circle cx="17.6" cy="7.5" r="2.15"/><circle cx="11.6" cy="17" r="2.15"/><path d="M8.13 7.2 15.47 7.4"/><path d="M7.06 8.86 10.55 15.15"/><path d="M16.55 9.28 12.62 15.2"/>',
+    'teal',
   ),
   // Ordered/stepped list.
   'sequential-thinking': neutralSvg(
     '<circle cx="4.75" cy="7" r="1.1"/><circle cx="4.75" cy="12" r="1.1"/><circle cx="4.75" cy="17" r="1.1"/><path d="M8.5 7H20"/><path d="M8.5 12H20"/><path d="M8.5 17H16"/>',
+    'sky',
   ),
   // Clock.
-  time: neutralSvg('<circle cx="12" cy="12" r="8.25"/><path d="M12 7.4V12l3.1 1.9"/>'),
+  time: neutralSvg('<circle cx="12" cy="12" r="8.25"/><path d="M12 7.4V12l3.1 1.9"/>', 'orange'),
   // Browser window + play (automation).
   playwright: neutralSvg(
     '<rect x="3.25" y="4.75" width="17.5" height="14.5" rx="2"/><path d="M3.25 9.25h17.5"/><path d="m10.4 12.4 3.6 2-3.6 2z"/>',
+    'green',
   ),
   // Browser window + code brackets (developer tools / inspect).
   'chrome-devtools': neutralSvg(
     '<rect x="3.25" y="4.75" width="17.5" height="14.5" rx="2"/><path d="M3.25 9.25h17.5"/><path d="m9.5 12-2 2 2 2"/><path d="m14.5 12 2 2-2 2"/>',
+    'blue',
   ),
   // Speech bubble with text lines (messaging).
   slack: neutralSvg(
     '<path d="M5 5.75A1.5 1.5 0 0 1 6.5 4.25h11A1.5 1.5 0 0 1 19 5.75v7.5a1.5 1.5 0 0 1-1.5 1.5H10l-4 3.25v-3.25H6.5A1.5 1.5 0 0 1 5 13.25z"/><path d="M9 9h6"/><path d="M9 12h4"/>',
+    'rose',
   ),
   // Bar chart on axes (analytics / BI).
   tableau: neutralSvg(
     '<path d="M4.5 4.5v15h15"/><path d="M8.5 16.5v-4"/><path d="M12.5 16.5v-7"/><path d="M16.5 16.5v-2.5"/>',
+    'sky',
   ),
   // Isometric cube (3D / game engine).
   unity: neutralSvg(
     '<path d="M12 3.5 20 8v8l-8 4.5L4 16V8z"/><path d="M4 8l8 4.5L20 8"/><path d="M12 12.5V20.5"/>',
+    'slate',
   ),
   // ── First-party builtins ("By us") ──────────────────────────────────────────
   // A terminal prompt: the CLI tool interface.
   'cli-tools': neutralSvg(
     '<rect x="3.5" y="5" width="17" height="14" rx="2"/><path d="m7.5 9.5 3 2.5-3 2.5"/><path d="M12.5 14.5h4"/>',
+    'green',
   ),
   // Film strip / frames (motion-graphics render).
   hyperframes: neutralSvg(
     '<rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="M7.75 5.5v13M16.25 5.5v13"/><path d="M3.5 9.5h4.25M3.5 14.5h4.25M16.25 9.5h4.25M16.25 14.5h4.25"/>',
+    'rose',
   ),
   // A Bézier: one curve with its two handles — the thing an SVG is made of.
   omnisvg: neutralSvg(
     '<path d="M4.5 18.5C6 9 13 6 19.5 5.5"/><path d="M4.5 18.5L9.5 12.5"/><path d="M19.5 5.5L13.5 8.5"/>' +
       '<circle cx="4.5" cy="18.5" r="1.5"/><circle cx="19.5" cy="5.5" r="1.5"/><circle cx="9.5" cy="12.5" r="1.25"/><circle cx="13.5" cy="8.5" r="1.25"/>',
+    'orange',
   ),
   // Scissors (a typed ffmpeg cut/edit façade).
   // Three bars on a baseline — the chart card's own glyph.
   'data-visuals': neutralSvg(
     '<path d="M4 20h16"/><rect x="5.5" y="11" width="3.5" height="7" rx="0.8"/><rect x="10.25" y="6" width="3.5" height="12" rx="0.8"/><rect x="15" y="9" width="3.5" height="9" rx="0.8"/>',
+    'blue',
   ),
   'video-editing': neutralSvg(
     '<circle cx="6" cy="6.5" r="2.15"/><circle cx="6" cy="17.5" r="2.15"/><path d="M7.9 7.7 19.5 16.5M7.9 16.3 19.5 7.5M12 12l4-2.9"/>',
+    'rose',
   ),
   // ── First-party macOS connectors ("By us") ─────────────────────────────────
   // Neutral category glyphs (NOT the trademarked Apple app icons): a calendar
@@ -197,22 +232,27 @@ const NEUTRAL_ICON_SVGS: Record<string, string> = {
   // Calendar grid.
   'mac-calendar': neutralSvg(
     '<rect x="3.75" y="5" width="16.5" height="15" rx="2"/><path d="M3.75 9.25h16.5"/><path d="M8 3.5v3M16 3.5v3"/><path d="M7.5 13h2.5M14 13h2.5M7.5 16.5h2.5"/>',
+    'rose',
   ),
   // Envelope.
   'mac-mail': neutralSvg(
     '<rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="m4.25 7.5 7.75 5.75L19.75 7.5"/>',
+    'blue',
   ),
   // Rounded chat bubble with a tail.
   'mac-messages': neutralSvg(
     '<path d="M12 4.75c-4.55 0-8.25 2.9-8.25 6.5 0 1.9 1.05 3.6 2.7 4.75-.15 1.15-.7 2.2-1.45 3 1.5-.2 2.9-.75 4-1.6.95.25 1.95.35 3 .35 4.55 0 8.25-2.9 8.25-6.5s-3.7-6.5-8.25-6.5z"/>',
+    'green',
   ),
   // Person (bust in a head + shoulders arc).
   'mac-contacts': neutralSvg(
     '<circle cx="12" cy="8.5" r="3.5"/><path d="M5.75 19a6.25 6.25 0 0 1 12.5 0"/>',
+    'amber',
   ),
   // Checklist (two checked rows).
   'mac-reminders': neutralSvg(
     '<path d="M4.25 7.25 5.5 8.5l2.25-2.5"/><path d="M4.25 15.25 5.5 16.5l2.25-2.5"/><path d="M11 7.5h8.75M11 15.5h8.75"/>',
+    'orange',
   ),
 };
 

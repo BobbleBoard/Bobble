@@ -231,11 +231,19 @@ describe('cascadeHeat — the user's y = x - t', () => {
 });
 
 describe('sceneAt — every frame of every variant', () => {
-  const inBox = (b: Block) =>
-    b.cx - b.size / 2 >= -0.51 &&
-    b.cx + b.size / 2 <= BOARD + 0.51 &&
-    b.cy - b.size / 2 >= -0.51 &&
-    b.cy + b.size / 2 <= BOARD + 0.51;
+  /* Inside the board — with the rim allowance the spread earns: at spread 1
+     the grid spans the whole board and a rim cell blooming on the wave runs a
+     little past the edge on purpose (the user, 2026-09-17: the cascade "needs to
+     seem to go off of it"); the frame clips it. Never more than that. */
+  const inBox = (b: Block, spread = 0) => {
+    const over = 0.51 + 3.2 * spread;
+    return (
+      b.cx - b.size / 2 >= -over &&
+      b.cx + b.size / 2 <= BOARD + over &&
+      b.cy - b.size / 2 >= -over &&
+      b.cy + b.size / 2 <= BOARD + over
+    );
+  };
 
   it('always emits the same blocks, so the acts have nothing to match up', () => {
     for (const v of VARIANTS) {
@@ -252,9 +260,11 @@ describe('sceneAt — every frame of every variant', () => {
     const out: string[] = [];
     for (const v of VARIANTS) {
       for (const t of frames(v, 20)) {
-        const blocks = sceneAt(t, v).blocks;
+        const scene = sceneAt(t, v);
+        const blocks = scene.blocks;
         for (let i = 0; i < blocks.length; i++) {
-          if (!inBox(blocks[i] as Block)) out.push(`${v} t=${Math.round(t)} block ${i}`);
+          if (!inBox(blocks[i] as Block, scene.spread))
+            out.push(`${v} t=${Math.round(t)} block ${i}`);
         }
       }
     }
@@ -356,18 +366,37 @@ describe('sceneAt — every frame of every variant', () => {
     expect(cells.size).toBe(3);
   });
 
-  it('ends the split on the full grid, every cell seated', () => {
+  it('ends the split on the full grid, every cell seated — spread to the rim', () => {
     const acts = timeline('image');
     const split = acts.find((a) => a.act === 'split');
     const scene = sceneAt((split?.end ?? 0) - 1, 'image');
     expect(scene.blocks).toHaveLength(TOTAL);
+    expect(scene.spread).toBeCloseTo(1, 2);
+    // The seats, pushed out from the centre so the grid spans the whole board.
+    const k = BOARD / (BOBBLE_TILE.pitch + BOBBLE_TILE.size);
+    const out = (v: number) => BOARD / 2 + (v - BOARD / 2) * k;
     for (let i = 0; i < TOTAL; i++) {
       const b = scene.blocks[i] as Block;
       const seat = seatOf(i);
-      expect(b.cx).toBeCloseTo(seat.cx, 1);
-      expect(b.cy).toBeCloseTo(seat.cy, 1);
+      expect(b.cx).toBeCloseTo(out(seat.cx), 1);
+      expect(b.cy).toBeCloseTo(out(seat.cy), 1);
       expect(b.alpha).toBeGreaterThan(0.9);
     }
+  });
+
+  it('spreads the board for the dot field and folds it back for the mark', () => {
+    const acts = timeline('image');
+    const at = (name: string, f: number) => {
+      const a = acts.find((x) => x.act === name);
+      return sceneAt((a?.start ?? 0) + ((a?.end ?? 0) - (a?.start ?? 0)) * f, 'image');
+    };
+    expect(at('puzzle', 0.5).spread).toBe(0);
+    expect(at('cascade', 0.5).spread).toBe(1);
+    expect(at('merge', 0.99).spread).toBeLessThan(0.01);
+    // The rim cell sits at the board's edge when spread: its centre within a
+    // cell of the edge, where the icon's grid stopped 2.75 + half a cell short.
+    const rim = at('cascade', 0.5).blocks.reduce((m, b) => Math.max(m, b.cx + b.size / 2), 0);
+    expect(rim).toBeGreaterThan(BOARD - 2);
   });
 
   it('turns cells into dots away from the wave, and back into squares on it', () => {

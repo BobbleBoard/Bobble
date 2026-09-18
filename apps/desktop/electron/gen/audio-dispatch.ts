@@ -189,11 +189,23 @@ export function defaultAudioModel(
     const speech = audio.filter((m) => m.backend === 'mlx-audio' || m.backend === 'torch-tts');
     return speech.find((m) => m.recommended === true) ?? speech[0];
   }
-  // SFX prefers the small Stable Audio build — it is the one the catalogue
-  // labels "(SFX)", and it is markedly cheaper per attempt than the full model.
-  const wanted = kind === 'sfx' ? 'stable-audio-open-small' : 'ace-step';
+  /*
+   * BY KIND, IN ORDER. SEEN (the user, 2026-09-17): "sfx of a door creaking" ran
+   * on stable-audio-3-MUSIC — the sfx pick named a model that is no longer in
+   * the catalogue and the fallback was "the first ComfyUI audio model", which
+   * is the music one. Each kind now names the builds tuned for it, newest
+   * first, and only then takes whatever ComfyUI audio model there is.
+   */
+  const wanted =
+    kind === 'sfx'
+      ? ['stable-audio-3-sfx', 'stable-audio-open-small', 'stable-audio-open']
+      : ['stable-audio-3-music', 'ace-step', 'stable-audio-open'];
   const comfy = audio.filter((m) => m.backend === 'comfyui');
-  return comfy.find((m) => m.id === wanted) ?? comfy[0];
+  for (const id of wanted) {
+    const hit = comfy.find((m) => m.id === id);
+    if (hit !== undefined) return hit;
+  }
+  return comfy[0];
 }
 
 /** Absolute path helper mirroring the video dispatcher's output convention. */

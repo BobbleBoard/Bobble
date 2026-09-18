@@ -33,6 +33,8 @@ describe('buildComfyArgs', () => {
     expect(args).toContain('--disable-auto-launch');
     expect(args[args.indexOf('--extra-model-paths-config') + 1]).toBe('/app/models.yaml');
     expect(args).toContain('--force-upcast-attention');
+    // MEASURED 2026-09-18: the audio VAE in bf16 on MPS decodes to noise.
+    expect(args).toContain('--fp32-vae');
   });
 
   it('omits --extra-model-paths-config when no yaml is given', () => {
