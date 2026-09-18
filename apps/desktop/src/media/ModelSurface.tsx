@@ -21,8 +21,9 @@
  * apart from the centre — and reports back what the file actually has, so the
  * strip never offers a Skeleton for a model without one.
  */
-import { GLTFLoader, OrbitControls, THREE } from '@pi-desktop/canvas/three';
+import { GLTFLoader, OrbitControls, RoomEnvironment, THREE } from '@pi-desktop/canvas/three';
 import { type JSX, useEffect, useMemo, useRef, useState } from 'react';
+import { disableMipmaps } from '../tripo/atlas-textures';
 import { countParts, createModelView, fileFacts, type ModelView } from './model-view';
 
 export interface ModelSurfaceProps {
@@ -55,10 +56,25 @@ export function ModelSurface({ src, testid, view: given }: ModelSurfaceProps): J
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    /*
+     * LIT THE WAY THE STUDIO LIGHTS IT. the user (2026-09-18), on a card: "what's
+     * with this artifacting" — the same file was clean in the 3D studio. The
+     * flecks themselves were the culling (see the material note below);
+     * what remained after that was a model that read dark and flat here and
+     * bright there, because a baked PBR material under three lights and no
+     * environment is a different picture from one under the studio's image-
+     * based light and ACES. Same environment, same tone mapping, same
+     * exposure, so a model looks like ITSELF in both rooms.
+     */
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     host.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const envTexture = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    scene.environment = envTexture;
     const camera = new THREE.PerspectiveCamera(38, 1, 0.05, 100);
     camera.position.set(2.4, 1.5, 3.4);
 
@@ -71,11 +87,12 @@ export function ModelSurface({ src, testid, view: given }: ModelSurfaceProps): J
     controls.minDistance = 1.2;
     controls.maxDistance = 9;
 
-    scene.add(new THREE.HemisphereLight(0xffffff, 0x202020, 1.1));
-    const key = new THREE.DirectionalLight(0xffffff, 1.9);
+    // The studio's rig, minus its shadows: hemisphere fill, warm key, cool rim.
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x222222, 0.5));
+    const key = new THREE.DirectionalLight(0xffffff, 2.2);
     key.position.set(3, 5, 3);
     scene.add(key);
-    const rim = new THREE.DirectionalLight(0xbfd4ff, 0.5);
+    const rim = new THREE.DirectionalLight(0xffffff, 1.1);
     rim.position.set(-3, 2, -3);
     scene.add(rim);
 
@@ -204,7 +221,23 @@ export function ModelSurface({ src, testid, view: given }: ModelSurfaceProps): J
         model.traverse((o) => {
           const mesh = o as Mesh;
           if ((mesh as { isMesh?: boolean }).isMesh !== true) return;
-          bodies.push({ mesh, own: mesh.material as Material | Material[] });
+          const own = mesh.material as Material | Material[];
+          /* THE FILE'S MATERIAL, TREATED AS THE STUDIO TREATS IT (Viewer3D):
+             DOUBLE-SIDED — a generated mesh always carries some inconsistently
+             wound triangles (marching cubes emits them, decimation flips more),
+             and each one culled is a hole onto the dark ground, or onto the lit
+             inside of the surface behind it: the black and white specks.
+             MEASURED by ablation 2026-09-18: this line alone took every fleck
+             off a clean-atlas bake (385fa85ad18b); the environment above only
+             changed the brightness. And NO MIP CHAIN (atlas-textures.ts): a
+             TRELLIS atlas is a chart per triangle, and at a size where each
+             triangle is a pixel the GPU sits on a mip level where every texel
+             averages hundreds of unrelated charts — the studio's measured case. */
+          for (const mat of Array.isArray(own) ? own : [own]) {
+            mat.side = THREE.DoubleSide;
+            disableMipmaps(mat);
+          }
+          bodies.push({ mesh, own });
           names.push(mesh.name);
           if ((mesh as { isSkinnedMesh?: boolean }).isSkinnedMesh === true) skinned = true;
           /* A mesh with no NORMAL attribute is BLACK under Normals and Grey —
@@ -326,6 +359,8 @@ export function ModelSurface({ src, testid, view: given }: ModelSurfaceProps): J
       renderer.domElement.remove();
       normalMat.dispose();
       clayMat.dispose();
+      envTexture.dispose();
+      pmrem.dispose();
       scene.traverse((o) => {
         const mesh = o as THREE.Mesh;
         if (mesh.geometry !== undefined) mesh.geometry.dispose?.();

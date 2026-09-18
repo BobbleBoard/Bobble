@@ -44,6 +44,7 @@ import type { JSX } from 'react';
 import { useEffect, useRef } from 'react';
 import { ensureModelBytes } from './asset-registry';
 import { HERO_MESH_GLB_B64, HERO_RIG_GLB_B64 } from './assets/hero-glb';
+import { disableMipmaps, hasTextureMaps } from './atlas-textures';
 import { buildPresetClip } from './preset-motions';
 import { useTripoStore } from './store';
 import {
@@ -156,44 +157,9 @@ function paintSegmentColors(geo: InstanceType<typeof THREE.BufferGeometry>): num
   return parts;
 }
 
-/**
- * Turn OFF mipmapping on a baked material's maps.
- *
- * A TRELLIS surface is stair-stepped voxel faces, so xatlas splits the atlas at
- * nearly every edge: MEASURED on a 199,999-face helicopter, the exported GLB has
- * 197,309 vertices — i.e. a chart per triangle. The atlas itself is correct
- * (extracted and inspected; the charts are cleanly coloured, and sampling the
- * voxel volume at each vertex agrees with the texture at its UV). But charts
- * that small are destroyed by mip generation: each triangle is around a pixel
- * on screen, the GPU drops to a high mip level, and every mip texel is an
- * average of hundreds of UNRELATED charts. That is the coloured static the user saw
- * — "texturing is completely messed up" — and it is why raising the atlas from
- * 1024 to 4096 did not help: a bigger base level still collapses the same way.
- *
- * Linear filtering with no mip chain samples the base level, which is the one
- * that actually corresponds to the surface.
- */
-function disableMipmaps(mat: InstanceType<typeof THREE.Material>): void {
-  const m = mat as unknown as Record<string, unknown>;
-  for (const key of ['map', 'metalnessMap', 'roughnessMap', 'emissiveMap', 'aoMap']) {
-    const tex = m[key] as InstanceType<typeof THREE.Texture> | null | undefined;
-    if (tex == null) continue;
-    tex.generateMipmaps = false;
-    tex.minFilter = THREE.LinearFilter;
-    tex.needsUpdate = true;
-  }
-}
-
-/** Does this material carry real baked maps (rather than a flat colour)? */
-function hasTextureMaps(mat: InstanceType<typeof THREE.Material>): boolean {
-  const m = mat as {
-    map?: unknown;
-    metalnessMap?: unknown;
-    roughnessMap?: unknown;
-    emissiveMap?: unknown;
-  };
-  return m.map != null || m.metalnessMap != null || m.roughnessMap != null || m.emissiveMap != null;
-}
+// disableMipmaps / hasTextureMaps live in atlas-textures.ts — shared with the
+// chat's card (media/ModelSurface.tsx), which showed the same static until it
+// treated a baked atlas the way this viewer does.
 
 /** Generate the procedural "generated texture": muted painterly bands +
  * speckle. Returns an sRGB CanvasTexture (the Hunyuan-Paint stage's demo). */

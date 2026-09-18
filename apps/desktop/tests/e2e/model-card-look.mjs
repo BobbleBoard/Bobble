@@ -25,13 +25,32 @@ import { decodePng } from './png.mjs';
 const SHOT_DIR = process.env.SHOT_DIR ?? '/tmp/model-card';
 mkdirSync(SHOT_DIR, { recursive: true });
 
-/* Real engine outputs from this Mac's own runs (the August layout kept them
-   under the cache). Copied into the probe HOME's engine sandbox — where a
-   result lands today, inside the pd-file fence — before the app starts. */
+/* Real engine outputs from this Mac's own runs, copied into the probe HOME's
+   engine sandbox — where a result lands today, inside the pd-file fence —
+   before the app starts.
+
+   POST-FIX FILES ONLY. the user (2026-09-18), on a card showing f184ded6efb6:
+   "what's with this artifacting" — that model was baked 2026-08-18 15:45,
+   nine hours BEFORE the dark-crackle fix (65b6ae02, `dilate_atlas`): MEASURED
+   37.8% near-black gutter texels in its 4096² atlas against 0.5% in a bake
+   from the next morning. The card draws what the file carries, so the
+   fixtures are bakes from after the fix; the segmentation is vertex-coloured
+   (no atlas) and was never affected. */
+const SANDBOX = path.join(homedir(), '.pi', 'desktop', 'sandbox', 'gen3d');
 const OLD_SANDBOX = path.join(homedir(), '.cache', 'bobble', 'gen3d', 'sandbox');
+/* The rig of 385fa85ad18b (62cbf654a14b, Aug 19) with its TEXCOORD_0 V put the
+   right way up — the skinned writer's own fix of 2026-09-18 (_glbskin.py),
+   applied to the file; a fresh rig of the same source through today's engine
+   renders identically (model-tool-real-probe.mjs). Rebuilt from the Aug 19
+   file by flipping V if it is missing. */
+const FIXTURES = path.join(process.cwd(), 'scratchpad', 'fixtures', 'gen3d');
 const SOURCES = {
-  model: path.join(OLD_SANDBOX, 'f184ded6efb6', 'model.glb'),
-  rigged: path.join(OLD_SANDBOX, '1a5f5befbc4b', 'rigged.glb'),
+  model: path.join(SANDBOX, '385fa85ad18b', 'model.glb'),
+  rigged:
+    process.env.RIG_FIXTURE ??
+    (existsSync(path.join(FIXTURES, 'rigged-v-fixed.glb'))
+      ? path.join(FIXTURES, 'rigged-v-fixed.glb')
+      : path.join(SANDBOX, '62cbf654a14b', 'rigged.glb')),
   parts: path.join(OLD_SANDBOX, '1b71bafc10f9', 'parts.glb'),
 };
 for (const [k, f] of Object.entries(SOURCES)) {

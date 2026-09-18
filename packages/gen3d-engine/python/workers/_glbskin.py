@@ -91,7 +91,18 @@ def write_skinned_glb(
     attributes = {"POSITION": 0, "NORMAL": 1, "JOINTS_0": 2, "WEIGHTS_0": 3}
 
     if uv is not None:
-        uvs = np.ascontiguousarray(uv, dtype=np.float32)
+        # glTF's texture origin is the TOP-left; trimesh keeps `visual.uv` in
+        # the OBJ/OpenGL bottom-left convention and flips V in its own glTF
+        # exporter — which this writer bypasses. Written as-is, the texture is
+        # sampled upside down: on a TRELLIS atlas (a chart per triangle) that
+        # does not look upside down, it looks like grey mottle over the whole
+        # body, because every triangle lands on some OTHER triangle's chart.
+        # MEASURED 2026-09-18: a clean source (385fa85ad18b/model.glb) rigged
+        # into a mottled rigged.glb with identical positions, indices and
+        # texture, and `uv2 == (u, 1 - v)` of the source. The retopo worker
+        # exports through trimesh and was clean; trellis_worker flips by hand.
+        uvs = np.ascontiguousarray(uv, dtype=np.float32).copy()
+        uvs[:, 1] = 1.0 - uvs[:, 1]
         uv_view = buf.add_view(uvs.tobytes(), 34962)
         attributes["TEXCOORD_0"] = len(accessors)
         accessors.append(_accessor(uv_view, FLOAT, len(uvs), "VEC2"))

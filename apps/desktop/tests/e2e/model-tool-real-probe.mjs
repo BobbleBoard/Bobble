@@ -194,7 +194,9 @@ try {
    * (retopo, rig) are light (2 GB / 1 GB footprints) and deterministic; the
    * generate leg from its picture is the heavy one and comes last.
    */
-  const OLD = path.join(homedir(), '.cache', 'bobble', 'gen3d', 'sandbox', 'f184ded6efb6');
+  // A bake from AFTER the dark-crackle fix (65b6ae02): the retopo re-bakes
+  // from the source's texture, so a pre-fix source would hand its gutters on.
+  const OLD = path.join(homedir(), '.pi', 'desktop', 'sandbox', 'gen3d', '385fa85ad18b');
   const dir = path.join(home, '.pi', 'desktop', 'sandbox', 'gen3d', 'probe-src');
   mkdirSync(dir, { recursive: true });
   const modelPath = path.join(dir, 'model.glb');
