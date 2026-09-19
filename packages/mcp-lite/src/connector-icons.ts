@@ -1,32 +1,42 @@
 /**
  * Self-contained inline SVG marks for the connector gallery.
  *
- * Brand glyphs are pulled DIRECTLY from the CC0/MIT `simple-icons` npm package
- * (https://simpleicons.org) as named imports — never hand-transcribed — so the
- * `d` path and canonical brand `hex` are always the upstream-correct values (no
- * transcription corruption, no wrong-identity grabs). The explicit
- * {@link BRAND_ICONS} `id → siX` map declares every id≠slug remap
- * (`postgres → siPostgresql`, `google-drive → siGoogledrive`, …) and lets the
- * bundler tree-shake `simple-icons` down to only the ~20 marks used here. Each is
- * rendered in its brand color via the icon's `.hex` (e.g. Blender #E87D0D, Docker
- * #2496ED, Spotify #1ED760). Every mark is fully INLINE — no remote URLs — so it
- * works under the app CSP and offline.
+ * the user (2026-09-18): "as much as you can, don't frankenstein or recreate
+ * logos, find a catalog or official svgs". So a brand's mark is one of two
+ * things, never a drawing of ours:
  *
- * THEME SAFETY: a near-black brand (GitHub #181717, Notion #000) is invisible on
- * a dark surface, so those marks fill with `var(--pd-connector-ink, <brand hex>)`
- * — the brand hex on light, but the box's ink (currentColor) on dark, where the
- * app defines `--pd-connector-ink` (see ConnectorIcon's CSS). The hex fallback
- * keeps the mark correct even with no app CSS (tests/offline). Neutral CATEGORY
- * fallbacks stay `stroke="currentColor"`.
+ *  - THE CATALOG. Brand glyphs are pulled DIRECTLY from the CC0/MIT
+ *    `simple-icons` npm package (https://simpleicons.org) as named imports —
+ *    never hand-transcribed — so the `d` path and canonical brand `hex` are
+ *    always the upstream-correct values. The explicit {@link BRAND_ICONS}
+ *    `id → siX` map declares every id≠slug remap (`postgres → siPostgresql`,
+ *    `google-drive → siGoogledrive`, …) and lets the bundler tree-shake
+ *    `simple-icons` down to only the marks used here. Each is rendered in its
+ *    brand color via the icon's `.hex` (Docker #2496ED, Spotify #1ED760).
+ *  - THE OFFICIAL FILE. simple-icons ships one path in one colour; where that
+ *    is a silhouette of a logo whose identity is its colours (Blender, Chrome,
+ *    Slack, Figma, Google's Drive/Gmail/Calendar, Playwright) the brand owner's
+ *    own logo file is used instead, verbatim — official-marks.ts, which lists
+ *    each file's provenance and does the inline housekeeping (namespaced ids,
+ *    100% root).
+ *
+ * Every mark is fully INLINE — no remote URLs — so it works under the app CSP
+ * and offline.
+ *
+ * THEME SAFETY: a near-black brand (GitHub #181717, Notion #000, Unity's
+ * #222C37) is invisible on a dark surface, so those marks fill with
+ * `var(--pd-connector-ink, <brand hex>)` — the brand hex on light, but the
+ * box's ink (currentColor) on dark, where the app defines `--pd-connector-ink`
+ * (see ConnectorIcon's CSS). The hex fallback keeps the mark correct even with
+ * no app CSS (tests/offline). Neutral CATEGORY fallbacks are two-tone line art
+ * in a hue of their own.
  *
  * All third-party product names, logos, and brands are the property of their
  * respective owners; the marks are used here for identification only (see the
- * disclaimer on the connectors page). Where a brand has no published mark in the
- * set (Slack/Tableau were removed upstream, Chrome DevTools was never in it) or
- * its published mark renders illegibly (Unity's mark is pure white, which would
- * vanish on a light surface), the connector falls back to a neutral CATEGORY
- * glyph rather than shipping a missing/garbled/invisible mark (see
- * {@link NEUTRAL_ICON_SVGS}).
+ * disclaimer on the connectors page). Where a brand has no published mark in
+ * either place (Tableau was removed upstream and publishes no vector; Apple's
+ * app icons are not vectors) the connector gets a neutral CATEGORY glyph rather
+ * than a drawing of the logo (see {@link NEUTRAL_ICON_SVGS}).
  */
 import {
   type SimpleIcon,
@@ -48,9 +58,11 @@ import {
   siSentry,
   siSpotify,
   siSqlite,
+  siUnity,
   siXcode,
   siZoom,
 } from 'simple-icons';
+import { OFFICIAL_MARKS } from './official-marks';
 
 /**
  * Connector id → its `simple-icons` mark. Explicit named imports (not slug
@@ -81,6 +93,18 @@ const BRAND_ICONS: Record<string, SimpleIcon> = {
   spotify: siSpotify,
   discord: siDiscord,
   zoom: siZoom,
+  unity: siUnity,
+};
+
+/**
+ * simple-icons gives a brand ONE hex, and for Unity that is the white of its
+ * dark-surface mark. The mark itself is monochrome — on light it is Unity's own
+ * near-black (unity.com's light-mode logo); that hex goes through the
+ * near-black flip below like GitHub's, so the mark is ink on dark and this on
+ * light.
+ */
+const LIGHT_INK: Record<string, string> = {
+  unity: '#222C37',
 };
 
 /** Below this WCAG relative luminance a brand hex reads as "near-black". */
@@ -174,30 +198,10 @@ const NEUTRAL_ICON_SVGS: Record<string, string> = {
   ),
   // Clock.
   time: neutralSvg('<circle cx="12" cy="12" r="8.25"/><path d="M12 7.4V12l3.1 1.9"/>', 'orange'),
-  // Browser window + play (automation).
-  playwright: neutralSvg(
-    '<rect x="3.25" y="4.75" width="17.5" height="14.5" rx="2"/><path d="M3.25 9.25h17.5"/><path d="m10.4 12.4 3.6 2-3.6 2z"/>',
-    'green',
-  ),
-  // Browser window + code brackets (developer tools / inspect).
-  'chrome-devtools': neutralSvg(
-    '<rect x="3.25" y="4.75" width="17.5" height="14.5" rx="2"/><path d="M3.25 9.25h17.5"/><path d="m9.5 12-2 2 2 2"/><path d="m14.5 12 2 2-2 2"/>',
-    'blue',
-  ),
-  // Speech bubble with text lines (messaging).
-  slack: neutralSvg(
-    '<path d="M5 5.75A1.5 1.5 0 0 1 6.5 4.25h11A1.5 1.5 0 0 1 19 5.75v7.5a1.5 1.5 0 0 1-1.5 1.5H10l-4 3.25v-3.25H6.5A1.5 1.5 0 0 1 5 13.25z"/><path d="M9 9h6"/><path d="M9 12h4"/>',
-    'rose',
-  ),
   // Bar chart on axes (analytics / BI).
   tableau: neutralSvg(
     '<path d="M4.5 4.5v15h15"/><path d="M8.5 16.5v-4"/><path d="M12.5 16.5v-7"/><path d="M16.5 16.5v-2.5"/>',
     'sky',
-  ),
-  // Isometric cube (3D / game engine).
-  unity: neutralSvg(
-    '<path d="M12 3.5 20 8v8l-8 4.5L4 16V8z"/><path d="M4 8l8 4.5L20 8"/><path d="M12 12.5V20.5"/>',
-    'slate',
   ),
   // ── First-party builtins ("By us") ──────────────────────────────────────────
   // A terminal prompt: the CLI tool interface.
@@ -267,38 +271,26 @@ const NEUTRAL_ICON_SVGS: Record<string, string> = {
 
 /**
  * Connector id → self-contained inline SVG mark. Branded connectors get their
- * canonical simple-icons glyph; everything else gets a neutral category glyph.
+ * canonical simple-icons glyph, or — where the catalog's one colour is not the
+ * logo — the brand's own logo file (official-marks.ts: Blender, Chrome, Slack,
+ * Figma, Google Drive/Gmail/Calendar, Playwright); everything else gets a
+ * neutral category glyph.
  */
-/**
- * BLENDER IN ITS OWN THREE COLOURS. the user (2026-09-18): "blender logo isn't
- * correct (color)". simple-icons ships one path in one colour; the real mark
- * (blender.org, the SVG without text) is the orange body, a WHITE ring and a
- * BLUE centre — the body's ring hole and its inner disc are exactly the
- * simple-icons path's second and first subpaths. So: a white disc under the
- * hole, the whole path in the brand's own orange (#EA7600, the official
- * file's value), and the inner-disc subpath again on top in Blender blue.
- */
-function blenderSvg(pathD: string): string {
-  const inner = pathD.slice(0, pathD.indexOf('M7.35'));
-  return (
-    '<svg viewBox="0 0 24 24" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
-    '<circle cx="15.65" cy="13.2" r="4.8" fill="#ffffff"/>' +
-    `<path d="${pathD}" fill="#EA7600"/>` +
-    `<path d="${inner}" fill="#265787"/>` +
-    '</svg>'
-  );
-}
-
 export const CONNECTOR_ICON_SVGS: Record<string, string> = {
   ...Object.fromEntries(
-    Object.entries(BRAND_ICONS).map(([id, icon]) => [id, brandSvg(icon.path, `#${icon.hex}`)]),
+    Object.entries(BRAND_ICONS).map(([id, icon]) => [
+      id,
+      brandSvg(icon.path, LIGHT_INK[id] ?? `#${icon.hex}`),
+    ]),
   ),
-  blender: blenderSvg(siBlender.path),
+  ...OFFICIAL_MARKS,
   ...NEUTRAL_ICON_SVGS,
 };
 
 /** Connector ids whose mark is a real, published brand glyph (not a fallback). */
-export const BRANDED_CONNECTOR_IDS: readonly string[] = Object.keys(BRAND_ICONS);
+export const BRANDED_CONNECTOR_IDS: readonly string[] = [
+  ...new Set([...Object.keys(BRAND_ICONS), ...Object.keys(OFFICIAL_MARKS)]),
+];
 
 /** The inline SVG mark for a connector id, if one is defined. */
 export function connectorIconSvg(id: string): string | undefined {
