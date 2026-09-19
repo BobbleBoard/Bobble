@@ -289,6 +289,15 @@ try {
       conn.addCentred === true,
     `the add control is a square, unbordered and unfilled at rest, centred: ${JSON.stringify(conn)}`,
   );
+  // The card's own hover must not light the + (the user, 2026-09-18: "separate
+  // hover than the whole card").
+  await page.hover('.pdc-row .pdc-row-name');
+  await sleep(400);
+  const connCardHover = await readAdd();
+  check(
+    connCardHover.addBg === conn.addBg,
+    `the card's hover leaves the add alone (${connCardHover.addBg})`,
+  );
   await page.hover('.pdc-ctl--add');
   await sleep(400);
   const connHover = await readAdd();
@@ -298,9 +307,11 @@ try {
     `…and a rounded box appears under the pointer: ${JSON.stringify({ rest: conn.addBg, hover: connHover.addBg, radius: connHover.addRadius })}`,
   );
 
-  // 4. Scheduled: the templates with their + and (seeded) the task list.
+  // 4. Scheduled: the templates with their + (on the Templates page now).
   await page.click('[data-testid="nav-scheduled"]');
   await sleep(1500);
+  await page.click('[data-testid="sd-view-templates"]');
+  await sleep(600);
   const readPlus = () =>
     page.evaluate(() => {
       const row = document.querySelector('.sd-row');
@@ -334,13 +345,22 @@ try {
       sched.plusCentred === true,
     `the + is a square, unbordered and unfilled at rest, centred: ${JSON.stringify(sched)}`,
   );
-  await page.hover('.sd-row');
+  /* Hovering the CARD must not light the +; hovering the + itself does
+     (the user, 2026-09-18: "separate hover than the whole card"). */
+  await page.hover('.sd-row .sd-row-name');
+  await sleep(400);
+  const cardHover = await readPlus();
+  check(
+    cardHover.plusBg === sched.plusBg,
+    `the card's hover leaves the + alone (${cardHover.plusBg})`,
+  );
+  await page.hover('.sd-row-plus');
   await sleep(400);
   const schedHover = await readPlus();
   await clip('7b-scheduled-plus-hover', '.sd-row');
   check(
     schedHover.plusBg !== sched.plusBg && Number.parseFloat(schedHover.plusRadius ?? '0') >= 8,
-    `…and a rounded box appears on hover: ${JSON.stringify({ rest: sched.plusBg, hover: schedHover.plusBg, radius: schedHover.plusRadius })}`,
+    `…and a rounded box appears under the pointer on the + itself: ${JSON.stringify({ rest: sched.plusBg, hover: schedHover.plusBg, radius: schedHover.plusRadius })}`,
   );
   await setTheme('dark');
   await sleep(400);

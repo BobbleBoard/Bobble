@@ -36,11 +36,11 @@ import {
   Button,
   CollapsibleSearch,
   IconChevronLeft,
-  IconChevronRight,
   IconPencil,
   IconPlus,
   ScrollArea,
   Switch,
+  Tooltip,
 } from '@pi-desktop/ui';
 import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
 import type { ScheduledTask } from '../../electron/scheduled/schedule-logic';
@@ -412,7 +412,14 @@ export function ScheduledView() {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [query, setQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
-  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
+  /*
+   * ROUTINES | TEMPLATES. the user (2026-09-18): "show a button under 'Scheduled'
+   * header, remove the subheading text … put 2 buttons, 1 templates and one is
+   * the user's set up stuff … show the templates only on templates." The
+   * person's own tasks are their routines — what runs for them — and the
+   * suggestions are templates; each is its own page under the one header.
+   */
+  const [view, setView] = useState<'routines' | 'templates'>('routines');
   /** A row (by task id) that should take focus once it exists — after a save, or coming back. */
   const [focusRow, setFocusRow] = useState<string | null>(null);
   const rowRefs = useRef(new Map<string, HTMLButtonElement>());
@@ -509,7 +516,8 @@ export function ScheduledView() {
         setFocusRow(t.id);
       });
     setDraft(null);
-    setSuggestionsOpen(false);
+    // A task made from a template is a routine now; that is where it shows.
+    setView('routines');
   };
 
   const newBlank = () => setDraft({ kind: 'new', seq: nextSeq() });
@@ -531,9 +539,6 @@ export function ScheduledView() {
     e.preventDefault();
     rowRefs.current.get(id)?.focus();
   };
-
-  const moreNames = suggestions.slice(0, 2).map((t) => t.name);
-  const moreRest = suggestions.length - moreNames.length;
 
   return (
     <div ref={rootRef} className="sd-page" data-testid="scheduled-view">
@@ -581,87 +586,101 @@ export function ScheduledView() {
                   <IconPlus size={14} /> New task
                 </Button>
               </div>
-              {/* The line says what this is — and, when scheduling is off, says that instead. */}
-              <p className="sd-lede" data-off={!enabled} data-testid="sd-lede">
-                {enabled ? (
-                  'What Bobble does on its own while it is open.'
-                ) : (
-                  <>
-                    <IconPause size={14} />
-                    <span>
-                      Scheduling is off. Nothing fires until it is back on; you can still run a task
-                      by hand.
-                    </span>
-                  </>
-                )}
-              </p>
             </header>
 
-            {empty ? (
-              <section className="sd-empty">
-                <p className="sd-empty-title">No scheduled tasks yet.</p>
-                <p className="sd-empty-line">
-                  Start from one of these, or write your own with New task. Every one runs on this
-                  Mac; it can read what is here and cannot send anything.
+            {/* No line under the title (the user: "remove the subheading text"); the
+                two pages, and — beside them, so the list below never moves — the one
+                line that matters: scheduling being off. */}
+            <div className="sd-views-row">
+              <div className="pd-segmented sd-views" data-testid="sd-views">
+                <button
+                  type="button"
+                  className="pd-segment pd-focusable"
+                  aria-pressed={view === 'routines'}
+                  data-state={view === 'routines' ? 'active' : undefined}
+                  data-testid="sd-view-routines"
+                  onClick={() => setView('routines')}
+                >
+                  Routines
+                </button>
+                <button
+                  type="button"
+                  className="pd-segment pd-focusable"
+                  aria-pressed={view === 'templates'}
+                  data-state={view === 'templates' ? 'active' : undefined}
+                  data-testid="sd-view-templates"
+                  onClick={() => setView('templates')}
+                >
+                  Templates
+                </button>
+              </div>
+              {enabled ? null : (
+                <p className="sd-lede" data-off="true" data-testid="sd-lede">
+                  <IconPause size={14} />
+                  <span>Scheduling is off — nothing fires until it is back on.</span>
                 </p>
-                <Suggestions templates={suggestions} columns={columns} onPick={pickTemplate} />
-              </section>
+              )}
+            </div>
+
+            {view === 'templates' ? (
+              <Suggestions templates={suggestions} columns={columns} onPick={pickTemplate} />
             ) : (
               <>
-                <section className="sd-list" aria-label="Tasks" onKeyDown={onListKey}>
-                  {loaded && rows.length === 0 ? (
-                    <p className="sd-nothing">No task matches.</p>
-                  ) : (
-                    rows.map(({ task, state }) => (
-                      <TaskRow
-                        key={task.id}
-                        task={task}
-                        runs={runs[task.id]}
-                        state={state}
-                        now={now}
-                        onOpen={() => setOpenId(task.id)}
-                        rowRef={(el) => {
-                          if (el === null) rowRefs.current.delete(task.id);
-                          else rowRefs.current.set(task.id, el);
-                        }}
-                      />
-                    ))
-                  )}
-                </section>
-                {suggestions.length > 0 && needle === '' ? (
-                  <section className="sd-more-section">
-                    {/* One quiet row for the suggestions, the way a list says "and more". */}
+                {/* THE STRIP, like the Connectors page's Installed strip: every routine
+                    as a tile, the dotted + to make one — and the + with its line even
+                    when there is nothing yet (the user, 2026-09-18). */}
+                <div className="sd-strip" data-testid="sd-strip">
+                  {rows.map(({ task, state }) => (
+                    <Tooltip key={task.id} label={task.name}>
+                      <button
+                        type="button"
+                        className="sd-strip-tile pd-focusable"
+                        data-state={state.kind}
+                        aria-label={`Open ${task.name}`}
+                        data-testid={`sd-strip-${task.id}`}
+                        onClick={() => setOpenId(task.id)}
+                      >
+                        <StatusGlyph state={state} runs={runs[task.id]} />
+                      </button>
+                    </Tooltip>
+                  ))}
+                  <Tooltip label="New task">
                     <button
                       type="button"
-                      className="sd-more pd-focusable"
-                      aria-expanded={suggestionsOpen}
-                      onClick={() => setSuggestionsOpen((v) => !v)}
-                      data-testid="sd-more-templates"
+                      className="sd-strip-tile sd-strip-tile--add pd-focusable"
+                      aria-label="New task"
+                      onClick={newBlank}
+                      data-testid="sd-strip-add"
                     >
-                      <span className="sd-cluster" aria-hidden="true">
-                        {suggestions.slice(0, 3).map((t) => (
-                          <span key={t.id} className="sd-tile sd-tile--xs">
-                            <TemplateIcon id={t.id} size={12} />
-                          </span>
-                        ))}
-                      </span>
-                      <span className="sd-more-text">
-                        {suggestionsOpen ? 'Suggestions' : 'Start from a suggestion'}
-                        {suggestionsOpen
-                          ? ''
-                          : ` — ${moreNames.join(', ')}${moreRest > 0 ? ` and ${moreRest} more` : ''}`}
-                      </span>
-                      <span className="sd-more-chev" data-open={suggestionsOpen}>
-                        <IconChevronRight size={14} />
-                      </span>
+                      <IconPlus size={24} />
                     </button>
-                    {suggestionsOpen ? (
-                      <Suggestions
-                        templates={suggestions}
-                        columns={columns}
-                        onPick={pickTemplate}
-                      />
-                    ) : null}
+                  </Tooltip>
+                  {empty ? (
+                    <span className="sd-strip-hint" data-testid="sd-strip-empty">
+                      What you set up appears here. Start from a template, or write your own.
+                    </span>
+                  ) : null}
+                </div>
+                {tasks.length > 0 ? (
+                  <section className="sd-list" aria-label="Tasks" onKeyDown={onListKey}>
+                    {loaded && rows.length === 0 ? (
+                      <p className="sd-nothing">No task matches.</p>
+                    ) : (
+                      rows.map(({ task, state }) => (
+                        <TaskRow
+                          key={task.id}
+                          task={task}
+                          runs={runs[task.id]}
+                          state={state}
+                          now={now}
+                          onOpen={() => setOpenId(task.id)}
+                          rowRef={(el) => {
+                            if (el === null) rowRefs.current.delete(task.id);
+                            else rowRefs.current.set(task.id, el);
+                          }}
+                        />
+                      ))
+                    )}
                   </section>
                 ) : null}
               </>

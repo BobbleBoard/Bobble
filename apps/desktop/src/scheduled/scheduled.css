@@ -74,14 +74,14 @@
 }
 
 .sd-lede {
-  grid-column: 1 / -1;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 6px;
   margin: 0;
+  min-width: 0;
   color: var(--pd-text-muted);
-  font-size: var(--pd-font-size-body);
-  line-height: var(--pd-leading-body);
+  font-size: var(--pd-font-size-footnote);
+  line-height: var(--pd-leading-footnote);
 }
 
 .sd-lede[data-off="true"] {
@@ -90,7 +90,6 @@
 
 .sd-lede > .pd-icon {
   flex: none;
-  margin-top: 3px;
 }
 
 /* The magnifier in the header: a small ghost button, a field when opened. */
@@ -110,6 +109,85 @@
 
 .sd-header-actions .pd-collapsible-search--expanded {
   width: 200px;
+}
+
+/* ---- Routines | Templates, under the title -------------------------------- */
+
+.sd-views-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: -8px 0 20px;
+}
+
+/* ---- the strip: every routine as a tile, and the dotted + ------------------
+   The Connectors page's Installed strip, here (the user, 2026-09-18: "put a
+   similar to the dotted + and connectors shown under installed even when
+   there's nothing there yet"). Same 56px tiles, same dashed add. */
+
+.sd-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.sd-strip-tile {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--pd-radius-lg);
+  background: var(--pd-bg-inset);
+  box-shadow: inset 0 0 0 1px var(--pd-border-subtle);
+  color: var(--pd-text-secondary);
+  cursor: pointer;
+  transition:
+    transform var(--pd-duration-base) var(--pd-easing-standard),
+    opacity var(--pd-duration-base) var(--pd-easing-standard);
+}
+
+.sd-strip-tile:hover {
+  transform: translateY(-1px);
+}
+
+.sd-strip-tile[data-state="paused"],
+.sd-strip-tile[data-state="off"] {
+  opacity: 0.45;
+}
+
+.sd-strip-tile[data-state="paused"]:hover,
+.sd-strip-tile[data-state="off"]:hover {
+  opacity: 0.8;
+}
+
+.sd-strip-tile--add {
+  background: transparent;
+  box-shadow: none;
+  border: 1.5px dashed var(--pd-border-strong);
+  color: var(--pd-text-muted);
+  transition:
+    color var(--pd-duration-base) var(--pd-easing-standard),
+    border-color var(--pd-duration-base) var(--pd-easing-standard),
+    background-color var(--pd-duration-base) var(--pd-easing-standard);
+}
+
+.sd-strip-tile--add:hover {
+  color: var(--pd-text-primary);
+  border-color: var(--pd-text-secondary);
+  background: var(--pd-bg-hover);
+  transform: none;
+}
+
+.sd-strip-hint {
+  font-size: var(--pd-font-size-body);
+  line-height: var(--pd-leading-body);
+  color: var(--pd-text-secondary);
 }
 
 /* ---- rows: straight on the background ------------------------------------ */
@@ -151,8 +229,7 @@
 
 /* The app's focus ring, drawn inside the row so a scroll area cannot clip it. */
 .sd-row.pd-focusable,
-.sd-run-head.pd-focusable,
-.sd-more.pd-focusable {
+.sd-run-head.pd-focusable {
   outline-offset: -2px;
 }
 
@@ -233,7 +310,9 @@
   transition: background-color var(--pd-duration-fast) var(--pd-easing-standard);
 }
 
-.sd-row:hover .sd-row-plus {
+/* Its own hover, not the card's (the user, 2026-09-18: "separate hover than the
+   whole card"). */
+.sd-row-plus:hover {
   background: var(--pd-bg-active);
 }
 
@@ -286,91 +365,6 @@
 
 .sd-suggest-grid .sd-row-plus {
   margin-top: 0;
-}
-
-/* ---- the empty page ------------------------------------------------------- */
-
-.sd-empty-title {
-  margin: 12px 0 0;
-  font-size: var(--pd-font-size-body);
-  line-height: var(--pd-leading-body);
-  font-weight: var(--pd-font-weight-medium);
-}
-
-.sd-empty-line {
-  margin: 2px 0 12px;
-  color: var(--pd-text-muted);
-  font-size: var(--pd-font-size-footnote);
-  line-height: var(--pd-leading-footnote);
-}
-
-/* ---- "and more": the suggestions under a list ----------------------------- */
-
-.sd-more-section {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--pd-border-subtle);
-}
-
-.sd-more {
-  display: flex;
-  width: calc(100% + 24px);
-  align-items: center;
-  gap: 12px;
-  margin: 0 -12px;
-  padding: 8px 12px;
-  border: 0;
-  border-radius: var(--pd-radius-row);
-  background: transparent;
-  color: var(--pd-text-secondary);
-  font: inherit;
-  font-size: var(--pd-font-size-footnote);
-  text-align: left;
-  cursor: pointer;
-  transition: background-color var(--pd-duration-base) var(--pd-easing-standard);
-}
-
-.sd-more:hover {
-  background: var(--pd-bg-hover);
-  color: var(--pd-text-primary);
-}
-
-.sd-more-text {
-  min-width: 0;
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.sd-more-chev {
-  display: inline-flex;
-  flex: none;
-  color: var(--pd-text-muted);
-  transition: transform var(--pd-duration-base) var(--pd-easing-standard);
-}
-
-.sd-more-chev[data-open="true"] {
-  transform: rotate(90deg);
-}
-
-.sd-cluster {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-}
-
-.sd-tile--xs {
-  width: 22px;
-  height: 22px;
-  border-radius: var(--pd-radius-xs);
-  box-shadow:
-    inset 0 0 0 1px var(--pd-border-subtle),
-    0 0 0 2px var(--pd-bg-base);
-}
-
-.sd-cluster > .sd-tile--xs + .sd-tile--xs {
-  margin-left: -6px;
 }
 
 /* ---- a task's page ------------------------------------------------------- */

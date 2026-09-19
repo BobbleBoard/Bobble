@@ -71,7 +71,9 @@ const openTask = async (id) => {
 const backToList = async () => {
   await page.click('[data-testid="sd-back"]');
   await page.waitForSelector('.sd-list', { timeout: 5_000 });
-  await page.waitForTimeout(300);
+  // The list page slides in (sd-in: 4px up over --pd-duration-base); a box
+  // read mid-slide is 4px off — MEASURED as "the kill switch moved the list".
+  await page.waitForTimeout(600);
 };
 
 try {
@@ -81,11 +83,31 @@ try {
   console.log('\nthe page');
   await page.click('[data-testid="nav-scheduled"]');
   await page.waitForSelector('[data-testid="scheduled-view"]', { timeout: 10_000 });
+  /* the user (2026-09-18): Routines | Templates under the title, no line under
+     it, the dotted + with its line even when there is nothing yet, and the
+     templates only on Templates. */
+  await page.waitForSelector('[data-testid="sd-strip-add"]', { timeout: 5_000 });
+  check(
+    (await page.$('[data-testid="sd-strip-empty"]')) !== null &&
+      (await page.$('[data-testid="sd-templates"]')) === null,
+    'an empty schedule shows the dotted + with its line, and no templates',
+  );
+  check(
+    (await page.$('[data-testid="sd-lede"]')) === null,
+    'no line under the title while scheduling is on',
+  );
+  await page.click('[data-testid="sd-view-templates"]');
   await page.waitForSelector('[data-testid="sd-templates"]', { timeout: 5_000 });
   check(
     (await page.$$('[data-testid^="sd-template-"]')).length === 9,
-    'an empty schedule offers the nine suggestions',
+    'Templates offers the nine suggestions',
   );
+  check(
+    (await page.$('[data-testid="sd-strip-add"]')) === null,
+    'the strip is the routines page, not the templates page',
+  );
+  await page.click('[data-testid="sd-view-routines"]');
+  await page.waitForSelector('[data-testid="sd-strip-add"]', { timeout: 5_000 });
   check((await page.$('.sd-list')) === null, 'no list when empty');
   check(
     (await page.$('[data-testid="sd-search"]')) === null,
@@ -171,8 +193,9 @@ try {
     `after Schedule it the keyboard is on the new row (${await focused()})`,
   );
   check(
-    (await page.$('[data-testid="sd-more-templates"]')) !== null,
-    'the suggestions stay one click away under the list',
+    (await page.$$('[data-testid^="sd-strip-"]')).length >= 2 &&
+      (await page.$('[data-testid="sd-strip-empty"]')) === null,
+    'the new routine is a tile in the strip beside the +, and the empty line is gone',
   );
   await shot('3-one-task');
 
