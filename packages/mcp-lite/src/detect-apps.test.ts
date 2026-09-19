@@ -89,13 +89,16 @@ describe('detectApps', () => {
   });
 
   it('renders github, figma, and blender in their brand color (real published glyphs)', () => {
-    // Canonical simple-icons brand hex: figma #F24E1E, blender #E87D0D. GitHub
-    // #181717 is near-black, so it fills via --pd-connector-ink (currentColor on
-    // dark) with the brand hex as the light-theme fallback.
+    // Canonical simple-icons brand hex: figma #F24E1E. GitHub #181717 is
+    // near-black, so it fills via --pd-connector-ink (currentColor on dark)
+    // with the brand hex as the light-theme fallback. Blender is composed in
+    // its own three colours (the user, 2026-09-18: "blender logo isn't correct
+    // (color)"): the official file's orange #EA7600, a white ring, a blue
+    // #265787 centre.
     const brandHex: Record<string, string> = {
       github: '#181717',
       figma: '#F24E1E',
-      blender: '#E87D0D',
+      blender: '#EA7600',
     };
     for (const id of ['github', 'figma', 'blender'] as const) {
       expect(BRANDED_CONNECTOR_IDS).toContain(id);
@@ -110,6 +113,9 @@ describe('detectApps', () => {
       // The rendered card SVG matches the source-of-truth icon map.
       expect(svg).toBe(connectorIconSvg(id));
     }
+    const blender = KNOWN_CONNECTORS_BY_ID.blender?.iconSvg ?? '';
+    expect(blender).toContain('#265787'); // the blue centre
+    expect(blender).toContain('fill="#ffffff"'); // the white ring
   });
 
   it('falls back to a neutral (stroked) glyph for connectors without a brand mark', () => {

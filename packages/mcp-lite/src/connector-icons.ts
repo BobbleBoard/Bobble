@@ -216,9 +216,13 @@ const NEUTRAL_ICON_SVGS: Record<string, string> = {
       '<circle cx="4.5" cy="18.5" r="1.5"/><circle cx="19.5" cy="5.5" r="1.5"/><circle cx="9.5" cy="12.5" r="1.25"/><circle cx="13.5" cy="8.5" r="1.25"/>',
     'orange',
   ),
-  // A cube seen from a corner, lit — the mesh a chat can now turn.
+  // The sidebar's own cube (SessionSidebar ModalityCube), in a hue: the top
+  // face drawn as its own closed shape, so the two-tone fill lands on it
+  // twice and the cube reads as lit from above. the user (2026-09-18): "that 3d
+  // icon doesn't look nice" — the first cut had a stray diagonal across the
+  // top and nothing to tell the faces apart.
   'bobble-3d': neutralSvg(
-    '<path d="M12 3.5 20 8v8l-8 4.5L4 16V8z"/><path d="M4 8l8 4.5L20 8"/><path d="M12 12.5V20.5"/><path d="M8 6.25l8 4.5"/>',
+    '<path d="M12 3.5 20 8v8l-8 4.5L4 16V8z"/><path d="M4 8l8-4.5L20 8l-8 4.5z"/><path d="M12 12.5V20.5"/>',
     'teal',
   ),
   // Scissors (a typed ffmpeg cut/edit façade).
@@ -265,10 +269,31 @@ const NEUTRAL_ICON_SVGS: Record<string, string> = {
  * Connector id → self-contained inline SVG mark. Branded connectors get their
  * canonical simple-icons glyph; everything else gets a neutral category glyph.
  */
+/**
+ * BLENDER IN ITS OWN THREE COLOURS. the user (2026-09-18): "blender logo isn't
+ * correct (color)". simple-icons ships one path in one colour; the real mark
+ * (blender.org, the SVG without text) is the orange body, a WHITE ring and a
+ * BLUE centre — the body's ring hole and its inner disc are exactly the
+ * simple-icons path's second and first subpaths. So: a white disc under the
+ * hole, the whole path in the brand's own orange (#EA7600, the official
+ * file's value), and the inner-disc subpath again on top in Blender blue.
+ */
+function blenderSvg(pathD: string): string {
+  const inner = pathD.slice(0, pathD.indexOf('M7.35'));
+  return (
+    '<svg viewBox="0 0 24 24" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
+    '<circle cx="15.65" cy="13.2" r="4.8" fill="#ffffff"/>' +
+    `<path d="${pathD}" fill="#EA7600"/>` +
+    `<path d="${inner}" fill="#265787"/>` +
+    '</svg>'
+  );
+}
+
 export const CONNECTOR_ICON_SVGS: Record<string, string> = {
   ...Object.fromEntries(
     Object.entries(BRAND_ICONS).map(([id, icon]) => [id, brandSvg(icon.path, `#${icon.hex}`)]),
   ),
+  blender: blenderSvg(siBlender.path),
   ...NEUTRAL_ICON_SVGS,
 };
 

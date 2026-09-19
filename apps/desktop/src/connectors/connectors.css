@@ -184,11 +184,20 @@
   gap: 6px;
 }
 
-/* ---- the Installed strip: marks only, 40px, and the way to add your own ---- */
+/* ---- the Installed strip: marks only, 56px, and the way to add your own ----
+   the user (2026-09-18): "increase the size of this installed section, the button
+   and text next to it" — 40 → 56 for the marks and the add tile, the line
+   beside them at body size. */
 .pdc-strip {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  align-items: center;
+  gap: 12px;
+}
+.pdc-installed-hint {
+  font-size: var(--pd-font-size-body);
+  line-height: var(--pd-leading-body);
+  color: var(--pd-text-secondary);
 }
 .pdc-tile {
   position: relative;
@@ -224,8 +233,8 @@
 .pdc-tile--add {
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 56px;
+  height: 56px;
   border: 1.5px dashed var(--pd-border-strong);
   color: var(--pd-text-muted);
   transition:

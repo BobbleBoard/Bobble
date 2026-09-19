@@ -232,7 +232,7 @@ function Tile({ item, onOpen }: { item: Item; onOpen: () => void }): JSX.Element
         data-testid={`connector-tile-${item.id}`}
         onClick={onOpen}
       >
-        <ItemMark item={item} size={40} />
+        <ItemMark item={item} size={56} />
         {warn !== null ? <span className="pdc-tile-dot" aria-hidden="true" /> : null}
       </button>
     </Tooltip>
@@ -334,11 +334,11 @@ function Installed({
               onClick={onAdd}
               data-testid="connectors-add-server"
             >
-              <IconPlus size={18} />
+              <IconPlus size={24} />
             </button>
           </Tooltip>
           {items.length === 0 ? (
-            <span className="pdc-quiet self-center" data-testid="connectors-installed-empty">
+            <span className="pdc-installed-hint" data-testid="connectors-installed-empty">
               What you add appears here. The built-in tools below already work.
             </span>
           ) : null}
