@@ -240,9 +240,17 @@ export async function launchApp(name, options = {}) {
    * it here only so the value handed back is the one the app actually got.
    */
   const home = env.HOME ?? probeHome(name);
-  // Ours to remove at the end: a caller's own home is theirs, and a stable one
-  // (probeHome's `stable`) is a per-name path a mkdtemp name never has.
-  const throwaway = env.HOME === undefined && /-[A-Za-z0-9]{6}$/.test(home);
+  /*
+   * Ours to remove at the end: any mkdtemp-shaped `pd-home-<name>-XXXXXX`
+   * under the temp dir, whoever made it — a probe that builds its own home
+   * with `probeHome()` and hands it over as `env.HOME` (deep-tasks,
+   * chat-order, dialogs-look) is not asking to keep it. MEASURED 2026-09-20:
+   * ten of those left behind by one session, 2.2 GB in one of them (uv's
+   * cache). A stable one (probeHome's `stable`) is a per-name path a mkdtemp
+   * name never has, and a home elsewhere is the caller's.
+   */
+  const throwaway =
+    /-[A-Za-z0-9]{6}$/.test(home) && home.startsWith(path.join(tmpdir(), 'pd-home-'));
   mkdirSync(path.join(home, '.pi', 'agent', 'sessions', 'proj'), { recursive: true });
 
   const before = frontmostApp();
