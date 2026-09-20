@@ -108,7 +108,12 @@ export {
   useCopyFeedback,
   writeClipboardText,
 } from './components/copy-button.tsx';
-export type { CurtainProps, DialogContentProps } from './components/dialog.tsx';
+export type {
+  CurtainProps,
+  DialogContentProps,
+  DialogFieldProps,
+  DialogSummaryProps,
+} from './components/dialog.tsx';
 export {
   Curtain,
   Dialog,
@@ -116,8 +121,11 @@ export {
   DialogClose,
   DialogContent,
   DialogDescription,
+  DialogField,
+  DialogFieldRow,
   DialogFooter,
   DialogHeader,
+  DialogSummary,
   DialogTitle,
   DialogTrigger,
 } from './components/dialog.tsx';

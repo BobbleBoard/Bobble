@@ -21,6 +21,8 @@ import {
   DialogBody,
   DialogClose,
   DialogContent,
+  DialogDescription,
+  DialogField,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -445,7 +447,14 @@ export function AddServerDialog({
           </button>
         </DialogClose>
         <DialogHeader>
-          <DialogTitle>{editing ? `Edit ${initial.name}` : 'Add a server'}</DialogTitle>
+          <div className="min-w-0">
+            <DialogTitle>{editing ? `Edit ${initial.name}` : 'Add a server'}</DialogTitle>
+            <DialogDescription>
+              {editing
+                ? 'How Bobble starts it, and what it needs to run.'
+                : 'A tool server Bobble starts for you, or one already running at a URL.'}
+            </DialogDescription>
+          </div>
         </DialogHeader>
         <DialogBody>
           <form
@@ -602,7 +611,9 @@ export function AddServerDialog({
           {onTest !== undefined ? (
             <Button
               variant="secondary"
-              className="mr-auto"
+              // `.pd-btn { margin: 0 }` outranks Tailwind's mr-auto; the
+              // left-hand slot is the footer's own.
+              className="pd-dialog-footer-aside"
               onClick={runTest}
               disabled={test.status === 'running'}
               data-testid="add-server-test"
@@ -620,7 +631,7 @@ export function AddServerDialog({
           <Button
             type="submit"
             form="add-server-form"
-            variant="accent"
+            variant="primary"
             data-testid="add-server-submit"
           >
             {primaryLabel}
@@ -681,21 +692,24 @@ function Field({
   error?: string;
   children: React.ReactNode;
 }) {
+  // The dialog's own field (label over control over hint); `htmlFor` rather
+  // than wrapping, so a screen reader associates the label with a control
+  // that is a child component. The error replaces the hint, under the same id
+  // the tests know.
   return (
-    <div className="flex flex-col gap-1">
-      {/* `htmlFor` rather than wrapping: a wrapped label does not associate for
-          a screen reader when the control is a child component. */}
-      <label className="text-caption text-text-secondary" htmlFor={id}>
-        {label}
-      </label>
+    <DialogField
+      htmlFor={id}
+      label={label}
+      hint={hint}
+      error={
+        error !== undefined ? (
+          <span className="pdc-field-error" data-testid={`${id}-error`}>
+            {error}
+          </span>
+        ) : undefined
+      }
+    >
       {children}
-      {error !== undefined ? (
-        <span className="pdc-field-error" data-testid={`${id}-error`}>
-          {error}
-        </span>
-      ) : (
-        <span className="text-caption text-text-muted">{hint}</span>
-      )}
-    </div>
+    </DialogField>
   );
 }

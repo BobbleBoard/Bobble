@@ -17,7 +17,9 @@
 import {
   Button,
   Dialog,
+  DialogBody,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -114,19 +116,21 @@ export function PermissionDialog({
     >
       <DialogContent data-testid="permission-dialog" className="max-w-[620px]">
         <DialogHeader>
-          <DialogTitle>{titleFor(request.toolName)}</DialogTitle>
+          <div className="min-w-0">
+            <DialogTitle>{titleFor(request.toolName)}</DialogTitle>
+            <DialogDescription>{request.reason}</DialogDescription>
+          </div>
         </DialogHeader>
-        <div className="flex flex-col gap-3">
-          <p className="text-body text-text-secondary">{request.reason}</p>
+        <DialogBody className="gap-2">
           {preview.path !== undefined ? (
-            <p className="text-caption text-text-muted" data-testid="permission-path">
+            <p className="pd-field-label" data-testid="permission-path">
               {preview.path}
             </p>
           ) : null}
           <pre className="pd-permission-preview" data-testid="permission-preview">
             {preview.body}
           </pre>
-        </div>
+        </DialogBody>
         <DialogFooter>
           <Button variant="ghost" onClick={() => onAnswer('deny')} data-testid="permission-deny">
             Don't

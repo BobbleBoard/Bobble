@@ -64,42 +64,182 @@
   }
 }
 
+/*
+ * THE ANATOMY, WITH A HIERARCHY. the user (2026-09-20), on the task dialog: "that
+ * modal and all similar look incredibly generic and lack hierarchy in the
+ * slightest". What he was looking at: a 22px title, then five labels, a
+ * field, three selects and a summary all in the same grey at the same size
+ * with the same 16px between them — nothing dominant, nothing grouped, no
+ * step between "the thing" and "its settings" and "what will happen".
+ *
+ * So every dialog is built from the same four steps, and the steps are far
+ * enough apart to read as steps:
+ *
+ *   title        20/26 semibold, the tightest tracking on the page
+ *   description  14/20 secondary — one line on what this dialog is for
+ *   field label  13/16 medium secondary, hint 12/16 muted
+ *   body         14/20 primary; the HERO field (the one thing the dialog is
+ *                about) is 15/22 on a taller box
+ *
+ * and the spacing has a rhythm instead of a constant: 24px in from the edge,
+ * 20px between fields, 6px from a label to its control, and the footer a
+ * clear 16px below the body with the primary action the only filled button.
+ * A summary strip (what will happen when you press it) sits on the inset
+ * surface so the eye has somewhere to land between the fields and the
+ * buttons.
+ */
+
 .pd-dialog-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  padding: 16px 20px 0;
+  /* The right inset leaves the corner X its own room. */
+  padding: 24px 56px 0 24px;
 }
 
-/* Codex heading-dialog: 20px/28px w500 tracking -0.36px; claude title serif-adjacent
- * scale rides the title tokens. */
 .pd-dialog-title {
   margin: 0;
-  font-size: var(--pd-font-size-title);
-  line-height: var(--pd-leading-title);
-  font-weight: var(--pd-font-weight-medium);
-  letter-spacing: -0.02em;
+  font-size: 20px;
+  line-height: 26px;
+  font-weight: var(--pd-font-weight-semibold);
+  letter-spacing: -0.015em;
 }
 
 .pd-dialog-description {
   margin: 0;
-  color: var(--pd-text-muted);
+  color: var(--pd-text-secondary);
   font-size: var(--pd-font-size-body);
   line-height: var(--pd-leading-body);
 }
 
+.pd-dialog-title + .pd-dialog-description {
+  margin-top: 6px;
+}
+
 .pd-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
   min-height: 0;
-  padding: 12px 20px;
+  padding: 20px 24px 8px;
   overflow-y: auto;
 }
 
 .pd-dialog-footer {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 24px 24px;
+}
+
+/* A footer's left-hand slot: a secondary action (Test, Reset) that is not
+ * part of the decision on the right. */
+.pd-dialog-footer > .pd-dialog-footer-aside {
+  margin-right: auto;
+}
+
+/* ---- a field: label, control, hint ---------------------------------------- */
+
+.pd-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.pd-field-label {
+  color: var(--pd-text-secondary);
+  font-size: var(--pd-font-size-footnote);
+  line-height: 16px;
+  font-weight: var(--pd-font-weight-medium);
+}
+
+.pd-field-hint {
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+}
+
+.pd-field-error {
+  color: var(--pd-status-danger-fg);
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+}
+
+/* The hero: the one field the dialog is about — a size up, a box that
+ * invites a sentence. On the same raised surface as every other input (the
+ * inset one vanished into the light panel and made the Name field the
+ * brightest thing on it); its size and type are what make it the hero. */
+.pd-field--hero .pd-input,
+.pd-field--hero .pd-textarea {
+  padding: 12px 14px;
+  font-size: 15px;
+  line-height: 22px;
+}
+
+.pd-field--hero .pd-textarea {
+  min-height: 116px;
+}
+
+/* Fields side by side, each as wide as its controls; wraps when narrow. */
+.pd-field-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 12px 24px;
+}
+
+/* The controls inside a field sit in one line. */
+.pd-field-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
-  padding: 10px 12px;
+}
+
+/* ---- the summary: what will happen ---------------------------------------- */
+
+.pd-dialog-summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--pd-radius-md);
+  background: var(--pd-bg-inset);
+}
+
+.pd-dialog-summary-icon {
+  flex: none;
+  margin-top: 2px;
+  color: var(--pd-text-secondary);
+}
+
+.pd-dialog-summary-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pd-dialog-summary-main {
+  margin: 0;
+  color: var(--pd-text-secondary);
+  font-size: var(--pd-font-size-body);
+  line-height: var(--pd-leading-body);
+}
+
+.pd-dialog-summary-main strong {
+  color: var(--pd-text-primary);
+  font-weight: var(--pd-font-weight-medium);
+}
+
+.pd-dialog-summary-note {
+  margin: 0;
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
 }
 
 /*

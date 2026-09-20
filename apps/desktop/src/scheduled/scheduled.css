@@ -767,34 +767,26 @@
 }
 
 /* ---- the dialog ------------------------------------------------------------- */
+/* Built from the dialog's own parts (ui/dialog.css: title, description, fields,
+   summary); only the width and the parse line are the page's. */
 
 .sd-dialog.pd-dialog {
-  width: min(92vw, 560px);
-  max-width: min(92vw, 560px);
+  width: min(92vw, 600px);
+  max-width: min(92vw, 600px);
 }
 
 .sd-dialog-body.pd-dialog-body {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding-top: 14px;
+  padding-bottom: 4px;
 }
 
-.sd-dialog-footer.pd-dialog-footer {
-  padding: 8px 20px 16px;
-}
-
-.sd-field-label {
-  display: block;
-  margin-bottom: 4px;
-  color: var(--pd-text-muted);
-  font-size: var(--pd-font-size-caption);
-  line-height: var(--pd-leading-caption);
+/* The name takes the row; the When and Where fields take what they need. */
+.sd-field-name {
+  flex: 1 1 100%;
 }
 
 /* What the sentence was read as, under the instruction: one line of prose with the schedule in it. */
 .sd-parse {
-  margin: 8px 0 0;
+  margin: 2px 0 0;
   color: var(--pd-text-muted);
   font-size: var(--pd-font-size-caption);
   line-height: 22px;
@@ -825,34 +817,6 @@
 
 .sd-chip .pd-icon {
   color: var(--pd-text-muted);
-}
-
-/* The consequence: the schedule in primary, the caveats a quieter line under it. */
-.sd-preview {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.sd-preview p {
-  margin: 0;
-}
-
-.sd-preview-main {
-  color: var(--pd-text-secondary);
-  font-size: var(--pd-font-size-footnote);
-  line-height: var(--pd-leading-footnote);
-}
-
-.sd-preview-main strong {
-  color: var(--pd-text-primary);
-  font-weight: var(--pd-font-weight-medium);
-}
-
-.sd-preview-note {
-  color: var(--pd-text-muted);
-  font-size: var(--pd-font-size-caption);
-  line-height: var(--pd-leading-caption);
 }
 
 /* ---- reduced motion --------------------------------------------------------- */

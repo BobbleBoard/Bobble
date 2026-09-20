@@ -761,7 +761,7 @@ export function StorageView() {
             ) : null}
             <label
               htmlFor="delete-model-dontask"
-              className="mt-3 flex cursor-pointer items-center gap-2 text-footnote text-text-muted"
+              className="flex cursor-pointer items-center gap-2 text-footnote text-text-muted"
             >
               <Checkbox
                 id="delete-model-dontask"

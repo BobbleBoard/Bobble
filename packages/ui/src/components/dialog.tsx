@@ -1,6 +1,6 @@
 import { clsx } from 'clsx';
 import { Dialog as RadixDialog } from 'radix-ui';
-import type { ComponentPropsWithoutRef, HTMLAttributes } from 'react';
+import type { ComponentPropsWithoutRef, HTMLAttributes, ReactNode } from 'react';
 import { forwardRef, useEffect, useRef } from 'react';
 import { IconClose } from './icons.tsx';
 
@@ -149,6 +149,88 @@ export const DialogFooter = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivEle
     return <div ref={ref} className={clsx('pd-dialog-footer', className)} {...rest} />;
   },
 );
+
+export interface DialogFieldProps extends HTMLAttributes<HTMLDivElement> {
+  /** The control's id, so the label reaches it for a screen reader. */
+  htmlFor?: string;
+  label: ReactNode;
+  /** One line under the control: what goes here, or what it will become. */
+  hint?: ReactNode;
+  /** Replaces the hint while there is something wrong with the value. */
+  error?: ReactNode;
+  /** The one field the dialog is about: a size up, on the inset surface. */
+  hero?: boolean;
+}
+
+/**
+ * A labelled control in a dialog: label over control over hint, on the
+ * dialog's own type steps (dialog.css). The label is a real <label> when it
+ * has a control to point at; a group of controls (a row of selects) gets a
+ * plain caption instead.
+ */
+export const DialogField = forwardRef<HTMLDivElement, DialogFieldProps>(function DialogField(
+  { htmlFor, label, hint, error, hero = false, className, children, ...rest },
+  ref,
+) {
+  return (
+    <div ref={ref} className={clsx('pd-field', hero && 'pd-field--hero', className)} {...rest}>
+      {htmlFor !== undefined ? (
+        <label className="pd-field-label" htmlFor={htmlFor}>
+          {label}
+        </label>
+      ) : (
+        <span className="pd-field-label">{label}</span>
+      )}
+      {children}
+      {error !== undefined && error !== null && error !== false ? (
+        <span className="pd-field-error" role="alert">
+          {error}
+        </span>
+      ) : hint !== undefined && hint !== null && hint !== false ? (
+        <span className="pd-field-hint">{hint}</span>
+      ) : null}
+    </div>
+  );
+});
+
+/** Fields side by side (each as wide as its controls), wrapping when narrow. */
+export const DialogFieldRow = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
+  function DialogFieldRow({ className, ...rest }, ref) {
+    return <div ref={ref} className={clsx('pd-field-row', className)} {...rest} />;
+  },
+);
+
+export interface DialogSummaryProps extends HTMLAttributes<HTMLDivElement> {
+  /** A glyph for what kind of thing will happen (a clock, a download…). */
+  icon?: ReactNode;
+  /** The consequence, in a sentence; <strong> the parts that matter. */
+  children: ReactNode;
+  /** The quieter second line: the caveats. */
+  note?: ReactNode;
+}
+
+/**
+ * What will happen when the primary button is pressed — the schedule and its
+ * first run, the size of a download — on the inset surface between the
+ * fields and the buttons, so a person reads the consequence before the
+ * action.
+ */
+export const DialogSummary = forwardRef<HTMLDivElement, DialogSummaryProps>(function DialogSummary(
+  { icon, children, note, className, ...rest },
+  ref,
+) {
+  return (
+    <div ref={ref} className={clsx('pd-dialog-summary', className)} {...rest}>
+      {icon !== undefined ? <span className="pd-dialog-summary-icon">{icon}</span> : null}
+      <div className="pd-dialog-summary-text">
+        <p className="pd-dialog-summary-main">{children}</p>
+        {note !== undefined && note !== null && note !== false ? (
+          <p className="pd-dialog-summary-note">{note}</p>
+        ) : null}
+      </div>
+    </div>
+  );
+});
 
 export type CurtainProps = HTMLAttributes<HTMLDivElement>;
 

@@ -12,8 +12,8 @@
 import {
   Button,
   Dialog,
-  DialogBody,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -65,11 +65,13 @@ export function UiRequestDialogs() {
       <Dialog open onOpenChange={onOpenChange}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{request.title ?? 'Pi needs your input'}</DialogTitle>
+            <div className="min-w-0">
+              <DialogTitle>{request.title ?? 'Bobble needs your input'}</DialogTitle>
+              {request.message !== undefined && request.message !== '' ? (
+                <DialogDescription>{request.message}</DialogDescription>
+              ) : null}
+            </div>
           </DialogHeader>
-          <DialogBody>
-            <p className="text-text-secondary">{request.message}</p>
-          </DialogBody>
           <DialogFooter>
             <Button variant="ghost" onClick={cancel}>
               Cancel
@@ -102,7 +104,7 @@ export function UiRequestDialogs() {
 type UiRequest = NonNullable<ReturnType<typeof usePiStore.getState>['uiRequests'][number]>;
 
 function renderQuestionCard(request: UiRequest, onCancel: () => void) {
-  const title = request.title ?? 'Pi needs your input';
+  const title = request.title ?? 'Bobble needs your input';
 
   // The harness ask_user tool — a rich spec decoded by the event-router. The
   // answer round-trips back as the input's string value (JSON), which the tool

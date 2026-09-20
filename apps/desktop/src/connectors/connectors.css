@@ -746,14 +746,11 @@
    legible through the form for the first 80ms of its entrance. A width, so
    the dialog is not the width of its longest input. */
 .pdc-dialog.pd-dialog {
-  width: min(92vw, 480px);
-  max-width: min(92vw, 480px);
+  width: min(92vw, 520px);
+  max-width: min(92vw, 520px);
   background: linear-gradient(var(--pd-bg-overlay), var(--pd-bg-overlay)), var(--pd-bg-raised);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
-}
-.pdc-dialog .pd-dialog-body {
-  padding-top: 16px;
 }
 .pdc-field-error {
   color: var(--pd-status-danger-fg);
@@ -766,7 +763,7 @@
   resize: none;
   min-height: 64px;
 }
-.pdc-dialog .pd-btn--accent:disabled {
+.pdc-dialog .pd-btn--primary:disabled {
   opacity: 0.4;
 }
 /* The detected-config line and the Test result. */

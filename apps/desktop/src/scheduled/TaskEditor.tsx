@@ -32,8 +32,12 @@ import {
   Dialog,
   DialogBody,
   DialogContent,
+  DialogDescription,
+  DialogField,
+  DialogFieldRow,
   DialogFooter,
   DialogHeader,
+  DialogSummary,
   DialogTitle,
   Input,
   Select,
@@ -101,7 +105,6 @@ export function TaskDialog({ open, initial, editingId, onClose, onSave }: TaskDi
     >
       <DialogContent
         className="sd-dialog"
-        aria-describedby={undefined}
         // The caret goes to the instruction — AFTER the key that opened the
         // dialog has finished. Chrome delivers an Enter's keypress to whatever
         // is focused by then, and a textarea would take it as a newline.
@@ -111,7 +114,12 @@ export function TaskDialog({ open, initial, editingId, onClose, onSave }: TaskDi
         }}
       >
         <DialogHeader>
-          <DialogTitle>{editingId === undefined ? 'New task' : 'Edit task'}</DialogTitle>
+          <div className="min-w-0">
+            <DialogTitle>{editingId === undefined ? 'New task' : 'Edit task'}</DialogTitle>
+            <DialogDescription>
+              Something Bobble does on its own, on this Mac, while it is open.
+            </DialogDescription>
+          </div>
         </DialogHeader>
         <TaskForm
           initial={initial}
@@ -288,10 +296,8 @@ function TaskForm({
   return (
     <>
       <DialogBody className="sd-dialog-body" data-testid="sd-editor">
-        <div className="flex flex-col gap-1">
-          <label htmlFor={promptId} className="sd-field-label">
-            What should it do?
-          </label>
+        {/* THE HERO: the instruction is the task; everything else is a setting. */}
+        <DialogField htmlFor={promptId} label="What should it do?" hero>
           <TextArea
             ref={promptRef}
             id={promptId}
@@ -306,38 +312,35 @@ function TaskForm({
                 ? 'Every weekday at 9am, summarise what changed in my working folder'
                 : 'Run the test suite and tell me only what failed.'
             }
-            style={{ minHeight: 108 }}
           />
           {parsing ? <ParseNote parsed={parsed} instruction={instruction} now={now} /> : null}
-        </div>
+        </DialogField>
 
-        <div className="flex flex-col gap-1">
-          <label htmlFor={nameId} className="sd-field-label">
-            Name
-          </label>
-          <Input
-            id={nameId}
-            data-testid="sd-editor-name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onKeyDown={onFieldKey}
-            placeholder={
-              instruction === ''
-                ? 'Named from the first line if you leave this blank'
-                : nameFrom(instruction)
-            }
-          />
-        </div>
+        <DialogFieldRow>
+          <DialogField htmlFor={nameId} label="Name" className="sd-field-name">
+            <Input
+              id={nameId}
+              data-testid="sd-editor-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={onFieldKey}
+              placeholder={
+                instruction === ''
+                  ? 'Named from the first line if you leave this blank'
+                  : nameFrom(instruction)
+              }
+            />
+          </DialogField>
+        </DialogFieldRow>
 
-        <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
-          <div className="flex flex-col gap-1">
-            <span className="sd-field-label">When</span>
-            <div className="flex flex-wrap items-center gap-2" data-testid="sd-editor-when">
+        <DialogFieldRow>
+          <DialogField label="When">
+            <div className="pd-field-controls" data-testid="sd-editor-when">
               <Select
                 value={frequency}
                 onValueChange={touchWhen((v) => setFrequency(v as Frequency))}
               >
-                <SelectTrigger className="pd-btn--sm" data-testid="sd-editor-frequency">
+                <SelectTrigger data-testid="sd-editor-frequency">
                   {FREQUENCY_LABEL[frequency]}
                 </SelectTrigger>
                 <SelectContent>
@@ -353,9 +356,7 @@ function TaskForm({
                   value={String(weekday)}
                   onValueChange={touchWhen((v) => setWeekday(Number(v)))}
                 >
-                  <SelectTrigger className="pd-btn--sm" data-testid="sd-editor-weekday">
-                    {DAYS[weekday]}
-                  </SelectTrigger>
+                  <SelectTrigger data-testid="sd-editor-weekday">{DAYS[weekday]}</SelectTrigger>
                   <SelectContent>
                     {DAYS.map((d, i) => (
                       <SelectItem key={d} value={String(i)}>
@@ -367,7 +368,7 @@ function TaskForm({
               ) : null}
               {frequency !== 'manual' && frequency !== 'hourly' ? (
                 <Select value={String(hour)} onValueChange={touchWhen((v) => setHour(Number(v)))}>
-                  <SelectTrigger className="pd-btn--sm" data-testid="sd-editor-hour">
+                  <SelectTrigger data-testid="sd-editor-hour">
                     {formatTime(hour, 0).replace(':00', '')}
                   </SelectTrigger>
                   <SelectContent>
@@ -384,7 +385,7 @@ function TaskForm({
                   value={String(minute)}
                   onValueChange={touchWhen((v) => setMinute(Number(v)))}
                 >
-                  <SelectTrigger className="pd-btn--sm" data-testid="sd-editor-minute">
+                  <SelectTrigger data-testid="sd-editor-minute">
                     {frequency === 'hourly' ? 'at ' : ''}:{String(minute).padStart(2, '0')}
                   </SelectTrigger>
                   <SelectContent>
@@ -397,17 +398,14 @@ function TaskForm({
                 </Select>
               ) : null}
             </div>
-          </div>
+          </DialogField>
 
-          <div className="flex flex-col gap-1">
-            <span className="sd-field-label">Where it works</span>
+          <DialogField label="Where it works">
             <Select
               value={cwd === '' ? OWN_FOLDER : cwd}
               onValueChange={(v) => setCwd(v === OWN_FOLDER ? '' : v)}
             >
-              <SelectTrigger className="pd-btn--sm" data-testid="sd-editor-folder">
-                {folderLabel}
-              </SelectTrigger>
+              <SelectTrigger data-testid="sd-editor-folder">{folderLabel}</SelectTrigger>
               <SelectContent>
                 <SelectItem value={OWN_FOLDER} description="A new one per run, kept with the run">
                   Its own folder
@@ -419,56 +417,53 @@ function TaskForm({
                 ))}
               </SelectContent>
             </Select>
-          </div>
-        </div>
+          </DialogField>
+        </DialogFieldRow>
 
         {/*
-         * The consequence, in words, before the button — two lines by design.
-         * The schedule and the first run are the thing; the two caveats are a
-         * quieter line under it, not a fourth and fifth clause of dots.
+         * The consequence, in words, before the button. The schedule and the
+         * first run are the thing; the two caveats are a quieter line under
+         * it, not a fourth and fifth clause of dots.
          */}
-        <div className="sd-preview" data-testid="sd-editor-preview">
-          <p className="sd-preview-main">
-            <strong>{schedule}</strong>
-            {!enabled ? (
-              <span> · saved paused</span>
-            ) : catchesUp && slot !== undefined ? (
-              <span>
-                {' '}
-                · {describeMomentIn(slot, now)} already passed, so it runs{' '}
-                <strong>as soon as you save</strong>
-              </span>
-            ) : next !== undefined ? (
-              <span>
-                {' '}
-                · {editingId === undefined ? 'first' : 'next'} run{' '}
-                <strong>{describeMomentIn(next, now)}</strong> ({describeDelta(next, now)})
-              </span>
-            ) : frequency === 'manual' ? (
-              <span> · nothing fires on its own</span>
-            ) : null}
-          </p>
-          <p className="sd-preview-note">
-            {modelNote !== null && enabled
-              ? `${modelNote.charAt(0).toUpperCase()}${modelNote.slice(1)} · `
-              : loadedModel !== null && enabled
-                ? `Runs on ${loadedModel} · `
-                : ''}
-            reads your Mac, never sends
-          </p>
-        </div>
+        <DialogSummary
+          icon={frequency === 'manual' ? <IconTimer size={16} /> : <IconRepeat size={16} />}
+          data-testid="sd-editor-preview"
+          note={
+            <>
+              {modelNote !== null && enabled
+                ? `${modelNote.charAt(0).toUpperCase()}${modelNote.slice(1)} · `
+                : loadedModel !== null && enabled
+                  ? `Runs on ${loadedModel} · `
+                  : ''}
+              reads your Mac, never sends
+            </>
+          }
+        >
+          <strong>{schedule}</strong>
+          {!enabled ? (
+            <span> · saved paused</span>
+          ) : catchesUp && slot !== undefined ? (
+            <span>
+              {' '}
+              · {describeMomentIn(slot, now)} already passed, so it runs{' '}
+              <strong>as soon as you save</strong>
+            </span>
+          ) : next !== undefined ? (
+            <span>
+              {' '}
+              · {editingId === undefined ? 'first' : 'next'} run{' '}
+              <strong>{describeMomentIn(next, now)}</strong> ({describeDelta(next, now)})
+            </span>
+          ) : frequency === 'manual' ? (
+            <span> · nothing fires on its own</span>
+          ) : null}
+        </DialogSummary>
       </DialogBody>
       <DialogFooter className="sd-dialog-footer">
-        <Button variant="ghost" size="sm" onClick={onCancel} data-testid="sd-editor-cancel">
+        <Button variant="ghost" onClick={onCancel} data-testid="sd-editor-cancel">
           Cancel
         </Button>
-        <Button
-          variant="primary"
-          size="sm"
-          disabled={!canSave}
-          onClick={save}
-          data-testid="sd-editor-save"
-        >
+        <Button variant="primary" disabled={!canSave} onClick={save} data-testid="sd-editor-save">
           {editingId === undefined ? 'Schedule it' : 'Save'}
         </Button>
       </DialogFooter>

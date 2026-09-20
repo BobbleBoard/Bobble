@@ -157,7 +157,8 @@ try {
    */
   if (process.env.DIAG === '1') {
     await page.evaluate(() => {
-      const log = (window.__scrollLog = []);
+      window.__scrollLog = [];
+      const log = window.__scrollLog;
       const isThread = (n) =>
         n instanceof Element && n.getAttribute('data-testid') === 'chat-scroll';
       const thread = () => document.querySelector('[data-testid="chat-scroll"]');
@@ -239,10 +240,17 @@ try {
           .__pi_store()
           .getState()
           .messages.slice(k)
-          .map(
-            (m) =>
-              `${m.kind}${m.kind === 'assistant' ? ':' + (m.blocks ?? []).map((b) => (b.type === 'toolCall' ? `[${b.name}]` : b.type === 'text' ? `"${b.text.slice(0, 40)}"` : b.type)).join(' ') : ''}`,
-          ),
+          .map((m) => {
+            if (m.kind !== 'assistant') return m.kind;
+            const blocks = (m.blocks ?? []).map((b) =>
+              b.type === 'toolCall'
+                ? `[${b.name}]`
+                : b.type === 'text'
+                  ? `"${b.text.slice(0, 40)}"`
+                  : b.type,
+            );
+            return `assistant:${blocks.join(' ')}`;
+          }),
       n,
     );
     log(`store tail: ${msgs.join(' | ')}`);
