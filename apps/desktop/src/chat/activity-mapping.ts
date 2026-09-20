@@ -65,8 +65,9 @@ export function segmentBlocks(blocks: ContentBlock[]): ThreadSegment[] {
 
   for (const block of blocks) {
     if (block.type === 'text') {
-      // An EMPTY text block is not a boundary (see segmentGroup).
-      if (block.text.length === 0) continue;
+      // An EMPTY text block is not a boundary (see segmentGroup) — nor is a
+      // whitespace-only one.
+      if (block.text.trim().length === 0) continue;
       flush();
       segments.push({ kind: 'text', text: block.text });
     } else {
@@ -120,8 +121,15 @@ export function segmentGroup(group: AssistantMsg[]): GroupSegment[] {
          * chain re-formed when the provider turned the markup into a real
          * call. MEASURED by the flicker guard (office-embed probe,
          * 2026-09-17): 18 such clamp-and-unclamp flashes in one turn.
+         *
+         * WHITESPACE IS NOTHING TO SHOW EITHER. Qwen3.5 puts a "\n\n" text
+         * block between its thought and its tool call (chat-order-probe,
+         * 2026-09-20: every tool turn), which cut the turn into a "Thought"
+         * row, an empty paragraph and a second chain "Thought for 2s, drew a
+         * chart" — two chains for one piece of work, the first of them a
+         * bare thought sitting above the tool that used it.
          */
-        if (text.length === 0) continue;
+        if (text.trim().length === 0) continue;
         flush();
         const start = fenceCounts.get(message.id) ?? 0;
         const { segments: parts, nextIndex } = segmentMessageText(

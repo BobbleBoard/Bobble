@@ -34,7 +34,7 @@ import {
   Thread,
   writeClipboardText,
 } from '@pi-desktop/ui';
-import { Fragment, type ReactNode, useEffect, useRef, useState } from 'react';
+import { Fragment, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { IconWarning } from '../settings/icons';
 import { useCorpStore } from '../state/corp-store';
 import { useLlmStore } from '../state/llm-store';
@@ -420,11 +420,40 @@ export function ChatThread() {
    * until the user comes back down to the bottom.
    */
   const intentRef = useRef<'up' | 'down'>('down');
+  /*
+   * WHERE WE LAST PUT THE THREAD OURSELVES. the user (2026-09-20), after a chat
+   * with the media tools: "new stuff seems to go above old stuff in the chat
+   * rather than going below the old stuff" — the thread had stopped following,
+   * so every later turn landed under the composer, out of sight, while the
+   * view stayed on the older turns.
+   *
+   * MEASURED (chat-order-probe DIAG): the follow below set scrollTop to the
+   * foot (1138); by the time the browser dispatched that scroll's event — a
+   * frame later — the chart card had grown the thread by 50px, so the event
+   * read as "50px above the foot", the stick was released as if the user had
+   * scrolled up, and nothing re-armed it. Our own scroll must never count as
+   * the user leaving: a scroll event that finds the view exactly where we put
+   * it is ours, whatever the gap has become since; only a position we did not
+   * set — a scrollbar drag, a wheel — is theirs.
+   */
+  const placedRef = useRef(-1);
+  const follow = useCallback(() => {
+    const el = scrollRef.current;
+    if (el === null) return;
+    el.scrollTop = el.scrollHeight;
+    // What the browser clamps the request to — the position the event reports.
+    placedRef.current = el.scrollTop;
+  }, []);
 
   const onScroll = () => {
     const el = scrollRef.current;
     if (el === null) return;
     const gap = el.scrollHeight - el.scrollTop - el.clientHeight;
+    if (Math.abs(el.scrollTop - placedRef.current) <= 1) {
+      // Our own follow arriving. Content grew under it? Follow again.
+      if (pinnedRef.current && gap > 2) follow();
+      return;
+    }
     if (gap > 2) pinnedRef.current = false;
     else if (intentRef.current === 'down') pinnedRef.current = true;
   };
@@ -487,9 +516,23 @@ export function ChatThread() {
 
   // Keep the newest content in view ONLY while pinned (never fights a scroll-up).
   useEffect(() => {
-    const el = scrollRef.current;
-    if (el !== null && pinnedRef.current) el.scrollTop = el.scrollHeight;
+    if (pinnedRef.current) follow();
   });
+  /*
+   * …and when the content grows WITHOUT a render: a card revealing, a picture
+   * decoding, a chart building itself. Those used to leave the foot a card's
+   * height out of view until the next token happened to re-render the thread.
+   */
+  useEffect(() => {
+    const el = scrollRef.current;
+    const content = el?.firstElementChild;
+    if (el === null || !(content instanceof HTMLElement)) return;
+    const ro = new ResizeObserver(() => {
+      if (pinnedRef.current) follow();
+    });
+    ro.observe(content);
+    return () => ro.disconnect();
+  }, [follow]);
 
   // Index tool results by both the assistant-scoped id and the bare callId so a
   // tool call finds its result whether streamed live or rehydrated.

@@ -80,6 +80,23 @@ describe('segmentBlocks (grouping rule)', () => {
     ]);
     expect(segments.map((s) => s.kind)).toEqual(['chain']);
   });
+
+  it('a whitespace-only text block is not a boundary either (Qwen3.5 puts "\\n\\n" before its call)', () => {
+    const segments = segmentBlocks([
+      think('planning'),
+      text('\n\n'),
+      call('c1', 'bash', { command: 'ls' }),
+      text('Done.'),
+    ]);
+    // One chain — the thought and the call it led to — then the answer; not a
+    // bare "Thought" row, an empty paragraph and a second chain.
+    expect(segments.map((s) => s.kind)).toEqual(['chain', 'text']);
+    expect(
+      segmentGroup([assistant('a1', [think('t'), text('\n\n'), call('c1', 'bash', {})])]).map(
+        (s) => s.kind,
+      ),
+    ).toEqual(['chain']);
+  });
 });
 
 const assistant = (id: string, blocks: ContentBlock[], streaming = false): AssistantMsg => ({
