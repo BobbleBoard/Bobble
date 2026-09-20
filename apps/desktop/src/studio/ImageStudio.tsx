@@ -95,7 +95,7 @@ const SHAPES = [
  * had no way to ask for it.
  */
 const SIZES = [
-  { value: 512, label: 'Quick', hint: 'Runs on 16 GB' },
+  { value: 512, label: 'Quick', hint: 'Small models only' },
   { value: 768, label: 'Draft', hint: 'Fast' },
   { value: 1024, label: 'Standard', hint: 'Trained size' },
   { value: 1536, label: 'Large', hint: 'Slowest' },
@@ -167,13 +167,21 @@ export function ImageStudio(): JSX.Element {
     sizeTouched.current = true;
     setLong(v);
   }, []);
+  /*
+   * …re-measured since. Every mflux job runs `--low-ram` now (klein 1024² is
+   * 5.8 GB of the OS's memory, not 19 — see the catalog), and the default
+   * model is Qwen-Image 2.1 on ComfyUI, MEASURED at ~12 GB across a 1024² run
+   * on the 24 GB M5 Pro — and trained at 1–4 MP: at 512² its text comes out
+   * garbled (2026-09-20). So 1024² is the default from 24 GB up; 768² on 16;
+   * 512² below that, where only the small mflux models run at all.
+   */
   useEffect(() => {
     void window.piDesktop
       .invoke('app:get-info', undefined)
       .then((info) => {
         if (sizeTouched.current) return;
         const gb = info.totalMemoryBytes / 1024 ** 3;
-        setLong(gb < 32 ? 512 : gb < 48 ? 768 : 1024);
+        setLong(gb < 16 ? 512 : gb < 24 ? 768 : 1024);
       })
       .catch(() => undefined);
   }, []);

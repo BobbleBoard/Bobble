@@ -98,6 +98,7 @@ class FakeComfyServer {
     }
     if (u.includes('/view')) return resp(200, {});
     if (u.endsWith('/interrupt')) return resp(200, {});
+    if (u.endsWith('/free')) return resp(200, {});
     return resp(404, {});
   }) as unknown as typeof fetch;
 
@@ -183,6 +184,44 @@ describe('ComfyClient.run — ws → GenEvent translation', () => {
     expect(start).toMatchObject({ event: 'start', total: 8, candidates: 2 });
     const progress = events.find((e) => e.event === 'progress');
     expect(progress).toMatchObject({ event: 'progress', candidate: 0, step: 4, total: 8 });
+  });
+
+  it('runs a template prelude first — the encode alone, then /free — and only once for two seeds', async () => {
+    // Qwen-Image 2.1: the encoder (nodes 2 → 4) alone, previewed, then the
+    // models unloaded, then the full graph; the second candidate's encode
+    // hits ComfyUI's cache, so no prelude for it.
+    const server = new FakeComfyServer();
+    const { client } = clientWith(server);
+    const job: GenJob = {
+      id: 'job-q',
+      modality: 'image',
+      backend: 'comfyui',
+      outputDir: '/out/job-q',
+      comfy: {
+        prompt: 'a sign that reads "QWEN"',
+        modelId: 'qwen-image-2.1',
+        workflowTemplate: 'qwen-image-2.1-t2i',
+        inputs: { prompt: 'a sign that reads "QWEN"', width: 1024, height: 1024, steps: 12 },
+        seeds: [1, 2],
+      },
+    };
+    const outputs = await client.run(job);
+    expect(outputs).toHaveLength(2);
+    // Three prompts: prelude, candidate 1, candidate 2 — with /free between the first two.
+    const posts = server.calls.filter((c) => c.startsWith('POST'));
+    expect(posts.map((c) => c.split(' ')[1]?.split('/').pop())).toEqual([
+      'prompt',
+      'free',
+      'prompt',
+      'prompt',
+    ]);
+    const prelude = server.postedBodies[0]?.prompt ?? {};
+    expect(Object.keys(prelude).sort()).toEqual(['2', '4', '_prelude']);
+    expect(prelude._prelude?.inputs).toEqual({ source: ['4', 0] });
+    expect(prelude['4']?.inputs.prompt).toBe('a sign that reads "QWEN"');
+    // The full graphs carry the sampler with each candidate's own seed.
+    expect(server.postedBodies[1]?.prompt['6']?.inputs.seed).toBe(1);
+    expect(server.postedBodies[2]?.prompt['6']?.inputs.seed).toBe(2);
   });
 
   it('POSTs API-format graph with client_id, prompt spliced, and a distinct seed per candidate', async () => {

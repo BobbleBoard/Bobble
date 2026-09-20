@@ -41,6 +41,27 @@ export interface WorkflowTemplate {
   /** catalog param name → dotted node-input path, or several (mirrors the
    * catalog `comfy.paramMap`). */
   readonly paramMap: Readonly<Record<string, string | readonly string[]>>;
+  /**
+   * THE ENCODER AND THE DiT, NEVER RESIDENT TOGETHER.
+   *
+   * ComfyUI keeps every model it has loaded until it believes memory is
+   * short, and on unified memory it never believes that — so a graph whose
+   * text encoder is half the size of its DiT holds both through the whole
+   * sample. MEASURED (Qwen-Image 2.1, 1024², M5 Pro 24 GB, the OS's own free
+   * level): 14.4 GB taken with both resident, 11.3 GB when the encoder is
+   * gone before the DiT loads.
+   *
+   * A prelude names the nodes that ARE the text encode (the loader and the
+   * encode node). The adapter runs them alone first — ComfyUI caches that
+   * node's result — asks the server to unload its models (`/free`), and only
+   * then posts the full graph, whose encode node hits the cache and whose DiT
+   * loads into the room the encoder left. `output` is the encode node's
+   * output the prelude previews so the prompt has something to execute for.
+   */
+  readonly prelude?: {
+    readonly nodes: readonly string[];
+    readonly output: readonly [string, number];
+  };
 }
 
 // ── graph builders (one per modality family) ────────────────────────────────
@@ -1007,12 +1028,95 @@ const FLUX_GGUF_PARAM_MAP = {
 } as const;
 
 /**
+ * Qwen-Image 2.1 text-to-image — Comfy-Org's own template
+ * (workflow_templates/image_qwen_image_2_1_t2i.json) as the API graph it
+ * resolves to, with two substitutions a Mac needs:
+ *
+ *  - `UnetLoaderGGUF` for the DiT instead of `UNETLoader` on the int8 convrot
+ *    file: the int8 kernels are CUDA's, and on MPS the eager fallback carries a
+ *    7.3 GB file for no speed; the Q4_K_M GGUF is 4.2 GB and MEASURED at 7.0
+ *    s/step at 1024² on the M5 Pro;
+ *  - `CLIPLoaderGGUF` on the official llama.cpp GGUF of Qwen3-VL-8B (5 GB)
+ *    instead of the 17.5 GB bf16 / 9.4 GB int8 encoder. Its language model is
+ *    Qwen3-8B-shaped, so without the vision tower ComfyUI would read it as
+ *    FLUX.2 klein's encoder (a 12288-wide tap the DiT refuses); the
+ *    bobble_comfy_fixes predicate (comfy-h3-shim.ts) reads a text-only
+ *    Qwen3-8B shape asked for as `qwen_image` as this encoder.
+ *
+ * Everything else is the template's: cfg 1 (the official guidance-free path;
+ * a negative prompt only acts above 1), euler/simple, the 2.1 VAE, and the
+ * encode node's own `latent` output unused — `EmptyLatentImage` sizes the
+ * picture, as in the template. No `QwenImage21Cache`: MEASURED no change on
+ * MPS. Text-to-image only: a reference image needs the encoder's vision
+ * tower, which the GGUF keeps in a separate mmproj.
+ */
+function qwenImage21T2iGraph(): ComfyGraph {
+  return {
+    '1': {
+      class_type: 'UnetLoaderGGUF',
+      inputs: { unet_name: 'qwen_image_2.1_Q4_K_M.gguf' },
+    },
+    '2': {
+      class_type: 'CLIPLoaderGGUF',
+      inputs: { clip_name: 'Qwen3VL-8B-Instruct-Q4_K_M.gguf', type: 'qwen_image' },
+    },
+    '3': { class_type: 'VAELoader', inputs: { vae_name: 'qwen_image_2.1_vae_bf16.safetensors' } },
+    '4': {
+      class_type: 'TextEncodeQwenImage21',
+      inputs: { clip: ['2', 0], prompt: '', negative_prompt: '', resolution: 1024 },
+    },
+    '5': {
+      class_type: 'EmptyLatentImage',
+      inputs: { width: 1024, height: 1024, batch_size: 1 },
+    },
+    '6': {
+      class_type: 'KSampler',
+      inputs: {
+        model: ['1', 0],
+        positive: ['4', 0],
+        negative: ['4', 1],
+        latent_image: ['5', 0],
+        seed: 0,
+        steps: 12,
+        cfg: 1,
+        sampler_name: 'euler',
+        scheduler: 'simple',
+        denoise: 1,
+      },
+    },
+    '7': { class_type: 'VAEDecode', inputs: { samples: ['6', 0], vae: ['3', 0] } },
+    '8': {
+      class_type: 'SaveImage',
+      inputs: { images: ['7', 0], filename_prefix: 'bobble/qwen-image-2.1' },
+    },
+  };
+}
+
+const QWEN_IMAGE_21_PARAM_MAP = {
+  prompt: '4.inputs.prompt',
+  negativePrompt: '4.inputs.negative_prompt',
+  width: '5.inputs.width',
+  height: '5.inputs.height',
+  steps: '6.inputs.steps',
+  cfg: '6.inputs.cfg',
+  seed: '6.inputs.seed',
+} as const;
+
+/**
  * The template registry, keyed by template id. Every id here is referenced by a
  * `comfyui`-backed catalog entry's `comfy.workflowTemplate`; the three LTX rows
  * share one graph shape (they differ only by which GGUF weights get downloaded,
  * not by graph topology).
  */
 export const WORKFLOW_TEMPLATES: Readonly<Record<string, WorkflowTemplate>> = {
+  'qwen-image-2.1-t2i': {
+    id: 'qwen-image-2.1-t2i',
+    graph: qwenImage21T2iGraph(),
+    paramMap: QWEN_IMAGE_21_PARAM_MAP,
+    // The Qwen3-VL-8B encoder (node 2 → 4) alone, then unloaded — 3 GB less
+    // at the peak (see WorkflowTemplate.prelude).
+    prelude: { nodes: ['2', '4'], output: ['4', 0] },
+  },
   'ltx-video-2b-distilled-gguf': {
     id: 'ltx-video-2b-distilled-gguf',
     graph: ltxVideoGraph(),
@@ -1110,6 +1214,31 @@ export const WORKFLOW_TEMPLATES: Readonly<Record<string, WorkflowTemplate>> = {
     paramMap: IMAGE_TO_3D_GREY_PARAM_MAP,
   },
 };
+
+/**
+ * The prelude graph: the named nodes of a FILLED graph plus a `PreviewAny` on
+ * the encode output, so ComfyUI has an output node to execute for. Returns
+ * null for a template without a prelude.
+ */
+export function preludeGraph(
+  filled: ComfyGraph,
+  template: Pick<WorkflowTemplate, 'prelude'>,
+): ComfyGraph | null {
+  const prelude = template.prelude;
+  if (prelude === undefined) return null;
+  const out: Record<string, unknown> = {};
+  const nodes = filled as unknown as Record<string, unknown>;
+  for (const id of prelude.nodes) {
+    const node = nodes[id];
+    if (node === undefined) throw new Error(`prelude names node "${id}", which the graph lacks`);
+    out[id] = structuredClone(node);
+  }
+  out['_prelude'] = {
+    class_type: 'PreviewAny',
+    inputs: { source: [prelude.output[0], prelude.output[1]] },
+  };
+  return out as unknown as ComfyGraph;
+}
 
 /** Look up a template by id. */
 export function getWorkflowTemplate(id: string): WorkflowTemplate | undefined {

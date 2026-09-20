@@ -120,6 +120,11 @@ const NONE: PromptGuideline = {
  * it is one entry away — not because the code half-supports it today.
  */
 const BY_MODEL: Readonly<Record<string, PromptGuideline>> = {
+  // Qwen-Image 2.1 reads a sentence through Qwen3-VL-8B — the same dialect;
+  // its two extras (text in quotes renders as written; "This is an RGBA image
+  // with transparency … transparent background" for a cutout) are prompt
+  // content, not a dialect.
+  'qwen-image-2.1': IMAGE_NATURAL,
   'flux2-klein-4b': IMAGE_NATURAL,
   'flux1-schnell': IMAGE_NATURAL,
   'flux1-dev-gguf': IMAGE_NATURAL,

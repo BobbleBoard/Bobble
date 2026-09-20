@@ -240,6 +240,118 @@ export const MODALITY_CATALOG: readonly ModalityModel[] = [
     notes:
       'Default. Apache, mflux auto-fetches text-enc+VAE (no manual aux). Pre-quantized 4-bit mflux repo (no on-the-fly -q). 3.6s/512² (4.95GB peak) · 8.4s/1024² (12.4GB peak) ALONE [measured 2026-08-25]. Alongside a resident 9B chat model on 24GB, 1024² swaps: ~2min/step.',
   },
+  // ---- IMAGE · the quality pick (ComfyUI) --------------------------------
+  {
+    /*
+     * THE QUALITY PICK, NOT (YET) THE DEFAULT. the user (2026-09-20): "this is a
+     * really strong new model … if possible to make this runnable at Q4 with
+     * comparable/better quality to what currently runs at that speed, make
+     * that the new normal/default."
+     *
+     * Qwen-Image-2.1: a 7B single-stream DiT (32 layers) conditioned on the
+     * full Qwen3-VL-8B, guidance-free (cfg 1), native 2K, RGBA output, text
+     * rendering the fast models cannot match. Runs here through ComfyUI
+     * (0.37, day-0 support) with a Q4_K_M GGUF of the DiT and a Q4_K_M GGUF of
+     * the encoder — fp8 is refused on MPS and the bf16 encoder alone is 17.5
+     * GB, so GGUF is the only shape of this model a 24 GB Mac runs.
+     *
+     * MEASURED 2026-09-20 (M5 Pro 24 GB, ComfyUI 0.37 on MPS, warm):
+     *   1024²  12 steps   94 s   (7.0 s/step; ~30 s of encode + decode)
+     *   1024²  20 steps  170 s
+     *   1024²  40 steps  ~5 min (the card's own number; 12 and 20 were not
+     *                     distinguishable side by side, so 12 is the default)
+     *   512²   20 steps   81 s   — and the text in the sign came out garbled:
+     *                     the model is trained at 1–4 MP; 768² is its floor.
+     * Against the fast models on the same four prompts (klein 16 s, Z-Image
+     * 46 s at 1024²): better on text-in-scene and product shots, level on the
+     * portrait, weaker on the flat illustration — comparable, at 6–10× the
+     * time; what ran at THIS speed before, Qwen-Image 2512, never finished
+     * downloading on this Mac.
+     *
+     * WHY IT IS NOT THE DEFAULT, AND WHY 32 GB: memory, on the app's own
+     * terms. The OS's free level fell 82% → 21% across a 1024² run with the
+     * encoder and the DiT resident together (14.4 GB), and settled at 35%
+     * (11.3 GB) with the encoder unloaded before the DiT loads (the
+     * template's prelude does that) — but the DiT's LOAD is a spike on its
+     * own: free fell to 20% for ten seconds while 4.2 GB of GGUF became ~14
+     * GB of resident model, with the Mac swapping at 16k pages/s, and the
+     * guardian shed the job for it in the app, as it should (2026-09-11).
+     * The DiT phase costs what a bf16 7B costs: on MPS, ComfyUI holds the
+     * GGUF dequantized (--gpu-only, split and quad attention, --reserve-vram
+     * were all measured and changed nothing), so Q4 buys disk, not memory.
+     * A 24 GB Mac runs it by hand at 21% free and not under the guardian;
+     * 32 is the machine it fits, like LTX-2.5. The way to a default on 24 GB
+     * is the MLX port (filipstrand/mflux#736, in review, encoder still bf16
+     * = 17.5 GB) with a quantized encoder: MLX keeps weights quantized and
+     * runs klein's 1024² in 5.8 GB. stable-diffusion.cpp (Metal, Q4_K) was
+     * measured too: 11.5 s/step plus a 142 s VAE decode — twice ComfyUI's
+     * time.
+     *
+     * TEXT-TO-IMAGE ONLY on this path: editing with reference images needs the
+     * encoder's vision tower, which the GGUF keeps in a separate mmproj that
+     * ComfyUI-GGUF does not load for Qwen3-VL. `edit_image` keeps its own model.
+     *
+     * LICENSE: the Qwen Research License is NON-COMMERCIAL (research and
+     * evaluation); a commercial licence is a separate request to Qwen. The
+     * card says so.
+     */
+    id: 'qwen-image-2.1',
+    modality: 'image',
+    label: 'Qwen-Image 2.1',
+    backend: 'comfyui',
+    repo: 'Qwen/Qwen-Image-2.1',
+    license: 'research-nc',
+    commercialUse: false,
+    approxSizeGB: 9.9,
+    minUnifiedMemoryGB: 32,
+    // The DiT phase (a bf16-sized 7B on MPS) plus its load spike; the OS free
+    // level at the trough, not the file sizes.
+    residentFloorGB: 12,
+    peakResidentGB: 15,
+    runsLocally: true,
+    heavy: true,
+    recommended: true,
+    weights: [
+      {
+        // ComfyUI-GGUF's own conversion (city96's loader reads it; the sd.cpp
+        // conversions carry different tensor names and are refused).
+        repo: 'Abiray/Qwen-Image-2.1-GGUF',
+        path: 'qwen_image_2.1_Q4_K_M.gguf',
+        bytes: 4_189_343_904,
+        folder: 'diffusion_models',
+      },
+      {
+        // The official llama.cpp GGUF of the encoder. Its language model is
+        // Qwen3-8B-shaped, so ComfyUI needs the bobble_comfy_fixes predicate
+        // to read it as Qwen-Image 2.1's (comfy-h3-shim.ts).
+        repo: 'Qwen/Qwen3-VL-8B-Instruct-GGUF',
+        path: 'Qwen3VL-8B-Instruct-Q4_K_M.gguf',
+        bytes: 5_027_784_800,
+        folder: 'text_encoders',
+      },
+      {
+        repo: 'Comfy-Org/Qwen-Image-2.1',
+        path: 'vae/qwen_image_2.1_vae_bf16.safetensors',
+        bytes: 675_509_688,
+      },
+    ],
+    comfy: {
+      kind: 'comfyui',
+      workflowTemplate: 'qwen-image-2.1-t2i',
+      paramMap: {
+        prompt: '4.inputs.prompt',
+        negativePrompt: '4.inputs.negative_prompt',
+        width: '5.inputs.width',
+        height: '5.inputs.height',
+        steps: '6.inputs.steps',
+        cfg: '6.inputs.cfg',
+        seed: '6.inputs.seed',
+      },
+    },
+    defaultSteps: 12,
+    notes:
+      'Quality pick. Qwen-Image-2.1 (7B DiT + Qwen3-VL-8B) at Q4 via ComfyUI-GGUF on MPS: 94 s/1024² at 12 steps, 170 s at 20 (MEASURED 2026-09-20, M5 Pro 24GB) — but ~15 GB at the DiT load (the GGUF is held dequantized on MPS), which the guardian sheds on 24 GB: a 32 GB machine. Text-to-image only here (editing needs the mmproj). Research licence: non-commercial.',
+  },
   {
     id: 'z-image-turbo',
     modality: 'image',
@@ -295,7 +407,10 @@ export const MODALITY_CATALOG: readonly ModalityModel[] = [
     minUnifiedMemoryGB: 24,
     runsLocally: true,
     heavy: true,
-    recommended: true,
+    // Superseded by Qwen-Image 2.1 above (a third of the memory, better
+    // pictures); on the user's Mac this 40 GB download never completed — 18 GB
+    // of .incomplete blobs from 2026-09-11 were what was on disk.
+    recommended: false,
     mflux: { kind: 'mflux', command: 'mflux-generate-qwen' },
     defaultSteps: 20,
     defaultQuantize: 4,

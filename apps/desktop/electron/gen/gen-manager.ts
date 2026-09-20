@@ -89,6 +89,7 @@ import { type GenModulesManager, moduleForBackend, weightsModuleFor } from './ge
 import { guardRun } from './guardian-main';
 import { createStillRenderer } from './hyperframes-still';
 import { openStillWindow } from './hyperframes-window';
+import { buildComfyImageJob, isComfyImageModel } from './image-dispatch';
 import { createRoomKeeper, type RoomKeeper } from './make-room';
 import { generateSvg, omniSvgFiles } from './omnisvg';
 import { canEnhance, type EnhancerEndpoint, enhancePrompt } from './prompt-enhancer';
@@ -584,9 +585,16 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
 
   async function handleGenerate(raw: GenerateImageParams): Promise<GenerateImageResult> {
     const model = getModel(raw.model ?? defaultImageModel().id);
-    if (model === undefined || model.modality !== 'image' || model.mflux === undefined) {
+    // An image model runs one of two ways: the mflux worker (its `mflux`
+    // command) or a ComfyUI graph (`comfy`, Qwen-Image 2.1 — image-dispatch).
+    const runsHere = (m: ModalityModel | undefined): m is ModalityModel =>
+      m !== undefined &&
+      m.modality === 'image' &&
+      m.reserved !== true &&
+      (m.mflux !== undefined || isComfyImageModel(m));
+    if (!runsHere(model)) {
       const runnable = modelsForModality('image')
-        .filter((m) => m.mflux !== undefined)
+        .filter(runsHere)
         .map((m) => m.id)
         .join(', ');
       throw new Error(
@@ -623,37 +631,68 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
     const eco = opts.eco?.() ?? { pace: 0, previews: true };
     // Under 'low' the policy has already said no to previews — the 4.5 GB is
     // the headroom the user asked to keep — so the guardian is not even asked.
-    const previewsAllowed = eco.previews ? (opts.heavyAllowed?.(withPreviews) ?? true) : false;
+    // A ComfyUI graph decodes once at the end: no per-step frames, no
+    // preview cost, and the footprint is the bare job.
+    const canPreview = model.mflux !== undefined && eco.previews;
+    const previewsAllowed = canPreview ? (opts.heavyAllowed?.(withPreviews) ?? true) : false;
     const stepPreviews =
       typeof previewsAllowed === 'boolean' ? previewsAllowed : previewsAllowed.ok;
     const footprintGB = stepPreviews ? withPreviews : bare;
 
-    const job: GenJob = {
-      id: jobId,
-      modality: 'image',
-      backend: 'mflux',
-      outputDir,
-      image: {
-        prompt: raw.prompt,
-        modelId: model.id,
-        mfluxCommand: model.mflux.command,
-        mfluxModel: model.mflux.model,
-        width,
-        height,
-        steps,
-        seeds,
-        stepPreviews,
-        ...(eco.pace > 0 ? { pace: eco.pace } : {}),
-        negativePrompt: raw.negativePrompt,
-        ...(guidance !== undefined ? { guidance } : {}),
-        // An edit rather than a fresh generation — see ImageJobSpec.imagePath.
-        ...(raw.inputImage !== undefined && raw.inputImage.length > 0
-          ? { imagePath: raw.inputImage }
-          : {}),
-        ...(raw.strength !== undefined ? { imageStrength: raw.strength } : {}),
-        quantize: model.defaultQuantize,
-      },
-    };
+    const job: GenJob =
+      model.mflux !== undefined
+        ? {
+            id: jobId,
+            modality: 'image',
+            backend: 'mflux',
+            outputDir,
+            image: {
+              prompt: raw.prompt,
+              modelId: model.id,
+              mfluxCommand: model.mflux.command,
+              mfluxModel: model.mflux.model,
+              width,
+              height,
+              steps,
+              seeds,
+              stepPreviews,
+              ...(eco.pace > 0 ? { pace: eco.pace } : {}),
+              negativePrompt: raw.negativePrompt,
+              ...(guidance !== undefined ? { guidance } : {}),
+              // An edit rather than a fresh generation — see ImageJobSpec.imagePath.
+              ...(raw.inputImage !== undefined && raw.inputImage.length > 0
+                ? { imagePath: raw.inputImage }
+                : {}),
+              ...(raw.strength !== undefined ? { imageStrength: raw.strength } : {}),
+              quantize: model.defaultQuantize,
+            },
+          }
+        : /*
+           * ComfyUI (Qwen-Image 2.1). No step previews — the adapter reports
+           * progress, not frames — so the pending card plays the mark; the
+           * pace is the guardian's SIGSTOP on the ComfyUI process (pausables).
+           * An input picture is not offered on this path: editing needs the
+           * encoder's vision tower, which the GGUF does not carry.
+           */
+          buildComfyImageJob(
+            model,
+            {
+              prompt: raw.prompt,
+              width,
+              height,
+              ...(steps !== undefined ? { steps } : {}),
+              ...(raw.negativePrompt !== undefined ? { negativePrompt: raw.negativePrompt } : {}),
+              ...(guidance !== undefined ? { guidance } : {}),
+              seeds,
+            },
+            jobId,
+            outputDir,
+          );
+    if (job.backend === 'comfyui' && raw.inputImage !== undefined && raw.inputImage.length > 0) {
+      throw new Error(
+        `${model.label} generates from text only here — editing a picture needs an mflux edit model (see edit_image)`,
+      );
+    }
 
     const tabId = `pi:gen-${jobId}`;
     const modelInfo = { id: model.id, label: model.label, license: model.license };

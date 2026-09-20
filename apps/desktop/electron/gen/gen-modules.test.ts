@@ -81,7 +81,9 @@ describe('the gate — a job waits for the button, then continues', () => {
     await new Promise((r) => setTimeout(r, 0));
     m.dismiss('comfy');
     await expect(job).rejects.toBeInstanceOf(GenModuleMissingError);
-    await expect(job).rejects.toThrow(/Video, music, sound-effect and 3D generation is not set up/);
+    await expect(job).rejects.toThrow(
+      /Picture, video, music, sound-effect and 3D generation is not set up/,
+    );
   });
 
   it('nobody pressing it for the wait ends the job the same way', async () => {

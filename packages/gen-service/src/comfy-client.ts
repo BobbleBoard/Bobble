@@ -29,7 +29,12 @@
 import { readFile as fsReadFile, writeFile as fsWriteFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { GenAbortError } from './client.js';
-import { fillWorkflow, WORKFLOW_TEMPLATES, type WorkflowTemplate } from './comfy-workflow.js';
+import {
+  fillWorkflow,
+  preludeGraph,
+  WORKFLOW_TEMPLATES,
+  type WorkflowTemplate,
+} from './comfy-workflow.js';
 import type { GenEvent, GenJob, GenOutput } from './protocol.js';
 
 /** Minimal structural WebSocket the adapter drives (satisfied by the `ws` pkg / a fake). */
@@ -260,18 +265,9 @@ export class ComfyClient {
       const uploaded =
         spec.inputImage === undefined ? null : await this.#uploadImage(origin, spec.inputImage);
 
-      const outputs: GenOutput[] = [];
-      for (let i = 0; i < seeds.length; i++) {
-        if (aborted) throw new GenAbortError();
-        if (wsFailure !== null) throw wsFailure;
-        const seed = seeds[i] ?? 0;
-        const graph = fillWorkflow(
-          uploaded === null ? spec : { ...spec, inputs: { ...spec.inputs, image: uploaded } },
-          seed,
-          registry,
-        );
+      /** Post a graph and wait for its execution to end, routing progress to candidate i. */
+      const execute = async (graph: unknown, i: number): Promise<string> => {
         const promptId = await this.#postPrompt(origin, graph, clientId);
-
         await new Promise<void>((resolve, reject) => {
           waiter = {
             promptId,
@@ -287,6 +283,29 @@ export class ComfyClient {
             },
           };
         });
+        return promptId;
+      };
+
+      const outputs: GenOutput[] = [];
+      for (let i = 0; i < seeds.length; i++) {
+        if (aborted) throw new GenAbortError();
+        if (wsFailure !== null) throw wsFailure;
+        const seed = seeds[i] ?? 0;
+        const graph = fillWorkflow(
+          uploaded === null ? spec : { ...spec, inputs: { ...spec.inputs, image: uploaded } },
+          seed,
+          registry,
+        );
+        // The encoder first, alone, then out of memory before the DiT loads
+        // (WorkflowTemplate.prelude). Once: the later candidates' encode node
+        // hits the cache, so no encoder is loaded for them either.
+        const template = registry[spec.workflowTemplate];
+        const prelude = i === 0 && template !== undefined ? preludeGraph(graph, template) : null;
+        if (prelude !== null) {
+          await execute(prelude, i);
+          await this.#unloadModels(origin);
+        }
+        const promptId = await execute(graph, i);
 
         const history = await this.#getHistory(origin, promptId);
         const candOutputs = await this.#downloadOutputs(
@@ -372,6 +391,16 @@ export class ComfyClient {
   }
 
   /** Fetch `/history/{promptId}`. */
+  /** Ask ComfyUI to drop every loaded model (the node cache stays). */
+  async #unloadModels(origin: string): Promise<void> {
+    const res = await this.#fetch(`${origin}/free`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ unload_models: true }),
+    });
+    if (!res.ok) throw new Error(`ComfyUI /free failed (${res.status})`);
+  }
+
   async #getHistory(origin: string, promptId: string): Promise<ComfyHistory> {
     const res = await this.#fetch(`${origin}/history/${encodeURIComponent(promptId)}`);
     if (!res.ok) throw new Error(`ComfyUI /history failed (${res.status})`);

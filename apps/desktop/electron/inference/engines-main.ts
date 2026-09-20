@@ -371,9 +371,11 @@ async function fetchGitHubTree(
 /**
  * The ComfyUI this app's graphs are written against. The native TRELLIS.2 and
  * Pixal3D nodes (image → 3D with no git, no Xcode, no custom wheels) landed in
- * 0.34.0; the graphs were verified on 0.35.0.
+ * 0.34.0; the graphs were verified on 0.35.0. Qwen-Image 2.1 (the image
+ * default since 2026-09-20: TextEncodeQwenImage21, the 2.1 DiT and VAE)
+ * landed on master on 2026-09-19 and reports 0.37.0.
  */
-export const COMFY_REQUIRED_VERSION = '0.35.0';
+export const COMFY_REQUIRED_VERSION = '0.37.0';
 
 /** `__version__` from the checkout's comfyui_version.py; null when unreadable. */
 export function comfyVersionInstalled(): string | null {

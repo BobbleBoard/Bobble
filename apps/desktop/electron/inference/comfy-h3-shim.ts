@@ -1,10 +1,13 @@
 /**
  * BOBBLE'S FIXES, DROPPED INTO THE USER'S ComfyUI AS FILES IT LOADS.
  *
- * Two of them, one directory (`bobble_comfy_fixes`), both registering no nodes:
+ * Three of them, one directory (`bobble_comfy_fixes`), none registering nodes:
  *
  *   __init__.py      MiniMax H3's text encoder is detected by the language
- *                    model, so a GGUF of it loads (below).
+ *                    model, so a GGUF of it loads (below); and a text-only
+ *                    Qwen3-VL-8B GGUF asked for as `qwen_image` is read as
+ *                    Qwen-Image 2.1's encoder rather than FLUX.2 klein's
+ *                    (same file, second predicate, 2026-09-20).
  *   mesh_on_cpu.py   ComfyUI's mesh post-processing runs on the CPU on Apple
  *                    Silicon, because on MPS it does not run at all
  *                    (COMFY_MESH_ON_CPU_PY, further below).
@@ -51,7 +54,7 @@ version. It is distributed WITHOUT ANY WARRANTY; without even the implied
 warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
 General Public License for more details: <https://www.gnu.org/licenses/>.
 
-It registers no nodes. It corrects one model-detection predicate:
+It registers no nodes. It corrects two model-detection predicates:
 
 TEXT-ONLY QWEN3-VL-32B (MiniMax H3's conditioning encoder)
 
@@ -99,14 +102,71 @@ def is_text_only_qwen3vl_32b(sd) -> bool:
     )
 
 
+"""
+TEXT-ONLY QWEN3-VL-8B, ASKED FOR AS QWEN-IMAGE (Qwen-Image 2.1's encoder)
+
+Qwen-Image 2.1 conditions on the full Qwen3-VL-8B. Its language model has the
+exact shape of Qwen3-8B (36 layers, 4096 wide, q-norm), so a GGUF of it — the
+language model alone, the vision tower in a separate mmproj — reads to upstream
+as Qwen3-8B, which with a qwen_image graph is FLUX.2 klein's encoder: a
+three-layer tap 12288 wide that the 2.1 DiT's 4096-wide context projection
+rejects ("expected input with shape [*4096]"). The GGUF is the only quant of
+this 17.5 GB encoder a Mac can run, so the misreading is the whole model.
+
+Shapes cannot tell the two apart; the graph can. load_text_encoder_state_dicts
+receives the clip type the loader node asked for, and a text-only Qwen3-8B-shaped
+encoder loaded for QWEN_IMAGE can only be Qwen-Image 2.1's (Qwen-Image 1.0's is
+Qwen2.5-VL-7B: 28 layers, no q-norm; FLUX.2 asks as FLUX2). So the type in
+flight is remembered for the length of that one call — ComfyUI runs nodes one
+at a time — and detection answers QWEN3VL_8B for that conjunction only. Text-
+to-image never touches the vision half; a reference image (editing) needs the
+mmproj, which this does not load.
+"""
+
+_clip_type_in_flight = None
+_upstream_load_text_encoder_state_dicts = comfy.sd.load_text_encoder_state_dicts
+
+QWEN3VL_8B_VOCAB = 151936
+QWEN3VL_8B_HIDDEN = 4096
+
+
+def is_text_only_qwen3_8b_shape(sd) -> bool:
+    emb = sd.get("model.embed_tokens.weight")
+    return (
+        emb is not None
+        and tuple(emb.shape) == (QWEN3VL_8B_VOCAB, QWEN3VL_8B_HIDDEN)
+        and "model.layers.0.self_attn.q_norm.weight" in sd       # Qwen3, not Qwen2.5-VL
+        and "model.layers.35.self_attn.q_proj.weight" in sd      # 36 layers
+        and "model.layers.36.self_attn.q_proj.weight" not in sd
+        and "visual.deepstack_merger_list.0.norm.weight" not in sd
+        and "model.visual.deepstack_merger_list.0.norm.weight" not in sd
+    )
+
+
+def load_text_encoder_state_dicts(*args, **kwargs):
+    # Signature-agnostic on purpose: upstream adds parameters (disable_dynamic
+    # arrived in 0.37) and every caller must keep working. clip_type is the
+    # third positional or a keyword.
+    global _clip_type_in_flight
+    _clip_type_in_flight = kwargs.get("clip_type", args[2] if len(args) > 2 else None)
+    try:
+        return _upstream_load_text_encoder_state_dicts(*args, **kwargs)
+    finally:
+        _clip_type_in_flight = None
+
+
 def detect_te_model(sd):
     if is_text_only_qwen3vl_32b(sd):
         logging.info("[bobble] text-only Qwen3-VL-32B (MiniMax H3 encoder, no mmproj)")
         return comfy.sd.TEModel.QWEN3VL_32B
+    if _clip_type_in_flight == comfy.sd.CLIPType.QWEN_IMAGE and is_text_only_qwen3_8b_shape(sd):
+        logging.info("[bobble] text-only Qwen3-VL-8B asked for as qwen_image (Qwen-Image 2.1 encoder, no mmproj)")
+        return comfy.sd.TEModel.QWEN3VL_8B
     return _upstream_detect(sd)
 
 
 comfy.sd.detect_te_model = detect_te_model
+comfy.sd.load_text_encoder_state_dicts = load_text_encoder_state_dicts
 
 # The second fix, same directory: mesh post-processing on the CPU on Apple Silicon.
 from . import mesh_on_cpu  # noqa: E402,F401

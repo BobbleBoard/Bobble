@@ -72,6 +72,39 @@ describe('image models are phase-1 wired', () => {
     expect(def.license).toBe('apache-2.0');
   });
 
+  it('Qwen-Image 2.1 is the recommended quality pick on ComfyUI, its research licence said plainly (2026-09-20)', () => {
+    const q = getModel('qwen-image-2.1');
+    expect(q?.modality).toBe('image');
+    expect(q?.backend).toBe('comfyui');
+    expect(q?.comfy?.workflowTemplate).toBe('qwen-image-2.1-t2i');
+    expect(q?.recommended).toBe(true);
+    expect(q?.reserved).not.toBe(true);
+    expect(q?.runsLocally).toBe(true);
+    expect(q?.defaultSteps).toBe(12);
+    // Second in the list: the fast Apache default first, the quality pick next.
+    expect(
+      modelsForModality('image')
+        .map((m) => m.id)
+        .slice(0, 2),
+    ).toEqual(['flux2-klein-4b', 'qwen-image-2.1']);
+    // The Qwen Research License is non-commercial: the card must say so.
+    expect(q?.commercialUse).toBe(false);
+    expect(q?.license).toBe('research-nc');
+    expect(requiresLicenseGate(q as ModalityModel)).toBe(true);
+    // The three files its graph loads, each in the ComfyUI folder its loader reads.
+    const folders = (q?.weights ?? []).map((w) => w.folder ?? w.path.split('/')[0]);
+    expect(folders.sort()).toEqual(['diffusion_models', 'text_encoders', 'vae']);
+    // Measured numbers: the DiT phase is bf16-sized on MPS and its load is a
+    // spike the guardian sheds on 24 GB — a 32 GB machine.
+    expect(q?.residentFloorGB).toBe(12);
+    expect(q?.peakResidentGB).toBe(15);
+    expect(q?.minUnifiedMemoryGB).toBe(32);
+  });
+
+  it('the 20B Qwen-Image is no longer recommended: superseded by 2.1', () => {
+    expect(getModel('qwen-image-2512')?.recommended).toBe(false);
+  });
+
   it('includes the verified fast/smoke model z-image-turbo with its own command', () => {
     const z = getModel('z-image-turbo');
     expect(z?.mflux?.command).toBe('mflux-generate-z-image-turbo');

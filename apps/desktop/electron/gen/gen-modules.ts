@@ -30,7 +30,8 @@
  */
 
 /**
- * The modules a person can install. `comfy` serves video AND ComfyUI audio.
+ * The modules a person can install. `comfy` serves the default picture model
+ * (Qwen-Image 2.1), video AND ComfyUI audio.
  *
  * `weights:<catalog id>` is a model's own files — the second thing a ComfyUI
  * job needs after the runtime. the user (2026-09-14): "one click download of any
@@ -104,14 +105,15 @@ export const GEN_MODULE_META: Record<GenRuntimeModuleId, GenModuleMeta> = {
     noun: 'Speech generation',
   },
   comfy: {
-    label: 'Video module',
-    blurb: 'ComfyUI — video, music, sound effects and 3D. Models download on first use.',
+    label: 'ComfyUI module',
+    blurb:
+      'ComfyUI — pictures (Qwen-Image 2.1), video, music, sound effects and 3D. Models download on first use.',
     // MEASURED 2026-09-14 on a fresh cache: the checkout plus a venv of 179
     // packages is 1.5 GB on Apple Silicon (the Torch wheel has no CUDA in
     // it), installed in 30 seconds on a fast line. The 6 here was the Linux
     // figure.
     approxGB: 1.5,
-    noun: 'Video, music, sound-effect and 3D generation',
+    noun: 'Picture, video, music, sound-effect and 3D generation',
   },
   '3d': {
     label: '3D module',

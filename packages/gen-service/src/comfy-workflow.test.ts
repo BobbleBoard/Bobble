@@ -129,6 +129,47 @@ describe('fillWorkflow', () => {
       expect(graph['10']).toBeUndefined();
     }
   });
+  it('draws Qwen-Image 2.1 the way its template does: GGUF loaders, cfg 1, euler/simple, the size on the empty latent', () => {
+    // Comfy-Org's image_qwen_image_2_1_t2i template, with the DiT and the
+    // encoder as the GGUFs a Mac can load (comfy-workflow: qwenImage21T2iGraph).
+    const graph = fillWorkflow(
+      {
+        prompt: 'a neon sign that reads "QWEN"',
+        modelId: 'qwen-image-2.1',
+        workflowTemplate: 'qwen-image-2.1-t2i',
+        inputs: {
+          prompt: 'a neon sign that reads "QWEN"',
+          negativePrompt: '',
+          width: 1280,
+          height: 768,
+          steps: 12,
+          cfg: 1,
+        },
+        seeds: [42],
+      },
+      42,
+    );
+    expect(at(graph, '1.class_type')).toBe('UnetLoaderGGUF');
+    expect(at(graph, '1.inputs.unet_name')).toBe('qwen_image_2.1_Q4_K_M.gguf');
+    expect(at(graph, '2.class_type')).toBe('CLIPLoaderGGUF');
+    expect(at(graph, '2.inputs.clip_name')).toBe('Qwen3VL-8B-Instruct-Q4_K_M.gguf');
+    expect(at(graph, '2.inputs.type')).toBe('qwen_image');
+    expect(at(graph, '3.inputs.vae_name')).toBe('qwen_image_2.1_vae_bf16.safetensors');
+    expect(at(graph, '4.class_type')).toBe('TextEncodeQwenImage21');
+    expect(at(graph, '4.inputs.prompt')).toBe('a neon sign that reads "QWEN"');
+    expect(at(graph, '5.inputs.width')).toBe(1280);
+    expect(at(graph, '5.inputs.height')).toBe(768);
+    expect(at(graph, '6.inputs.steps')).toBe(12);
+    expect(at(graph, '6.inputs.cfg')).toBe(1);
+    expect(at(graph, '6.inputs.seed')).toBe(42);
+    expect(at(graph, '6.inputs.sampler_name')).toBe('euler');
+    expect(at(graph, '6.inputs.scheduler')).toBe('simple');
+    // positive/negative both come from the 2.1 encode node; the latent from the empty latent.
+    expect(at(graph, '6.inputs.positive')).toEqual(['4', 0]);
+    expect(at(graph, '6.inputs.negative')).toEqual(['4', 1]);
+    expect(at(graph, '6.inputs.latent_image')).toEqual(['5', 0]);
+    expect(at(graph, '8.class_type')).toBe('SaveImage');
+  });
 });
 
 describe('workflow registry ↔ catalog consistency', () => {
