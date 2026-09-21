@@ -1,0 +1,50 @@
+Qwen-Image 2.1 on mflux: quantize the text encoder — to 8 bits under a
+4-bit save.
+
+The port (mflux-community/mflux#736, ivanfioravanti) keeps the Qwen3-VL-8B
+encoder in bf16 on purpose — the author's note says quantization degraded
+the conditioning. In bf16 that encoder is 17.5 GB, and the DiT another 14:
+a 64 GB machine's model. Quantized it runs on a 24 GB M5 Pro in 88–97 s at
+1024² with a 5.96 GB peak, and it is the default picture model. Without
+this it does not fit the machine at all.
+
+The second change is the recipe under `-q 4`. MEASURED (2026-09-20, ten
+prompts with a word in the picture at one seed, plus the app's own neon
+sign at three seeds and a poster at one): the DiT at 4 bits renders every
+word when its conditioning is right; a 4-bit encoder flips a letter in
+about one prompt in ten ("BOBBBLE"), and keeping a few of its layers at 8
+bits moved the failure to another prompt rather than removing it. An 8-bit
+encoder beside the 4-bit DiT rendered all of them, like the all-8-bit
+model, and it costs disk only: the encoder is one pass, evicted before the
+DiT loads (`--low-ram`), and its weights are file-backed pages the OS drops
+freely — the MLX peak and the machine's free-memory drop are those of the
+uniform 4-bit model. Saved models record the per-layer precision in their
+shapes, so the loader needs nothing further. Dropped the day upstream
+ships a way to quantize the encoder.
+
+--- a/src/mflux/models/qwen21/weights/qwen21_weight_definition.py
++++ b/src/mflux/models/qwen21/weights/qwen21_weight_definition.py
+@@ -29,7 +29,10 @@
+                 hf_subdir="text_encoder",
+                 loading_mode="multi_json",
+                 precision=mx.bfloat16,
+-                skip_quantization=True,  # Quantization causes significant semantic degradation
++                # Bobble: quantized with the DiT — the bf16 encoder is 17.5 GB, which a
++                # 24 GB Mac cannot hold beside it. Measured clean at 4 bits on text,
++                # diagrams and portraits (packages/gen-service/python/mflux-qwen21).
++                skip_quantization=False,
+                 mapping_getter=Qwen21WeightMapping.get_text_encoder_mapping,
+             ),
+         ]
+@@ -66,4 +69,11 @@
+     def quantization_predicate(path: str, module, bits: int | None = None):
+         if not hasattr(module, "to_quantized"):
+             return False
++        # Bobble: under a 4-bit save the TEXT ENCODER keeps 8 bits. Paths are relative to
++        # each component: the encoder's are `embed_tokens` and `layers.*`, the DiT's
++        # `transformer_blocks.*`, `modulation.*` and the rest. MEASURED on ten
++        # words-in-picture prompts: the 4-bit DiT renders every word; a 4-bit encoder
++        # flips a letter in one of ten. One pass, evicted before sampling: disk, not memory.
++        if bits == 4 and path.split(".")[0] in ("embed_tokens", "layers"):
++            return {"bits": 8}
+         return True

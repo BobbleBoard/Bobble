@@ -17,16 +17,35 @@
  * from their own state instead.
  */
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import {
   buildEnvWarmArgs,
+  bundledWheelPath,
+  DEFAULT_PYTHON_VERSION,
   getModel,
+  MODALITY_CATALOG,
   type ModalityModel,
+  resolveWorkerScript,
   type WeightFile,
 } from '@pi-desktop/gen-service';
 import { cacheRoot } from '@pi-desktop/inference';
-import { downloadRepo } from '@pi-desktop/model-store';
+import {
+  downloadRepo,
+  readManifest,
+  removeStored,
+  type StoredModel,
+  writeManifest,
+} from '@pi-desktop/model-store';
 import { createLogger } from '@pi-desktop/shared';
 import { ensureUv } from '@pi-desktop/web-tools';
 import { gen3dModuleReady, warmGen3dModule } from '../gen3d/gen3d-main';
@@ -42,6 +61,8 @@ import {
 } from './gen-modules';
 import {
   downloadedPath,
+  preparedDir,
+  preparedPresent,
   storeKind,
   weightPath,
   weightPresent,
@@ -50,6 +71,12 @@ import {
 } from './weights-on-shelf';
 
 const log = createLogger('desktop:gen-modules');
+
+/** What the ports need to know about this Mac beyond the catalog. */
+export interface GenModulePortsDeps {
+  /** worker.py's path (main.ts resolves it); the bundled wheels sit beside it. */
+  readonly workerScript?: string | undefined;
+}
 
 function markerDir(): string {
   return path.join(cacheRoot(), 'gen', 'modules');
@@ -65,12 +92,139 @@ function writeMarker(id: GenModuleId, how: 'installed' | 'succeeded'): void {
   writeFileSync(markerPath(id), `${JSON.stringify({ id, how, at: new Date().toISOString() })}\n`);
 }
 
-/** The catalog entry behind a weights module, when it lists files. */
+/** The catalog entry behind a weights module, when it lists or prepares files. */
 function weightsModel(id: GenModuleId): ModalityModel | undefined {
   const modelId = weightsModelId(id);
   if (modelId === null) return undefined;
   const model = getModel(modelId);
-  return model?.weights !== undefined && model.weights.length > 0 ? model : undefined;
+  if (model === undefined) return undefined;
+  const lists = model.weights !== undefined && model.weights.length > 0;
+  return lists || model.mflux?.prepared !== undefined ? model : undefined;
+}
+
+/**
+ * A MODEL MADE ON THIS MAC — `mflux.prepared` (Qwen-Image 2.1). Three steps
+ * under one bar: fetch the bf16 release through the model store (sha-verified,
+ * resumable, the same download Model management runs), `mflux-save` it to a
+ * quantized folder on the shelf under the model's own mflux build, and remove
+ * the release — 31 GB that nothing will read again. MEASURED 2026-09-20 (M5
+ * Pro 24 GB): the conversion itself is 12 s; the fetch is the wait.
+ *
+ * The saved folder gets a manifest so Model management lists it as what it
+ * is: a conversion of Qwen/Qwen-Image-2.1, made here, not a download.
+ */
+async function installPrepared(
+  model: ModalityModel,
+  deps: GenModulePortsDeps,
+  report: (detail: string, percent?: number) => void,
+): Promise<void> {
+  const mflux = model.mflux;
+  const prepared = mflux?.prepared;
+  if (mflux === undefined || prepared === undefined)
+    throw new Error(`${model.id} prepares nothing`);
+  const total = prepared.downloadGB * 1e9;
+  report(`Downloading ${prepared.from}…`, 0);
+  const release = await downloadRepo({
+    repo: prepared.from,
+    kind: storeKind(model),
+    name: `${model.label} (bf16 release)`,
+    allow: prepared.patterns,
+    backend: 'mflux',
+    notes: 'The release Bobble converts to MLX; removed once the conversion has landed.',
+    onProgress: (p) => {
+      report(
+        `Downloading ${p.file} — ${(p.received / 1e9).toFixed(1)} of ${(p.total / 1e9).toFixed(1)} GB`,
+        // The whole button: the fetch is ~95% of it, the conversion the rest.
+        Math.min(0.95, (0.95 * p.received) / Math.max(p.total, total)),
+      );
+    },
+  });
+
+  const uv = await ensureUv({});
+  const workerScript = resolveWorkerScript(deps.workerScript);
+  const dest = preparedDir(model);
+  // A half-written folder from an interrupted save is redone, not trusted.
+  if (existsSync(dest) && !preparedPresent(model)) rmSync(dest, { recursive: true, force: true });
+  mkdirSync(path.dirname(dest), { recursive: true });
+  report(`Converting to ${prepared.bits}-bit for MLX — a minute or two, once…`, 0.95);
+  const args = ['run', '--no-project', '--python', DEFAULT_PYTHON_VERSION];
+  args.push(
+    '--with',
+    mflux.wheel !== undefined ? bundledWheelPath(workerScript, mflux.wheel) : 'mflux',
+  );
+  args.push('mflux-save', '--model', release.dir);
+  if (mflux.baseModel !== undefined) args.push('--base-model', mflux.baseModel);
+  args.push('-q', String(prepared.bits), '--path', dest);
+  await runUv(uv.uvPath, args, (line) => report(line, 0.97));
+  if (!preparedPresent(model)) {
+    throw new Error(`mflux-save finished but ${dest} is not a complete model`);
+  }
+
+  // What Model management shows for the folder: a conversion, with its bytes.
+  await writeManifest(await preparedManifest(model, dest));
+
+  report('Removing the bf16 release…', 0.99);
+  await removeStored(release.id).catch((err) => {
+    // Not fatal: the picture works; the 31 GB shows in Model management to remove by hand.
+    log.warn('prepared: release not removed', { dir: release.dir, err: String(err) });
+  });
+  report('Ready', 1);
+}
+
+/** The manifest of a conversion: what it is, where from, what it weighs. */
+async function preparedManifest(model: ModalityModel, dir: string): Promise<StoredModel> {
+  const prepared = model.mflux?.prepared;
+  if (prepared === undefined) throw new Error(`${model.id} prepares nothing`);
+  const files = await savedFiles(dir);
+  return {
+    id: prepared.folder,
+    repo: prepared.from,
+    // The wheel keeps the text encoder at 8 bits under a 4-bit save.
+    name: `${model.label} (MLX ${prepared.bits}-bit, 8-bit encoder)`,
+    org: prepared.from.split('/')[0] ?? '',
+    kind: storeKind(model),
+    tasks: ['text-to-image'],
+    backend: 'mflux',
+    dir,
+    files,
+    bytes: files.reduce((n, f) => n + f.bytes, 0),
+    installedAt: new Date().toISOString(),
+    source: 'store',
+    quant: `${prepared.bits}-bit MLX, 8-bit encoder`,
+    notes: `Converted on this Mac from ${prepared.from} by mflux-save; the bf16 release is not kept.`,
+  };
+}
+
+/** Every file under a saved model's folder, relative, with its size. */
+async function savedFiles(dir: string): Promise<{ path: string; bytes: number }[]> {
+  const out: { path: string; bytes: number }[] = [];
+  const walk = async (rel: string): Promise<void> => {
+    for (const entry of await readdir(path.join(dir, rel), { withFileTypes: true })) {
+      const next = rel.length > 0 ? `${rel}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) await walk(next);
+      else if (entry.isFile() && entry.name !== 'model.json')
+        out.push({ path: next, bytes: statSync(path.join(dir, next)).size });
+    }
+  };
+  await walk('');
+  return out.sort((a, b) => a.path.localeCompare(b.path));
+}
+
+/**
+ * A conversion that is there but has no manifest — made by hand before the
+ * button existed — is adopted: the manifest is written so Model management
+ * lists it, and it counts as ready. Idempotent; nothing is downloaded.
+ */
+async function adoptPrepared(model: ModalityModel): Promise<boolean> {
+  if (!preparedPresent(model)) return false;
+  const dir = preparedDir(model);
+  if ((await readManifest(dir)) === undefined) {
+    await writeManifest(await preparedManifest(model, dir)).catch((err) =>
+      log.warn('prepared: manifest not written', { dir, err: String(err) }),
+    );
+    log.info('prepared: adopted a conversion found on the shelf', { dir });
+  }
+  return true;
 }
 
 /**
@@ -123,9 +277,24 @@ async function installWeights(
   }
 }
 
-/** The env-warm argv for a uv-worker module. */
-function warmArgs(id: 'image' | 'audio'): string[] {
-  return buildEnvWarmArgs({ backend: id === 'image' ? 'mflux' : 'mlx-audio' });
+/**
+ * The env-warm argv for a uv-worker module — for `image`, one per mflux build
+ * the catalog's image models run on: the pinned release, and the bundled
+ * wheel of any model that ships its own (Qwen-Image 2.1's port). Same
+ * packages for the most part; uv hardlinks them, so the second is quick.
+ */
+function warmArgs(id: 'image' | 'audio', deps: GenModulePortsDeps): string[][] {
+  if (id === 'audio') return [buildEnvWarmArgs({ backend: 'mlx-audio' })];
+  const workerScript = resolveWorkerScript(deps.workerScript);
+  const wheels = new Set<string>();
+  for (const m of MODALITY_CATALOG) {
+    if (m.modality === 'image' && m.reserved !== true && m.mflux?.wheel !== undefined)
+      wheels.add(bundledWheelPath(workerScript, m.mflux.wheel));
+  }
+  return [
+    buildEnvWarmArgs({ backend: 'mflux' }),
+    ...[...wheels].map((mfluxWith) => buildEnvWarmArgs({ backend: 'mflux', mfluxWith })),
+  ];
 }
 
 /**
@@ -164,11 +333,16 @@ function runUv(
 
 export function createGenModulePorts(
   emit: (states: readonly GenModuleState[]) => void,
+  deps: GenModulePortsDeps = {},
 ): GenModulePorts {
   return {
     ready: async (id) => {
       const weighted = weightsModel(id);
-      if (weighted !== undefined) return weightsPresent(weighted);
+      if (weighted !== undefined) {
+        return weighted.mflux?.prepared !== undefined
+          ? adoptPrepared(weighted)
+          : weightsPresent(weighted);
+      }
       switch (id) {
         case 'comfy':
           return comfyEngineInstalled();
@@ -185,7 +359,8 @@ export function createGenModulePorts(
     install: async (id, report) => {
       const weighted = weightsModel(id);
       if (weighted !== undefined) {
-        await installWeights(weighted, report);
+        if (weighted.mflux?.prepared !== undefined) await installPrepared(weighted, deps, report);
+        else await installWeights(weighted, report);
         return;
       }
       switch (id) {
@@ -200,7 +375,7 @@ export function createGenModulePorts(
           });
           log.info('module install: uv ready', { id, source: uv.source, uvPath: uv.uvPath });
           report('Resolving packages…');
-          await runUv(uv.uvPath, warmArgs(id), report);
+          for (const args of warmArgs(id, deps)) await runUv(uv.uvPath, args, report);
           writeMarker(id, 'installed');
           return;
         }
@@ -232,6 +407,9 @@ export function readModuleMarker(id: GenModuleId): { how: string; at: string } |
   }
 }
 
-export function createGenModules(emit: (states: readonly GenModuleState[]) => void) {
-  return new GenModulesManager(createGenModulePorts(emit));
+export function createGenModules(
+  emit: (states: readonly GenModuleState[]) => void,
+  deps: GenModulePortsDeps = {},
+) {
+  return new GenModulesManager(createGenModulePorts(emit, deps));
 }

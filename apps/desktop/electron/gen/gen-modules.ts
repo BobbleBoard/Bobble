@@ -30,28 +30,34 @@
  */
 
 /**
- * The modules a person can install. `comfy` serves the default picture model
- * (Qwen-Image 2.1), video AND ComfyUI audio.
+ * The modules a person can install. `image` is the mflux environment — the
+ * default picture model (Qwen-Image 2.1) and the fast ones run on it; `comfy`
+ * serves video, ComfyUI audio and 3D.
  *
- * `weights:<catalog id>` is a model's own files — the second thing a ComfyUI
- * job needs after the runtime. the user (2026-09-14): "one click download of any
+ * `weights:<catalog id>` is a model's own files — the second thing a job
+ * needs after the runtime. the user (2026-09-14): "one click download of any
  * of these modules … video image 3d and audio generation with an m1-m6 mac".
  * A runtime with no weights is not one click; it is one click and then an
  * error naming a file. So the weights are a module with the same button, the
  * same wait, the same card — one per catalog entry that lists what it loads
- * (`ModalityModel.weights`), known to the manager the first time a job asks.
+ * (`ModalityModel.weights`) or MAKES on this Mac (`mflux.prepared`: the bf16
+ * release fetched and quantized here, once), known to the manager the first
+ * time a job asks.
  */
 export type GenRuntimeModuleId = 'image' | 'audio' | 'comfy' | '3d';
 export type GenModuleId = GenRuntimeModuleId | `weights:${string}`;
 
 export const GEN_MODULE_IDS: readonly GenRuntimeModuleId[] = ['image', 'audio', 'comfy', '3d'];
 
-/** The weights module of a catalog entry, or nothing when it lists no files. */
+/** The weights module of a catalog entry, or nothing when it neither lists
+ * files nor prepares any. */
 export function weightsModuleFor(model: {
   readonly id: string;
   readonly weights?: readonly unknown[];
+  readonly mflux?: { readonly prepared?: unknown };
 }): GenModuleId | undefined {
-  return model.weights !== undefined && model.weights.length > 0
+  return (model.weights !== undefined && model.weights.length > 0) ||
+    model.mflux?.prepared !== undefined
     ? `weights:${model.id}`
     : undefined;
 }
@@ -94,8 +100,11 @@ export interface GenModuleState {
 export const GEN_MODULE_META: Record<GenRuntimeModuleId, GenModuleMeta> = {
   image: {
     label: 'Image module',
-    blurb: 'The picture engine (mflux on MLX). Models download on first use.',
-    approxGB: 2,
+    blurb:
+      'The picture engine (mflux on MLX) — Qwen-Image 2.1, FLUX.2 klein, Z-Image. Models download on first use.',
+    // Two environments: the pinned mflux release and the Qwen-Image 2.1 build
+    // beside it, which share most of their packages in uv's cache.
+    approxGB: 2.5,
     noun: 'Image generation',
   },
   audio: {
@@ -106,14 +115,13 @@ export const GEN_MODULE_META: Record<GenRuntimeModuleId, GenModuleMeta> = {
   },
   comfy: {
     label: 'ComfyUI module',
-    blurb:
-      'ComfyUI — pictures (Qwen-Image 2.1), video, music, sound effects and 3D. Models download on first use.',
+    blurb: 'ComfyUI — video, music, sound effects and 3D. Models download on first use.',
     // MEASURED 2026-09-14 on a fresh cache: the checkout plus a venv of 179
     // packages is 1.5 GB on Apple Silicon (the Torch wheel has no CUDA in
     // it), installed in 30 seconds on a fast line. The 6 here was the Linux
     // figure.
     approxGB: 1.5,
-    noun: 'Picture, video, music, sound-effect and 3D generation',
+    noun: 'Video, music, sound-effect and 3D generation',
   },
   '3d': {
     label: '3D module',
@@ -444,8 +452,8 @@ export function uvLineToDetail(chunk: string): string | undefined {
     .pop();
   if (last === undefined) return undefined;
   const cleaned = last
-    // biome-ignore lint/suspicious/noControlCharactersInRegex: uv colours its output
-    .replace(/\x1b\[[0-9;]*m/g, '')
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: uv colours its output; tqdm moves the cursor
+    .replace(/\x1b\[[0-9;]*[A-Za-z]/g, '')
     .replace(/^(warning|error):\s*/i, '');
   return cleaned.length > 120 ? `${cleaned.slice(0, 119)}…` : cleaned;
 }

@@ -102,6 +102,12 @@ export interface RunJobOptions {
   readonly signal?: AbortSignal;
   /** Extra `uv --with` deps for this job's backend (e.g. `mlx-audio`). */
   readonly extraWith?: readonly string[];
+  /**
+   * The mflux build this job runs on, in place of the client's pin: the
+   * absolute path of the model's bundled wheel (catalog `mflux.wheel`, resolved
+   * against worker.py by {@link bundledWheelPath}).
+   */
+  readonly mfluxWith?: string;
 }
 
 /**
@@ -156,6 +162,7 @@ export class GenServiceClient {
        */
       backend: job.backend,
       mfluxPin: this.#opts.mfluxPin,
+      ...(options.mfluxWith !== undefined ? { mfluxWith: options.mfluxWith } : {}),
       python: this.#opts.python,
       extraWith: options.extraWith,
     });

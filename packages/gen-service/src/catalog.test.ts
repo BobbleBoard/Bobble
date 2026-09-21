@@ -65,40 +65,60 @@ describe('image models are phase-1 wired', () => {
     expect(requiresLicenseGate(adv as ModalityModel)).toBe(true);
   });
 
-  it('default image model is FLUX.2 klein and permits commercial use', () => {
-    const def = defaultImageModel();
-    expect(def.id).toBe('flux2-klein-4b');
-    expect(def.commercialUse).toBe(true);
-    expect(def.license).toBe('apache-2.0');
-  });
-
-  it('Qwen-Image 2.1 is the recommended quality pick on ComfyUI, its research licence said plainly (2026-09-20)', () => {
-    const q = getModel('qwen-image-2.1');
-    expect(q?.modality).toBe('image');
-    expect(q?.backend).toBe('comfyui');
-    expect(q?.comfy?.workflowTemplate).toBe('qwen-image-2.1-t2i');
-    expect(q?.recommended).toBe(true);
-    expect(q?.reserved).not.toBe(true);
-    expect(q?.runsLocally).toBe(true);
-    expect(q?.defaultSteps).toBe(12);
-    // Second in the list: the fast Apache default first, the quality pick next.
+  it('the default image model is Qwen-Image 2.1 on MLX, made on this Mac, its research licence said plainly (2026-09-20)', () => {
+    const q = defaultImageModel();
+    expect(q.id).toBe('qwen-image-2.1');
+    expect(q.modality).toBe('image');
+    expect(q.backend).toBe('mflux');
+    expect(q.recommended).toBe(true);
+    expect(q.reserved).not.toBe(true);
+    expect(q.runsLocally).toBe(true);
+    // 12 steps come out garbled on the port, 20 slightly broken, 24 clean.
+    expect(q.defaultSteps).toBe(24);
+    // The port's dedicated command, the family named for a local folder, the
+    // bundled build with the quantized-encoder patch, and the conversion that
+    // makes the folder: the 31 GB bf16 release → 13 GB (4-bit DiT, 8-bit encoder).
+    expect(q.mflux?.command).toBe('mflux-generate-qwen-2.1');
+    expect(q.mflux?.baseModel).toBe('qwen-image-2.1');
+    expect(q.mflux?.wheel).toBe('mflux-0.19.2+bobble.qwen21.te8-py3-none-any.whl');
+    expect(q.mflux?.model).toBeUndefined();
+    expect(q.mflux?.prepared).toMatchObject({
+      from: 'Qwen/Qwen-Image-2.1',
+      folder: 'qwen-image-2.1-mflux-4bit-te8',
+      bits: 4,
+      downloadGB: 31,
+      sizeGB: 13,
+    });
+    expect(q.mflux?.prepared?.patterns).toContain('transformer/*');
+    expect(q.mflux?.prepared?.patterns).toContain('processor/*');
+    // No ComfyUI files: it is not a graph any more.
+    expect(q.weights).toBeUndefined();
+    expect(q.comfy).toBeUndefined();
+    // Per-step previews: +14 GB and twice the time, MEASURED — never.
+    expect(q.previews).toBe(false);
+    // First in the list, the fast Apache pick next.
     expect(
       modelsForModality('image')
         .map((m) => m.id)
         .slice(0, 2),
-    ).toEqual(['flux2-klein-4b', 'qwen-image-2.1']);
+    ).toEqual(['qwen-image-2.1', 'flux2-klein-4b']);
     // The Qwen Research License is non-commercial: the card must say so.
-    expect(q?.commercialUse).toBe(false);
-    expect(q?.license).toBe('research-nc');
-    expect(requiresLicenseGate(q as ModalityModel)).toBe(true);
-    // The three files its graph loads, each in the ComfyUI folder its loader reads.
-    const folders = (q?.weights ?? []).map((w) => w.folder ?? w.path.split('/')[0]);
-    expect(folders.sort()).toEqual(['diffusion_models', 'text_encoders', 'vae']);
-    // Measured numbers: the DiT phase is bf16-sized on MPS and its load is a
-    // spike the guardian sheds on 24 GB — a 32 GB machine.
-    expect(q?.residentFloorGB).toBe(12);
-    expect(q?.peakResidentGB).toBe(15);
-    expect(q?.minUnifiedMemoryGB).toBe(32);
+    expect(q.commercialUse).toBe(false);
+    expect(q.license).toBe('research-nc');
+    expect(requiresLicenseGate(q)).toBe(true);
+    // Measured on MLX: ~7.4 GB of the machine across a 1024² run; a 16 GB Mac.
+    expect(q.residentFloorGB).toBe(5);
+    expect(q.peakResidentGB).toBe(7.5);
+    expect(q.minUnifiedMemoryGB).toBe(16);
+    expect(q.approxSizeGB).toBe(13);
+  });
+
+  it('FLUX.2 klein stays the fast, commercial-use pick, second in the list', () => {
+    const klein = getModel('flux2-klein-4b');
+    expect(klein?.recommended).toBe(true);
+    expect(klein?.commercialUse).toBe(true);
+    expect(klein?.license).toBe('apache-2.0');
+    expect(modelsForModality('image')[1]?.id).toBe('flux2-klein-4b');
   });
 
   it('the 20B Qwen-Image is no longer recommended: superseded by 2.1', () => {
@@ -134,9 +154,10 @@ describe('license gating', () => {
     expect(gated).toContain('ltx-2');
     // Correction #8: FLUX.1-dev GGUF is NON-COMMERCIAL now → gated.
     expect(gated).toContain('flux1-dev-gguf');
-    // The Apache mflux image models stay ungated (only the NC ComfyUI entry gates).
+    // The Apache mflux image models stay ungated; Qwen-Image 2.1 (research
+    // licence, non-commercial) is the one mflux entry that gates.
     for (const m of modelsForModality('image')) {
-      if (m.backend === 'mflux') expect(requiresLicenseGate(m)).toBe(false);
+      if (m.backend === 'mflux') expect(requiresLicenseGate(m)).toBe(m.id === 'qwen-image-2.1');
     }
   });
 

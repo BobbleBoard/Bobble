@@ -39,6 +39,8 @@ export interface VideoRunOptions {
   readonly onEvent?: (event: GenEvent) => void;
   readonly signal?: AbortSignal;
   readonly extraWith?: readonly string[];
+  /** The mflux build for an image job (a bundled wheel's path); the uv arm reads it. */
+  readonly mfluxWith?: string;
 }
 
 /**

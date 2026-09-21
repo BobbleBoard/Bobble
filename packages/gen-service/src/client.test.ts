@@ -92,6 +92,19 @@ function clientWith(child: FakeChild): { client: GenServiceClient; spawnFn: GenS
 const flush = (): Promise<void> => new Promise((r) => setTimeout(r, 0));
 
 describe('GenServiceClient.run', () => {
+  it("spawns the worker on the job's own mflux build when one is named (a bundled wheel)", async () => {
+    const child = new FakeChild();
+    const { client, spawnFn } = clientWith(child);
+    const p = client.run(IMAGE_JOB, { mfluxWith: '/res/gen-worker/wheels/mflux-x.whl' });
+    await flush();
+    const args = (spawnFn as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] as string[];
+    expect(args[args.indexOf('--with') + 1]).toBe('/res/gen-worker/wheels/mflux-x.whl');
+    expect(args.some((a) => a.startsWith('mflux=='))).toBe(false);
+    child.emitStdout('{"event":"done","jobId":"job-1","outputs":[]}\n');
+    child.emitExit(0);
+    await expect(p).resolves.toEqual([]);
+  });
+
   it('streams events and resolves with outputs on done', async () => {
     const child = new FakeChild();
     const { client, spawnFn } = clientWith(child);

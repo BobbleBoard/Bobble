@@ -39,6 +39,49 @@ export interface MfluxBackendConfig {
   readonly command: string;
   /** `--model` arg when the command multiplexes families (flux2 variants, schnell/dev). */
   readonly model?: string;
+  /**
+   * `--base-model`: the built-in family a third-party repo or a local folder
+   * is a checkpoint of (`qwen-image-2.1`), so mflux does not have to guess it
+   * from the folder's name.
+   */
+  readonly baseModel?: string;
+  /**
+   * A BUNDLED mflux BUILD this model runs on instead of the pinned release:
+   * the file name of a wheel in `python/wheels/` (packages/gen-service, shipped
+   * beside worker.py), handed to `uv run --with` in place of `mflux==<pin>`.
+   *
+   * Qwen-Image 2.1 runs on the port that is still a pull request
+   * (mflux-community/mflux#736) plus the one patch that lets its text encoder
+   * be quantized — `python/mflux-qwen21/` holds the patch and the build script.
+   * A wheel and not a git URL, so a picture never depends on GitHub, a fork
+   * or a build backend being reachable, and the bytes are the tested ones.
+   */
+  readonly wheel?: string;
+  /**
+   * The weights are MADE ON THIS MAC, once: `mflux-save` quantizes the bf16
+   * release into a folder in the library, and `--model` is that folder. For a
+   * model nobody has published pre-quantized in mflux's own layout — every
+   * "MLX 4-bit" Qwen-Image 2.1 repo on the hub is another runtime's tensor
+   * naming, which mflux cannot read. Publishing ours makes this a plain
+   * download (`model` = the repo); until then the conversion is the download.
+   */
+  readonly prepared?: PreparedWeights;
+}
+
+/** A local conversion: what is fetched, what it becomes, what each costs. */
+export interface PreparedWeights {
+  /** The bf16 Hugging Face repo the conversion reads (the official release). */
+  readonly from: string;
+  /** The repo files it needs — `*` globs, the store's `allow` (mflux's own download patterns). */
+  readonly patterns: readonly string[];
+  /** The folder the quantized model is saved to, under the modality's shelf. */
+  readonly folder: string;
+  /** mflux `-q` for the save. */
+  readonly bits: 4 | 8;
+  /** What is fetched, GB — gone again once the conversion has landed. */
+  readonly downloadGB: number;
+  /** What stays, GB. */
+  readonly sizeGB: number;
 }
 
 /** A catalog entry for one generation model. */
@@ -135,6 +178,17 @@ export interface ModalityModel {
   readonly weights?: readonly WeightFile[];
   /** Sensible default denoising steps for this model. */
   readonly defaultSteps?: number;
+  /**
+   * `false` ⇒ never ask the worker for per-step preview frames, whatever the
+   * machine has. The frames are a VAE decode at every step, and for a 64-channel
+   * VAE at 1024² that is not the ~4.5 GB klein's costs: MEASURED for Qwen-Image
+   * 2.1 (2026-09-20), the same job with previews took 181 s instead of 97, the
+   * MLX peak went 5.96 → 20.45 GB and the OS's free memory fell to 6% — a run
+   * the guardian would shed for a card animation. The pending card plays the
+   * mark instead, as it does for a ComfyUI graph. Absent means the admission
+   * decides, as before.
+   */
+  readonly previews?: false;
   /** Default quantization to request (mflux `-q`). */
   readonly defaultQuantize?: 3 | 4 | 5 | 6 | 8;
   /** RESERVED entry: enumerated + gated now, backend lands in a later phase. */
@@ -157,6 +211,123 @@ export interface ModalityModel {
  */
 export const MODALITY_CATALOG: readonly ModalityModel[] = [
   // ---- IMAGE (mflux fast-paths: active + verified) ----------------------
+  // ---- IMAGE · THE DEFAULT: Qwen-Image 2.1 on MLX -------------------------
+  {
+    /*
+     * THE DEFAULT PICTURE MODEL. the user (2026-09-20): "this is a really strong
+     * new model … if possible to make this runnable at Q4 with
+     * comparable/better quality to what currently runs at that speed, make
+     * that the new normal/default." And, the same day: "it may be worth
+     * attempting a dedicated mac inference engine since this will likely be
+     * the top tier model for its weight class for consumer machines for quite
+     * a while to come." This entry is that engine: the MLX port.
+     *
+     * Qwen-Image-2.1: a 7B single-stream DiT (32 layers) conditioned on the
+     * full Qwen3-VL-8B, guidance-free (cfg 1), native 2K, text rendering the
+     * fast models cannot match. It ran here first through ComfyUI with GGUFs
+     * (comfy-workflow.ts still carries that graph): 94 s at 12 steps, but ~15
+     * GB at the DiT load because MPS holds a GGUF dequantized — a 32 GB
+     * machine's job, shed by the guardian on 24. MLX keeps the weights
+     * quantized, and that is the whole difference:
+     *
+     * MEASURED 2026-09-20 (M5 Pro 24 GB, mflux port at 4 bits, DiT AND
+     * encoder, `--low-ram`, no previews, a 4B chat model resident):
+     *   1024²  24 steps   97 s   3.55 s/step   MLX peak 5.96 GB   OS free 57% → 26% (≈7.4 GB)
+     *    768²  24 steps   49 s   1.8 s/step    MLX peak 5.86 GB
+     *   1024²  24 steps   88 s   3.38 s/step   on an idle machine
+     *   8 bits: 94 s, 3.6 s/step, 8.8 GB peak — no faster, so 4 bits is the
+     *   shape that ships, with the recipe below.
+     * Steps: 12 comes out garbled on this port (the schedule, not the
+     * quantization — a bf16 encoder gave the same), 20 slightly broken, 24
+     * clean; the card's own 40 is a quality knob, not a floor. On the same
+     * seven prompts as the fast models: the poster's two lines of text and
+     * the flowchart's three labels exact, portraits and the watch movement
+     * photoreal, the flat fox clean — the pictures are in the memory notes.
+     *
+     * THE RECIPE — a 4-bit DiT, an 8-bit text encoder. Ten prompts with a
+     * word in the picture at one seed, the app's own neon sign at three and
+     * a poster at one: with everything at 4 bits the DiT rendered every
+     * word it was conditioned on, but the 4-bit ENCODER flipped a letter in
+     * about one in ten ("BOBBBLE"); protecting a few of its layers (the
+     * token embeddings, mflux's img_mod-style modulation guard on the DiT)
+     * moved the failure to another prompt ("VISIT" without its "KYOTO")
+     * rather than removing it; the encoder at 8 bits beside the 4-bit DiT
+     * rendered all of them, like the all-8-bit model. It costs disk only —
+     * 13 GB instead of 9 — because the encoder is one pass, evicted before
+     * the DiT loads (`--low-ram`), and its weights are file-backed pages the
+     * OS drops freely: MLX peak 5.96 GB and the free-memory drop are the
+     * uniform 4-bit model's. The wheel's predicate does this under `-q 4`;
+     * a saved model records per-layer precision in its shapes, so the
+     * loader needs nothing further.
+     *
+     * WHAT IT COSTS TO HAVE. Nobody has published this model pre-quantized in
+     * mflux's layout (the hub's "MLX 4-bit" repos are another runtime's
+     * tensor names), so the first use fetches the 31 GB bf16 release and
+     * `mflux-save`s it to 13 GB here — MEASURED 18 s of conversion on this
+     * Mac, the bf16 files removed after. Publishing our folder turns that
+     * into a 13 GB download (`mflux.model` = the repo, `prepared` dropped).
+     *
+     * THE BUILD. The port is mflux-community/mflux#736, an open pull request,
+     * and it keeps the encoder in bf16 (17.5 GB — the author measured on a
+     * 64 GB machine). The wheel in python/wheels/ is that commit plus the
+     * patch that lets the encoder quantize with the DiT and applies the
+     * recipe; see python/mflux-qwen21/. Every other mflux model stays on the
+     * pinned release.
+     *
+     * LICENSE: the Qwen Research License is NON-COMMERCIAL (research and
+     * evaluation); a commercial licence is a separate request to Qwen. The
+     * card says so, and klein below is the Apache pick for anyone who needs it.
+     */
+    id: 'qwen-image-2.1',
+    modality: 'image',
+    label: 'Qwen-Image 2.1',
+    backend: 'mflux',
+    repo: 'Qwen/Qwen-Image-2.1',
+    license: 'research-nc',
+    commercialUse: false,
+    // What stays on disk after the conversion; the 31 GB fetched is transient.
+    approxSizeGB: 13,
+    minUnifiedMemoryGB: 16,
+    // THE NUMBERS ADMISSION READS — the OS's own free-memory drop across a
+    // 1024² run (above), not the MLX figure: a floor under the weights, the
+    // encoder pass and the runtime, and the 1024² peak a little above the
+    // measured 7.4 GB so a noisy sample does not admit a swap.
+    residentFloorGB: 5,
+    peakResidentGB: 7.5,
+    runsLocally: true,
+    heavy: true, // serial — see the klein entry
+    recommended: true,
+    mflux: {
+      kind: 'mflux',
+      command: 'mflux-generate-qwen-2.1',
+      baseModel: 'qwen-image-2.1',
+      wheel: 'mflux-0.19.2+bobble.qwen21.te8-py3-none-any.whl',
+      prepared: {
+        from: 'Qwen/Qwen-Image-2.1',
+        // mflux's own download patterns for the family, plus the tokenizer.
+        patterns: [
+          'transformer/*',
+          'text_encoder/*',
+          'vae/*',
+          'processor/*',
+          'model_index.json',
+          'scheduler/*',
+        ],
+        // The folder names the recipe (te8 = the 8-bit text encoder): a
+        // plain `-4bit` save from before (2026-09-20) is not this model.
+        folder: 'qwen-image-2.1-mflux-4bit-te8',
+        bits: 4,
+        downloadGB: 31,
+        sizeGB: 13,
+      },
+    },
+    defaultSteps: 24,
+    // The 64-channel VAE decoded at every step: +14 GB and twice the time (see
+    // ModalityModel.previews). The card plays the mark.
+    previews: false,
+    notes:
+      'Default. Qwen-Image-2.1 (7B DiT at 4 bits, Qwen3-VL-8B encoder at 8) on MLX (mflux port): 97 s/1024² and 49 s/768² at 24 steps, ~6 GB MLX peak, ~7.4 GB of the machine (MEASURED 2026-09-20, M5 Pro 24GB); every words-in-picture prompt exact where a 4-bit encoder flipped one letter in ten. Converted on this Mac from the 31 GB bf16 release, once (18 s). Research licence: non-commercial.',
+  },
   {
     id: 'flux2-klein-4b',
     modality: 'image',
@@ -238,119 +409,7 @@ export const MODALITY_CATALOG: readonly ModalityModel[] = [
     },
     defaultSteps: 4,
     notes:
-      'Default. Apache, mflux auto-fetches text-enc+VAE (no manual aux). Pre-quantized 4-bit mflux repo (no on-the-fly -q). 3.6s/512² (4.95GB peak) · 8.4s/1024² (12.4GB peak) ALONE [measured 2026-08-25]. Alongside a resident 9B chat model on 24GB, 1024² swaps: ~2min/step.',
-  },
-  // ---- IMAGE · the quality pick (ComfyUI) --------------------------------
-  {
-    /*
-     * THE QUALITY PICK, NOT (YET) THE DEFAULT. the user (2026-09-20): "this is a
-     * really strong new model … if possible to make this runnable at Q4 with
-     * comparable/better quality to what currently runs at that speed, make
-     * that the new normal/default."
-     *
-     * Qwen-Image-2.1: a 7B single-stream DiT (32 layers) conditioned on the
-     * full Qwen3-VL-8B, guidance-free (cfg 1), native 2K, RGBA output, text
-     * rendering the fast models cannot match. Runs here through ComfyUI
-     * (0.37, day-0 support) with a Q4_K_M GGUF of the DiT and a Q4_K_M GGUF of
-     * the encoder — fp8 is refused on MPS and the bf16 encoder alone is 17.5
-     * GB, so GGUF is the only shape of this model a 24 GB Mac runs.
-     *
-     * MEASURED 2026-09-20 (M5 Pro 24 GB, ComfyUI 0.37 on MPS, warm):
-     *   1024²  12 steps   94 s   (7.0 s/step; ~30 s of encode + decode)
-     *   1024²  20 steps  170 s
-     *   1024²  40 steps  ~5 min (the card's own number; 12 and 20 were not
-     *                     distinguishable side by side, so 12 is the default)
-     *   512²   20 steps   81 s   — and the text in the sign came out garbled:
-     *                     the model is trained at 1–4 MP; 768² is its floor.
-     * Against the fast models on the same four prompts (klein 16 s, Z-Image
-     * 46 s at 1024²): better on text-in-scene and product shots, level on the
-     * portrait, weaker on the flat illustration — comparable, at 6–10× the
-     * time; what ran at THIS speed before, Qwen-Image 2512, never finished
-     * downloading on this Mac.
-     *
-     * WHY IT IS NOT THE DEFAULT, AND WHY 32 GB: memory, on the app's own
-     * terms. The OS's free level fell 82% → 21% across a 1024² run with the
-     * encoder and the DiT resident together (14.4 GB), and settled at 35%
-     * (11.3 GB) with the encoder unloaded before the DiT loads (the
-     * template's prelude does that) — but the DiT's LOAD is a spike on its
-     * own: free fell to 20% for ten seconds while 4.2 GB of GGUF became ~14
-     * GB of resident model, with the Mac swapping at 16k pages/s, and the
-     * guardian shed the job for it in the app, as it should (2026-09-11).
-     * The DiT phase costs what a bf16 7B costs: on MPS, ComfyUI holds the
-     * GGUF dequantized (--gpu-only, split and quad attention, --reserve-vram
-     * were all measured and changed nothing), so Q4 buys disk, not memory.
-     * A 24 GB Mac runs it by hand at 21% free and not under the guardian;
-     * 32 is the machine it fits, like LTX-2.5. The way to a default on 24 GB
-     * is the MLX port (filipstrand/mflux#736, in review, encoder still bf16
-     * = 17.5 GB) with a quantized encoder: MLX keeps weights quantized and
-     * runs klein's 1024² in 5.8 GB. stable-diffusion.cpp (Metal, Q4_K) was
-     * measured too: 11.5 s/step plus a 142 s VAE decode — twice ComfyUI's
-     * time.
-     *
-     * TEXT-TO-IMAGE ONLY on this path: editing with reference images needs the
-     * encoder's vision tower, which the GGUF keeps in a separate mmproj that
-     * ComfyUI-GGUF does not load for Qwen3-VL. `edit_image` keeps its own model.
-     *
-     * LICENSE: the Qwen Research License is NON-COMMERCIAL (research and
-     * evaluation); a commercial licence is a separate request to Qwen. The
-     * card says so.
-     */
-    id: 'qwen-image-2.1',
-    modality: 'image',
-    label: 'Qwen-Image 2.1',
-    backend: 'comfyui',
-    repo: 'Qwen/Qwen-Image-2.1',
-    license: 'research-nc',
-    commercialUse: false,
-    approxSizeGB: 9.9,
-    minUnifiedMemoryGB: 32,
-    // The DiT phase (a bf16-sized 7B on MPS) plus its load spike; the OS free
-    // level at the trough, not the file sizes.
-    residentFloorGB: 12,
-    peakResidentGB: 15,
-    runsLocally: true,
-    heavy: true,
-    recommended: true,
-    weights: [
-      {
-        // ComfyUI-GGUF's own conversion (city96's loader reads it; the sd.cpp
-        // conversions carry different tensor names and are refused).
-        repo: 'Abiray/Qwen-Image-2.1-GGUF',
-        path: 'qwen_image_2.1_Q4_K_M.gguf',
-        bytes: 4_189_343_904,
-        folder: 'diffusion_models',
-      },
-      {
-        // The official llama.cpp GGUF of the encoder. Its language model is
-        // Qwen3-8B-shaped, so ComfyUI needs the bobble_comfy_fixes predicate
-        // to read it as Qwen-Image 2.1's (comfy-h3-shim.ts).
-        repo: 'Qwen/Qwen3-VL-8B-Instruct-GGUF',
-        path: 'Qwen3VL-8B-Instruct-Q4_K_M.gguf',
-        bytes: 5_027_784_800,
-        folder: 'text_encoders',
-      },
-      {
-        repo: 'Comfy-Org/Qwen-Image-2.1',
-        path: 'vae/qwen_image_2.1_vae_bf16.safetensors',
-        bytes: 675_509_688,
-      },
-    ],
-    comfy: {
-      kind: 'comfyui',
-      workflowTemplate: 'qwen-image-2.1-t2i',
-      paramMap: {
-        prompt: '4.inputs.prompt',
-        negativePrompt: '4.inputs.negative_prompt',
-        width: '5.inputs.width',
-        height: '5.inputs.height',
-        steps: '6.inputs.steps',
-        cfg: '6.inputs.cfg',
-        seed: '6.inputs.seed',
-      },
-    },
-    defaultSteps: 12,
-    notes:
-      'Quality pick. Qwen-Image-2.1 (7B DiT + Qwen3-VL-8B) at Q4 via ComfyUI-GGUF on MPS: 94 s/1024² at 12 steps, 170 s at 20 (MEASURED 2026-09-20, M5 Pro 24GB) — but ~15 GB at the DiT load (the GGUF is held dequantized on MPS), which the guardian sheds on 24 GB: a 32 GB machine. Text-to-image only here (editing needs the mmproj). Research licence: non-commercial.',
+      'Fast pick, Apache (the commercial-use default). mflux auto-fetches text-enc+VAE (no manual aux). Pre-quantized 4-bit mflux repo (no on-the-fly -q). 3.6s/512² (4.95GB peak) · 8.4s/1024² (12.4GB peak) ALONE [measured 2026-08-25]. Alongside a resident 9B chat model on 24GB, 1024² swaps: ~2min/step.',
   },
   {
     id: 'z-image-turbo',

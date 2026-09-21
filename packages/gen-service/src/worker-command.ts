@@ -41,10 +41,16 @@ export const DEFAULT_PYTHON_VERSION = '3.12';
  * 3D deps (`triposr` / `trellis`) are forward-dated: the exact package set is
  * finalised when the Phase-D 3D worker lands. [projected]
  */
-export function baseWorkerWith(backend: Backend, mfluxPin: string = MFLUX_PIN): readonly string[] {
+export function baseWorkerWith(
+  backend: Backend,
+  mfluxPin: string = MFLUX_PIN,
+  mfluxWith?: string,
+): readonly string[] {
   switch (backend) {
     case 'mflux':
-      return [`mflux==${mfluxPin}`];
+      // A model that names its own mflux build (a bundled wheel — the Qwen-Image
+      // 2.1 port, see catalog MfluxBackendConfig.wheel) replaces the pin.
+      return [mfluxWith !== undefined && mfluxWith.length > 0 ? mfluxWith : `mflux==${mfluxPin}`];
     case 'mlx-audio':
       return [`mlx-audio==${MLX_AUDIO_PIN}`];
     case 'torch-tts':
@@ -77,11 +83,14 @@ export function baseWorkerWith(backend: Backend, mfluxPin: string = MFLUX_PIN): 
 export function buildEnvWarmArgs(opts: {
   backend: Backend;
   mfluxPin?: string;
+  /** The mflux requirement in place of the pin (a bundled wheel's path). */
+  mfluxWith?: string;
   python?: string;
   extraWith?: readonly string[];
 }): string[] {
   const args = ['run', '--no-project', '--python', opts.python ?? DEFAULT_PYTHON_VERSION];
-  for (const dep of baseWorkerWith(opts.backend, opts.mfluxPin)) args.push('--with', dep);
+  for (const dep of baseWorkerWith(opts.backend, opts.mfluxPin, opts.mfluxWith))
+    args.push('--with', dep);
   for (const dep of opts.extraWith ?? []) args.push('--with', dep);
   args.push('python', '-c', "print('module ready')");
   return args;
@@ -109,6 +118,15 @@ export function resolveWorkerScript(override?: string): string {
   return path.join(packageRoot(), 'python', 'worker.py');
 }
 
+/**
+ * Where a bundled mflux wheel sits: `wheels/<name>` beside worker.py, in the
+ * checkout (packages/gen-service/python) and in the packaged app
+ * (<Resources>/gen-worker) alike, since the whole python/ folder ships.
+ */
+export function bundledWheelPath(workerScript: string, wheel: string): string {
+  return path.join(path.dirname(workerScript), 'wheels', wheel);
+}
+
 export interface WorkerUvArgsOptions {
   /** Absolute path to worker.py (from {@link resolveWorkerScript}). */
   readonly workerScript: string;
@@ -121,6 +139,12 @@ export interface WorkerUvArgsOptions {
   readonly backend?: Backend;
   /** mflux version pin (default {@link MFLUX_PIN}); applies to the mflux base. */
   readonly mfluxPin?: string;
+  /**
+   * The mflux requirement to use INSTEAD of the pin — the absolute path of a
+   * wheel shipped beside worker.py (catalog `mflux.wheel`, resolved by the
+   * app). uv takes a path where it takes `name==version`.
+   */
+  readonly mfluxWith?: string;
   /** uv-provisioned Python version (default {@link DEFAULT_PYTHON_VERSION}). */
   readonly python?: string;
   /**
@@ -152,7 +176,7 @@ export interface WorkerUvArgsOptions {
  */
 export function buildWorkerUvArgs(opts: WorkerUvArgsOptions): string[] {
   const args = ['run', '--no-project', '--python', opts.python ?? DEFAULT_PYTHON_VERSION];
-  for (const dep of baseWorkerWith(opts.backend ?? 'mflux', opts.mfluxPin)) {
+  for (const dep of baseWorkerWith(opts.backend ?? 'mflux', opts.mfluxPin, opts.mfluxWith)) {
     args.push('--with', dep);
   }
   for (const dep of opts.extraWith ?? []) {

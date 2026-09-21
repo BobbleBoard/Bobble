@@ -81,9 +81,7 @@ describe('the gate — a job waits for the button, then continues', () => {
     await new Promise((r) => setTimeout(r, 0));
     m.dismiss('comfy');
     await expect(job).rejects.toBeInstanceOf(GenModuleMissingError);
-    await expect(job).rejects.toThrow(
-      /Picture, video, music, sound-effect and 3D generation is not set up/,
-    );
+    await expect(job).rejects.toThrow(/Video, music, sound-effect and 3D generation is not set up/);
   });
 
   it('nobody pressing it for the wait ends the job the same way', async () => {
@@ -215,12 +213,17 @@ describe("a model's weights are a module of their own", () => {
         }
       : undefined;
 
-  it('names one only for an entry that lists files', () => {
+  it('names one only for an entry that lists files — or makes them here (mflux.prepared)', () => {
     expect(weightsModuleFor({ id: 'ltx-2.5-distilled', weights: [{}] })).toBe(
       'weights:ltx-2.5-distilled',
     );
     expect(weightsModuleFor({ id: 'hyperframes' })).toBeUndefined();
     expect(weightsModuleFor({ id: 'x', weights: [] })).toBeUndefined();
+    // Qwen-Image 2.1: no files listed, a conversion made on this Mac instead.
+    expect(weightsModuleFor({ id: 'qwen-image-2.1', mflux: { prepared: {} } })).toBe(
+      'weights:qwen-image-2.1',
+    );
+    expect(weightsModuleFor({ id: 'flux2-klein-4b', mflux: {} })).toBeUndefined();
     expect(weightsModelId('weights:ltx-2.5-distilled')).toBe('ltx-2.5-distilled');
     expect(weightsModelId('comfy')).toBeNull();
   });

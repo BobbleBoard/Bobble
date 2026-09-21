@@ -159,8 +159,10 @@ export function registerGenTools(pi: ExtensionAPI, options: GenToolsOptions): vo
       'Generate an image from a text prompt, locally on-device (Apple-Silicon MLX). Returns the ' +
       'image(s) and opens them on the canvas with a live progress bar. Every result is footnoted ' +
       `with the model that made it. Available models: ${IMAGE_MODEL_IDS.join(', ')} ` +
-      '(default is a fast, Apache-licensed model). Use size like "512x512" or "1024x1024"; higher ' +
-      'sizes and step counts are slower. When the user names a folder or file for the picture, ' +
+      '(default: qwen-image-2.1 — the best pictures and exact text, about a minute and a half at ' +
+      '1024x1024; flux2-klein-4b is the fast Apache-licensed pick, seconds). Use size like ' +
+      '"768x768" or "1024x1024"; higher sizes and step counts are slower. When the user names a ' +
+      'folder or file for the picture, ' +
       'pass it as save_to — the finished image is saved there for you; no copying afterwards.',
     promptSnippet: 'Generate an image from a text prompt (on-device)',
     /*
@@ -188,7 +190,7 @@ export function registerGenTools(pi: ExtensionAPI, options: GenToolsOptions): vo
       ),
       model: Type.Optional(
         Type.String({
-          description: `Model id. One of: ${IMAGE_MODEL_IDS.join(', ')}. Default: fast model.`,
+          description: `Model id. One of: ${IMAGE_MODEL_IDS.join(', ')}. Default: qwen-image-2.1.`,
         }),
       ),
       size: Type.Optional(

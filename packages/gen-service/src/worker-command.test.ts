@@ -2,7 +2,9 @@ import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   baseWorkerWith,
+  buildEnvWarmArgs,
   buildWorkerUvArgs,
+  bundledWheelPath,
   DEFAULT_PYTHON_VERSION,
   GEN_WORKER_PATH_ENV,
   MFLUX_PIN,
@@ -33,6 +35,37 @@ describe('buildWorkerUvArgs', () => {
     });
     expect(args).toContain('mflux==9.9.9');
     expect(args[args.indexOf('--python') + 1]).toBe('3.13');
+  });
+
+  it('runs a model on its own bundled mflux build in place of the pin (Qwen-Image 2.1)', () => {
+    // The wheel beside worker.py, in the checkout and the packaged app alike.
+    const wheel = bundledWheelPath(
+      '/w/worker.py',
+      'mflux-0.19.2+bobble.qwen21.te8-py3-none-any.whl',
+    );
+    expect(wheel).toBe(
+      path.join('/w', 'wheels', 'mflux-0.19.2+bobble.qwen21.te8-py3-none-any.whl'),
+    );
+    const args = buildWorkerUvArgs({ workerScript: '/w/worker.py', mfluxWith: wheel });
+    expect(args).toEqual([
+      'run',
+      '--no-project',
+      '--python',
+      DEFAULT_PYTHON_VERSION,
+      '--with',
+      wheel,
+      'python',
+      '/w/worker.py',
+    ]);
+    // Never both: the pinned release and the wheel are the same package.
+    expect(args.filter((a) => a.startsWith('mflux=='))).toEqual([]);
+    // The env warm takes the same override, so the module can warm that env too.
+    expect(buildEnvWarmArgs({ backend: 'mflux', mfluxWith: wheel })).toContain(wheel);
+    expect(buildEnvWarmArgs({ backend: 'mflux' })).toContain(`mflux==${MFLUX_PIN}`);
+    // An empty override means the pin.
+    expect(buildWorkerUvArgs({ workerScript: '/w/worker.py', mfluxWith: '' })).toContain(
+      `mflux==${MFLUX_PIN}`,
+    );
   });
 
   it('appends extra --with deps (a future modality backend) before python', () => {

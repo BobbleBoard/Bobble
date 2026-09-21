@@ -1233,7 +1233,7 @@ export function preludeGraph(
     if (node === undefined) throw new Error(`prelude names node "${id}", which the graph lacks`);
     out[id] = structuredClone(node);
   }
-  out['_prelude'] = {
+  out._prelude = {
     class_type: 'PreviewAny',
     inputs: { source: [prelude.output[0], prelude.output[1]] },
   };

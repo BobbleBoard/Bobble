@@ -34,6 +34,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
   activeModels,
+  bundledWheelPath,
   ComfyClient,
   default3dModel,
   defaultGenSpawn,
@@ -52,6 +53,7 @@ import {
   type ModelFinish,
   modelsForModality,
   previewCostGB,
+  resolveWorkerScript,
 } from '@pi-desktop/gen-service';
 import {
   GEN_SOCK_ENV,
@@ -101,6 +103,7 @@ import {
   HyperFramesRunner,
   makeVideoAwareRunner,
 } from './video-dispatch';
+import { preparedDir } from './weights-on-shelf';
 
 const log = createLogger('desktop:gen');
 
@@ -633,7 +636,9 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
     // the headroom the user asked to keep — so the guardian is not even asked.
     // A ComfyUI graph decodes once at the end: no per-step frames, no
     // preview cost, and the footprint is the bare job.
-    const canPreview = model.mflux !== undefined && eco.previews;
+    // …and never for a model whose per-step decode is the job's cost again
+    // (ModalityModel.previews: Qwen-Image 2.1's 64-channel VAE, +14 GB).
+    const canPreview = model.mflux !== undefined && model.previews !== false && eco.previews;
     const previewsAllowed = canPreview ? (opts.heavyAllowed?.(withPreviews) ?? true) : false;
     const stepPreviews =
       typeof previewsAllowed === 'boolean' ? previewsAllowed : previewsAllowed.ok;
@@ -650,7 +655,11 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
               prompt: raw.prompt,
               modelId: model.id,
               mfluxCommand: model.mflux.command,
-              mfluxModel: model.mflux.model,
+              // A model MADE on this Mac (mflux.prepared) is loaded from its
+              // library folder; a published one by its repo.
+              mfluxModel:
+                model.mflux.prepared !== undefined ? preparedDir(model) : model.mflux.model,
+              ...(model.mflux.baseModel !== undefined ? { baseModel: model.mflux.baseModel } : {}),
               width,
               height,
               steps,
@@ -774,6 +783,16 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
         heavy: model.heavy,
         footprintGB,
         onEvent,
+        // The model's own mflux build, when it ships one (the Qwen-Image 2.1
+        // port): a wheel beside worker.py, in place of the pinned release.
+        ...(model.mflux?.wheel !== undefined
+          ? {
+              mfluxWith: bundledWheelPath(
+                resolveWorkerScript(opts.workerScript),
+                model.mflux.wheel,
+              ),
+            }
+          : {}),
       }).result;
       moduleSucceeded(job.backend);
       progress = undefined;

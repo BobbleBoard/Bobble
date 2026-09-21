@@ -197,7 +197,7 @@ describe('generate_image tool', () => {
     }));
     const tools = collectTools(bridge, async () => Buffer.from('x'));
     await run(tools, { prompt: 'a tree' });
-    expect(bridge.calls[0]?.params?.model).toBe('flux2-klein-4b');
+    expect(bridge.calls[0]?.params?.model).toBe('qwen-image-2.1');
   });
 
   it('surfaces a generator error as a structured (never-thrown) result', async () => {

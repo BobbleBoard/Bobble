@@ -170,10 +170,11 @@ export function ImageStudio(): JSX.Element {
   /*
    * …re-measured since. Every mflux job runs `--low-ram` now (klein 1024² is
    * 5.8 GB of the OS's memory, not 19 — see the catalog), and the default
-   * model is Qwen-Image 2.1 on ComfyUI, MEASURED at ~12 GB across a 1024² run
-   * on the 24 GB M5 Pro — and trained at 1–4 MP: at 512² its text comes out
-   * garbled (2026-09-20). So 1024² is the default from 24 GB up; 768² on 16;
-   * 512² below that, where only the small mflux models run at all.
+   * model is Qwen-Image 2.1 on MLX, MEASURED at ~7.4 GB of the machine across
+   * a 1024² run on the 24 GB M5 Pro (97 s; 768² in 49 s) — and trained at 1–4
+   * MP: at 512² its text comes out garbled (2026-09-20). So 1024² is the
+   * default from 24 GB up; 768² on 16; 512² below that, where only the small
+   * mflux models run at all.
    */
   useEffect(() => {
     void window.piDesktop
@@ -195,6 +196,8 @@ export function ImageStudio(): JSX.Element {
   const { busy, error, runs, job, run, cancel, finishReveal } = useStudio('image');
   const models = useMemo(() => catalog.filter((m) => m.modality === 'image'), [catalog]);
   const blocked = studioBlockedReason(models, 'image');
+  /** The model a run will use: the chosen one, else the catalog's default. */
+  const wantedModel = model !== '' ? model : (models[0]?.id ?? '');
   const size = (SHAPES.find((x) => x.value === shape) ?? SHAPES[0]).of(long);
   const enhancer = useEnhancer(useCallback((next: string) => setPrompt(next), []));
   /*
@@ -343,7 +346,17 @@ export function ImageStudio(): JSX.Element {
       {...(job?.cancellable === true ? { onStop: cancel } : {})}
       runLabel={enhancer.enhancing ? 'Enhancing…' : handoff.input !== null ? 'Edit' : 'Generate'}
       {...(blocked !== undefined ? { blocked } : {})}
-      notice={<ModuleCard id="image" place="studio" />}
+      notice={
+        <>
+          <ModuleCard id="image" place="studio" />
+          {/* The chosen model's own files, once a run has asked for them. With
+              nothing chosen the run uses the catalog's first image model, which
+              the DTO lists first — so its card is the one to show: Qwen-Image
+              2.1 is MADE on this Mac (31 GB fetched, converted, pruned) and a
+              first run without this card would wait on a button nobody sees. */}
+          {wantedModel !== '' ? <ModuleCard id={`weights:${wantedModel}`} place="studio" /> : null}
+        </>
+      }
       error={error}
       onRetry={() => void onRun()}
       {...(handoff.card !== undefined ? { input: handoff.card } : {})}

@@ -1,24 +1,26 @@
 /**
- * QWEN-IMAGE 2.1 THROUGH THE APP — the quality pick since 2026-09-20, on the
- * real engine and the real shelved weights, in the Image studio the way a
- * person uses it: open the room, pick Qwen-Image 2.1 in the rail, leave the
- * size the machine picked, type a line with text in it, press Generate,
- * wait, LOOK.
+ * QWEN-IMAGE 2.1 THROUGH THE APP — the DEFAULT picture model since 2026-09-20,
+ * on MLX (the mflux port, bundled as a wheel beside worker.py) and the model
+ * this Mac converted for itself, in the Image studio the way a person uses it:
+ * open the room, leave the model and the size the machine picked, type a line
+ * with text in it, press Generate, wait, LOOK.
  *
- * What is checked: the catalog lists it second, recommended, on ComfyUI with
- * its research licence; the machine's default size on 24 GB is 1024 (the
- * model garbles text at 512); the guardian admits it on an idle 24 GB Mac
- * (the encoder-then-DiT prelude keeps the peak at ~11.5 GB); a real PNG
- * lands in the run's folder; the wall time is printed against the measured
- * 94 s (12 steps at 1024², warm) so a regression shows as a number.
+ * What is checked: the catalog lists it FIRST (the default), on mflux with
+ * the bundled build and the research licence; klein second; the machine's
+ * default size on 24 GB is 1024 (the model garbles text at 512); the guardian
+ * admits it on a 24 GB Mac (MEASURED ~7.4 GB of the machine, ~6 GB MLX peak);
+ * no download card appears when the conversion is on the shelf; the note
+ * counts steps; a real PNG lands in the run's folder; the wall time is
+ * printed against the measured 97 s (24 steps at 1024², a chat model
+ * resident) so a regression shows as a number.
  *
- * Needs the machine idle enough: ~76% free. Quit Bobble first.
+ * Under 16 GB the honest outcome is the guardian holding it with the numbers.
  *
  *   MAX_MIN=10 SHOT_DIR=/tmp/qwen21 node apps/desktop/tests/e2e/qwen-image-21-real-probe.mjs
  *
- * Real cache + real library (the weights on their shelves, the ComfyUI
- * engine), throwaway home (the output lands in the probe's own
- * Bobble/generated, never the user's). Run `npm run build` first.
+ * Real cache + real library (the converted model on its shelf), throwaway
+ * home (the output lands in the probe's own Bobble/generated, never the
+ * user's). Run `npm run build` first.
  */
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
@@ -64,12 +66,9 @@ try {
     };
   });
   console.log('catalog:', JSON.stringify(facts));
-  check(facts.first === 'flux2-klein-4b', `the default image model stays klein (${facts.first})`);
-  check(
-    facts.second === 'qwen-image-2.1',
-    `Qwen-Image 2.1 is the second, quality pick (${facts.second})`,
-  );
-  check(facts.backend === 'comfyui', 'it runs on ComfyUI');
+  check(facts.first === 'qwen-image-2.1', `Qwen-Image 2.1 is the default (${facts.first})`);
+  check(facts.second === 'flux2-klein-4b', `klein is the fast pick after it (${facts.second})`);
+  check(facts.backend === 'mflux', `it runs on MLX (${facts.backend})`);
   check(
     facts.commercial === false && facts.license === 'research-nc',
     'its card says research licence',
@@ -106,14 +105,13 @@ try {
 
   await page.fill('[data-testid="studio-prompt"]', PROMPT);
   await shot('1-before');
-  // What this Mac is: the catalog says 32 GB; on less the guardian must say
-  // so — hold with the numbers — rather than run it into a swap storm
-  // (MEASURED 2026-09-20: the DiT load took the OS to 20% free at 16k
-  // pages/s of swap, and the guardian shed it).
+  // What this Mac is: the catalog says 16 GB for the MLX path (~7.4 GB of
+  // the machine at 1024²); on less the guardian must say so — hold with the
+  // numbers — rather than run it into a swap storm.
   const totalGB = await page.evaluate(() =>
     window.piDesktop.invoke('app:get-info', undefined).then((i) => i.totalMemoryBytes / 1024 ** 3),
   );
-  const fits = totalGB >= 32;
+  const fits = totalGB >= 16;
   console.log(
     `machine: ${totalGB.toFixed(0)} GB — ${fits ? 'expect a picture' : 'expect the guardian to hold it, with the numbers'}`,
   );
@@ -125,6 +123,7 @@ try {
   let done = false;
   let held = '';
   let firstStepAt = null;
+  let stepsSeen = 0;
   while (Date.now() - t0 < (fits ? CAP_MS : 45_000)) {
     const state = await page
       .evaluate(() => {
@@ -149,8 +148,11 @@ try {
       console.log(
         `   [${((Date.now() - t0) / 1000).toFixed(0)}s] ${lastNote.replace(/\s+/g, ' ').slice(0, 140)}`,
       );
-      if (firstStepAt === null && /step|\d+\s*\/\s*\d+/i.test(lastNote)) firstStepAt = Date.now();
-      const m = /needs about [^]*?(?=Try again|$)/.exec(lastNote.replace(/\s+/g, ' '));
+      if (/step|\d+\s*\/\s*\d+/i.test(lastNote)) {
+        stepsSeen += 1;
+        if (firstStepAt === null) firstStepAt = Date.now();
+      }
+      const m = /needs about [\s\S]*?(?=Try again|$)/.exec(lastNote.replace(/\s+/g, ' '));
       if (m !== null) held = m[0].trim();
     }
     if (state.err.length > 0) {
@@ -176,8 +178,9 @@ try {
     console.log(`held: ${held}`);
   } else {
     check(done, `no picture after ${secs.toFixed(0)}s`);
+    check(stepsSeen > 0, `the card counted steps as it went (${stepsSeen} notes)`);
     console.log(
-      `wall: ${secs.toFixed(0)} s (measured by hand: 94 s warm at 12 steps, ~30 s more cold)`,
+      `wall: ${secs.toFixed(0)} s (measured by hand: 97 s at 24 steps with a chat model resident; the first run of a fresh uv env adds its resolve)`,
     );
   }
 

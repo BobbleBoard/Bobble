@@ -26,6 +26,8 @@ export type JobRunner = (
     onEvent?: (event: GenEvent) => void;
     signal?: AbortSignal;
     extraWith?: readonly string[];
+    /** The mflux build for this job (a bundled wheel's path) — see client RunJobOptions. */
+    mfluxWith?: string;
   },
 ) => Promise<GenOutput[]>;
 
@@ -45,6 +47,8 @@ export interface EnqueueOptions {
   readonly heavy?: boolean;
   /** Extra `uv --with` deps for the backend. */
   readonly extraWith?: readonly string[];
+  /** The mflux build for this job, in place of the pin (a bundled wheel's path). */
+  readonly mfluxWith?: string;
   /** Per-job worker event stream (progress/candidate/…). */
   readonly onEvent?: (event: GenEvent) => void;
 }
@@ -59,6 +63,7 @@ interface Entry {
   readonly job: GenJob;
   readonly heavy: boolean;
   readonly extraWith?: readonly string[];
+  readonly mfluxWith?: string;
   readonly onEvent?: (event: GenEvent) => void;
   readonly controller: AbortController;
   footprintGB?: number;
@@ -209,6 +214,7 @@ export class JobQueue {
       heavy: options.heavy === true,
       footprintGB: options.footprintGB,
       extraWith: options.extraWith,
+      ...(options.mfluxWith !== undefined ? { mfluxWith: options.mfluxWith } : {}),
       onEvent: options.onEvent,
       controller: new AbortController(),
       status: 'queued',
@@ -344,6 +350,7 @@ export class JobQueue {
     this.#runner(entry.job, {
       signal: entry.controller.signal,
       extraWith: entry.extraWith,
+      ...(entry.mfluxWith !== undefined ? { mfluxWith: entry.mfluxWith } : {}),
       onEvent: (event) => {
         entry.onEvent?.(event);
         this.#emit({ type: 'event', jobId: entry.job.id, event });

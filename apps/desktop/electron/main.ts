@@ -851,10 +851,14 @@ function registerAppIpc(): void {
      * the button that installs it. Their state is pushed to the window; the
      * gate inside registerGenIpc holds a job on them.
      */
-    const genModules = createGenModules((states) => {
-      const wc = mainWindow?.webContents ?? null;
-      if (wc !== null && !wc.isDestroyed()) events.send(wc, 'gen:module', states);
-    });
+    const genModules = createGenModules(
+      (states) => {
+        const wc = mainWindow?.webContents ?? null;
+        if (wc !== null && !wc.isDestroyed()) events.send(wc, 'gen:module', states);
+      },
+      // The bundled mflux wheels sit beside worker.py (Qwen-Image 2.1's build).
+      { workerScript: genWorker },
+    );
     genModulesRef = genModules;
     const genQueue = registerGenIpc({
       /*
