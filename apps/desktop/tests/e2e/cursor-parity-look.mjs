@@ -332,23 +332,29 @@ try {
     });
     const gsock = await connect(genSock);
     const grpc = makeRpc(gsock, 240_000);
-    const job = grpc('generateSvg', { prompt: 'a red heart icon, flat', candidates: 2 });
+    const job = grpc('generateSvg', { prompt: 'a red heart icon, flat', candidates: 3 });
     // Photograph the card as it draws.
     let drewFrames = 0;
     let firstNote = '';
+    const polls = [];
     const t0 = Date.now();
     while (Date.now() - t0 < 200_000) {
-      await sleep(700);
+      // A small icon draws in about a second per sample; poll fast enough to
+      // see it, and count the DRAWING's paths — the card's head has icons too.
+      await sleep(200);
       const state = await page.evaluate(() => {
         const card = document.querySelector('[data-testid="live-svg"]');
         const note = document.querySelector('[data-testid="live-svg-note"]')?.textContent ?? '';
-        const paths = card ? card.querySelectorAll('svg path').length : -1;
+        const paths = card ? card.querySelectorAll('.pd-inline-widget-box svg path').length : -1;
         return { has: !!card, status: card?.getAttribute('data-status'), note, paths };
       });
+      polls.push(
+        `${Math.round((Date.now() - t0) / 100) / 10}s:${state.status ?? '-'}/${state.paths}`,
+      );
       if (state.has && state.status === 'drawing' && state.paths > 0) {
         drewFrames += 1;
         if (firstNote === '') firstNote = state.note;
-        if (drewFrames === 1 || drewFrames === 4) await shot(`5-live-drawing-${drewFrames}`);
+        if (drewFrames === 1 || drewFrames === 3) await shot(`5-live-drawing-${drewFrames}`);
       }
       if (state.status === 'done' || !state.has) {
         let settled = false;
@@ -367,6 +373,7 @@ try {
       }
     }
     const result = await job.catch((e) => ({ error: String(e) }));
+    console.log(`live polls: ${polls.join(' ')}`);
     check(!('error' in result), `OmniSVG ran (${result?.error ?? 'ok'})`);
     check(drewFrames >= 2, `the card drew live — ${drewFrames} frames with shapes seen`);
     check(/shape/.test(firstNote), `the note counts shapes (${firstNote})`);
