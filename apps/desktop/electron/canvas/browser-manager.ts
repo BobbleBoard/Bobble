@@ -139,6 +139,18 @@ function attachListeners(tabId: string, view: WebContentsView, owner: WebContent
   wc.on('did-start-loading', () => emitState(owner, { tabId, loading: true }));
   wc.on('did-stop-loading', () => emitState(owner, { tabId, loading: false, ...navState(wc) }));
   wc.on('page-title-updated', (_e, title) => emitState(owner, { tabId, title }));
+  /*
+   * A PAGE MAY NOT HOLD THE TAB. A `beforeunload` handler that returns a value
+   * ("Leave site? Changes you made may not be saved") is a request to ASK the
+   * user; this browser has no dialog for it, and without one Electron answers
+   * the request by CANCELLING the navigation — silently. SEEN 2026-09-21, a
+   * Desmos graph the model had edited: every `browser navigate` to GeoGebra
+   * after that reported "Navigated to https://www.desmos.com/calculator" — the
+   * page had refused to unload and nothing said so. the user: "try geogebra" went
+   * nowhere seven times. Whoever asked for the navigation — the model, or the
+   * user typing in the bar — asked to leave; leaving is what happens.
+   */
+  wc.on('will-prevent-unload', (e) => e.preventDefault());
   wc.on('page-favicon-updated', (_e, favicons) => {
     if (favicons[0]) emitState(owner, { tabId, faviconUrl: favicons[0] });
   });
@@ -442,6 +454,12 @@ export interface AgentTabState {
   tabId: string;
   url: string;
   title: string;
+  /** After a navigation: whether the main frame actually went anywhere. A tab
+   * that stayed put is reported as such rather than as "navigated to" the page
+   * it was already on. */
+  navigated?: boolean;
+  /** The load's failure, when it failed outright (`ERR_NAME_NOT_RESOLVED`…). */
+  loadError?: string;
 }
 
 /** Named keys → Electron `sendInputEvent` keyCodes. */
@@ -500,6 +518,27 @@ function sendKey(tabId: string, key: string): void {
   wc.sendInputEvent({ type: 'keyUp', keyCode: code });
 }
 
+/**
+ * Type `text` as keystrokes into whatever has focus — a keyDown, the character,
+ * a keyUp per glyph, the events a keyboard sends. This is how a field that is
+ * not a native input gets its text (see browser-scripts `focusByIndex`): a
+ * maths editor, a code editor, a document that listens for keys.
+ */
+function typeKeys(tabId: string, text: string): void {
+  const entry = entries.get(tabId);
+  if (entry === undefined) return;
+  const wc = entry.view.webContents;
+  for (const ch of text) {
+    if (ch === '\n') {
+      sendKey(tabId, 'enter');
+      continue;
+    }
+    wc.sendInputEvent({ type: 'keyDown', keyCode: ch });
+    wc.sendInputEvent({ type: 'char', keyCode: ch });
+    wc.sendInputEvent({ type: 'keyUp', keyCode: ch });
+  }
+}
+
 /** Resolve after the next `did-stop-loading`, or `timeoutMs` — whichever first. */
 function waitForStop(wc: WebContents, timeoutMs: number): Promise<void> {
   return new Promise((resolve) => {
@@ -527,12 +566,33 @@ async function navigateAndWait(
   const wc = entry.view.webContents;
   const target = normalizeUrl(url);
   if (target === '') return stateOf(tabId);
+  /*
+   * SAY WHETHER IT WENT. The state came back as whatever the tab showed once
+   * loading stopped, and a navigation that never started (the page refused to
+   * unload, the URL was junk) read as "navigated to" the OLD page. Watch for
+   * the main frame actually setting off, and keep a load failure's code.
+   */
+  let navigated = false;
+  const onNav = (details: { isMainFrame?: boolean }, ...legacy: unknown[]): void => {
+    const main =
+      typeof details.isMainFrame === 'boolean' ? details.isMainFrame : legacy[2] === true;
+    if (main) navigated = true;
+  };
+  wc.on('did-start-navigation', onNav);
+  let loadError: string | undefined;
   const stopped = waitForStop(wc, timeoutMs);
   // loadURL rejects on redirects/aborts (ERR_ABORTED) but did-stop-loading
-  // still fires — lean on the event, not the promise.
-  await wc.loadURL(target).catch(() => undefined);
+  // still fires — lean on the event, not the promise. Any OTHER rejection is a
+  // real failure worth naming.
+  await wc.loadURL(target).catch((err: unknown) => {
+    const code = (err as { code?: unknown } | null)?.code;
+    if (typeof code === 'string' && code !== 'ERR_ABORTED') loadError = code;
+  });
   await stopped;
-  return stateOf(tabId);
+  wc.removeListener('did-start-navigation', onNav);
+  const state = stateOf(tabId);
+  if (state === null) return null;
+  return { ...state, navigated, ...(loadError === undefined ? {} : { loadError }) };
 }
 
 async function waitForLoad(tabId: string, timeoutMs: number): Promise<AgentTabState | null> {
@@ -565,6 +625,7 @@ async function historyAndWait(
  */
 export const browserManager = {
   navigate,
+  typeKeys,
   capture,
   snapshotDom,
   click,
@@ -650,6 +711,19 @@ export function registerBrowserIpc(): void {
     return { ok: true };
   });
   handle('browser:capture', async (_owner, req) => ({ dataUrl: await capture(req.tabId) }));
+  /* A probe's window into the native view: hidden windows and headless runs
+     have no other way to ask whether a WebContentsView was ever shown. */
+  handle('browser:debug-view', (_owner, req) => {
+    if (process.env.PI_E2E !== '1') return { exists: false, visible: false, bounds: null, url: '' };
+    const entry = entries.get(req.tabId);
+    if (entry === undefined) return { exists: false, visible: false, bounds: null, url: '' };
+    return {
+      exists: true,
+      visible: entry.visible,
+      bounds: entry.view.getBounds(),
+      url: entry.view.webContents.getURL(),
+    };
+  });
   handle('browser:snapshot-dom', async (_owner, req) => ({ html: await snapshotDom(req.tabId) }));
   handle('browser:click', (_owner, req) => {
     click(req.tabId, req.x as number, req.y as number);

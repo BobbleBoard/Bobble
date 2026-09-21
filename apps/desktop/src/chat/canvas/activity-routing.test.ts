@@ -223,6 +223,55 @@ describe('detectActivity — newest wins, across kinds', () => {
     expect(stream.focus?.kind === 'browser' && stream.focus.label).toBe('ex.com');
   });
 
+  /*
+   * the user (2026-09-21), after a Desmos run in tool-CLI mode: "the activity panel
+   * doesn't focus the working browser tab it shows a terminal actually
+   * executing the browser snapshot command, and then doesn't show the user
+   * anything for the actual browser actions". The whole run was `bash` lines —
+   * `open <url>` (which the wrapper turns into a visit), `browser snapshot`,
+   * `browser click 4` — and none of them counted as browsing here.
+   */
+  it('is the browser when the browser call came as a CLI line — and `open <url>` is one', () => {
+    const opened = detectActivity(
+      [
+        ...messages,
+        assistant('a4', [
+          call('c4', 'bash', { command: 'open https://www.desmos.com/calculator' }),
+        ]),
+        result('c4', 'Opening it in the app own browser instead (browser navigate).'),
+      ],
+      {},
+      CWD,
+    );
+    expect(opened.focus?.kind).toBe('browser');
+    expect(opened.focus?.kind === 'browser' && opened.focus.label).toBe('www.desmos.com');
+    // Not a shell line for the scrollback either: it was a visit.
+    expect(opened.commands.map((c) => c.command)).toEqual(['ls -la', 'git status']);
+
+    for (const [command, label] of [
+      ['browser snapshot', 'Reading the page'],
+      ['browser click 4', 'Clicking'],
+      ['browser type 14 --text "x^2 + y^2 = 1" --submit true', 'Typing'],
+      ['browser navigate https://www.geogebra.org/calculator', 'www.geogebra.org'],
+      ['browser key t', 'Typing'],
+    ] as const) {
+      const stream = detectActivity(
+        [...messages, assistant('a4', [call('c4', 'bash', { command })])],
+        {},
+        CWD,
+      );
+      expect(stream.focus?.kind, command).toBe('browser');
+      expect(stream.focus?.kind === 'browser' && stream.focus.label, command).toBe(label);
+    }
+    // Reading the browser's guide is not browsing.
+    const help = detectActivity(
+      [...messages, assistant('a4', [call('c4', 'bash', { command: 'browser --help' })])],
+      {},
+      CWD,
+    );
+    expect(help.focus?.kind).toBe('terminal');
+  });
+
   it('gives a redirect write to the FILE, not to the command that wrote it', () => {
     const stream = detectActivity(
       [assistant('a1', [call('c1', 'bash', { command: 'echo hi > notes.md' })]), result('c1', '')],

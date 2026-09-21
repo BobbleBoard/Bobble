@@ -118,6 +118,13 @@ describe('when it fails, it says what would unblock it', () => {
 
   it('says when there is simply no window open', () => {
     expect(explainChromeFailure("can't get front window")).toContain('no open window');
+    // macOS's own spelling, curly apostrophe and all — the raw error reached the
+    // model eight times in one run because only the straight quote was matched.
+    expect(
+      explainChromeFailure(
+        '36:151: execution error: Google Chrome got an error: Can’t get window 1. Invalid index. (-1719)',
+      ),
+    ).toContain('profile picker');
   });
 });
 

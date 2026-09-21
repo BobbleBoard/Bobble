@@ -250,7 +250,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  min-height: 36px;
+  min-height: 40px;
   padding: 4px 6px 0 14px;
   user-select: none;
 }

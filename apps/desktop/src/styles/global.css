@@ -6037,50 +6037,8 @@ body[data-media-expanded="true"] .pd-studio-compose {
   line-height: var(--pd-leading-caption);
 }
 
-/* ── Chat | Work, beside the traffic lights ───────────────────────────────
- *
- * Deliberately the same shape as the sidebar toggle next to it — two 28px
- * squares in a recessed well — so the top-left corner reads as one cluster of
- * window controls rather than a control plus a feature.
- */
-.pd-mode-toggle {
-  display: inline-flex;
-  gap: 2px;
-  margin: 0;
-  border: none;
-  padding: 2px;
-  border-radius: calc(var(--pd-radius-md) + 2px);
-  background: var(--pd-bg-track);
-  box-shadow: inset 0 0 0 0.5px var(--pd-border-subtle);
-}
-
-.pd-mode-seg {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 24px;
-  border: none;
-  border-radius: var(--pd-radius-md);
-  background: transparent;
-  color: var(--pd-text-muted);
-  cursor: pointer;
-  transition:
-    color var(--pd-duration-base) var(--pd-easing-standard),
-    background-color var(--pd-duration-base) var(--pd-easing-standard),
-    box-shadow var(--pd-duration-base) var(--pd-easing-standard);
-}
-
-.pd-mode-seg:hover {
-  color: var(--pd-text-secondary);
-}
-
-.pd-mode-seg[aria-pressed="true"] {
-  background: var(--pd-bg-raised);
-  color: var(--pd-text-primary);
-  box-shadow: var(--pd-shadow-hairline), var(--pd-shadow-sm);
-}
-
+/* The Chat | Work toggle beside the traffic lights lived here until
+   2026-09-21 (the user: "just leave it on 'work'"); the ledge is always open. */
 /* ── The working ledge, sliding ───────────────────────────────────────────
  *
  * In chat mode the bar slides UP behind the composer card and stops taking
@@ -8784,4 +8742,15 @@ body[data-media-expanded="true"] .pd-studio-compose {
 
 .pd-home-lead-name {
   display: inline-block;
+}
+
+/* THE DRAWING, LIVE (chat/LiveSvgCard): the inline SVG card with the pending
+   bar every generating card wears under it. */
+.pd-live-svg {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  width: 100%;
+  max-width: 100%;
 }

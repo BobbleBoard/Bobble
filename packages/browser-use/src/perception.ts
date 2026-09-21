@@ -195,6 +195,10 @@ export function collectSnapshot(win: PageWin, cap: number): PageSnapshot {
     const t = tag(el);
     if (t === 'textarea' || t === 'select') return true;
     if (attr(el, 'contenteditable') === 'true') return true;
+    // A widget that SAYS it is a text field is one to type into, whatever it
+    // is made of — a maths editor's expression line, a code editor's surface.
+    const role = attr(el, 'role');
+    if (role === 'textbox' || role === 'searchbox' || role === 'combobox') return true;
     if (t === 'input') {
       const it = (el.type || 'text').toLowerCase();
       return (

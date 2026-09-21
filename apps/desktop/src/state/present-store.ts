@@ -17,6 +17,7 @@ import type { PresentKind } from '@pi-desktop/ui';
 import { create } from 'zustand';
 import { previewKindForExt } from '../chat/canvas/file-preview';
 import { fileTabKey, openFileInCanvas } from '../chat/canvas/file-tabs';
+import { svgCardPayload } from '../chat/svg-size';
 import { getCanvasController } from './canvas-store';
 import { usePiStore } from './pi-slice';
 
@@ -289,7 +290,9 @@ export function chartsInTranscript(
     const text = m.text ?? '';
     const match =
       /^(?:Drew|Changed)\b[^\n]*?:\s+(\S+\.svg)\b/.exec(text) ??
-      /^Presented (\S+\.svg) to the user/.exec(text);
+      /^Presented (\S+\.svg) to the user/.exec(text) ??
+      // The svg tool's own reply: "Made 1 SVG:\n  1. /abs/01.svg — 30 paths".
+      /^Made \d+ SVGs?[^\n]*\n\s*1\.\s+(\S+\.svg)\s+—/.exec(text);
     const said = match?.[1];
     if (said === undefined) continue;
     const path =
@@ -328,11 +331,32 @@ export async function rehydratePresented(
     } catch {
       chart = undefined;
     }
-    if (chart === undefined) continue;
+    /*
+     * NO SIDECAR: a plain drawing (the svg tool's, or a presented icon). Its
+     * card is its markup, read back off disk when it is small enough to sit
+     * in the thread — the same rule present-inline applies on the way in.
+     */
+    let svg: { width: number; height: number; bytes: number; text?: string } | undefined;
+    if (chart === undefined) {
+      try {
+        const read = (await bridge.invoke('fs:read-file', { path })) as { text?: string | null };
+        const markup = typeof read?.text === 'string' ? read.text : '';
+        svg = markup === '' ? undefined : svgCardPayload(markup);
+      } catch {
+        svg = undefined;
+      }
+      if (svg?.text === undefined) continue;
+    }
     // The chat may have been opened elsewhere while the sidecars were read.
     const have = presentedFor(usePresentStore.getState(), chat);
     if (have.some((r) => r.path === path && r.afterMessageId === afterMessageId)) continue;
-    usePresentStore.getState().add({ path, chat, afterMessageId, chart });
+    usePresentStore.getState().add({
+      path,
+      chat,
+      afterMessageId,
+      ...(chart === undefined ? {} : { chart }),
+      ...(svg === undefined ? {} : { svg }),
+    });
     added += 1;
   }
   return added;
@@ -540,36 +564,52 @@ export function connectPresent(): () => void {
       );
     }
   });
-  const unsubShow = window.piDesktop.onEvent('present:show', ({ path, note, chart, svg }) => {
-    // Anchor it to the turn that produced it — see `afterMessageId` — in the
-    // chat that is RUNNING: the one in the background if a turn is going there,
-    // else the one on screen. Read lazily off the live store so this module
-    // keeps no import on the chat.
-    const pi = usePiStore.getState();
-    const bg = pi.bgRun?.streaming === true ? pi.bgRun : null;
-    const messages = bg !== null ? bg.messages : pi.messages;
-    const chat = bg !== null ? bg.sessionFile : (pi.session?.sessionFile ?? UNSAVED_CHAT);
-    const anchor = messages[messages.length - 1]?.id ?? null;
-    const record = usePresentStore.getState().add({
-      path,
-      chat,
-      afterMessageId: anchor,
-      ...(note !== undefined ? { note } : {}),
-      ...(chart !== undefined ? { chart } : {}),
-      ...(svg !== undefined ? { svg } : {}),
-    });
-    // The canvas belongs to the chat on screen; a background chat's artefact
-    // waits in its card until the user comes back to it. A chart or a small
-    // SVG shows IN the thread and does not open the canvas on its own — the
-    // card's corner control moves it over when the user wants it larger.
-    if (bg === null && !isInlinePresented(record)) {
-      void openPresented(getCanvasController() as never, record);
-    }
-  });
+  const unsubShow = window.piDesktop.onEvent('present:show', presentFromMain);
   return () => {
     unsubStore();
     unsubShow();
   };
+}
+
+/**
+ * An artefact main is handing to the user — the `present` tool's, or a drawing
+ * the svg tool just finished (gen-stream). Recorded as a card, and opened.
+ */
+export function presentFromMain({
+  path,
+  note,
+  chart,
+  svg,
+}: {
+  path: string;
+  note?: string;
+  chart?: Record<string, unknown>;
+  svg?: { width: number; height: number; bytes: number; text?: string };
+}): void {
+  // Anchor it to the turn that produced it — see `afterMessageId` — in the
+  // chat that is RUNNING: the one in the background if a turn is going there,
+  // else the one on screen. Read lazily off the live store so this module
+  // keeps no import on the chat.
+  const pi = usePiStore.getState();
+  const bg = pi.bgRun?.streaming === true ? pi.bgRun : null;
+  const messages = bg !== null ? bg.messages : pi.messages;
+  const chat = bg !== null ? bg.sessionFile : (pi.session?.sessionFile ?? UNSAVED_CHAT);
+  const anchor = messages[messages.length - 1]?.id ?? null;
+  const record = usePresentStore.getState().add({
+    path,
+    chat,
+    afterMessageId: anchor,
+    ...(note !== undefined ? { note } : {}),
+    ...(chart !== undefined ? { chart } : {}),
+    ...(svg !== undefined ? { svg } : {}),
+  });
+  // The canvas belongs to the chat on screen; a background chat's artefact
+  // waits in its card until the user comes back to it. A chart or a small
+  // SVG shows IN the thread and does not open the canvas on its own — the
+  // card's corner control moves it over when the user wants it larger.
+  if (bg === null && !isInlinePresented(record)) {
+    void openPresented(getCanvasController() as never, record);
+  }
 }
 
 /** Canvas tab kind → the artifact kind its surface expects. */

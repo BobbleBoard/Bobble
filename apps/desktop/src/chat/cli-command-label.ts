@@ -38,6 +38,92 @@ export interface CliCommandLabel {
    * app to name.
    */
   readonly action?: { readonly running: string; readonly done: string };
+  /**
+   * THE ROW IS ONE OF THE APP'S OWN KINDS, not a command. the user (2026-09-21),
+   * watching `svg --prompt="a smiley fac…"` and `browser click` render as
+   * terminal rows: "ensure all things have custom 'Clicking with browser'
+   * 'Drawing SVG' rather than 'svg --prompt a smiley fac...'". So a line that
+   * is a browser action, a drawing, a generation or a document carries the
+   * kind its native tool call would have, and the row draws the same mark.
+   */
+  readonly kind?:
+    | 'browser-navigate'
+    | 'browser-click'
+    | 'browser-type'
+    | 'browser-read'
+    | 'image'
+    | 'svg'
+    | 'video'
+    | 'speech'
+    | 'music'
+    | 'sfx'
+    | 'file';
+  /** A file name the row's mark should carry (`smiley.svg`, `probe.docx`). */
+  readonly filename?: string;
+  /** The URL a browser row visited or acted on. */
+  readonly url?: string;
+  /** What a browser click/type acted on (an index, a selector, a point). */
+  readonly target?: string;
+  /** What a browser type put into the page. */
+  readonly typed?: string;
+  /** The one-line thing behind the row (a prompt, a brief, a query). */
+  readonly detail?: string;
+}
+
+/**
+ * `--key=value`, `--key "value"` and `--key value` flags of a command line,
+ * with the bare words that are left. Quotes may wrap the value either way.
+ */
+export function cliFlags(command: string): {
+  readonly flags: Readonly<Record<string, string>>;
+  readonly bare: readonly string[];
+} {
+  const flags: Record<string, string> = {};
+  const bare: string[] = [];
+  const re = /--([\w][\w-]*)(?:=(?:"([^"]*)"|'([^']*)'|(\S*)))?|"([^"]*)"|'([^']*)'|(\S+)/g;
+  let pendingKey: string | null = null;
+  let m: RegExpExecArray | null = re.exec(command);
+  while (m !== null) {
+    if (m[1] !== undefined) {
+      const value = m[2] ?? m[3] ?? m[4];
+      if (value !== undefined && value !== '') {
+        flags[m[1]] = value;
+        pendingKey = null;
+      } else {
+        flags[m[1]] = 'true';
+        pendingKey = m[1];
+      }
+    } else {
+      const word = m[5] ?? m[6] ?? m[7] ?? '';
+      // A flag the model wrapped whole in quotes — `"--prompt=a smiley face"`
+      // (seen in a real run) — is still a flag.
+      const quotedFlag = /^--([\w][\w-]*)=(.*)$/s.exec(word);
+      if (quotedFlag !== null && (m[5] !== undefined || m[6] !== undefined)) {
+        flags[quotedFlag[1] as string] = quotedFlag[2] as string;
+        pendingKey = null;
+      } else if (pendingKey !== null && !word.startsWith('-')) {
+        flags[pendingKey] = word;
+        pendingKey = null;
+      } else {
+        bare.push(word);
+      }
+    }
+    m = re.exec(command);
+  }
+  return { flags, bare };
+}
+
+/** The line after its first word — the arguments, quoting intact. */
+function argsOf(line: string): string {
+  return line.replace(/^\S+\s*/, '');
+}
+
+/** A long argument, shortened for a row: one line, ~72 characters. */
+function brief(text: string | undefined, max = 72): string | undefined {
+  if (text === undefined) return undefined;
+  const one = text.replace(/\s+/g, ' ').trim();
+  if (one === '') return undefined;
+  return one.length > max ? `${one.slice(0, max - 1)}…` : one;
 }
 
 /** Split a command line into words, respecting simple quoting. */
@@ -79,6 +165,72 @@ const BROWSER_VERBS: Record<string, [string, string]> = {
   snapshot: ['Reading the page', 'Read the page'],
   read: ['Reading the page', 'Read the page'],
   scroll: ['Scrolling', 'Scrolled'],
+  wait: ['Waiting for the page', 'Waited for the page'],
+  back: ['Going back', 'Went back'],
+  forward: ['Going forward', 'Went forward'],
+  key: ['Pressing a key', 'Pressed a key'],
+};
+
+/** Which of the app's kinds a browser verb is — the mark its native call draws. */
+const BROWSER_KIND: Record<string, CliCommandLabel['kind']> = {
+  navigate: 'browser-navigate',
+  back: 'browser-navigate',
+  forward: 'browser-navigate',
+  click: 'browser-click',
+  scroll: 'browser-click',
+  type: 'browser-type',
+  key: 'browser-type',
+  snapshot: 'browser-read',
+  read: 'browser-read',
+  wait: 'browser-read',
+};
+
+/**
+ * A browser row from its verb and the line. The CLI takes its arguments BOTH
+ * ways — `browser click 4` and `browser click --index=4`, `browser navigate
+ * <url>` and `--url=<url>`, `browser type 14 --text "…"` and `--index=14 "…"`
+ * (all four seen in one real run) — so the positional words fill whichever flag
+ * is missing.
+ */
+function browserLabel(verb: string, pair: [string, string], line: string): CliCommandLabel {
+  const { flags, bare } = cliFlags(argsOf(line));
+  // The words after the verb: `browser type 14 "hello"` → ['14', 'hello'].
+  const after = bare.slice(bare.indexOf(verb) + 1);
+  const leadIndex = after[0] !== undefined && /^\d+$/.test(after[0]) ? after[0] : undefined;
+  const rest = leadIndex === undefined ? after : after.slice(1);
+  const url = flags.url ?? (verb === 'navigate' ? after[0] : undefined);
+  const index = flags.index ?? leadIndex;
+  const key = flags.key ?? (verb === 'key' ? after[0] : undefined);
+  const direction = flags.direction ?? (verb === 'scroll' ? after[0] : undefined);
+  const target =
+    index !== undefined
+      ? `element ${index}`
+      : flags.x !== undefined && flags.y !== undefined
+        ? `(${flags.x}, ${flags.y})`
+        : (flags.selector ?? direction ?? key);
+  const typed = verb === 'type' ? (flags.text ?? rest[0]) : verb === 'key' ? key : undefined;
+  const detail = url ?? (verb === 'type' ? brief(typed) : target);
+  return {
+    // "Clicking with the browser" — the row names the surface, since a
+    // browser click and a Mac click are different hands.
+    running: `${pair[0]} in the browser`,
+    done: `${pair[1]} in the browser`,
+    kind: BROWSER_KIND[verb],
+    ...(url === undefined ? {} : { url }),
+    ...(target === undefined ? {} : { target }),
+    ...(typed === undefined ? {} : { typed }),
+    ...(detail === undefined ? {} : { detail }),
+  };
+}
+
+/** `media generate <what>` / `media edit <what>`: the generate family's kinds. */
+const MEDIA_KINDS: Record<string, { kind: CliCommandLabel['kind']; verbs: [string, string] }> = {
+  image: { kind: 'image', verbs: ['Generating an image', 'Generated an image'] },
+  video: { kind: 'video', verbs: ['Generating a video', 'Generated a video'] },
+  speech: { kind: 'speech', verbs: ['Reading it aloud', 'Read it aloud'] },
+  music: { kind: 'music', verbs: ['Composing music', 'Composed music'] },
+  sfx: { kind: 'sfx', verbs: ['Making a sound effect', 'Made a sound effect'] },
+  '3d': { kind: 'file', verbs: ['Building a 3D model', 'Built a 3D model'] },
 };
 
 const CHROME_VERBS: Record<string, [string, string]> = {
@@ -160,8 +312,122 @@ export function cliCommandLabel(command: string | undefined): CliCommandLabel | 
   if (group === 'browser') {
     const verb = rest.find((w) => !w.startsWith('-'));
     const pair = verb === undefined ? undefined : BROWSER_VERBS[verb];
+    if (pair === undefined || verb === undefined) return null;
+    return browserLabel(verb, pair, line);
+  }
+
+  /*
+   * `open <url>` IS a browser visit: the shell wrapper turns it into `browser
+   * navigate` (tool-cli-bridge — `open` would hand the page to another browser
+   * and bring it in front of the user), so the row says what actually happened.
+   * `open -a Safari …` names an app and is the app-launch guard's business.
+   */
+  if (group === 'open' && !rest.includes('-a')) {
+    const url = rest.find((w) => /^[a-z][a-z0-9+.-]*:\/\//i.test(w));
+    if (url !== undefined) {
+      return browserLabel(
+        'navigate',
+        BROWSER_VERBS.navigate as [string, string],
+        `browser navigate ${url}`,
+      );
+    }
+  }
+
+  /*
+   * `svg --prompt="a smiley face" [--out x.svg]` — the OmniSVG drawing. A
+   * drawing, not a command: the vector-file mark and "Drawing an SVG".
+   */
+  if (group === 'svg') {
+    const { flags, bare } = cliFlags(argsOf(line));
+    // The output path is `--out`, or the positional `.svg`; the prompt is
+    // `--prompt`, or whatever bare word is left.
+    const out = flags.out ?? flags.output ?? bare.find((w) => /\.svg$/i.test(w));
+    const prompt = brief(flags.prompt ?? bare.find((w) => !/\.svg$/i.test(w)));
+    return {
+      running: 'Drawing an SVG',
+      done: 'Drew an SVG',
+      kind: 'svg',
+      filename: out !== undefined && /\.svg$/i.test(out) ? out : 'drawing.svg',
+      ...(prompt === undefined ? {} : { detail: prompt }),
+    };
+  }
+
+  /*
+   * `media generate image --prompt=…`, `media edit image …`: the generate
+   * family in CLI clothes — the same kinds and words the native calls have.
+   */
+  if (group === 'media') {
+    const { flags, bare } = cliFlags(argsOf(line));
+    const verb = bare[0];
+    const what = bare[1];
+    const entry = what === undefined ? undefined : MEDIA_KINDS[what];
+    if (entry === undefined) return null;
+    const prompt = brief(flags.prompt);
+    const editing = verb === 'edit';
+    return {
+      running: editing ? `Editing ${what === 'image' ? 'an image' : what}` : entry.verbs[0],
+      done: editing ? `Edited ${what === 'image' ? 'an image' : what}` : entry.verbs[1],
+      kind: entry.kind,
+      ...(prompt === undefined ? {} : { detail: prompt }),
+    };
+  }
+
+  /*
+   * `office make --kind=docx --out=… --brief=…`, `office edit`, `office
+   * inspect`: a document, with its file's mark.
+   */
+  if (group === 'office') {
+    const { flags, bare } = cliFlags(argsOf(line));
+    const verb = bare[0];
+    const out = flags.out ?? flags.file ?? flags.path;
+    const kindWord = flags.kind ?? (out !== undefined ? (out.split('.').pop() ?? '') : undefined);
+    const noun =
+      kindWord === 'pptx'
+        ? 'a deck'
+        : kindWord === 'xlsx'
+          ? 'a spreadsheet'
+          : kindWord === 'pdf'
+            ? 'a PDF'
+            : 'a document';
+    const verbs: Record<string, [string, string]> = {
+      make: [`Making ${noun}`, `Made ${noun}`],
+      edit: [`Editing ${noun}`, `Edited ${noun}`],
+      inspect: [`Reading ${noun}`, `Read ${noun}`],
+    };
+    const pair = verb === undefined ? undefined : verbs[verb];
     if (pair === undefined) return null;
-    return { running: pair[0], done: pair[1] };
+    const detail = brief(flags.brief) ?? out;
+    return {
+      running: pair[0],
+      done: pair[1],
+      kind: 'file',
+      ...(out === undefined ? {} : { filename: out }),
+      ...(detail === undefined ? {} : { detail }),
+    };
+  }
+
+  /* `web search --query=…` / `web fetch --url=…`: said as what they do; the
+     answer stays a terminal reveal, which is what the text result is. */
+  if (group === 'web') {
+    const { flags, bare } = cliFlags(argsOf(line));
+    const verb = bare[0];
+    if (verb === 'search') {
+      const q = brief(flags.query ?? flags.q ?? bare[1]);
+      return {
+        running: q === undefined ? 'Searching the web' : `Searching the web for “${q}”`,
+        done: q === undefined ? 'Searched the web' : `Searched the web for “${q}”`,
+        ...(q === undefined ? {} : { detail: q }),
+      };
+    }
+    if (verb === 'fetch') {
+      const url = flags.url ?? bare[1];
+      return {
+        running: 'Reading a page',
+        done: 'Read a page',
+        ...(url === undefined ? {} : { detail: url, url }),
+      };
+    }
+    return null;
   }
 
   /*

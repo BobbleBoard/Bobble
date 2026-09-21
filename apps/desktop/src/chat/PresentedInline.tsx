@@ -69,14 +69,13 @@ export function PresentedInline({ item }: { item: PresentedRecord }) {
             spec={item.chart}
             corner={
               <IconButton
-                size="sm"
                 className="pd-inline-chart-move"
                 aria-label="Open in canvas"
                 title="Open in canvas"
                 data-testid="inline-chart-move"
                 onClick={moveToCanvas}
               >
-                <IconToCanvas size={14} />
+                <IconToCanvas size={16} />
               </IconButton>
             }
           />

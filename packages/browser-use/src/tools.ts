@@ -146,6 +146,24 @@ export function registerBrowserUseTools(pi: ExtensionAPI, options: BrowserUseOpt
       try {
         const state = await bridge.request<TabState>('navigate', { url: params.url });
         /*
+         * A NAVIGATION THAT DID NOT HAPPEN IS SAID SO. SEEN 2026-09-21: a page
+         * refusing to unload made `navigate` report "Navigated to" the page it
+         * never left, seven times in a row, and the model kept trying the same
+         * URL because nothing told it the URL was not the problem.
+         */
+        if (state.navigated === false || state.loadError !== undefined) {
+          const why =
+            state.loadError !== undefined
+              ? `the load failed (${state.loadError})`
+              : 'the page never left';
+          return errResult(
+            'browser_navigate',
+            `Could not open ${params.url}: ${why}. The browser is still on ${state.url || 'an empty tab'}` +
+              `${state.title ? ` (${state.title})` : ''}. Check the URL; a site that is down or ` +
+              'does not resolve fails this way.',
+          );
+        }
+        /*
          * NAVIGATE HANDS BACK THE PAGE, not a receipt for it.
          *
          * It used to say "Navigated to X — call browser_snapshot to see it",

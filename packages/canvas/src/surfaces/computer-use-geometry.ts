@@ -236,31 +236,13 @@ export function annotationScale(windowScale: number, floor = 0.62): number {
   return Math.min(1, Math.max(floor, windowScale));
 }
 
-/**
- * Place the status bubble beside the cursor, flipping it back inside the
- * viewport near the right/bottom edge — the same rule overlay.html applies with
- * its `.flip-x` / `.flip-y` classes, so the two read as one object.
- *
- * Offsets are in already-scaled canvas pixels; `size` is the bubble's measured
- * box. Returns the bubble's top-left corner.
+/*
+ * The status bubble's placement beside the cursor lives with the cursor itself
+ * now — `agentPillPlacement` in @pi-desktop/shared, the overlay's own rule
+ * (below-right by 11×15, flipped and clamped inside the window it belongs to).
+ * The `bubbleAnchor` that sat here parked it 27×40 away and flipped at the
+ * viewport's edge: the pill the user saw "really far away from" the cursor.
  */
-export function bubbleAnchor(
-  cursor: Point,
-  size: Size,
-  viewport: Size,
-  offset: Point = { x: 27, y: 40 },
-  margin = 8,
-): Point & { flipX: boolean; flipY: boolean } {
-  const flipX = cursor.x + offset.x + size.w > viewport.w - margin;
-  const flipY = cursor.y + offset.y + size.h > viewport.h - margin;
-  const x = flipX
-    ? Math.max(margin, Math.min(cursor.x - offset.x - size.w, viewport.w - margin - size.w))
-    : cursor.x + offset.x;
-  const y = flipY
-    ? Math.max(margin, Math.min(cursor.y - offset.y * 0.35 - size.h, viewport.h - margin - size.h))
-    : cursor.y + offset.y;
-  return { x, y, flipX, flipY };
-}
 
 /**
  * The overlay's cursor travel easing — `cubic-bezier(0.22, 0.9, 0.32, 1.1)`,

@@ -81,16 +81,40 @@ export interface GenSurfacePayload {
 }
 
 /** main→renderer events. Compose into AppEventMap. */
+export type SvgLiveEvent =
+  | {
+      readonly status: 'drawing';
+      /** The drawing so far, as SVG markup (finished shapes + the pen's outline). */
+      readonly svg: string;
+      readonly paths: number;
+      /** Which sample this is, of how many — each starts a fresh drawing. */
+      readonly candidate: number;
+      readonly candidates: number;
+      readonly prompt?: string;
+    }
+  | {
+      readonly status: 'done';
+      readonly outputs: readonly {
+        readonly path: string;
+        readonly svg: string;
+        readonly paths: number;
+      }[];
+      readonly prompt?: string;
+    }
+  | { readonly status: 'error'; readonly error: string; readonly prompt?: string };
+
 export type GenEventMap = {
   /** A job has started: its first surface state. `tabId` is the stream's id. */
   'gen:open': { tabId: string; payload: GenSurfacePayload };
   /**
-   * A generated FILE to show on the canvas as itself — no candidates, no
-   * seeds, no progress bar. An SVG from OmniSVG is a vector file the canvas
-   * already knows how to render; the image surface's raster machinery would
-   * only get in its way.
+   * THE DRAWING, AS IT IS DRAWN. (This replaced `gen:open-file`, which opened
+   * a finished SVG as a canvas file tab: the drawing lives in the thread now.) OmniSVG's ids stream in and every few
+   * hundred milliseconds the shapes finished so far — plus an outline of the
+   * one in progress — go to the thread's card, so the model is seen drawing
+   * rather than the card saying "drawing" (the user, 2026-09-21). `done` carries
+   * the files that landed, with their markup, for the finished card.
    */
-  'gen:open-file': { path: string };
+  'gen:svg-live': SvgLiveEvent;
   /** Push updated surface data (step preview / candidate done / finished). */
   'gen:update': { tabId: string; payload: GenSurfacePayload };
   /** ComfyUI install progress (consent / venv / torch / per-pack download / config). */
@@ -276,7 +300,7 @@ export type GenInvokeMap = {
 
 export const GEN_EVENT_CHANNELS = [
   'gen:open',
-  'gen:open-file',
+  'gen:svg-live',
   'gen:update',
   'gen:comfy-install',
   'gen:module',

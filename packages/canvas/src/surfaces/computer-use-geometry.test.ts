@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
   annotationScale,
   blendPlacement,
-  bubbleAnchor,
   coverCrop,
   cursorEase,
   fitWindow,
@@ -276,37 +275,6 @@ describe('stagePadding', () => {
   });
   it('never disappears entirely', () => {
     expect(stagePadding({ w: 60, h: 60 })).toBe(4);
-  });
-});
-
-describe('bubbleAnchor', () => {
-  const viewport = { w: 500, h: 400 };
-  const size = { w: 140, h: 34 };
-
-  it('sits down-right of the cursor with room to spare', () => {
-    const a = bubbleAnchor({ x: 100, y: 100 }, size, viewport);
-    expect(a).toMatchObject({ x: 127, y: 140, flipX: false, flipY: false });
-  });
-
-  it('flips left near the right edge and stays inside', () => {
-    const a = bubbleAnchor({ x: 470, y: 100 }, size, viewport);
-    expect(a.flipX).toBe(true);
-    expect(a.x).toBeGreaterThanOrEqual(8);
-    expect(a.x + size.w).toBeLessThanOrEqual(viewport.w - 8);
-  });
-
-  it('flips up near the bottom edge and stays inside', () => {
-    const a = bubbleAnchor({ x: 100, y: 380 }, size, viewport);
-    expect(a.flipY).toBe(true);
-    expect(a.y).toBeGreaterThanOrEqual(8);
-    expect(a.y + size.h).toBeLessThanOrEqual(viewport.h - 8);
-  });
-
-  it('flips both in the bottom-right corner', () => {
-    const a = bubbleAnchor({ x: 495, y: 395 }, size, viewport);
-    expect(a).toMatchObject({ flipX: true, flipY: true });
-    expect(a.x).toBeGreaterThanOrEqual(8);
-    expect(a.y).toBeGreaterThanOrEqual(8);
   });
 });
 

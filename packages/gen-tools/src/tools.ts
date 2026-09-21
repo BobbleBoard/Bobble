@@ -716,10 +716,13 @@ function registerSvgTool(pi: ExtensionAPI, bridge: GenBridge | null): void {
           rel === undefined
             ? 'Reference it by its path, or `cp` it into a project; never retype its markup.'
             : `In a page: <img src="${rel}" alt="…">. Never retype its markup.`;
+        /* The user watched it drawn and has it as a card in the chat already
+           (gen:svg-live) — a `present` call after this would show it twice. */
+        const shown = 'The user already sees it as a card in the chat; do not present it again.';
         const text =
           `Made ${result.outputs.length} SVG${result.outputs.length === 1 ? '' : 's'}` +
           `${outPath === undefined ? ' on the canvas' : ''}:\n` +
-          `${lines.join('\n')}\n${usage}\nModel: OmniSVG 1.1 4B (omnisvg-1.1-4b, Apache-2.0)`;
+          `${lines.join('\n')}\n${usage} ${shown}\nModel: OmniSVG 1.1 4B (omnisvg-1.1-4b, Apache-2.0)`;
         return {
           content: [{ type: 'text', text }],
           details: {

@@ -29,6 +29,8 @@
 import { useEffect } from 'react';
 import type { GenSurfacePayload } from '../../electron/gen/gen-ipc-contract';
 import { type GenLiveJob, useGenLive } from '../state/gen-live';
+import { useSvgLive } from '../state/svg-live';
+import { svgCardPayload } from './svg-size';
 
 /** `pi:gen-<jobId>` → the engine job id `gen:cancel` wants. */
 export function jobIdFromTab(tabId: string): string {
@@ -92,27 +94,31 @@ export function useGenStream(): void {
     const unsubOpen = bridge.onEvent('gen:open', ({ tabId, payload }) => {
       open(jobFromPayload(tabId, payload, Date.now()));
     });
-    /* A generated file that IS the deliverable (an SVG): open it as a file tab,
-       the way the file tree or `present` would, so it renders as itself. */
-    const unsubOpenFile = bridge.onEvent('gen:open-file', ({ path }) => {
-      /* Imported lazily: both modules reach for `window` when they load, and
-         this file is unit-tested under node. Same pattern as llm-store's
-         vision hook. */
-      void Promise.all([
-        import('../state/canvas-store'),
-        import('./canvas/file-tabs'),
-        import('../state/pi-slice'),
-      ]).then(([canvas, tabs, pi]) =>
-        /* With the session's cwd the breadcrumb reads "Bobble › generated › … ›
-           01.svg", the way every other file open does; without it the bar
-           got the whole absolute path — nine segments squeezed into a strip
-           of clipped glyphs (seen on the first generated SVG). */
-        tabs.openFileInCanvas(
-          canvas.getCanvasController() as never,
-          path,
-          pi.usePiStore.getState().session?.cwd ?? undefined,
-        ),
-      );
+    /*
+     * THE DRAWING, LIVE. A generated SVG used to open as a file tab in the
+     * canvas the moment it was done; the user wants it IN the thread, drawn as it
+     * is drawn (svg-live store → LiveSvgCard), and, once finished, presented
+     * there the way a chart is — the same card, the canvas only on request.
+     */
+    const unsubSvgLive = bridge.onEvent('gen:svg-live', (ev) => {
+      const live = useSvgLive.getState();
+      if (ev.status === 'drawing') {
+        live.drawing(ev);
+        return;
+      }
+      if (ev.status === 'error') {
+        live.failed(ev.error, ev.prompt);
+        return;
+      }
+      live.done(ev.outputs, ev.prompt);
+      // Lazily, as the file-tab path was: present-store reaches for `window`
+      // when it loads and this file is unit-tested under node.
+      void import('../state/present-store').then(({ presentFromMain }) => {
+        for (const o of ev.outputs) {
+          const svg = svgCardPayload(o.svg);
+          presentFromMain({ path: o.path, ...(svg === undefined ? {} : { svg }) });
+        }
+      });
     });
     const unsubUpdate = bridge.onEvent('gen:update', ({ tabId, payload }) => {
       const existing = useGenLive.getState().jobs[tabId];
@@ -139,7 +145,7 @@ export function useGenStream(): void {
 
     return () => {
       unsubOpen();
-      unsubOpenFile();
+      unsubSvgLive();
       unsubUpdate();
     };
   }, []);

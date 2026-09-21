@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { MacBridge } from './bridge-client.js';
 import { createMacConsentGate, type MacConsentGate } from './permissions.js';
 import type { MacAgentMethod } from './protocol.js';
-import { registerMacComputerUseTools } from './tools.js';
+import { registerChromeTools, registerMacComputerUseTools } from './tools.js';
 
 type Handler = (params: Record<string, unknown> | undefined) => unknown;
 
@@ -66,8 +66,11 @@ function collectTools(
      failed when it had one. Returning null here puts the fake bridge back in
      charge, which is the only thing these tests are supposed to be measuring. */
   registerMacComputerUseTools(pi, { bridge, consent, readChromeTabs: async () => null });
+  registerChromeTools(pi, bridge, { isChromeRunning: async () => chromeUp });
   return tools;
 }
+/** What the fake "is Chrome running?" answers; tests flip it. */
+let chromeUp = true;
 
 async function run(
   tools: Map<string, ToolDefinition>,
@@ -85,7 +88,7 @@ async function run(
 const details = (r: { details: unknown }) => r.details as any;
 
 describe('registerMacComputerUseTools', () => {
-  it('registers the full tool set', () => {
+  it("registers the full tool set — the mac_* set and Chrome's own", () => {
     const tools = collectTools(new FakeBridge());
     expect([...tools.keys()].sort()).toEqual(
       [
@@ -97,6 +100,10 @@ describe('registerMacComputerUseTools', () => {
         'mac_scroll',
         'mac_snapshot',
         'mac_type',
+        'chrome_click',
+        'chrome_go',
+        'chrome_snapshot',
+        'chrome_type',
       ].sort(),
     );
   });
@@ -1098,5 +1105,26 @@ describe('browser tabs (the window around the page)', () => {
     expect(res.content.map((c) => (c.type === 'text' ? c.text : '')).join('')).toContain(
       'came to the front',
     );
+  });
+});
+
+describe('chrome_* never launch Chrome by addressing it (the user: "chrome … steal focus upon computer use launch")', () => {
+  it('launches a Chrome that is not running THROUGH THE BRIDGE, in the background, and says when it has no window yet', async () => {
+    chromeUp = false;
+    try {
+      const bridge = new FakeBridge();
+      bridge.handlers.set('policy', async () => ({ mode: 'always' }));
+      // Chrome comes up showing its profile picker: a pid, no window bounds.
+      bridge.handlers.set('launch', async () => ({ ok: true, app: 'Google Chrome', pid: 777 }));
+      const tools = collectTools(bridge);
+      const res = await run(tools, 'chrome_go', { url: 'https://www.geogebra.org/calculator' });
+      const text = res.content.map((c) => ('text' in c ? c.text : '')).join('');
+      expect(bridge.countOf('launch')).toBe(1);
+      expect(bridge.lastParams('launch')).toMatchObject({ app: 'Google Chrome', background: true });
+      expect(text).toContain('profile picker');
+      expect(text).toContain('browser navigate');
+    } finally {
+      chromeUp = true;
+    }
   });
 });

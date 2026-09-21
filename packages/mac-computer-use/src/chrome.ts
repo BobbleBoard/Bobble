@@ -117,10 +117,32 @@ export function explainChromeFailure(stderr: string): string {
       'screenshot. Use `find` to jump to a word that is further down it.'
     );
   }
-  if (s.includes("can't get") || s.includes('front window')) {
-    return 'Chrome has no open window to act on. Open a tab first.';
+  // macOS spells it "Can’t get window 1" — a curly apostrophe, which the
+  // straight-quoted test below never matched (SEEN: the raw AppleScript error
+  // reached the model eight times in one run).
+  const plain = s.replace(/[\u2018\u2019]/g, "'");
+  if (plain.includes("can't get") || plain.includes('front window') || plain.includes('-1719')) {
+    return (
+      'Chrome has no open window to act on — it is showing its profile picker, or every ' +
+      'window is closed. Pick a profile / open a window in Chrome first: `mac snapshot ' +
+      '"Google Chrome"` lists the picker\'s buttons to click. Or use the built-in browser ' +
+      '(`browser navigate`), which needs none of this.'
+    );
   }
   return stderr.length > 0 ? stderr : 'Chrome did not respond to the script.';
+}
+
+/**
+ * Is Chrome running? Asked BEFORE any `tell application "Google Chrome"`,
+ * because AppleScript launches an app it addresses — and a Chrome launched that
+ * way comes up in FRONT, profile picker and all, with nobody to hand the focus
+ * back. the user: "chrome I know for sure … steal focus upon computer use launch."
+ * A Chrome that is not running is launched through the bridge's background
+ * launch instead, which watches the focus and returns it.
+ */
+export async function chromeRunning(): Promise<boolean> {
+  const res = await run('pgrep', ['-x', 'Google Chrome']);
+  return res.ok && res.stdout !== '';
 }
 
 /** Run JS in Chrome's active tab and return whatever it evaluated to. */
@@ -243,6 +265,9 @@ export function parseChromeTabs(raw: string): ChromeTabInfo[] {
 /** Every open tab in every Chrome window, or null when Chrome will not answer
  * (not running, or Automation permission refused — NOT the JavaScript flag). */
 export async function chromeTabs(): Promise<ChromeTabInfo[] | null> {
+  // Listing the tabs of a Chrome that is not running is "none" — asking
+  // AppleScript would LAUNCH it, in front (see chromeRunning).
+  if (!(await chromeRunning())) return null;
   const res = await run('osascript', ['-e', TABS_SCRIPT]);
   if (!res.ok) return null;
   const tabs = parseChromeTabs(res.stdout);

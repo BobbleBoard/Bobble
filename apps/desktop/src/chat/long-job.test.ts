@@ -161,6 +161,18 @@ describe('a shell call running a media command IS the generation (bash-CLI mode)
     expect(mediaToolOfCommand(undefined)).toBeNull();
   });
 
+  it('the svg command is a drawing with a live card (the user 2026-09-21) — and only as the command', () => {
+    expect(mediaToolOfCommand('svg "--prompt=A smiley face" assets/smileys.svg')).toBe(
+      'generate_svg',
+    );
+    expect(mediaToolOfCommand('svg --prompt="a fox icon"')).toBe('generate_svg');
+    expect(jobKindForTool('generate_svg')).toBe('svg');
+    expect(mediaToolOfCommand('svg --help')).toBeNull();
+    expect(mediaToolOfCommand('ls svg')).toBeNull();
+    expect(mediaToolOfCommand('cat assets/logo.svg')).toBeNull();
+    expect(mediaToolOfCommand('file read logo.svg')).toBeNull();
+  });
+
   it('gives a bash call the card its command earns, and leaves other calls alone', () => {
     expect(effectiveToolName('bash', { command: 'media generate image "a fox"' })).toBe(
       'generate_image',

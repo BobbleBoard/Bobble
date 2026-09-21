@@ -22,6 +22,26 @@
  * visible. Nothing queues: a frame that arrives while an older one is still
  * being drawn replaces it.
  */
+import {
+  AGENT_CURSOR_BODY,
+  AGENT_CURSOR_BOX,
+  AGENT_CURSOR_GLOW,
+  AGENT_CURSOR_GLOW_BAND,
+  AGENT_CURSOR_GLOW_DARK_OPACITY,
+  AGENT_CURSOR_GLOW_OPACITY,
+  AGENT_CURSOR_GLOW_SIGMA,
+  AGENT_CURSOR_HEIGHT,
+  AGENT_CURSOR_KEYLINE,
+  AGENT_CURSOR_KEYLINE_THIN,
+  AGENT_CURSOR_PATH,
+  AGENT_CURSOR_PRESS,
+  AGENT_CURSOR_SHADOW,
+  AGENT_CURSOR_STROKE_W,
+  AGENT_CURSOR_TRAVEL_MS,
+  AGENT_PILL_RADIUS,
+  agentCursorSize,
+  agentPillPlacement,
+} from '@pi-desktop/shared';
 import { IconMore } from '@pi-desktop/ui';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useOutsideClose } from '../tabs/use-outside-close.ts';
@@ -43,7 +63,6 @@ import {
 import {
   annotationScale,
   blendPlacement,
-  bubbleAnchor,
   coverCrop,
   cursorEase,
   type DrawnWindow,
@@ -62,36 +81,26 @@ export interface ComputerUseSurfaceProps {
 }
 
 /**
- * THE SHARED AGENT CURSOR — the user's artwork, the same path the native overlay
- * draws (pi-mac Overlay.swift `pointerGlyph`).
+ * THE SHARED AGENT CURSOR — the user's artwork, the path the native overlay draws
+ * (pi-mac Overlay.swift `pointerGlyph`), read from the one definition in
+ * @pi-desktop/shared together with its paint, its size and its press.
  *
  * He sent one SVG for "the fake cursor", and there are two of them: the panel
  * painted over his real screen, and this one painted over a picture of the
  * window. They have to be the same drawing or the monitor is showing something
- * that is not what is happening — so this is his path verbatim, arcs and all,
- * because SVG is what a canvas Path2D speaks anyway.
+ * that is not what is happening. They had drifted: the overlay went to a black
+ * body with a subtle blue edge glow and grew 15%, while this one kept the blue
+ * body and teal halo of the first cut — the user (2026-09-21): "the drawn cursor on
+ * the computer use visual in the canvas shows the old colored cursor with the
+ * status pill really far away from it … it's drawn correctly on the real
+ * application window." Now every number here is the overlay's.
  */
-const CURSOR_PATH =
-  'M 58.48 87.06 A 24.06 25.11 -36 0 1 93.89 61.34 L 223.67 137.27 ' +
-  'A 18.23 19.02 -36 0 1 218.85 171.89 A 117.23 122.31 -36 0 0 131.29 247.95 ' +
-  'A 19.66 20.51 -36 0 1 92.88 244.4 Z';
-/** His stroke, in his viewBox units, so it scales with the glyph. */
-const CURSOR_STROKE_W = 13.79;
-/** Body and keyline, straight off the SVG. */
-const CURSOR_BODY = '#78BFE5';
-const CURSOR_KEYLINE = '#FFFFFF';
-const CURSOR_GLOW = '#95F9E5';
-/** The anchors' bounds grown by half the keyline — what is actually drawn. */
-const CURSOR_VIEWBOX = { x: 51.59, y: 54.45, w: 188.56, h: 213.37 };
-/** Drawn size in CSS px, pinned by HEIGHT to match the panel's 22pt. */
-const CURSOR_BOX = { w: 19.44, h: 22 };
-/** The point of the pointer, in drawn-box units — the rounded corner between
- * the first arc's ends, pulled out along the diagonal by half the keyline. */
-const CURSOR_TIP = { x: 1.15, y: 0.31 };
-/** Matches CURSOR_TRAVEL_MS in overlay-controller.ts. */
-const CURSOR_TRAVEL_MS = 300;
-/** How long a click ripple lives (overlay.html's .ripple transition). */
-const RIPPLE_MS = 620;
+/** Drawn size in CSS px at real size, pinned by HEIGHT to the overlay's. */
+const CURSOR_SIZE = agentCursorSize(AGENT_CURSOR_HEIGHT);
+/** The scale from viewBox units to CSS px at real size. */
+const CURSOR_UNIT = AGENT_CURSOR_HEIGHT / AGENT_CURSOR_BOX.h;
+/** Matches the overlay's travel. */
+const CURSOR_TRAVEL_MS = AGENT_CURSOR_TRAVEL_MS;
 /** Corner radius of a macOS window, at real size. */
 const WINDOW_RADIUS = 11;
 /**
@@ -448,6 +457,19 @@ function ensureBackdrop(
 /** No drift. A shared frozen object so the hot path allocates nothing. */
 const ZERO = { x: 0, y: 0 } as const;
 
+/** The overlap of two rects (a zero-sized rect at `a`'s origin when none). */
+function intersectRects(
+  a: { x: number; y: number; w: number; h: number },
+  b: { x: number; y: number; w: number; h: number },
+): { x: number; y: number; w: number; h: number } {
+  const x = Math.max(a.x, b.x);
+  const y = Math.max(a.y, b.y);
+  const r = Math.min(a.x + a.w, b.x + b.w);
+  const btm = Math.min(a.y + a.h, b.y + b.h);
+  if (r <= x || btm <= y) return { x: a.x, y: a.y, w: 0, h: 0 };
+  return { x, y, w: r - x, h: btm - y };
+}
+
 function roundRect(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -537,7 +559,7 @@ export function ComputerUseSurface({ feed, className }: ComputerUseSurfaceProps)
    * expensive part fifteen times over for a picture that has not changed.
    */
   const cursorPath = useMemo(
-    () => (typeof Path2D === 'function' ? new Path2D(CURSOR_PATH) : null),
+    () => (typeof Path2D === 'function' ? new Path2D(AGENT_CURSOR_PATH) : null),
     [],
   );
 
@@ -1078,8 +1100,9 @@ export function ComputerUseSurface({ feed, className }: ComputerUseSurfaceProps)
       const at = { x: mapped.x + drift.x, y: mapped.y + drift.y };
       const k = annotationScale(drawn.scale);
 
-      const sinceClick = reduced ? RIPPLE_MS : now - lastClick.current;
-      if (sinceClick < RIPPLE_MS) drawRipples(ctx, at, k, sinceClick, palette.accent);
+      // A press is the glyph's own squeeze (the overlay has no ring), so a
+      // click leaves nothing behind once it is over.
+      const sinceClick = reduced ? AGENT_CURSOR_PRESS.ms : now - lastClick.current;
       if (cursorPath !== null) {
         // Resting reads as resting: a hair smaller and a touch transparent, so
         // an idle phantom is calm rather than merely stationary.
@@ -2259,7 +2282,68 @@ async function copyFrame(
   }
 }
 
-/** The shared agent cursor, tip exactly on `at`, matching overlay.html. */
+/**
+ * THE GLOW, rendered once per device scale: the outline stroked 1.1 keylines
+ * wide and filled, blurred five keylines out, in the glow colour at full alpha.
+ * ONE silhouette and ONE blur — casting a shadow from a fill and again from a
+ * stroke would add up to a rim twice as bright as the overlay's, whose glow is
+ * one layer's shadow. Cached by scale (a few entries: the rail's zoom passes
+ * through a handful of scales), so the 60 fps loop draws an image, not a blur.
+ */
+const glowSprites = new Map<string, { canvas: HTMLCanvasElement; margin: number }>();
+function glowSprite(device: number): { canvas: HTMLCanvasElement; margin: number } | null {
+  if (!Number.isFinite(device) || device <= 0) return null;
+  const key = device.toFixed(3);
+  const hit = glowSprites.get(key);
+  if (hit !== undefined) return hit;
+  if (typeof document === 'undefined' || typeof Path2D !== 'function') return null;
+  const stroke = AGENT_CURSOR_STROKE_W * device;
+  const sigma = stroke * AGENT_CURSOR_GLOW_SIGMA;
+  const margin = Math.ceil(sigma * 3 + stroke);
+  const w = Math.ceil(AGENT_CURSOR_BOX.w * device) + margin * 2;
+  const h = Math.ceil(AGENT_CURSOR_BOX.h * device) + margin * 2;
+  const silhouette = document.createElement('canvas');
+  silhouette.width = w;
+  silhouette.height = h;
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const sc = silhouette.getContext('2d');
+  const gc = canvas.getContext('2d');
+  if (sc === null || gc === null) return null;
+  sc.translate(margin, margin);
+  sc.scale(device, device);
+  sc.translate(-AGENT_CURSOR_BOX.x, -AGENT_CURSOR_BOX.y);
+  const path = new Path2D(AGENT_CURSOR_PATH);
+  sc.fillStyle = AGENT_CURSOR_GLOW;
+  sc.strokeStyle = AGENT_CURSOR_GLOW;
+  sc.lineJoin = 'round';
+  sc.lineWidth = AGENT_CURSOR_STROKE_W * AGENT_CURSOR_GLOW_BAND;
+  sc.fill(path);
+  sc.stroke(path);
+  // The blur is the silhouette's shadow: draw it one sprite to the left and
+  // offset the shadow back, so only the blur lands.
+  gc.shadowColor = AGENT_CURSOR_GLOW;
+  gc.shadowBlur = sigma * 2;
+  gc.shadowOffsetX = w;
+  gc.drawImage(silhouette, -w, 0);
+  if (glowSprites.size >= 12) {
+    const oldest = glowSprites.keys().next().value;
+    if (oldest !== undefined) glowSprites.delete(oldest);
+  }
+  const sprite = { canvas, margin };
+  glowSprites.set(key, sprite);
+  return sprite;
+}
+
+/**
+ * The shared agent cursor, tip exactly on `at`, painted layer for layer as the
+ * overlay paints it (Overlay.swift, the `── pointer ──` block): one soft
+ * neutral shadow; a screen-blended blue rim that adds light only on a dark
+ * ground; the same rim blurred wide at a low opacity; the black body under the
+ * white keyline at his thickness; a thin white line on top. Canvas shadows are
+ * in device space, so the blur radii are scaled by hand.
+ */
 function drawCursor(
   ctx: CanvasRenderingContext2D,
   path: Path2D,
@@ -2267,72 +2351,79 @@ function drawCursor(
   k: number,
   sinceClick: number,
 ): void {
-  // overlay.html's press "pop": shrink then overshoot, radiating from the tip.
+  // The overlay's press: a squeeze to 0.78 at 45% of 150 ms and back, eased,
+  // about the tip.
   let pop = 1;
-  if (sinceClick < 340) {
-    const p = sinceClick / 340;
-    pop =
-      p < 0.38
-        ? 1 - 0.18 * (p / 0.38)
-        : p < 0.7
-          ? 0.82 + 0.27 * ((p - 0.38) / 0.32)
-          : 1.09 - 0.09 * ((p - 0.7) / 0.3);
+  if (sinceClick < AGENT_CURSOR_PRESS.ms) {
+    const p = sinceClick / AGENT_CURSOR_PRESS.ms;
+    const ease = (t: number): number => 0.5 - Math.cos(Math.PI * t) / 2;
+    const depth = 1 - AGENT_CURSOR_PRESS.scale;
+    pop = p < 0.45 ? 1 - depth * ease(p / 0.45) : 1 - depth * (1 - ease((p - 0.45) / 0.55));
   }
+  const unit = CURSOR_UNIT * k * pop;
+  // Shadows are in DEVICE pixels, untouched by the transform: the canvas is
+  // drawn at the display's ratio, so every blur and offset is scaled by it —
+  // and `shadowBlur` is twice the Gaussian σ the overlay's shadowRadius is.
+  const dpr = ctx.getTransform().a || 1;
+  const blur = (sigmaCss: number): number => sigmaCss * 2 * dpr;
+  // Casting a shadow without painting a body: draw the shape this far
+  // off-canvas (in device px) and offset the shadow back by the same amount.
+  const OFF = 10000;
+
   ctx.save();
   ctx.translate(at.x, at.y);
-  ctx.scale(k * pop, k * pop);
-  ctx.translate(-CURSOR_TIP.x, -CURSOR_TIP.y);
-  ctx.scale(CURSOR_BOX.w / CURSOR_VIEWBOX.w, CURSOR_BOX.h / CURSOR_VIEWBOX.h);
-  ctx.translate(-CURSOR_VIEWBOX.x, -CURSOR_VIEWBOX.y);
+  ctx.scale(unit, unit);
+  ctx.translate(-CURSOR_SIZE.tip.x / CURSOR_UNIT, -CURSOR_SIZE.tip.y / CURSOR_UNIT);
+  ctx.translate(-AGENT_CURSOR_BOX.x, -AGENT_CURSOR_BOX.y);
+  ctx.lineJoin = 'round';
+  const device = dpr * unit;
 
-  /*
-   * HIS PAINT, and the panel's: a #95F9E5 glow, a solid #78BFE5 body, a white
-   * keyline. The old stack was a pearl gradient with two luminous rims tuned to
-   * match overlay.html — a file that no longer exists, for a glyph that no
-   * longer exists. Matching the NATIVE panel is what matters now: the phantom on
-   * screen and the phantom in this tab have to be the same object.
-   */
+  // 1. The soft neutral shadow, cast by the outline.
   ctx.save();
-  ctx.shadowColor = CURSOR_GLOW;
-  ctx.shadowBlur = 13;
-  ctx.fillStyle = CURSOR_GLOW;
-  ctx.globalAlpha = 0.38;
+  ctx.shadowColor = AGENT_CURSOR_SHADOW.color;
+  ctx.shadowBlur = blur(AGENT_CURSOR_SHADOW.sigma * k * pop);
+  ctx.shadowOffsetY = AGENT_CURSOR_SHADOW.dy * k * pop * dpr;
+  ctx.shadowOffsetX = OFF;
+  ctx.translate(-OFF / device, 0);
+  ctx.fillStyle = AGENT_CURSOR_SHADOW.color;
   ctx.fill(path);
-  ctx.globalAlpha = 1;
   ctx.restore();
 
-  ctx.fillStyle = CURSOR_BODY;
-  ctx.fill(path);
+  // 2 + 3. The blue rim: the outline stroked 1.1 keylines wide and blurred five
+  // keylines out — rendered once per scale (glowSprite) and laid down twice:
+  // screen-blended (more on dark, nothing on white), then plain at a low
+  // opacity. The sprite is built at the unpressed size; a press scales it
+  // with the glyph for 150 ms, which no eye can tell from a re-blur.
+  const glow = glowSprite(dpr * CURSOR_UNIT * k);
+  if (glow !== null) {
+    const inv = 1 / (dpr * CURSOR_UNIT * k);
+    const gx = AGENT_CURSOR_BOX.x - glow.margin * inv;
+    const gy = AGENT_CURSOR_BOX.y - glow.margin * inv;
+    const gw = glow.canvas.width * inv;
+    const gh = glow.canvas.height * inv;
+    for (const [alpha, op] of [
+      [AGENT_CURSOR_GLOW_DARK_OPACITY, 'screen'],
+      [AGENT_CURSOR_GLOW_OPACITY, 'source-over'],
+    ] as const) {
+      ctx.save();
+      ctx.globalCompositeOperation = op;
+      ctx.globalAlpha = alpha;
+      ctx.drawImage(glow.canvas, gx, gy, gw, gh);
+      ctx.restore();
+    }
+  }
 
-  ctx.strokeStyle = CURSOR_KEYLINE;
-  ctx.lineWidth = CURSOR_STROKE_W;
-  ctx.lineJoin = 'round';
+  // 4. The body: black under the keyline at his thickness.
+  ctx.fillStyle = AGENT_CURSOR_BODY;
+  ctx.fill(path);
+  ctx.strokeStyle = AGENT_CURSOR_KEYLINE;
+  ctx.lineWidth = AGENT_CURSOR_STROKE_W;
+  ctx.stroke(path);
+
+  // 5. The thin bright line on top.
+  ctx.lineWidth = AGENT_CURSOR_STROKE_W * AGENT_CURSOR_KEYLINE_THIN;
   ctx.stroke(path);
   ctx.restore();
-}
-
-/** Two expanding rings, the overlay's click feedback. */
-function drawRipples(
-  ctx: CanvasRenderingContext2D,
-  at: { x: number; y: number },
-  k: number,
-  since: number,
-  accent: string,
-): void {
-  for (const delay of [0, 130]) {
-    const t = (since - delay) / 500;
-    if (t < 0 || t > 1) continue;
-    const eased = 1 - (1 - t) ** 3;
-    const scale = 0.55 + eased * 2.55;
-    ctx.save();
-    ctx.globalAlpha = 0.95 * (1 - t);
-    ctx.strokeStyle = accent;
-    ctx.lineWidth = 2.5 * k;
-    ctx.beginPath();
-    ctx.arc(at.x, at.y, 9 * k * scale, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
-  }
 }
 
 /**
@@ -2402,7 +2493,18 @@ function drawBubble(
   }
   const w = padX * 2 + dotsWidth + labelWidth + detailWidth;
   const h = fontSize * 1.2 + padY * 2;
-  const anchor = bubbleAnchor(at, { w, h }, viewport, { x: 27 * k, y: 40 * k }, 8);
+  /*
+   * PARKED WHERE THE OVERLAY PARKS IT. This used to sit 27×40 px from the tip
+   * (the first overlay's distance) and flip at the edge of the whole viewport —
+   * the user: "the status pill really far away from it for some reason". The
+   * overlay has since been brought "a bit closer" (11×15) and keeps the pill
+   * inside the window it belongs to, so the same rule runs here against the
+   * drawn window — clipped to the viewport, since in follow mode the window
+   * runs past it.
+   */
+  const bounds = intersectRects(drawn, { x: 0, y: 0, w: viewport.w, h: viewport.h });
+  const anchor = agentPillPlacement(at, { w, h }, bounds, k);
+  const radius = Math.min(h / 2, AGENT_PILL_RADIUS * k);
 
   // Glass pill: dark enough that any window content reads behind it, lifted by
   // the theme accent and a hairline top highlight. The fill was near-black,
@@ -2413,7 +2515,7 @@ function drawBubble(
   ctx.shadowBlur = 18 * k;
   ctx.shadowOffsetY = 4 * k;
   ctx.fillStyle = 'rgba(22, 24, 30, 0.92)';
-  roundRect(ctx, anchor.x, anchor.y, w, h, h / 2);
+  roundRect(ctx, anchor.x, anchor.y, w, h, radius);
   ctx.fill();
   ctx.restore();
 
@@ -2421,13 +2523,13 @@ function drawBubble(
   ctx.globalAlpha = 0.55;
   ctx.strokeStyle = palette.accent;
   ctx.lineWidth = 2 * k;
-  roundRect(ctx, anchor.x, anchor.y, w, h, h / 2);
+  roundRect(ctx, anchor.x, anchor.y, w, h, radius);
   ctx.stroke();
   ctx.restore();
 
   ctx.strokeStyle = 'rgba(255,255,255,0.24)';
   ctx.lineWidth = 1;
-  roundRect(ctx, anchor.x + 0.5, anchor.y + 0.5, w - 1, h - 1, (h - 1) / 2);
+  roundRect(ctx, anchor.x + 0.5, anchor.y + 0.5, w - 1, h - 1, Math.max(0, radius - 0.5));
   ctx.stroke();
 
   let x = anchor.x + padX;

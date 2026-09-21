@@ -55,6 +55,7 @@ import { useCorpStore } from '../../state/corp-store';
 import { usePiStore } from '../../state/pi-slice';
 import { useProjectStore } from '../../state/project-store';
 import { toolStepKind } from '../activity-mapping';
+import { cliCommandLabel } from '../cli-command-label';
 import { useHarnessStatus } from '../harness-status';
 import { COMMAND_KEYS, partialJsonString } from '../partial-json';
 import { firstCommandWord, isTerminalCommand } from './activity-cli';
@@ -64,6 +65,7 @@ import { computerUseLabel, isComputerUseCall } from './activity-computer-use';
 // it). Re-exported below: this module is where it is used.
 import { ACTIVITY_TAB_KEY, ACTIVITY_TITLE } from './activity-tab';
 import { mirrorCommandText, shortCommandTitle } from './agent-surfaces';
+import { getDrivenBrowserTab, subscribeDrivenBrowserTab } from './browser-agent-tab';
 import { pdFileUrl, previewKindForExt } from './file-preview';
 import {
   fileArtifact,
@@ -150,7 +152,10 @@ const BROWSER_KINDS = new Set([
 /** A short human label for a browser call: the site when we can name one, else
  * the verb. It rides in the tab's subtitle, so it has to fit in a tab. */
 export function browserLabel(block: ToolCallBlock): string {
-  const url = str(block.arguments?.url);
+  return browserLabelFor(toolStepKind(block.name), str(block.arguments?.url));
+}
+
+function browserLabelFor(kind: string | undefined, url: string | undefined): string {
   if (url !== undefined) {
     try {
       return new URL(url).host || url;
@@ -158,11 +163,22 @@ export function browserLabel(block: ToolCallBlock): string {
       return url.replace(/^https?:\/\//, '').split('/')[0] ?? url;
     }
   }
-  const kind = toolStepKind(block.name);
   if (kind === 'browser-click') return 'Clicking';
   if (kind === 'browser-type') return 'Typing';
   if (kind === 'browser-read') return 'Reading the page';
   return 'Browsing';
+}
+
+/**
+ * The browser call a bash line IS, in tool-CLI mode — `browser click 4`,
+ * `browser navigate <url>`, and the `open <url>` the shell wrapper turns into
+ * one. Read through the same table the chat's activity rows use, so the tab
+ * and the row can never disagree about what a line was.
+ */
+function cliBrowserFocus(command: string | undefined): { kind: string; url?: string } | null {
+  const cli = cliCommandLabel(command);
+  if (cli?.kind === undefined || !cli.kind.startsWith('browser-')) return null;
+  return { kind: cli.kind, ...(cli.url === undefined ? {} : { url: cli.url }) };
 }
 
 /**
@@ -258,6 +274,24 @@ export function detectActivity(
         continue;
       }
       const rawCommand = block.name === 'bash' ? commandOf(block) : undefined;
+      /*
+       * THE SAME CALL IN ITS CLI CLOTHES. In tool-CLI mode `browser click 4`
+       * arrives as a bash line, and this loop saw no browser in it at all — so
+       * while the bridge morphed the tab into the page, this pass, still
+       * holding the newest thing it recognised (an `open <url>` terminal line),
+       * morphed it straight back. the user: "the activity panel doesn't focus the
+       * working browser tab … doesn't show the user anything for the actual
+       * browser actions".
+       */
+      const cliBrowser = cliBrowserFocus(rawCommand);
+      if (cliBrowser !== null) {
+        browserFocus = {
+          kind: 'browser',
+          at,
+          label: browserLabelFor(cliBrowser.kind, cliBrowser.url),
+        };
+        continue;
+      }
       if (isComputerUseCall(block.name, rawCommand)) {
         computerUseFocus = {
           kind: 'computer-use',
@@ -608,6 +642,11 @@ export function useActivityCanvasRouting(controller: CanvasController): void {
   // The monitor's session (which app, whether it is live) settles after the
   // call that started it; the pass that names the tab after it has to run again.
   useEffect(() => macMonitorFeed.subscribe(rerun), []);
+  // So does the bridge adopting a browser tab for the model.
+  useEffect(() => subscribeDrivenBrowserTab(rerun), []);
+  /** The user turn in which the model's own browser tab was last brought
+   * forward — once per turn, so a user who clicks away is not dragged back. */
+  const browsingTurn = useRef(-1);
 
   // A session boundary wipes the slate: the latch, and every id-keyed set, which
   // referred to a thread that is no longer the one on screen.
@@ -666,6 +705,29 @@ export function useActivityCanvasRouting(controller: CanvasController): void {
       const stale = controller.getState().tabs.find((t) => t.key === ACTIVITY_TAB_KEY);
       if (stale !== undefined && stale.kind === 'file') controller.closeTab(stale.id);
       return;
+    }
+
+    /*
+     * THE PAGE THE MODEL IS DRIVING IS THE THING TO SHOW. When the bridge
+     * adopted a browser tab that is NOT the Activity tab — the page the user
+     * already had open — the Activity tab must not become a second, empty
+     * browser beside it. Bring the driven tab forward instead, once per turn
+     * (a user who clicks away is not dragged back), and leave the Activity tab
+     * as it was. When the model browses in the Activity tab itself, or the
+     * bridge has not adopted anything yet, the spec below keeps it a browser.
+     */
+    if (spec?.kind === 'browser') {
+      const driven = getDrivenBrowserTab();
+      const tabs = controller.getState().tabs;
+      const activityId = tabs.find((t) => t.key === ACTIVITY_TAB_KEY)?.id;
+      if (driven !== null && driven !== activityId && tabs.some((t) => t.id === driven)) {
+        if (browsingTurn.current !== turns) {
+          browsingTurn.current = turns;
+          controller.focusTab(driven);
+          useCanvasStore.getState().setCanvasOpen(true);
+        }
+        return;
+      }
     }
 
     const present = controller.getState().tabs.some((t) => t.key === ACTIVITY_TAB_KEY);

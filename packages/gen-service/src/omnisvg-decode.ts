@@ -224,3 +224,37 @@ export function decodeOmniSvg(
   if (paths.length === 0) return null;
   return { svg: pathsToSvg(paths, c), paths: paths.length };
 }
+
+/**
+ * The drawing SO FAR, from a prefix of the ids — for the card that shows the
+ * model drawing while it draws.
+ *
+ * The colour of a shape arrives AFTER its commands in this vocabulary, so the
+ * shape being drawn has no fill yet and `xyToPaths` flushes it with `none`,
+ * which is invisible. Here the unfinished shape is shown as the pen would show
+ * it: an outline, so the eye sees where the line is going before the colour
+ * lands. Every finished shape is exactly what the final file will have.
+ */
+export function decodeOmniSvgPartial(
+  ids: readonly number[],
+  c = OMNISVG_4B,
+): { svg: string; paths: number; drawing: boolean } | null {
+  const body: number[] = [];
+  for (const t of ids) {
+    if (t === c.eos) break;
+    if (t === c.bos) continue;
+    body.push(t);
+  }
+  const paths = xyToPaths(tokensToXY(body, c), c);
+  if (paths.length === 0) return null;
+  const last = paths[paths.length - 1];
+  const drawing = last !== undefined && last.fill === 'none';
+  const finished = drawing ? paths.slice(0, -1) : paths;
+  const pen =
+    drawing && last !== undefined
+      ? `<path fill="none" stroke="#7a8190" stroke-opacity="0.8" stroke-width="1.2" ` +
+        `stroke-linejoin="round" stroke-linecap="round" d="${last.d}"></path>`
+      : '';
+  const svg = pathsToSvg(finished, c).replace('</svg>', `${pen}</svg>`);
+  return { svg, paths: finished.length, drawing };
+}

@@ -238,6 +238,7 @@ const STEP_LABELS: Record<ActivityStepKind, [running: string, done: string]> = {
   connector: ['Using a connector', 'Used a connector'],
   tool: ['Running a tool', 'Used a tool'],
   image: ['Generating an image', 'Generated an image'],
+  svg: ['Drawing an SVG', 'Drew an SVG'],
   video: ['Generating a video', 'Generated a video'],
   speech: ['Reading it aloud', 'Read it aloud'],
   music: ['Composing music', 'Composed music'],
@@ -360,9 +361,10 @@ const TOOL_REGISTRY: Record<string, ToolResolution> = {
   generate_3d: { kind: 'model3d' },
   refine_3d: { kind: 'model3d-refine' },
   edit_image: { kind: 'image', label: ['Editing an image', 'Edited an image'] },
-  // OmniSVG through the `svg` command — a drawing, so the image glyph, but the
-  // words say what kind: a vector file, not a render.
-  generate_svg: { kind: 'image', label: ['Making an SVG', 'Made an SVG'] },
+  // OmniSVG through the `svg` command — a drawing: its own kind, the SVG
+  // file mark, and rows that say so. Its result is a card in the thread (the
+  // live drawing, then the file), never a canvas tab.
+  generate_svg: { kind: 'svg', label: ['Drawing an SVG', 'Drew an SVG'] },
   // The data-visuals tools. The chart arm below names the KIND of chart from
   // the call's own arguments ("Rendering a bar chart"); this is the fallback.
   chart: { kind: 'chart' },
@@ -959,7 +961,7 @@ export function generatedImageSrc(
  * they are one behaviour; it lived inside a `case` and image could not reach it.
  */
 function producedArtifactStep(
-  kind: 'image' | 'video' | 'speech' | 'music' | 'sfx' | 'model3d' | 'model3d-refine',
+  kind: 'image' | 'svg' | 'video' | 'speech' | 'music' | 'sfx' | 'model3d' | 'model3d-refine',
   label: string,
   status: 'running' | 'done',
   filename: string | undefined,
@@ -1110,6 +1112,58 @@ function mapToolStepData(
           },
         };
       }
+      /*
+       * A BROWSER ACTION IS A BROWSER ROW, a drawing an image row, a document
+       * a file row — the same kinds and marks the native calls have. the user
+       * (2026-09-21): "ensure all things have custom 'Clicking with browser'
+       * 'Drawing SVG' rather than 'svg --prompt a smiley fac...'". The raw
+       * line stays behind the disclosure as the command; the tool's answer as
+       * its output.
+       */
+      if (cli?.kind !== undefined) {
+        const cliLabel = status === 'running' ? cli.running : cli.done;
+        const text = str(result?.text);
+        const k = cli.kind;
+        if (
+          k === 'browser-navigate' ||
+          k === 'browser-click' ||
+          k === 'browser-type' ||
+          k === 'browser-read'
+        ) {
+          return {
+            data: {
+              kind: k,
+              label: cliLabel,
+              status,
+              detail: cli.detail ?? command,
+              ...(cli.url === undefined ? {} : { url: cli.url }),
+              ...(cli.target === undefined ? {} : { target: cli.target }),
+              ...(cli.typed === undefined ? {} : { typed: cli.typed }),
+              // The page's text, for the read row's reveal.
+              ...(k === 'browser-read' && text !== undefined ? { preview: text } : {}),
+            },
+          };
+        }
+        if (k === 'file') {
+          return {
+            data: {
+              kind: 'file',
+              label: cliLabel,
+              status,
+              detail: cli.detail ?? cli.filename ?? command,
+              ...(cli.filename === undefined ? {} : { filename: cli.filename }),
+              ...(text === undefined ? {} : { preview: text }),
+            },
+          };
+        }
+        const produced = producedArtifactStep(k, cliLabel, status, cli.filename, undefined, result);
+        return {
+          data: {
+            ...produced.data,
+            ...(cli.detail === undefined ? {} : { detail: cli.detail }),
+          },
+        };
+      }
       /* When the line names an app, the row becomes "Used <icon> <app>
          <action>" and the raw command moves behind the disclosure — see the
          connector-row note in activity-chain. `detail` still carries it, which
@@ -1241,6 +1295,9 @@ function mapToolStepData(
           preview: kind === 'browser-read' ? str(result?.text) : undefined,
         },
       };
+    case 'svg':
+      // A drawing is a card in the thread, like the generate family below.
+      return producedArtifactStep('svg', label, status, filename, path, result);
     case 'image':
     case 'pdf': {
       /*

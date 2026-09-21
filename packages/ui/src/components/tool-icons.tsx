@@ -87,6 +87,9 @@ export type ToolIconKind =
   // generic file sheet — because its content is instructions, not a plain file.
   | 'skill'
   | 'image'
+  /* A drawing the svg tool made — the vector-file mark, and rows that say
+     "Drew an SVG" rather than "Generated an image" (the user, 2026-09-21). */
+  | 'svg'
   | 'pdf'
   // A chart drawn by the `chart` tool (or `chart_edit`): the data-visuals
   // mark, and a label that names the kind of chart — the user (2026-09-17):
@@ -242,6 +245,8 @@ export function toolIcon(
       );
     case 'image':
       return <FileExtIcon ext={fileExt(filename) || 'PNG'} size={size + 4} />;
+    case 'svg':
+      return <FileExtIcon ext="SVG" size={size + 4} />;
     case 'video':
       return <FileExtIcon ext={fileExt(filename) || 'MP4'} size={size + 4} />;
     case 'speech':

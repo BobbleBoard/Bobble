@@ -166,7 +166,6 @@ export { IDLE_MAC_MONITOR_SESSION } from './surfaces/computer-use-feed.ts';
 export type { DrawnWindow } from './surfaces/computer-use-geometry.ts';
 export {
   annotationScale,
-  bubbleAnchor,
   coverCrop,
   cursorEase,
   fitWindow,

@@ -169,7 +169,7 @@ export function InlineWidget({
                   title="Rendered"
                   onClick={() => setView('rendered')}
                 >
-                  <IconEye size={14} />
+                  <IconEye size={16} />
                 </button>
                 <button
                   type="button"
@@ -179,27 +179,28 @@ export function InlineWidget({
                   title="Raw"
                   onClick={() => setView('raw')}
                 >
-                  <IconCode size={14} />
+                  <IconCode size={16} />
                 </button>
               </span>
             ) : null}
+            {/* the user (2026-09-21): "top right buttons on inline blocks sizes
+                need to be increased" — the controls are the default 28px
+                square with 16px glyphs now, not the 26px/14px small pair. */}
             <IconButton
-              size="sm"
               className="pd-inline-widget-copy"
               aria-label={copied ? 'Copied' : 'Copy'}
               title={copied ? 'Copied' : 'Copy'}
               onClick={() => copy(artifact.content.text)}
             >
-              {copied ? <IconCheck size={14} /> : <IconCopy size={14} />}
+              {copied ? <IconCheck size={16} /> : <IconCopy size={16} />}
             </IconButton>
             <IconButton
-              size="sm"
               className="pd-inline-widget-move"
               aria-label="Open in canvas"
               title="Open in canvas"
               onClick={() => onMoveToCanvas?.(artifact)}
             >
-              <IconToCanvas size={14} />
+              <IconToCanvas size={16} />
             </IconButton>
           </span>
         </div>

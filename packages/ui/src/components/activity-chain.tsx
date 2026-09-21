@@ -244,6 +244,7 @@ export type ActivityStepData =
        */
       kind:
         | 'image'
+        | 'svg'
         | 'pdf'
         | 'canvas-open'
         | 'video'
@@ -336,6 +337,7 @@ const VERBS: Record<ActivityStepKind, VerbSpec> = {
   connector: { verb: 'Used', singular: 'a connector', plural: 'connectors' },
   tool: { verb: 'Used', singular: 'a tool', plural: 'tools' },
   image: { verb: 'Generated', singular: 'an image', plural: 'images', attempt: 'image' },
+  svg: { verb: 'Drew', singular: 'an SVG', plural: 'SVGs', attempt: 'drawing' },
   video: { verb: 'Generated', singular: 'a video', plural: 'videos', attempt: 'video' },
   speech: { verb: 'Read', singular: 'it aloud', plural: 'passages', attempt: 'read-aloud' },
   music: { verb: 'Composed', singular: 'music', plural: 'pieces', attempt: 'piece' },
@@ -391,6 +393,7 @@ const KIND_ORDER: ActivityStepKind[] = [
   'connector',
   'tool',
   'image',
+  'svg',
   /* The rest of the generate family. Omitted here they are invisible to the
      chain SUMMARY — the collapsed header aggregates by KIND_ORDER, so a turn
      whose only step was a sound effect summarised as something else entirely. */
@@ -567,6 +570,7 @@ const RUNNING_PHRASE: Record<ActivityStepKind, string> = {
   connector: 'Using a connector',
   tool: 'Running a tool',
   image: 'Generating an image',
+  svg: 'Drawing an SVG',
   video: 'Generating a video',
   speech: 'Reading it aloud',
   music: 'Composing music',
@@ -803,10 +807,11 @@ function StepError({ text }: { text: string }) {
 
 function StepContent({ step, live = false }: { step: ActivityStepData; live?: boolean }) {
   /*
-   * A FAILURE OUTRANKS THE NORMAL BODY. Whatever this kind usually shows, the
-   * thing you opened it for is what went wrong — so the error leads, and the
-   * usual content follows it (a bash row still shows its command and stdout
-   * under the red stderr).
+   * A FAILURE IS SHOWN IN THE ORDER IT HAPPENED. The error used to lead and the
+   * command sat under it; the user (2026-09-21): "flip the order of the shown
+   * terminal calls when tool calls are individually expanded, terminal above,
+   * then output below" — the same order a successful row has, so the eye
+   * never has to learn two. The red is still the thing you opened it for.
    */
   const errText =
     step.failed === true
@@ -815,10 +820,13 @@ function StepContent({ step, live = false }: { step: ActivityStepData; live?: bo
   if (errText.trim().length > 0) {
     return (
       <>
-        <StepError text={errText} />
         {step.kind === 'bash' || step.kind === 'python' ? (
-          <TerminalBlock command={(step as { command?: string }).command} />
+          <TerminalBlock
+            command={(step as { command?: string }).command}
+            prompt={step.kind === 'python' ? '>>>' : '$'}
+          />
         ) : null}
+        <StepError text={errText} />
         {step.kind === 'edit' && step.diff !== undefined && step.diff.length > 0 ? (
           // What WOULD have been written, under the reason it was not.
           <DiffView files={step.diff} />
@@ -898,6 +906,7 @@ function StepContent({ step, live = false }: { step: ActivityStepData; live?: bo
         />
       );
     case 'image':
+    case 'svg':
     case 'pdf':
     case 'canvas-open':
       return (
@@ -1116,6 +1125,7 @@ function MediaReveal({
 }: {
   kind:
     | 'image'
+    | 'svg'
     | 'pdf'
     | 'canvas-open'
     | 'video'
@@ -1134,6 +1144,7 @@ function MediaReveal({
   const NOUNS: Record<string, string> = {
     pdf: 'PDF',
     image: 'image',
+    svg: 'drawing',
     video: 'video',
     speech: 'recording',
     music: 'track',
@@ -1288,6 +1299,7 @@ export function hasInlineContent(step: ActivityStepData): boolean {
      * destination at all. See {@link MediaReveal}.
      */
     case 'image':
+    case 'svg':
     case 'pdf':
     case 'canvas-open':
       return settled && (nonEmpty(step.src) || nonEmpty(step.detail) || nonEmpty(step.filename));

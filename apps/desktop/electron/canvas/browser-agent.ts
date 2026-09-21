@@ -230,19 +230,40 @@ async function typeInto(params: Record<string, unknown>): Promise<Resolved> {
   const index = Number(params.index);
   const text = String(params.text ?? '');
   const submit = params.submit === true;
-  const focus = (await browserManager.evaluate(id, focusByIndex(index))) as Resolved | null;
+  const focus = (await browserManager.evaluate(id, focusByIndex(index))) as
+    | (Resolved & { native?: boolean })
+    | null;
   if (focus === null || !focus.found) return { found: false };
-  await moveCursor(focus.x ?? 0, focus.y ?? 0);
+  const x = focus.x ?? 0;
+  const y = focus.y ?? 0;
+  await moveCursor(x, y);
+  const native = focus.native !== false;
+  if (!native) {
+    /*
+     * NOT A FIELD WITH A VALUE — a widget that draws its own caret (Desmos's
+     * expression line, a code editor, a document). Type into it the way a
+     * person does: click it so it takes focus, then send the keystrokes to
+     * whatever is focused. Setting `.value` on it would set nothing.
+     */
+    await cursor({ kind: 'click', x, y });
+    browserManager.click(id, x, y);
+    await sleep(TYPE_STEP_MS);
+  }
   await browserManager
     .evaluate(id, cursorCommand({ kind: 'typing', active: true, text }))
     .catch(() => undefined);
-  const steps = reducedMotion ? 1 : Math.min(TYPE_MAX_STEPS, Math.max(1, text.length));
-  for (let i = 1; i <= steps; i++) {
-    const upto = Math.ceil((text.length * i) / steps);
-    await browserManager
-      .evaluate(id, setValueByIndex(index, text.slice(0, upto), i === steps))
-      .catch(() => undefined);
-    if (!reducedMotion && i < steps) await sleep(TYPE_STEP_MS);
+  if (native) {
+    const steps = reducedMotion ? 1 : Math.min(TYPE_MAX_STEPS, Math.max(1, text.length));
+    for (let i = 1; i <= steps; i++) {
+      const upto = Math.ceil((text.length * i) / steps);
+      await browserManager
+        .evaluate(id, setValueByIndex(index, text.slice(0, upto), i === steps))
+        .catch(() => undefined);
+      if (!reducedMotion && i < steps) await sleep(TYPE_STEP_MS);
+    }
+  } else {
+    browserManager.typeKeys(id, text);
+    await sleep(TYPE_STEP_MS);
   }
   await browserManager
     .evaluate(id, cursorCommand({ kind: 'typing', active: false }))

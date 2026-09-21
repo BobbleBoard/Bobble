@@ -106,14 +106,16 @@ export const CodeBlock = forwardRef<HTMLDivElement, CodeBlockProps>(function Cod
       <div className="pd-code-block-head">
         <span className="pd-code-block-lang">{language ?? ''}</span>
         <span className="pd-code-block-actions">
+          {/* The default 28px square with a 16px glyph — the user (2026-09-21):
+              the inline blocks' corner buttons were too small. */}
           <button
             type="button"
-            className="pd-btn pd-btn--ghost pd-icon-btn pd-btn--sm pd-code-block-copy"
+            className="pd-btn pd-btn--ghost pd-icon-btn pd-code-block-copy"
             aria-label={copied ? 'Copied' : 'Copy code'}
             title={copied ? 'Copied' : 'Copy'}
             onClick={handleCopy}
           >
-            {copied ? <IconCheck size={14} /> : <IconCopy size={14} />}
+            {copied ? <IconCheck size={16} /> : <IconCopy size={16} />}
           </button>
         </span>
       </div>

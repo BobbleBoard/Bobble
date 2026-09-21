@@ -28,7 +28,7 @@
  */
 import { randomBytes, randomInt } from 'node:crypto';
 import { existsSync, unlinkSync } from 'node:fs';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import net from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -1120,8 +1120,35 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
         };
         const name = slug(p.prompt ?? p.images?.[0] ?? 'svg', 'svg');
         const outputDir = path.join(outputRoot, uniqueName(outputRoot, name));
-        const result = await generateSvg({ ...p, outputDir });
-        for (const o of result.outputs) send('gen:open-file', { path: o.outputPath });
+        const prompt = p.prompt === undefined ? {} : { prompt: p.prompt };
+        let result: Awaited<ReturnType<typeof generateSvg>>;
+        try {
+          result = await generateSvg({ ...p, outputDir }, (partial) =>
+            send('gen:svg-live', { status: 'drawing', ...partial, ...prompt }),
+          );
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          send('gen:svg-live', { status: 'error', error: message, ...prompt });
+          throw err;
+        }
+        /*
+         * THE FINISHED DRAWING GOES TO THE THREAD, IN PLACE OF THE LIVE ONE.
+         * It used to open as a file tab in the canvas (`gen:open-file`); the user
+         * wants the drawing in the chat, as the card the live drawing was, and
+         * the canvas only when its corner control is asked for — the same rule
+         * a presented chart follows.
+         */
+        const outputs: { path: string; svg: string; paths: number }[] = [];
+        for (const o of result.outputs) {
+          let svg = '';
+          try {
+            svg = await readFile(o.outputPath, 'utf8');
+          } catch {
+            svg = '';
+          }
+          outputs.push({ path: o.outputPath, svg, paths: o.paths });
+        }
+        send('gen:svg-live', { status: 'done', outputs, ...prompt });
         return result;
       }
       case 'omnisvgStatus':

@@ -39,7 +39,7 @@ import {
 } from '../state/pi-connect';
 import { usePiStore } from '../state/pi-slice';
 import { assessCurrentSend, useQueueExplainer } from '../state/running-chats';
-import { corpForceEnabled, productionHarnessEnabled, useWorkMode } from '../state/settings-store';
+import { corpForceEnabled, productionHarnessEnabled } from '../state/settings-store';
 import { useThemeStore } from '../store/theme';
 import { AttachedFileCard } from './AttachedFileCard';
 import { ComposerBar } from './ComposerBar';
@@ -382,7 +382,6 @@ export function ChatComposer({
   onCorpFollowUp?: (question: string) => void;
 }) {
   // Which half of the app is on screen — the ledge below the card follows it.
-  const workMode = useWorkMode();
   /*
    * CAN THE SELECTED MODEL READ A PICTURE? Asked here so the answer arrives
    * before the mistake rather than after it — the send path asks the same
@@ -1642,26 +1641,12 @@ export function ChatComposer({
 
           the user: "have that bottom bar that has the context model and project
           slide down and slide up when we want it, by default … slid down."
-          The top-left Chat|Work control owns the choice (ModeToggle); this only
-          renders the slide. It stays MOUNTED in chat mode rather than being
-          removed, so the project picker and the effort dial keep their state
-          across a toggle and the transition has something to animate.
+          Then (2026-09-21) the user: "remove chat vs work, just leave it on
+          'work' no need for a seperate thing" — so the ledge is simply open.
+          The slide machinery (`data-open`) stays, one attribute, in case a
+          surface ever wants it folded; nothing toggles it now.
         */}
-        <div
-          className="pd-composer-ledge"
-          data-open={workMode === 'work'}
-          data-testid="composer-ledge"
-          /*
-           * A CLOSED PANEL MUST NOT KEEP ITS CONTROLS IN THE TAB ORDER.
-           *
-           * It stays mounted so the project picker and effort dial keep their
-           * state across a toggle and the transition has something to animate —
-           * but a control you cannot see and can still tab to is the same defect
-           * the closed settings rail had. `inert` takes the whole subtree out of
-           * focus, hit-testing and the accessibility tree in one attribute.
-           */
-          inert={workMode !== 'work'}
-        >
+        <div className="pd-composer-ledge" data-open="true" data-testid="composer-ledge">
           <div>
             <ComposerBar />
           </div>

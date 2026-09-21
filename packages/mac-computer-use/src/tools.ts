@@ -26,6 +26,7 @@ import {
   chromeActionJs,
   chromeEval,
   chromeJsAllowed,
+  chromeRunning,
   chromeTabs,
   enableChromeJs,
 } from './chrome.js';
@@ -147,6 +148,9 @@ export interface MacComputerUseOptions {
    * had one. A test that depends on the machine it runs on is not a test.
    */
   readonly readChromeTabs?: () => Promise<ChromeTabInfo[] | null>;
+  /** Whether Chrome is running (the chrome_* set) — same reason: a unit test
+   *  must not depend on, or launch, the Chrome of the machine running it. */
+  readonly isChromeRunning?: () => Promise<boolean>;
   /** Turns short texts into vectors, for the `like` search. Absent until an
    *  embedding model is deployed; the keyword half answers alone until then. */
   readonly embedText?: Embedder;
@@ -1528,8 +1532,13 @@ export async function checkMacTcc(bridge: MacBridge): Promise<MacTccStatus> {
 /** The user's own Chrome, by the name macOS knows it by. */
 const CHROME_APP = 'Google Chrome';
 
-export function registerChromeTools(pi: ExtensionAPI, bridge: MacBridge | null = null): void {
+export function registerChromeTools(
+  pi: ExtensionAPI,
+  bridge: MacBridge | null = null,
+  options: { readonly isChromeRunning?: () => Promise<boolean> } = {},
+): void {
   let askedThisSession = false;
+  const isChromeRunning = options.isChromeRunning ?? chromeRunning;
 
   /**
    * THE ROUTE THAT ACTUALLY WORKS.
@@ -1583,6 +1592,29 @@ export function registerChromeTools(pi: ExtensionAPI, bridge: MacBridge | null =
     );
   }
 
+  /**
+   * Chrome, running — launched in the background through the bridge when it
+   * is not, never by AppleScript addressing it (which brings it to the front
+   * and leaves it there). Returns what to tell the model when Chrome came up
+   * without a window to act on (its profile picker), else null.
+   */
+  async function ensureChromeRunning(): Promise<string | null> {
+    if (await isChromeRunning()) return null;
+    const ack = await ax<MacLaunchAck>('launch', { app: CHROME_APP, background: true });
+    if (ack === null || !ack.ok) {
+      return `Chrome is not running and could not be launched${ack?.error ? `: ${ack.error}` : ''}.`;
+    }
+    if (ack.bounds === undefined) {
+      return (
+        'Chrome was launched in the background but has no window yet — it is showing its ' +
+        'profile picker. `mac snapshot "Google Chrome"` lists the picker\'s profile buttons; ' +
+        'click one with `mac click`, then try again. Or use the built-in browser ' +
+        '(`browser navigate`), which needs none of this.'
+      );
+    }
+    return null;
+  }
+
   /** Shared: gate, evaluate, and turn a failure into something actionable. */
   async function evalInChrome(
     ctx: ExtensionContext,
@@ -1590,6 +1622,8 @@ export function registerChromeTools(pi: ExtensionAPI, bridge: MacBridge | null =
   ): Promise<{ text: string; ok: boolean }> {
     const blocked = await ensureChromeJs(ctx);
     if (blocked !== null) return { text: blocked, ok: false };
+    const notUp = await ensureChromeRunning();
+    if (notUp !== null) return { text: notUp, ok: false };
     const res = await chromeEval(js);
     if (!res.ok) return { text: res.error ?? 'Chrome did not respond.', ok: false };
     return { text: res.value, ok: true };

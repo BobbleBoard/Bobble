@@ -129,7 +129,7 @@ export const DEFAULT_SETTINGS: DesktopSettings = {
   mcpMode: 'lite',
   toolInterface: 'bash-cli',
   specialistToolInterface: 'bash-cli',
-  workMode: 'chat',
+  workMode: 'work', // retired 2026-09-21: the ledge is always open; parsed, unread
   /* 'low' by default — the user, after the freeze that took the trackpad with it:
      "switch default to low power mode". The machine stays usable out of the
      box; a person who wants a run pushed picks 'full' for it. */

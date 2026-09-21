@@ -87,13 +87,79 @@ describe('a chart command is the chart tool in CLI clothes', () => {
       done: 'Rendered a bar chart',
       chart: { type: 'bar', title: 'Units Sold by Year' },
     });
-    expect(cliCommandLabel('chart --type hbar --title "Top 5" --labels a --values 1')?.running).toBe(
-      'Rendering a horizontal bar chart',
-    );
+    expect(
+      cliCommandLabel('chart --type hbar --title "Top 5" --labels a --values 1')?.running,
+    ).toBe('Rendering a horizontal bar chart');
     expect(cliCommandLabel('chart edit units.svg --look sunset')).toEqual({
       running: 'Redrawing the chart',
       done: 'Redrew the chart',
       chart: { type: 'chart', title: 'units.svg' },
     });
+  });
+});
+
+describe("browser rows — the app's own kinds, not terminal lines (the user 2026-09-21)", () => {
+  it('reads both spellings of every argument, as one real run typed them', () => {
+    expect(cliCommandLabel('browser navigate https://www.desmos.com/calculator')).toEqual({
+      running: 'Visiting in the browser',
+      done: 'Visited in the browser',
+      kind: 'browser-navigate',
+      url: 'https://www.desmos.com/calculator',
+      detail: 'https://www.desmos.com/calculator',
+    });
+    expect(cliCommandLabel('browser navigate --url=https://a.b/c')?.url).toBe('https://a.b/c');
+    expect(cliCommandLabel('browser click 4')).toMatchObject({
+      running: 'Clicking in the browser',
+      kind: 'browser-click',
+      target: 'element 4',
+      detail: 'element 4',
+    });
+    expect(cliCommandLabel('browser click --index=13')?.target).toBe('element 13');
+    expect(cliCommandLabel('browser type 14 --text "x^2 + y^2 = 1" --submit true')).toMatchObject({
+      kind: 'browser-type',
+      target: 'element 14',
+      typed: 'x^2 + y^2 = 1',
+      detail: 'x^2 + y^2 = 1',
+    });
+    expect(cliCommandLabel('browser type --index=13 "x^2 + (y-5)^2 = 9"')).toMatchObject({
+      target: 'element 13',
+      typed: 'x^2 + (y-5)^2 = 9',
+    });
+    expect(cliCommandLabel('browser key t')).toMatchObject({
+      running: 'Pressing a key in the browser',
+      kind: 'browser-type',
+      typed: 't',
+    });
+    expect(cliCommandLabel('browser scroll --direction=down --amount=300')).toMatchObject({
+      kind: 'browser-click',
+      target: 'down',
+    });
+    expect(cliCommandLabel('browser snapshot')).toMatchObject({
+      running: 'Reading the page in the browser',
+      kind: 'browser-read',
+    });
+    expect(cliCommandLabel('browser read --selector="input, textarea"')?.target).toBe(
+      'input, textarea',
+    );
+    expect(cliCommandLabel('browser back')?.kind).toBe('browser-navigate');
+  });
+
+  it('`open <url>` is a visit — the wrapper turns it into one', () => {
+    expect(cliCommandLabel('open https://www.desmos.com/calculator')).toMatchObject({
+      running: 'Visiting in the browser',
+      kind: 'browser-navigate',
+      url: 'https://www.desmos.com/calculator',
+    });
+    // Naming an app is the launch guard's business, not a visit.
+    expect(cliCommandLabel('open -a Safari https://x.y')).toBeNull();
+    expect(cliCommandLabel('open .')).toBeNull();
+  });
+
+  it('a drawing is "Drawing an SVG" with the file named, never the prompt as a command', () => {
+    const l = cliCommandLabel(
+      'svg "--prompt=A clean educational SVG showing a 5-wide smiley face" assets/smileys.svg',
+    );
+    expect(l).toMatchObject({ running: 'Drawing an SVG', done: 'Drew an SVG', kind: 'svg' });
+    expect(l?.detail).toContain('smiley face');
   });
 });

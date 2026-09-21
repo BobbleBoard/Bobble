@@ -204,9 +204,9 @@ export function focusComplaint(before, during) {
  * is the "element intercepts pointer events" failure that found this.
  */
 export async function openWorkMode(page) {
-  const toggle = await page.$('[data-testid="mode-work"]');
-  if (toggle === null) return false;
-  await toggle.click();
+  // The Chat|Work toggle is gone (2026-09-21, the user: "just leave it on 'work'")
+  // and the ledge is always open; this waits for it and nothing more, so the
+  // probes that call it keep their shape.
   await page.waitForFunction(
     () =>
       document.querySelector('[data-testid="composer-ledge"]')?.getAttribute('data-open') ===
@@ -214,7 +214,6 @@ export async function openWorkMode(page) {
     undefined,
     { timeout: 5000 },
   );
-  await page.waitForTimeout(400);
   return true;
 }
 

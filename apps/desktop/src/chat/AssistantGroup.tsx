@@ -25,6 +25,7 @@ import { segmentGroup } from './activity-mapping';
 import { InlineArtifact } from './canvas/InlineArtifacts';
 import { useGeneratingJob, useModel3dLive } from './GeneratingMedia';
 import { jobSamples, recordJobDuration } from './job-history';
+import { LiveSvgCard } from './LiveSvgCard';
 import { LongJobCard } from './LongJobCard';
 import { effectiveToolName, estimateFor, type JobKind, jobKindForTool, jobView } from './long-job';
 import { Markdown } from './markdown';
@@ -355,7 +356,10 @@ export function AssistantGroup({
               chain that started the work, and the finished result replaces it
               in place.
             */}
-            {jobHere !== null && pendingKindFor(jobHere.kind) !== null ? (
+            {jobHere !== null && jobHere.kind === 'svg' ? (
+              /* The drawing, drawn live — see LiveSvgCard. */
+              <LiveSvgCard callId={jobHere.callId} />
+            ) : jobHere !== null && pendingKindFor(jobHere.kind) !== null ? (
               /*
                * THE CARD THE RESULT WILL OCCUPY, mounted early — the same one the
                * studios use. No title, no clock, no Cancel: the row above says

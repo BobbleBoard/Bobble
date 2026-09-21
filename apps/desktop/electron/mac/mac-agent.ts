@@ -48,7 +48,7 @@ import { isBackgroundMode } from '../background-mode';
 import { readSettings } from '../settings/settings-main';
 import { isTrustedIpcEvent } from '../trusted-senders';
 import { userLaunchEnv } from './launch-env';
-import { listInstalledApps } from './mac-apps';
+import { listInstalledApps, sameApp } from './mac-apps';
 import {
   macMonitor,
   registerMacMonitorIpc,
@@ -259,12 +259,27 @@ async function frontmostAppName(): Promise<string | null> {
  * concludes all is well. Bounded, and it never fights the user — if they have
  * moved to something else in the meantime, that is not ours to undo.
  */
+/**
+ * How long a launched app is watched for taking the front. It was 6 × 350 ms
+ * — and Chrome's profile picker arrives after a cold start that takes longer
+ * than that on its own, so the watch was over before the theft. the user, after
+ * that fix had shipped: "chrome I know for sure … steal focus upon computer
+ * use launch." Ten seconds covers a cold start; the loop leaves the moment the
+ * user goes somewhere else themselves.
+ */
+const LAUNCH_FOCUS_WATCH_MS = 10_000;
+const LAUNCH_FOCUS_POLL_MS = 250;
+
 async function restoreFocusTo(previous: string, launched: string): Promise<void> {
-  for (let i = 0; i < 6; i += 1) {
-    await new Promise((r) => setTimeout(r, 350));
+  const until = Date.now() + LAUNCH_FOCUS_WATCH_MS;
+  while (Date.now() < until) {
+    await new Promise((r) => setTimeout(r, LAUNCH_FOCUS_POLL_MS));
     const now = await frontmostAppName();
     if (now === null) return;
-    if (now !== launched) return; // the user is somewhere else, or it behaved
+    const tookIt = sameApp(now, launched);
+    // The user went to a third app themselves: not ours to undo.
+    if (!tookIt && !sameApp(now, previous)) return;
+    if (!tookIt) continue; // behaving (or given back) — keep watching
     try {
       await getHelper().request('focus', { app: previous });
     } catch {

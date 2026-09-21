@@ -1812,7 +1812,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  min-height: 36px;
+  min-height: 40px;
   padding: 4px 6px 0 14px;
   user-select: none;
 }
@@ -1855,8 +1855,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 20px;
+  /* Sized with the buttons beside it (the user: the head's controls were too small). */
+  width: 30px;
+  height: 24px;
   border-radius: 6px;
   color: var(--pd-text-muted);
   transition:

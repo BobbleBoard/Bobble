@@ -178,3 +178,14 @@ export function listInstalledApps(
   }
   return listing;
 }
+
+/**
+ * The same app, as the model named it and as macOS names it — "chrome" and
+ * "Google Chrome" are one app. The pi-mac helper matches app names by
+ * case-insensitive substring; so does this, from either side.
+ */
+export function sameApp(a: string, b: string): boolean {
+  const x = a.trim().toLowerCase();
+  const y = b.trim().toLowerCase();
+  return x !== '' && y !== '' && (x === y || x.includes(y) || y.includes(x));
+}

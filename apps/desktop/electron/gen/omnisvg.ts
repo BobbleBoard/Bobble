@@ -22,7 +22,12 @@ import { existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import net from 'node:net';
 import path from 'node:path';
-import { buildOmniSvgRequest, decodeOmniSvg, idsFromCompletion } from '@pi-desktop/gen-service';
+import {
+  buildOmniSvgRequest,
+  decodeOmniSvg,
+  decodeOmniSvgPartial,
+  idsFromCompletion,
+} from '@pi-desktop/gen-service';
 import {
   cacheRoot,
   ensureLlamaCpp,
@@ -51,6 +56,21 @@ export interface OmniSvgParams {
    * the drawing is on the canvas and in the gallery either way.
    */
   readonly outPath?: string;
+}
+
+/**
+ * The drawing as it is being drawn — the finished shapes plus an outline of the
+ * one in progress (decodeOmniSvgPartial), a few times a second while the ids
+ * stream in. `candidate` counts the samples: each starts a fresh drawing, and
+ * the best of them is what lands on disk.
+ */
+export interface OmniSvgPartial {
+  readonly svg: string;
+  readonly paths: number;
+  readonly candidate: number;
+  readonly candidates: number;
+  /** "prompt", or the reference image's file name. */
+  readonly source: string;
 }
 
 export interface OmniSvgOutput {
@@ -126,7 +146,86 @@ async function waitHealthy(base: string, ms: number): Promise<void> {
   throw new Error('OmniSVG server did not come up in time');
 }
 
-export async function generateSvg(params: OmniSvgParams): Promise<{ outputs: OmniSvgOutput[] }> {
+/** How often, at most, a partial drawing is decoded and handed on. */
+const PARTIAL_EVERY_MS = 120;
+
+/**
+ * One `/completion`, STREAMED: the ids as they arrive, so the caller can show
+ * the drawing forming. llama-server sends `data: {…}` lines, each with the
+ * chunk's `tokens` (return_tokens) and the last with `stop: true` and the
+ * timings. Returns the same shape `idsFromCompletion` reads off a non-streamed
+ * reply, so the decode below is unchanged.
+ */
+async function streamCompletion(
+  base: string,
+  body: ReturnType<typeof buildOmniSvgRequest>,
+  onIds: (ids: readonly number[]) => void,
+): Promise<{ ids: number[]; stop: string; tokPerSec: number | null } | { error: string }> {
+  const res = await fetch(`${base}/completion`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ ...body, stream: true }),
+  });
+  if (!res.ok || res.body === null) {
+    return { error: `llama-server answered ${res.status}` };
+  }
+  const ids: number[] = [];
+  let stop = 'unknown';
+  let tokPerSec: number | null = null;
+  let error: string | undefined;
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  const take = (line: string): void => {
+    if (!line.startsWith('data:')) return;
+    const json = line.slice(5).trim();
+    if (json === '' || json === '[DONE]') return;
+    let chunk: {
+      tokens?: unknown;
+      stop?: unknown;
+      stop_type?: unknown;
+      timings?: { predicted_per_second?: unknown };
+      error?: unknown;
+    };
+    try {
+      chunk = JSON.parse(json);
+    } catch {
+      return;
+    }
+    if (chunk.error !== undefined) {
+      error = `llama-server: ${JSON.stringify(chunk.error)}`;
+      return;
+    }
+    if (Array.isArray(chunk.tokens) && chunk.tokens.length > 0) {
+      for (const t of chunk.tokens) ids.push(Number(t));
+      onIds(ids);
+    }
+    if (chunk.stop === true) {
+      if (typeof chunk.stop_type === 'string') stop = chunk.stop_type;
+      const tps = chunk.timings?.predicted_per_second;
+      if (typeof tps === 'number') tokPerSec = tps;
+    }
+  };
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let nl = buffer.indexOf('\n');
+    while (nl !== -1) {
+      take(buffer.slice(0, nl).trim());
+      buffer = buffer.slice(nl + 1);
+      nl = buffer.indexOf('\n');
+    }
+  }
+  if (buffer.trim() !== '') take(buffer.trim());
+  if (error !== undefined) return { error };
+  return { ids, stop, tokPerSec };
+}
+
+export async function generateSvg(
+  params: OmniSvgParams,
+  onPartial?: (partial: OmniSvgPartial) => void,
+): Promise<{ outputs: OmniSvgOutput[] }> {
   const files = omniSvgFiles();
   if (!files.ready) {
     throw new Error(
@@ -188,14 +287,46 @@ export async function generateSvg(params: OmniSvgParams): Promise<{ outputs: Omn
     for (const job of jobs) {
       let best: (OmniSvgOutput & { svg: string }) | null = null;
       for (let k = 0; k < candidates; k++) {
-        const res = await fetch(`${base}/completion`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify(job.body),
-        });
-        const parsed = idsFromCompletion(
-          (await res.json()) as Parameters<typeof idsFromCompletion>[0],
-        );
+        /*
+         * STREAMED, so the drawing can be watched forming (the user: the thread
+         * should show "the model streaming the svg … render live as drawing").
+         * Decoding the whole prefix a few times a second is cheap — a file is
+         * at most 1,536 ids — and every partial is exactly the shapes the
+         * final file will have, plus an outline of the one in progress.
+         */
+        let lastPartialAt = 0;
+        let lastPaths = -1;
+        const parsed =
+          onPartial === undefined
+            ? await (async () => {
+                const res = await fetch(`${base}/completion`, {
+                  method: 'POST',
+                  headers: { 'content-type': 'application/json' },
+                  body: JSON.stringify(job.body),
+                });
+                return idsFromCompletion(
+                  (await res.json()) as Parameters<typeof idsFromCompletion>[0],
+                );
+              })()
+            : await streamCompletion(base, job.body, (ids) => {
+                const now = Date.now();
+                if (now - lastPartialAt < PARTIAL_EVERY_MS) return;
+                const partial = decodeOmniSvgPartial(ids);
+                if (partial === null) return;
+                // A tick with nothing new to show is not sent — the in-progress
+                // outline changes with every command, so this only skips the
+                // ticks between two ids of one command.
+                if (partial.paths === lastPaths && !partial.drawing) return;
+                lastPartialAt = now;
+                lastPaths = partial.paths;
+                onPartial({
+                  svg: partial.svg,
+                  paths: partial.paths,
+                  candidate: k + 1,
+                  candidates,
+                  source: job.source,
+                });
+              });
         if ('error' in parsed) throw new Error(parsed.error);
         const decoded = decodeOmniSvg(parsed.ids);
         if (decoded === null) continue;

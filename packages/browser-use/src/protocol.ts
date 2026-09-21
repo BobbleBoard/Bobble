@@ -68,6 +68,10 @@ export interface TabState {
   readonly tabId: string;
   readonly url: string;
   readonly title: string;
+  /** After `navigate`: whether the main frame actually went anywhere. */
+  readonly navigated?: boolean;
+  /** After `navigate`: the load's failure code, when it failed outright. */
+  readonly loadError?: string;
 }
 
 /**

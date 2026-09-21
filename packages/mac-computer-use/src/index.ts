@@ -38,7 +38,11 @@ export function registerMacComputerUse(pi: ExtensionAPI, options: MacComputerUse
   /* Chrome's own set. It prefers the real DOM over Apple Events and falls back
      to Accessibility when Chrome refuses those — which is the usual case — so
      it takes the bridge as well. */
-  registerChromeTools(pi, options.bridge);
+  registerChromeTools(
+    pi,
+    options.bridge,
+    options.isChromeRunning === undefined ? {} : { isChromeRunning: options.isChromeRunning },
+  );
 }
 
 /** pi extension factory (zero-config; reads the bridge socket from env).

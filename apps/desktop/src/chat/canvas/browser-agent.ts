@@ -2,23 +2,21 @@
  * Renderer half of the browser-agent bridge. Tabs are CanvasController-owned, so
  * when the model starts browsing the main-process bridge
  * (electron/canvas/browser-agent.ts) asks us — over `browser:agent-open-tab` —
- * to open/focus a dedicated agent browser tab; we open it (via the same
- * `upsertTab`/native-surface path a user browser tab uses, so the
+ * to open/focus a browser tab; we adopt one (the user's, or the Activity tab —
+ * via the same `upsertTab`/native-surface path a user browser tab uses, so the
  * WebContentsView mounts), mark it "driving", and report its id back over
  * `browser:agent-register`. The bridge then drives that tab and toggles the
- * "Pi is browsing" chrome via `browser:agent-driving`.
+ * `driving` state via `browser:agent-driving`.
  *
- * A stable per-session key means repeat browsing reuses the one agent tab
- * instead of piling up duplicates; closing it releases the registration.
+ * The adopted id is published (browser-agent-tab.ts) so the Activity router
+ * can keep the page in view; closing the tab releases the registration.
  */
 import type { CanvasController } from '@pi-desktop/canvas';
 import { useEffect, useRef } from 'react';
 import { useCanvasStore } from '../../state/canvas-store';
 import { usePiStore } from '../../state/pi-slice';
-import { ACTIVITY_TAB_KEY } from './activity-tab';
-
-/** Stable upsert key for the model's browser tab. */
-const AGENT_TAB_KEY = 'pi:agent-browser';
+import { ACTIVITY_TAB_KEY, ACTIVITY_TITLE } from './activity-tab';
+import { setDrivenBrowserTab } from './browser-agent-tab';
 
 /** Fixed id of the main-owned headless agent view (must match the main bridge). */
 const HEADLESS_AGENT_TAB_ID = 'pi:agent-headless';
@@ -57,9 +55,17 @@ function adoptOrOpenBrowserTab(controller: CanvasController): string {
     controller.updateTab(existing, { kind: 'browser', driving: true });
     return existing;
   }
-  return controller.upsertTab(AGENT_TAB_KEY, {
+  /*
+   * No browser anywhere, and no Activity tab yet either: the page goes in the
+   * Activity tab, CREATED here as a browser. It used to open a separate "Pi
+   * Browser" tab, which left the thread's one tab to be created a moment later
+   * by the router — two tabs for one turn, the very spam the Activity tab
+   * exists to end. Keyed as the Activity tab, the router finds it and morphs it
+   * as the model moves on, and the bridge keeps driving the same id.
+   */
+  return controller.upsertTab(ACTIVITY_TAB_KEY, {
     kind: 'browser',
-    title: 'Pi Browser',
+    title: ACTIVITY_TITLE,
     driving: true,
   });
 }
@@ -105,6 +111,7 @@ export function useBrowserAgent(controller: CanvasController): void {
        */
       const id = adoptOrOpenBrowserTab(controller);
       agentTabId.current = id;
+      setDrivenBrowserTab(id);
       // Ensure the rail is visible so the WebContentsView actually mounts.
       useCanvasStore.getState().setCanvasOpen(true);
       void window.piDesktop.invoke('browser:agent-register', { tabId: id });
@@ -123,6 +130,7 @@ export function useBrowserAgent(controller: CanvasController): void {
       const id = agentTabId.current;
       if (id !== null && !controller.getState().tabs.some((t) => t.id === id)) {
         agentTabId.current = null;
+        setDrivenBrowserTab(null);
         void window.piDesktop.invoke('browser:agent-release', { tabId: id });
       }
     });

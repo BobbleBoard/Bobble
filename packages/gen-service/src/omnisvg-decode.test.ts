@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { colorFromToken, decodeOmniSvg, OMNISVG_4B } from './omnisvg-decode';
+import { colorFromToken, decodeOmniSvg, decodeOmniSvgPartial, OMNISVG_4B } from './omnisvg-decode';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const fixture = (name: string) => path.join(here, 'fixtures', name);
@@ -31,6 +31,24 @@ describe('OmniSVG token decoding — against their decoder', () => {
     const raw = ids('omnisvg-heart.ids.json');
     expect(raw[0]).toBe(OMNISVG_4B.bos);
     expect(raw[raw.length - 1]).toBe(OMNISVG_4B.eos);
+  });
+
+  it('a PREFIX decodes to the shapes finished so far, with the one being drawn as an outline', () => {
+    const all = ids('omnisvg-fox.ids.json');
+    const whole = decodeOmniSvgPartial(all);
+    expect(whole?.svg).toBe(golden('omnisvg-fox.golden.svg'));
+    expect(whole?.drawing).toBe(false);
+    // Cut mid-way: fewer finished paths than the whole, every one of them a
+    // path the final file has, and an outline for the shape in progress.
+    const half = decodeOmniSvgPartial(all.slice(0, Math.floor(all.length * 0.55)));
+    expect(half).not.toBeNull();
+    expect(half?.paths).toBeLessThan(whole?.paths ?? 0);
+    for (const m of (half?.svg ?? '').matchAll(/<path fill="(#[0-9a-f]{6})"[^>]*d="([^"]+)"/g)) {
+      expect(whole?.svg).toContain(`d="${m[2]}"`);
+    }
+    if (half?.drawing === true) expect(half.svg).toContain('stroke="#7a8190"');
+    // Too short to hold a single command: nothing yet.
+    expect(decodeOmniSvgPartial(all.slice(0, 3))).toBeNull();
   });
 
   it('returns null rather than an empty file when nothing decodes', () => {

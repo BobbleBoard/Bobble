@@ -65,7 +65,6 @@ import { EngineMenu } from './EngineMenu';
 import { GuardianBanner } from './GuardianBanner';
 import { useHarnessTitleSync } from './harness-title';
 import { InputNeededBanner } from './InputNeededBanner';
-import { ModeToggle } from './ModeToggle';
 import { ModuleNotice } from './ModuleNotice';
 import { SessionSidebar } from './SessionSidebar';
 import { StageAnnouncer } from './StageAnnouncer';
@@ -936,8 +935,9 @@ export function ChatApp({
                 rect before the renderer sees them, and a second control in the
                 same corner would hit the identical bug on its own.
               */}
-              {/* Not in the 3D studio — the user: "no work/chat buttons here". */}
-              {modality === '3d' ? null : <ModeToggle />}
+              {/* The Chat|Work toggle lived here until 2026-09-21 — the user:
+                  "remove chat vs work, just leave it on 'work'". The ledge is
+                  simply there now. */}
             </div>
 
             <CanvasErrorBoundary>

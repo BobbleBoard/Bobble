@@ -75,6 +75,7 @@ export type { DecodedPath } from './omnisvg-decode.js';
 export {
   colorFromToken,
   decodeOmniSvg,
+  decodeOmniSvgPartial,
   OMNISVG_4B,
   pathsToSvg,
   tokensToXY,

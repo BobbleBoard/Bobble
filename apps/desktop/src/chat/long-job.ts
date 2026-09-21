@@ -22,7 +22,7 @@
  */
 
 /** The kinds of work worth putting a card in front of. */
-export type JobKind = 'image' | 'video' | 'music' | 'speech' | 'sfx' | 'model3d' | 'other';
+export type JobKind = 'image' | 'video' | 'music' | 'speech' | 'sfx' | 'model3d' | 'svg' | 'other';
 
 /** Seconds, low to high — the range the card quotes. */
 export interface JobEstimate {
@@ -44,6 +44,8 @@ export const DEFAULT_ESTIMATES: Record<JobKind, [lowSec: number, highSec: number
   speech: [10, 60],
   sfx: [10, 60],
   model3d: [180, 600],
+  // OmniSVG: a 5 s server start, then three samples of up to 1,536 ids.
+  svg: [20, 90],
   other: [10, 120],
 };
 
@@ -55,6 +57,7 @@ export const JOB_TITLE: Record<JobKind, string> = {
   speech: 'Recording the audio',
   sfx: 'Making the sound',
   model3d: 'Building your 3D model',
+  svg: 'Drawing the SVG',
   other: 'Working on it',
 };
 
@@ -76,7 +79,15 @@ export const JOB_TITLE: Record<JobKind, string> = {
  * the noise the delay exists to prevent — that job has no result to hold a place
  * for.
  */
-const ALWAYS_CARD = new Set<JobKind>(['image', 'video', 'music', 'speech', 'sfx', 'model3d']);
+const ALWAYS_CARD = new Set<JobKind>([
+  'image',
+  'video',
+  'music',
+  'speech',
+  'sfx',
+  'model3d',
+  'svg',
+]);
 
 /** How long a not-known-slow job runs before it earns a card. */
 export const CARD_AFTER_MS = 10_000;
@@ -202,6 +213,15 @@ export function mediaToolOfCommand(command: string | undefined): string | null {
   const gen = /(?:^|[\s;&|(`])media\s+generate\s+(image|video|speech|music|sfx)\b/.exec(command);
   if (gen !== null) return `generate_${gen[1]}`;
   if (/(?:^|[\s;&|(`])media\s+edit\s+image\b/.test(command)) return 'edit_image';
+  // The OmniSVG command: `svg --prompt=… [out]` — a drawing, with a live card.
+  // Only as THE command (`ls svg` and `cat logo.svg` are not drawings), and
+  // not its manual.
+  if (
+    /^\s*(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*svg(?:\s|$)/.test(command) &&
+    !/\s(?:--help|-h)(?:\s|$)/.test(command)
+  ) {
+    return 'generate_svg';
+  }
   // The Bobble 3D connector's commands: `3d generate …` and `3d refine …`.
   const model = /(?:^|[\s;&|(`])3d\s+(generate|refine)\b/.exec(command);
   if (model !== null) return `${model[1]}_3d`;
@@ -234,5 +254,6 @@ export function jobKindForTool(name: string | undefined): JobKind | null {
   if (n.includes('speech') || n.includes('voice') || n.includes('tts')) return 'speech';
   if (n.includes('sfx') || n.includes('sound_effect')) return 'sfx';
   if (n.includes('3d') || n.includes('mesh') || n.includes('model_gen')) return 'model3d';
+  if (n === 'generate_svg') return 'svg';
   return null;
 }

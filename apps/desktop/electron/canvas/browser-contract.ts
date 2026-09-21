@@ -45,6 +45,16 @@ export type BrowserInvokeMap = {
   'browser:snapshot-dom': { request: { tabId: string }; response: { html: string | null } };
   /** Synthesize a left click at view-relative coords `(x, y)`. */
   'browser:click': { request: { tabId: string; x: number; y: number }; response: { ok: boolean } };
+  /** E2E only: the native view's state as main holds it — is it shown, where. */
+  'browser:debug-view': {
+    request: { tabId: string };
+    response: {
+      exists: boolean;
+      visible: boolean;
+      bounds: { x: number; y: number; width: number; height: number } | null;
+      url: string;
+    };
+  };
 };
 
 export const BROWSER_INVOKE_CHANNELS = [
@@ -59,6 +69,7 @@ export const BROWSER_INVOKE_CHANNELS = [
   'browser:capture',
   'browser:snapshot-dom',
   'browser:click',
+  'browser:debug-view',
 ] as const satisfies readonly (keyof BrowserInvokeMap)[];
 
 /** Live navigation state pushed main → renderer; the renderer maps this onto

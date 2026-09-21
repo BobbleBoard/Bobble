@@ -421,6 +421,24 @@ export class NativeSurfaces {
             void window.piDesktop.invoke('browser:navigate', { tabId, url });
           }
         });
+        /*
+         * THE SAME STRANDING THE OFFICE VIEW HAD (below), never fixed here.
+         * MEASURED 2026-09-21 (cursor-parity-look): the model's first browse
+         * opens the canvas, the rail slides in from the right, and the
+         * WebContentsView is left at x=1441 in a 1440-wide window — bounds
+         * 439×779, "visible", and a 0×0 viewport, because the slot's SIZE never
+         * changed and the ResizeObserver never fired. Every click landed on
+         * nothing and the page was never seen: the user's "doesn't show the user
+         * anything for the actual browser actions". Keep the element and
+         * re-measure across the slide, as the office view does.
+         */
+        this.#browsers.set(tabId, {
+          ...(this.#browsers.get(tabId) ?? {
+            lastBounds: rectToBounds(el.getBoundingClientRect()),
+          }),
+          el,
+        });
+        this.#renudge('browser', tabId, el);
       } else this.#hideBrowser(tabId);
       return;
     }
@@ -458,7 +476,7 @@ export class NativeSurfaces {
           ...(this.#offices.get(tabId) ?? { lastBounds: rectToBounds(el.getBoundingClientRect()) }),
           el,
         });
-        this.#renudgeOffice(tabId, el);
+        this.#renudge('office', tabId, el);
       } else this.#hideOffice(tabId);
       return;
     }
@@ -475,7 +493,7 @@ export class NativeSurfaces {
         return;
       }
       const bounds = rectToBounds(rect);
-      this.#browsers.set(tabId, { lastBounds: bounds });
+      this.#browsers.set(tabId, { ...(this.#browsers.get(tabId) ?? {}), lastBounds: bounds });
       // Only show the view while the panel is open — a stray scroll/resize emit
       // must not re-strand it over the chat after the canvas has been closed.
       void window.piDesktop.invoke('browser:set-bounds', {
@@ -509,18 +527,19 @@ export class NativeSurfaces {
    * was already open and would leave the view stranded in exactly the case this
    * exists to fix.
    */
-  #renudgeOffice(tabId: string, el: HTMLElement): void {
+  #renudge(kind: 'browser' | 'office', tabId: string, el: HTMLElement): void {
+    const views = kind === 'browser' ? this.#browsers : this.#offices;
     for (const delay of [80, 220, 420, 700]) {
       setTimeout(() => {
-        if (!this.#offices.has(tabId) && delay > 80) return;
+        if (!views.has(tabId) && delay > 80) return;
         const rect = el.getBoundingClientRect();
         if (rect.width === 0 || rect.height === 0) return;
         const bounds = rectToBounds(rect);
-        this.#offices.set(tabId, { lastBounds: bounds });
-        void window.piDesktop.invoke('office:set-bounds', {
+        views.set(tabId, { ...(views.get(tabId) ?? {}), lastBounds: bounds, el });
+        void window.piDesktop.invoke(`${kind}:set-bounds`, {
           tabId,
           bounds,
-          visible: this.#panelOpen,
+          visible: this.#panelOpen && this.#controller.getState().activeTabId === tabId,
         });
       }, delay);
     }
