@@ -244,15 +244,16 @@ export function applySettingsEnvFromDisk(): void {
 }
 
 /**
- * Main-side twin of the renderer's `generationEnabled()`: whether the
- * EXPERIMENTAL generation stack is on. True when the dev env override
- * `PI_DESKTOP_GEN=1` is set OR the persisted `experimentalGeneration` flag is
- * true. Read at main startup to gate `registerGenIpc` (main.ts) and the
- * `gen-tools` pi extension (pi-main.ts), so an untoggled build stays clean.
+ * Whether the generation stack is on: ALWAYS. It was an experiment behind a
+ * Settings toggle (`experimentalGeneration`) and the `PI_DESKTOP_GEN=1` env
+ * override; the user (2026-09-20): "remove from experimental the 'on device
+ * generation' button, that's just a bit silly, the whole app is that". The
+ * persisted flag is still parsed so an old settings file reads cleanly, and
+ * ignored. pi-main reads this for PI_DESKTOP_GEN_MEDIA (which gen tools
+ * register).
  */
 export function generationExperimentEnabled(): boolean {
-  if (process.env.PI_DESKTOP_GEN === '1') return true;
-  return readSettings().experimentalGeneration;
+  return true;
 }
 
 /**

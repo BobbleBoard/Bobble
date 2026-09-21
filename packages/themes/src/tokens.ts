@@ -67,6 +67,13 @@ export interface ThemeTokens {
     muted: string;
     /** Text on inverted surfaces (e.g. tooltips using text.primary as bg). */
     inverse: string;
+    /**
+     * The chrome's ICONS — the rail, the top bar's buttons, the settings nav.
+     * the user (2026-09-20): "the svgs should be pure white not the current grayish
+     * color" — so pure white on every dark theme, the primary text colour on
+     * the light ones (where white would vanish). Consumed as --pd-text-icon.
+     */
+    icon: string;
     /** Text on accent.primary fills. */
     onAccent: string;
     /** Hyperlinks. Claude keeps a separate blue; codex uses its accent blue. */
@@ -554,6 +561,7 @@ const claudeLight: ThemeTokens = {
     secondary: '#3d3d3a', // --text-200
     muted: '#73726c', // --text-400
     inverse: '#ffffff',
+    icon: '#141413',
     onAccent: '#ffffff', // --oncolor-100
     link: '#2c84db', // --accent-100
     placeholder: '#7b7a75', // text-500 (observed)
@@ -656,6 +664,7 @@ const claudeDark: ThemeTokens = {
     secondary: '#c2c0b6',
     muted: '#9c9a92',
     inverse: '#0b0b0b', // CDS --on-primary dark
+    icon: '#ffffff',
     onAccent: '#ffffff', // clay fills keep white text in dark mode
     link: '#74abe2', // --accent-000 dark
     placeholder: '#a6a39b', // text-500 dark
@@ -753,6 +762,7 @@ const codexLight: ThemeTokens = {
     secondary: '#1a1c1fb3', // fg @ 70%
     muted: '#1a1c1f80', // fg @ 50%
     inverse: '#ffffff',
+    icon: '#1a1c1f',
     onAccent: '#ffffff', // --color-text-button-primary
     link: '#339cff', // --color-text-accent (blue-300)
     placeholder: '#1a1c1f7e', // input-placeholder: fg @ 49.5%
@@ -842,6 +852,7 @@ const codexDark: ThemeTokens = {
     secondary: '#ffffffb3', // white @ 70%
     muted: '#ffffff80', // white @ 50%
     inverse: '#0d0d0d', // gray-1000
+    icon: '#ffffff',
     onAccent: '#0d0d0d', // white pill carries near-black text
     link: '#99ceff', // --color-text-accent dark (blue-100)
     placeholder: '#ffffff80', // white @ 50%
@@ -1077,6 +1088,7 @@ const bobbleLight: ThemeTokens = {
     secondary: '#55555a',
     muted: '#86868b',
     inverse: '#ffffff',
+    icon: '#1d1d1f',
     onAccent: '#ffffff',
     link: '#0066cc',
     placeholder: '#9d9da3',
@@ -1179,6 +1191,7 @@ const bobbleDark: ThemeTokens = {
     secondary: '#c0c0c6',
     muted: '#98989f',
     inverse: '#1d1d1f',
+    icon: '#ffffff',
     onAccent: '#ffffff',
     link: '#2997ff',
     placeholder: '#7c7c85',

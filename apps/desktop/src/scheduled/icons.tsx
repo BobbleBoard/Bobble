@@ -3,15 +3,17 @@
  * drawn in the same 16-box / 1.5-stroke / `.pd-icon` recipe as packages/ui
  * icons.tsx so they take the app's stroke token and sit on the same baseline.
  */
+import { iconBaseStyle } from '@pi-desktop/ui';
 import type { SVGProps } from 'react';
 
 type P = SVGProps<SVGSVGElement> & { size?: number };
 
-function G({ size = 16, className, children, ...rest }: P) {
+function G({ size = 16, className, style, children, ...rest }: P) {
   return (
     <svg
       width={size}
       height={size}
+      style={iconBaseStyle(size, style)}
       viewBox="0 0 16 16"
       fill="none"
       stroke="currentColor"

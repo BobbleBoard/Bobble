@@ -35,6 +35,7 @@ export function flattenTheme(t: ThemeTokens): Array<[name: string, value: string
   push('text-secondary', t.text.secondary);
   push('text-muted', t.text.muted);
   push('text-inverse', t.text.inverse);
+  push('text-icon', t.text.icon);
   push('text-on-accent', t.text.onAccent);
   push('text-link', t.text.link);
   push('text-placeholder', t.text.placeholder);

@@ -4,11 +4,26 @@
  */
 
 import { clsx } from 'clsx';
-import type { ReactNode, SVGProps } from 'react';
+import type { CSSProperties, ReactNode, SVGProps } from 'react';
 
 export type IconProps = SVGProps<SVGSVGElement> & { size?: number };
 
-function Icon({ size = 16, className, children, ...rest }: IconProps & { children: ReactNode }) {
+/**
+ * The size an icon was asked for, as a CSS variable on the element: icons.css
+ * draws `.pd-icon` at `--pd-icon-base × --pd-icon-scale` (Settings › Interface
+ * › Size), so one global scale resizes every icon without touching a `size`.
+ */
+export function iconBaseStyle(size: number, style?: CSSProperties): CSSProperties {
+  return { ...style, '--pd-icon-base': size } as CSSProperties;
+}
+
+function Icon({
+  size = 16,
+  className,
+  style,
+  children,
+  ...rest
+}: IconProps & { children: ReactNode }) {
   return (
     <svg
       width={size}
@@ -23,6 +38,7 @@ function Icon({ size = 16, className, children, ...rest }: IconProps & { childre
       strokeLinecap="round"
       strokeLinejoin="round"
       className={clsx('pd-icon', className)}
+      style={iconBaseStyle(size, style)}
       aria-hidden="true"
       {...rest}
     >

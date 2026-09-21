@@ -124,6 +124,21 @@ describe('clampSettings', () => {
     expect(clampSettings({ sidebarScale: Number.NaN }).sidebarScale).toBe(1.0);
   });
 
+  it('icon thickness stops at 1.75 px and icon size at 0.85–1.25× — the range a person cannot make look bad (the user, 2026-09-20)', () => {
+    expect(DEFAULT_SETTINGS.iconStroke).toBe(1.25);
+    expect(DEFAULT_SETTINGS.iconScale).toBe(1.0);
+    // An older file with the old 2.5 ceiling comes back inside the new one.
+    expect(clampSettings({ iconStroke: 2.5 }).iconStroke).toBe(1.75);
+    expect(clampSettings({ iconStroke: 0.2 }).iconStroke).toBe(1);
+    expect(clampSettings({ iconStroke: 1.5 }).iconStroke).toBe(1.5);
+    expect(clampSettings({ iconScale: 2 }).iconScale).toBe(1.25);
+    expect(clampSettings({ iconScale: 0.1 }).iconScale).toBe(0.85);
+    expect(clampSettings({ iconScale: 'huge' }).iconScale).toBe(1.0);
+    // The generation toggle is retired: the flag parses, and is simply on.
+    expect(clampSettings({ experimentalGeneration: false }).experimentalGeneration).toBe(false);
+    expect(DEFAULT_SETTINGS.experimentalGeneration).toBe(true);
+  });
+
   it('defaults modelSelection to auto and effortMode to auto', () => {
     expect(DEFAULT_SETTINGS.modelSelection).toEqual({ mode: 'auto' });
     expect(DEFAULT_SETTINGS.effortMode).toBe('auto');

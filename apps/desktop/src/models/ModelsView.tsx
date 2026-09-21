@@ -1633,17 +1633,15 @@ export function ModelsView() {
                 tab === t ? 'bg-bg-raised text-text-primary shadow-sm' : 'text-text-secondary',
               )}
             >
-              {t === 'storage' ? (
-                /* Storage management carries the drive (the user's 2026-09-20 pick). */
-                <span className="inline-flex items-center gap-1.5">
-                  <Glyph name="storage" size={14} />
-                  Manage Storage
-                </span>
-              ) : t === 'discover' ? (
-                'Discover'
-              ) : (
-                'On Device'
-              )}
+              {/* Each tab wears its glyph (the user's 2026-09-20 set): the compass,
+                  this laptop, the drive. */}
+              <span className="inline-flex items-center gap-1.5">
+                <Glyph
+                  name={t === 'storage' ? 'storage' : t === 'discover' ? 'discover' : 'onDevice'}
+                  size={14}
+                />
+                {t === 'discover' ? 'Discover' : t === 'device' ? 'On Device' : 'Manage Storage'}
+              </span>
             </button>
           ))}
         </div>

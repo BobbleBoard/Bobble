@@ -159,6 +159,11 @@
 .pd-btn--ghost {
   --pd-btn-fg: var(--pd-text-secondary);
 }
+/* A ghost button that is only an icon is chrome: it takes the icon colour
+   (pure white on dark, see --pd-text-icon), like the rail's glyphs. */
+.pd-icon-btn.pd-btn--ghost {
+  --pd-btn-fg: var(--pd-text-icon, var(--pd-text-secondary));
+}
 
 /* data-[state=open] mirrors hover so dropdown triggers stay lit (codex rule,
  * adopted for both flavors per spec-buttons ADAPTATION). Same for

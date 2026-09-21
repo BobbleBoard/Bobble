@@ -73,6 +73,10 @@ const clip = async (label, sel, pad = 8) => {
 try {
   await page.waitForFunction(() => typeof window.__pi_store === 'function', { timeout: 15_000 });
   await page.waitForSelector('[data-testid="chat-row-plan a launch"]', { timeout: 10_000 });
+  // The theme follows the Mac's appearance in a fresh home; pin it so the
+  // pictures compare run to run (dark first, light later).
+  await page.evaluate(() => document.documentElement.setAttribute('data-mode', 'dark'));
+  await sleep(300);
 
   // ── The rail: labels and glyphs ────────────────────────────────────────────
   const labels = await page.evaluate(() =>
@@ -190,6 +194,58 @@ try {
   check(mid.morphing === 'true', 'and it morphed between them (a mid-frame was a polyline)');
   check(mid.d !== before.d && mid.d !== after.d, 'the mid-frame is neither end');
 
+  // ── The knobs: stroke sweep and size extremes on the rail ─────────────────
+  // The stroke token is pixels; the slider stops at 1.75 — LOOK at why.
+  for (const mode of ['dark', 'light']) {
+    await page.evaluate((m) => document.documentElement.setAttribute('data-mode', m), mode);
+    await sleep(200);
+    for (const w of [1, 1.25, 1.5, 1.75, 2, 2.5]) {
+      await page.evaluate(
+        (v) => document.documentElement.style.setProperty('--pd-icon-stroke', String(v)),
+        w,
+      );
+      await sleep(120);
+      await clip(`04-stroke-${mode}-${w.toFixed(2)}`, '[data-testid="modalities"]', 24);
+    }
+  }
+  await page.evaluate(() => document.documentElement.style.removeProperty('--pd-icon-stroke'));
+  await page.evaluate(() => document.documentElement.setAttribute('data-mode', 'dark'));
+  await sleep(200);
+  for (const k of [0.85, 1, 1.25]) {
+    await page.evaluate(
+      (v) => document.documentElement.style.setProperty('--pd-icon-scale', String(v)),
+      k,
+    );
+    await sleep(120);
+    await clip(`05-scale-${k.toFixed(2)}`, '[data-testid="modalities"]', 24);
+  }
+  const scaled = await page.evaluate(() => {
+    const w = (sel) => document.querySelector(sel)?.getBoundingClientRect().width ?? 0;
+    return {
+      rail: w('[data-testid="nav-scheduled"] .pd-icon'),
+      row: w('[data-testid="modality-image"] .pd-icon'),
+      engine: w('[data-testid="engine-menu-button"] .pd-icon'),
+    };
+  });
+  console.log('icon widths at 1.25×:', JSON.stringify(scaled));
+  check(
+    Math.abs(scaled.rail - 20) < 0.6 && Math.abs(scaled.row - 20) < 0.6,
+    `a 16px icon is 20px at 1.25× (${scaled.rail}, ${scaled.row})`,
+  );
+  check(Math.abs(scaled.engine - 20) < 0.6, `…the top bar's too (${scaled.engine})`);
+  await page.evaluate(() => document.documentElement.style.removeProperty('--pd-icon-scale'));
+  // The chrome's icons are pure white on the dark theme (the user).
+  const iconColor = await page.evaluate(() => ({
+    mode: document.documentElement.getAttribute('data-mode'),
+    color: getComputedStyle(
+      document.querySelector('[data-testid="nav-scheduled"] .pd-sidebar-row-icon'),
+    ).color,
+  }));
+  check(
+    iconColor.mode !== 'dark' || iconColor.color === 'rgb(255, 255, 255)',
+    `the rail's icons are pure white on dark (${JSON.stringify(iconColor)})`,
+  );
+
   // ── The light theme (the app opens dark in a fresh home) ──────────────────
   await page.evaluate(() => document.documentElement.setAttribute('data-mode', 'light'));
   await sleep(500);
@@ -204,6 +260,17 @@ try {
   await page.waitForSelector('[data-testid="settings-nav-experimental"]', { timeout: 8000 });
   await sleep(400);
   await shot('04-settings-nav');
+  await page.click('[data-testid="settings-nav-interface"]');
+  await sleep(400);
+  const sizeSlider = await page.evaluate(
+    () => document.querySelector('[data-testid="settings-icon-scale"]') !== null,
+  );
+  check(sizeSlider, 'Interface has the icon size slider');
+  const noGenToggle = await page.evaluate(
+    () => document.querySelector('[data-testid="settings-experimental-generation"]') === null,
+  );
+  check(noGenToggle, 'the on-device generation toggle is gone');
+  await shot('04b-settings-interface');
   await page.click('[data-testid="settings-nav-experimental"]');
   await sleep(500);
   const flasks = await page.evaluate(
@@ -229,11 +296,18 @@ try {
   await page.waitForSelector('[data-testid="models-tab-storage"]', { timeout: 8000 });
   await page.click('[data-testid="models-tab-storage"]');
   await sleep(800);
-  const driveOnTab = await page.evaluate(
-    () =>
-      document.querySelector('[data-testid="models-tab-storage"] [data-glyph="storage"]') !== null,
+  const tabGlyphs = await page.evaluate(() =>
+    ['discover', 'device', 'storage'].map(
+      (t) =>
+        document
+          .querySelector(`[data-testid="models-tab-${t}"] [data-glyph]`)
+          ?.getAttribute('data-glyph') ?? null,
+    ),
   );
-  check(driveOnTab, 'Manage Storage carries the drive');
+  check(
+    JSON.stringify(tabGlyphs) === JSON.stringify(['discover', 'onDevice', 'storage']),
+    `the three tabs wear the compass, the laptop, the drive (${tabGlyphs.join(', ')})`,
+  );
   await shot('07-storage');
   await clip('07b-tabs', '[data-testid="models-tab-storage"]', 60);
 

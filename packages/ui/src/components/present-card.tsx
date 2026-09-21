@@ -18,7 +18,7 @@ import { fileExt as fileExtOf } from './tool-icons.tsx';
  */
 
 import clsx from 'clsx';
-import { forwardRef, type HTMLAttributes } from 'react';
+import { type CSSProperties, forwardRef, type HTMLAttributes } from 'react';
 
 /** What kind of thing was presented — drives the glyph and the `Kind · EXT` line. */
 export type PresentKind =
@@ -110,6 +110,7 @@ function FolderGlyph() {
       strokeLinecap="round"
       strokeLinejoin="round"
       className="pd-icon"
+      style={{ '--pd-icon-base': 14 } as CSSProperties}
       aria-hidden="true"
     >
       <path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h2.3l1.4 1.5h5.3A1.5 1.5 0 0 1 14 6v5.5A1.5 1.5 0 0 1 12.5 13h-9A1.5 1.5 0 0 1 2 11.5z" />

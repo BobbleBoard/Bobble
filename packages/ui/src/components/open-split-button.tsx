@@ -1,4 +1,5 @@
 import { clsx } from 'clsx';
+import type { CSSProperties } from 'react';
 import { type RefObject, useEffect, useRef, useState } from 'react';
 import { IconChevronDown } from './icons.tsx';
 
@@ -81,6 +82,7 @@ function GenericApp() {
       strokeLinecap="round"
       strokeLinejoin="round"
       className="pd-icon"
+      style={{ '--pd-icon-base': 16 } as CSSProperties}
       aria-hidden="true"
     >
       <rect x="2.75" y="2.75" width="4.5" height="4.5" rx="1.2" />
@@ -121,6 +123,7 @@ function CanvasGlyph() {
       strokeLinecap="round"
       strokeLinejoin="round"
       className="pd-icon"
+      style={{ '--pd-icon-base': 16 } as CSSProperties}
       aria-hidden="true"
     >
       <rect x="2" y="3" width="12" height="10" rx="2" />

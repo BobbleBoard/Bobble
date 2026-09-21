@@ -14,7 +14,7 @@
  * tab line) grows from, or shrinks to, a point.
  */
 import { clsx } from 'clsx';
-import { useEffect, useRef, useState } from 'react';
+import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import { GLYPHS } from './glyph.tsx';
 
 type Pt = readonly [number, number];
@@ -175,6 +175,7 @@ export function FolderGlyph({ open, size = 16, className }: FolderGlyphProps) {
     <svg
       width={size}
       height={size}
+      style={{ '--pd-icon-base': size } as CSSProperties}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"

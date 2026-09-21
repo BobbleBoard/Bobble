@@ -165,8 +165,14 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: calc(var(--pd-icon-size) * var(--pd-sidebar-scale, 1));
-  color: inherit;
+  /* The box grows with the icon scale too, or a flex-shrunk glyph would stay
+     at the box's width whatever Settings › Size says (MEASURED: 18 for 20). */
+  width: calc(var(--pd-icon-size) * var(--pd-sidebar-scale, 1) * var(--pd-icon-scale, 1));
+  /* The chrome's icon colour — pure white on the dark themes (the user,
+     2026-09-20: "the svgs should be pure white not the current grayish
+     color"), the primary text colour on the light ones. The label beside it
+     keeps the row's secondary. */
+  color: var(--pd-text-icon, inherit);
   flex: none;
 }
 
@@ -402,8 +408,8 @@
  * (already-scaled) icon box. Fallback ,1 keeps the default a byte-identical 16px.
  */
 .pd-sidebar-row-icon .pd-icon {
-  width: calc(16px * var(--pd-sidebar-scale, 1));
-  height: calc(16px * var(--pd-sidebar-scale, 1));
+  width: calc(16px * var(--pd-sidebar-scale, 1) * var(--pd-icon-scale, 1));
+  height: calc(16px * var(--pd-sidebar-scale, 1) * var(--pd-icon-scale, 1));
 }
 
 /*

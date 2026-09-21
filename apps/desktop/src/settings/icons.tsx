@@ -7,6 +7,7 @@
  * (The settings GEAR now lives in @pi-desktop/ui as `IconSettings` — a proper
  * cog, shared by the sidebar — so it never reads as the sun toggle.)
  */
+import { iconBaseStyle } from '@pi-desktop/ui';
 import type { SVGProps } from 'react';
 
 export type LocalIconProps = SVGProps<SVGSVGElement> & { size?: number };
@@ -14,6 +15,7 @@ export type LocalIconProps = SVGProps<SVGSVGElement> & { size?: number };
 function Svg({
   size = 16,
   className,
+  style,
   children,
   ...props
 }: LocalIconProps & { children: React.ReactNode }) {
@@ -21,6 +23,7 @@ function Svg({
     <svg
       width={size}
       height={size}
+      style={iconBaseStyle(size, style)}
       viewBox="0 0 16 16"
       fill="none"
       stroke="currentColor"

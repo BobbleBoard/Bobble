@@ -28,6 +28,7 @@
   --pd-text-secondary: #3d3d3a;
   --pd-text-muted: #73726c;
   --pd-text-inverse: #ffffff;
+  --pd-text-icon: #141413;
   --pd-text-on-accent: #ffffff;
   --pd-text-link: #2c84db;
   --pd-text-placeholder: #7b7a75;
@@ -219,6 +220,7 @@
   --pd-text-secondary: #c2c0b6;
   --pd-text-muted: #9c9a92;
   --pd-text-inverse: #0b0b0b;
+  --pd-text-icon: #ffffff;
   --pd-text-on-accent: #ffffff;
   --pd-text-link: #74abe2;
   --pd-text-placeholder: #a6a39b;
@@ -410,6 +412,7 @@
   --pd-text-secondary: #1a1c1fb3;
   --pd-text-muted: #1a1c1f80;
   --pd-text-inverse: #ffffff;
+  --pd-text-icon: #1a1c1f;
   --pd-text-on-accent: #ffffff;
   --pd-text-link: #339cff;
   --pd-text-placeholder: #1a1c1f7e;
@@ -601,6 +604,7 @@
   --pd-text-secondary: #ffffffb3;
   --pd-text-muted: #ffffff80;
   --pd-text-inverse: #0d0d0d;
+  --pd-text-icon: #ffffff;
   --pd-text-on-accent: #0d0d0d;
   --pd-text-link: #99ceff;
   --pd-text-placeholder: #ffffff80;
@@ -792,6 +796,7 @@
   --pd-text-secondary: #55555a;
   --pd-text-muted: #86868b;
   --pd-text-inverse: #ffffff;
+  --pd-text-icon: #1d1d1f;
   --pd-text-on-accent: #ffffff;
   --pd-text-link: #0066cc;
   --pd-text-placeholder: #9d9da3;
@@ -983,6 +988,7 @@
   --pd-text-secondary: #c0c0c6;
   --pd-text-muted: #98989f;
   --pd-text-inverse: #1d1d1f;
+  --pd-text-icon: #ffffff;
   --pd-text-on-accent: #ffffff;
   --pd-text-link: #2997ff;
   --pd-text-placeholder: #7c7c85;

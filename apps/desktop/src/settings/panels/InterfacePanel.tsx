@@ -1,12 +1,19 @@
 /**
- * UI customization (round-5 #23). The main section keeps the everyday chrome
- * knob (global icon stroke width → `--pd-icon-stroke` on the document root,
- * persisted as `iconStroke`). An ADVANCED section below holds the nitpicky
- * customization: the claude/codex theme FLAVOR toggle (relocated out of the main
- * Appearance view) and a developer entry into the component GALLERY (relocated
- * off the top bar). Default icon stroke is the token value (1.25).
+ * UI customization (round-5 #23). The everyday chrome knobs: the icons'
+ * THICKNESS (`--pd-icon-stroke`, pixels, persisted as `iconStroke`) and a
+ * SIZE panel — the icons' own scale (`--pd-icon-scale`, `iconScale`) beside
+ * the sidebar and menu scales. An ADVANCED section below holds the nitpicky
+ * customization: the theme FLAVOR toggle and a developer entry into the
+ * component GALLERY. Default icon stroke is the token value (1.25).
+ *
+ * the user (2026-09-20): "add to the interface slider a more realistic range of
+ * stroke thickness none of which look absolutely excessive … also add to that
+ * interface settings area a 'size' panel, and remove from experimental the
+ * 'on device generation' button, that's just a bit silly, the whole app is
+ * that". The generation toggle is gone; generation is simply on.
  */
 import { Button, IconStrokeControl, SegmentedControl } from '@pi-desktop/ui';
+import { ICON_SCALE_MAX, ICON_SCALE_MIN } from '../../../electron/settings/settings-contract';
 import { useSettingsStore } from '../../state/settings-store';
 import { SettingGroup, SettingRow, SettingSection, SettingSlider } from '../parts';
 
@@ -18,11 +25,10 @@ export function InterfacePanel({
   onRedoOnboarding?: () => void;
 }) {
   const iconStroke = useSettingsStore((s) => s.settings.iconStroke);
+  const iconScale = useSettingsStore((s) => s.settings.iconScale);
   const sidebarScale = useSettingsStore((s) => s.settings.sidebarScale);
   const menuScale = useSettingsStore((s) => s.settings.menuScale);
   const flavor = useSettingsStore((s) => s.settings.theme.flavor);
-  const _productionHarness = useSettingsStore((s) => s.settings.experimentalProductionHarness);
-  const generation = useSettingsStore((s) => s.settings.experimentalGeneration);
   const update = useSettingsStore((s) => s.update);
 
   return (
@@ -30,7 +36,7 @@ export function InterfacePanel({
       <SettingSection description="Fine-tune how the app's chrome looks.">
         <SettingRow
           label="Icon thickness"
-          hint="How heavy the line icons throughout the app appear. Lighter reads calmer."
+          hint="How heavy the line icons throughout the app appear, in pixels. Lighter reads calmer; the range stops where the drawings would clog."
         >
           <IconStrokeControl
             data-testid="settings-icon-stroke"
@@ -41,13 +47,35 @@ export function InterfacePanel({
       </SettingSection>
 
       <SettingSection
-        title="Element size"
-        description="Scale individual parts of the app up or down. 1.00× is the default."
+        title="Size"
+        description="Scale parts of the app up or down. 1.00× is the default."
       >
-        {/* The two scale knobs and the icon-thickness one above them are the
-            same kind of control, so they are now drawn by the same part — the
-            readout used to sit AFTER the track here and ABOVE it there. */}
+        {/* The scale knobs and the icon-thickness one above them are the same
+            kind of control, so they are drawn by the same part. */}
         <SettingGroup>
+          <SettingSlider
+            label="Icon size"
+            hint="Every icon in the app, from its own size. Rows and toolbars keep their spacing."
+            min={ICON_SCALE_MIN}
+            max={ICON_SCALE_MAX}
+            step={0.05}
+            value={iconScale}
+            testId="settings-icon-scale"
+            format={(v) => `${v.toFixed(2)}×`}
+            onChange={(v) => void update({ iconScale: v })}
+            action={
+              iconScale !== 1 ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  data-testid="settings-icon-scale-reset"
+                  onClick={() => void update({ iconScale: 1 })}
+                >
+                  Reset
+                </Button>
+              ) : null
+            }
+          />
           <SettingSlider
             label="Sidebar size"
             hint="Scale the sidebar's rows, icons and text."
@@ -154,35 +182,6 @@ export function InterfacePanel({
             </div>
           </SettingRow>
         ) : null}
-      </SettingSection>
-
-      <SettingSection
-        title="Experimental"
-        description="Early features, still being built. Off by default."
-        experimental
-      >
-        {/*
-         * "Coordination harness" REMOVED. the user: deprecated. It only ever took
-         * effect alongside the `?corpForce` dev URL param
-         * (productionHarnessEnabled && corpForceEnabled in ChatComposer), so as a
-         * user-facing switch it did nothing — the corporation is reached through
-         * the top effort levels now. The dev override is untouched.
-         */}
-        <SettingRow
-          label="On-device generation"
-          hint="Give the assistant on-device image/video generation tools (Apple-Silicon MLX/mflux; ComfyUI for video) that stream results onto the canvas. Downloads models on first use. Restart to apply. Experimental."
-        >
-          <SegmentedControl
-            aria-label="On-device generation"
-            data-testid="settings-experimental-generation"
-            value={generation ? 'on' : 'off'}
-            onValueChange={(v) => void update({ experimentalGeneration: v === 'on' })}
-            options={[
-              { value: 'off', label: 'Off' },
-              { value: 'on', label: 'On' },
-            ]}
-          />
-        </SettingRow>
       </SettingSection>
     </div>
   );

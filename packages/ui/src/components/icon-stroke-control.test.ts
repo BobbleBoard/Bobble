@@ -9,15 +9,16 @@ describe('clampIconStroke', () => {
     expect(ICON_STROKE_MIN).toBe(1);
   });
 
-  it('caps values above the maximum', () => {
+  it('caps values above the maximum — 1.75, past which the drawings clog (the user, 2026-09-20)', () => {
     expect(clampIconStroke(9)).toBe(ICON_STROKE_MAX);
-    expect(ICON_STROKE_MAX).toBe(2.5);
+    expect(clampIconStroke(2.5)).toBe(ICON_STROKE_MAX);
+    expect(ICON_STROKE_MAX).toBe(1.75);
   });
 
   it('passes in-range values through untouched', () => {
     expect(clampIconStroke(1)).toBe(1);
     expect(clampIconStroke(1.25)).toBe(1.25);
-    expect(clampIconStroke(2.5)).toBe(2.5);
+    expect(clampIconStroke(1.75)).toBe(1.75);
   });
 
   it('treats the bounds as inclusive', () => {

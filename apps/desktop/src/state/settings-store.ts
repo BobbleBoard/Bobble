@@ -65,13 +65,14 @@ const DEFAULTS: DesktopSettings = {
   capabilities: { image: true, video: true, audio: true, threeD: true },
   customInstructions: '',
   iconStroke: ICON_STROKE_DEFAULT,
+  iconScale: 1.0,
   sidebarScale: 1.0,
   menuScale: 1.0,
   favoriteModels: [],
   modelEffortDefaults: {},
   hfToken: '',
   experimentalProductionHarness: false,
-  experimentalGeneration: false,
+  experimentalGeneration: true,
   advanced: DEFAULT_ADVANCED,
   engineLaunch: {},
   portableKnobs: {},
@@ -130,6 +131,8 @@ function applyUiScales(s: DesktopSettings): void {
   const root = document.documentElement.style;
   root.setProperty('--pd-sidebar-scale', String(s.sidebarScale));
   root.setProperty('--pd-menu-scale', String(s.menuScale));
+  // Every icon's own size × this (icons.css) — Settings › Interface › Size.
+  root.setProperty('--pd-icon-scale', String(s.iconScale));
 }
 
 interface SettingsStoreState {
@@ -471,47 +474,12 @@ export function productionHarnessEnabled(): boolean {
 }
 
 /**
- * Experimental generation-stack flag (default FALSE) — the sibling of
- * {@link selectExperimentalProductionHarness} that gates ALL live generation
- * wiring (gen bridge / gen tools / gen-image surface). When false the app is
- * byte-for-byte its current self. Follows the same selector/hook/setter shape.
- */
-export const selectExperimentalGeneration = (state: SettingsStoreState): boolean =>
-  state.settings.experimentalGeneration;
-
-/** Reactive hook: the persisted experimental generation setting. */
-export function useExperimentalGeneration(): boolean {
-  return useSettingsStore(selectExperimentalGeneration);
-}
-
-/** Persist the experimental generation flag. */
-export async function setExperimentalGeneration(enabled: boolean): Promise<void> {
-  await useSettingsStore.getState().update({ experimentalGeneration: enabled });
-}
-
-/**
- * The DEV env override (`PI_DESKTOP_GEN=1`), surfaced by main.ts as a `?gen=1`
- * query param on the main window. Resolved lazily + cached (a launch-time flag),
- * guarded so importing this module in a non-DOM (test) context is safe. Mirrors
- * {@link corpEnvOverrideEnabled}.
- */
-let genEnvOverride: boolean | undefined;
-function genEnvOverrideEnabled(): boolean {
-  if (genEnvOverride === undefined) {
-    genEnvOverride =
-      typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('gen');
-  }
-  return genEnvOverride;
-}
-
-/**
- * The EFFECTIVE generation-stack state: the persisted setting OR the dev env
- * override. It is what decides whether the gen-tools extension is loaded into
- * pi at all, so with it off the generate tools do not exist and nothing
- * downstream — the bridge, the JobQueue, the thread's card — is ever reached.
+ * The generation stack is ALWAYS on. It was an experiment behind a Settings
+ * toggle (`experimentalGeneration`, still parsed and ignored) and a
+ * `PI_DESKTOP_GEN=1` dev override; the user (2026-09-20): "the whole app is that".
  */
 export function generationEnabled(): boolean {
-  return genEnvOverrideEnabled() || useSettingsStore.getState().settings.experimentalGeneration;
+  return true;
 }
 
 /** Star / unstar a model id, persisting the whole favorites list. */

@@ -43,11 +43,18 @@
 }
 
 /*
- * ONE SIZE, PER CONTEXT. `--pd-icon-px` is unset by default so every `size`
- * prop stands; set it on a container and every icon inside takes that size —
- * the sidebar's rows, a toolbar, a card head — one line each.
+ * ONE SIZE, GLOBALLY AND PER CONTEXT. Every icon stamps the size it was asked
+ * for as `--pd-icon-base` (iconBaseStyle); the app's `--pd-icon-scale`
+ * (Settings › Interface › Size, 1 by default) multiplies it everywhere at
+ * once. `--pd-icon-px`, unset by default, pins every icon inside a container
+ * to one size — the sidebar's rows, a toolbar, a card head — one line each.
+ * An icon without a base (a stray inline svg) keeps its attributes.
  */
 .pd-icon {
   width: var(--pd-icon-px, auto);
   height: var(--pd-icon-px, auto);
+}
+.pd-icon[style*="--pd-icon-base"] {
+  width: var(--pd-icon-px, calc(var(--pd-icon-base, 16) * 1px * var(--pd-icon-scale, 1)));
+  height: var(--pd-icon-px, calc(var(--pd-icon-base, 16) * 1px * var(--pd-icon-scale, 1)));
 }

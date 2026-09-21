@@ -241,7 +241,7 @@ export function SettingsView({
                   : 'text-text-secondary hover:bg-bg-hover',
               )}
             >
-              <span className="shrink-0 text-text-muted">{item.icon}</span>
+              <span className="pd-chrome-icon shrink-0">{item.icon}</span>
               {item.label}
             </button>
           ))}

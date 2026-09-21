@@ -15,7 +15,7 @@
  * corners of radius ~1, stems of 5, bowls that meet the stem at mid-height.
  */
 import { clsx } from 'clsx';
-import type { SVGProps } from 'react';
+import type { CSSProperties, SVGProps } from 'react';
 
 /** A letter: its path with the left edge at x=0, and its advance width. */
 interface Letter {
@@ -193,13 +193,14 @@ export interface FileGlyphProps extends SVGProps<SVGSVGElement> {
 }
 
 /** A page with the extension on it; a plain page when there is none. */
-export function FileGlyph({ ext, size = 16, className, ...rest }: FileGlyphProps) {
+export function FileGlyph({ ext, size = 16, className, style, ...rest }: FileGlyphProps) {
   const label = fileLabel(ext);
   const { letters, page } = layoutLabel(label);
   return (
     <svg
       width={size}
       height={size}
+      style={{ ...style, '--pd-icon-base': size } as CSSProperties}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"

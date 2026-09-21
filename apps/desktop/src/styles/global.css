@@ -2386,8 +2386,14 @@ h2.text-heading {
 }
 .pd-child-row-icon {
   display: inline-flex;
-  color: var(--pd-text-muted);
+  /* The chrome's icon colour (pure white on dark); an uninstalled module's
+     row dims as a whole, icon included, through its own opacity rule. */
+  color: var(--pd-text-icon, var(--pd-text-muted));
   flex: none;
+}
+/* Any other chrome icon that wants the same colour (the settings nav). */
+.pd-chrome-icon {
+  color: var(--pd-text-icon, var(--pd-text-primary));
 }
 .pd-child-row-label {
   flex: 1;
@@ -6820,7 +6826,13 @@ body[data-media-expanded="true"] .pd-studio-compose {
   --pd-falloff: var(--pd-bg-base);
   background:
     linear-gradient(to right, var(--pd-falloff), transparent 8%, transparent 92%, var(--pd-falloff)),
-    linear-gradient(to bottom, var(--pd-falloff), transparent 8%, transparent 92%, var(--pd-falloff));
+    linear-gradient(
+      to bottom,
+      var(--pd-falloff),
+      transparent 8%,
+      transparent 92%,
+      var(--pd-falloff)
+    );
   transition: opacity 420ms var(--pd-easing-standard, ease);
 }
 .pd-media-card--pending[data-kind="model"] .pd-pending-falloff {

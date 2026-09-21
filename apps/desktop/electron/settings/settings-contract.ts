@@ -395,9 +395,13 @@ export interface DesktopSettings {
   /** User system-instructions prepended to the first prompt of each NEW session
    * (see pi-connect's session-instructions seam). Empty = none. */
   customInstructions: string;
-  /** Global SVG icon stroke width; applied to `--pd-icon-stroke` on <html>.
-   * Defaults to the token value (1.25). */
+  /** Global SVG icon stroke width, in PIXELS (every stroked shape is
+   * non-scaling); applied to `--pd-icon-stroke` on <html>. Defaults to the
+   * token value (1.25). */
   iconStroke: number;
+  /** Global icon size, a multiplier on every icon's own size; applied to
+   * `--pd-icon-scale` on <html>. Default 1.0 (no-op). */
+  iconScale: number;
   /** Element-size scale for the sidebar (rows, icons, text, rail); applied to
    * `--pd-sidebar-scale` on <html>. Default 1.0 (no-op). */
   sidebarScale: number;
@@ -524,6 +528,7 @@ export interface DesktopSettingsPatch {
   capabilities?: Partial<GenerationCapabilities>;
   customInstructions?: string;
   iconStroke?: number;
+  iconScale?: number;
   sidebarScale?: number;
   menuScale?: number;
   /** Full replacement list (renderer read-modify-writes the whole array). */
@@ -552,10 +557,22 @@ export interface DesktopSettingsPatch {
   moduleConnectors?: Record<string, boolean>;
 }
 
-/** Icon-stroke bounds — mirrors the IconStrokeControl slider range. */
+/**
+ * Icon-stroke bounds, in pixels — mirrors the IconStrokeControl slider range.
+ * the user (2026-09-20): "a more realistic range of stroke thickness none of which
+ * look absolutely excessive, make sure the user can't make the app just 'look
+ * bad'". LOOKED AT on the rail: 1.0 is a hairline that still reads, 1.75 is
+ * bold and still crisp; 2.0 clogs the calendar's rows and the file glyphs'
+ * letters, 2.5 was a blob. So 1.0–1.75.
+ */
 export const ICON_STROKE_MIN = 1;
-export const ICON_STROKE_MAX = 2.5;
+export const ICON_STROKE_MAX = 1.75;
 export const ICON_STROKE_DEFAULT = 1.25;
+/** Icon-size bounds: 0.85× keeps a 16px glyph legible (13.6px); 1.25× (20px)
+ * is as large as the rows and toolbars take without crowding their labels. */
+export const ICON_SCALE_MIN = 0.85;
+export const ICON_SCALE_MAX = 1.25;
+export const ICON_SCALE_DEFAULT = 1.0;
 
 /** Element-size scale bounds — shared by the sidebar + menu scale sliders.
  * Both default to 1.0 so an untouched install is byte-identical to today. */

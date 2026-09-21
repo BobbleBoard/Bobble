@@ -1,6 +1,8 @@
 import { clsx } from 'clsx';
 import type { CSSProperties, HTMLAttributes, ReactNode } from 'react';
 import { forwardRef } from 'react';
+import { FileGlyph } from './file-glyph.tsx';
+import { Glyph } from './glyph.tsx';
 import {
   IconChat,
   IconFile,
@@ -13,14 +15,19 @@ import {
 import { Slider } from './slider.tsx';
 
 /**
- * Global floor for the icon stroke width, in SVG user units. 1.0 is the
- * thinnest weight that still reads as a hairline glyph; `.pd-icon` mirrors this
- * floor at render time via `max(1, …)`, so nothing draws thinner even if the
- * token is set out of band.
+ * Global floor for the icon stroke width, in PIXELS (every stroked shape is
+ * non-scaling, icons.css). 1.0 is the thinnest weight that still reads as a
+ * hairline glyph; `.pd-icon` mirrors this floor at render time via
+ * `max(1, …)`, so nothing draws thinner even if the token is set out of band.
  */
 export const ICON_STROKE_MIN = 1;
-/** Upper bound of the stroke slider — heavy but not blobby at icon sizes. */
-export const ICON_STROKE_MAX = 2.5;
+/**
+ * Upper bound of the stroke slider. the user (2026-09-20): "a more realistic
+ * range … none of which look absolutely excessive, make sure the user can't
+ * make the app just 'look bad'". LOOKED AT on the rail: 1.75 is bold and
+ * still crisp; 2.0 clogs the calendar's rows and the file glyphs' letters.
+ */
+export const ICON_STROKE_MAX = 1.75;
 
 /**
  * Clamp a stroke width into the sane `[ICON_STROKE_MIN, ICON_STROKE_MAX]` range.
@@ -37,15 +44,21 @@ export function clampIconStroke(
   return Math.min(max, Math.max(min, value));
 }
 
-/** A representative sample of stroked glyphs for the live preview row. */
-const PREVIEW_ICONS = [
+/** A representative sample of stroked glyphs for the live preview row — the
+ * 16-grid icons and the 24-grid set side by side, since the width is pixels
+ * on both. */
+const PREVIEW_ICONS: readonly (({ size }: { size?: number }) => ReactNode)[] = [
   IconChat,
   IconSearch,
-  IconFile,
+  ({ size }) => <Glyph name="models" size={size} />,
+  ({ size }) => <Glyph name="scheduled" size={size} />,
   IconTerminal,
+  ({ size }) => <Glyph name="extensions" size={size} />,
   IconGlobe,
+  ({ size }) => <FileGlyph ext="wav" size={size} />,
   IconSparkles,
   IconSidebar,
+  IconFile,
 ];
 
 export interface IconStrokeControlProps extends Omit<HTMLAttributes<HTMLDivElement>, 'onChange'> {
@@ -72,7 +85,7 @@ export const IconStrokeControl = forwardRef<HTMLDivElement, IconStrokeControlPro
       onChange,
       min = ICON_STROKE_MIN,
       max = ICON_STROKE_MAX,
-      step = 0.25,
+      step = 0.05,
       label = 'Icon stroke width',
       className,
       ...rest
@@ -101,8 +114,9 @@ export const IconStrokeControl = forwardRef<HTMLDivElement, IconStrokeControlPro
           style={{ '--pd-icon-stroke': safe } as CSSProperties}
           aria-hidden="true"
         >
-          {PREVIEW_ICONS.map((Glyph) => (
-            <Glyph key={Glyph.name} size={22} />
+          {PREVIEW_ICONS.map((Draw, i) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: a fixed sample row
+            <Draw key={i} size={22} />
           ))}
         </div>
       </div>

@@ -6,16 +6,23 @@
  * exist — these fill the gaps (pdf, subagent, expand, minimize, download, nav).
  */
 
-import { Glyph } from '@pi-desktop/ui';
+import { Glyph, iconBaseStyle } from '@pi-desktop/ui';
 import type { ReactNode, SVGProps } from 'react';
 
 export type IconProps = SVGProps<SVGSVGElement> & { size?: number };
 
-function Icon({ size = 16, className, children, ...rest }: IconProps & { children: ReactNode }) {
+function Icon({
+  size = 16,
+  className,
+  style,
+  children,
+  ...rest
+}: IconProps & { children: ReactNode }) {
   return (
     <svg
       width={size}
       height={size}
+      style={iconBaseStyle(size, style)}
       viewBox="0 0 16 16"
       fill="none"
       stroke="currentColor"
