@@ -24,7 +24,7 @@
  * Every row that was measured is clickable: it relaunches the model on that
  * engine + method by hand, calibration's verdict notwithstanding.
  */
-import { IconButton, IconSpeed, Popover, PopoverContent, PopoverTrigger } from '@pi-desktop/ui';
+import { Glyph, IconButton, Popover, PopoverContent, PopoverTrigger } from '@pi-desktop/ui';
 import { useEffect, useMemo, useState } from 'react';
 import type { EngineState, LlmCompanion } from '../../electron/ipc-contract';
 import {
@@ -578,7 +578,8 @@ export function EngineMenu() {
             data-testid="engine-menu-button"
             className="[-webkit-app-region:no-drag]"
           >
-            <IconSpeed size={16} />
+            {/* The inference engines' mark: the graphics card (the user's pick). */}
+            <Glyph name="engine" size={16} />
           </IconButton>
         </PopoverTrigger>
         <PopoverContent

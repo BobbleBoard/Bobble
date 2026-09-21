@@ -14,7 +14,7 @@ try {
   await page.waitForFunction(() => typeof window.piDesktop?.invoke === 'function', {
     timeout: 30000,
   });
-  await page.getByText('Connectors', { exact: true }).first().click();
+  await page.getByText('Extensions', { exact: true }).first().click();
   await page.waitForTimeout(1800);
   await page.getByPlaceholder('Search connectors').fill('OmniSVG');
   await page.waitForTimeout(700);

@@ -1,8 +1,6 @@
 /*
- * Individualized tool-step icons (THEME 3). The file-extension badge is the
- * Claude signature: a generic file sheet with a small uppercase ext chip on its
- * lower edge ("PY", "PNG", …). Colors are inverse-on-secondary so the chip
- * reads in both light and dark.
+ * Individualized tool-step icons (THEME 3). A file step shows the page with
+ * its extension written on it in strokes ("PY", "PNG", …) — file-glyph.tsx.
  */
 
 .pd-file-ext-icon {
@@ -18,31 +16,6 @@
   display: block;
 }
 
-/*
- * Round-3 (the user img28): the "TXT"/"PY" badge text was too dark — lightened the
- * FILL to the muted token.
- * Round-5 #7 (the user img40): the badge rendered BROKEN — it was pinned to the span
- * bottom (bottom: 1px), which floats it BELOW the file-sheet glyph (the sheet
- * ends ~87% down), so the chip looked detached. Anchor it a step up (bottom:
- * 16%) with tighter line-height so the ext chip sits ON the sheet's lower band.
- */
-.pd-file-ext-badge {
-  position: absolute;
-  left: 50%;
-  bottom: 16%;
-  transform: translateX(-50%);
-  max-width: 100%;
-  padding: 0 2px;
-  border-radius: 2px;
-  background: var(--pd-text-muted);
-  color: var(--pd-bg-raised);
-  font-family: var(--pd-font-sans);
-  font-size: 7px;
-  line-height: 1.3;
-  font-weight: var(--pd-font-weight-semibold);
-  letter-spacing: 0.02em;
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: clip;
-}
+/* The extension is drawn ON the page in strokes now (file-glyph.tsx), so
+ * there is no badge to place; the sheet-and-chip rules that were here went
+ * with it (2026-09-20). */

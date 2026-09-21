@@ -6,6 +6,7 @@
  * exist — these fill the gaps (pdf, subagent, expand, minimize, download, nav).
  */
 
+import { Glyph } from '@pi-desktop/ui';
 import type { ReactNode, SVGProps } from 'react';
 
 export type IconProps = SVGProps<SVGSVGElement> & { size?: number };
@@ -284,11 +285,17 @@ export function IconTable(props: IconProps) {
   );
 }
 
-/** Bring a canvas tab back into the chat — the reverse of IconExpand. */
-export function IconInline(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <path d="M3 6h3V3M13 10h-3v3M6 6L2.5 2.5M10 10l3.5 3.5" />
-    </Icon>
-  );
+/**
+ * THE TWO DIRECTIONS, ONE ARROW. the user (2026-09-20): an arrow up and to the
+ * right "for putting inline code blocks/data visuals in the canvas … and
+ * then flip it 180 degrees for going canvas to inline". Both are the set's
+ * glyphs (ui glyph.tsx), so they take the app's stroke and size tokens.
+ */
+export function IconToCanvas({ size = 16, className }: IconProps) {
+  return <Glyph name="toCanvas" size={size} className={className} />;
+}
+
+/** Bring a canvas tab back into the chat — the same arrow turned around. */
+export function IconInline({ size = 16, className }: IconProps) {
+  return <Glyph name="toInline" size={size} className={className} />;
 }

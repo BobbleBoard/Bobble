@@ -946,7 +946,7 @@ export function ChatComposer({
               id: `/${c.slug} `,
               label: `/${c.slug}`,
               subtitle: c.enabled ? c.description : `${c.description} · off — picking turns it on`,
-              section: 'Connectors',
+              section: 'Extensions',
               kind: 'connector',
               ...(c.iconSvg !== undefined ? { iconSvg: c.iconSvg } : {}),
             }),

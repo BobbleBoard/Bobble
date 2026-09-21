@@ -441,7 +441,7 @@ function Detail({
           onClick={onClose}
           data-testid="connectors-back"
         >
-          <IconChevronLeft size={16} /> Connectors
+          <IconChevronLeft size={16} /> Extensions
         </button>
         <DetailHeader
           item={item}
@@ -649,7 +649,7 @@ export function ConnectorsScreen({
         <div className="pdc-col">
           <div className="pdc-head">
             <div className="min-w-0">
-              <h1 className="pdc-title">Connectors</h1>
+              <h1 className="pdc-title">Extensions</h1>
               <p className="pdc-sub" data-testid="connectors-intro">
                 Tools and skills Bobble can use. Everything here runs on this Mac.
               </p>
@@ -659,8 +659,8 @@ export function ConnectorsScreen({
               <input
                 type="search"
                 className="pdc-search pd-focusable"
-                placeholder="Search connectors"
-                aria-label="Search connectors"
+                placeholder="Search extensions"
+                aria-label="Search extensions"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 data-testid="connectors-search"

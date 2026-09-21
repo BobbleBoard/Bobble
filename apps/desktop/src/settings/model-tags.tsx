@@ -14,16 +14,9 @@
  * (`.pd-mm-pill*`) — deliberately NOT in @pi-desktop/ui (Wave B owns that) — and
  * are tuned for AA contrast in both light and dark modes.
  */
+import { Glyph } from '@pi-desktop/ui';
 import type { ReactNode } from 'react';
-import {
-  IconBolt,
-  IconCpu,
-  IconEye,
-  IconLock,
-  IconShield,
-  IconSparkle,
-  IconWaveform,
-} from './icons';
+import { IconBolt, IconEye, IconLock, IconShield, IconSparkle, IconWaveform } from './icons';
 import { type SpecMethod, VARIANT_LABEL } from './model-manager-logic';
 
 /** The attribute a pill represents; drives its colour class + default glyph. */
@@ -59,7 +52,7 @@ function defaultIcon(kind: ModelTagKind): ReactNode {
     case 'reliable':
       return <IconShield size={12} />;
     case 'engine':
-      return <IconCpu size={12} />;
+      return <Glyph name="engine" size={12} />;
     case 'gated':
       return <IconLock size={11} />;
     default:

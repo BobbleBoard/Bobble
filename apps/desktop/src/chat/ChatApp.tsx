@@ -279,7 +279,7 @@ export function ChatApp({
       { id: 'new-chat', label: 'New chat', hint: '⌘N', run: () => void newSession() },
       { id: 'settings', label: 'Settings', run: () => onOpenSettings('personalization') },
       { id: 'models', label: 'Model management', run: () => onOpenSettings('models') },
-      { id: 'connectors', label: 'Connectors', run: onOpenConnectors },
+      { id: 'connectors', label: 'Extensions', run: onOpenConnectors },
       { id: 'scheduled', label: 'Scheduled tasks', run: onOpenScheduled },
       {
         id: 'sidebar',

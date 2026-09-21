@@ -5722,39 +5722,8 @@ body[data-media-expanded="true"] .pd-studio-compose {
   transition: opacity var(--pd-duration-dialog-in) var(--pd-easing-standard);
 }
 
-/* ═══ THE NEW-CHAT MARK ════════════════════════════════════════════════════
- *
- * A pencil above the line it is about to write. Hovering the ROW draws the line
- * on and slides the pencil along it; leaving runs the same curves backwards,
- * because both are transitions rather than keyframes — an interrupted hover
- * reverses from wherever it reached instead of snapping.
- */
-.pd-compose-line {
-  /* `pathLength: 10` on the element makes this readable: a dash of the whole
-     length, offset so that only the first 3.5 of 10 is showing at rest. */
-  stroke-dasharray: 10;
-  stroke-dashoffset: 6.5;
-  transition: stroke-dashoffset var(--pd-duration-base, 220ms) var(--pd-easing-standard);
-}
-.pd-compose-pen {
-  transition: transform var(--pd-duration-base, 220ms) var(--pd-easing-standard);
-}
-.pd-sidebar-row:hover .pd-compose-line,
-.pd-sidebar-row:focus-visible .pd-compose-line {
-  stroke-dashoffset: 0;
-}
-/* Up and to the right: the direction the line is being drawn in, so the pencil
-   reads as having written it rather than as having twitched. */
-.pd-sidebar-row:hover .pd-compose-pen,
-.pd-sidebar-row:focus-visible .pd-compose-pen {
-  transform: translate(1.1px, -0.9px);
-}
-@media (prefers-reduced-motion: reduce) {
-  .pd-compose-line,
-  .pd-compose-pen {
-    transition: none;
-  }
-}
+/* The new-chat row's pencil-and-line mark and its hover animation lived here
+ * until 2026-09-20; the row takes the set's circled plus now (glyph.tsx). */
 
 /*
  * ONE ROUTE'S FAILURE, DRAWN INSIDE THAT ROUTE.

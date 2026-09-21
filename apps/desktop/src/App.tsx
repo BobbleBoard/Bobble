@@ -356,7 +356,7 @@ export function App() {
                       : view === 'scheduled'
                         ? 'Scheduled'
                         : view === 'connectors'
-                          ? 'Connectors'
+                          ? 'Extensions'
                           : undefined
                     : undefined
                 }

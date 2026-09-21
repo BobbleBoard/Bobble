@@ -159,6 +159,7 @@ export function InterfacePanel({
       <SettingSection
         title="Experimental"
         description="Early features, still being built. Off by default."
+        experimental
       >
         {/*
          * "Coordination harness" REMOVED. the user: deprecated. It only ever took

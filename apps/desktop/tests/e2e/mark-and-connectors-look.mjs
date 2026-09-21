@@ -29,7 +29,7 @@ for (const m of ['dark', 'light']) {
     clip: { x: box.x - 8, y: box.y - 8, width: 200, height: box.height + 16 },
   });
 }
-await page.click('text=Connectors').catch(() => {});
+await page.click('text=Extensions').catch(() => {});
 await page.waitForTimeout(1200);
 const card = await page.evaluate(() => {
   const el = [...document.querySelectorAll('button, div, a')].find(

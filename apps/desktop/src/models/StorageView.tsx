@@ -42,20 +42,17 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  Glyph,
   IconBrain,
   IconChevronRight,
   IconCopy,
   IconFile,
   IconFolderOpen,
   IconGears,
-  IconImage,
   IconMore,
-  IconPuzzle,
   IconRefresh,
   IconShare,
   IconTrash,
-  IconVideo,
-  IconWaveform,
 } from '@pi-desktop/ui';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { StorageNode, StorageOverview } from '../../electron/storage/storage-contract';
@@ -107,6 +104,8 @@ export function matchesQuery(node: StorageNode, q: string): boolean {
   return (node.children ?? []).some((c) => matchesQuery(c, needle));
 }
 
+// The modality marks are the sidebar's (ui glyph.tsx), so a shelf reads as the
+// room it feeds: the picture, the slate, the waveform, the cube.
 function modalityIcon(node: StorageNode, size = 16): ReactNode {
   const m = node.meta?.modality ?? (node.kind === 'modality' ? node.name : '');
   if (node.kind === 'tool' || m === 'Support') return <IconGears size={size} />;
@@ -114,13 +113,13 @@ function modalityIcon(node: StorageNode, size = 16): ReactNode {
     case 'LLM':
       return <IconBrain size={size} />;
     case 'Image':
-      return <IconImage size={size} />;
+      return <Glyph name="image" size={size} />;
     case 'Video':
-      return <IconVideo size={size} />;
+      return <Glyph name="video" size={size} />;
     case '3D':
-      return <IconPuzzle size={size} />;
+      return <Glyph name="studio3d" size={size} />;
     case 'Audio':
-      return <IconWaveform size={size} />;
+      return <Glyph name="audio" size={size} />;
     default:
       return <IconFile size={size} />;
   }

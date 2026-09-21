@@ -1,6 +1,7 @@
 import { clsx } from 'clsx';
 import type { HTMLAttributes, ReactNode } from 'react';
 import { forwardRef } from 'react';
+import { FileGlyph } from './file-glyph.tsx';
 import {
   IconChart,
   IconClock,
@@ -127,14 +128,14 @@ export interface FileExtIconProps extends HTMLAttributes<HTMLSpanElement> {
 }
 
 /**
- * Generic file sheet with an extension badge (`FileExtIcon ext="py"`). The
- * badge sits on the sheet's lower edge, tabular and clipped to <=4 chars.
+ * The page with the extension written on it (`FileExtIcon ext="py"`) — the
+ * letters are strokes on the page (file-glyph.tsx), not a text badge, so they
+ * take the icon stroke like everything else. A plain page without one.
  */
 export const FileExtIcon = forwardRef<HTMLSpanElement, FileExtIconProps>(function FileExtIcon(
   { ext, size = 20, className, style, ...rest },
   ref,
 ) {
-  const label = (ext ?? '').replace(/^\./, '').slice(0, 4).toUpperCase();
   return (
     <span
       ref={ref}
@@ -143,8 +144,7 @@ export const FileExtIcon = forwardRef<HTMLSpanElement, FileExtIconProps>(functio
       aria-hidden="true"
       {...rest}
     >
-      <IconFile size={size} />
-      {label ? <span className="pd-file-ext-badge">{label}</span> : null}
+      <FileGlyph ext={ext} size={size} />
     </span>
   );
 });

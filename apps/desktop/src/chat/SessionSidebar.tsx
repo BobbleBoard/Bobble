@@ -15,12 +15,11 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
+  FolderGlyph,
+  Glyph,
   IconChat,
   IconChevronDown,
-  IconClock,
-  IconConnector,
   IconFolderPlus,
-  IconImage,
   IconMore,
   IconPencil,
   IconPin,
@@ -28,8 +27,6 @@ import {
   IconSettings,
   IconShare,
   IconTrash,
-  IconVideo,
-  IconWaveform,
   Kbd,
   Sidebar,
   SidebarRow,
@@ -38,18 +35,10 @@ import {
   Spinner,
   writeClipboardText,
 } from '@pi-desktop/ui';
-import {
-  type ComponentType,
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { SessionSummary } from '../../electron/ipc-contract';
 import type { ChatProject } from '../../electron/settings/settings-contract';
-import { IconCpu, IconMoon, IconSun } from '../settings/icons';
+import { IconMoon, IconSun } from '../settings/icons';
 import type { SettingsSection } from '../settings/SettingsView';
 import {
   assignChat,
@@ -267,7 +256,7 @@ function relativeTime(iso: string): string {
 interface WorkspaceNavItem {
   id: string;
   label: string;
-  icon: ComponentType<{ size?: number }>;
+  icon: ReactNode;
   onClick: () => void;
   testid: string;
 }
@@ -287,86 +276,11 @@ function statusTone(label: string): 'done' | 'error' | 'paused' | 'waiting' | un
   return undefined;
 }
 
-/** Stylized isometric cube — the 3D Studio modality glyph. */
-/**
- * The Modalities glyph.
- *
- * DRAWN, NOT FILLED. It used to be three solid faces at 0.9/0.7/0.5 opacity —
- * the only filled icon in a rail of 1.5px outlines, which is exactly the kind
- * of mismatch you notice without being able to name: one row looks heavier and
- * slightly closer to you than its neighbours. Same 16 grid and the same
- * `pd-icon` class as the shared set, so it takes the same stroke token and
- * changes weight with them.
- */
 /*
- * NEW CHAT: a pencil, and the line it is about to write.
- *
- * Fourth drawing, and the user specified this one: "it needs to be a pencil with a
- * flat _ line below, line is tiny but gets drawn a bit and the pencil moves a
- * bit as a subtle hover animation, plays in reverse when un-hovered."
- *
- * WHY IT WORKS WHERE THE OTHER THREE DID NOT. A bare pencil says EDIT, which is
- * what Rename means two rows down; a sheet-and-pen was too much detail for 16px;
- * a bubble-and-plus said "conversation" without saying "write". A pencil ABOVE A
- * LINE says writing something that is not there yet — and the hover makes it
- * literal: the line grows and the pencil rides along it, so the icon performs
- * the thing the row does.
- *
- * The reverse is free. Both properties are TRANSITIONED rather than keyframed,
- * so leaving the row runs the same curve backwards from wherever it had reached
- * — an interrupted hover never snaps and there is no half-finished state to
- * clean up.
- *
- * `pathLength={10}` normalises the dash maths, so "a third of it showing" is
- * written as 6.5 of 10 rather than as a number derived from the viewBox that
- * nobody can check.
+ * The rail's own drawings (a cube, a pencil over a line) lived here until
+ * 2026-09-20; the user handed over one set for the whole app — packages/ui
+ * glyph.tsx — and these rows take theirs from it like every other surface.
  */
-function ComposeMark({ size = 16 }: { size?: number }): ReactNode {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.5}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="pd-icon pd-compose"
-      aria-hidden="true"
-    >
-      <g className="pd-compose-pen">
-        <path d="M10.7 2.2 13.1 4.6 7.4 10.3 4.3 11.1 5.1 8z" />
-        <path d="M9.2 3.7 11.6 6.1" />
-      </g>
-      <path className="pd-compose-line" d="M2.8 13.7h7.2" pathLength={10} />
-    </svg>
-  );
-}
-
-/** The 3D Studio's own glyph, on the 3D Studio's own row. The section header
- *  above it carries no icon at all. */
-function ModalityCube({ size = 16 }: { size?: number }): ReactNode {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.5}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="pd-icon"
-      aria-hidden="true"
-    >
-      <path d="M8 2 13.5 5 8 8 2.5 5Z" />
-      <path d="M2.5 5v6l5.5 3 5.5-3V5" />
-      <path d="M8 8v6" />
-    </svg>
-  );
-}
-
 export function SessionSidebar({
   open,
   onTruncated,
@@ -1256,25 +1170,29 @@ export function SessionSidebar({
   // removed; "Model management" routes to the settings model-manager surface
   // (section id `models` is the seam the parallel model-manager rework owns);
   // the redundant Settings entry is gone (it lives in the profile footer).
+  // The glyphs are the set's (packages/ui glyph.tsx — the user's 2026-09-20 picks):
+  // the circuit board, the puzzle piece, the calendar. "Extensions" is what
+  // the connectors are called on screen now (the user); ids and test ids keep the
+  // old name, the way pi's internals keep theirs.
   const workspaceNav: WorkspaceNavItem[] = [
     {
       id: 'models',
       label: 'Model management',
-      icon: IconCpu,
+      icon: <Glyph name="models" />,
       onClick: () => onOpenSettings('models'),
       testid: 'nav-model-management',
     },
     {
       id: 'connectors',
-      label: 'Connectors',
-      icon: IconConnector,
+      label: 'Extensions',
+      icon: <Glyph name="extensions" />,
       onClick: onOpenConnectors,
       testid: 'nav-connectors',
     },
     {
       id: 'scheduled',
       label: 'Scheduled',
-      icon: IconClock,
+      icon: <Glyph name="scheduled" />,
       onClick: onOpenScheduled,
       testid: 'nav-scheduled',
     },
@@ -1326,7 +1244,7 @@ export function SessionSidebar({
 
       <SidebarScroll>
         <SidebarRow
-          icon={<ComposeMark size={16} />}
+          icon={<Glyph name="newChat" />}
           label="New chat"
           meta={<Kbd keys="⌘N" />}
           onClick={() => void onNewChat()}
@@ -1334,18 +1252,15 @@ export function SessionSidebar({
         />
 
         <SidebarSection label="Workspace">
-          {workspaceNav.map((item) => {
-            const Icon = item.icon;
-            return (
-              <SidebarRow
-                key={item.id}
-                icon={<Icon size={16} />}
-                label={item.label}
-                onClick={item.onClick}
-                data-testid={item.testid}
-              />
-            );
-          })}
+          {workspaceNav.map((item) => (
+            <SidebarRow
+              key={item.id}
+              icon={item.icon}
+              label={item.label}
+              onClick={item.onClick}
+              data-testid={item.testid}
+            />
+          ))}
         </SidebarSection>
 
         {/* Modalities — full-window studios (3D now; image/video/audio later). A
@@ -1402,7 +1317,7 @@ export function SessionSidebar({
                   onClick={() => setModalityView('3d')}
                 >
                   <span className="pd-child-row-icon">
-                    <ModalityCube size={15} />
+                    <Glyph name="studio3d" />
                   </span>
                   <span className="pd-child-row-label">3D Studio</span>
                   {!module3d.installed && moduleSize !== '' ? (
@@ -1430,7 +1345,7 @@ export function SessionSidebar({
                   onClick={() => setModalityView('image')}
                 >
                   <span className="pd-child-row-icon">
-                    <IconImage size={15} />
+                    <Glyph name="image" />
                   </span>
                   <span className="pd-child-row-label">Image</span>
                 </button>
@@ -1444,7 +1359,7 @@ export function SessionSidebar({
                   onClick={() => setModalityView('video')}
                 >
                   <span className="pd-child-row-icon">
-                    <IconVideo size={15} />
+                    <Glyph name="video" />
                   </span>
                   <span className="pd-child-row-label">Video</span>
                 </button>
@@ -1458,7 +1373,7 @@ export function SessionSidebar({
                   onClick={() => setModalityView('audio')}
                 >
                   <span className="pd-child-row-icon">
-                    <IconWaveform size={15} />
+                    <Glyph name="audio" />
                   </span>
                   <span className="pd-child-row-label">Audio</span>
                 </button>
@@ -1522,15 +1437,10 @@ export function SessionSidebar({
                       the .pd-chatrow-main above); this now matches it. */}
                   <div className={auto ? '' : 'pd-chatrow pd-chatrow-main'}>
                     <SidebarRow
-                      icon={
-                        <span className="pd-chat-icon-swap">
-                          <IconFolderPlus size={16} className="pd-chat-icon-bubble" />
-                          <IconChevronDown
-                            size={14}
-                            className={`pd-chat-icon-caret ${pExpanded ? '' : '-rotate-90'}`}
-                          />
-                        </span>
-                      }
+                      /* The folder IS the state: closed while the project is
+                         folded, open once it is not, morphing between the two
+                         (FolderGlyph) — so no caret swap on hover here. */
+                      icon={<FolderGlyph open={pExpanded} />}
                       label={project.name}
                       meta={
                         <span className="text-text-muted">

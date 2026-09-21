@@ -26,7 +26,7 @@
  */
 import {
   ChartView,
-  IconExpand,
+  IconToCanvas,
   InlineWidget,
   inlineTransitionStyle,
   useCanvasTabs,
@@ -76,7 +76,7 @@ export function PresentedInline({ item }: { item: PresentedRecord }) {
                 data-testid="inline-chart-move"
                 onClick={moveToCanvas}
               >
-                <IconExpand size={14} />
+                <IconToCanvas size={14} />
               </IconButton>
             }
           />

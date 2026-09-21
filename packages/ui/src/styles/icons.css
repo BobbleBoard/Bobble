@@ -19,3 +19,35 @@
 .pd-icon {
   stroke-width: max(1, var(--pd-icon-stroke, 1.5));
 }
+
+/*
+ * ONE THICKNESS, IN PIXELS. the user (2026-09-20): "have a consistent modifier to
+ * all svgs for thickness and size and such so they can be easily edited."
+ *
+ * The stroke token above is in user units, and the set is drawn on two grids
+ * — the 16-grid icons and the 24-grid glyphs (glyph.tsx) — so the same token
+ * drew a thinner line on a 24-grid glyph than on a 16-grid icon at the same
+ * rendered size, and thinner again at 14px than at 20px. `non-scaling-stroke`
+ * makes the stroke a screen-pixel width whatever the viewBox or the rendered
+ * size: the token IS the pixel width, everywhere, and thickness is edited in
+ * one place (the theme's --pd-icon-stroke, or Settings › Appearance).
+ */
+.pd-icon path,
+.pd-icon circle,
+.pd-icon rect,
+.pd-icon line,
+.pd-icon polyline,
+.pd-icon polygon,
+.pd-icon ellipse {
+  vector-effect: non-scaling-stroke;
+}
+
+/*
+ * ONE SIZE, PER CONTEXT. `--pd-icon-px` is unset by default so every `size`
+ * prop stands; set it on a container and every icon inside takes that size —
+ * the sidebar's rows, a toolbar, a card head — one line each.
+ */
+.pd-icon {
+  width: var(--pd-icon-px, auto);
+  height: var(--pd-icon-px, auto);
+}

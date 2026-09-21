@@ -12,7 +12,7 @@ import { SettingRow, SettingSection } from '../parts';
 const MODE_HINT: Record<McpMode, string> = {
   lite: 'Servers are proxied through one lightweight tool; schemas load on demand.',
   native: 'Every MCP tool is registered directly (heavier context, full fidelity).',
-  'bash-cli': 'Connectors run as a `pi-tool` shell command in bash (best for small models).',
+  'bash-cli': 'Extensions run as a `pi-tool` shell command in bash (best for small models).',
 };
 
 export function ConnectorsPanel({ onOpenConnectors }: { onOpenConnectors?: () => void }) {
@@ -20,7 +20,7 @@ export function ConnectorsPanel({ onOpenConnectors }: { onOpenConnectors?: () =>
   const update = useSettingsStore((s) => s.update);
 
   return (
-    <SettingSection description="How MCP connector tools are exposed to the agent.">
+    <SettingSection description="How extension (MCP) tools are exposed to the agent.">
       <SettingRow label="MCP mode" hint={MODE_HINT[mode]}>
         <SegmentedControl
           aria-label="MCP mode"
@@ -35,13 +35,13 @@ export function ConnectorsPanel({ onOpenConnectors }: { onOpenConnectors?: () =>
         />
       </SettingRow>
       {onOpenConnectors !== undefined ? (
-        <SettingRow label="Browse connectors" hint="Install and manage MCP connectors.">
+        <SettingRow label="Browse extensions" hint="Install and manage MCP extensions.">
           <Button
             variant="secondary"
             data-testid="settings-open-connectors"
             onClick={onOpenConnectors}
           >
-            Open connectors
+            Open extensions
           </Button>
         </SettingRow>
       ) : null}

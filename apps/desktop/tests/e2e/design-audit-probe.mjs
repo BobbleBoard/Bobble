@@ -690,7 +690,7 @@ for (const mode of ['light', 'dark']) {
   await win.waitForTimeout(600);
 
   // 9. Sidebar destinations: Model management / Connectors / Scheduled / Skills.
-  for (const label of ['Model management', 'Connectors', 'Scheduled', 'Skills']) {
+  for (const label of ['Model management', 'Extensions', 'Scheduled', 'Skills']) {
     const item = win
       .locator(
         `.pd-sidebar [aria-label="${label}"], .pd-sidebar button:has-text("${label}"), .pd-sidebar-row:has-text("${label}")`,

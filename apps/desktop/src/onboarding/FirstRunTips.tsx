@@ -42,7 +42,7 @@ const TIPS: Array<{ title: string; body: string }> = [
   },
   {
     title: 'Give Pi tools & skills',
-    body: 'Open Connectors to enable MCP tools and saved skill playbooks.',
+    body: 'Open Extensions to enable MCP tools and saved skill playbooks.',
   },
 ];
 

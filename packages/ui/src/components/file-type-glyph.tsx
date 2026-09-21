@@ -6,9 +6,27 @@
  * shape is the thing itself: a slide with a bar chart, a page of lines, a grid,
  * a picture, a film frame, a waveform — so a row of cards reads at a glance.
  */
+import { FileGlyph, fileLabel } from './file-glyph.tsx';
 import type { FileFamily } from './file-type.ts';
 
-export function FileTypeGlyph({ family, size = 22 }: { family: FileFamily; size?: number }) {
+/**
+ * the user (2026-09-20): "all files with specific types" carry the page with the
+ * extension written on it (file-glyph.tsx) — so given an extension the tile
+ * shows that, on the family's colour; the family shapes below remain for a
+ * folder and for anything without an extension the alphabet can set.
+ */
+export function FileTypeGlyph({
+  family,
+  ext,
+  size = 22,
+}: {
+  family: FileFamily;
+  ext?: string;
+  size?: number;
+}) {
+  if (family !== 'folder' && fileLabel(ext).length > 0) {
+    return <FileGlyph ext={ext} size={size} />;
+  }
   const common = {
     'aria-hidden': true as const,
     width: size,

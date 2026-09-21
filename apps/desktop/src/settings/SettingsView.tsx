@@ -13,17 +13,17 @@
  * that id to the standalone view instead of opening this panel.
  */
 import {
+  Glyph,
   IconClose,
-  IconConnector,
   IconPencil,
-  IconPuzzle,
   IconSearch,
+  IconSparkles,
   IconTerminal,
   ScrollArea,
 } from '@pi-desktop/ui';
 import { type ReactNode, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { cx } from '../onboarding/cx';
-import { IconCpu, IconCursor, IconShield, IconSlider, IconSun } from './icons';
+import { IconCursor, IconShield, IconSlider, IconSun } from './icons';
 import { AgentPanel } from './panels/AgentPanel';
 import { AppearancePanel } from './panels/AppearancePanel';
 import { CapabilitiesPanel } from './panels/CapabilitiesPanel';
@@ -58,10 +58,12 @@ const NAV: Array<{ id: SettingsSection; label: string; icon: ReactNode }> = [
   { id: 'agent', label: 'Agent', icon: <IconShield /> },
   { id: 'computer-use', label: 'Computer use', icon: <IconCursor /> },
   { id: 'search', label: 'Web search', icon: <IconSearch /> },
-  { id: 'connectors', label: 'Connectors', icon: <IconConnector /> },
-  { id: 'capabilities', label: 'Capabilities', icon: <IconPuzzle /> },
-  // The memory guard and the alternative inference engines — both experimental.
-  { id: 'experimental', label: 'Experimental', icon: <IconCpu /> },
+  // "Extensions" on screen (the user, 2026-09-20); the section id stays.
+  { id: 'connectors', label: 'Extensions', icon: <Glyph name="extensions" /> },
+  { id: 'capabilities', label: 'Capabilities', icon: <IconSparkles /> },
+  // The memory guard and the alternative inference engines — both experimental,
+  // and marked the way everything experimental is: the flask.
+  { id: 'experimental', label: 'Experimental', icon: <Glyph name="experimental" /> },
 ];
 
 const TITLES: Record<SettingsSection, string> = {
@@ -73,7 +75,7 @@ const TITLES: Record<SettingsSection, string> = {
   interface: 'Interface',
   agent: 'Agent',
   search: 'Web search',
-  connectors: 'Connectors',
+  connectors: 'Extensions',
   capabilities: 'Capabilities',
   'computer-use': 'Computer use',
   experimental: 'Experimental',

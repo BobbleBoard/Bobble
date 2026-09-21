@@ -249,6 +249,7 @@ export {
   IconPdf,
   IconPopout,
   IconSubagent,
+  IconToCanvas,
 } from './tab-icons.tsx';
 // Per-tab operation bar (breadcrumb / file-tree / open-with; browser nav; media)
 export type { CanvasOperationBarProps } from './tabs/canvas-operation-bar.tsx';

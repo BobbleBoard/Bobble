@@ -170,3 +170,11 @@
   background: var(--pd-accent-hover);
   filter: brightness(1.05);
 }
+
+/* The tile's glyph is white on colour at 22px: a touch heavier than the
+ * rail's 1.25px line, as its family shapes were (1.7 units) before the page
+ * with the extension on it took their place. The token is pixels now, so
+ * this is the whole override. */
+.pd-present-thumb {
+  --pd-icon-stroke: 1.6;
+}

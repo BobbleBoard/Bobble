@@ -14,13 +14,14 @@
  * default that no theme can move, and a card sitting on an 18px-radius panel
  * shell wants to be on the same scale as it.
  */
-import { Slider } from '@pi-desktop/ui';
+import { Glyph, Slider } from '@pi-desktop/ui';
 import type { ReactNode } from 'react';
 
 export function SettingSection({
   title,
   description,
   action,
+  experimental = false,
   children,
 }: {
   /** Omitted when the panel's own title already says this — the Settings shell
@@ -30,6 +31,9 @@ export function SettingSection({
   description?: string;
   /** A section-level affordance (a Reset, say), baselined with the heading. */
   action?: ReactNode;
+  /** Early work: the flask sits by the title — the user (2026-09-20): "anything
+   * experimental mark with [the flask]". */
+  experimental?: boolean;
   children: ReactNode;
 }) {
   const head = title !== undefined || description !== undefined;
@@ -39,7 +43,12 @@ export function SettingSection({
         <div className="flex items-baseline justify-between gap-3">
           <div className="min-w-0">
             {title !== undefined ? (
-              <h2 className="text-heading font-medium text-text-primary">{title}</h2>
+              <h2 className="flex items-center gap-2 text-heading font-medium text-text-primary">
+                {experimental ? (
+                  <Glyph name="experimental" size={18} className="text-text-secondary" />
+                ) : null}
+                {title}
+              </h2>
             ) : null}
             {description !== undefined ? (
               <p className="mt-1 text-footnote text-text-muted">{description}</p>

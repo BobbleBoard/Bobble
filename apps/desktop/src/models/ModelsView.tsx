@@ -30,6 +30,7 @@ import {
   reliableAuthorsForDomains,
 } from '@pi-desktop/inference/catalog';
 import {
+  Glyph,
   IconCheck,
   IconChevronDown,
   IconClock,
@@ -1632,7 +1633,17 @@ export function ModelsView() {
                 tab === t ? 'bg-bg-raised text-text-primary shadow-sm' : 'text-text-secondary',
               )}
             >
-              {t === 'discover' ? 'Discover' : t === 'device' ? 'On Device' : 'Manage Storage'}
+              {t === 'storage' ? (
+                /* Storage management carries the drive (the user's 2026-09-20 pick). */
+                <span className="inline-flex items-center gap-1.5">
+                  <Glyph name="storage" size={14} />
+                  Manage Storage
+                </span>
+              ) : t === 'discover' ? (
+                'Discover'
+              ) : (
+                'On Device'
+              )}
             </button>
           ))}
         </div>

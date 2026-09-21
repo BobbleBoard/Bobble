@@ -69,7 +69,7 @@ try {
   const list = () => page.evaluate(() => window.piDesktop.invoke('connectors:list', undefined));
 
   // 1. Connectors → OmniSVG.
-  await page.getByText('Connectors', { exact: true }).first().click();
+  await page.getByText('Extensions', { exact: true }).first().click();
   await page.waitForTimeout(1500);
   await page.getByPlaceholder('Search connectors').fill('OmniSVG');
   await page.waitForTimeout(600);

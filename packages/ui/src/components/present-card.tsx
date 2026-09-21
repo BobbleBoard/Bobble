@@ -1,6 +1,7 @@
 import { fileTypeOf } from './file-type.ts';
 import { FileTypeGlyph } from './file-type-glyph.tsx';
 import { OpenSplitButton, type OpenWithChoice } from './open-split-button.tsx';
+import { fileExt as fileExtOf } from './tool-icons.tsx';
 /**
  * The card `present` puts in the thread: here is the finished thing.
  *
@@ -182,7 +183,7 @@ export const PresentCard = forwardRef<HTMLDivElement, PresentCardProps>(function
           {item.thumbnailUrl !== undefined ? (
             <img className="pd-present-thumb-img" src={item.thumbnailUrl} alt="" />
           ) : (
-            <FileTypeGlyph family={type.family} />
+            <FileTypeGlyph family={type.family} ext={fileExtOf(item.path)} />
           )}
         </span>
         <span className="pd-present-text">

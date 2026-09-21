@@ -12,7 +12,7 @@ import { type ReactNode, useCallback, useLayoutEffect, useMemo, useRef, useState
 import type { Artifact } from './model.ts';
 import { defaultSurfaceRegistry, type SurfaceRegistry } from './registry.ts';
 import { ensureDefaultSurfaces } from './surfaces/register-builtins.tsx';
-import { IconExpand } from './tab-icons.tsx';
+import { IconToCanvas } from './tab-icons.tsx';
 
 /** Kinds that MAY live inline in the chat when small (everything else → canvas). */
 const INLINE_ELIGIBLE_KINDS = new Set(['svg', 'html', 'widget', 'chart']);
@@ -199,7 +199,7 @@ export function InlineWidget({
               title="Open in canvas"
               onClick={() => onMoveToCanvas?.(artifact)}
             >
-              <IconExpand size={14} />
+              <IconToCanvas size={14} />
             </IconButton>
           </span>
         </div>

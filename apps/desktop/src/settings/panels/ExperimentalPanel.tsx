@@ -25,6 +25,7 @@ export function ExperimentalPanel() {
       <SettingSection
         title="Memory guard"
         description="Keeps this Mac responsive while Bobble works. Nothing heavy starts unless it fits beside the memory kept for you; anything running is paused the moment memory gets tight, resumes when it has come back, and is stopped if a pause is not enough."
+        experimental
       >
         <SettingRow
           label="Guard memory"
@@ -71,6 +72,7 @@ export function ExperimentalPanel() {
       <SettingSection
         title="Alternative inference engines"
         description="Engines other than the built-in llama.cpp. They can be faster for a given model or run several agents at once; they are also newer, and a wrong turn here is a chat that does not answer."
+        experimental
       >
         <EnginePanel />
       </SettingSection>
