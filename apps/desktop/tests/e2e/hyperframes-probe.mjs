@@ -127,6 +127,7 @@ async function openWindowInApp(width, height) {
       });
       win.webContents.setZoomFactor(1);
       globalThis.__hfProbeWin = win;
+      globalThis.__hfProbeSize = { width: w, height: h };
     },
     [width, height],
   );
@@ -143,11 +144,20 @@ async function openWindowInApp(width, height) {
         (_electron, s) => globalThis.__hfProbeWin.webContents.executeJavaScript(s, true),
         script,
       ),
+    // The same capture as hyperframes-window.ts: scaled to the requested size
+    // when the display's device ratio rendered it larger.
     capture: async () =>
       Buffer.from(
-        await app.evaluate(async () =>
-          (await globalThis.__hfProbeWin.webContents.capturePage()).toPNG().toString('base64'),
-        ),
+        await app.evaluate(async () => {
+          const image = await globalThis.__hfProbeWin.webContents.capturePage();
+          const { width: w, height: h } = globalThis.__hfProbeSize;
+          const size = image.getSize();
+          const out =
+            size.width > w || size.height > h
+              ? image.resize({ width: w, height: h, quality: 'best' })
+              : image;
+          return out.toPNG().toString('base64');
+        }),
         'base64',
       ),
     dispose: () =>
@@ -245,10 +255,15 @@ try {
     actl?.readUInt32BE(0) === 121 && count('fcTL') === 121,
     'the APNG does not hold 121 frames',
   );
-  // What the capture actually produced — capturePage works in device pixels, so
-  // on a Retina display a 640x352 request comes back at twice that.
+  // What the capture actually produced. capturePage works in device pixels, so
+  // on a Retina display a 640x352 request used to come back at twice that —
+  // four times the file for the same animation. The capture scales it back.
   const pixels = { w: chunks[0]?.data.readUInt32BE(0), h: chunks[0]?.data.readUInt32BE(4) };
-  say(`requested 640x352; the frames are ${pixels.w}x${pixels.h} device pixels`);
+  say(`requested 640x352; the frames are ${pixels.w}x${pixels.h}`);
+  check(
+    pixels.w === 640 && pixels.h === 352,
+    `the frames are the requested size, not the display's device pixels (${pixels.w}x${pixels.h})`,
+  );
 
   if (has('ffprobe') && has('ffmpeg')) {
     const probe = execFileSync(

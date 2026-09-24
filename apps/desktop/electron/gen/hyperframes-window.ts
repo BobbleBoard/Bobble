@@ -44,8 +44,8 @@ export async function openStillWindow(width: number, height: number): Promise<St
       backgroundThrottling: false,
     },
   });
-  // Match the drawing surface exactly, so CSS pixels are output pixels and a
-  // 1280x720 request is not silently captured at the host's device ratio.
+  // CSS pixels stay CSS pixels (no page zoom). The DEVICE ratio is another
+  // matter — see `capture`.
   win.webContents.setZoomFactor(1);
 
   return {
@@ -60,6 +60,19 @@ export async function openStillWindow(width: number, height: number): Promise<St
     },
     async capture() {
       const image = await win.webContents.capturePage();
+      /*
+       * AT THE SIZE THAT WAS ASKED FOR. An offscreen window renders at the
+       * display's device ratio, and `setZoomFactor(1)` does not change that:
+       * MEASURED on a Retina Mac, a 640x352 request came back as 1280x704
+       * frames — four times the pixels in every frame and in the joined
+       * animation, while the output reported 640x352. Scaled down here, the
+       * frame is exactly the requested size and the 2x render becomes its
+       * antialiasing rather than its file size.
+       */
+      const size = image.getSize();
+      if (size.width > width || size.height > height) {
+        return image.resize({ width, height, quality: 'best' }).toPNG();
+      }
       return image.toPNG();
     },
     async dispose() {
