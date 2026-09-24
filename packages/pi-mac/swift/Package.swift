@@ -16,7 +16,9 @@ import PackageDescription
 // linked explicitly so the executable resolves AXUIElement*/CGEvent* symbols
 // even when auto-linking is conservative. QuartzCore comes in for the `--overlay`
 // mode's CALayer tree and ImageIO for the PNG writer the overlay probe renders
-// its screenshots through.
+// its screenshots through. Vision + CoreVideo serve `--vision` (instance masks,
+// instance-at-point, OCR on image files; Vision.swift) — both live in the dyld
+// shared cache, and `--check` was measured before and after linking them.
 let package = Package(
   name: "pi-mac",
   platforms: [
@@ -33,6 +35,8 @@ let package = Package(
         .linkedFramework("CoreGraphics"),
         .linkedFramework("QuartzCore"),
         .linkedFramework("ImageIO"),
+        .linkedFramework("Vision"),
+        .linkedFramework("CoreVideo"),
       ]
     )
   ]

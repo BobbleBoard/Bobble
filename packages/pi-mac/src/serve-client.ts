@@ -42,6 +42,26 @@ export interface MacHelperClientOptions {
    * are still drained (a pipe nobody reads eventually blocks the child) but
    * dropped. */
   readonly onStderr?: (line: string) => void;
+  /**
+   * Stop the helper when a request times out, so the next request reaches a
+   * fresh one. The helper is single-threaded: a request it has not answered
+   * is still running inside it, and everything sent after it waits behind it.
+   * Off by default (the computer-use bridge keeps its index map across a slow
+   * act); the vision helper turns it on.
+   */
+  readonly restartOnTimeout?: boolean;
+}
+
+/** A request the helper did not answer in time. */
+export class MacHelperTimeoutError extends Error {
+  readonly method: string;
+  readonly timeoutMs: number;
+  constructor(method: string, timeoutMs: number) {
+    super(`pi-mac "${method}" timed out (${timeoutMs}ms)`);
+    this.name = 'MacHelperTimeoutError';
+    this.method = method;
+    this.timeoutMs = timeoutMs;
+  }
 }
 
 const DEFAULT_REQUEST_TIMEOUT = 30_000;
@@ -57,6 +77,7 @@ export class MacHelperClient {
   #nextId = 1;
   /** Called with each line the helper writes to stderr — see #ensureChild. */
   readonly #onStderr: ((line: string) => void) | undefined;
+  readonly #restartOnTimeout: boolean;
 
   constructor(opts: MacHelperClientOptions = {}) {
     this.#bin = helperPath(opts.helperPath);
@@ -64,6 +85,7 @@ export class MacHelperClient {
     this.#spawnFn = opts.spawnFn ?? defaultSpawn;
     this.#requestTimeoutMs = opts.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT;
     this.#onStderr = opts.onStderr;
+    this.#restartOnTimeout = opts.restartOnTimeout ?? false;
   }
 
   #ensureChild(): MacChildProcess {
@@ -71,7 +93,20 @@ export class MacHelperClient {
     const child = this.#spawnFn(this.#bin, this.#args);
     this.#child = child;
     this.#buffer = '';
-    child.stdout?.on('data', (chunk) => this.#onData(String(chunk)));
+    /*
+     * EVERY HANDLER ANSWERS ONLY FOR ITS OWN CHILD.
+     *
+     * After dispose() (or a crash) the next request spawns a replacement at
+     * once, while the old child is still dying. Its late 'close' used to run
+     * #onExit against the NEW child — dropping the reference (an orphan that
+     * lives as long as the app) and rejecting requests the new child was about
+     * to answer — and its last stdout bytes landed in the new child's line
+     * buffer. A child that is no longer current is ignored.
+     */
+    const current = (): boolean => this.#child === child;
+    child.stdout?.on('data', (chunk) => {
+      if (current()) this.#onData(String(chunk));
+    });
     /*
      * READ THE CHILD'S STDERR — nobody did, and it is spawned with a PIPE.
      *
@@ -90,8 +125,22 @@ export class MacHelperClient {
         if (t !== '') this.#onStderr?.(t);
       }
     });
-    child.on('error', (err) => this.#onExit(err));
-    child.on('close', () => this.#onExit(new Error('pi-mac helper exited')));
+    /*
+     * A HELPER THAT STOPPED READING. One that dies (a trap, a kill) closes its
+     * end of the pipe a moment before Node hears that it exited, and a request
+     * written in that window fails with EPIPE — which Node ALSO emits as an
+     * 'error' event on stdin. With no listener that event is an uncaught
+     * exception (in Electron main, a crash dialog). The write callback already
+     * rejects that request and 'close' tidies up after the child, so all this
+     * listener has to do is exist.
+     */
+    child.stdin?.on('error', () => undefined);
+    child.on('error', (err) => {
+      if (current()) this.#onExit(err);
+    });
+    child.on('close', () => {
+      if (current()) this.#onExit(new Error('pi-mac helper exited'));
+    });
     return child;
   }
 
@@ -171,7 +220,10 @@ export class MacHelperClient {
     return new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.#pending.delete(id);
-        reject(new Error(`pi-mac "${method}" timed out (${this.#requestTimeoutMs}ms)`));
+        reject(new MacHelperTimeoutError(method, this.#requestTimeoutMs));
+        // Only the child this request went to, and only while it is still
+        // the current one — a replacement has not seen this request at all.
+        if (this.#restartOnTimeout && this.#child === child) this.#restart(child);
       }, this.#requestTimeoutMs);
       timer.unref?.();
       this.#pending.set(id, { resolve: resolve as (v: unknown) => void, reject, timer });
@@ -192,6 +244,17 @@ export class MacHelperClient {
         reject(err instanceof Error ? err : new Error(String(err)));
       }
     });
+  }
+
+  /** Stop a wedged child; whatever was queued behind it fails with the reason. */
+  #restart(child: MacChildProcess): void {
+    this.#onExit(new Error('pi-mac helper restarted: an earlier request timed out'));
+    try {
+      child.stdin?.end();
+      child.kill('SIGTERM');
+    } catch {
+      // already gone
+    }
   }
 
   dispose(): void {
