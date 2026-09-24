@@ -16,7 +16,8 @@ import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-OFFICE = HERE.parents[1] / "office-gen" / "office.py"
+# VQ_OFFICE_GEN: judge another copy of the pipeline (before/after a change).
+OFFICE = Path(os.environ.get("VQ_OFFICE_GEN") or HERE.parents[1] / "office-gen") / "office.py"
 
 
 def free_port() -> int:

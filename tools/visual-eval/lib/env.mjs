@@ -16,7 +16,15 @@ export const REPO = path.resolve(EVAL_ROOT, '../..');
 export const PY_DIR = path.join(EVAL_ROOT, 'py');
 export const FIXTURES = path.join(EVAL_ROOT, 'fixtures');
 export const PROMPTS = path.join(EVAL_ROOT, 'prompts');
-export const OFFICE_GEN = path.join(REPO, 'tools', 'office-gen');
+/**
+ * The office pipeline under test. `VQ_OFFICE_GEN` points the eval at another
+ * copy — main's, say — so a renderer change is judged before and after with
+ * the same ruler.
+ */
+const { VQ_OFFICE_GEN } = process.env;
+export const OFFICE_GEN = VQ_OFFICE_GEN
+  ? path.resolve(VQ_OFFICE_GEN)
+  : path.join(REPO, 'tools', 'office-gen');
 
 const PY_LIBS = 'import pptx, docx, reportlab, PIL, pypdf, openpyxl';
 

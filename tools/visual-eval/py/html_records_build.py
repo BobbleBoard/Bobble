@@ -14,11 +14,12 @@ repo's own dormant emitters in tools/office-gen:
     python html_records_build.py pdf  records.json out.pdf [w_pt h_pt]
 """
 import json
+import os
 import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE.parents[1] / "office-gen"))
+sys.path.insert(0, str(os.environ.get("VQ_OFFICE_GEN") or HERE.parents[1] / "office-gen"))
 
 A = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
 

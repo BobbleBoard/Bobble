@@ -266,7 +266,7 @@ writeFileSync(path.join(OUT, 'report.json'), `${JSON.stringify(stable(report), n
 timings.total = Date.now() - t0;
 writeFileSync(
   path.join(OUT, 'run.json'),
-  `${JSON.stringify({ python, mermaid: ctx.mermaid, out: OUT, timings_ms: timings, focus }, null, 1)}\n`,
+  `${JSON.stringify({ python, office_gen: OFFICE_GEN, mermaid: ctx.mermaid, out: OUT, timings_ms: timings, focus }, null, 1)}\n`,
 );
 
 // ── console summary ─────────────────────────────────────────────────────────

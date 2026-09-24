@@ -162,6 +162,9 @@ export const CASES = [
       ];
       const r = ctx.office(['apply', a.file, '--ops', JSON.stringify(ops)]);
       a.checks = { insert_chart: r.ok ? (r.applied ?? []).length : 0, after: pid };
+      // A chart that did not go in is a broken pipeline, not a variant.
+      if (!r.ok || a.checks.insert_chart === 0)
+        a.error = `insert_chart failed: ${r.error ?? r.missed}`;
       return [a];
     },
   },

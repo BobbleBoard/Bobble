@@ -500,6 +500,14 @@ def _docx_para(p, doc_default: float, width_pt: float):
             except Exception:  # noqa: BLE001
                 rgb = None
     text = p.text
+    # An inline picture (a chart put in with office edit --chart) is as tall
+    # as its extent, whatever the text size says.
+    pic_h = 0.0
+    for ext in p._p.iter("{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}extent"):
+        try:
+            pic_h = max(pic_h, int(ext.get("cy", "0")) / 12700)
+        except ValueError:
+            pass
     # The paragraph MARK has a size too: an empty paragraph is one line of it.
     mark_size = doc_default
     rpr = p._p.pPr.find(W_NS + "rPr") if p._p.pPr is not None else None
@@ -535,7 +543,8 @@ def _docx_para(p, doc_default: float, width_pt: float):
     before = pf.space_before.pt if pf.space_before is not None else 0.0
     after = pf.space_after.pt if pf.space_after is not None else 0.0
     brk = any(br.get(W_NS + "type") == "page" for br in p._p.iter(W_NS + "br"))
-    return before + n * line_h + after, chars, small, fonts, size, rgb, bold, brk
+    body = max(n * line_h, pic_h + line_h * 0.2) if pic_h else n * line_h
+    return before + body + after, chars, small, fonts, size, rgb, bold, brk
 
 
 def measure_docx(path: Path, spec: dict | None = None) -> dict:
@@ -555,6 +564,7 @@ def measure_docx(path: Path, spec: dict | None = None) -> dict:
     used = 0.0
     pages = 1
     tables = []
+    rules = []
     contrast_fails = []
     contrast_min = None
     all_text = []
@@ -574,6 +584,17 @@ def measure_docx(path: Path, spec: dict | None = None) -> dict:
         if tag == "p":
             p = Paragraph(el, doc)
             h, ch, sm, fs, size, rgb, bold, brk = _docx_para(p, default, content_w)
+            ppr = el.find(W_NS + "pPr")
+            bdr = ppr.find(W_NS + "pBdr") if ppr is not None else None
+            bot = bdr.find(W_NS + "bottom") if bdr is not None else None
+            if bot is not None and not p.text.strip():
+                ind = ppr.find(W_NS + "ind")
+                left = (_twips(ind, "left") or 0) / 20 if ind is not None else 0.0
+                right = (_twips(ind, "right") or 0) / 20 if ind is not None else 0.0
+                pf = p.paragraph_format
+                line = pf.line_spacing.pt if pf.line_spacing is not None and not isinstance(pf.line_spacing, float) else size * 1.2
+                rules.append({"kind": "border", "height_pt": r1(line + (_twips(bot, "sz") or 0) / 8),
+                              "width_in": round((content_w - left - right) / 72, 2)})
             total += ch
             small += sm
             fonts |= fs
@@ -647,9 +668,13 @@ def measure_docx(path: Path, spec: dict | None = None) -> dict:
                 height += rh
                 place(rh)
             is_rule = len(t.rows) == 1 and ncols == 1 and not any(x.strip() for x in shaded_text)
-            tables.append({"cols": ncols, "rows": len(t.rows), "tblW": bool(has_w),
-                           "width_in": round(width / 72, 2) if width else None,
-                           "rule": is_rule, "height_pt": r1(height)})
+            if is_rule:
+                rules.append({"kind": "table", "height_pt": r1(height),
+                              "width_in": round(width / 72, 2) if width else None})
+            else:
+                tables.append({"cols": ncols, "rows": len(t.rows), "tblW": bool(has_w),
+                               "width_in": round(width / 72, 2) if width else None,
+                               "height_pt": r1(height)})
     dropped = []
     blocks = (spec or {}).get("blocks") if isinstance(spec, dict) else None
     hay = "\n".join(all_text)
@@ -679,6 +704,7 @@ def measure_docx(path: Path, spec: dict | None = None) -> dict:
         "text": {"chars": total, "small_threshold": "10pt",
                  "small_pct": r1(100.0 * small / total) if total else 0.0},
         "tables": tables,
+        "rules": rules,
         "dropped": dropped,
         "fonts": sorted(fonts),
         "palette": {"contrast_min": round(contrast_min, 2) if contrast_min is not None else None,

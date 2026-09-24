@@ -5,42 +5,38 @@
  * applies), headless, mock pi.
  *
  *   node apps/desktop/tests/e2e/office-shots.mjs <outDir> <file>[#slide-or-page] …
+ *   OFFICE_SHOTS_THEME=dark node apps/desktop/tests/e2e/office-shots.mjs …
+ *
+ * Launched through harness.mjs's launchApp: a hidden window, a throwaway HOME
+ * and the focus guard (the probe fails if anything took the screen).
+ *
+ * `#n` on a DECK clicks the slides editor's thumbnail rail, which the current
+ * editor build does not show at this width — MEASURED 2026-09-23, the click
+ * landed on slide 1 and selected a shape, so slides 4 and 5 captured as slide
+ * 1. To capture a given slide, cut the deck into one-slide files first
+ * (tools/visual-eval/py/quicklook.py split_pptx) and open each.
  */
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { _electron as electron } from 'playwright';
+import { launchApp, REPO_ROOT } from './harness.mjs';
 
-const require = createRequire(import.meta.url);
-const here = path.dirname(fileURLToPath(import.meta.url));
-const appRoot = path.resolve(here, '../..');
-const repoRoot = path.resolve(appRoot, '../..');
-
-const outDir = path.resolve(process.argv[2] ?? '/tmp/office-shots');
+const outDir = path.resolve(
+  process.argv[2] ?? path.join(process.env.SHOT_DIR ?? '.', 'office-shots'),
+);
 const targets = process.argv.slice(3).map((arg) => {
   const [file, n] = arg.split('#');
   return { file: path.resolve(file), n: n === undefined ? 1 : Number(n) };
 });
 mkdirSync(outDir, { recursive: true });
+const THEME = process.env.OFFICE_SHOTS_THEME === 'dark' ? 'dark' : 'light';
 
 const KIND_FOR_EXT = { pptx: 'slides', docx: 'docs', xlsx: 'sheets', pdf: 'pdf' };
 // Thumbnail rail pitch of the slides editor (deck-shots.mjs, measured).
 const THUMB = { x: 54, top: 67, pitch: 68 };
 
-const app = await electron.launch({
-  executablePath: require('electron'),
-  args: [appRoot, `--user-data-dir=${mkdtempSync(path.join(tmpdir(), 'pi-office-shots-'))}`],
-  env: {
-    ...process.env,
-    HOME: mkdtempSync(path.join(tmpdir(), 'pi-office-shots-home-')),
-    PI_BIN: path.join(repoRoot, 'packages/engine/tools/mock-pi/mock-pi.mjs'),
-    MOCK_PI_FIXTURE: path.join(repoRoot, 'packages/engine/tools/mock-pi/fixtures/simple-chat.json'),
-    PI_E2E: '1',
-    PI_E2E_NO_SERVER: '1',
-    PI_E2E_BACKGROUND: '1',
-  },
+const { page, check, finish } = await launchApp('office-shots', {
+  fixture: path.join(REPO_ROOT, 'packages/engine/tools/mock-pi/fixtures/simple-chat.json'),
+  env: { PI_E2E_NO_SERVER: '1' },
 });
 
 function png(dataUrl) {
@@ -49,10 +45,9 @@ function png(dataUrl) {
 }
 
 try {
-  const page = await app.firstWindow();
   await page.waitForFunction(() => typeof window.__pi_canvas === 'function', { timeout: 20000 });
   await page.waitForTimeout(3000);
-  await page.evaluate(() => window.__pi_theme?.()?.setMode?.('light'));
+  await page.evaluate((mode) => window.__pi_theme?.()?.setMode?.(mode), THEME);
   const handle = page.locator('[data-testid="canvas-rail-handle"]');
   let first = true;
   for (const t of targets) {
@@ -69,7 +64,8 @@ try {
     );
     await page.waitForTimeout(1200);
     await page.evaluate(
-      ({ tabId, filePath, kind }) => window.piDesktop.invoke('office:create', { tabId, kind, filePath }),
+      ({ tabId, filePath, kind }) =>
+        window.piDesktop.invoke('office:create', { tabId, kind, filePath }),
       { tabId, filePath: t.file, kind },
     );
     await page.waitForTimeout(first ? 7000 : 5000);
@@ -108,19 +104,22 @@ try {
     );
     const buf = png(shot?.dataUrl);
     const name = `${title.replace(/\.[a-z]+$/, '')}${t.n > 1 ? `-${t.n}` : ''}.png`;
-    if (buf) {
+    if (
+      check(buf !== null && buf.length > 5000, `${name}: no capture (${shot?.error ?? 'blank'})`)
+    ) {
       writeFileSync(path.join(outDir, name), buf);
       console.log(`${name}: ${buf.length} bytes`);
-    } else {
-      console.log(`${name}: NO CAPTURE (${shot?.error ?? 'unknown'})`);
     }
+    // The window around the editor too, in the theme asked for.
+    writeFileSync(
+      path.join(outDir, `${name.replace(/\.png$/, '')}-window-${THEME}.png`),
+      await page.screenshot(),
+    );
     await page.evaluate((tabId) => window.__pi_canvas().closeTab(tabId), tabId);
     await page.waitForTimeout(600);
   }
 } catch (err) {
-  console.error(err);
-  process.exitCode = 1;
-} finally {
-  await app.close().catch(() => undefined);
+  check(false, String(err?.stack ?? err));
 }
+await finish();
 console.log(`shots -> ${outDir}`);

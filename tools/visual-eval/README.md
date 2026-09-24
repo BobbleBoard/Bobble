@@ -7,6 +7,8 @@ in well under three minutes (about 40 s on the M5).
     pnpm vq:eval                                  # = node tools/visual-eval/eval.mjs
     node tools/visual-eval/eval.mjs --out /tmp/vq --only pitch-deck,captured
     node tools/visual-eval/eval.mjs --mermaid path/to/mermaid.min.js   # adds the diagram prototype
+    VQ_OFFICE_GEN=/path/to/other/tools/office-gen node tools/visual-eval/eval.mjs --out /tmp/before
+                                                  # judge another copy of the pipeline, same ruler
 
 ## What it needs
 

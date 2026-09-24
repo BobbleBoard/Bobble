@@ -12,6 +12,12 @@ Three techniques carry all of it:
     any photograph, which is the thing amateur decks always get wrong;
   - one element allowed to BREAK the grid — a panel bleeding off an edge, a
     numeral crossing a colour boundary.
+
+VQ-01 (2026-09-23): the type here was sized by CHARACTER COUNT and placed at
+fixed heights (`58 if len(title) < 46 …`, subtitle at 5.05 in), so a 58-char
+title wrapped to four lines and ran through its subtitle (D1). Every block is
+now measured against the real font (textfit) and the next one placed below it;
+sizes step down until the whole stack fits above the footnote.
 """
 from __future__ import annotations
 
@@ -22,14 +28,21 @@ from pptx.enum.text import PP_ALIGN
 from pptx.util import Inches, Pt
 
 import imagery
+import numparse
+import textfit
 
 W, H = Inches(13.333), Inches(7.5)
 M = Inches(0.9)
 CW = W - 2 * M
+FONT = "Helvetica Neue"
 
 
 def _hex(rgb) -> str:
     return f"#{rgb}"
+
+
+def _s(v) -> str:
+    return numparse.as_text(v)
 
 
 def _picture(sl, path: Path, x, y, w, h):
@@ -57,30 +70,58 @@ def _scrim(sl, x, y, w, h, colour, alpha_pct):
     return s
 
 
-def _tf(sl, x, y, w, h):
+def _tf(sl, x, y, w, h, *, wrap=True):
     tb = sl.shapes.add_textbox(int(x), int(y), int(w), int(h))
     f = tb.text_frame
-    f.word_wrap = True
+    f.word_wrap = wrap
     f.margin_left = f.margin_right = f.margin_top = f.margin_bottom = 0
     return f
 
 
 def _p(tf, text, size, colour, *, bold=False, first=False, line=None,
-       align=PP_ALIGN.LEFT, after=0, spacing=None, font="Helvetica Neue"):
+       align=PP_ALIGN.LEFT, after=0, spacing=None, font=FONT, italic=False):
     p = tf.paragraphs[0] if first else tf.add_paragraph()
     p.alignment = align
     p.space_after = Pt(after)
     if line:
         p.line_spacing = line
     r = p.add_run()
-    r.text = str(text)
+    r.text = _s(text)
     r.font.size = Pt(size)
     r.font.bold = bold
     r.font.name = font
     r.font.color.rgb = colour
+    if italic:
+        r.font.italic = True
     if spacing is not None:
         r.font._rPr.set("spc", str(int(spacing * 100)))
     return p
+
+
+def _measure(text, box, size, *, bold=False, font=FONT, italic=False, spacing=0.0):
+    return textfit.wrap(_s(text), box / 12700, size, bold=bold, font=font, italic=italic,
+                        tracking=spacing)
+
+
+def _height(n, size, line):
+    return Pt(textfit.height_pt(n, size, line))
+
+
+def _write(sl, lines, x, y, box, size, colour, *, bold=False, line=1.05, font=FONT,
+           italic=False, spacing=None):
+    """Measured lines, one paragraph each, reflow OFF — what was measured is
+    what renders. Returns the bottom."""
+    h = _height(len(lines), size, line) + Inches(0.04)
+    tf = _tf(sl, x, y, box, h, wrap=False)
+    for i, ln in enumerate(lines):
+        _p(tf, ln, size, colour, bold=bold, first=(i == 0), line=line, font=font,
+           italic=italic, spacing=spacing)
+    return y + h
+
+
+def _fit(text, box, sizes, max_lines, *, bold=False, font=FONT, italic=False, spacing=0.0):
+    return textfit.fit_size(_s(text), box / 12700, sizes, max_lines, bold=bold, font=font,
+                            italic=italic, tracking=spacing)
 
 
 def _ground(t, kind: str, query: str, tag: str) -> Path | None:
@@ -103,7 +144,7 @@ def _ground(t, kind: str, query: str, tag: str) -> Path | None:
 def hero_title(prs, t, s):
     """Full-bleed ground, a scrim wedge, oversized type crossing it."""
     sl = prs.slides.add_slide(prs.slide_layouts[6])
-    g = _ground(t, s.get("ground", "photo"), s.get("image_query", "abstract"), "hero")
+    g = _ground(t, _s(s.get("ground") or "photo"), _s(s.get("image_query") or "abstract"), "hero")
     if g:
         _picture(sl, g, 0, 0, W, H)
     # Wedge scrim: dense on the left where the type sits, clearing to the right
@@ -114,18 +155,49 @@ def hero_title(prs, t, s):
     s0.fill.solid(); s0.fill.fore_color.rgb = t.accent
     s0.line.fill.background(); s0.shadow.inherit = False
 
+    top = Inches(2.15)
     if s.get("eyebrow"):
-        tf0 = _tf(sl, M, Inches(1.55), CW * 0.5, Inches(0.3))
-        _p(tf0, str(s["eyebrow"]).upper(), 11, t.accent, bold=True, first=True, spacing=1.8)
-    title = str(s.get("title", ""))
-    size = 58 if len(title) < 46 else (48 if len(title) < 72 else 40)
-    tf = _tf(sl, M, Inches(2.15), W * 0.54, Inches(3.0))
-    _p(tf, title, size, t.paper, bold=True, line=1.02, first=True)
-    if s.get("subtitle"):
-        tf2 = _tf(sl, M, Inches(5.05), W * 0.46, Inches(1.0))
-        _p(tf2, s["subtitle"], 16.5, t.support, line=1.35, first=True)
+        ey = _s(s["eyebrow"]).upper()
+        size, lines = _fit(ey, CW * 0.5, [11, 10], 2, bold=True, spacing=1.8)
+        end = _write(sl, lines, M, Inches(1.55), CW * 0.5, size, t.accent, bold=True,
+                     line=1.1, spacing=1.8)
+        top = max(top, end + Inches(0.22))
+    foot = H - Inches(0.95)
+    floor = foot - Inches(0.25)
+    title = _s(s.get("title"))
+    sub = _s(s.get("subtitle"))
+    title_box, sub_box = W * 0.54, W * 0.46
+    # The largest title (then subtitle) for which the WHOLE stack sits above the
+    # footnote. The old rule sized by character count and put the subtitle at a
+    # fixed 5.05 in, under a title that had wrapped to four lines (D1).
+    choice = None
+    for tsize in (58, 52, 46, 40, 36, 32):
+        tl = _measure(title, title_box, tsize, bold=True)
+        if len(tl) > 4 or any(textfit.width_pt(x, tsize, bold=True) > title_box / 12700 for x in tl):
+            continue
+        t_end = top + _height(len(tl), tsize, 1.02)
+        if not sub:
+            if t_end <= floor:
+                choice = (tsize, tl, None, [])
+                break
+            continue
+        for ssize in (16.5, 15, 14):
+            sl_ = _measure(sub, sub_box, ssize)
+            if len(sl_) <= 3 and t_end + Inches(0.28) + _height(len(sl_), ssize, 1.35) <= floor:
+                choice = (tsize, tl, ssize, sl_)
+                break
+        if choice:
+            break
+    if choice is None:
+        tsize, tl = _fit(title, title_box, [32], 3, bold=True)
+        ssize, sl_ = (14, _fit(sub, sub_box, [14], 2)[1]) if sub else (None, [])
+        choice = (tsize, tl, ssize, sl_)
+    tsize, tl, ssize, sl_ = choice
+    end = _write(sl, tl, M, top, title_box, tsize, t.paper, bold=True, line=1.02)
+    if sub:
+        _write(sl, sl_, M, end + Inches(0.28), sub_box, ssize, t.support, line=1.35)
     if s.get("footnote"):
-        tf3 = _tf(sl, M, H - Inches(0.95), W * 0.5, Inches(0.3))
+        tf3 = _tf(sl, M, foot, W * 0.5, Inches(0.3))
         _p(tf3, s["footnote"], 10.5, t.support, first=True, spacing=0.8)
     return sl
 
@@ -140,46 +212,56 @@ def hero_split(prs, t, s):
     bg.line.fill.background(); bg.shadow.inherit = False
 
     img_w = W * 0.46
-    g = _ground(t, s.get("ground", "photo"), s.get("image_query", "texture"), "split")
+    g = _ground(t, _s(s.get("ground") or "photo"), _s(s.get("image_query") or "texture"), "split")
     if g:
         _picture(sl, g, W - img_w, 0, img_w, H)
         _scrim(sl, W - img_w, 0, img_w, H, t.deep, 42)
 
+    y = Inches(1.55)
     if s.get("kicker"):
-        tf0 = _tf(sl, M, Inches(1.05), CW * 0.45, Inches(0.3))
-        _p(tf0, str(s["kicker"]).upper(), 10.5, t.accent, bold=True, first=True, spacing=1.5)
-    title = str(s.get("title", ""))
-    tf = _tf(sl, M, Inches(1.55), W * 0.44, Inches(2.0))
-    _p(tf, title, 36 if len(title) < 44 else 30, t.ink, bold=True, line=1.06, first=True)
+        size, lines = _fit(_s(s["kicker"]).upper(), CW * 0.45, [10.5], 2, bold=True, spacing=1.5)
+        end = _write(sl, lines, M, Inches(1.05), CW * 0.45, size, t.accent, bold=True, line=1.1,
+                     spacing=1.5)
+        y = max(y, end + Inches(0.14))
+    title = _s(s.get("title"))
+    tsize, tl = _fit(title, W * 0.44, [36, 32, 28, 24], 3, bold=True)
+    t_end = _write(sl, tl, M, y, W * 0.44, tsize, t.ink, bold=True, line=1.06)
     # Body column is NARROWER than the flat half, so the breaking stat card has
     # somewhere to live. The first version ran the body to the seam and the card
     # sat straight on top of the third paragraph — a "breaking the grid" element
     # only works if the grid left room for it to break into.
     body = s.get("body")
     body_w = W * 0.34
-    body_bottom = Inches(3.5)
+    body_top = max(Inches(3.5), t_end + Inches(0.35))
+    stat = s.get("stat") if isinstance(s.get("stat"), dict) else None
+    card_h = Inches(1.85)
+    limit = (H - M - card_h - Inches(0.25)) if stat else (H - M)
+    body_bottom = body_top
     if body:
-        items = body[:4] if isinstance(body, list) else [body]
-        tf2 = _tf(sl, M, Inches(3.5), body_w, Inches(3.0))
-        for i, b in enumerate(items):
-            _p(tf2, b, 14.5, t.ink, line=1.5, after=12, first=(i == 0))
-        # Estimate where it ends so the card can clear it.
-        est_lines = sum(max(1, int(-(-len(str(b)) // 42))) for b in items)
-        body_bottom = Inches(3.5) + Inches(est_lines * 14.5 * 1.5 / 72) + Inches(len(items) * 0.17)
+        items = [_s(b) for b in (body if isinstance(body, list) else [body]) if _s(b).strip()]
+        for bsize in (14.5, 13.5, 12.5, 11.5):
+            wrapped = [_measure(b, body_w, bsize) for b in items]
+            need = sum(_height(len(w), bsize, 1.5) for w in wrapped) + Pt(12) * max(0, len(items) - 1)
+            if body_top + need <= limit:
+                break
+        cy = body_top
+        for w in wrapped:
+            cy = _write(sl, w, M, cy, body_w, bsize, t.ink, line=1.5) + Pt(12)
+        body_bottom = cy - Pt(12)
 
-    stat = s.get("stat")
     if stat:
         px = W - img_w - Inches(1.35)
-        card_y = max(H * 0.585, min(body_bottom + Inches(0.25), H - M - Inches(1.95)))
+        card_y = max(H * 0.585, min(body_bottom + Inches(0.25), H - M - card_h))
         card = sl.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, int(px),
-                                   int(card_y), int(Inches(3.9)), int(Inches(1.85)))
+                                   int(card_y), int(Inches(3.9)), int(card_h))
         card.fill.solid(); card.fill.fore_color.rgb = t.accent
         card.line.fill.background(); card.shadow.inherit = False
         card.adjustments[0] = 0.07
-        tf3 = _tf(sl, px + Inches(0.34), card_y + Inches(0.24), Inches(3.3), Inches(0.9))
-        _p(tf3, str(stat.get("value", "")), 46, t.paper, bold=True, line=0.98, first=True)
-        tf4 = _tf(sl, px + Inches(0.34), card_y + Inches(1.12), Inches(3.2), Inches(0.6))
-        _p(tf4, str(stat.get("label", "")), 12, t.paper, line=1.25, first=True)
+        vsize, vl = _fit(_s(stat.get("value", "")), Inches(3.3), [46, 40, 34, 28], 1, bold=True)
+        _write(sl, vl, px + Inches(0.34), card_y + Inches(0.24), Inches(3.3), vsize, t.paper,
+               bold=True, line=0.98)
+        lsize, ll = _fit(_s(stat.get("label", "")), Inches(3.2), [12, 11], 2)
+        _write(sl, ll, px + Inches(0.34), card_y + Inches(1.12), Inches(3.2), lsize, t.paper, line=1.25)
     return sl
 
 
@@ -189,7 +271,7 @@ def hero_statement(prs, t, s):
     sl = prs.slides.add_slide(prs.slide_layouts[6])
     # Photo by default. The statement slide is the deck's quiet moment and a
     # flat ground wastes it — the whole point is one sentence over an image.
-    g = _ground(t, s.get("ground", "photo"), s.get("image_query", "fog landscape minimal"), "stmt")
+    g = _ground(t, _s(s.get("ground") or "photo"), _s(s.get("image_query") or "fog landscape minimal"), "stmt")
     if g:
         _picture(sl, g, 0, 0, W, H)
     # 55, not 68: the earlier scrim was heavy enough that the picture read as a
@@ -199,14 +281,21 @@ def hero_statement(prs, t, s):
                               int(Inches(1.5)), int(Pt(7)))
     bar.fill.solid(); bar.fill.fore_color.rgb = t.accent
     bar.line.fill.background(); bar.shadow.inherit = False
-    text = str(s.get("statement", ""))
-    size = 42 if len(text) < 90 else (35 if len(text) < 140 else 28)
-    tf = _tf(sl, M, Inches(2.7), CW * 0.86, Inches(3.2))
+    text = _s(s.get("statement"))
+    top = Inches(2.7)
+    floor = (H - Inches(1.75)) if s.get("attribution") else (H - Inches(0.9))
+    box = CW * 0.86
     # Serif italic, borrowed from the benchmark deck: the same sentence in bold
-    # sans reads as a heading, in serif italic it reads as a statement.
-    p = _p(tf, text, size, t.paper, line=1.22, first=True, font="Georgia")
-    p.runs[0].font.italic = True
+    # sans reads as a heading, in serif italic it reads as a statement. Sized to
+    # the room above the attribution, not by character count.
+    size, lines = 25, _measure(text, box, 25, font="Georgia", italic=True)
+    for cand in (42, 38, 35, 31, 28, 25, 22):
+        lines = _measure(text, box, cand, font="Georgia", italic=True)
+        size = cand
+        if top + _height(len(lines), cand, 1.22) <= floor:
+            break
+    _write(sl, lines, M, top, box, size, t.paper, line=1.22, font="Georgia", italic=True)
     if s.get("attribution"):
         tf2 = _tf(sl, M, H - Inches(1.5), CW * 0.6, Inches(0.5))
-        _p(tf2, str(s["attribution"]), 13, t.support, first=True, spacing=0.6)
+        _p(tf2, _s(s["attribution"]), 13, t.support, first=True, spacing=0.6)
     return sl
