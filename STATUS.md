@@ -1,45 +1,34 @@
 # Bobble — status
 
-Updated: 2026-09-23 22:50 · **PAUSED** · main `8f52b2ce` · build on /Applications: `c1f7d578` (installed 17:32, packaged probe + smoke OK)
+Updated: 2026-09-23 23:50 · **PAUSED for the user's testing** · main `e376f35a` · **installed in /Applications: the candidate `candidate/2026-09-23-night` (`e55163af`)**, packaged probe + smoke OK, signed with the stable identity
 
-## Why it stopped
-All five workflows stopped at about 19:35 because **the account hit its monthly spend limit** ("raise it at claude.ai/settings/usage"). This was not a crash. Every agent after that failed with the same message. Cleanup done:
-- no leftover processes: no Electron, headless browser, model server or probe running;
-- lock slots are free;
-- 8,158 stale probe homes and profiles deleted from the temp folder (2.6 GB freed);
-- in-progress changes in 6 worktrees saved as labelled WIP commits on their own branches. Nothing unverified touched main.
+## What is in the installed candidate (built by agents; NOT independently verified — the user tests)
+main (today's computer-use/vision wave + the merged push units) plus these branches, merged cleanly:
 
-## Merged to main during the push (each built, independently verified, rebased, re-checked)
-
-| Track | Package | Commit(s) | What it does |
+| Unit | Kind | What it does | How to try it |
 |---|---|---|---|
-| 4 Cross-platform | XP-01 | `bf167e4e` | Off macOS the memory guardian read "0 bytes free", treated that as critical and unloaded the chat model at every reading. It now reads the real machine (Linux PSI/MemAvailable, Windows); the macOS path is byte-identical |
-| 9 Ming | MING-0 | `18d42c0a` | Ming-Image's engine: mlx-vlm at the Ming commit, patched and shipped as a pinned 3 MB wheel (it is not on PyPI) and wired into the worker command |
-| 11 Workflows | WF-00b | `056baf83` `210225f3` `1fb4c49f` | Measured finding: DuckDuckGo refuses Bobble's search after 2 requests, even at 5 s pacing, and the refusal lasts over 30 min. Deep research must not wait it out |
-| 5 Devices | DEV-0 · DEV-1 · DEV-2 · DEV-3 | `f299c754` `e0f65c4b` `0d2c988e` `5813e33c` `a5f4658c` `8f52b2ce` | Tailscale reading fixed for Finder launches; tailnet adapter (LocalAPI first, CLI fallback, whois, ping, live watch); providers send `models.json` headers/keys; device store, SAS pairing, hashed tokens with constant-time compare, trust policy, `safeStorage` secrets, 0600 files |
+| W0-A pre-wire scaffold | internal | Registries and contracts for every coming feature (settings sections, routes, + menu entries, thread slots, storage rows, per-feature settings groups, 9 new package skeletons, a batch of new glyphs). **Nothing on screen should move.** Byte-identical prompt; 48/50 before/after shots identical (2 = render noise) | Use the app normally: any visual change or broken setting/sidebar/composer is a regression |
+| XP-04 uv per platform | functional | The Python tool installer (uv) is now pinned and sha256-checked per OS and CPU (was: macOS arm64 tarball on every OS); Windows by OS architecture | Fresh install of a module that needs uv (Image/Audio/3D module download) still works |
+| MAC-01 pi-mac vision | functional (helper) | The computer-use helper gains `--vision`: instance masks, the instance under a point, and OCR on image files | Computer use must still work as before (permissions kept) |
+| SPK-02 Mage-Flow downloads | functional | The image-edit model downloads again: the withdrawn microsoft/* weights are rebuilt byte-for-byte from Comfy-Org + Qwen sources | 3D studio → Image editing, or `edit_image` in chat: the edit model downloads and runs |
+| VQ-00/VQ-01 office renderers | output quality | The office renderers stop corrupting ordinary input (numbers like 22M/$38k, overlaps, blank headers, table widths) and say what they drew | Ask for a deck/doc with numbers and a table |
+| VQ-02/03/11L charts + HyperFrames | output quality | Charts: each call writes its own file, `22M`/`3,100`/`$1.2M` parse, ticks carry units, size presets, sticky look; every look passes palette checks (no periwinkle); a HyperFrames title card shows the quoted words, not the prompt | Ask for charts with units; ask for a "Launch day" title animation |
+| W0-B test infrastructure | dev only | Mock model server, mock web, fake Tailscale/Hindsight, one lock scheme, bench-run.sh | — |
+| XP-01 probe | dev only | A probe for the guardian fix already on main | — |
 
-## Built but not merged (on branches, safe)
+Candidate-only fixes: the prompt snapshot now includes VQ-02's chart-tool wording (**+~0.8k chars per mode, ~200 tokens — a real TTFT/prefill check is still owed**); a stale fake-Tailscale test expectation.
 
-| Branch | State |
-|---|---|
-| `push/xp-04` | uv pinned per platform/arch with sha256 (pins spot-checked against the official release) + a zip extractor. Fixed after review; the second verification never ran |
-| `push/w0-b` | Shared mocks (OpenAI/llama-server, web, Tailscale, Hindsight), `_locks.mjs`, `bench-run.sh`, `worktree-new.sh`. Verification found 7 issues (count-based caps, locale-proof pid check, bench orphan on SIGKILL, missing net/cargo classes, untagged output dirs); the fix never ran. + WIP |
-| `push/spk-02` | Mage-Flow download source fix (the microsoft repos answer 401). Built; verification never ran |
-| `push/mac-01` · `push/vq-kit-w1` · `push/vq-office-w1` | Mid-build (2–3 commits each + WIP) |
-| `push/w0-a` | The pre-wire scaffold, mid-build (WIP: 155 new files, 29 modified). **Everything else in Wave 1 waits on this** |
-| `bench/bench-1` | Engine-capability spike scripts written (WIP); never run |
+## Design prototypes — `deliverables/gallery.html` (open it in a browser)
+10 clickable prototypes, 2 directions each, 437 screens light/dark: **Image editor (click-to-comment)**, Devices, Workflows + Deep research, Memory, Bobble help. Plus the visual exemplars (deck, report, diagrams). No automated critique — the user critiques.
+Training UI: the Bobble design brief is written (`deliverables/training-ui/bobble-design-brief.md`), the Unsloth Studio study was in progress; the 3 prototypes were not built before the pause. Resume: workflow `wf_de15cc75-557` (the script now stops before critique).
 
-## Research and design (on disk under `deliverables/`)
-- `research/` — 10 track docs + **PLAN.md** (12 lanes, waves W0–W5, file ownership, resource plan, 28 ranked questions). Committed.
-- `review/wave-0923-findings.md` — the review of today's wave: **6 confirmed bugs** (all in the vision work, 3/3 votes, unfixed) + **33 unverified candidates** (their checkers never ran). Committed.
-- `ui-design/` — Image editor (click-to-comment), Devices, Workflows/Deep research, Memory, Bobble help: **2 clickable prototypes each (10), 930 screenshots in both themes**. Critique and refinement never ran. Not committed (374 MB of PNGs).
-- `training-ui/` — 101 reference screenshots from the study phase; prototypes never started.
-- `visual-quality/exemplars/` — exemplar deck (.pptx), report (.docx) and diagrams + 450 renders; critiques and the rulebook never ran.
+## Not in the candidate (on branches, WIP)
+VQ-08 anti-fabrication (vq-office-w1 WIP), extra w0-b/wf-00b edits (WIP). Branch tips were recorded before the WIP commits.
+
+## Known issues to fix next
+`deliverables/review/wave-0923-findings.md`: 6 confirmed bugs in the vision work (worst: calibration/clicked rapid-mlx rows silently switched to the vision lane) + 33 unverified candidates.
 
 ## Blocked on the user
-- **Spend limit** — raise it to continue. Every workflow resumes from its run id (`wf_bbdc6328-a58` build, `wf_de15cc75-557` training UI, `wf_ce6de857-d55` UI designs, `wf_b2330c71-d84` review, `wf_e80131e7-ca7` exemplars). Finished agents replay from cache.
-- CI runs need your OK to push to the public GitHub repo (XP-03/04).
-- Heavy downloads/GPU jobs (PLAN.md Q1): assumed yes. None ran; BENCH-1 was starting when the limit hit.
-
-## Earlier today — computer use / vision wave: DONE
-All 13 items + follow-ups: `c1f7d578` `3ab7ec95` `c51638c7` `9d0d2e38` (memory `pi-desktop-wave-2026-09-23`).
+- Testing + feedback on the candidate and the prototypes.
+- CI runs need a push to the public GitHub repo (XP-03/04).
+- Heavy downloads / GPU jobs (PLAN.md Q1) — none ran.
