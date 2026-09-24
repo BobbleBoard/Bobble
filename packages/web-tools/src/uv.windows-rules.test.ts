@@ -284,6 +284,11 @@ describe('ensureUv reads a Windows PATH the Windows way', () => {
       pathEnv,
       host: { platform: 'win32', arch: 'x64', osArch: 'x64' },
       fs,
+      // Should the PATH lookup miss, fail here rather than install anything.
+      dir: join(workdir, 'must-not-install'),
+      fetchImpl: (async () => {
+        throw new Error('the PATH lookup missed and an install was attempted');
+      }) as typeof fetch,
     });
     expect(install).toEqual({ uvPath: want, source: 'path' });
     expect(seen).toEqual([

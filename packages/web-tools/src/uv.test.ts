@@ -2,10 +2,11 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ChecksumMismatchError } from './download.js';
+import { uvDir } from './paths.js';
 import { buildZip } from './testing/zip-builder.js';
 import { ensureUv, readUvMarker, UV_MARKER, uvInstallDir } from './uv.js';
 import { PINNED_UV } from './uv-pins.js';
@@ -48,12 +49,30 @@ const never = (() => {
   throw new Error('should not be called on the cached path');
 }) as unknown as typeof fetch;
 
+/** For a test that must be answered from PATH: a miss fails here and installs nothing. */
+const noInstall = (): { dir: string; fetchImpl: typeof fetch } => ({
+  dir: join(workdir, 'must-not-install'),
+  fetchImpl: (() => {
+    throw new Error('the PATH lookup missed and an install was attempted');
+  }) as unknown as typeof fetch,
+});
+
+describe('test isolation', () => {
+  it('never resolves the app’s real cache (vitest.config sets PI_DESKTOP_CACHE_DIR)', () => {
+    expect(process.env.PI_DESKTOP_CACHE_DIR).toBeTruthy();
+    expect(uvDir(PINNED_UV.version).startsWith(join(homedir(), '.cache', 'bobble'))).toBe(false);
+    expect(uvDir(PINNED_UV.version).startsWith(join(homedir(), '.cache', 'pi-desktop'))).toBe(
+      false,
+    );
+  });
+});
+
 describe('ensureUv PATH detection', () => {
   it('resolves an existing uv from a scanned PATH', async () => {
     const bindir = join(workdir, 'bin');
     await mkdir(bindir, { recursive: true });
     await writeFile(join(bindir, 'uv'), '#!/bin/sh\n');
-    const install = await ensureUv({ pathEnv: bindir, host: MAC });
+    const install = await ensureUv({ pathEnv: bindir, host: MAC, ...noInstall() });
     expect(install.source).toBe('path');
     expect(install.uvPath).toBe(join(bindir, 'uv'));
   });
@@ -66,7 +85,11 @@ describe('ensureUv PATH detection', () => {
     await writeFile(join(plain, 'uv'), 'not a windows binary');
     await writeFile(join(exe, 'uv.exe'), 'MZ');
     const pathEnv = [plain, `"${exe}"`].join(process.platform === 'win32' ? ';' : ':');
-    const install = await ensureUv({ pathEnv, host: { platform: 'win32', arch: 'x64' } });
+    const install = await ensureUv({
+      pathEnv,
+      host: { platform: 'win32', arch: 'x64' },
+      ...noInstall(),
+    });
     expect(install).toEqual({ uvPath: join(exe, 'uv.exe'), source: 'path' });
   });
 
@@ -74,7 +97,11 @@ describe('ensureUv PATH detection', () => {
     const bindir = join(workdir, 'bin');
     await mkdir(bindir, { recursive: true });
     await writeFile(join(bindir, 'uv'), '#!/bin/sh\n');
-    const install = await ensureUv({ pathEnv: bindir, host: { platform: 'freebsd', arch: 'x64' } });
+    const install = await ensureUv({
+      pathEnv: bindir,
+      host: { platform: 'freebsd', arch: 'x64' },
+      ...noInstall(),
+    });
     expect(install.source).toBe('path');
   });
 });
