@@ -35,7 +35,7 @@ import {
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { cacheRoot, libraryRoot } from '@pi-desktop/inference';
-import { ensureUv, PINNED_UV, uvDir } from '@pi-desktop/web-tools';
+import { ensureUv, findInstalledUv } from '@pi-desktop/web-tools';
 import type { EngineState } from '../ipc-contract';
 import {
   COMFY_H3_SHIM_DIRNAME,
@@ -183,29 +183,17 @@ function run(cmd: string, args: string[], timeoutMs = 20 * 60_000): Promise<void
 
 /** `uv` is how the venv is created and populated; without it MLX installs fail. */
 /**
- * A uv already on this Mac, by the places people put it — plus the app's own
- * pinned copy (`ensureUv`'s marker), which is what a Mac that never had Python
- * tooling gets. `null` only when there is none of either; an INSTALL then
- * fetches the pinned copy (see {@link ensureUvPath}) rather than telling the
- * user to go and install uv.
+ * A uv already on this machine, by the places people put it on its OS — on a Mac
+ * `~/.local/bin` and Homebrew (as before), on Windows `%USERPROFILE%\.local\bin\uv.exe`,
+ * Cargo, winget, Scoop and Chocolatey, on Linux the installer, Cargo, Linuxbrew
+ * and system dirs (web-tools `knownUvLocations`) — plus the app's own pinned copy
+ * (`ensureUv`'s marker, checked against this machine's build), which is what a
+ * machine that never had Python tooling gets. `null` only when there is none of
+ * either; an INSTALL then fetches the pinned copy (see {@link ensureUvPath})
+ * rather than telling the user to go and install uv.
  */
 function uvPath(): string | null {
-  for (const p of [
-    path.join(process.env.HOME ?? '', '.local/bin/uv'),
-    '/opt/homebrew/bin/uv',
-    '/usr/local/bin/uv',
-  ]) {
-    if (existsSync(p)) return p;
-  }
-  try {
-    const marker = JSON.parse(
-      readFileSync(path.join(uvDir(PINNED_UV.version), '.installed.json'), 'utf8'),
-    ) as { uvPath?: string };
-    if (typeof marker.uvPath === 'string' && existsSync(marker.uvPath)) return marker.uvPath;
-  } catch {
-    // no pinned copy yet
-  }
-  return null;
+  return findInstalledUv();
 }
 
 /** uv for an install: what is here, else the pinned copy, fetched. */

@@ -55,6 +55,9 @@ export * from './sanitizer.js';
 export * from './search.js';
 export * from './spotlight.js';
 export * from './uv.js';
+export * from './uv-locations.js';
+export * from './uv-pins.js';
+export * from './uv-platform.js';
 
 /** Stable tool names — also the identifiers W5 gates on via pi's `tool_call` event. */
 export const WEB_SEARCH_TOOL = 'web_search';
