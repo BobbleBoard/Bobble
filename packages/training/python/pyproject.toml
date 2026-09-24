@@ -1,0 +1,43 @@
+# bobble-train — the Python half of packages/training: the training worker
+# (TR-2), the shared Qwen3.5 renderer with span masks (LR-08, `render.py`, used
+# by TR-2 too) and the export helpers (TR-10). ONE uv project whose pins both the
+# TRAIN and LORA lanes use (deliverables/research/PLAN.md §2.3, W0-A).
+#
+# The pins are the MLX engine venv's measured pair (training.md §2: mlx 0.32.2,
+# mlx-lm 0.31.3, transformers 5.12.1), which is also exactly what
+# mlx-train-perf 0.8.0 accepts (mlx>=0.32,<0.33, mlx-lm>=0.31.3,<0.32,
+# transformers>=5.0,<5.13). Training never shares the engine venv — an engine
+# upgrade must not move these — so the worker runs in its own env:
+#   uv run --no-project --python 3.12 --with <these pins> python -m bobble_train.worker
+# The llama.cpp convert scripts (transformers 4.57.6 / torch 2.11) need a THIRD
+# env and are not pinned here (training.md §3.5).
+[project]
+name = "bobble-train"
+version = "0.0.0"
+description = "Bobble training worker, shared Qwen3.5 renderer and export helpers."
+requires-python = ">=3.12,<3.13"
+license = "GPL-3.0-or-later"
+dependencies = [
+  # The MLX training stack exists only on Apple Silicon.
+  "mlx==0.32.2; sys_platform == 'darwin' and platform_machine == 'arm64'",
+  "mlx-lm==0.31.3; sys_platform == 'darwin' and platform_machine == 'arm64'",
+  "mlx-train-perf==0.8.0; sys_platform == 'darwin' and platform_machine == 'arm64'",
+  # Tokenizer + chat template for the renderer's byte parity (LR-08).
+  "transformers==5.12.1",
+  "jinja2>=3.1,<4",
+  "safetensors>=0.5",
+  "huggingface-hub>=0.34",
+  "numpy>=2.0",
+]
+
+[dependency-groups]
+dev = ["pytest>=8.3"]
+
+[tool.uv]
+# A tool env, not a distributable: `uv sync` installs the dependencies and the
+# worker runs from this directory as `python -m bobble_train.worker`.
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

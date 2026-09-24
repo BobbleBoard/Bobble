@@ -1,0 +1,438 @@
+{
+ "capabilities": [
+  {
+   "name": "browser",
+   "summary": "Drive the app's own built-in browser: navigate, click, type, read a page. THE way onto the web for any site or page — not the user's own Chrome, unless they name it.",
+   "guidance": "Your PRIMARY web control. browser_navigate and browser_snapshot are always in your list; this adds the rest — click, type, scroll, read, wait, back, forward, key. Never re-navigate to a page you are already on just to look at it: snapshot it. If a tab is already open, act on THAT tab rather than opening another.",
+   "tools": [
+    "browser_navigate",
+    "browser_snapshot",
+    "browser_click",
+    "browser_type",
+    "browser_scroll",
+    "browser_read",
+    "browser_wait",
+    "browser_back",
+    "browser_forward",
+    "browser_key"
+   ]
+  },
+  {
+   "name": "computer-use",
+   "summary": "Computer use: see and control any app on the user's Mac — its windows, menu bar, and its own dialogs, sheets and file pickers. \"Use <app>\", \"open <app> and…\", \"do it in <app>\", \"click that\", \"type it in there\". Not for the web: a web page is the built-in browser's job unless the user names their own browser.",
+   "guidance": "For work inside the user's OWN applications — Notes, Finder, Photoshop, a game — and for their own browsers (Safari, Chrome, Arc) when they ask for those specifically. A web page in any of them comes back as TEXT from the ordinary snapshot — the page's own headings, prices and labels, each with the point to click it — so read a page that way first rather than reaching for a screenshot. (The chrome_* tools read the real DOM, but they need a Chrome setting that is off by default and that only the user can turn on, so they usually fail; the snapshot needs nothing.) The window AROUND the page — which tabs are open, switching between them, opening and closing one — is mac_tabs / mac_tab, and no page can tell you any of it. An app that exposes nothing to Accessibility returns a screenshot automatically; act by x,y then. A save sheet or file picker is part of the app that opened it — same snapshot, same clicks. A third of what an app can do is in its menu bar, which is in no window: mac_click takes menu:\"File > New\". It runs in the background — the app never comes to the front. Document commands (Save, Bold, Close) are the exception: macOS runs those only for the frontmost app, so pass activate:true to borrow the focus for one command. Open an app with the launch here, NEVER with `open -a` in a shell — that yanks it in front of whatever the user is doing.",
+   "tools": [
+    "mac_launch",
+    "mac_snapshot",
+    "mac_click",
+    "mac_type",
+    "mac_key",
+    "mac_scroll",
+    "chrome_snapshot",
+    "chrome_click",
+    "chrome_type",
+    "chrome_go"
+   ]
+  },
+  {
+   "name": "chrome",
+   "summary": "The user's OWN Google Chrome — its open tabs, the page in front, and their logged-in session. ONLY when they say so: \"in Chrome\", \"in my browser\", \"the tab I have open\". A web task they did not tie to Chrome is the built-in browser's.",
+   "guidance": "For work in the browser the USER already has open, with their logins and their tabs — not the app's built-in browser (that is `browser`). chrome_tabs lists what is open and chrome_tab switches between them; SWITCHING is invisible to the user, but OPENING or CLOSING a tab brings Chrome to the front and cannot be undone, so prefer switching. Read a page with a snapshot: it carries the page's own text with the point to click on each line, so a page can be read and driven without a screenshot and without any Chrome setting. Everything else about the window — profiles, settings, the toolbar — is ordinary computer use on the Chrome app.",
+   "tools": [
+    "chrome_tabs",
+    "chrome_tab",
+    "chrome_snapshot",
+    "chrome_click",
+    "chrome_type",
+    "chrome_go"
+   ]
+  },
+  {
+   "name": "personal",
+   "summary": "The user's Calendar, Mail, Reminders, Contacts and Messages.",
+   "guidance": "Call these DIRECTLY for \"what's on my calendar\", \"remind me to…\", \"email…\", \"text…\", or anything needing today's date. Never read a file to work out the date, and never drive the Calendar or Mail UI with computer use when a connector answers.",
+   "tools": [
+    "calendar_list_events",
+    "calendar_create_event",
+    "reminders_list",
+    "reminders_create",
+    "contacts_search",
+    "mail_search",
+    "mail_recent",
+    "mail_read",
+    "messages_recent",
+    "messages_send"
+   ]
+  },
+  {
+   "name": "web-research",
+   "summary": "Search the web and fetch a page as readable text.",
+   "guidance": "Search to FIND things, fetch to read one quickly. When you need to interact with a page rather than just read it, activate the browser capability instead.",
+   "tools": [
+    "web_search",
+    "web_fetch"
+   ]
+  },
+  {
+   "name": "generation",
+   "summary": "Create images, video, speech, music and sound effects on-device. Every request for a picture, a clip or a sound goes here — never draw or synthesise one in code.",
+   "guidance": "Use when the deliverable IS the media, rather than a description of it. NEVER write a script that draws a picture or synthesises a sound (Pillow, cairo, wave, ffmpeg): a drawing library makes the shapes you described, this makes the thing itself. Code is right for a CHART or a diagram, which is a rendering of data and not a picture of something. For a picture that has to be GOOD rather than merely produced, commission the image specialist with spawn_subagent instead — it works in passes and keeps the best.",
+   "tools": [
+    "generate_image",
+    "edit_image",
+    "generate_video",
+    "generate_speech",
+    "generate_music",
+    "generate_sfx"
+   ]
+  },
+  {
+   "name": "svg",
+   "summary": "Draw any icon, logo, symbol or simple flat illustration as an SVG file — a website's graphics too, and whether or not \"SVG\" was said. One call per graphic; --out puts it in the project (assets/logo.svg). Never write SVG markup yourself.",
+   "guidance": "Every graphic goes through this: icons, logos, symbols, pictograms, simple flat illustrations, and the logo and icons of a site or app you are building — whether or not anyone said \"SVG\". Draw first, then reference the file (<img src>); never write SVG markup by hand. One call per graphic; describe subject, shape and colour plainly, or hand it a reference image to trace. Photos and realistic pictures are not vectors — those are generation.",
+   "tools": [
+    "generate_svg"
+   ]
+  },
+  {
+   "name": "chart",
+   "summary": "Draw an interactive chart of numbers in the chat — bar, stacked, horizontal bar, line, area, scatter, donut, pie, radar — from the labels and values, in a second, in a look you choose; and change a chart that exists (colour, bar thickness, a second series, a new style, colours from a picture). Every request to chart, plot, graph or visualise data, and every change to a chart, goes here; never image generation, matplotlib or hand-written SVG.",
+   "guidance": "chart takes the type, the title, the labels and the values (several series as \"Name: 1, 2; Other: 3, 4\"; a unit, a highlight, a source note) and puts the chart in the chat as a card the user can hover, flip to a table, or open larger in the canvas. Put the real numbers in — it draws exactly what it is given. Give it a LOOK that fits the subject and vary between charts: clean (everyday), soft (pastel pills), bold (loud, values on), mono (one hue, rankings), editorial (serif, muted — reports), ocean, forest, sunset, candy (playful), slate (its own dark ground — dashboards), paper (cream, book-like); or set --palette/--accent/--radius/--bars/--grid/--line/--font, or --from_image a picture for its colours. chart_edit changes a chart that exists — --add \"Cost: 8, 12, 10, 14\" for a second bar per category, --set \"2023: 17\", --remove, --sort desc, --bars thin, --accent coral, --look …, --from_image — and redraws it in place. Several charts in one answer are fine — one call each. A chart goes INTO a document with office_edit: `office edit deck.pptx --chart units.svg --slide 2` (a native, editable group on the slide), `--after p3` for a .docx paragraph, `--anchor B12` for a .xlsx cell, `--page 2` for a .pdf (it lands in free space on that page, or on a new page after it). Then say in one line what the chart shows; the values are in front of the user already.",
+   "tools": [
+    "chart",
+    "chart_edit"
+   ]
+  },
+  {
+   "name": "office",
+   "summary": "Make a real slide deck (.pptx), document (.docx), workbook (.xlsx) or PDF from a brief, and edit or read existing ones. Every deck, report, memo or spreadsheet goes here — never python-pptx, python-docx, openpyxl or hand-written XML, and never `read` on an office file. (A chart on its own is the chart capability.)",
+   "guidance": "office_make takes a brief and returns a NEW file, open in the canvas, with a slide-by-slide summary (a file that exists is changed with office_edit, never re-made). Put EVERYTHING the file should say into the brief — the facts, the numbers, the names, the sections in order — because the pipeline writes only what it is given. office_edit changes wording, style, position or slide order in a file that exists, and puts a chart in it: draw it with chart first, then `office edit file --chart <svg>` with --slide N (pptx), --after <paragraph id> (docx), --anchor B12 (xlsx) or --page N (pdf; free space on that page, else a new page after it). \"Reformat to fit\" is the same call with an instruction — move/resize/shrink the shapes office_inspect names by id. office_inspect reads a file as an outline with ids. Never write these formats with a library or by assembling XML: the pipeline owns the format so the file opens and stays editable. An open document reloads in the canvas by itself after every edit.",
+   "tools": [
+    "office_make",
+    "office_edit",
+    "office_inspect"
+   ]
+  },
+  {
+   "name": "3d",
+   "summary": "Make a 3D model (.glb) from a description or a picture, and texture, split into parts, rig or retopologise one — on-device, shown in the chat as a card the user can turn. Every request for a 3D model, mesh, asset or figure goes here; never write geometry in code (trimesh, bpy, OBJ by hand).",
+   "guidance": "generate_3d takes a prompt (\"a low-poly fox sitting\"), an image_path (a picture the chat has — a generate_image result, an attachment), or both, and a finish: pbr (default, the full material), color (base colour only) or grey (the shape alone, quickest). One object on a plain ground works; a scene does not. It takes minutes — say so in one line and wait; do not poll or retry. refine_3d works on a model the chat has: texture (paint a grey one, or repaint with a prompt), segment (named parts — the card gets an Explode control), rig (a skeleton — the card gets a Skeleton control), retopo (a clean low-poly version). Each result is a NEW file beside the original. Refer to a model by the path the result names.",
+   "tools": [
+    "generate_3d",
+    "refine_3d"
+   ]
+  },
+  {
+   "name": "connectors",
+   "summary": "Anything reachable over MCP — Notion, Slack, Jira, and whatever else is installed.",
+   "guidance": "List what is connected first, read the schema of the one you want, then call it. The set depends on what this user has installed, so never assume a particular service is there.",
+   "tools": [
+    "mcp_list",
+    "mcp_schema",
+    "mcp_call"
+   ]
+  }
+ ],
+ "menu": "Capabilities you can turn on, by name:\n\n- browser — Drive the app's own built-in browser: navigate, click, type, read a page. THE way onto the web for any site or page — not the user's own Chrome, unless they name it.\n- computer-use — Computer use: see and control any app on the user's Mac — its windows, menu bar, and its own dialogs, sheets and file pickers. \"Use <app>\", \"open <app> and…\", \"do it in <app>\", \"click that\", \"type it in there\". Not for the web: a web page is the built-in browser's job unless the user names their own browser.\n- chrome — The user's OWN Google Chrome — its open tabs, the page in front, and their logged-in session. ONLY when they say so: \"in Chrome\", \"in my browser\", \"the tab I have open\". A web task they did not tie to Chrome is the built-in browser's.\n- personal — The user's Calendar, Mail, Reminders, Contacts and Messages.\n- web-research — Search the web and fetch a page as readable text.\n- generation — Create images, video, speech, music and sound effects on-device. Every request for a picture, a clip or a sound goes here — never draw or synthesise one in code.\n- svg — Draw any icon, logo, symbol or simple flat illustration as an SVG file — a website's graphics too, and whether or not \"SVG\" was said. One call per graphic; --out puts it in the project (assets/logo.svg). Never write SVG markup yourself.\n- chart — Draw an interactive chart of numbers in the chat — bar, stacked, horizontal bar, line, area, scatter, donut, pie, radar — from the labels and values, in a second, in a look you choose; and change a chart that exists (colour, bar thickness, a second series, a new style, colours from a picture). Every request to chart, plot, graph or visualise data, and every change to a chart, goes here; never image generation, matplotlib or hand-written SVG.\n- office — Make a real slide deck (.pptx), document (.docx), workbook (.xlsx) or PDF from a brief, and edit or read existing ones. Every deck, report, memo or spreadsheet goes here — never python-pptx, python-docx, openpyxl or hand-written XML, and never `read` on an office file. (A chart on its own is the chart capability.)\n- 3d — Make a 3D model (.glb) from a description or a picture, and texture, split into parts, rig or retopologise one — on-device, shown in the chat as a card the user can turn. Every request for a 3D model, mesh, asset or figure goes here; never write geometry in code (trimesh, bpy, OBJ by hand).\n- connectors — Anything reachable over MCP — Notion, Slack, Jira, and whatever else is installed.\n\nCall capability with one of these names and its tools join your list from your NEXT reply onward — not this one. Turn on only what the task needs.",
+ "activated": [
+  {
+   "name": "browser",
+   "schemas": "\"browser\" is on, and takes effect on your NEXT reply: browser_navigate, browser_snapshot, browser_click, browser_type, browser_scroll, browser_read, browser_wait, browser_back, browser_forward, browser_key.\n\nThey are NOT callable in this reply — calling one now returns \"tool not found\". Finish this reply with what you can already do, or stop and say what you are about to do with them; they will be in your tool list from your next reply onward, and stay there.\n\nYour PRIMARY web control. browser_navigate and browser_snapshot are always in your list; this adds the rest — click, type, scroll, read, wait, back, forward, key. Never re-navigate to a page you are already on just to look at it: snapshot it. If a tab is already open, act on THAT tab rather than opening another.",
+   "cli": "\"browser\" is available NOW, as `browser` — it always was, and it stays. Run `browser --help` to see what it does.\n\nNothing is pending and nothing changed: these are commands, not a tool list, so use them in THIS reply rather than stopping to announce them.\n\nYour PRIMARY web control. browser_navigate and browser_snapshot are always in your list; this adds the rest — click, type, scroll, read, wait, back, forward, key. Never re-navigate to a page you are already on just to look at it: snapshot it. If a tab is already open, act on THAT tab rather than opening another.",
+   "none": "The \"browser\" capability is not available in this build — none of its tools are installed. Say so plainly rather than pretending to use it."
+  },
+  {
+   "name": "computer-use",
+   "schemas": "\"computer-use\" is on, and takes effect on your NEXT reply: mac_launch, mac_snapshot, mac_click, mac_type, mac_key, mac_scroll, chrome_snapshot, chrome_click, chrome_type, chrome_go.\n\nThey are NOT callable in this reply — calling one now returns \"tool not found\". Finish this reply with what you can already do, or stop and say what you are about to do with them; they will be in your tool list from your next reply onward, and stay there.\n\nFor work inside the user's OWN applications — Notes, Finder, Photoshop, a game — and for their own browsers (Safari, Chrome, Arc) when they ask for those specifically. A web page in any of them comes back as TEXT from the ordinary snapshot — the page's own headings, prices and labels, each with the point to click it — so read a page that way first rather than reaching for a screenshot. (The chrome_* tools read the real DOM, but they need a Chrome setting that is off by default and that only the user can turn on, so they usually fail; the snapshot needs nothing.) The window AROUND the page — which tabs are open, switching between them, opening and closing one — is mac_tabs / mac_tab, and no page can tell you any of it. An app that exposes nothing to Accessibility returns a screenshot automatically; act by x,y then. A save sheet or file picker is part of the app that opened it — same snapshot, same clicks. A third of what an app can do is in its menu bar, which is in no window: mac_click takes menu:\"File > New\". It runs in the background — the app never comes to the front. Document commands (Save, Bold, Close) are the exception: macOS runs those only for the frontmost app, so pass activate:true to borrow the focus for one command. Open an app with the launch here, NEVER with `open -a` in a shell — that yanks it in front of whatever the user is doing.",
+   "cli": "\"computer-use\" is available NOW, as `computer-use` — it always was, and it stays. Run `computer-use --help` to see what it does.\n\nNothing is pending and nothing changed: these are commands, not a tool list, so use them in THIS reply rather than stopping to announce them.\n\nFor work inside the user's OWN applications — Notes, Finder, Photoshop, a game — and for their own browsers (Safari, Chrome, Arc) when they ask for those specifically. A web page in any of them comes back as TEXT from the ordinary snapshot — the page's own headings, prices and labels, each with the point to click it — so read a page that way first rather than reaching for a screenshot. (The chrome_* tools read the real DOM, but they need a Chrome setting that is off by default and that only the user can turn on, so they usually fail; the snapshot needs nothing.) The window AROUND the page — which tabs are open, switching between them, opening and closing one — is mac_tabs / mac_tab, and no page can tell you any of it. An app that exposes nothing to Accessibility returns a screenshot automatically; act by x,y then. A save sheet or file picker is part of the app that opened it — same snapshot, same clicks. A third of what an app can do is in its menu bar, which is in no window: mac_click takes menu:\"File > New\". It runs in the background — the app never comes to the front. Document commands (Save, Bold, Close) are the exception: macOS runs those only for the frontmost app, so pass activate:true to borrow the focus for one command. Open an app with the launch here, NEVER with `open -a` in a shell — that yanks it in front of whatever the user is doing.",
+   "none": "The \"computer-use\" capability is not available in this build — none of its tools are installed. Say so plainly rather than pretending to use it."
+  },
+  {
+   "name": "chrome",
+   "schemas": "\"chrome\" is on, and takes effect on your NEXT reply: chrome_tabs, chrome_tab, chrome_snapshot, chrome_click, chrome_type, chrome_go.\n\nThey are NOT callable in this reply — calling one now returns \"tool not found\". Finish this reply with what you can already do, or stop and say what you are about to do with them; they will be in your tool list from your next reply onward, and stay there.\n\nFor work in the browser the USER already has open, with their logins and their tabs — not the app's built-in browser (that is `browser`). chrome_tabs lists what is open and chrome_tab switches between them; SWITCHING is invisible to the user, but OPENING or CLOSING a tab brings Chrome to the front and cannot be undone, so prefer switching. Read a page with a snapshot: it carries the page's own text with the point to click on each line, so a page can be read and driven without a screenshot and without any Chrome setting. Everything else about the window — profiles, settings, the toolbar — is ordinary computer use on the Chrome app.",
+   "cli": "\"chrome\" is available NOW, as `chrome` — it always was, and it stays. Run `chrome --help` to see what it does.\n\nNothing is pending and nothing changed: these are commands, not a tool list, so use them in THIS reply rather than stopping to announce them.\n\nFor work in the browser the USER already has open, with their logins and their tabs — not the app's built-in browser (that is `browser`). chrome_tabs lists what is open and chrome_tab switches between them; SWITCHING is invisible to the user, but OPENING or CLOSING a tab brings Chrome to the front and cannot be undone, so prefer switching. Read a page with a snapshot: it carries the page's own text with the point to click on each line, so a page can be read and driven without a screenshot and without any Chrome setting. Everything else about the window — profiles, settings, the toolbar — is ordinary computer use on the Chrome app.",
+   "none": "The \"chrome\" capability is not available in this build — none of its tools are installed. Say so plainly rather than pretending to use it."
+  },
+  {
+   "name": "personal",
+   "schemas": "\"personal\" is on, and takes effect on your NEXT reply: calendar_list_events, calendar_create_event, reminders_list, reminders_create, contacts_search, mail_search, mail_recent, mail_read, messages_recent, messages_send.\n\nThey are NOT callable in this reply — calling one now returns \"tool not found\". Finish this reply with what you can already do, or stop and say what you are about to do with them; they will be in your tool list from your next reply onward, and stay there.\n\nCall these DIRECTLY for \"what's on my calendar\", \"remind me to…\", \"email…\", \"text…\", or anything needing today's date. Never read a file to work out the date, and never drive the Calendar or Mail UI with computer use when a connector answers.",
+   "cli": "\"personal\" is available NOW, as `personal` — it always was, and it stays. Run `personal --help` to see what it does.\n\nNothing is pending and nothing changed: these are commands, not a tool list, so use them in THIS reply rather than stopping to announce them.\n\nCall these DIRECTLY for \"what's on my calendar\", \"remind me to…\", \"email…\", \"text…\", or anything needing today's date. Never read a file to work out the date, and never drive the Calendar or Mail UI with computer use when a connector answers.",
+   "none": "The \"personal\" capability is not available in this build — none of its tools are installed. Say so plainly rather than pretending to use it."
+  },
+  {
+   "name": "web-research",
+   "schemas": "\"web-research\" is on, and takes effect on your NEXT reply: web_search, web_fetch.\n\nThey are NOT callable in this reply — calling one now returns \"tool not found\". Finish this reply with what you can already do, or stop and say what you are about to do with them; they will be in your tool list from your next reply onward, and stay there.\n\nSearch to FIND things, fetch to read one quickly. When you need to interact with a page rather than just read it, activate the browser capability instead.",
+   "cli": "\"web-research\" is available NOW, as `web-research` — it always was, and it stays. Run `web-research --help` to see what it does.\n\nNothing is pending and nothing changed: these are commands, not a tool list, so use them in THIS reply rather than stopping to announce them.\n\nSearch to FIND things, fetch to read one quickly. When you need to interact with a page rather than just read it, activate the browser capability instead.",
+   "none": "The \"web-research\" capability is not available in this build — none of its tools are installed. Say so plainly rather than pretending to use it."
+  },
+  {
+   "name": "generation",
+   "schemas": "\"generation\" is on, and takes effect on your NEXT reply: generate_image, edit_image, generate_video, generate_speech, generate_music, generate_sfx.\n\nThey are NOT callable in this reply — calling one now returns \"tool not found\". Finish this reply with what you can already do, or stop and say what you are about to do with them; they will be in your tool list from your next reply onward, and stay there.\n\nUse when the deliverable IS the media, rather than a description of it. NEVER write a script that draws a picture or synthesises a sound (Pillow, cairo, wave, ffmpeg): a drawing library makes the shapes you described, this makes the thing itself. Code is right for a CHART or a diagram, which is a rendering of data and not a picture of something. For a picture that has to be GOOD rather than merely produced, commission the image specialist with spawn_subagent instead — it works in passes and keeps the best.",
+   "cli": "\"generation\" is available NOW, as `generation` — it always was, and it stays. Run `generation --help` to see what it does.\n\nNothing is pending and nothing changed: these are commands, not a tool list, so use them in THIS reply rather than stopping to announce them.\n\nUse when the deliverable IS the media, rather than a description of it. NEVER write a script that draws a picture or synthesises a sound (Pillow, cairo, wave, ffmpeg): a drawing library makes the shapes you described, this makes the thing itself. Code is right for a CHART or a diagram, which is a rendering of data and not a picture of something. For a picture that has to be GOOD rather than merely produced, commission the image specialist with spawn_subagent instead — it works in passes and keeps the best.",
+   "none": "The \"generation\" capability is not available in this build — none of its tools are installed. Say so plainly rather than pretending to use it."
+  },
+  {
+   "name": "svg",
+   "schemas": "\"svg\" is on, and takes effect on your NEXT reply: generate_svg.\n\nThey are NOT callable in this reply — calling one now returns \"tool not found\". Finish this reply with what you can already do, or stop and say what you are about to do with them; they will be in your tool list from your next reply onward, and stay there.\n\nEvery graphic goes through this: icons, logos, symbols, pictograms, simple flat illustrations, and the logo and icons of a site or app you are building — whether or not anyone said \"SVG\". Draw first, then reference the file (<img src>); never write SVG markup by hand. One call per graphic; describe subject, shape and colour plainly, or hand it a reference image to trace. Photos and realistic pictures are not vectors — those are generation.",
+   "cli": "\"svg\" is available NOW, as `svg` — it always was, and it stays. Run `svg --help` to see what it does.\n\nNothing is pending and nothing changed: these are commands, not a tool list, so use them in THIS reply rather than stopping to announce them.\n\nEvery graphic goes through this: icons, logos, symbols, pictograms, simple flat illustrations, and the logo and icons of a site or app you are building — whether or not anyone said \"SVG\". Draw first, then reference the file (<img src>); never write SVG markup by hand. One call per graphic; describe subject, shape and colour plainly, or hand it a reference image to trace. Photos and realistic pictures are not vectors — those are generation.",
+   "none": "The \"svg\" capability is not available in this build — none of its tools are installed. Say so plainly rather than pretending to use it."
+  },
+  {
+   "name": "chart",
+   "schemas": "\"chart\" is on, and takes effect on your NEXT reply: chart, chart_edit.\n\nThey are NOT callable in this reply — calling one now returns \"tool not found\". Finish this reply with what you can already do, or stop and say what you are about to do with them; they will be in your tool list from your next reply onward, and stay there.\n\nchart takes the type, the title, the labels and the values (several series as \"Name: 1, 2; Other: 3, 4\"; a unit, a highlight, a source note) and puts the chart in the chat as a card the user can hover, flip to a table, or open larger in the canvas. Put the real numbers in — it draws exactly what it is given. Give it a LOOK that fits the subject and vary between charts: clean (everyday), soft (pastel pills), bold (loud, values on), mono (one hue, rankings), editorial (serif, muted — reports), ocean, forest, sunset, candy (playful), slate (its own dark ground — dashboards), paper (cream, book-like); or set --palette/--accent/--radius/--bars/--grid/--line/--font, or --from_image a picture for its colours. chart_edit changes a chart that exists — --add \"Cost: 8, 12, 10, 14\" for a second bar per category, --set \"2023: 17\", --remove, --sort desc, --bars thin, --accent coral, --look …, --from_image — and redraws it in place. Several charts in one answer are fine — one call each. A chart goes INTO a document with office_edit: `office edit deck.pptx --chart units.svg --slide 2` (a native, editable group on the slide), `--after p3` for a .docx paragraph, `--anchor B12` for a .xlsx cell, `--page 2` for a .pdf (it lands in free space on that page, or on a new page after it). Then say in one line what the chart shows; the values are in front of the user already.",
+   "cli": "\"chart\" is available NOW, as `chart` — it always was, and it stays. Run `chart --help` to see what it does.\n\nNothing is pending and nothing changed: these are commands, not a tool list, so use them in THIS reply rather than stopping to announce them.\n\nchart takes the type, the title, the labels and the values (several series as \"Name: 1, 2; Other: 3, 4\"; a unit, a highlight, a source note) and puts the chart in the chat as a card the user can hover, flip to a table, or open larger in the canvas. Put the real numbers in — it draws exactly what it is given. Give it a LOOK that fits the subject and vary between charts: clean (everyday), soft (pastel pills), bold (loud, values on), mono (one hue, rankings), editorial (serif, muted — reports), ocean, forest, sunset, candy (playful), slate (its own dark ground — dashboards), paper (cream, book-like); or set --palette/--accent/--radius/--bars/--grid/--line/--font, or --from_image a picture for its colours. chart_edit changes a chart that exists — --add \"Cost: 8, 12, 10, 14\" for a second bar per category, --set \"2023: 17\", --remove, --sort desc, --bars thin, --accent coral, --look …, --from_image — and redraws it in place. Several charts in one answer are fine — one call each. A chart goes INTO a document with office_edit: `office edit deck.pptx --chart units.svg --slide 2` (a native, editable group on the slide), `--after p3` for a .docx paragraph, `--anchor B12` for a .xlsx cell, `--page 2` for a .pdf (it lands in free space on that page, or on a new page after it). Then say in one line what the chart shows; the values are in front of the user already.",
+   "none": "The \"chart\" capability is not available in this build — none of its tools are installed. Say so plainly rather than pretending to use it."
+  },
+  {
+   "name": "office",
+   "schemas": "\"office\" is on, and takes effect on your NEXT reply: office_make, office_edit, office_inspect.\n\nThey are NOT callable in this reply — calling one now returns \"tool not found\". Finish this reply with what you can already do, or stop and say what you are about to do with them; they will be in your tool list from your next reply onward, and stay there.\n\noffice_make takes a brief and returns a NEW file, open in the canvas, with a slide-by-slide summary (a file that exists is changed with office_edit, never re-made). Put EVERYTHING the file should say into the brief — the facts, the numbers, the names, the sections in order — because the pipeline writes only what it is given. office_edit changes wording, style, position or slide order in a file that exists, and puts a chart in it: draw it with chart first, then `office edit file --chart <svg>` with --slide N (pptx), --after <paragraph id> (docx), --anchor B12 (xlsx) or --page N (pdf; free space on that page, else a new page after it). \"Reformat to fit\" is the same call with an instruction — move/resize/shrink the shapes office_inspect names by id. office_inspect reads a file as an outline with ids. Never write these formats with a library or by assembling XML: the pipeline owns the format so the file opens and stays editable. An open document reloads in the canvas by itself after every edit.",
+   "cli": "\"office\" is available NOW, as `office` — it always was, and it stays. Run `office --help` to see what it does.\n\nNothing is pending and nothing changed: these are commands, not a tool list, so use them in THIS reply rather than stopping to announce them.\n\noffice_make takes a brief and returns a NEW file, open in the canvas, with a slide-by-slide summary (a file that exists is changed with office_edit, never re-made). Put EVERYTHING the file should say into the brief — the facts, the numbers, the names, the sections in order — because the pipeline writes only what it is given. office_edit changes wording, style, position or slide order in a file that exists, and puts a chart in it: draw it with chart first, then `office edit file --chart <svg>` with --slide N (pptx), --after <paragraph id> (docx), --anchor B12 (xlsx) or --page N (pdf; free space on that page, else a new page after it). \"Reformat to fit\" is the same call with an instruction — move/resize/shrink the shapes office_inspect names by id. office_inspect reads a file as an outline with ids. Never write these formats with a library or by assembling XML: the pipeline owns the format so the file opens and stays editable. An open document reloads in the canvas by itself after every edit.",
+   "none": "The \"office\" capability is not available in this build — none of its tools are installed. Say so plainly rather than pretending to use it."
+  },
+  {
+   "name": "3d",
+   "schemas": "\"3d\" is on, and takes effect on your NEXT reply: generate_3d, refine_3d.\n\nThey are NOT callable in this reply — calling one now returns \"tool not found\". Finish this reply with what you can already do, or stop and say what you are about to do with them; they will be in your tool list from your next reply onward, and stay there.\n\ngenerate_3d takes a prompt (\"a low-poly fox sitting\"), an image_path (a picture the chat has — a generate_image result, an attachment), or both, and a finish: pbr (default, the full material), color (base colour only) or grey (the shape alone, quickest). One object on a plain ground works; a scene does not. It takes minutes — say so in one line and wait; do not poll or retry. refine_3d works on a model the chat has: texture (paint a grey one, or repaint with a prompt), segment (named parts — the card gets an Explode control), rig (a skeleton — the card gets a Skeleton control), retopo (a clean low-poly version). Each result is a NEW file beside the original. Refer to a model by the path the result names.",
+   "cli": "\"3d\" is available NOW, as `3d` — it always was, and it stays. Run `3d --help` to see what it does.\n\nNothing is pending and nothing changed: these are commands, not a tool list, so use them in THIS reply rather than stopping to announce them.\n\ngenerate_3d takes a prompt (\"a low-poly fox sitting\"), an image_path (a picture the chat has — a generate_image result, an attachment), or both, and a finish: pbr (default, the full material), color (base colour only) or grey (the shape alone, quickest). One object on a plain ground works; a scene does not. It takes minutes — say so in one line and wait; do not poll or retry. refine_3d works on a model the chat has: texture (paint a grey one, or repaint with a prompt), segment (named parts — the card gets an Explode control), rig (a skeleton — the card gets a Skeleton control), retopo (a clean low-poly version). Each result is a NEW file beside the original. Refer to a model by the path the result names.",
+   "none": "The \"3d\" capability is not available in this build — none of its tools are installed. Say so plainly rather than pretending to use it."
+  },
+  {
+   "name": "connectors",
+   "schemas": "\"connectors\" is on, and takes effect on your NEXT reply: mcp_list, mcp_schema, mcp_call.\n\nThey are NOT callable in this reply — calling one now returns \"tool not found\". Finish this reply with what you can already do, or stop and say what you are about to do with them; they will be in your tool list from your next reply onward, and stay there.\n\nList what is connected first, read the schema of the one you want, then call it. The set depends on what this user has installed, so never assume a particular service is there.",
+   "cli": "\"connectors\" is available NOW, as `connectors` — it always was, and it stays. Run `connectors --help` to see what it does.\n\nNothing is pending and nothing changed: these are commands, not a tool list, so use them in THIS reply rather than stopping to announce them.\n\nList what is connected first, read the schema of the one you want, then call it. The set depends on what this user has installed, so never assume a particular service is there.",
+   "none": "The \"connectors\" capability is not available in this build — none of its tools are installed. Say so plainly rather than pretending to use it."
+  }
+ ],
+ "byTool": {
+  "read": null,
+  "write": null,
+  "edit": null,
+  "bash": null,
+  "ls": null,
+  "find": null,
+  "grep": null,
+  "browser_navigate": "browser",
+  "browser_snapshot": "browser",
+  "browser_click": "browser",
+  "browser_type": "browser",
+  "browser_scroll": "browser",
+  "browser_read": "browser",
+  "browser_wait": "browser",
+  "browser_back": "browser",
+  "browser_forward": "browser",
+  "browser_key": "browser",
+  "mac_launch": "computer-use",
+  "mac_snapshot": "computer-use",
+  "mac_click": "computer-use",
+  "mac_type": "computer-use",
+  "mac_key": "computer-use",
+  "mac_scroll": "computer-use",
+  "chrome_snapshot": "computer-use",
+  "chrome_click": "computer-use",
+  "chrome_type": "computer-use",
+  "chrome_go": "computer-use",
+  "chrome_tabs": "chrome",
+  "chrome_tab": "chrome",
+  "calendar_list_events": "personal",
+  "calendar_create_event": "personal",
+  "reminders_list": "personal",
+  "reminders_create": "personal",
+  "contacts_search": "personal",
+  "mail_search": "personal",
+  "mail_recent": "personal",
+  "mail_read": "personal",
+  "messages_recent": "personal",
+  "messages_send": "personal",
+  "web_search": "web-research",
+  "web_fetch": "web-research",
+  "generate_image": "generation",
+  "edit_image": "generation",
+  "generate_video": "generation",
+  "generate_speech": "generation",
+  "generate_music": "generation",
+  "generate_sfx": "generation",
+  "generate_svg": "svg",
+  "chart": "chart",
+  "chart_edit": "chart",
+  "office_make": "office",
+  "office_edit": "office",
+  "office_inspect": "office",
+  "generate_3d": "3d",
+  "refine_3d": "3d",
+  "mcp_list": "connectors",
+  "mcp_schema": "connectors",
+  "mcp_call": "connectors"
+ },
+ "lookups": {
+  "computer use": "computer-use",
+  "computer_use": "computer-use",
+  "mail": null,
+  "web": "web-research",
+  "3D": "3d",
+  "Chrome": "chrome",
+  "nothing-like-it": null
+ },
+ "cliGroups": [
+  {
+   "name": "browser",
+   "summary": "Drive the app's own built-in browser: navigate, click, type, read a page. THE way onto the web for any site or page — not the user's own Chrome, unless they name it.",
+   "guidance": "Your PRIMARY web control. browser_navigate and browser_snapshot are always in your list; this adds the rest — click, type, scroll, read, wait, back, forward, key. Never re-navigate to a page you are already on just to look at it: snapshot it. If a tab is already open, act on THAT tab rather than opening another.",
+   "tools": [
+    "browser_navigate",
+    "browser_snapshot",
+    "browser_click",
+    "browser_type",
+    "browser_scroll",
+    "browser_read",
+    "browser_wait",
+    "browser_back",
+    "browser_forward",
+    "browser_key"
+   ]
+  },
+  {
+   "name": "computer-use",
+   "summary": "Computer use: see and control any app on the user's Mac — its windows, menu bar, and its own dialogs, sheets and file pickers. \"Use <app>\", \"open <app> and…\", \"do it in <app>\", \"click that\", \"type it in there\". Not for the web: a web page is the built-in browser's job unless the user names their own browser.",
+   "guidance": "For work inside the user's OWN applications — Notes, Finder, Photoshop, a game — and for their own browsers (Safari, Chrome, Arc) when they ask for those specifically. A web page in any of them comes back as TEXT from the ordinary snapshot — the page's own headings, prices and labels, each with the point to click it — so read a page that way first rather than reaching for a screenshot. (The chrome_* tools read the real DOM, but they need a Chrome setting that is off by default and that only the user can turn on, so they usually fail; the snapshot needs nothing.) The window AROUND the page — which tabs are open, switching between them, opening and closing one — is mac_tabs / mac_tab, and no page can tell you any of it. An app that exposes nothing to Accessibility returns a screenshot automatically; act by x,y then. A save sheet or file picker is part of the app that opened it — same snapshot, same clicks. A third of what an app can do is in its menu bar, which is in no window: mac_click takes menu:\"File > New\". It runs in the background — the app never comes to the front. Document commands (Save, Bold, Close) are the exception: macOS runs those only for the frontmost app, so pass activate:true to borrow the focus for one command. Open an app with the launch here, NEVER with `open -a` in a shell — that yanks it in front of whatever the user is doing.",
+   "tools": [
+    "mac_launch",
+    "mac_snapshot",
+    "mac_click",
+    "mac_type",
+    "mac_key",
+    "mac_scroll",
+    "chrome_snapshot",
+    "chrome_click",
+    "chrome_type",
+    "chrome_go"
+   ]
+  },
+  {
+   "name": "chrome",
+   "summary": "The user's OWN Google Chrome — its open tabs, the page in front, and their logged-in session. ONLY when they say so: \"in Chrome\", \"in my browser\", \"the tab I have open\". A web task they did not tie to Chrome is the built-in browser's.",
+   "guidance": "For work in the browser the USER already has open, with their logins and their tabs — not the app's built-in browser (that is `browser`). chrome_tabs lists what is open and chrome_tab switches between them; SWITCHING is invisible to the user, but OPENING or CLOSING a tab brings Chrome to the front and cannot be undone, so prefer switching. Read a page with a snapshot: it carries the page's own text with the point to click on each line, so a page can be read and driven without a screenshot and without any Chrome setting. Everything else about the window — profiles, settings, the toolbar — is ordinary computer use on the Chrome app.",
+   "tools": [
+    "chrome_tabs",
+    "chrome_tab",
+    "chrome_snapshot",
+    "chrome_click",
+    "chrome_type",
+    "chrome_go"
+   ]
+  },
+  {
+   "name": "personal",
+   "summary": "The user's Calendar, Mail, Reminders, Contacts and Messages.",
+   "guidance": "Call these DIRECTLY for \"what's on my calendar\", \"remind me to…\", \"email…\", \"text…\", or anything needing today's date. Never read a file to work out the date, and never drive the Calendar or Mail UI with computer use when a connector answers.",
+   "tools": [
+    "calendar_list_events",
+    "calendar_create_event",
+    "reminders_list",
+    "reminders_create",
+    "contacts_search",
+    "mail_search",
+    "mail_recent",
+    "mail_read",
+    "messages_recent",
+    "messages_send"
+   ]
+  },
+  {
+   "name": "web-research",
+   "summary": "Search the web and fetch a page as readable text.",
+   "guidance": "Search to FIND things, fetch to read one quickly. When you need to interact with a page rather than just read it, activate the browser capability instead.",
+   "tools": [
+    "web_search",
+    "web_fetch"
+   ]
+  },
+  {
+   "name": "generation",
+   "summary": "Create images, video, speech, music and sound effects on-device. Every request for a picture, a clip or a sound goes here — never draw or synthesise one in code.",
+   "guidance": "Use when the deliverable IS the media, rather than a description of it. NEVER write a script that draws a picture or synthesises a sound (Pillow, cairo, wave, ffmpeg): a drawing library makes the shapes you described, this makes the thing itself. Code is right for a CHART or a diagram, which is a rendering of data and not a picture of something. For a picture that has to be GOOD rather than merely produced, commission the image specialist with spawn_subagent instead — it works in passes and keeps the best.",
+   "tools": [
+    "generate_image",
+    "edit_image",
+    "generate_video",
+    "generate_speech",
+    "generate_music",
+    "generate_sfx"
+   ]
+  },
+  {
+   "name": "svg",
+   "summary": "Draw any icon, logo, symbol or simple flat illustration as an SVG file — a website's graphics too, and whether or not \"SVG\" was said. One call per graphic; --out puts it in the project (assets/logo.svg). Never write SVG markup yourself.",
+   "guidance": "Every graphic goes through this: icons, logos, symbols, pictograms, simple flat illustrations, and the logo and icons of a site or app you are building — whether or not anyone said \"SVG\". Draw first, then reference the file (<img src>); never write SVG markup by hand. One call per graphic; describe subject, shape and colour plainly, or hand it a reference image to trace. Photos and realistic pictures are not vectors — those are generation.",
+   "tools": [
+    "generate_svg"
+   ]
+  },
+  {
+   "name": "chart",
+   "summary": "Draw an interactive chart of numbers in the chat — bar, stacked, horizontal bar, line, area, scatter, donut, pie, radar — from the labels and values, in a second, in a look you choose; and change a chart that exists (colour, bar thickness, a second series, a new style, colours from a picture). Every request to chart, plot, graph or visualise data, and every change to a chart, goes here; never image generation, matplotlib or hand-written SVG.",
+   "guidance": "chart takes the type, the title, the labels and the values (several series as \"Name: 1, 2; Other: 3, 4\"; a unit, a highlight, a source note) and puts the chart in the chat as a card the user can hover, flip to a table, or open larger in the canvas. Put the real numbers in — it draws exactly what it is given. Give it a LOOK that fits the subject and vary between charts: clean (everyday), soft (pastel pills), bold (loud, values on), mono (one hue, rankings), editorial (serif, muted — reports), ocean, forest, sunset, candy (playful), slate (its own dark ground — dashboards), paper (cream, book-like); or set --palette/--accent/--radius/--bars/--grid/--line/--font, or --from_image a picture for its colours. chart_edit changes a chart that exists — --add \"Cost: 8, 12, 10, 14\" for a second bar per category, --set \"2023: 17\", --remove, --sort desc, --bars thin, --accent coral, --look …, --from_image — and redraws it in place. Several charts in one answer are fine — one call each. A chart goes INTO a document with office_edit: `office edit deck.pptx --chart units.svg --slide 2` (a native, editable group on the slide), `--after p3` for a .docx paragraph, `--anchor B12` for a .xlsx cell, `--page 2` for a .pdf (it lands in free space on that page, or on a new page after it). Then say in one line what the chart shows; the values are in front of the user already.",
+   "tools": [
+    "chart",
+    "chart_edit"
+   ]
+  },
+  {
+   "name": "office",
+   "summary": "Make a real slide deck (.pptx), document (.docx), workbook (.xlsx) or PDF from a brief, and edit or read existing ones. Every deck, report, memo or spreadsheet goes here — never python-pptx, python-docx, openpyxl or hand-written XML, and never `read` on an office file. (A chart on its own is the chart capability.)",
+   "guidance": "office_make takes a brief and returns a NEW file, open in the canvas, with a slide-by-slide summary (a file that exists is changed with office_edit, never re-made). Put EVERYTHING the file should say into the brief — the facts, the numbers, the names, the sections in order — because the pipeline writes only what it is given. office_edit changes wording, style, position or slide order in a file that exists, and puts a chart in it: draw it with chart first, then `office edit file --chart <svg>` with --slide N (pptx), --after <paragraph id> (docx), --anchor B12 (xlsx) or --page N (pdf; free space on that page, else a new page after it). \"Reformat to fit\" is the same call with an instruction — move/resize/shrink the shapes office_inspect names by id. office_inspect reads a file as an outline with ids. Never write these formats with a library or by assembling XML: the pipeline owns the format so the file opens and stays editable. An open document reloads in the canvas by itself after every edit.",
+   "tools": [
+    "office_make",
+    "office_edit",
+    "office_inspect"
+   ]
+  },
+  {
+   "name": "3d",
+   "summary": "Make a 3D model (.glb) from a description or a picture, and texture, split into parts, rig or retopologise one — on-device, shown in the chat as a card the user can turn. Every request for a 3D model, mesh, asset or figure goes here; never write geometry in code (trimesh, bpy, OBJ by hand).",
+   "guidance": "generate_3d takes a prompt (\"a low-poly fox sitting\"), an image_path (a picture the chat has — a generate_image result, an attachment), or both, and a finish: pbr (default, the full material), color (base colour only) or grey (the shape alone, quickest). One object on a plain ground works; a scene does not. It takes minutes — say so in one line and wait; do not poll or retry. refine_3d works on a model the chat has: texture (paint a grey one, or repaint with a prompt), segment (named parts — the card gets an Explode control), rig (a skeleton — the card gets a Skeleton control), retopo (a clean low-poly version). Each result is a NEW file beside the original. Refer to a model by the path the result names.",
+   "tools": [
+    "generate_3d",
+    "refine_3d"
+   ]
+  },
+  {
+   "name": "connectors",
+   "summary": "Anything reachable over MCP — Notion, Slack, Jira, and whatever else is installed.",
+   "guidance": "List what is connected first, read the schema of the one you want, then call it. The set depends on what this user has installed, so never assume a particular service is there.",
+   "tools": [
+    "mcp_list",
+    "mcp_schema",
+    "mcp_call"
+   ]
+  },
+  {
+   "name": "coordinate",
+   "summary": "Ask the user something, publish your plan, hand work to a subagent, or contract large tasks that are not feasible to complete on your own.",
+   "tools": [
+    "ask_user",
+    "update_plan",
+    "spawn_subagent",
+    "talk_to_manager",
+    "present",
+    "create_scheduled_task"
+   ]
+  },
+  {
+   "name": "machine",
+   "summary": "Run Python on this Mac, and search everything on it by name or contents.",
+   "tools": [
+    "python_run",
+    "spotlight_search"
+   ]
+  },
+  {
+   "name": "file",
+   "summary": "Read, write, edit and list files — the safe path, and the one that repairs itself.",
+   "tools": [
+    "read",
+    "write",
+    "edit",
+    "ls"
+   ]
+  }
+ ]
+}

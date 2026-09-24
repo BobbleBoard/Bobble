@@ -40,6 +40,7 @@ describe('clampSettings', () => {
       video: DEFAULT_SETTINGS.capabilities.video,
       audio: DEFAULT_SETTINGS.capabilities.audio,
       threeD: DEFAULT_SETTINGS.capabilities.threeD,
+      training: DEFAULT_SETTINGS.capabilities.training,
     });
   });
 
@@ -255,7 +256,15 @@ describe('seedFromOnboarding', () => {
     const s = seedFromOnboarding(choices, null);
     expect(s.theme).toEqual({ flavor: 'codex', mode: 'light' });
     expect(s.permissionMode).toBe('review-all');
-    expect(s.capabilities).toEqual({ image: true, video: false, audio: false, threeD: true });
+    // Onboarding never asks about training (the pre-wire added the key), so it
+    // arrives at its default: off.
+    expect(s.capabilities).toEqual({
+      image: true,
+      video: false,
+      audio: false,
+      threeD: true,
+      training: false,
+    });
     expect(s.mcpMode).toBe('lite'); // no registry → default
   });
 

@@ -9,6 +9,7 @@
  * of an app-created window may reach them.
  */
 import { REASONING_BUDGET_MESSAGE } from '@pi-desktop/inference/reasoning-budget';
+import type { FeatureSettings, FeatureSettingsPatch } from './features';
 
 export type ThemeFlavor = 'claude' | 'codex' | 'bobble';
 /** Settings-level mode adds `system` (resolved to light/dark via the OS pref at
@@ -159,6 +160,12 @@ export interface GenerationCapabilities {
   video: boolean;
   audio: boolean;
   threeD: boolean;
+  /**
+   * On-device training (the Training row and view). OFF by default, and with no
+   * toggle yet: TR-5 adds the fifth row to the Capabilities panel when the view
+   * ships. Added by the W0-A pre-wire so the key exists before its lane forks.
+   */
+  training: boolean;
 }
 
 /**
@@ -314,7 +321,12 @@ export interface CodeThemeChoice {
   dark: string;
 }
 
-export interface DesktopSettings {
+/**
+ * The feature groups (`memory`, `training`, `devices`, `design`, `workflows`,
+ * `editor`) come from ./features — one file per group, so a lane adds its keys
+ * there and never here (deliverables/research/PLAN.md R6).
+ */
+export interface DesktopSettings extends FeatureSettings {
   version: 1;
   theme: { flavor: ThemeFlavor; mode: ThemeModePref };
   /** Code appearance (Settings → Appearance): the code theme per mode. */
@@ -508,8 +520,9 @@ export interface DesktopSettings {
 }
 
 /** A partial patch merged over the current document (one level deep on the
- * nested `theme` / `search` / `capabilities` objects). */
-export interface DesktopSettingsPatch {
+ * nested `theme` / `search` / `capabilities` objects and on every feature
+ * group from ./features). */
+export interface DesktopSettingsPatch extends FeatureSettingsPatch {
   theme?: Partial<DesktopSettings['theme']>;
   /** One slot or both; the other keeps its current theme. */
   codeTheme?: Partial<CodeThemeChoice>;

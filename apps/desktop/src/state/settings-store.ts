@@ -10,6 +10,7 @@
  */
 import { DEFAULT_CODE_THEME_IDS } from '@pi-desktop/code-themes';
 import { create } from 'zustand';
+import { DEFAULT_FEATURE_SETTINGS, mergeFeatureSettings } from '../../electron/settings/features';
 import {
   type AdvancedSettings,
   DEFAULT_ADVANCED,
@@ -60,8 +61,11 @@ const DEFAULTS: DesktopSettings = {
    * old false, because the old value was never read: keeping it would take the
    * four studios away from everyone who has not been through onboarding, which
    * is a very loud way to fix a silent bug.
+   *
+   * `training` is the exception — off, like its default in settings-logic,
+   * until the Training view ships and someone turns it on.
    */
-  capabilities: { image: true, video: true, audio: true, threeD: true },
+  capabilities: { image: true, video: true, audio: true, threeD: true, training: false },
   customInstructions: '',
   iconStroke: ICON_STROKE_DEFAULT,
   iconScale: 1.0,
@@ -86,6 +90,9 @@ const DEFAULTS: DesktopSettings = {
   moduleConnectors: {},
   harnessId: 'pi-bundled',
   harnessConfigPath: '',
+  // The feature groups (memory, training, devices, design, workflows, editor),
+  // all off — the same composition main uses (electron/settings/features).
+  ...DEFAULT_FEATURE_SETTINGS,
 };
 
 function prefersDark(): boolean {
@@ -179,6 +186,8 @@ export const useSettingsStore = create<SettingsStoreState>((set, get) => ({
         ),
       ),
       modelSpec: { ...get().settings.modelSpec, ...patch.modelSpec },
+      // Each feature group one level deep, exactly as main merges it.
+      ...mergeFeatureSettings(get().settings, patch),
       ...(patch.modelsRoot === undefined ? {} : { modelsRoot: patch.modelsRoot }),
     };
     set({ settings: optimistic });

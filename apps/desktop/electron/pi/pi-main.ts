@@ -50,11 +50,13 @@ import { isTrustedIpcEvent } from '../trusted-senders';
 import { type ChildAgents, createChildAgents } from './child-agents';
 import type { PiInvokeMap } from './contract';
 import { extensionPackageDirs, toolExtensionPackageDirs } from './extension-dirs';
+import { piEnvContributions } from './pi-env';
 import { createPiSessions, type PiSessionHandlers } from './pi-sessions';
 import { registerPrefillIpc } from './prefill-main';
 import { registerPresentBridge } from './present-bridge';
 import { installPiQuitHold } from './quit-hold';
 import { registerResumeIpc } from './resume-main';
+import { type ScopedPiBridgeOptions, scopedPiBridgeOptions } from './scoped-bridge';
 import { registerSubagentBridge } from './subagent-bridge';
 
 /**
@@ -151,6 +153,10 @@ const KILL_GRACE_MS = 1500;
  * unset and the harness degrades to its heuristic fallback (never a hardcoded
  * URL). Dynamic gap: a server that starts WITHOUT a subsequent pi respawn won't
  * re-point the already-running child until the next spawn.
+ *
+ * A FEATURE'S OWN KEYS come from `registerPiEnvContributor` (./pi-env.ts), not
+ * from edits here: they land after the inherited environment and before the
+ * app's own keys below, so a contributor can never change one of those.
  */
 function buildPiEnv(cwd: string | undefined): Record<string, string | undefined> {
   const utility = getInferenceUtility();
@@ -159,6 +165,9 @@ function buildPiEnv(cwd: string | undefined): Record<string, string | undefined>
   const vision = getInferenceVisionReady() ? '1' : '0';
   return {
     ...process.env,
+    ...piEnvContributions({ cwd }, (error) =>
+      log.warn('pi env contributor failed', { error: String(error) }),
+    ),
     // File-spill containment (blind-test round-2 #2): turn ON the harness's
     // sandbox-fenced write/edit/read/ls override (packages/harness sandbox-fs.ts)
     // for every desktop-spawned pi, and hand it the resolved sandbox/project cwd
@@ -306,14 +315,14 @@ const sessions = createPiSessions<WebContents>({
 });
 
 /**
- * Build an app-owned CHILD pi instance (a subagent / role as its own first-class
- * `pi --mode rpc`, driven by the app exactly like the main chat). Same base
- * config as the main bridge, but a fresh `--no-session` and a bumped subagent
- * depth so the child's own harness won't register spawn_subagent — no runaway
- * recursion of children spawning children.
+ * A pi the app owns beside the chat — sessionless, our extensions only, its own
+ * process group — with `opts.env` on top of the chat's environment. The one
+ * constructor behind a subagent (`createChildBridge`), a scheduled run
+ * (`createScheduledRunBridge`) and the scoped Bobble help pi (BH-6), which
+ * passes its own `extensionPaths`. See ./scoped-bridge.ts for the shared base.
  */
-function createChildBridge(
-  opts: { cwd?: string; specialist?: string; agentId?: string },
+export function createScopedPiBridge(
+  opts: ScopedPiBridgeOptions & { cwd?: string },
   onEvent: (event: PiBridgeEvent) => void,
 ): PiBridge {
   /*
@@ -326,10 +335,35 @@ function createChildBridge(
     cwd: opts.cwd ?? currentWorkspaceDir() ?? activeProjectPath() ?? undefined,
   });
   return new PiBridge(
+    scopedPiBridgeOptions(
+      {
+        cwd,
+        env: buildPiEnv(cwd),
+        extensionPaths: EXTENSION_PATHS,
+        killGraceMs: KILL_GRACE_MS,
+        appRoot: app.getAppPath(),
+      },
+      opts,
+    ),
+    onEvent,
+  );
+}
+
+/**
+ * Build an app-owned CHILD pi instance (a subagent / role as its own first-class
+ * `pi --mode rpc`, driven by the app exactly like the main chat). Same base
+ * config as the main bridge, but a fresh `--no-session` and a bumped subagent
+ * depth so the child's own harness won't register spawn_subagent — no runaway
+ * recursion of children spawning children.
+ */
+function createChildBridge(
+  opts: { cwd?: string; specialist?: string; agentId?: string },
+  onEvent: (event: PiBridgeEvent) => void,
+): PiBridge {
+  return createScopedPiBridge(
     {
-      cwd,
+      cwd: opts.cwd,
       env: {
-        ...buildPiEnv(cwd),
         // Matches SUBAGENT_DEPTH_ENV (packages/harness subagent/types.ts): a child
         // at depth >= 1 does NOT register the spawn tool.
         PI_DESKTOP_SUBAGENT_DEPTH: '1',
@@ -359,12 +393,6 @@ function createChildBridge(
          */
         PI_DESKTOP_TOOL_CLI: readSettings().specialistToolInterface === 'bash-cli' ? '1' : '0',
       },
-      noSession: true,
-      extensionPaths: EXTENSION_PATHS,
-      extraArgs: ['--no-extensions', '--no-skills'],
-      killGraceMs: KILL_GRACE_MS,
-      detached: true,
-      appRoot: app.getAppPath(),
     },
     onEvent,
   );
@@ -397,12 +425,9 @@ export function createScheduledRunBridge(
   opts: { cwd?: string },
   onEvent: (event: PiBridgeEvent) => void,
 ): PiBridge {
-  const cwd = resolveSessionCwd({
-    cwd: opts.cwd ?? currentWorkspaceDir() ?? activeProjectPath() ?? undefined,
-  });
-  return new PiBridge(
+  return createScopedPiBridge(
     {
-      cwd,
+      cwd: opts.cwd,
       /*
        * NOTHING GOES OUT FROM AN UNATTENDED RUN.
        *
@@ -413,16 +438,7 @@ export function createScheduledRunBridge(
        * at `tool_call`, the one place every dispatch path passes through — an
        * advertised call, `use`, or a bash-CLI command.
        */
-      env: {
-        ...buildPiEnv(cwd),
-        [FORBID_TOOLS_ENV]: SCHEDULED_FORBIDDEN_TOOLS.join(','),
-      },
-      noSession: true,
-      extensionPaths: EXTENSION_PATHS,
-      extraArgs: ['--no-extensions', '--no-skills'],
-      killGraceMs: KILL_GRACE_MS,
-      detached: true,
-      appRoot: app.getAppPath(),
+      env: { [FORBID_TOOLS_ENV]: SCHEDULED_FORBIDDEN_TOOLS.join(',') },
     },
     onEvent,
   );

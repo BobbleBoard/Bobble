@@ -51,6 +51,7 @@ import type {
   StorageNode,
   StorageOverview,
 } from './storage-contract';
+import { featureStorageRoots, featureStorageRows, supportNoteFor } from './storage-rows';
 
 const log = createLogger('desktop:storage');
 
@@ -593,12 +594,14 @@ async function supportTree(): Promise<StorageNode[]> {
   for (const n of names) {
     const p = path.join(root, n);
     const { bytes, files, mtime } = await sizeOf(p);
+    // A feature's own folder carries the note it registered (storage-rows.ts).
+    const note = SUPPORT_NOTES[n] ?? supportNoteFor(n);
     out.push({
       name: n,
       path: p,
       bytes,
       kind: 'tool',
-      ...(SUPPORT_NOTES[n] === undefined ? {} : { note: SUPPORT_NOTES[n] }),
+      ...(note === undefined ? {} : { note }),
       fileCount: files,
       mtime,
     });
@@ -612,7 +615,13 @@ let cached: { at: number; overview: StorageOverview } | null = null;
 async function overview(fresh: boolean): Promise<StorageOverview> {
   if (!fresh && cached !== null && Date.now() - cached.at < 30_000) return cached.overview;
   const t0 = Date.now();
-  const [library, support] = await Promise.all([libraryTree(), supportTree()]);
+  const [library, support, features] = await Promise.all([
+    libraryTree(),
+    supportTree(),
+    featureStorageRows((id, error) =>
+      log.warn('storage rows failed', { provider: id, error: String(error) }),
+    ),
+  ]);
   const { free, total } = await diskSpace();
   const disk = { free, total };
   const out: StorageOverview = {
@@ -622,6 +631,7 @@ async function overview(fresh: boolean): Promise<StorageOverview> {
     disk,
     library,
     support,
+    features,
     migration:
       lastMigration === null
         ? null
@@ -639,9 +649,10 @@ async function overview(fresh: boolean): Promise<StorageOverview> {
   return out;
 }
 
-/** Only the library and the support root are ours to touch. */
+/** Only the library, the support root and the folders a feature registered
+ * (storage-rows.ts) are ours to touch. */
 function underOurRoots(p: string): boolean {
-  const roots = [libraryRoot(), cacheRoot()].map((r) => {
+  const roots = [libraryRoot(), cacheRoot(), ...featureStorageRoots()].map((r) => {
     try {
       return realpathSync(r);
     } catch {

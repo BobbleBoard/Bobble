@@ -24,7 +24,12 @@ import type { IpcMain } from 'electron';
 import type { OnboardingChoices } from '../import/import-contract';
 import { macOverlay } from '../mac/overlay-controller';
 import type { DesktopSettings, McpMode, SettingsInvokeMap } from './settings-contract';
-import { clampSettings, mergeSettingsPatch, seedFromOnboarding } from './settings-logic';
+import {
+  clampSettings,
+  mergeSettingsPatch,
+  seedFromOnboarding,
+  settingsChangedAt,
+} from './settings-logic';
 
 const log = createLogger('desktop:settings');
 
@@ -257,15 +262,61 @@ export function generationExperimentEnabled(): boolean {
 }
 
 /**
+ * SIDE EFFECTS SUBSCRIBE; THEY ARE NOT WIRED IN HERE.
+ *
+ * The three reactions above this line (power, engine launch, the pill) were
+ * each a callback threaded through `registerSettingsIpc`, which is fine for
+ * three and a merge conflict for the push's six features (memory starts its
+ * service, devices its gateway, training re-reads its power policy…). A
+ * feature subscribes to the part of the document it cares about instead,
+ * from its own file (deliverables/research/PLAN.md R6):
+ *
+ *   subscribeSettings('memory.enabled', (next, before) => …)
+ *
+ * `prefix` is a dotted path (`memory`, `memory.enabled`,
+ * `capabilities.training`); `''` hears every change. A listener runs after the
+ * document is written, only when the value at its path actually changed, and
+ * for EVERY write — the renderer's `settings:set` and main's own
+ * `writeSettingsPatch` alike, because a reaction that holds only for one of
+ * the two is a reaction that drifts. A listener that throws is logged and
+ * does not stop the others or the write. Returns the unsubscribe.
+ */
+export type SettingsListener = (next: DesktopSettings, before: DesktopSettings) => void;
+
+const subscribers = new Set<{ prefix: string; listener: SettingsListener }>();
+
+export function subscribeSettings(prefix: string, listener: SettingsListener): () => void {
+  const entry = { prefix, listener };
+  subscribers.add(entry);
+  return () => {
+    subscribers.delete(entry);
+  };
+}
+
+function notifySubscribers(before: DesktopSettings, next: DesktopSettings): void {
+  for (const { prefix, listener } of [...subscribers]) {
+    if (!settingsChangedAt(prefix, before, next)) continue;
+    try {
+      listener(next, before);
+    } catch (error) {
+      log.warn('settings subscriber failed', { prefix, error: String(error) });
+    }
+  }
+}
+
+/**
  * A main-side write of one patch, for a setting main itself decides — the
- * library root after a move (storage-main). No side-effect hooks: those are
- * for the renderer's own edits.
+ * library root after a move (storage-main). None of the renderer-edit hooks
+ * below (power, engine launch, the pill) run for it; `subscribeSettings`
+ * listeners do.
  */
 export function writeSettingsPatch(
   patch: SettingsInvokeMap['settings:set']['request']['patch'],
 ): DesktopSettings {
-  const next = mergeSettingsPatch(readSettings(), patch);
+  const before = readSettings();
+  const next = mergeSettingsPatch(before, patch);
   writeSettings(next);
+  notifySubscribers(before, next);
   return next;
 }
 
@@ -298,6 +349,8 @@ const handlers: IpcHandlers<SettingsInvokeMap> = {
     if (next.showComputerUseStatusPill !== before.showComputerUseStatusPill) {
       void macOverlay.setPillEnabled(next.showComputerUseStatusPill);
     }
+    // Every feature's own reaction (see subscribeSettings).
+    notifySubscribers(before, next);
     log.info('settings updated', {
       keys: Object.keys(req.patch),
       mcpMode: next.mcpMode,

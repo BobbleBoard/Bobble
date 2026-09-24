@@ -276,7 +276,9 @@ export function StorageView() {
       children: overview.support,
       mtime: overview.support.reduce((m, n) => Math.max(m, n.mtime ?? 0), 0),
     };
-    return [...(overview.library.children ?? []), tools];
+    // A feature's own rows (memory, training runs, studio documents…) sit
+    // between the library and the engines — see electron/storage/storage-rows.ts.
+    return [...(overview.library.children ?? []), ...overview.features, tools];
   }, [overview]);
   const byPath = useMemo(() => {
     const map = new Map<string, StorageNode>();
