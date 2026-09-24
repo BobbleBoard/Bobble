@@ -1,6 +1,6 @@
 # Bobble — status
 
-Updated: 2026-09-24 · **PAUSED for the user's testing** · main `9135cb54` · **installed in /Applications: `candidate/2026-09-24` (`fec48c2d`)** = last night's candidate + the elevation fix below, packaged probe + smoke OK, signed with the stable identity
+Updated: 2026-09-24 · **PAUSED for the user's testing** · main `2ea663a7` · **installed in /Applications: `candidate/2026-09-24` (`e3276740`)** = last night's candidate + the elevation fix + the History-card fix below, packaged probe + smoke OK, signed with the stable identity
 
 ## Since your review (2026-09-24): "everything has the same softness" / the History card looks "flimsy"
 | Where | Before | After | Proof |
@@ -12,6 +12,15 @@ Updated: 2026-09-24 · **PAUSED for the user's testing** · main `9135cb54` · *
 | Prototypes (gallery) | same soft cards + 12 proto rules edged with the divider colour | follow the live tokens; those 12 edges on border-default; **all 10 prototypes re-shot** (804 shots; the gallery shows the 437 at 1440 wide). Help (B) links the app's compiled CSS by content hash — re-pointed at the current build | `deliverables/gallery.html` |
 
 Commits: `b493d344` (tokens + studio material), `bc44d674` (four hard-coded shadows; `fec48c2d` on the candidate), `9135cb54` (the studio probe `elevation-look.mjs`). Themes suite 27/27, token-hygiene + terminal-surface CSS tests pass.
+
+## Then (2026-09-24): the History cards — "text not vertically centered inside dots and overlapping not well done dotted lines especially around the curves"
+| Where | Before | After | Proof |
+|---|---|---|---|
+| Numbers in dots (History badges, queue dots, chips, canvas pins — both image-editor prototypes) | −0.9…+0.8px off, and different at every position: Chrome snaps a text baseline to a whole pixel but paints the circle where it falls | text trimmed to cap height + baseline, and each circle moved so the digit's baseline lands on a whole pixel: every kind within 0.25px (the measurement's step), identical at every position | 4× crops measured per kind, light + dark |
+| Branch lines (both prototypes) | a dashed-border elbow drawn over the trunk (doubled dashes), a smudged rounded corner, a run that stopped short and above the dot; Direction B's spine restarted its dashes at every row and ran past the last branch | one SVG layer fitted to the laid-out rows: whole dashes per stretch, the trunk split around each fork so nothing is drawn twice, the last branch is the trunk turning (╰) | 8× fork crops |
+| The app's 3D History card | one dashed line behind every dot, cut by a ring: a dash + stub in one gap, a lone dash in the next | one stretch per stage, two whole dashes and 3px of air at both dots | app markup + stylesheets at 4×; real studio card re-checked |
+
+Commits: `2ea663a7` (app; `e3276740` on the candidate). The prototypes' fixes are in `deliverables/ui-design/_shared/` (`history-lines.js`, `number-dots.js`) + their own CSS/JS; both image-editor prototypes re-shot, gallery rebuilt.
 
 ## What is in the installed candidate (built by agents; NOT independently verified — the user tests)
 Everything below plus the elevation fix above. main (today's computer-use/vision wave + the merged push units) plus these branches, merged cleanly:
