@@ -146,6 +146,49 @@ describe('acquire', () => {
     expect(locks.heldByAncestor('probe', {})).toBe(false);
   });
 
+  it('while a heavy job waits for probes to drain, new probes are held to one (no starvation)', async () => {
+    const p1 = plant('probe', 1, process.pid);
+    plant('probe', 2, process.pid);
+    expect(locks.capNow('probe', { root })).toBe(3);
+    let heavy: { release(): void } | null = null;
+    const waiting = locks
+      .acquire('heavy', { root, run: noBlockers, pollMs: 20, log: () => {} })
+      .then((l: { release(): void }) => {
+        heavy = l;
+      });
+    await new Promise((r) => setTimeout(r, 120));
+    expect(heavy).toBeNull();
+    expect(locks.heavyPending({ root })).toBe(true);
+    expect(locks.capNow('probe', { root })).toBe(1);
+    expect(locks.capNow('build', { root })).toBe(1);
+    expect(locks.lockStatus({ root, run: noBlockers }).heavyPending).toMatchObject({
+      pid: process.pid,
+    });
+    rmSync(p1, { recursive: true, force: true }); // one probe finishes: one left
+    await waiting;
+    expect(heavy).not.toBeNull();
+    expect(locks.heavyPending({ root })).toBe(false);
+  });
+
+  it('does not hold probes back for a heavy job that is waiting on something else', async () => {
+    plant('probe', 0, process.pid);
+    plant('probe', 1, process.pid);
+    const battery = fakeRun({ batt: "Now drawing from 'Battery Power'\n\t50%;" });
+    const seen: boolean[] = [];
+    await locks
+      .acquire('heavy', {
+        root,
+        waitMs: 80,
+        pollMs: 20,
+        platform: 'darwin',
+        run: battery,
+        log: () => seen.push(locks.heavyPending({ root })),
+      })
+      .catch(() => undefined);
+    expect(seen.every((p) => p === false)).toBe(true);
+    expect(locks.heavyPending({ root })).toBe(false);
+  });
+
   it('holds a heavy job while it has blockers', async () => {
     const err = await locks
       .acquire('heavy', {

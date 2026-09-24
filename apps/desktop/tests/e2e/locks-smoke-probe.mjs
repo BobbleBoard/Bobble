@@ -21,6 +21,10 @@
  *   4. two heavy scripts — the literal case, when this machine allows a heavy
  *      job right now (AC, the user's app idle, no orphans); otherwise recorded as
  *      skipped with the reason.
+ *   5. no starvation — a heavy job waiting for two running probes to drain
+ *      leaves its pending marker, a new probe is held back even though a slot
+ *      is free, the heavy job starts once the probes drain, and the held-back
+ *      probe runs after it.
  *
  *   node tests/e2e/locks-smoke-probe.mjs
  */
@@ -35,7 +39,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { acquire, heavyBlockers, tryAcquire } from './_locks.mjs';
+import { acquire, heavyBlockers, heavyPending, tryAcquire } from './_locks.mjs';
 import { focusComplaint, frontmostApp, REPO_ROOT } from './harness.mjs';
 
 const WITH_LOCK = path.join(REPO_ROOT, 'scripts', 'with-lock.mjs');
@@ -212,6 +216,47 @@ try {
       check(rf.code === 0 && rg.code === 0, `heavy scripts exited ${rf.code}/${rg.code}`);
       check(!overlaps(iv.F, iv.G), `heavy critical sections overlapped: ${JSON.stringify(iv)}`);
       results.heavy = { F: iv.F, G: iv.G };
+    }
+  }
+
+  // ── 5. a waiting heavy job holds new probes to one slot, so probes drain ────
+  {
+    const blockers = heavyBlockers({ root: LOCK_DIR }).filter((b) => b.kind !== 'busy');
+    if (blockers.length > 0) {
+      results.pending = { skipped: blockers.map((b) => b.detail).join('; ') };
+    } else {
+      // Two probes are running (slots 0 and 1); slot 2 is free.
+      const p0 = tryAcquire('probe', { root: LOCK_DIR, command: 'locks-smoke (probe 0)' });
+      const p1 = tryAcquire('probe', { root: LOCK_DIR, command: 'locks-smoke (probe 1)' });
+      const log = path.join(ROOT, 'five.log');
+      const h = wrapped('heavy', 'H', log, 300);
+      await sleep(1500);
+      const pendingSeen = heavyPending({ root: LOCK_DIR });
+      check(pendingSeen, 'the waiting heavy job left no pending marker');
+      // Without the marker this probe would take the free slot 2 at once.
+      const q = wrapped('probe', 'Q', log, 200);
+      await sleep(2500);
+      let qEarly = false;
+      try {
+        qEarly = readFileSync(log, 'utf8').includes('start Q');
+      } catch {
+        /* nothing yet: correct */
+      }
+      check(!qEarly, 'a new probe started beside two others while a heavy job waited for them');
+      const releasedAt = Date.now();
+      rmSync(p1, { recursive: true, force: true }); // one probe finishes: one left
+      await h.done;
+      rmSync(p0, { recursive: true, force: true }); // the other finishes too
+      await q.done;
+      const iv = intervals(log);
+      check(iv.H?.start >= releasedAt, 'the heavy job started before the probes drained');
+      check(iv.Q?.start >= iv.H?.start, 'the held-back probe ran before the heavy job');
+      check(!heavyPending({ root: LOCK_DIR }), 'the pending marker outlived the heavy job');
+      results.pending = {
+        pendingSeen,
+        heavyStartAfterDrainMs: iv.H?.start - releasedAt,
+        probeAfterHeavy: iv.Q?.start - iv.H?.start,
+      };
     }
   }
 } finally {

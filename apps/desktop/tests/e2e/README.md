@@ -86,7 +86,7 @@ from "the seed was kind".
 
 A dozen worktrees share this machine during the push (`deliverables/research/PLAN.md` §4). The
 slots live in `_locks.mjs` — heavy 1, probe 3, build 2, test 6; probes and builds drop to one while
-a heavy job runs:
+a heavy job runs, and while one waits for them to drain:
 
 ```bash
 node ../../scripts/with-lock.mjs build -- npm run build          # from apps/desktop

@@ -44,7 +44,9 @@
  *     live app always has a live parent. `scripts/bench-run.sh` sweeps them.
  *   - at most one probe and one build already running, so "1 probe while a
  *     heavy job runs" is true from the moment it starts, not only for probes
- *     that start after it.
+ *     that start after it. While it waits for that alone, it leaves a
+ *     `heavy-pending` marker and new probes and builds are held to one, so a
+ *     busy afternoon of probes cannot starve it.
  *
  * ## Nesting
  *
@@ -325,8 +327,39 @@ export function classHeld(cls, opts = {}) {
 /** The cap right now: probes and builds shrink to one while a heavy job runs. */
 export function capNow(cls, opts = {}) {
   assertClass(cls);
-  if (SHRINKS_UNDER_HEAVY.has(cls) && classHeld('heavy', opts)) return 1;
+  if (!SHRINKS_UNDER_HEAVY.has(cls)) return LOCK_CAPS[cls];
+  if (classHeld('heavy', opts) || heavyPending(opts)) return 1;
   return LOCK_CAPS[cls];
+}
+
+/*
+ * HEAVY PENDING. A heavy job starts beside at most one probe and one build, so
+ * it waits for them to drain — and with a dozen lanes launching probes all day
+ * they might never drain on their own. While a heavy job is waiting on THAT
+ * alone, it leaves a `heavy-pending` marker (same layout as a slot), and new
+ * probes and builds are capped at one exactly as if it were already running.
+ * Only then: a heavy job waiting for AC power must not throttle every lane for
+ * the hours it may take.
+ */
+const PENDING = 'heavy-pending';
+
+/** Is a live heavy job waiting for probes and builds to drain? */
+export function heavyPending(opts = {}) {
+  const dir = path.join(opts.root ?? lockRoot(opts.env), PENDING);
+  return slotState(dir, opts) === 'held';
+}
+
+function markPending(root, pid, command, cwd, deps) {
+  const dir = path.join(root, PENDING);
+  const mine = claim(dir) || (slotState(dir, deps) === 'stale' && reclaim(dir, root, deps));
+  if (mine) writeOwner(dir, { pid, command, cwd, startOf: deps.startOf });
+  // Another heavy waiter holding the marker serves the same purpose.
+}
+
+function clearPending(root, pid) {
+  const dir = path.join(root, PENDING);
+  const o = readSlot(dir);
+  if (o !== null && o.pid === pid) rmSync(dir, { recursive: true, force: true });
 }
 
 /**
@@ -431,26 +464,43 @@ export async function acquire(cls, opts = {}) {
   const startedAt = Date.now();
   let lastWhy = '';
   let lastSaidAt = 0;
-  for (;;) {
-    const blockers = cls === 'heavy' ? heavyBlockers({ ...opts, root }) : [];
-    if (blockers.length === 0) {
-      const dir = tryAcquire(cls, { ...opts, root, pid });
-      if (dir !== null) {
-        if (lastWhy !== '') say(`[locks] got a ${cls} slot after ${elapsed(startedAt)}`);
-        return makeLease(cls, dir, root, pid, env);
+  const command = opts.command ?? process.argv.slice(1).join(' ');
+  const cwd = opts.cwd ?? process.cwd();
+  const dropPending = () => clearPending(root, pid);
+  if (cls === 'heavy') process.once('exit', dropPending);
+  try {
+    for (;;) {
+      const blockers = cls === 'heavy' ? heavyBlockers({ ...opts, root }) : [];
+      if (blockers.length === 0) {
+        const dir = tryAcquire(cls, { ...opts, root, pid });
+        if (dir !== null) {
+          if (lastWhy !== '') say(`[locks] got a ${cls} slot after ${elapsed(startedAt)}`);
+          return makeLease(cls, dir, root, pid, env);
+        }
       }
+      if (cls === 'heavy') {
+        // Waiting only for probes and builds to drain: ask new ones to hold back.
+        if (blockers.length > 0 && blockers.every((b) => b.kind === 'busy')) {
+          markPending(root, pid, command, cwd, opts);
+        } else dropPending();
+      }
+      const why =
+        blockers.length > 0
+          ? blockers.map((b) => b.detail).join('; ')
+          : `all ${capNow(cls, { ...opts, root })} ${cls} slot(s) busy: ${describeHolders(cls, root, opts)}`;
+      if (Date.now() - startedAt > waitMs) throw new LockTimeoutError(cls, waitMs, why);
+      if (why !== lastWhy || Date.now() - lastSaidAt > 60_000) {
+        say(`[locks] waiting for a ${cls} slot — ${why}`);
+        lastWhy = why;
+        lastSaidAt = Date.now();
+      }
+      await sleep(pollMs);
     }
-    const why =
-      blockers.length > 0
-        ? blockers.map((b) => b.detail).join('; ')
-        : `all ${capNow(cls, { ...opts, root })} ${cls} slot(s) busy: ${describeHolders(cls, root, opts)}`;
-    if (Date.now() - startedAt > waitMs) throw new LockTimeoutError(cls, waitMs, why);
-    if (why !== lastWhy || Date.now() - lastSaidAt > 60_000) {
-      say(`[locks] waiting for a ${cls} slot — ${why}`);
-      lastWhy = why;
-      lastSaidAt = Date.now();
+  } finally {
+    if (cls === 'heavy') {
+      dropPending();
+      process.removeListener('exit', dropPending);
     }
-    await sleep(pollMs);
   }
 }
 
@@ -710,7 +760,15 @@ export function lockStatus(opts = {}) {
     }
     classes[cls] = { cap: LOCK_CAPS[cls], capNow: capNow(cls, { ...opts, root }), slots };
   }
-  return { root, classes, heavyBlockers: heavyBlockers({ ...opts, root }) };
+  const pending = readSlot(path.join(root, PENDING));
+  return {
+    root,
+    classes,
+    heavyPending: heavyPending({ ...opts, root })
+      ? { pid: pending.pid, command: pending.command }
+      : null,
+    heavyBlockers: heavyBlockers({ ...opts, root }),
+  };
 }
 
 // ── CLI ─────────────────────────────────────────────────────────────────────
@@ -719,7 +777,7 @@ function printStatus(s) {
   console.log(`lock root: ${s.root}`);
   for (const [cls, c] of Object.entries(s.classes)) {
     const held = c.slots.filter((x) => x.state === 'held');
-    const shrunk = c.capNow !== c.cap ? ` (cap ${c.capNow} while heavy runs)` : '';
+    const shrunk = c.capNow !== c.cap ? ` (cap ${c.capNow} while heavy runs or waits)` : '';
     console.log(`${cls.padEnd(6)} ${held.length}/${c.cap}${shrunk}`);
     for (const x of c.slots) {
       if (x.state === 'free') continue;
@@ -732,6 +790,11 @@ function printStatus(s) {
   const running = s.classes.heavy.slots.find((x) => x.state === 'held');
   if (running !== undefined)
     console.log(`heavy: RUNNING (pid ${running.pid}) — the next one waits`);
+  if (s.heavyPending !== null) {
+    console.log(
+      `heavy: PENDING (pid ${s.heavyPending.pid}: ${s.heavyPending.command}) — probes and builds held to one`,
+    );
+  }
   for (const b of s.heavyBlockers) console.log(`heavy blocked: ${b.detail}`);
   if (running === undefined && s.heavyBlockers.length === 0) console.log('heavy: may start now');
 }
