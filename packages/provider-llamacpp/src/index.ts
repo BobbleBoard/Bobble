@@ -95,6 +95,7 @@ export * from './advanced-hook.js';
 export * from './live-tps.js';
 export * from './repair.js';
 export * from './repair-bridge.js';
+export * from './request-headers.js';
 export * from './request-tap.js';
 export * from './settle-reply.js';
 export * from './sse.js';

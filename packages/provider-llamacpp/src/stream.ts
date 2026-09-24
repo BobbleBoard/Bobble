@@ -45,6 +45,7 @@ import {
   validateAgainstSchema,
   withoutWrittenToolCall,
 } from './repair.js';
+import { buildRequestHeaders } from './request-headers.js';
 import { tapRequest, tapUsage } from './request-tap.js';
 import { settleReply } from './settle-reply.js';
 import { parseSSE } from './sse.js';
@@ -674,7 +675,8 @@ export function createLlamaCppStream(deps: LlamaCppStreamDeps = {}): LlamaCppStr
           tapRequest(body, 'llamacpp');
           res = await fetchWhenBack(`${model.baseUrl}/chat/completions`, {
             method: 'POST',
-            headers: { 'content-type': 'application/json', ...(model.headers ?? {}) },
+            // models.json headers / apiKey arrive in `options`, not on the model.
+            headers: buildRequestHeaders(model, options),
             body: JSON.stringify(body),
             signal: options?.signal,
           });

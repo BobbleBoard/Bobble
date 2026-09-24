@@ -31,6 +31,7 @@ import {
 } from '@mariozechner/pi-ai';
 import {
   buildChatCompletionsRequest,
+  buildRequestHeaders,
   createLiveTpsReporter,
   headersToRecord,
   parseSSE,
@@ -309,7 +310,8 @@ export function createMlxStream(deps: MlxStreamDeps = {}): MlxStreamFn {
         tapRequest(body, engineOf(model));
         const res = await doFetch(`${model.baseUrl}/chat/completions`, {
           method: 'POST',
-          headers: { 'content-type': 'application/json', ...(model.headers ?? {}) },
+          // models.json headers / apiKey arrive in `options`, not on the model.
+          headers: buildRequestHeaders(model, options),
           body: JSON.stringify(body),
           signal: options?.signal,
         });
