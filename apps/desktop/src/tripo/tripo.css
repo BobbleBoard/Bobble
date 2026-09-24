@@ -737,8 +737,8 @@
   flex-direction: column;
   min-height: 0;
   border-radius: var(--pd-radius-lg);
-  background: color-mix(in srgb, var(--pd-bg-overlay) 86%, transparent);
-  border: 1px solid var(--pd-border-subtle);
+  background: var(--pd-bg-overlay);
+  border: 1px solid var(--pd-border-default);
   -webkit-backdrop-filter: blur(var(--pd-blur-overlay));
   backdrop-filter: blur(var(--pd-blur-overlay));
   box-shadow: var(--pd-shadow-lg);
@@ -1854,8 +1854,8 @@
   gap: 2px;
   padding: 7px;
   border-radius: var(--pd-radius-full);
-  background: color-mix(in srgb, var(--pd-bg-raised) 88%, transparent);
-  border: 1px solid var(--pd-border-subtle);
+  background: var(--pd-bg-overlay);
+  border: 1px solid var(--pd-border-default);
   box-shadow: var(--pd-shadow-md);
   backdrop-filter: blur(10px);
 }
@@ -2023,9 +2023,9 @@
   min-width: 168px;
   max-width: 240px;
   padding: 10px 14px 6px;
-  border-radius: 18px;
-  background: color-mix(in srgb, var(--pd-bg-overlay) 82%, transparent);
-  border: 1px solid var(--pd-border-subtle);
+  border-radius: var(--pd-radius-lg);
+  background: var(--pd-bg-overlay);
+  border: 1px solid var(--pd-border-default);
   -webkit-backdrop-filter: blur(var(--pd-blur-overlay));
   backdrop-filter: blur(var(--pd-blur-overlay));
   box-shadow: var(--pd-shadow-md);
@@ -2157,8 +2157,8 @@
   gap: 2px;
   padding: 5px 8px;
   border-radius: var(--pd-radius-full);
-  background: color-mix(in srgb, var(--pd-bg-raised) 88%, transparent);
-  border: 1px solid var(--pd-border-subtle);
+  background: var(--pd-bg-overlay);
+  border: 1px solid var(--pd-border-default);
   box-shadow: var(--pd-shadow-md);
   backdrop-filter: blur(10px);
 }
@@ -2263,8 +2263,8 @@
   gap: 3px;
   padding: 6px 8px;
   border-radius: var(--pd-radius-full);
-  background: color-mix(in srgb, var(--pd-bg-raised) 90%, transparent);
-  border: 1px solid var(--pd-border-subtle);
+  background: var(--pd-bg-overlay);
+  border: 1px solid var(--pd-border-default);
   box-shadow: var(--pd-shadow-lg);
   backdrop-filter: blur(12px);
 }
@@ -2379,7 +2379,7 @@
   width: 330px;
   padding: 14px;
   border-radius: var(--pd-radius-surface);
-  background: color-mix(in srgb, var(--pd-bg-overlay) 96%, transparent);
+  background: var(--pd-bg-overlay);
   border: 1px solid var(--pd-border-default);
   box-shadow: var(--pd-shadow-popover);
   display: flex;

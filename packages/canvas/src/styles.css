@@ -4821,7 +4821,7 @@
   max-width: 46ch;
   padding: var(--pd-space-lg) var(--pd-space-xl) var(--pd-space-lg);
   border-radius: var(--pd-radius-lg);
-  border: 1px solid var(--pd-border-subtle);
+  border: 1px solid var(--pd-border-default);
   background: color-mix(in srgb, var(--pd-bg-base) 88%, transparent);
   -webkit-backdrop-filter: blur(20px) saturate(140%);
   backdrop-filter: blur(20px) saturate(140%);
