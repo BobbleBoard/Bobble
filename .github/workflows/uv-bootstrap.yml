@@ -1,0 +1,94 @@
+name: uv bootstrap
+
+# XP-04 (crossplatform.md §5): the pinned uv builds install, verify and run on
+# every OS the app targets. The unit tests run on each runner; the live job
+# downloads that runner's own build (~25 MB) through `ensureUv({ ignorePath:
+# true })` — pinned sha256, zip on Windows, tar.gz elsewhere — and runs
+# `uv --version`. `pins` re-reads the release (small files only) so a drifted
+# pin fails here, and runs weekly as well.
+#
+# Kept apart from ci.yml (XP-03 owns it and creates crossplatform.yml); XP-03
+# can fold these jobs into its matrix.
+
+on:
+  pull_request:
+    paths:
+      - 'packages/web-tools/src/uv*.ts'
+      - 'packages/web-tools/src/unzip*.ts'
+      - 'packages/web-tools/src/download.ts'
+      - 'packages/web-tools/src/paths.ts'
+      - 'packages/web-tools/src/testing/**'
+      - 'packages/web-tools/src/fixtures/zip/**'
+      - 'packages/web-tools/scripts/pin-uv.mjs'
+      - '.github/workflows/uv-bootstrap.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'packages/web-tools/src/uv*.ts'
+      - 'packages/web-tools/src/unzip*.ts'
+      - 'packages/web-tools/src/download.ts'
+      - 'packages/web-tools/src/paths.ts'
+      - 'packages/web-tools/src/testing/**'
+      - 'packages/web-tools/src/fixtures/zip/**'
+      - 'packages/web-tools/scripts/pin-uv.mjs'
+      - '.github/workflows/uv-bootstrap.yml'
+  schedule:
+    - cron: '17 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: uv-bootstrap-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pins:
+    name: pins equal the release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - run: node packages/web-tools/scripts/pin-uv.mjs --check
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  install:
+    name: install on ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm, windows-2025, windows-11-arm, macos-14]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      TURBO_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      # web-tools and its workspace deps only: no Electron app, no native builds.
+      # The root's electron devDependency would otherwise fetch its binary here.
+      # Filters are quoted: an unquoted `@name` is splatting in PowerShell, the
+      # default shell on the Windows runners.
+      - run: pnpm install --frozen-lockfile --filter '@pi-desktop/web-tools...'
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - name: unit tests (uv, unzip, platform, locations)
+        run: >-
+          pnpm --filter '@pi-desktop/web-tools' exec vitest run
+          src/uv.test.ts src/uv.default-host.test.ts src/uv-platform.test.ts
+          src/uv-locations.test.ts src/unzip.test.ts
+      - name: install this runner's build and run it
+        run: >-
+          pnpm --filter '@pi-desktop/web-tools' exec vitest run src/uv.live.test.ts
+          --reporter=verbose --silent=false
+        env:
+          PI_DESKTOP_UV_LIVE: '1'
