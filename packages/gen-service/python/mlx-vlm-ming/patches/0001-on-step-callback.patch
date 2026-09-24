@@ -1,0 +1,58 @@
+Ming-Image: call back after each denoising step.
+
+The pipeline runs all 12 steps inside one call with nothing in between, so
+a caller cannot say where a minute-long picture is. Bobble's card shows
+"step 7/12" and an ETA from the measured seconds per step; both need this.
+
+`generate_array(on_step=fn)` calls `fn(step, steps)` after each step's
+latents are evaluated, with `step` counting from 1. Through the generic API,
+`generate_image(model, prompt, on_step=fn)` reaches it in `request.extra`,
+where other families already read their extra options. Without a callback
+nothing changes. Upstreamable as is.
+
+--- a/mlx_vlm/models/ming_image/model.py
++++ b/mlx_vlm/models/ming_image/model.py
+@@ -42,6 +42,8 @@
+             width=request.width,
+             height=request.height,
+             guidance=guidance,
++            # generate_image(..., on_step=fn) lands here through request.extra.
++            on_step=request.extra.get("on_step"),
+         )
+         return ImageGenerationResult(
+             array=array,
+--- a/mlx_vlm/models/ming_image/pipeline.py
++++ b/mlx_vlm/models/ming_image/pipeline.py
+@@ -3,6 +3,7 @@
+ from __future__ import annotations
+ 
+ import gc
++from collections.abc import Callable
+ from pathlib import Path
+ 
+ import mlx.core as mx
+@@ -84,8 +85,14 @@
+         height: int = 1024,
+         guidance: float = 1.0,
+         num_images: int = 1,
++        on_step: Callable[[int, int], None] | None = None,
+     ) -> mx.array:
+-        """Generate one image ([H, W, 4]) or a batch ([N, H, W, 4]) for one prompt."""
++        """Generate one image ([H, W, 4]) or a batch ([N, H, W, 4]) for one prompt.
++
++        ``on_step(step, steps)`` runs after each denoising step has been
++        evaluated (``step`` counts from 1), so a caller can report progress, or
++        pause and pace the run, between steps.
++        """
+         validate_dimensions(width=width, height=height)
+         if steps < 1:
+             raise ValueError(f"steps must be at least 1, got {steps}")
+@@ -127,6 +134,8 @@
+             ).astype(mx.float32)
+             latents = scheduler.step(noise=-pred, step_index=i, latents=latents)
+             mx.eval(latents)
++            if on_step is not None:
++                on_step(i + 1, steps)
+ 
+         images = self._decode(latents)
+         return images[0] if num_images == 1 else images

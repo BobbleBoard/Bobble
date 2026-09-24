@@ -1,16 +1,28 @@
+import { createHash } from 'node:crypto';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
+import type { Backend } from './protocol.ts';
 import {
+  backendUvFlags,
   baseWorkerWith,
   buildEnvWarmArgs,
   buildWorkerUvArgs,
+  bundledMlxVlmWheel,
   bundledWheelPath,
   DEFAULT_PYTHON_VERSION,
   GEN_WORKER_PATH_ENV,
   MFLUX_PIN,
   MLX_AUDIO_PIN,
+  MLX_VLM_COMMIT,
+  MLX_VLM_RESOLVED_BEFORE,
+  MLX_VLM_WHEEL,
   resolveWorkerScript,
 } from './worker-command.ts';
+
+/** packages/gen-service/python — worker.py, wheels/, mlx-vlm-ming/. */
+const PYTHON_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'python');
 
 describe('buildWorkerUvArgs', () => {
   it('builds `uv run --with mflux==<pin> python <worker>` by default', () => {
@@ -205,5 +217,175 @@ describe('resolveWorkerScript', () => {
     const resolved = resolveWorkerScript();
     expect(resolved.endsWith(path.join('python', 'worker.py'))).toBe(true);
     expect(path.isAbsolute(resolved)).toBe(true);
+  });
+});
+
+describe('the mlx-vlm design env (Ming-Image)', () => {
+  const FROZEN = ['--no-build', '--exclude-newer', MLX_VLM_RESOLVED_BEFORE];
+
+  it('runs the bundled wheel beside worker.py, frozen and never built from source', () => {
+    const args = buildWorkerUvArgs({ workerScript: '/w/worker.py', backend: 'mlx-vlm' });
+    expect(args).toEqual([
+      'run',
+      '--no-project',
+      '--python',
+      DEFAULT_PYTHON_VERSION,
+      ...FROZEN,
+      '--with',
+      path.join('/w', 'wheels', MLX_VLM_WHEEL),
+      'python',
+      '/w/worker.py',
+    ]);
+    // Never PyPI's mlx-vlm (0.7.2 has no Ming), never mflux.
+    expect(args.some((a) => a.startsWith('mlx-vlm') || a.startsWith('mlx_vlm=='))).toBe(false);
+    expect(args.some((a) => a.startsWith('mflux'))).toBe(false);
+  });
+
+  it('takes the wheel from the worker.py it launches (the packaged app’s Resources)', () => {
+    const packaged = '/Applications/Bobble.app/Contents/Resources/gen-worker/worker.py';
+    const args = buildWorkerUvArgs({ workerScript: packaged, backend: 'mlx-vlm' });
+    const wheel = args[args.indexOf('--with') + 1];
+    expect(wheel).toBe(bundledMlxVlmWheel(packaged));
+    expect(wheel).toBe(
+      path.join('/Applications/Bobble.app/Contents/Resources/gen-worker/wheels', MLX_VLM_WHEEL),
+    );
+  });
+
+  it('honours an explicit wheel path; an empty one means the bundled wheel', () => {
+    const explicit = buildWorkerUvArgs({
+      workerScript: '/w/worker.py',
+      backend: 'mlx-vlm',
+      mlxVlmWith: '/elsewhere/mlx_vlm-x.whl',
+    });
+    expect(explicit).toContain('/elsewhere/mlx_vlm-x.whl');
+    expect(explicit).not.toContain(path.join('/w', 'wheels', MLX_VLM_WHEEL));
+    const empty = buildWorkerUvArgs({
+      workerScript: '/w/worker.py',
+      backend: 'mlx-vlm',
+      mlxVlmWith: '',
+    });
+    expect(empty).toContain(path.join('/w', 'wheels', MLX_VLM_WHEEL));
+  });
+
+  it('keeps extraWith additive and --serve last', () => {
+    const args = buildWorkerUvArgs({
+      workerScript: '/w/worker.py',
+      backend: 'mlx-vlm',
+      extraWith: ['soundfile'],
+      serveMode: true,
+    });
+    expect(args.slice(-7)).toEqual([
+      '--with',
+      path.join('/w', 'wheels', MLX_VLM_WHEEL),
+      '--with',
+      'soundfile',
+      'python',
+      '/w/worker.py',
+      '--serve',
+    ]);
+  });
+
+  it('warms exactly the env the jobs run in (same flags, same wheel)', () => {
+    const job = buildWorkerUvArgs({ workerScript: '/w/worker.py', backend: 'mlx-vlm' });
+    const warm = buildEnvWarmArgs({ backend: 'mlx-vlm', workerScript: '/w/worker.py' });
+    // Everything before the command is the env: uv resolves one env for both.
+    expect(warm.slice(0, warm.indexOf('python'))).toEqual(job.slice(0, job.indexOf('python')));
+    expect(warm.slice(-3)).toEqual(['python', '-c', "print('module ready')"]);
+    // Handing it the wheel's path directly is the same env.
+    expect(
+      buildEnvWarmArgs({
+        backend: 'mlx-vlm',
+        mlxVlmWith: bundledMlxVlmWheel('/w/worker.py'),
+      }),
+    ).toEqual(warm);
+  });
+
+  it('refuses to guess the wheel’s path', () => {
+    // Inside the bundled Electron main the package's own path is wrong
+    // (gen-manager), so no path is an error, not a quiet default.
+    expect(() => baseWorkerWith('mlx-vlm')).toThrow(MLX_VLM_WHEEL);
+    expect(() => buildEnvWarmArgs({ backend: 'mlx-vlm' })).toThrow(/bundledMlxVlmWheel/);
+    expect(() => buildEnvWarmArgs({ backend: 'mlx-vlm', workerScript: '' })).toThrow();
+    expect(baseWorkerWith('mlx-vlm', MFLUX_PIN, undefined, '/w/x.whl')).toEqual(['/w/x.whl']);
+  });
+
+  it('adds the frozen-resolve flags to mlx-vlm only; every other argv is unchanged', () => {
+    expect(backendUvFlags('mlx-vlm')).toEqual(FROZEN);
+    const others: Backend[] = [
+      'mflux',
+      'mlx-audio',
+      'torch-tts',
+      'triposr',
+      'trellis',
+      'hyperframes',
+      'comfyui',
+    ];
+    for (const backend of others) {
+      expect(backendUvFlags(backend)).toEqual([]);
+      const job = buildWorkerUvArgs({ workerScript: '/w/worker.py', backend });
+      expect(job.slice(0, 4)).toEqual(['run', '--no-project', '--python', DEFAULT_PYTHON_VERSION]);
+      expect(job).not.toContain('--exclude-newer');
+      expect(job).not.toContain('--no-build');
+      expect(job.some((a) => a.endsWith(MLX_VLM_WHEEL))).toBe(false);
+    }
+  });
+
+  it('freezes the resolve at an instant uv accepts (RFC 3339, UTC)', () => {
+    expect(MLX_VLM_RESOLVED_BEFORE).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+    expect(Number.isNaN(Date.parse(MLX_VLM_RESOLVED_BEFORE))).toBe(false);
+  });
+});
+
+describe('the shipped mlx-vlm wheel matches its recipe', () => {
+  const dir = path.join(PYTHON_DIR, 'mlx-vlm-ming');
+  const script = readFileSync(path.join(dir, 'build-wheel.sh'), 'utf8');
+  const field = (name: string): string | undefined =>
+    new RegExp(`^${name}='?([^'\\s]+)'?`, 'm').exec(script)?.[1];
+
+  it('ships the wheel the argv names, beside worker.py', () => {
+    expect(existsSync(path.join(PYTHON_DIR, 'worker.py'))).toBe(true);
+    expect(existsSync(bundledMlxVlmWheel(path.join(PYTHON_DIR, 'worker.py')))).toBe(true);
+  });
+
+  it('builds from the pinned commit, at the pinned version, frozen at the same instant', () => {
+    expect(field('SHA')).toBe(MLX_VLM_COMMIT);
+    expect(MLX_VLM_WHEEL).toBe(`mlx_vlm-${field('VERSION')}-py3-none-any.whl`);
+    expect(field('RESOLVED_BEFORE')).toBe(MLX_VLM_RESOLVED_BEFORE);
+    // The source is checked, not trusted: a sha256 of the archive, 64 hex digits.
+    expect(field('ARCHIVE_SHA256')).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('records the resolution it was measured with (resolved.txt)', () => {
+    const resolved = readFileSync(path.join(dir, 'resolved.txt'), 'utf8');
+    expect(resolved).toContain(`--exclude-newer ${MLX_VLM_RESOLVED_BEFORE}`);
+    expect(resolved).toContain('--no-build');
+    expect(resolved).toContain(MLX_VLM_WHEEL);
+    // Pins only (name==version): nothing floats inside a frozen env.
+    const pins = resolved.split('\n').filter((l) => /^[a-z0-9]/i.test(l));
+    expect(pins.length).toBeGreaterThan(0);
+    for (const pin of pins) expect(pin).toMatch(/^[A-Za-z0-9_.-]+==\S+/);
+  });
+
+  it('is the wheel the README documents (sha256)', () => {
+    const wheel = readFileSync(bundledMlxVlmWheel(path.join(PYTHON_DIR, 'worker.py')));
+    const sha = createHash('sha256').update(wheel).digest('hex');
+    expect(readFileSync(path.join(dir, 'README.md'), 'utf8')).toContain(sha);
+  });
+
+  it('carries exactly the four patches, each confined to the Ming model', () => {
+    const patches = readdirSync(path.join(dir, 'patches')).sort();
+    expect(patches).toEqual([
+      '0001-on-step-callback.patch',
+      '0002-encode-once-many-seeds.patch',
+      '0003-per-layer-quantization.patch',
+      '0004-per-layer-eval.patch',
+    ]);
+    for (const name of patches) {
+      const body = readFileSync(path.join(dir, 'patches', name), 'utf8');
+      const touched = [...body.matchAll(/^\+\+\+ b\/(\S+)/gm)].map((m) => m[1]);
+      expect(touched.length).toBeGreaterThan(0);
+      for (const file of touched)
+        expect(file).toMatch(/^mlx_vlm\/models\/ming_image\/[a-z_]+\.py$/);
+    }
   });
 });

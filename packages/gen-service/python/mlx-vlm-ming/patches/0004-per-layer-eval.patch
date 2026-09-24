@@ -1,0 +1,29 @@
+Ming-Image: evaluate the conditioning encoder one layer at a time.
+
+The encoder builds its whole forward lazily and evaluates it once, at the
+end. With mlx-vlm's expert offload (`moe_offload`: routed experts paged from
+SSD under a byte budget), that one graph holds every layer's experts at
+once. The offload module's own docstring warns about exactly this: "a lazy
+full-prompt forward pins every expert across every layer in one graph until
+the final eval and OOMs anyway". One `mx.eval` per layer keeps a single
+layer's experts live, so the store can evict the rest. This comes before
+running the 8-bit encoder offloaded on 24 GB, and any Ming on 16 GB.
+
+The math is unchanged: the same operations, evaluated earlier. The cost is
+one synchronization per layer (20 per prompt). Upstreamable.
+
+--- a/mlx_vlm/models/ming_image/text_encoder.py
++++ b/mlx_vlm/models/ming_image/text_encoder.py
+@@ -84,6 +84,12 @@
+         for layer in self.layers:
+             hidden_states.append(h)
+             h = layer(h, mask, image_mask)
++            # One layer per graph. A lazy forward over the whole prompt keeps
++            # every layer's routed experts in one graph until the final eval,
++            # which is what defeats expert offload (see moe_offload: "prefill
++            # must be chunked"); evaluated here, one layer's experts are live
++            # at a time and the store can evict the rest.
++            mx.eval(h)
+         hidden_states.append(self.norm(h))
+         return hidden_states
+ 

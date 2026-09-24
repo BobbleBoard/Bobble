@@ -107,13 +107,18 @@ export type {
 export { isGenEvent, NdjsonParser, parseGenEventLine } from './protocol.js';
 export type { WorkerUvArgsOptions } from './worker-command.js';
 export {
+  backendUvFlags,
   baseWorkerWith,
   buildEnvWarmArgs,
   buildWorkerUvArgs,
+  bundledMlxVlmWheel,
   bundledWheelPath,
   DEFAULT_PYTHON_VERSION,
   GEN_WORKER_PATH_ENV,
   MFLUX_PIN,
   MLX_AUDIO_PIN,
+  MLX_VLM_COMMIT,
+  MLX_VLM_RESOLVED_BEFORE,
+  MLX_VLM_WHEEL,
   resolveWorkerScript,
 } from './worker-command.js';

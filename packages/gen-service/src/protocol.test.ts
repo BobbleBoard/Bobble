@@ -68,11 +68,14 @@ describe('Backend union + ComfyUI job shape', () => {
       'trellis',
       'hyperframes',
       'comfyui',
+      'mlx-vlm',
     ];
     // The comfyui persistent-server backend is a first-class member of the union.
     expect(backends).toContain('comfyui');
     // torch-tts (Chatterbox) is the new torch/MPS→CPU TTS path.
     expect(backends).toContain('torch-tts');
+    // mlx-vlm runs the design models (Ming-Image) on the bundled mlx-vlm wheel.
+    expect(backends).toContain('mlx-vlm');
   });
 
   it('resolves a comfyui job through the `comfy` arm (image arm left empty)', () => {

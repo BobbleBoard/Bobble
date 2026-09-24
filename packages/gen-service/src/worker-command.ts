@@ -31,6 +31,56 @@ export const MLX_AUDIO_PIN = '0.4.5';
 export const DEFAULT_PYTHON_VERSION = '3.12';
 
 /**
+ * The design models (Ming-Image-0.1-Design) run on mlx-vlm at the commit that
+ * merged Ming support (Blaizzy/mlx-vlm#2334, 2026-09-23). No PyPI release has
+ * it yet: 0.7.2 predates it, and a bare `mlx-vlm` would resolve that, import
+ * fine, and fail at the first picture. So the app ships a wheel built from
+ * this commit's source archive plus four patches (python/mlx-vlm-ming/) and
+ * never asks PyPI for mlx-vlm.
+ */
+export const MLX_VLM_COMMIT = '7b3397a621533fbebe31be0d9ac05441f2e7d845';
+
+/**
+ * The wheel `python/mlx-vlm-ming/build-wheel.sh` builds from
+ * {@link MLX_VLM_COMMIT} plus the patches. It sits in `wheels/` beside
+ * worker.py; see {@link bundledMlxVlmWheel}.
+ */
+export const MLX_VLM_WHEEL = 'mlx_vlm-0.7.3.dev0+bobble.ming-py3-none-any.whl';
+
+/**
+ * The design env resolves as PyPI stood at this instant (`uv --exclude-newer`).
+ * python/mlx-vlm-ming/README.md records that resolution: 53 packages, every
+ * one a wheel, 158 MB, 0 source builds. mlx-vlm's floors are days old
+ * (transformers>=5.14, mlx>=0.32.2), so an open resolve would hand each user
+ * whatever shipped that morning, untested. Frozen, every Mac gets the env
+ * that was measured. Bump it together with the wheel.
+ */
+export const MLX_VLM_RESOLVED_BEFORE = '2026-09-24T00:00:00Z';
+
+/** The bundled mlx-vlm wheel beside a given worker.py (checkout or packaged app). */
+export function bundledMlxVlmWheel(workerScript: string): string {
+  return bundledWheelPath(workerScript, MLX_VLM_WHEEL);
+}
+
+/** An optional path option, with `''` meaning "not given", as for `mfluxWith`. */
+function given(value: string | undefined): string | undefined {
+  return value !== undefined && value.length > 0 ? value : undefined;
+}
+
+/**
+ * uv flags a backend's env needs besides its `--with` packages; they go
+ * before the packages, in the job and the env warm alike, so both resolve the
+ * same env. The design env is frozen ({@link MLX_VLM_RESOLVED_BEFORE}) and
+ * never builds from source: with `--no-build`, a resolve that would need a
+ * compiler fails with uv's message instead of reaching for one. On a Mac
+ * without the Command Line Tools, reaching for one means the install dialog,
+ * mid-job. Every other backend gets none, so its argv is unchanged.
+ */
+export function backendUvFlags(backend: Backend): readonly string[] {
+  return backend === 'mlx-vlm' ? ['--no-build', '--exclude-newer', MLX_VLM_RESOLVED_BEFORE] : [];
+}
+
+/**
  * The base `uv --with` package(s) a backend's `worker.py` modality dispatch
  * needs, BEFORE any entry-specific {@link WorkerUvArgsOptions.extraWith}. This is
  * the fix for the old hardcoded `--with mflux`: a TTS or 3D job must NOT drag in
@@ -40,17 +90,36 @@ export const DEFAULT_PYTHON_VERSION = '3.12';
  *
  * 3D deps (`triposr` / `trellis`) are forward-dated: the exact package set is
  * finalised when the Phase-D 3D worker lands. [projected]
+ *
+ * `mlx-vlm` needs `mlxVlmWith`, the absolute path of the bundled wheel
+ * ({@link bundledMlxVlmWheel}). It throws without one rather than guess: the
+ * wheel sits beside the worker.py being launched, and inside the bundled
+ * Electron main the package's own path resolves to a folder that does not
+ * exist (gen-manager's note on `resolveWorkerScript`). The argv builders
+ * below pass it from their worker script.
  */
 export function baseWorkerWith(
   backend: Backend,
   mfluxPin: string = MFLUX_PIN,
   mfluxWith?: string,
+  mlxVlmWith?: string,
 ): readonly string[] {
   switch (backend) {
     case 'mflux':
       // A model that names its own mflux build (a bundled wheel — the Qwen-Image
       // 2.1 port, see catalog MfluxBackendConfig.wheel) replaces the pin.
       return [mfluxWith !== undefined && mfluxWith.length > 0 ? mfluxWith : `mflux==${mfluxPin}`];
+    case 'mlx-vlm': {
+      // The design models (Ming-Image): always the bundled wheel, never PyPI.
+      const wheel = given(mlxVlmWith);
+      if (wheel === undefined) {
+        throw new Error(
+          `the mlx-vlm env runs on the bundled wheel ${MLX_VLM_WHEEL}: pass its path ` +
+            '(bundledMlxVlmWheel(workerScript)) or the worker script',
+        );
+      }
+      return [wheel];
+    }
     case 'mlx-audio':
       return [`mlx-audio==${MLX_AUDIO_PIN}`];
     case 'torch-tts':
@@ -85,11 +154,28 @@ export function buildEnvWarmArgs(opts: {
   mfluxPin?: string;
   /** The mflux requirement in place of the pin (a bundled wheel's path). */
   mfluxWith?: string;
+  /** The mlx-vlm wheel's absolute path; defaults to the one beside `workerScript`. */
+  mlxVlmWith?: string;
+  /**
+   * The worker.py the jobs will launch. The design env's wheel sits beside it,
+   * so pass the same path the jobs get; then warm and job resolve one env.
+   */
+  workerScript?: string;
   python?: string;
   extraWith?: readonly string[];
 }): string[] {
-  const args = ['run', '--no-project', '--python', opts.python ?? DEFAULT_PYTHON_VERSION];
-  for (const dep of baseWorkerWith(opts.backend, opts.mfluxPin, opts.mfluxWith))
+  const args = [
+    'run',
+    '--no-project',
+    '--python',
+    opts.python ?? DEFAULT_PYTHON_VERSION,
+    ...backendUvFlags(opts.backend),
+  ];
+  const workerScript = given(opts.workerScript);
+  const mlxVlmWith =
+    given(opts.mlxVlmWith) ??
+    (workerScript !== undefined ? bundledMlxVlmWheel(workerScript) : undefined);
+  for (const dep of baseWorkerWith(opts.backend, opts.mfluxPin, opts.mfluxWith, mlxVlmWith))
     args.push('--with', dep);
   for (const dep of opts.extraWith ?? []) args.push('--with', dep);
   args.push('python', '-c', "print('module ready')");
@@ -145,6 +231,11 @@ export interface WorkerUvArgsOptions {
    * app). uv takes a path where it takes `name==version`.
    */
   readonly mfluxWith?: string;
+  /**
+   * The mlx-vlm wheel's absolute path, for an `mlx-vlm` job. Defaults to the
+   * bundled wheel beside {@link workerScript}, which is where it ships.
+   */
+  readonly mlxVlmWith?: string;
   /** uv-provisioned Python version (default {@link DEFAULT_PYTHON_VERSION}). */
   readonly python?: string;
   /**
@@ -166,17 +257,27 @@ export interface WorkerUvArgsOptions {
 /**
  * Build the argv for the `uv` binary that launches the worker:
  *
- *   run --no-project --python <v> --with <base…> [--with <extra> …] python <worker.py>
+ *   run --no-project --python <v> [<backend flags>] --with <base…> [--with <extra> …] python <worker.py>
  *
  * The base `--with` package(s) come from the job's `backend` via
  * {@link baseWorkerWith} (mflux for image, mlx-audio for TTS, the 3D deps for
- * triposr/trellis) — NOT a hardcoded mflux. The job JSON is written to the
- * worker's stdin (see {@link ../client}); the worker streams
+ * triposr/trellis, the bundled wheel for mlx-vlm) — NOT a hardcoded mflux. The
+ * backend flags ({@link backendUvFlags}) are the design env's frozen, no-build
+ * resolve; other backends have none. The job JSON is written to the worker's
+ * stdin (see {@link ../client}); the worker streams
  * {@link ../protocol!GenEvent}s back on stdout. Pure.
  */
 export function buildWorkerUvArgs(opts: WorkerUvArgsOptions): string[] {
-  const args = ['run', '--no-project', '--python', opts.python ?? DEFAULT_PYTHON_VERSION];
-  for (const dep of baseWorkerWith(opts.backend ?? 'mflux', opts.mfluxPin, opts.mfluxWith)) {
+  const backend = opts.backend ?? 'mflux';
+  const args = [
+    'run',
+    '--no-project',
+    '--python',
+    opts.python ?? DEFAULT_PYTHON_VERSION,
+    ...backendUvFlags(backend),
+  ];
+  const mlxVlmWith = given(opts.mlxVlmWith) ?? bundledMlxVlmWheel(opts.workerScript);
+  for (const dep of baseWorkerWith(backend, opts.mfluxPin, opts.mfluxWith, mlxVlmWith)) {
     args.push('--with', dep);
   }
   for (const dep of opts.extraWith ?? []) {

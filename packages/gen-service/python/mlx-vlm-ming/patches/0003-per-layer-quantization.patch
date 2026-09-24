@@ -1,0 +1,105 @@
+Ming-Image: load mixed-precision checkpoints (per-layer quantization).
+
+`_apply` quantizes every module that has scales with ONE bits/group_size,
+the config's defaults. A checkpoint that keeps some layers at 8 bits beside
+4-bit experts therefore fails to load: the 8-bit layers' packed shapes do
+not fit a 4-bit module, and `load_weights(strict=True)` raises. That is the
+recipe Bobble has to benchmark for this model. For Qwen-Image 2.1, a 4-bit
+text encoder flipped a letter in about one rendered word in ten, and an
+8-bit encoder fixed it (packages/gen-service/python/mflux-qwen21).
+
+Each module now gets the precision it was saved with:
+- An entry for its path in the config's `quantization` wins. That is
+  mlx-vlm's own convention: `quantize_model` records it, and `load_model`
+  and `moe_offload` read it.
+- Without one, the packed shapes decide: `in_dims * bits / 32` words per row
+  and one scale per `group_size` inputs. So a checkpoint whose config
+  carries only the defaults loads too. That is what this family's
+  `convert.py` writes.
+The checkpoint still decides WHICH modules are quantized (their scales are
+there). Uniform checkpoints load exactly as before. Upstreamable.
+
+--- a/mlx_vlm/models/ming_image/weights.py
++++ b/mlx_vlm/models/ming_image/weights.py
+@@ -8,6 +8,8 @@
+ import mlx.core as mx
+ import mlx.nn as nn
+ 
++from mlx_vlm.quantization.one_bit import _quantization_for_path
++
+ from .config import MingImageConfig
+ from .text_encoder import MingImageTextEncoder
+ from .transformer import MingImageTransformer, sanitize_transformer_weights
+@@ -40,19 +42,70 @@
+     return bool(_component_config(directory).get("mlx_format"))
+ 
+ 
++def _quantization_from_shapes(
++    module: nn.Module, packed: mx.array | None, scales: mx.array | None
++) -> dict:
++    """``bits`` and ``group_size`` a module was saved with, read off its shapes.
++
++    A quantized weight packs ``in_dims * bits / 32`` uint32 words per row and
++    keeps one scale per ``group_size`` inputs, for a Linear, a SwitchLinear and
++    an Embedding alike; ``in_dims`` is the unquantized module's last axis.
++    """
++    weight = getattr(module, "weight", None)
++    if weight is None or packed is None or scales is None or scales.shape[-1] == 0:
++        return {}
++    in_dims = weight.shape[-1]
++    bits, bits_rest = divmod(packed.shape[-1] * 32, in_dims)
++    group_size, group_rest = divmod(in_dims, scales.shape[-1])
++    if bits_rest or group_rest or not 1 <= bits <= 8:
++        return {}
++    return {"bits": bits, "group_size": group_size}
++
++
++def _module_quantization(
++    path: str, module: nn.Module, weights: dict[str, mx.array], quant: dict
++) -> dict:
++    """The quantization ``path`` was saved with, for ``to_quantized``.
++
++    Mixed-precision checkpoints (say 8-bit attention beside 4-bit experts) keep
++    per-layer settings. An entry for the path in the config wins: mlx-vlm's
++    convention, the defaults plus ``{path: {bits, group_size, mode}}``, as
++    ``quantize_model`` records them. Without one the packed shapes decide, so a
++    checkpoint whose config carries only the defaults still loads. The
++    defaults are the last resort.
++    """
++    params = {"mode": "affine", **_quantization_for_path(quant, path)}
++    if not isinstance(quant.get(path), dict):
++        params.update(
++            _quantization_from_shapes(
++                module, weights.get(f"{path}.weight"), weights.get(f"{path}.scales")
++            )
++        )
++    return {key: params[key] for key in ("group_size", "bits", "mode")}
++
++
+ def _apply(
+     model: nn.Module, weights: list[tuple[str, mx.array]], quant: dict | None = None
+ ) -> nn.Module:
+     if quant is not None:
++        by_key = dict(weights)
+         quantized = {
+-            key[: -len(".scales")] for key, _ in weights if key.endswith(".scales")
++            key[: -len(".scales")] for key in by_key if key.endswith(".scales")
+         }
++
++        def predicate(path: str, module: nn.Module) -> dict | bool:
++            # The checkpoint decides WHICH modules are quantized (their scales
++            # are there); _module_quantization decides HOW each one was.
++            if path not in quantized:
++                return False
++            return _module_quantization(path, module, by_key, quant)
++
+         nn.quantize(
+             model,
+             group_size=quant["group_size"],
+             bits=quant["bits"],
+             mode=quant.get("mode", "affine"),
+-            class_predicate=lambda path, _module: path in quantized,
++            class_predicate=predicate,
+         )
+     model.load_weights(weights, strict=True)
+     model.eval()

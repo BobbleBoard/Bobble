@@ -1,0 +1,159 @@
+Ming-Image: encode a prompt once for many seeds, and let a second prompt work.
+
+The conditioning encoder is a ~16B MoE (about 10 GB at 4 bits). The pipeline
+evicts it after it runs so the DiT has the memory to itself. Upstream that
+has two costs:
+- N pictures of one prompt take N runs, and each one loads and runs the
+  encoder again. `num_images` batches them instead, which multiplies the
+  DiT's memory. It also draws every picture from ONE noise key, so seed k
+  alone never gives the picture seed k gave in the batch.
+- A second `generate_array` call on the same pipeline (a server, a notebook)
+  fails with `'NoneType' object has no attribute 'encode'`: the encoder was
+  evicted and nothing loads it back.
+
+This patch:
+- `encode(prompt)` returns the two small conditioning arrays, and
+  `generate_array(..., conditioning=...)` takes them.
+- `generate_seeds(prompt, seeds)` yields `(seed, image)` per seed after ONE
+  encode. Each image is exactly what that seed gives on its own (its own
+  noise key).
+- `_encode` loads an evicted encoder back, dropping the DiT and VAE first so
+  the encoder never sits beside them. They load again after it, as on a
+  first run.
+- The argument checks move into `_validate`, so `generate_seeds` rejects a
+  bad size before paying for the encode.
+Upstreamable.
+
+--- a/mlx_vlm/models/ming_image/pipeline.py
++++ b/mlx_vlm/models/ming_image/pipeline.py
+@@ -3,7 +3,7 @@
+ from __future__ import annotations
+ 
+ import gc
+-from collections.abc import Callable
++from collections.abc import Callable, Iterable, Iterator
+ from pathlib import Path
+ 
+ import mlx.core as mx
+@@ -65,6 +65,15 @@
+             self.vae = load_vae(self.model_path, self.config)
+ 
+     def _encode(self, prompt: str) -> tuple[mx.array, mx.array]:
++        if self.text_encoder is None:
++            # Evicted after an earlier prompt. Free the DiT and VAE first, so the
++            # encoder never sits beside them (the point of evicting); they load
++            # again after it, as on the first run.
++            self.transformer = None
++            self.vae = None
++            gc.collect()
++            mx.clear_cache()
++            self.text_encoder = load_text_encoder(self.model_path, self.config)
+         cap_feats, cap_feats_2 = self.text_encoder.encode(self._tokenize(prompt))
+         cap_feats = cap_feats.astype(mx.bfloat16)
+         cap_feats_2 = cap_feats_2.astype(mx.bfloat16)
+@@ -75,6 +84,66 @@
+             mx.clear_cache()
+         return cap_feats, cap_feats_2
+ 
++    def encode(self, prompt: str) -> tuple[mx.array, mx.array]:
++        """Condition on ``prompt`` once, for ``generate_array(conditioning=...)``.
++
++        The encoder is the heavy part of a run: a ~16B MoE, evicted after it
++        runs. Its output is two small arrays, so passing them to every
++        ``generate_array`` call for the prompt makes N seeds cost one encode.
++        """
++        return self._encode(prompt)
++
++    @staticmethod
++    def _validate(
++        *, width: int, height: int, steps: int, guidance: float, num_images: int = 1
++    ) -> None:
++        validate_dimensions(width=width, height=height)
++        if steps < 1:
++            raise ValueError(f"steps must be at least 1, got {steps}")
++        if num_images < 1:
++            raise ValueError(f"num_images must be at least 1, got {num_images}")
++        if guidance != 1.0:
++            raise ValueError(
++                "Ming-Image-0.1-Design is trained for guidance 1.0 (CFG off)"
++            )
++
++    def generate_seeds(
++        self,
++        prompt: str,
++        seeds: Iterable[int],
++        *,
++        steps: int = 12,
++        width: int = 1024,
++        height: int = 1024,
++        guidance: float = 1.0,
++        on_step: Callable[[int, int], None] | None = None,
++    ) -> Iterator[tuple[int, mx.array]]:
++        """Yield ``(seed, image)`` for each seed, encoding ``prompt`` only once.
++
++        Each ``[H, W, 4]`` image is exactly what ``generate_array(prompt,
++        seed=seed)`` returns alone: every seed draws its own noise, so a seed
++        reproduces the same picture whatever it was generated beside. Images
++        arrive one at a time, so a caller can save each as it is decoded.
++        Arguments are checked here; the encode runs on the first ``next``.
++        """
++        seeds = [int(seed) for seed in seeds]
++        if not seeds:
++            raise ValueError("generate_seeds needs at least one seed")
++        self._validate(width=width, height=height, steps=steps, guidance=guidance)
++        options = dict(
++            steps=steps, width=width, height=height, guidance=guidance, on_step=on_step
++        )
++        return self._seed_images(prompt, seeds, options)
++
++    def _seed_images(
++        self, prompt: str, seeds: list[int], options: dict
++    ) -> Iterator[tuple[int, mx.array]]:
++        conditioning = self.encode(prompt)
++        for seed in seeds:
++            yield seed, self.generate_array(
++                prompt, seed=seed, conditioning=conditioning, **options
++            )
++
+     def generate_array(
+         self,
+         prompt: str,
+@@ -86,24 +155,28 @@
+         guidance: float = 1.0,
+         num_images: int = 1,
+         on_step: Callable[[int, int], None] | None = None,
++        conditioning: tuple[mx.array, mx.array] | None = None,
+     ) -> mx.array:
+         """Generate one image ([H, W, 4]) or a batch ([N, H, W, 4]) for one prompt.
+ 
+         ``on_step(step, steps)`` runs after each denoising step has been
+         evaluated (``step`` counts from 1), so a caller can report progress, or
+         pause and pace the run, between steps.
++
++        ``conditioning`` is ``encode(prompt)``'s result; without it the prompt
++        is encoded here.
+         """
+-        validate_dimensions(width=width, height=height)
+-        if steps < 1:
+-            raise ValueError(f"steps must be at least 1, got {steps}")
+-        if num_images < 1:
+-            raise ValueError(f"num_images must be at least 1, got {num_images}")
+-        if guidance != 1.0:
+-            raise ValueError(
+-                "Ming-Image-0.1-Design is trained for guidance 1.0 (CFG off)"
+-            )
++        self._validate(
++            width=width,
++            height=height,
++            steps=steps,
++            guidance=guidance,
++            num_images=num_images,
++        )
+ 
+-        cap_feats, cap_feats_2 = self._encode(prompt)
++        if conditioning is None:
++            conditioning = self._encode(prompt)
++        cap_feats, cap_feats_2 = conditioning
+         self._ensure_components()
+ 
+         z = self.config.vae.z_dim

@@ -33,7 +33,10 @@ export type Modality = 'image' | 'audio' | 'video' | '3d';
  *   - `hyperframes` — the Node+ffmpeg motion-graphics path;
  *   - `torch-tts` — a torch/MPS→CPU TTS path (Chatterbox) that is NOT the
  *     mlx-audio CLI (slower, Perth-watermarked output); driven by the same uv
- *     worker but with a torch base package instead of mlx-audio.
+ *     worker but with a torch base package instead of mlx-audio;
+ *   - `mlx-vlm` — the design models (Ming-Image-0.1-Design) on MLX through
+ *     mlx-vlm, a process-per-job uv worker like mflux, on a bundled mlx-vlm
+ *     wheel (see worker-command's `MLX_VLM_WHEEL`).
  */
 export type Backend =
   | 'mflux'
@@ -42,7 +45,8 @@ export type Backend =
   | 'triposr'
   | 'trellis'
   | 'hyperframes'
-  | 'comfyui';
+  | 'comfyui'
+  | 'mlx-vlm';
 
 /**
  * Backend-resolved image parameters. The app resolves a catalog entry
