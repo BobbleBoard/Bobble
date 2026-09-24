@@ -43,7 +43,15 @@ import path from 'node:path';
 import type { GenOutput } from '@pi-desktop/gen-service';
 import { createLogger } from '@pi-desktop/shared';
 import { writeApngFile } from './apng.js';
+import {
+  durationFromPrompt,
+  looksLikeScene,
+  planMotion,
+  titleCardDocument,
+} from './hyperframes-templates.js';
 import type { HyperFramesRender } from './video-dispatch.js';
+
+export { looksLikeScene };
 
 const log = createLogger('desktop:hyperframes');
 
@@ -94,64 +102,44 @@ export function frameFileName(index: number, total: number): string {
   return `frame_${String(index).padStart(width, '0')}.png`;
 }
 
-/** Does this look like a scene the model authored, rather than a text prompt? */
-export function looksLikeScene(prompt: string): boolean {
-  return /<\s*(html|body|div|svg|canvas|style|section|main|h1)\b/i.test(prompt);
+/**
+ * "10-second", "6 s", "2.5 seconds" → seconds, when a prompt says how long
+ * (never from its quoted words, and never a decade: "the 90s").
+ */
+export function secondsFromPrompt(prompt: string): number | undefined {
+  return durationFromPrompt(prompt);
 }
 
 /**
  * Wrap whatever we were given into a full document at the right size.
  *
- * A prompt that is already a scene is used as-is inside a sized stage. A plain
- * text prompt is NOT silently turned into art — it becomes a legible title card
- * that says what it was asked to draw, which is honest output rather than a
- * blank frame the caller might mistake for a render.
+ * A prompt that is already a scene is used as-is inside a sized stage. A text
+ * prompt goes through ./hyperframes-templates.ts: the words it quotes (or the
+ * prompt itself, when it is the words) become a designed title card in the
+ * colours it names — never the instruction printed as a title, which is what
+ * this used to make of "10-second animated title card with the text 'Launch
+ * day' in bright yellow …" (REAL, twice). A prompt it cannot read as a card —
+ * a card with no words, a description of a picture — throws a message that
+ * says what to send instead, and the job fails with it rather than rendering a
+ * guess.
  */
 export function buildSceneDocument(prompt: string, opts: StillSceneOptions): string {
-  const body = looksLikeScene(prompt)
-    ? prompt
-    : `<div class="hf-card"><h1>${escapeHtml(prompt.trim() || 'Untitled scene')}</h1></div>`;
-  /*
-   * THE TITLE CARD MOVES. A plain prompt used to become a static card, and a
-   * static card renders the same instant ninety-seven times — which the frame
-   * check rightly refuses ("IDENTICAL frames"). MEASURED from the Video studio
-   * on a fresh Mac (modules-fresh-probe, 2026-09-14): the module installed,
-   * the renderer ran, and the one clip a weightless Mac can make failed on
-   * its own honesty. So the card carries real CSS animations, which the seek
-   * pins per frame: the title slides up and settles over the first second, a
-   * light sweeps the plate, and the glow breathes for the rest of the clip.
-   * The rise starts a third visible, not invisible: the clip's poster is its
-   * FIRST frame, and a poster of an empty plate reads as a failed render.
-   */
+  const plan = planMotion(prompt);
+  if (plan.kind === 'refuse') throw new Error(plan.message);
+  if (plan.kind === 'title-card') {
+    return titleCardDocument(plan.card, {
+      width: opts.width,
+      height: opts.height,
+      seconds: opts.seconds,
+    });
+  }
   return `<!doctype html>
 <html><head><meta charset="utf-8"><style>
   *, *::before, *::after { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; width: ${opts.width}px; height: ${opts.height}px;
     overflow: hidden; background: #0b0b0f; color: #f5f5f7;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-  .hf-card { position: relative; width: 100%; height: 100%; display: flex; align-items: center;
-    justify-content: center; text-align: center; padding: 8%; overflow: hidden;
-    background: radial-gradient(120% 90% at 50% 110%, #1b2a5a 0%, #0b0b0f 60%); }
-  .hf-card::before { content: ""; position: absolute; inset: -20%;
-    background: linear-gradient(115deg, transparent 40%, rgba(255,255,255,0.10) 50%, transparent 60%);
-    animation: hf-sweep 3.2s ease-in-out infinite; }
-  .hf-card h1 { position: relative; font-size: clamp(28px, 6vw, 88px); font-weight: 650;
-    letter-spacing: -0.02em; line-height: 1.08; margin: 0;
-    animation: hf-rise 1.1s cubic-bezier(0.2, 0.8, 0.2, 1) both, hf-glow 2.4s ease-in-out 1.1s infinite; }
-  @keyframes hf-rise { from { opacity: 0.35; transform: translateY(12%) scale(0.97); }
-    to { opacity: 1; transform: translateY(0) scale(1); } }
-  @keyframes hf-glow { 0%, 100% { text-shadow: 0 0 0 rgba(140,170,255,0); }
-    50% { text-shadow: 0 0 28px rgba(140,170,255,0.75), 0 0 6px rgba(255,255,255,0.5); } }
-  @keyframes hf-sweep { from { transform: translateX(-60%); } to { transform: translateX(60%); } }
-</style></head><body>${body}</body></html>`;
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+</style></head><body>${prompt}</body></html>`;
 }
 
 /**
@@ -233,14 +221,13 @@ export function createStillRenderer(deps: StillRendererDeps): HyperFramesRender 
     const width = spec.width ?? DEFAULT_WIDTH;
     const height = spec.height ?? DEFAULT_HEIGHT;
     const fps = frameRate(spec.fps ?? DEFAULT_FPS);
-    const times = frameTimes(spec.seconds ?? DEFAULT_SECONDS, fps);
+    // A length the caller did not set is the one a text prompt says ("10-second
+    // …") — never one read out of a scene's CSS ("animation: rise 0.9s").
+    const said = looksLikeScene(spec.prompt) ? undefined : secondsFromPrompt(spec.prompt);
+    const seconds = spec.seconds ?? said ?? DEFAULT_SECONDS;
+    const times = frameTimes(seconds, fps);
     const seed = spec.seeds[0];
-    const html = buildSceneDocument(spec.prompt, {
-      width,
-      height,
-      seconds: spec.seconds ?? DEFAULT_SECONDS,
-      fps,
-    });
+    const html = buildSceneDocument(spec.prompt, { width, height, seconds, fps });
 
     const framesDir = path.join(outputDir, FRAMES_DIR);
     await makeDir(framesDir);

@@ -126,7 +126,10 @@ try {
       else await page.keyboard.press('Escape');
       await page.fill(
         '[data-testid="studio-prompt"]',
-        'a bold title card that slides in and glows',
+        // The words in quotes: a HyperFrames title card prints exactly those
+        // (VQ-11 lite) and refuses a card with none, rather than printing the
+        // instruction as its title.
+        'a bold title card "Bobble" that slides in and glows',
       );
       await page.click('[data-testid="studio-run"]');
       const clip = await until(

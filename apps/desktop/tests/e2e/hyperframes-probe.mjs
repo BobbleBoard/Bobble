@@ -33,7 +33,14 @@
  */
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { copyFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -58,8 +65,15 @@ writeFileSync(
   ].join('\n'),
 );
 const bundle = path.join(OUT, 'probe-bundle.mjs');
-execFileSync(
+// esbuild is not a direct dependency of the app any more (vite 8 bundles with
+// rolldown): a fresh worktree has it only in pnpm's hoisted store.
+const esbuild = [
   path.join(APP_ROOT, 'node_modules/.bin/esbuild'),
+  path.join(REPO_ROOT, 'node_modules/.pnpm/node_modules/.bin/esbuild'),
+].find((p) => existsSync(p));
+if (esbuild === undefined) throw new Error('esbuild not found (run pnpm install)');
+execFileSync(
+  esbuild,
   [
     entry,
     '--bundle',
@@ -309,6 +323,13 @@ try {
     poster === path.join(outputDir, 'poster.png') && !src.isApng(readFileSync(poster)),
     `the poster should be a plain still beside the animation, got ${poster}`,
   );
+  // The poster is what the model judges its work by: the frame the scene
+  // SETTLES to (the last one), not frame 0 mid-entrance (VQ-11 lite).
+  const posterIsLast = readFileSync(poster).equals(frameBytes.at(-1));
+  say(
+    `poster = the last frame: ${posterIsLast}; = frame 0: ${readFileSync(poster).equals(frameBytes[0])}`,
+  );
+  check(posterIsLast, 'the poster is not the frame the animation settles to (the last one)');
   const tools = new Map();
   src.registerGenTools(
     { registerTool: (def) => tools.set(def.name, def) },
