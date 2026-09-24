@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="560" viewBox="0 0 1200 560" font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
+  <title>Order fulfilment</title>
+  <desc>Order placed, payment check (fail: email customer and retry), pick and pack, quality check (fail: back to pick and pack), ship, delivered, review request.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#4A5A63"/></marker>
+    <marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#C2410C"/></marker>
+  </defs>
+  <rect width="1200" height="560" fill="#F7F8F7"/>
+  <text x="48" y="56" font-size="26" font-weight="600" fill="#0F1E26">Order fulfilment</text>
+  <text x="48" y="84" font-size="15" fill="#4A5A63">Happy path left to right · failures loop back in orange</text>
+  <!-- main rail -->
+  <g font-size="16" fill="#0F1E26">
+    <rect x="48" y="230" width="132" height="64" rx="32" fill="#0F1E26"/><text x="114" y="268" text-anchor="middle" fill="#FFFFFF" font-weight="600">Order placed</text>
+    <polygon points="290,212 360,262 290,312 220,262" fill="#FFFFFF" stroke="#0F1E26" stroke-width="2"/><text x="290" y="258" text-anchor="middle" font-weight="600">Payment</text><text x="290" y="278" text-anchor="middle" font-weight="600">ok?</text>
+    <rect x="412" y="230" width="150" height="64" rx="10" fill="#FFFFFF" stroke="#0F1E26" stroke-width="2"/><text x="487" y="268" text-anchor="middle" font-weight="600">Pick &amp; pack</text>
+    <polygon points="672,212 742,262 672,312 602,262" fill="#FFFFFF" stroke="#0F1E26" stroke-width="2"/><text x="672" y="258" text-anchor="middle" font-weight="600">Quality</text><text x="672" y="278" text-anchor="middle" font-weight="600">ok?</text>
+    <rect x="792" y="230" width="104" height="64" rx="10" fill="#FFFFFF" stroke="#0F1E26" stroke-width="2"/><text x="844" y="268" text-anchor="middle" font-weight="600">Ship</text>
+    <rect x="936" y="230" width="112" height="64" rx="10" fill="#FFFFFF" stroke="#0F1E26" stroke-width="2"/><text x="992" y="268" text-anchor="middle" font-weight="600">Delivered</text>
+    <rect x="1036" y="380" width="128" height="64" rx="32" fill="#0E7C7B"/><text x="1100" y="409" text-anchor="middle" fill="#FFFFFF" font-weight="600">Review</text><text x="1100" y="429" text-anchor="middle" fill="#FFFFFF" font-weight="600">request</text>
+  </g>
+  <g stroke="#4A5A63" stroke-width="2" fill="none" marker-end="url(#arrow)">
+    <line x1="180" y1="262" x2="218" y2="262"/>
+    <line x1="360" y1="262" x2="410" y2="262"/>
+    <line x1="562" y1="262" x2="600" y2="262"/>
+    <line x1="742" y1="262" x2="790" y2="262"/>
+    <line x1="896" y1="262" x2="934" y2="262"/>
+    <path d="M992 294 L992 412 L1034 412"/>
+  </g>
+  <g font-size="13" fill="#4A5A63"><text x="378" y="252">yes</text><text x="758" y="252">yes</text></g>
+  <!-- payment failure loop -->
+  <g stroke="#C2410C" stroke-width="2" fill="none">
+    <path d="M290 312 L290 400 L230 400" marker-end="url(#arrow-red)"/>
+    <path d="M175 376 L175 340 L250 340 L250 290" marker-end="url(#arrow-red)"/>
+  </g>
+  <rect x="120" y="376" width="110" height="56" rx="10" fill="#FFF4EC" stroke="#C2410C" stroke-width="2"/>
+  <text x="175" y="400" text-anchor="middle" font-size="14" font-weight="600" fill="#9A3412">Email</text><text x="175" y="418" text-anchor="middle" font-size="14" font-weight="600" fill="#9A3412">customer</text>
+  <text x="298" y="352" font-size="13" fill="#C2410C">no</text>
+  <text x="160" y="334" font-size="13" fill="#C2410C" text-anchor="end">retry</text>
+  <!-- quality failure loop -->
+  <path d="M672 212 L672 150 L487 150 L487 228" stroke="#C2410C" stroke-width="2" fill="none" marker-end="url(#arrow-red)"/>
+  <text x="580" y="140" text-anchor="middle" font-size="13" fill="#C2410C">no — repack</text>
+</svg>

@@ -1,0 +1,13 @@
+# OmniSVG's REAL job, unmeasured so far (visual-quality.md §6: every OmniSVG
+# output on disk answers a diagram or text request, where it failed). One
+# `svg "<prompt>" --out <name>.svg` per line, on a quiet Mac (a BENCH job:
+# it loads the 4B OmniSVG model). No words in any of them — that is the diagram
+# tool's job, not this one's.
+a water droplet icon, flat, single teal colour, centered
+a gear icon, single colour, simple, even stroke
+a coffee cup logo, flat, two colours
+a leaf icon with one vein, green, minimal
+a paper plane icon, outline style, dark blue
+a house icon with a chimney, flat, two colours
+a bicycle, side view, simple flat shapes
+a red heart with smooth curved edges, centered

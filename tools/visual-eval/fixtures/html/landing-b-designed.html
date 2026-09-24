@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kiln — pottery studio, Portland</title>
+<!--
+  (b) The same toolchain a Bobble chat has — write HTML/CSS, generate_image for pictures,
+  present — used with a design system instead of a habit:
+  - PICTURES ARE REAL CONTENT. The hero and the strip are Qwen-Image outputs made in this app
+    (~/Bobble/generated/*ceramic-mug*, 2026-09); the page is built around them, not around
+    gradients and emoji. In a run: `media generate image "…" --save_to assets/hero.jpg` (~97 s at 1024²).
+  - TOKENS FIRST: one family, a 7-step type scale, an 8px rhythm, ink + paper + one accent
+    sampled from the hero photo (the sill's wood), black primary buttons.
+  - COPY FROM THE BRIEF: prices and lengths are the brief's; the schedule times are marked as
+    samples because the brief gave none.
+  - RESPONSIVE: one grid that collapses at 760px; no horizontal overflow on a phone.
+-->
+<style>
+  :root {
+    --ink:#1F1B16; --ink-2:#5C554C; --ink-3:#8A8277; --paper:#F7F5F1; --panel:#EFEBE4; --line:#DDD6CB;
+    --accent:#7A5A3A; --white:#FFFFFF;
+    --font:"Avenir Next","Helvetica Neue",Helvetica,Arial,sans-serif;
+    --s1:8px; --s2:16px; --s3:24px; --s4:32px; --s5:48px; --s6:64px; --s7:96px;
+    --r:14px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--paper);color:var(--ink);font-family:var(--font);font-size:18px;line-height:1.55;-webkit-font-smoothing:antialiased}
+  a{color:inherit}
+  .wrap{max-width:1200px;margin:0 auto;padding:0 var(--s4)}
+  nav{display:flex;align-items:center;justify-content:space-between;padding:var(--s3) 0}
+  .mark{font-size:26px;font-weight:700;letter-spacing:-0.02em;text-decoration:none}
+  .mark span{color:var(--accent)}
+  .links{display:flex;gap:var(--s4);font-size:16px;color:var(--ink-2)}
+  .links a{text-decoration:none}
+  .btn{display:inline-flex;align-items:center;gap:10px;background:var(--ink);color:var(--white);text-decoration:none;
+       font-weight:600;font-size:16px;padding:14px 22px;border-radius:999px;border:1.5px solid var(--ink)}
+  .btn.ghost{background:transparent;color:var(--ink)}
+  .btn small{font-weight:500;opacity:.75}
+  .hero{display:grid;grid-template-columns:5fr 6fr;gap:var(--s6);align-items:center;padding:var(--s5) 0 var(--s7)}
+  .eyebrow{font-size:15px;font-weight:600;color:var(--accent);margin-bottom:var(--s2)}
+  h1{font-size:72px;line-height:1.02;letter-spacing:-0.03em;font-weight:700;text-wrap:balance}
+  .lede{font-size:21px;color:var(--ink-2);margin:var(--s3) 0 var(--s4);max-width:30ch}
+  .ctas{display:flex;gap:var(--s2);flex-wrap:wrap}
+  .hero img{width:100%;aspect-ratio:4/5;object-fit:cover;border-radius:var(--r);display:block}
+  h2{font-size:40px;line-height:1.1;letter-spacing:-0.02em;font-weight:700;margin-bottom:var(--s2);text-wrap:balance}
+  .section{padding:var(--s7) 0;border-top:1px solid var(--line)}
+  .intro{color:var(--ink-2);max-width:56ch;margin-bottom:var(--s5)}
+  .offers{display:grid;grid-template-columns:1fr 1fr;gap:var(--s3)}
+  .offer{background:var(--white);border:1px solid var(--line);border-radius:var(--r);padding:var(--s5)}
+  .offer .what{font-size:15px;font-weight:600;color:var(--accent)}
+  .offer .price{font-size:64px;font-weight:700;letter-spacing:-0.03em;line-height:1;margin:var(--s2) 0 4px}
+  .offer .per{color:var(--ink-3);font-size:16px;margin-bottom:var(--s3)}
+  .offer ul{list-style:none;margin-bottom:var(--s4)}
+  .offer li{padding:10px 0;border-top:1px solid var(--line);color:var(--ink-2)}
+  table{width:100%;border-collapse:collapse;font-size:17px}
+  th{text-align:left;font-size:14px;font-weight:600;color:var(--ink-3);padding:0 0 12px}
+  td{padding:16px 0;border-top:1px solid var(--line)}
+  td:first-child{font-weight:600}
+  .tag{display:inline-block;font-size:13px;font-weight:600;color:var(--accent);background:var(--panel);padding:3px 10px;border-radius:999px;margin-left:10px;vertical-align:middle}
+  .strip{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--s3)}
+  .strip img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:var(--r);display:block}
+  .signup{background:var(--ink);color:var(--white);border-radius:24px;padding:var(--s6);display:grid;grid-template-columns:1.2fr 1fr;gap:var(--s5);align-items:center;margin:var(--s7) 0}
+  .signup h2{color:var(--white)}
+  .signup p{color:#CFC7BB}
+  form{display:flex;gap:var(--s1)}
+  input{flex:1;min-width:0;font:inherit;font-size:16px;padding:14px 18px;border-radius:999px;border:1px solid #4A4339;background:#2A251F;color:var(--white)}
+  .signup .btn{background:var(--white);color:var(--ink);border-color:var(--white)}
+  footer{display:flex;justify-content:space-between;color:var(--ink-3);font-size:15px;padding:0 0 var(--s5)}
+  @media (max-width:760px){
+    .wrap{padding:0 20px} .links{display:none}
+    .hero,.offers,.signup{grid-template-columns:1fr} .hero{gap:var(--s4);padding-top:var(--s3)}
+    h1{font-size:46px} h2{font-size:32px} .offer{padding:var(--s4)} .offer .price{font-size:52px}
+    .strip{grid-template-columns:1fr 1fr} .strip img:last-child{display:none}
+    .signup{padding:var(--s4)} form{flex-direction:column} footer{flex-direction:column;gap:8px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav>
+    <a class="mark" href="#">Kiln<span>.</span></a>
+    <div class="links"><a href="#classes">Classes</a><a href="#schedule">Schedule</a><a href="#pricing">Pricing</a></div>
+    <a class="btn" href="#signup">Sign up</a>
+  </nav>
+
+  <section class="hero">
+    <div>
+      <div class="eyebrow">Pottery studio · Portland</div>
+      <h1>Learn to throw on the wheel.</h1>
+      <p class="lede">A six-week course for complete beginners, and an open studio for when you just want time at the wheel.</p>
+      <div class="ctas">
+        <a class="btn" href="#signup">Join the beginner course <small>$280</small></a>
+        <a class="btn ghost" href="#pricing">Drop in for $25</a>
+      </div>
+    </div>
+    <img src="landing-b-assets/hero-mug.jpg" alt="A speckled hand-thrown mug on a wooden windowsill">
+  </section>
+
+  <section class="section" id="pricing">
+    <h2 id="classes">Two ways in</h2>
+    <p class="intro">Start with the course if you have never centered clay. Come to open studio once you have.</p>
+    <div class="offers">
+      <div class="offer">
+        <div class="what">Beginner wheel-throwing</div>
+        <div class="price">$280</div>
+        <div class="per">six weeks</div>
+        <ul><li>One class a week for six weeks</li><li>Centering, opening, pulling walls</li><li>For complete beginners</li></ul>
+        <a class="btn" href="#signup">Join the course</a>
+      </div>
+      <div class="offer">
+        <div class="what">Open studio</div>
+        <div class="price">$25</div>
+        <div class="per">per drop-in</div>
+        <ul><li>A wheel and the studio's tools</li><li>No booking a course</li><li>For people who know the basics</li></ul>
+        <a class="btn ghost" href="#schedule">See open hours</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="schedule">
+    <h2>Schedule <span class="tag">sample times — replace with the studio's calendar</span></h2>
+    <p class="intro">The brief gave no days or times, so these rows are placeholders in the right shape.</p>
+    <table>
+      <tr><th>Session</th><th>When</th><th>Length</th><th>Price</th></tr>
+      <tr><td>Beginner course</td><td>Tuesdays, 6:30 pm</td><td>6 weeks</td><td>$280</td></tr>
+      <tr><td>Beginner course</td><td>Saturdays, 10:00 am</td><td>6 weeks</td><td>$280</td></tr>
+      <tr><td>Open studio</td><td>Thursdays &amp; Sundays</td><td>Drop in</td><td>$25</td></tr>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>From the wheel</h2>
+    <div class="strip">
+      <img src="landing-b-assets/gallery-1.jpg" alt="Hand-thrown mug on a sunny windowsill">
+      <img src="landing-b-assets/gallery-2.jpg" alt="Speckled mug held by the handle">
+      <img src="landing-b-assets/gallery-3.jpg" alt="Glazed mug in morning light">
+    </div>
+  </section>
+
+  <section class="signup" id="signup">
+    <div>
+      <h2>Your first mug is six weeks away.</h2>
+      <p>Leave your email and we'll send the next course dates.</p>
+    </div>
+    <form onsubmit="return false"><input type="email" placeholder="you@example.com" aria-label="Email"><button class="btn" type="submit">Sign up</button></form>
+  </section>
+
+  <footer><span>Kiln · pottery studio · Portland, OR</span><span>Beginner course $280 · Open studio $25</span></footer>
+</div>
+</body>
+</html>

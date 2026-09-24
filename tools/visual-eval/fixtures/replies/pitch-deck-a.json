@@ -1,0 +1,23 @@
+{
+  "_note": "Canned replies for the replay stub. Each habit is copied from a captured 4B reply in ~/.cache/bobble/office-gen (last_pptx_spec.json 2026-09-16, raw_plan.txt + raw_fill1-8.txt 2026-09-16/21): the plan lists the planner's own rules in order; theme midnight (both captured plans); kicker = a description of the slide; bars.display = the unit; flow.emphasis as strings; an invented provenance footnote; image_query copies the layout's own description.",
+  "plan": {
+    "theme": "midnight",
+    "running_title": "Tidewell",
+    "slides": [
+      {"layout": "hero_title", "title": "Tidewell: Smart Water-Leak Sensors", "intent": "Introduce Tidewell and the seed raise"},
+      {"layout": "hero_statement", "title": "Water damage is the #1 insurance claim", "intent": "The deck's quiet moment framing the problem"},
+      {"layout": "flow", "title": "How Tidewell Works", "intent": "Map detection to automatic shutoff"},
+      {"layout": "stats", "title": "Strong Early Traction", "intent": "Headline traction numbers"},
+      {"layout": "bars", "title": "Market Opportunity", "intent": "Compare market size to current units"},
+      {"layout": "closing", "title": "The Ask", "intent": "Summarize the raise"}
+    ]
+  },
+  "fills": [
+    {"layout": "hero_title", "title": "Tidewell: Smart Water-Leak Sensors for Apartment Buildings", "subtitle": "Stopping water damage before it starts", "eyebrow": "Raising a $2.5M seed round to scale leak detection", "footnote": "Data sourced from internal company metrics", "image_query": "Full-bleed photo of a modern apartment building at dusk"},
+    {"layout": "hero_statement", "statement": "Water damage is the #1 insurance claim for multifamily buildings, averaging $24,000 per claim.", "attribution": "", "image_query": "water droplets abstract"},
+    {"title": "How Tidewell Works", "kicker": "Map the process from leak detection to automatic shutoff", "steps": [{"label": "Leak Detected", "caption": "$39 stick-on sensor detects water", "emphasis": "true"}, {"label": "Dashboard Alert", "caption": "Building manager is notified instantly", "emphasis": "false"}, {"label": "Auto Shutoff", "caption": "Valve closes automatically", "emphasis": "false"}], "note": "Based on current product capabilities."},
+    {"layout": "stats", "title": "Strong Early Traction", "kicker": "Key metrics showing company growth", "stats": [{"value": "42", "label": "Buildings"}, {"value": "3,100", "label": "Units"}, {"value": "$38k", "label": "MRR"}, {"value": "18%", "label": "Month-over-month growth"}], "note": "Growing rapidly every month"},
+    {"layout": "bars", "title": "Market Opportunity", "kicker": "Bar chart comparing market size to current units", "items": [{"label": "US rental units (mid/large buildings)", "value": "22M", "display": "units"}, {"label": "Tidewell units today", "value": "3,100", "display": "units"}], "highlight_index": 0, "note": "22M units represents a massive opportunity"},
+    {"layout": "closing", "title": "The Ask", "points": ["Raising $2.5M seed round", "18 months of runway", "Expand to more buildings nationwide"]}
+  ]
+}

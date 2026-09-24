@@ -1,0 +1,23 @@
+{
+  "layout": "flow",
+  "title": "The Path to 2030",
+  "kicker": "Map the sequence from current targets to future integration",
+  "steps": [
+    {
+      "label": "2029 Baseline",
+      "caption": "Global capacity reaches 960 GW.",
+      "emphasis": "current"
+    },
+    {
+      "label": "2030 Target",
+      "caption": "Achieve 1,000 GW global capacity.",
+      "emphasis": "goal"
+    },
+    {
+      "label": "2035 Impact",
+      "caption": "Solar provides 25% of global electricity.",
+      "emphasis": "outcome"
+    }
+  ],
+  "note": "Offshore solar and BIPV adoption accelerate the path."
+}

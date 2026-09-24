@@ -1,0 +1,4 @@
+{
+  "_note": "The other chart route: `office make chart --brief …` (office.py -> make_chart.py -> chart_render.py). The canned spec copies the captured one (last_chart_spec.json, 2026-09-16): a subtitle and axis titles that restate the title ('Number of Units', 'Year', 'Units Sold'), the k dropped from the values, no highlight, no source.",
+  "chart": {"type": "bar", "title": "Monthly Active Users by Quarter", "subtitle": "Number of Users", "x_label": "Quarter", "y_label": "Monthly Active Users", "series": [{"name": "Monthly Active Users", "points": [{"label": "Q1 2025", "value": 48}, {"label": "Q2 2025", "value": 61}, {"label": "Q3 2025", "value": 79}, {"label": "Q4 2025", "value": 102}]}], "highlight": "", "note": ""}
+}

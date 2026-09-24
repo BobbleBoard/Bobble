@@ -1,0 +1,35 @@
+{
+  "type": "line",
+  "title": "Revenue Growth Trend",
+  "series": [
+    {
+      "name": "",
+      "points": [
+        {
+          "label": "2020",
+          "value": 45000
+        },
+        {
+          "label": "2021",
+          "value": 52000
+        },
+        {
+          "label": "2022",
+          "value": 48000
+        },
+        {
+          "label": "2023",
+          "value": 61000
+        },
+        {
+          "label": "2024",
+          "value": 73000
+        }
+      ]
+    }
+  ],
+  "unit": "$",
+  "style": {
+    "look": "sunset"
+  }
+}

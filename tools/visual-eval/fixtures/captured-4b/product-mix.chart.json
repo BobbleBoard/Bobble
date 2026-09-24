@@ -1,0 +1,31 @@
+{
+  "type": "stacked",
+  "title": "Product Mix",
+  "series": [
+    {
+      "name": "",
+      "points": [
+        {
+          "label": "Electronics",
+          "value": 30
+        },
+        {
+          "label": "Clothing",
+          "value": 25
+        },
+        {
+          "label": "Home",
+          "value": 20
+        },
+        {
+          "label": "Beauty",
+          "value": 25
+        }
+      ]
+    }
+  ],
+  "unit": "%",
+  "style": {
+    "look": "ocean"
+  }
+}

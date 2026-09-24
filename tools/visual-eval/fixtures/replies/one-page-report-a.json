@@ -1,0 +1,23 @@
+{
+  "_note": "Canned reply for make_doc (docx). Habits copied from the captured 4B specs (last_docx_spec.json 'The Art of Tea', last_pdf_spec.json 'Annual Unit Sales', the cookie-recipe docx): opens with a full cover band whatever the length asked for; 13 blocks because the prompt demands 9-14; heading+standfirst pairs; generic body prose; an extra table column the brief never gave (the captured PDF invented a whole regional table); a quote with an invented attribution ('Director of Operations', 'The Tea Lover's Perspective'); the navy/red palette of the captured PDF spec.",
+  "doc": {
+    "title": "Q3 Customer Support Performance Report",
+    "running_title": "Support Operations Q3",
+    "palette": {"primary": "#1E3A5F", "accent": "#E63946"},
+    "blocks": [
+      {"type": "cover", "eyebrow": "Customer Support", "title": "Q3 Customer Support Performance Report", "subtitle": "A comprehensive review of our support metrics and improvements this quarter.", "byline": "Prepared by the Support Operations Team"},
+      {"type": "heading", "title": "Executive Summary", "standfirst": "A strong quarter of faster responses and a shrinking backlog."},
+      {"type": "body", "paragraphs": ["This report details the performance of our customer support team during the third quarter, highlighting key improvements in response times and customer satisfaction.", "Despite an increase in ticket volume, the team delivered faster responses and exceeded its satisfaction target."]},
+      {"type": "stats", "stats": [{"value": "12,480", "label": "Total Tickets"}, {"value": "2h 14m", "label": "Median First Response"}, {"value": "91%", "label": "CSAT Score"}, {"value": "640", "label": "Backlog"}]},
+      {"type": "callout", "label": "Key Achievement", "text": "Median first response time improved from 3h 40m to 2h 14m while ticket volume grew 9%."},
+      {"type": "heading", "title": "Top Ticket Drivers", "standfirst": "Understanding what drives customer contacts."},
+      {"type": "table", "headers": ["Driver", "Share of Tickets", "Trend"], "rows": [["Billing questions", "31%", "Increasing"], ["Login issues", "22%", "Stable"], ["Shipping delays", "18%", "Increasing"]]},
+      {"type": "body", "paragraphs": ["Billing questions remain the largest driver of support volume, followed by login issues and shipping delays."]},
+      {"type": "quote", "quote": "Great support is the backbone of customer loyalty.", "attribution": "Head of Customer Experience"},
+      {"type": "heading", "title": "Recommendations", "standfirst": "Three initiatives to reduce ticket volume in Q4."},
+      {"type": "bullets", "items": ["Launch self-serve refunds to reduce billing-related tickets.", "Roll out SSO to eliminate common login issues.", "Send carrier tracking emails to proactively address shipping questions."]},
+      {"type": "body", "paragraphs": ["By implementing these recommendations, we expect to further reduce ticket volume and improve customer satisfaction in the coming quarter."]},
+      {"type": "callout", "label": "Next Steps", "text": "The support leadership team will present a detailed implementation plan for each initiative in early Q4."}
+    ]
+  }
+}

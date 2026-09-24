@@ -16,7 +16,8 @@
     "test": "turbo run test",
     "check": "turbo run lint typecheck test build",
     "e2e": "pnpm --filter @pi-desktop/desktop e2e",
-    "format": "biome check --write ."
+    "format": "biome check --write .",
+    "vq:eval": "node tools/visual-eval/eval.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.2",

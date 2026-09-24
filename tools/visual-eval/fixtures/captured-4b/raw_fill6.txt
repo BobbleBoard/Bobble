@@ -1,0 +1,20 @@
+{
+  "title": "Market Camps: Traditional vs. Emerging",
+  "kicker": "Contrast conventional grid needs against offshore and BIPV opportunities",
+  "columns": ["Conventional Grid Needs", "Offshore & BIPV Opportunities"],
+  "rows": [
+    {
+      "label": "Cost Efficiency",
+      "values": [true, false]
+    },
+    {
+      "label": "Space Constraints",
+      "values": [false, true]
+    },
+    {
+      "label": "2030 Capacity Target",
+      "values": [false, true]
+    }
+  ],
+  "verdict": "Emerging markets offer higher growth potential despite higher initial deployment costs."
+}

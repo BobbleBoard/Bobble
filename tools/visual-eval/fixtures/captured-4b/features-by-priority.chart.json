@@ -1,0 +1,31 @@
+{
+  "type": "hbar",
+  "title": "Features by Priority",
+  "series": [
+    {
+      "name": "",
+      "points": [
+        {
+          "label": "Critical",
+          "value": 4
+        },
+        {
+          "label": "High",
+          "value": 8
+        },
+        {
+          "label": "Medium",
+          "value": 12
+        },
+        {
+          "label": "Low",
+          "value": 6
+        }
+      ]
+    }
+  ],
+  "unit": "features",
+  "style": {
+    "look": "terminal"
+  }
+}

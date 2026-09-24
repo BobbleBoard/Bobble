@@ -1,0 +1,18 @@
+{
+  "_note": "If the 4B takes the diagram to the deck pipeline instead (office make pptx 'flow diagram …'), the flow layout is the only diagram primitive: circles on one rail. Seven steps and two failure branches go in; L_flow keeps steps[:5] and has no way to draw a branch.",
+  "plan": {"theme": "midnight", "running_title": "Order Fulfilment", "slides": [
+    {"layout": "hero_title", "title": "Order Fulfilment Process", "intent": "Introduce the process"},
+    {"layout": "flow", "title": "Order Fulfilment Flow", "intent": "Map the process steps"},
+    {"layout": "closing", "title": "Summary", "intent": "Key takeaways"}]},
+  "fills": [
+    {"layout": "hero_title", "title": "Order Fulfilment Process", "subtitle": "From order placed to review request", "eyebrow": "Process overview", "footnote": "", "image_query": "warehouse boxes"},
+    {"layout": "flow", "title": "Order Fulfilment Flow", "kicker": "Map the process steps from order to review", "steps": [
+      {"label": "Order Placed", "caption": "Customer places an order", "emphasis": "true"},
+      {"label": "Payment Check", "caption": "If it fails, email the customer and retry", "emphasis": "false"},
+      {"label": "Pick & Pack", "caption": "Items are picked and packed", "emphasis": "false"},
+      {"label": "Quality Check", "caption": "If it fails, go back to pick & pack", "emphasis": "false"},
+      {"label": "Ship", "caption": "Order is shipped", "emphasis": "false"},
+      {"label": "Delivered", "caption": "Order is delivered", "emphasis": "false"},
+      {"label": "Review Request", "caption": "Customer is asked for a review", "emphasis": "false"}], "note": ""},
+    {"layout": "closing", "title": "Summary", "points": ["Seven steps from order to review", "Failures loop back for retry", "Quality is checked before shipping"]}]
+}
