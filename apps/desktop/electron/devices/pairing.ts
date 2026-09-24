@@ -177,8 +177,15 @@ export type PairStartResult =
     }
   | {
       readonly ok: false;
-      readonly status: 400 | 403 | 429;
-      readonly error: 'invalid' | 'closed' | 'no-identity' | 'locked-out' | 'rate-limited' | 'busy';
+      readonly status: 400 | 403 | 409 | 429;
+      readonly error:
+        | 'invalid'
+        | 'closed'
+        | 'no-identity'
+        | 'locked-out'
+        | 'rate-limited'
+        | 'busy'
+        | 'id-conflict';
       readonly retryAfterMs?: number;
     };
 
@@ -234,6 +241,12 @@ export interface PairingManagerDeps {
   readonly scopes?: () => DeviceScopes;
   /** Record the client as its token is handed over. Throwing withholds the token. */
   readonly persistClient: (client: NewClientRecord) => Promise<void>;
+  /**
+   * Is this client id already held by a different node? A client's id is its
+   * own claim (and public in its hello), so a request reusing another node's
+   * id is refused up front (409) instead of replacing that node's record.
+   */
+  readonly clientIdConflict?: (clientId: string, stableId: string) => boolean;
   readonly onEvent?: (event: PairEvent) => void;
   readonly now?: () => number;
   readonly random?: RandomBytes;
@@ -488,6 +501,9 @@ export function createPairingManager(deps: PairingManagerDeps): PairingManager {
         return { ok: false, status: 429, error: 'busy', retryAfterMs: ttl };
       }
       state.times.push(t);
+      if (deps.clientIdConflict?.(req.clientId, peer.stableId) === true) {
+        return { ok: false, status: 409, error: 'id-conflict' };
+      }
       const serverNonce = mintNonce(deps.random);
       const entry: Entry = {
         requestId: mintId('pair', deps.random),

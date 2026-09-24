@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
+  ClientIdConflictError,
   clientFingerprint,
   createDevicesStore,
   DevicesFileReadOnlyError,
@@ -97,8 +98,8 @@ describe('devices.json', () => {
     expect(client.tokenHash).toBe(hashToken(token));
     expect(clientFingerprint(client)).toBe(tokenFingerprint(token));
     expect(fs.readFileSync(file, 'utf8')).not.toContain(token);
-    expect(store.findClientByToken(token)?.id).toBe(client.id);
-    expect(store.findClientByToken(mintToken())).toBeUndefined();
+    expect((await store.findClientByToken(token))?.id).toBe(client.id);
+    expect(await store.findClientByToken(mintToken())).toBeUndefined();
     // Accepts a hash from the pairing flow, which never hands the store a token.
     const other = mintToken();
     await store.addClient({
@@ -110,7 +111,7 @@ describe('devices.json', () => {
       scopes: SCOPES,
       auto: false,
     });
-    expect(store.findClientByToken(other)?.id).toBe('dev_other000000000000000');
+    expect((await store.findClientByToken(other))?.id).toBe('dev_other000000000000000');
   });
 
   it('re-pairing replaces the client’s record, which revokes its old token', async () => {
@@ -128,10 +129,10 @@ describe('devices.json', () => {
     await store.addClient({ ...base, token: first });
     await store.addClient({ ...base, token: second });
     expect(store.snapshot()?.clients).toHaveLength(1);
-    expect(store.findClientByToken(first)).toBeUndefined();
-    expect(store.findClientByToken(second)?.id).toBe(base.id);
+    expect(await store.findClientByToken(first)).toBeUndefined();
+    expect((await store.findClientByToken(second))?.id).toBe(base.id);
     expect(await store.removeClient(base.id)).toBe(true);
-    expect(store.findClientByToken(second)).toBeUndefined();
+    expect(await store.findClientByToken(second)).toBeUndefined();
     expect(await store.removeClient(base.id)).toBe(false);
   });
 
@@ -360,5 +361,132 @@ describe('devices.json', () => {
     expect(await later.pairedToken('dev_a')).toBe(token);
     expect(fs.readFileSync(file, 'utf8')).toContain('"kind": "os"');
     expect(fs.readFileSync(file, 'utf8')).not.toContain('"kind": "plain"');
+  });
+  it('never lets one node’s pairing replace another node’s record (ids are public claims)', async () => {
+    const store = createDevicesStore({ file, secretBox: box });
+    const laptopToken = mintToken();
+    const base = { name: 'x', tsUserId: '1', scopes: SCOPES, auto: false };
+    await store.addClient({ ...base, id: 'dev_laptop', tsStableId: 'nLAPTOP', token: laptopToken });
+    // Another node claims the laptop's id (it is in the laptop's public hello).
+    await expect(
+      store.addClient({ ...base, id: 'dev_laptop', tsStableId: 'nINTRUDER', token: mintToken() }),
+    ).rejects.toBeInstanceOf(ClientIdConflictError);
+    expect((await store.findClientByToken(laptopToken))?.tsStableId).toBe('nLAPTOP');
+    expect(store.clientIdTakenByOtherNode('dev_laptop', 'nINTRUDER')).toBe(true);
+    expect(store.clientIdTakenByOtherNode('dev_laptop', 'nLAPTOP')).toBe(false);
+    expect(store.clientIdTakenByOtherNode('dev_new', 'nINTRUDER')).toBe(false);
+    // A second install on the same machine (another account) is a separate client.
+    await store.addClient({
+      ...base,
+      id: 'dev_laptop_user2',
+      tsStableId: 'nLAPTOP',
+      token: mintToken(),
+    });
+    expect(
+      store
+        .snapshot()
+        ?.clients.map((c) => c.id)
+        .sort(),
+    ).toEqual(['dev_laptop', 'dev_laptop_user2']);
+  });
+
+  it('finds a client by token even before anything loaded the file', async () => {
+    const token = mintToken();
+    await createDevicesStore({ file, secretBox: box }).addClient({
+      id: 'dev_a',
+      name: 'A',
+      tsStableId: 'nA',
+      tsUserId: '1',
+      token,
+      scopes: SCOPES,
+      auto: true,
+    });
+    const fresh = createDevicesStore({ file, secretBox: box });
+    expect(fresh.snapshot()).toBeNull();
+    expect((await fresh.findClientByToken(token))?.id).toBe('dev_a');
+  });
+
+  it('writes lastUsedAt at most once a minute per client', async () => {
+    let writes = 0;
+    const counting: DevicesFs = {
+      ...realFs,
+      rename: async (a, b) => {
+        writes += 1;
+        return fsp.rename(a, b);
+      },
+    };
+    const store = createDevicesStore({ file, secretBox: box, fs: counting });
+    await store.addClient({
+      id: 'dev_a',
+      name: 'A',
+      tsStableId: 'nA',
+      tsUserId: '1',
+      token: mintToken(),
+      scopes: SCOPES,
+      auto: true,
+    });
+    const base = writes;
+    await store.touchClient('dev_a', 1_000_000);
+    await store.touchClient('dev_a', 1_030_000); // 30 s later: nothing written
+    await store.touchClient('dev_a', 1_059_999);
+    expect(writes).toBe(base + 1);
+    await store.touchClient('dev_a', 1_061_000);
+    expect(writes).toBe(base + 2);
+    expect(store.snapshot()?.clients[0]?.lastUsedAt).toBe(1_061_000);
+    await store.touchClient('dev_unknown', 2_000_000);
+    expect(writes).toBe(base + 2);
+  });
+
+  it('never seals an old token over a re-pair that landed first', async () => {
+    const oldToken = mintToken();
+    const newToken = mintToken();
+    // Stored unprotected at first, so the next read asks for a re-seal.
+    await createDevicesStore({ file, secretBox: createSecretBox(null) }).addPaired({
+      id: 'dev_a',
+      tsStableId: 'nA',
+      name: 'A',
+      os: 'macOS',
+      ip: '100.64.0.5',
+      token: oldToken,
+      scopes: SCOPES,
+    });
+    const store = createDevicesStore({ file, secretBox: box });
+    await store.load();
+    // The read opens the OLD token; the re-pair commits the NEW one before the re-seal runs.
+    const [opened] = await Promise.all([
+      store.pairedToken('dev_a'),
+      store.addPaired({
+        id: 'dev_a',
+        tsStableId: 'nA',
+        name: 'A',
+        os: 'macOS',
+        ip: '100.64.0.5',
+        token: newToken,
+        scopes: SCOPES,
+      }),
+    ]);
+    expect(opened).toBe(oldToken);
+    expect(await store.pairedToken('dev_a')).toBe(newToken);
+    expect(await createDevicesStore({ file, secretBox: box }).pairedToken('dev_a')).toBe(newToken);
+    expect(store.snapshot()?.paired[0]?.tokenFingerprint).toBe(tokenFingerprint(newToken));
+  });
+
+  it('never moves aside or rewrites a newer Bobble’s file, even one this version cannot parse', async () => {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    const future = JSON.stringify({
+      version: 3,
+      selfId: { kind: 'uuid', value: 'x' },
+      devices: [],
+    });
+    fs.writeFileSync(file, future);
+    const store = createDevicesStore({ file, secretBox: box });
+    const loaded = await store.load();
+    expect(store.readOnly()).toBe(true);
+    expect(loaded.selfId).toBe('');
+    await expect(
+      store.addEndpoint({ name: 'x', url: 'http://x', api: 'mlx-stream' }),
+    ).rejects.toBeInstanceOf(DevicesFileReadOnlyError);
+    expect(fs.readFileSync(file, 'utf8')).toBe(future);
+    expect(fs.readdirSync(path.dirname(file)).filter((f) => f.includes('corrupt'))).toEqual([]);
   });
 });

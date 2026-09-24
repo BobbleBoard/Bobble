@@ -422,6 +422,23 @@ describe('rate limits and lock-out', () => {
     expect(manager.start(requestFrom().request, laptop)).toMatchObject({ ok: true });
   });
 
+  it('refuses, up front, a client id that belongs to another node', () => {
+    const taken = new Map([['dev_client0000000001', 'nSOMEONE_ELSE']]);
+    const { manager, events } = harness({
+      clientIdConflict: (clientId, stableId) =>
+        taken.has(clientId) && taken.get(clientId) !== stableId,
+    });
+    expect(manager.start(requestFrom().request, laptop)).toEqual({
+      ok: false,
+      status: 409,
+      error: 'id-conflict',
+    });
+    expect(events).toEqual([]); // no dialog for it
+    // The same id from the node that owns it is fine.
+    taken.set('dev_client0000000001', 'nLAPTOP');
+    expect(manager.start(requestFrom().request, laptop)).toMatchObject({ ok: true });
+  });
+
   it('caps pending requests across all callers', () => {
     const { manager } = harness({ maxPending: 2 });
     const who = (n: number): PeerIdentity => ({ ...sister, stableId: `n${n}` });

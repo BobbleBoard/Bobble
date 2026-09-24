@@ -137,12 +137,30 @@ export class DevicesFileReadOnlyError extends Error {
   }
 }
 
+/**
+ * A client id already belongs to another Tailscale node. The id is the
+ * client's own claim — and every install's id is in its public hello — so it
+ * can never be allowed to replace (and so revoke) another node's record.
+ */
+export class ClientIdConflictError extends Error {
+  constructor(id: string) {
+    super(`Client id ${id} already belongs to another device.`);
+    this.name = 'ClientIdConflictError';
+  }
+}
+
 export interface DevicesStoreDeps {
   readonly file: string;
   readonly secretBox: SecretBox;
   readonly fs?: DevicesFs;
   readonly now?: () => number;
   readonly random?: RandomBytes;
+  /**
+   * `lastUsedAt` is written at most this often per client (default 60 s): the
+   * gateway touches a client on every request, and a full atomic rewrite per
+   * streamed request would put the disk on the hot path.
+   */
+  readonly touchThrottleMs?: number;
 }
 
 export interface AddPairedInput {
@@ -191,9 +209,17 @@ export interface DevicesStore {
   ): Promise<PairedDevice | null>;
   removePaired(id: string): Promise<boolean>;
 
+  /**
+   * Record a client. Re-pairing the same client on the same node replaces its
+   * record (revoking the old token); the same id from a different node is
+   * refused with {@link ClientIdConflictError}.
+   */
   addClient(input: AddClientInput): Promise<ApprovedClient>;
-  /** The client this token belongs to (constant-time over every record). */
-  findClientByToken(token: string): ApprovedClient | undefined;
+  /** The client this token belongs to (constant-time over every record); loads first. */
+  findClientByToken(token: string): Promise<ApprovedClient | undefined>;
+  /** Is this client id already held by a different node? (Sync, on the loaded copy.) */
+  clientIdTakenByOtherNode(id: string, tsStableId: string): boolean;
+  /** Note that a client was just used; written at most once a minute per client. */
   touchClient(id: string, at?: number): Promise<void>;
   setClientScopes(id: string, scopes: DeviceScopes): Promise<ApprovedClient | null>;
   removeClient(id: string): Promise<boolean>;
@@ -339,12 +365,41 @@ export function parseDevicesFile(text: string): { file: DevicesFile; version: nu
   };
 }
 
+/**
+ * A file from a NEWER Bobble: its version, and as much as this version can
+ * read of it (for display only). Null for anything else, including every
+ * format-1 file.
+ */
+export function newerVersionOf(text: string): { version: number; file: DevicesFile } | null {
+  let doc: unknown;
+  try {
+    doc = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  if (typeof doc !== 'object' || doc === null || Array.isArray(doc)) return null;
+  const o = doc as Record<string, unknown>;
+  if (typeof o.version !== 'number' || !Number.isInteger(o.version)) return null;
+  if (o.version <= DEVICES_FILE_VERSION) return null;
+  return {
+    version: o.version,
+    file: {
+      version: 1,
+      selfId: typeof o.selfId === 'string' ? o.selfId : '',
+      paired: list(o.paired, readPaired),
+      clients: list(o.clients, readClient),
+      endpoints: list(o.endpoints, readEndpoint),
+    },
+  };
+}
+
 // --- the store ------------------------------------------------------------------
 
 export function createDevicesStore(deps: DevicesStoreDeps): DevicesStore {
   const fs = deps.fs ?? realFs;
   const now = deps.now ?? Date.now;
   const random = deps.random ?? nodeRandomBytes;
+  const touchThrottle = deps.touchThrottleMs ?? 60_000;
   let current: DevicesFile | null = null;
   let loading: Promise<DevicesFile> | null = null;
   let readOnlyVersion: number | null = null;
@@ -382,9 +437,19 @@ export function createDevicesStore(deps: DevicesStoreDeps): DevicesStore {
         if ((error as { code?: unknown }).code !== 'ENOENT') throw error;
       }
       if (text !== null) {
+        /*
+         * A newer Bobble's file is never moved aside or rewritten, even when
+         * this version cannot read its shape: the version is checked before
+         * anything else, and whatever can be read is shown read-only.
+         */
+        const newer = newerVersionOf(text);
+        if (newer !== null) {
+          readOnlyVersion = newer.version;
+          current = newer.file;
+          return newer.file;
+        }
         const parsed = parseDevicesFile(text);
         if (parsed !== null) {
-          if (parsed.version > DEVICES_FILE_VERSION) readOnlyVersion = parsed.version;
           current = parsed.file;
           return parsed.file;
         }
@@ -459,9 +524,21 @@ export function createDevicesStore(deps: DevicesStoreDeps): DevicesStore {
         const { plain, reseal } = await deps.secretBox.open(device.tokenEnc);
         if (reseal && readOnlyVersion === null) {
           await mutate(async (f) => {
+            /*
+             * Only if the record still holds the very secret opened above: a
+             * re-pair that landed in between carries a NEW token, and sealing
+             * the old one over it would lose the new token.
+             */
+            const still = f.paired.find(
+              (p) =>
+                p.id === id &&
+                p.tokenEnc.kind === device.tokenEnc.kind &&
+                p.tokenEnc.data === device.tokenEnc.data,
+            );
+            if (still === undefined) return { next: f, result: undefined };
             const tokenEnc = await deps.secretBox.seal(plain);
             return {
-              next: { ...f, paired: f.paired.map((p) => (p.id === id ? { ...p, tokenEnc } : p)) },
+              next: { ...f, paired: f.paired.map((p) => (p === still ? { ...p, tokenEnc } : p)) },
               result: undefined,
             };
           }).catch(() => undefined);
@@ -511,17 +588,33 @@ export function createDevicesStore(deps: DevicesStoreDeps): DevicesStore {
           approvedAt: input.approvedAt ?? now(),
           auto: input.auto,
         };
-        // Re-pairing replaces the old record, which revokes the old token.
-        const clients = [...file.clients.filter((c) => c.id !== input.id), client];
+        if (file.clients.some((c) => c.id === input.id && c.tsStableId !== input.tsStableId)) {
+          throw new ClientIdConflictError(input.id);
+        }
+        // Re-pairing on the same node replaces the old record, which revokes the old token.
+        const clients = [
+          ...file.clients.filter((c) => !(c.id === input.id && c.tsStableId === input.tsStableId)),
+          client,
+        ];
         return { next: { ...file, clients }, result: client };
       });
     },
-    findClientByToken(token) {
-      return current === null ? undefined : findByToken(current.clients, token);
+    async findClientByToken(token) {
+      // Never "no such client" just because the file has not been read yet.
+      return findByToken((await load()).clients, token);
+    },
+    clientIdTakenByOtherNode(id, tsStableId) {
+      return current?.clients.some((c) => c.id === id && c.tsStableId !== tsStableId) === true;
     },
     async touchClient(id, at = now()) {
+      const known = current?.clients.find((c) => c.id === id);
+      if (known?.lastUsedAt !== undefined && at - known.lastUsedAt < touchThrottle) return;
       await mutate(async (file) => {
-        if (!file.clients.some((c) => c.id === id)) return { next: file, result: undefined };
+        const c = file.clients.find((x) => x.id === id);
+        if (c === undefined) return { next: file, result: undefined };
+        if (c.lastUsedAt !== undefined && at - c.lastUsedAt < touchThrottle) {
+          return { next: file, result: undefined };
+        }
         return {
           next: {
             ...file,
