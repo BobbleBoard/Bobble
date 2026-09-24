@@ -26,6 +26,7 @@ on:
       - 'packages/web-tools/src/testing/**'
       - 'packages/web-tools/src/fixtures/zip/**'
       - 'packages/web-tools/scripts/pin-uv.mjs'
+      - 'packages/web-tools/vitest.config.ts'
       - '.github/workflows/uv-bootstrap.yml'
   push:
     branches: [main]
@@ -38,6 +39,7 @@ on:
       - 'packages/web-tools/src/testing/**'
       - 'packages/web-tools/src/fixtures/zip/**'
       - 'packages/web-tools/scripts/pin-uv.mjs'
+      - 'packages/web-tools/vitest.config.ts'
       - '.github/workflows/uv-bootstrap.yml'
   schedule:
     - cron: '17 4 * * 1'
