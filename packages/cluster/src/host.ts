@@ -12,15 +12,49 @@ import { parseTailscaleStatus, TAILSCALE_PATHS, type TailnetStatus } from './tai
 
 const execFile = promisify(execFileCb);
 
+/**
+ * The environment every Tailscale CLI spawn gets.
+ *
+ * On macOS the CLI IS the app binary (`/Applications/Tailscale.app/Contents/
+ * MacOS/Tailscale`; `/usr/local/bin/tailscale` is a shim that execs it), and
+ * that binary decides between GUI and CLI from environment variables such as
+ * `TERM`, `SHLVL` and `PS1` (Tailscale CLI docs, macOS tab). A terminal has
+ * them; a Bobble launched from the Finder has none — so without this the same
+ * `status --json` that passes in a terminal-run test can start Tailscale's own
+ * window, or fail, in the shipped app. `TAILSCALE_BE_CLI=1` forces CLI mode and
+ * is ignored everywhere else, so it is set on every platform, every spawn.
+ */
+export function tailscaleCliEnv(base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  return { ...base, TAILSCALE_BE_CLI: '1' };
+}
+
+/** The options every CLI spawn passes: a deadline, the CLI-mode env, no console window. */
+export interface TailscaleExecOptions {
+  readonly timeout?: number;
+  readonly env?: NodeJS.ProcessEnv;
+  readonly windowsHide?: boolean;
+}
+
 export interface ReadTailnetOptions {
   /** Injected for tests; defaults to running the real CLI. */
   readonly execFileImpl?: (
     file: string,
     args: readonly string[],
-    opts?: { timeout?: number },
+    opts?: TailscaleExecOptions,
   ) => Promise<{ stdout: string }>;
   /** Override the search order (tests, or a user-configured path). */
   readonly candidates?: readonly string[];
+  /** Base environment for the spawn (default `process.env`); CLI mode is forced on top. */
+  readonly env?: NodeJS.ProcessEnv;
+}
+
+/** "No such file" in any of the shapes a missing binary arrives as. */
+function isMissingBinary(e: unknown): boolean {
+  if (typeof e !== 'object' || e === null) return false;
+  const code = (e as { code?: unknown }).code;
+  if (code === 'ENOENT') return true;
+  const message = (e as { message?: unknown }).message;
+  return typeof message === 'string' && message.includes('ENOENT');
 }
 
 /**
@@ -34,10 +68,16 @@ export interface ReadTailnetOptions {
 export async function readTailnet(opts: ReadTailnetOptions = {}): Promise<TailnetStatus> {
   const exec = opts.execFileImpl ?? execFile;
   const candidates = opts.candidates ?? TAILSCALE_PATHS[platform()] ?? ['tailscale'];
+  const env = tailscaleCliEnv(opts.env ?? process.env);
   let lastError = 'Tailscale was not found on this machine.';
+  let found = false;
   for (const bin of candidates) {
     try {
-      const { stdout } = await exec(bin, ['status', '--json'], { timeout: 5000 });
+      const { stdout } = await exec(bin, ['status', '--json'], {
+        timeout: 5000,
+        env,
+        windowsHide: true,
+      });
       return parseTailscaleStatus(stdout);
     } catch (e) {
       /*
@@ -46,10 +86,33 @@ export async function readTailnet(opts: ReadTailnetOptions = {}): Promise<Tailne
        * "not installed" because the FIRST candidate was absent is how a working
        * install gets called broken.
        */
-      lastError = e instanceof Error ? e.message : String(e);
+      const message = e instanceof Error ? e.message : String(e);
+      if (isMissingBinary(e)) {
+        if (!found) lastError = message;
+      } else {
+        found = true;
+        lastError = message;
+      }
     }
   }
-  return { available: false, reason: lastError, peers: [] };
+  /*
+   * Every location missing is "not installed" (offer the download); a binary
+   * that ran and failed is "not running" (offer to open Tailscale). The Devices
+   * card says different things for the two.
+   */
+  return found
+    ? {
+        available: false,
+        reason: `Tailscale is installed but did not answer: ${lastError}`,
+        peers: [],
+        state: 'NotRunning',
+      }
+    : {
+        available: false,
+        reason: `Tailscale was not found on this machine (${lastError}).`,
+        peers: [],
+        state: 'NotInstalled',
+      };
 }
 
 /** What this machine answers when another one asks what it can do. */
