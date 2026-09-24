@@ -21,7 +21,10 @@
  *     instances; the wall and table are background; a near miss snaps only
  *     with a radius.
  *   - ORIENTATION: an EXIF-rotated copy answers in display coordinates.
- *   - OCR: every poster line exactly, in order; a misspelling read literally.
+ *   - OCR: every poster line exactly, in order; a misspelling read literally;
+ *     a region read returns only its lines, at picture (not crop) coordinates.
+ *   - ONE-SHOT: `pi-mac --vision <method> [json|path]` answers one line with the
+ *     right exit code (0 ok, 1 error, 2 usage).
  *   - NO PROMPT, NO DOCK TILE, NO FOCUS: tccd's own log shows only preflight
  *     (non-prompting) requests for the helper, no permission prompt and no
  *     accessibility warning during the run; the helper is never registered
@@ -50,7 +53,7 @@ import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { frontmostApp } from './_focus.mjs';
-import { decodePng, encodePng } from './png.mjs';
+import { cropPng, decodePng, encodePng } from './png.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../../../..');
@@ -516,6 +519,80 @@ try {
     for (const w of line.words ?? []) if (w.box) rect(posterView, roundBox(w.box), ORANGE, 1);
   }
   save('poster-ocr.png', posterView);
+
+  // A region is read as its own crop and mapped back to PICTURE pixels (top-left
+  // origin): the band holding the last three lines, inset from the left edge so
+  // x is offset too.
+  //   - EXACT: the same crop saved as its own file and read whole gives the
+  //     same lines and word boxes once shifted by the region's origin — to the
+  //     hundredth of a pixel. Crop coordinates, a flip or a scale would all
+  //     fail this.
+  //   - ROUGH: against the FULL read the boxes only overlap. Vision boxes the
+  //     crop's text differently (MEASURED: "Friday 12 June…" is 40 px tall on
+  //     the whole poster, 61.6 px on the crop — the same in both region and
+  //     file reads), so the full read is an overlap check, not an equality.
+  const band = { x: 40, y: 690, width: 820, height: 450 };
+  const inBand = (poster.result?.lines ?? []).filter(
+    (l) => l.box.y >= band.y && l.box.y + l.box.height <= band.y + band.height,
+  );
+  const part = await helper.call('ocr', { image: fx('poster.png'), region: band });
+  const partLines = part.result?.lines ?? [];
+  check(
+    part.ok &&
+      inBand.length === 3 &&
+      JSON.stringify(partLines.map((l) => l.text)) === JSON.stringify(inBand.map((l) => l.text)),
+    `a region read returns just the lines inside it (${partLines.map((l) => `"${l.text}"`).join(', ')})`,
+  );
+  const bandFile = path.join(work, 'poster-band.png');
+  writeFileSync(bandFile, cropPng(readFileSync(fx('poster.png')), band));
+  const whole = await helper.call('ocr', { image: bandFile });
+  const wholeLines = whole.result?.lines ?? [];
+  const shifted = (b) => ({ ...b, x: b.x + band.x, y: b.y + band.y });
+  let worst = 0;
+  const widen = (a, b) => {
+    if (a === undefined && b === undefined) return; // a word neither read could place
+    if (a === undefined || b === undefined) {
+      worst = Number.POSITIVE_INFINITY;
+      return;
+    }
+    for (const k of ['x', 'y', 'width', 'height']) worst = Math.max(worst, Math.abs(a[k] - b[k]));
+  };
+  partLines.forEach((l, i) => {
+    const w = wholeLines[i];
+    widen(l.box, w && shifted(w.box));
+    (l.words ?? []).forEach((word, j) => {
+      const other = w?.words?.[j]?.box;
+      widen(word.box, other && shifted(other));
+    });
+  });
+  check(
+    whole.ok &&
+      wholeLines.length === partLines.length &&
+      JSON.stringify(wholeLines.map((l) => l.text)) ===
+        JSON.stringify(partLines.map((l) => l.text)) &&
+      worst <= 0.02,
+    `…at exactly the boxes the same crop read as its own file gives, shifted by the region's origin (lines and words, worst Δ ${worst.toFixed(2)} px)`,
+  );
+  let lowest = 1;
+  partLines.forEach((l, i) => {
+    const full = inBand[i]?.box;
+    lowest = Math.min(lowest, full === undefined ? 0 : iou(l.box, full));
+  });
+  check(
+    partLines.length === inBand.length && lowest >= 0.5,
+    `…where the full read found each line in the picture (lowest IoU ${lowest.toFixed(2)})`,
+  );
+  report.steps.regionOcr = {
+    band,
+    lines: partLines.map((l) => l.text),
+    worstDeltaVsCropFile: worst,
+    lowestIoUVsFullRead: lowest,
+  };
+  const bandView = rgbaOf(readPng(fx('poster.png')));
+  rect(bandView, band, YELLOW, 3);
+  for (const l of partLines) rect(bandView, roundBox(l.box), GREEN, 3);
+  save('poster-ocr-region.png', bandView);
+
   const sign = await helper.call('ocr', { image: fx('sign-misspelt.png'), correction: false });
   check(
     sign.ok && sign.result.text === manifest['sign-misspelt.png'].text,
@@ -553,6 +630,59 @@ try {
   const still = await helper.call('info');
   check(still.ok, 'the helper still answers after the errors');
   sampleFront('after OCR and errors');
+
+  // ── the one-shot form, for a shell: one request, one line, an exit code ──
+  step('one-shot — pi-mac --vision <method> [json|path]');
+  {
+    const oneShot = (...args) => {
+      const r = spawnSync(HELPER, ['--vision', ...args], { encoding: 'utf8', timeout: 120_000 });
+      if (r.pid) helperPids.push(r.pid);
+      const lines = (r.stdout ?? '').split('\n').filter((l) => l.trim() !== '');
+      let msg = null;
+      try {
+        msg = lines.length === 1 ? JSON.parse(lines[0]) : null;
+      } catch {
+        msg = null;
+      }
+      return { status: r.status, lines: lines.length, msg, stderr: r.stderr ?? '' };
+    };
+    const read = oneShot(
+      'ocr',
+      JSON.stringify({ image: fx('sign-misspelt.png'), correction: false }),
+    );
+    check(
+      read.status === 0 && read.lines === 1 && read.msg?.ok === true && read.msg.id === undefined,
+      `ocr with JSON params: exit 0, one { ok, result } line (${read.msg?.result?.text})`,
+    );
+    const byPath = oneShot('lift', fx('cat.jpg'));
+    check(
+      byPath.status === 0 && byPath.msg?.result?.count === 1,
+      `lift with a bare path: exit 0, ${byPath.msg?.result?.count} instance`,
+    );
+    const badJson = oneShot('lift', '{not json');
+    check(
+      badJson.status === 1 &&
+        badJson.msg?.ok === false &&
+        /not a JSON object/.test(badJson.msg.error),
+      `malformed JSON params: exit 1 with an error line ("${badJson.msg?.error}")`,
+    );
+    const unknown = oneShot('frobnicate');
+    check(
+      unknown.status === 1 && unknown.msg?.error === 'unknown method: frobnicate',
+      'an unknown method: exit 1 with an error line',
+    );
+    const bare = oneShot();
+    check(
+      bare.status === 2 && bare.lines === 0 && /usage: pi-mac --vision/.test(bare.stderr),
+      'no method: exit 2, usage on stderr, nothing on stdout',
+    );
+    // Two pictures is not "lift both": it must not quietly lift only the first.
+    const extra = oneShot('lift', fx('cat.jpg'), fx('apples.jpg'));
+    check(
+      extra.status === 2 && extra.lines === 0 && /usage: pi-mac --vision/.test(extra.stderr),
+      'a stray extra argument: exit 2, usage on stderr, nothing on stdout',
+    );
+  }
 
   // ── hardening: each of these failed before the code-review fixes ────────
   step('hardening — radius, prefixes, limits, absurd numbers');

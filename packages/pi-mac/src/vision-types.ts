@@ -208,7 +208,8 @@ export interface VisionOcrParams extends VisionImageParams {
   /** BCP-47 codes; default is automatic detection. */
   readonly languages?: readonly string[];
   readonly minConfidence?: number;
-  /** Fraction of the picture's height. */
+  /** Ignore text shorter than this FRACTION (0…1) of the picture's height —
+   * of the region's height when `region` is set. */
   readonly minTextHeight?: number;
   /** Per-word boxes (default true). */
   readonly words?: boolean;

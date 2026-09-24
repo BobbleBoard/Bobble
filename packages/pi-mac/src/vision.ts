@@ -437,6 +437,24 @@ export class MacVisionClient {
       checkFinite(params.minConfidence, 'minConfidence', { min: 0 });
       if (params.minConfidence > 1) refuse('minConfidence must be at most 1');
     }
+    if (params.minTextHeight !== undefined) {
+      // A FRACTION of the picture's height: 24 (pixels, say) would quietly
+      // filter out every line on the page rather than fail.
+      checkFinite(params.minTextHeight, 'minTextHeight', { min: 0 });
+      if (params.minTextHeight > 1) {
+        refuse(
+          `minTextHeight is a fraction of the picture's height, at most 1 (got ${params.minTextHeight})`,
+        );
+      }
+    }
+    if (params.languages !== undefined) {
+      if (
+        !Array.isArray(params.languages) ||
+        params.languages.some((l) => typeof l !== 'string' || l.length === 0)
+      ) {
+        refuse('languages must be a list of BCP-47 codes such as "en-US"');
+      }
+    }
     if (params.region !== undefined) checkBox(params.region, 'region');
     return parseVisionOcr(await this.#helper.request('ocr', wire(params)));
   }

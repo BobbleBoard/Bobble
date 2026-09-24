@@ -284,6 +284,20 @@ describe('MacVisionClient', () => {
     await expect(
       vision.ocr({ image: '/p/a.jpg', region: { x: 0, y: 0, width: 0, height: 10 } }),
     ).rejects.toThrow('region must have a positive size');
+    // A pixel height where a fraction belongs would filter out every line.
+    await expect(vision.ocr({ image: '/p/a.jpg', minTextHeight: 24 })).rejects.toThrow(
+      "minTextHeight is a fraction of the picture's height, at most 1 (got 24)",
+    );
+    await expect(vision.ocr({ image: '/p/a.jpg', minTextHeight: -0.1 })).rejects.toThrow(
+      'minTextHeight must be at least 0',
+    );
+    await expect(
+      // @ts-expect-error — a bare string is not a list
+      vision.ocr({ image: '/p/a.jpg', languages: 'en-US' }),
+    ).rejects.toThrow('languages must be a list of BCP-47 codes');
+    await expect(vision.ocr({ image: '/p/a.jpg', languages: ['en-US', ''] })).rejects.toThrow(
+      'languages must be a list of BCP-47 codes',
+    );
     await expect(vision.forget('rel.png')).rejects.toThrow('image must be an absolute path');
     expect(spawns).toHaveLength(0);
     vision.dispose();

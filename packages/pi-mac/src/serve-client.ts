@@ -125,6 +125,16 @@ export class MacHelperClient {
         if (t !== '') this.#onStderr?.(t);
       }
     });
+    /*
+     * A HELPER THAT STOPPED READING. One that dies (a trap, a kill) closes its
+     * end of the pipe a moment before Node hears that it exited, and a request
+     * written in that window fails with EPIPE — which Node ALSO emits as an
+     * 'error' event on stdin. With no listener that event is an uncaught
+     * exception (in Electron main, a crash dialog). The write callback already
+     * rejects that request and 'close' tidies up after the child, so all this
+     * listener has to do is exist.
+     */
+    child.stdin?.on('error', () => undefined);
     child.on('error', (err) => {
       if (current()) this.#onExit(err);
     });

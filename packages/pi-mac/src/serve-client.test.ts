@@ -252,6 +252,28 @@ describe('a request that times out', () => {
   });
 });
 
+describe('a helper that stopped reading its stdin', () => {
+  /* A helper that dies (a Swift trap, a kill) closes its end of the pipe a
+     moment before Node hears that it exited. A request written in that window
+     fails with EPIPE — and Node also emits that as an 'error' EVENT on the
+     child's stdin, which with no listener is an uncaught exception: in Electron
+     main, a crash dialog. A REAL child reproduces it: /bin/sh closes its stdin
+     at once and lives on for a second. */
+  it('rejects the request instead of throwing an uncaught EPIPE', async () => {
+    const client = new MacHelperClient({
+      helperPath: '/bin/sh',
+      helperArgs: ['-c', 'exec 0<&-; sleep 1'],
+      requestTimeoutMs: 2_000,
+    });
+    const first = client.request('info').catch((e: Error) => e.message);
+    await new Promise((r) => setTimeout(r, 250)); // the shell has closed stdin by now
+    const second = await client.request('info').catch((e: Error) => e.message);
+    expect(second).toMatch(/EPIPE/);
+    client.dispose();
+    expect(await first).toBe('client disposed');
+  });
+});
+
 describe("the helper's stderr", () => {
   /* It was spawned with a pipe and never read: every diagnostic the helper
      wrote — including the ones it writes precisely when something is wrong —

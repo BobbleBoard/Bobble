@@ -1,12 +1,12 @@
 {
-  "_about": "Real pi-mac --vision-serve responses captured from the Swift helper on packages/pi-mac/fixtures/vision (paths rewritten to /fixtures and /out; the OCR language list trimmed). Pins the wire shapes the TS parsers accept.",
+  "_about": "Real pi-mac --vision-serve responses captured from the Swift helper on packages/pi-mac/fixtures/vision (paths rewritten to /fixtures and /out; the OCR language list trimmed). Pins the wire shapes the TS parsers accept. Regenerate with scripts/capture-vision-responses.mjs.",
   "warm": {
     "id": 1,
     "ok": true,
     "result": {
-      "liftMs": 238,
-      "ms": 373,
-      "ocrMs": 115,
+      "liftMs": 111,
+      "ms": 173,
+      "ocrMs": 51,
       "text": "Warm up"
     }
   },
@@ -14,7 +14,7 @@
     "id": 2,
     "ok": true,
     "result": {
-      "analysisMs": 47,
+      "analysisMs": 20,
       "cached": false,
       "count": 1,
       "foreground": {
@@ -67,7 +67,7 @@
         }
       ],
       "labelsPath": "/out/cat-17447790-labels.png",
-      "ms": 105,
+      "ms": 48,
       "orientation": 1,
       "width": 960
     }
@@ -76,7 +76,7 @@
     "id": 3,
     "ok": true,
     "result": {
-      "analysisMs": 26,
+      "analysisMs": 19,
       "cached": false,
       "count": 3,
       "foreground": {
@@ -146,7 +146,7 @@
           "pixels": 39876
         }
       ],
-      "ms": 67,
+      "ms": 39,
       "orientation": 1,
       "width": 960
     }
@@ -173,13 +173,13 @@
     "id": 5,
     "ok": true,
     "result": {
-      "analysisMs": 12,
+      "analysisMs": 8,
       "cached": false,
       "count": 0,
       "height": 240,
       "image": "/fixtures/blank.png",
       "instances": [],
-      "ms": 14,
+      "ms": 9,
       "orientation": 1,
       "width": 320
     }
@@ -188,7 +188,7 @@
     "id": 6,
     "ok": true,
     "result": {
-      "analysisMs": 26,
+      "analysisMs": 19,
       "cached": true,
       "count": 3,
       "height": 640,
@@ -224,7 +224,7 @@
     "id": 7,
     "ok": true,
     "result": {
-      "analysisMs": 26,
+      "analysisMs": 19,
       "cached": true,
       "count": 3,
       "height": 640,
@@ -244,10 +244,10 @@
     "id": 8,
     "ok": true,
     "result": {
-      "analysisMs": 26,
+      "analysisMs": 19,
       "cached": true,
       "count": 3,
-      "distance": 11,
+      "distance": 11.51,
       "height": 640,
       "hit": true,
       "image": "/fixtures/apples.jpg",
@@ -344,7 +344,7 @@
           ]
         }
       ],
-      "ms": 53,
+      "ms": 36,
       "orientation": 1,
       "revision": 3,
       "text": "FRESH BRAED DAILY",
@@ -361,7 +361,7 @@
       "image": "/fixtures/blank.png",
       "level": "accurate",
       "lines": [],
-      "ms": 17,
+      "ms": 10,
       "orientation": 1,
       "revision": 3,
       "text": "",

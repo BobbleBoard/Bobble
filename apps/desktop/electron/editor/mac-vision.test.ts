@@ -3,7 +3,17 @@
  * responses captured from `pi-mac --vision-serve` on the fixture pictures
  * (packages/pi-mac/src/__fixtures__/vision-responses.json).
  */
-import { readFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -14,8 +24,8 @@ import {
   parseVisionOcr,
   parseVisionWarm,
 } from '@pi-desktop/pi-mac';
-import { describe, expect, it } from 'vitest';
-import { MacVisionExecutor, type VisionClientLike } from './mac-vision';
+import { afterEach, describe, expect, it } from 'vitest';
+import { MacVisionExecutor, pruneVisionOutputs, type VisionClientLike } from './mac-vision';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const REAL = JSON.parse(
@@ -255,6 +265,79 @@ describe('ocr() and the rest', () => {
   it('surfaces the helper error unchanged', async () => {
     const fake = fakeClient({ lift: new Error('pi-mac: image not found: /doc/nope.png') });
     await expect(executor(fake).exec.matte('/doc/nope.png')).rejects.toThrow('image not found');
+  });
+});
+
+describe('the default output folder is scratch', () => {
+  const DAY = 24 * 60 * 60_000;
+  const NOW = Date.UTC(2026, 8, 23, 12);
+  const dirs: string[] = [];
+  afterEach(() => {
+    for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+  });
+
+  /** A folder holding `files` (name → age in ms at NOW). */
+  function folder(files: Record<string, number>): string {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'mac-vision-prune-'));
+    dirs.push(dir);
+    for (const [name, age] of Object.entries(files)) {
+      const file = path.join(dir, name);
+      if (name.endsWith('/')) mkdirSync(file);
+      else writeFileSync(file, 'x');
+      const t = (NOW - age) / 1000;
+      utimesSync(file, t, t);
+    }
+    return dir;
+  }
+  const names = (dir: string) => readdirSync(dir).sort();
+
+  it('deletes only helper outputs older than the cutoff', async () => {
+    const dir = folder({
+      'cat-1a2b3c4d-mask-1.png': 2 * DAY,
+      '.cat-1a2b3c4d-mask-1.png.4242.tmp': 2 * DAY, // an interrupted write
+      'apples-9f8e7d6c-mask-fg.png': 60_000, // written a minute ago
+      'notes.txt': 2 * DAY, // not something the helper writes
+      'nested/': 2 * DAY,
+    });
+    expect(await pruneVisionOutputs(dir, NOW - DAY)).toBe(2);
+    expect(names(dir)).toEqual(['apples-9f8e7d6c-mask-fg.png', 'nested', 'notes.txt']);
+  });
+
+  it('is quiet about a folder that does not exist yet', async () => {
+    expect(await pruneVisionOutputs('/nonexistent/bobble-vision', NOW)).toBe(0);
+  });
+
+  it('prunes before each new helper writes, and never a folder an op names', async () => {
+    const out = folder({ 'old-mask-1.png': 2 * DAY, 'recent-mask-1.png': 60_000 });
+    const docMasks = folder({ 'kept-by-the-document.png': 30 * DAY });
+    const seenAtFirstOp: string[][] = [];
+    const fake = fakeClient({
+      warm: () => {
+        seenAtFirstOp.push(names(out));
+        return parseVisionWarm(real('warm'));
+      },
+    });
+    const { exec, timers } = executor(fake, { outDir: out, now: () => NOW });
+    await exec.warm();
+    expect(seenAtFirstOp).toEqual([['recent-mask-1.png']]); // gone BEFORE the op ran
+    await exec.segmentAt('/doc/apples.jpg', { x: 146, y: 363 }, { outDir: docMasks });
+    expect(names(docMasks)).toEqual(['kept-by-the-document.png']);
+
+    // The helper idles out; the next one prunes again.
+    timers.fireAll();
+    writeFileSync(path.join(out, 'stale-mask-2.png'), 'x');
+    const t = (NOW - 3 * DAY) / 1000;
+    utimesSync(path.join(out, 'stale-mask-2.png'), t, t);
+    await exec.ocr('/doc/sign.png');
+    expect(existsSync(path.join(out, 'stale-mask-2.png'))).toBe(false);
+    expect(names(out)).toEqual(['recent-mask-1.png']);
+  });
+
+  it('can be switched off', async () => {
+    const out = folder({ 'old-mask-1.png': 30 * DAY });
+    const { exec } = executor(fakeClient(), { outDir: out, now: () => NOW, pruneAfterMs: 0 });
+    await exec.warm();
+    expect(names(out)).toEqual(['old-mask-1.png']);
   });
 });
 

@@ -20,9 +20,12 @@
  * injects the helper path — mac-vision-main.ts resolves the bundled one. The
  * helper is started on first use and stopped after `idleMs` without a request;
  * it also exits on its own when this process goes away (its stdin closes), so
- * it cannot be orphaned. No permission is involved: Vision reads files.
+ * it cannot be orphaned. No permission is involved: Vision reads files. The
+ * default output folder is scratch, pruned of day-old files as each helper
+ * starts (`pruneAfterMs`).
  */
-import { existsSync } from 'node:fs';
+import { type Dirent, existsSync } from 'node:fs';
+import { readdir, rm, stat } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {
@@ -62,11 +65,21 @@ export interface MacVisionExecutorOptions {
    * refused with an error, and the router moves on to the next engine.
    */
   readonly maxPixels?: number;
+  /**
+   * The DEFAULT output folder is scratch: the editor copies what it keeps into
+   * its document, and every new version of a picture gets new file names, so
+   * left alone it only ever grows. Each time a helper starts, the masks and
+   * cutouts (and interrupted-write leftovers) in it older than this are
+   * deleted first. A folder an op names itself is never touched. Default 24 h;
+   * 0 turns it off.
+   */
+  readonly pruneAfterMs?: number;
   readonly platform?: NodeJS.Platform;
   readonly fileExists?: (file: string) => boolean;
   readonly createClient?: (helperPath: string) => VisionClientLike;
   readonly setTimer?: (fn: () => void, ms: number) => unknown;
   readonly clearTimer?: (handle: unknown) => void;
+  readonly now?: () => number;
 }
 
 /** One candidate region for a tap, as the region pipeline consumes it. */
@@ -111,18 +124,57 @@ export interface VisionMatteResult {
 }
 
 const DEFAULT_IDLE_MS = 90_000;
+const DEFAULT_PRUNE_AFTER_MS = 24 * 60 * 60_000;
+
+/** What the helper writes into an output folder: `<prefix>-mask-1.png`, and
+ * `.<name>.png.<pid>.tmp` when a write was interrupted. Nothing else is ours. */
+function isHelperOutput(name: string): boolean {
+  return name.endsWith('.png') || (name.startsWith('.') && name.endsWith('.tmp'));
+}
+
+/**
+ * Delete helper outputs in `dir` last modified before `cutoff` (ms since the
+ * epoch). Best effort: a folder that does not exist yet, or a file that went
+ * away meanwhile, is not an error. Returns how many files were deleted.
+ */
+export async function pruneVisionOutputs(dir: string, cutoff: number): Promise<number> {
+  let entries: Dirent[];
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch {
+    return 0;
+  }
+  let removed = 0;
+  for (const entry of entries) {
+    if (!entry.isFile() || !isHelperOutput(entry.name)) continue;
+    const file = path.join(dir, entry.name);
+    try {
+      if ((await stat(file)).mtimeMs >= cutoff) continue;
+      await rm(file, { force: true });
+      removed++;
+    } catch {
+      // gone already, or not ours to delete: leave it
+    }
+  }
+  return removed;
+}
 
 export class MacVisionExecutor {
   readonly #helperPath: string;
   readonly #outDir: string;
   readonly #idleMs: number;
   readonly #maxPixels: number | undefined;
+  readonly #pruneAfterMs: number;
   readonly #platform: NodeJS.Platform;
   readonly #fileExists: (file: string) => boolean;
   readonly #createClient: (helperPath: string) => VisionClientLike;
   readonly #setTimer: (fn: () => void, ms: number) => unknown;
   readonly #clearTimer: (handle: unknown) => void;
+  readonly #now: () => number;
   #client: VisionClientLike | null = null;
+  /** The default folder's prune for the helper that is starting (see #run);
+   * null once it is done, so later ops start without an extra tick. */
+  #pruning: Promise<unknown> | null = null;
   #inFlight = 0;
   #idle: unknown = null;
   #compatible: Promise<boolean> | null = null;
@@ -133,6 +185,8 @@ export class MacVisionExecutor {
     this.#outDir = opts.outDir ?? path.join(os.tmpdir(), 'bobble-vision');
     this.#idleMs = opts.idleMs ?? DEFAULT_IDLE_MS;
     this.#maxPixels = opts.maxPixels;
+    this.#pruneAfterMs = opts.pruneAfterMs ?? DEFAULT_PRUNE_AFTER_MS;
+    this.#now = opts.now ?? Date.now;
     this.#platform = opts.platform ?? process.platform;
     this.#fileExists = opts.fileExists ?? existsSync;
     this.#createClient = opts.createClient ?? ((helperPath) => new MacVisionClient({ helperPath }));
@@ -307,10 +361,24 @@ export class MacVisionExecutor {
   async #run<T>(op: (client: VisionClientLike) => Promise<T>): Promise<T> {
     if (this.#disposed) throw new Error('mac-vision: the executor was disposed');
     this.#cancelIdle();
-    this.#client ??= this.#createClient(this.#helperPath);
+    if (this.#client === null) {
+      this.#client = this.#createClient(this.#helperPath);
+      // Prune BEFORE the new helper writes anything: it may rewrite a file of
+      // the same name, and a prune that stat'ed the old one could then delete
+      // the fresh one. The ops of this helper wait for it (a readdir; ms).
+      if (this.#pruneAfterMs > 0) {
+        const pruning = pruneVisionOutputs(this.#outDir, this.#now() - this.#pruneAfterMs).then(
+          () => {
+            if (this.#pruning === pruning) this.#pruning = null;
+          },
+        );
+        this.#pruning = pruning;
+      }
+    }
     const client = this.#client;
     this.#inFlight++;
     try {
+      if (this.#pruning !== null) await this.#pruning;
       return await op(client);
     } finally {
       this.#inFlight--;

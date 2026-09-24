@@ -14,7 +14,10 @@ import Vision
 //                                              error } out). The editor's Mac
 //                                              executor keeps one alive.
 //   pi-mac --vision <method> [json | path]   → one request, one `{ ok, … }` line,
-//                                              exit 0 (ok) or 1 (error).
+//                                              exit 0 (ok) or 1 (error); a
+//                                              missing method or a stray extra
+//                                              argument is exit 2 (usage on
+//                                              stderr, nothing on stdout).
 //
 // Methods:
 //   info        what this helper can do (protocol version, OCR languages, limits)
@@ -49,11 +52,15 @@ import Vision
 // executable's NAME (~/Library/Caches/pi-mac/com.apple.e5rt.e5bundlecache) for
 // ONE signed identity at a time. MEASURED: a byte-identical copy at another
 // path hits the cache; the same bytes re-signed recompile and take the cache
-// over, after which the original identity recompiles too. So each shipped
-// build pays once per user, and a dev build alternating with the shipped
-// helper pays on every switch. `warm` exists so the editor can pay it before
-// a person waits; the lift model and the fast OCR level showed no such cost
-// (~0.1 s cold).
+// over, after which the original identity recompiles too. MEASURED later with
+// the repo's stable certificate (scripts/build-signed.sh): a rebuild with
+// CHANGED code, signed with that same certificate, warmed accurate OCR in
+// 50 ms. So the cache appears to follow the signing identity rather than the
+// binary's hash (the recompiles above then being changes of identity): a user
+// would pay once for the first stably signed ship, and a helper signed any
+// other way (ad hoc) alternating with it pays on every switch. `warm` exists
+// so the editor can pay it before a person waits; the lift model and the fast
+// OCR level showed no such cost (~0.1 s cold).
 //
 // COORDINATES are image pixels with a TOP-LEFT origin, in the image's DISPLAYED
 // orientation (EXIF orientation applied) — the space the editor's canvas draws
@@ -87,7 +94,7 @@ func runVisionServe() {
     autoreleasepool {
       do {
         let result = try PiVision.handle(method: method, params: params)
-        emitResult(id: id, result: result)
+        emitVisionResult(id: id, result: result)
       } catch {
         emitError(id: id, message: PiVision.describe(error))
       }
@@ -95,12 +102,27 @@ func runVisionServe() {
   }
 }
 
-/// `pi-mac --vision <method> [<json params> | <image path>]`.
-func runVisionCommand(_ argv: [String]) {
-  guard let method = argv.first else {
-    writeStderr(
-      "usage: pi-mac --vision <info|lift|instanceAt|ocr|forget|warm>"
-        + " [<json params> | <image path>]\n")
+/// `emitResult`, but never silence. `emit` drops a line JSONSerialization
+/// cannot encode (a NaN, a type it does not know) and writes NOTHING — the
+/// caller would then wait out its whole timeout for an answer that is not
+/// coming. Every number here is rounded through `num` first, so this is a
+/// guard for a future slip, answered at once as an error.
+func emitVisionResult(id: Int?, result: [String: Any]) {
+  guard JSONSerialization.isValidJSONObject(["ok": true, "result": result]) else {
+    emitError(id: id, message: "internal error: the result could not be encoded as JSON")
+    return
+  }
+  emitResult(id: id, result: result)
+}
+
+private let visionUsage =
+  "usage: pi-mac --vision <info|lift|instanceAt|ocr|forget|warm> [<json params> | <image path>]\n"
+
+/// `pi-mac --vision <method> [<json params> | <image path>]`. Never returns:
+/// main.swift relies on that to keep the vision modes clear of AppKit.
+func runVisionCommand(_ argv: [String]) -> Never {
+  guard let method = argv.first, argv.count <= 2 else {
+    writeStderr(visionUsage)
     exit(2)
   }
   var params: [String: Any] = [:]
@@ -122,8 +144,8 @@ func runVisionCommand(_ argv: [String]) {
   autoreleasepool {
     do {
       let result = try PiVision.handle(method: method, params: params)
-      emitResult(id: nil, result: result)
-      ok = true
+      ok = JSONSerialization.isValidJSONObject(["ok": true, "result": result])
+      emitVisionResult(id: nil, result: result)
     } catch {
       emitError(id: nil, message: PiVision.describe(error))
     }
