@@ -370,7 +370,9 @@ export function AssistantGroup({
                */
               <PendingMediaCard
                 kind={pendingKindFor(jobHere.kind) as PendingKind}
-                live={jobHere.kind === 'image'}
+                /* The engine's own frames as they land: a picture's denoise
+                   steps, a clip's rendered frames (HyperFrames names each). */
+                live={jobHere.kind === 'image' || jobHere.kind === 'video'}
                 label={`Generating ${jobHere.kind}`}
                 note={
                   generating?.note ??
@@ -406,7 +408,7 @@ export function AssistantGroup({
             seg.blocks.some((b) => b.type === 'toolCall' && b.id === handing.callId) ? (
               <PendingMediaCard
                 kind={pendingKindFor(handing.kind) ?? 'image'}
-                live={handing.kind === 'image'}
+                live={handing.kind === 'image' || handing.kind === 'video'}
                 item={handingItem}
                 onRevealed={() => setRevealed((cur) => new Set([...cur, handingItem.path]))}
               />

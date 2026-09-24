@@ -910,7 +910,15 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
 
     const onEvent = (event: GenEvent): void => {
       if (event.event === 'progress') {
-        candidate = { ...candidate, status: 'generating' };
+        /* A FRAME AS IT LANDS. HyperFrames writes every frame to disk and names
+           it on its progress event; this handler used to drop the path, so the
+           chat's card and the Video studio showed only a percentage while the
+           animation was being drawn. The image handler has always carried it. */
+        candidate = {
+          ...candidate,
+          status: 'generating',
+          ...(event.previewPath !== undefined ? { previewSrc: toSrc(event.previewPath) } : {}),
+        };
         progress = { candidate: 0, step: event.step, total: event.total };
         send('gen:update', { tabId, payload: payload('generating') });
       } else if (event.event === 'candidate') {
