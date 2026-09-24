@@ -15,12 +15,19 @@
  * all work. Concurrent callers in one process share a single install. Provisioning
  * an isolated Python is uv's job (see python.ts) — we never touch system Python.
  *
- * spawn/extract/fetch are injectable so unit tests never require a real download.
+ * Windows' file rules are followed (win-fs.ts): a virus scanner holding the fresh
+ * uv.exe is waited out, the download and staging folders are removed through the
+ * same holds, and an older copy in the way is moved aside WHOLE before the new
+ * one goes in — never deleted in place, which on Windows would leave a running
+ * uv.exe stripped of its uvx.exe and uvw.exe.
+ *
+ * spawn/extract/fetch and the file operations are injectable, so unit tests
+ * never need a real download and the Windows rules run on any machine.
  */
 import { spawn as nodeSpawn } from 'node:child_process';
 import { readFileSync, statSync } from 'node:fs';
-import { chmod, mkdir, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
-import { delimiter, dirname, join } from 'node:path';
+import { chmod, mkdir, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { dirname, join, posix, win32 } from 'node:path';
 import { type DownloadProgress, downloadFile } from './download.js';
 import { uvDir } from './paths.js';
 import { extractZip } from './unzip.js';
@@ -31,6 +38,36 @@ import {
   uvAssetUrl,
   uvReleaseFor,
 } from './uv-platform.js';
+import {
+  defaultRetryFs,
+  REMOVE_OPTIONS,
+  type RemoveOptions,
+  type RetryFs,
+  renameRetrying,
+} from './win-fs.js';
+
+/**
+ * The file operations an install makes, and the OS whose rules they follow: the
+ * PATH format, and on Windows a scanner's hold and a running uv.exe. Injectable
+ * so those rules are exercised on any machine. Default: node:fs on this OS.
+ */
+export interface UvInstallFs extends RetryFs {
+  readonly rm: (path: string, opts: RemoveOptions) => Promise<void>;
+  /** Whether `p` is a regular file (false when it is missing or unreadable). */
+  readonly isFile: (p: string) => Promise<boolean>;
+}
+
+const defaultInstallFs: UvInstallFs = {
+  ...defaultRetryFs,
+  rm: (p, opts) => rm(p, opts),
+  isFile: async (p) => {
+    try {
+      return (await stat(p)).isFile();
+    } catch {
+      return false;
+    }
+  },
+};
 
 export interface EnsureUvOptions {
   /** The build to install. Default: the pinned build for {@link host}. */
@@ -51,6 +88,8 @@ export interface EnsureUvOptions {
   readonly ignorePath?: boolean;
   /** PATH string to scan when probing (tests). Default: process.env.PATH. */
   readonly pathEnv?: string;
+  /** File operations and the OS whose rules they follow (tests). Default: node:fs here. */
+  readonly fs?: Partial<UvInstallFs>;
 }
 
 export interface UvInstall {
@@ -132,23 +171,22 @@ export function readUvMarker(
   return isFile(expected) ? expected : undefined;
 }
 
-/** Resolve an executable by scanning PATH (so we get an absolute path). */
+/**
+ * Resolve an executable by scanning PATH (so we get an absolute path), read the
+ * way `fs.platform` writes it: on Windows `;`-separated, entries possibly quoted
+ * (`"C:\Program Files\uv"`), `\` paths.
+ */
 async function resolveOnPath(
   name: string,
   pathEnv: string | undefined,
+  fs: UvInstallFs,
 ): Promise<string | undefined> {
-  const raw = pathEnv ?? '';
-  for (const entry of raw.split(delimiter)) {
-    // Windows PATH entries may be quoted.
+  const flavour = fs.platform === 'win32' ? win32 : posix;
+  for (const entry of (pathEnv ?? '').split(flavour.delimiter)) {
     const dir = entry.replace(/^"(.*)"$/, '$1');
     if (dir.length === 0) continue;
-    const candidate = join(dir, name);
-    try {
-      const s = await stat(candidate);
-      if (s.isFile()) return candidate;
-    } catch {
-      // not here; keep scanning
-    }
+    const candidate = flavour.join(dir, name);
+    if (await fs.isFile(candidate)) return candidate;
   }
   return undefined;
 }
@@ -167,10 +205,18 @@ async function extractTarGz(archivePath: string, destDir: string): Promise<void>
   });
 }
 
-function defaultExtract(release: UvRelease) {
+function defaultExtract(release: UvRelease, fs: UvInstallFs) {
   return async (archivePath: string, destDir: string): Promise<void> => {
-    if (release.archive === 'zip') await extractZip(archivePath, destDir);
-    else await extractTarGz(archivePath, destDir);
+    if (release.archive === 'zip') {
+      // Each file is written under a temporary name and renamed: on Windows the
+      // scanner may be holding the uv.exe it just saw appear.
+      await extractZip(archivePath, destDir, {
+        platform: fs.platform,
+        rename: (from, to) => renameRetrying(from, to, fs),
+      });
+    } else {
+      await extractTarGz(archivePath, destDir);
+    }
   };
 }
 
@@ -191,59 +237,59 @@ async function findExecutable(root: string, name: string): Promise<string | unde
   return undefined;
 }
 
-const RETRYABLE_RENAME = new Set(['EPERM', 'EACCES', 'EBUSY']);
-
-/** `rename`, retried briefly on Windows, where a virus scan can hold a new .exe. */
-async function renameRetrying(from: string, to: string): Promise<void> {
-  for (let attempt = 0; ; attempt++) {
-    try {
-      await rename(from, to);
-      return;
-    } catch (err) {
-      const code = (err as NodeJS.ErrnoException).code ?? '';
-      if (process.platform !== 'win32' || !RETRYABLE_RENAME.has(code) || attempt >= 3) throw err;
-      await new Promise((r) => setTimeout(r, 150 * 2 ** attempt));
-    }
-  }
-}
-
 /**
- * Put a freshly unpacked folder at `installDir`. An older folder there (an
- * interrupted install from before staging existed, or a lost marker) is replaced.
- * If it cannot be removed — on Windows, because its uv.exe is running — or
- * another process moved its own copy in first, the copy that is there is kept
- * when it has the binary: something put it there whole, or is running it.
+ * Put a freshly unpacked folder at `installDir`.
+ *
+ * An older folder already there (an interrupted install from before staging
+ * existed, or a lost marker) is first renamed to `aside` — all at once — and only
+ * then deleted. Deleting it where it stands is not safe on Windows: a recursive
+ * delete removes what it can, and a running uv.exe cannot be removed, so the
+ * folder would be left with a uv.exe and no uvx.exe or uvw.exe. When it cannot be
+ * moved aside (on Windows, because its uv.exe is running), or another process
+ * moved its own copy in first, the copy that is there is kept, untouched, if it
+ * has the binary: something put it there whole, or is running it.
  */
-async function moveIntoPlace(from: string, installDir: string, binName: string): Promise<void> {
-  const keepExisting = (err: unknown): void => {
-    if (!defaultIsFile(join(installDir, binName))) throw err;
+async function moveIntoPlace(
+  from: string,
+  installDir: string,
+  aside: string,
+  binName: string,
+  fs: UvInstallFs,
+): Promise<void> {
+  const keepExisting = async (err: unknown): Promise<void> => {
+    if (!(await fs.isFile(join(installDir, binName)))) throw err;
   };
-  if (
-    await stat(installDir).then(
-      () => true,
-      () => false,
-    )
-  ) {
+  if (await fs.isDirectory(installDir)) {
     try {
-      // maxRetries rides out a virus scanner briefly holding a file on Windows.
-      await rm(installDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 150 });
+      await renameRetrying(installDir, aside, fs);
+      await fs.rm(aside, REMOVE_OPTIONS).catch(() => {}); // out of the way already
     } catch (err) {
-      keepExisting(err);
-      return;
+      // Gone meanwhile (another install moved it): the way is clear.
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+        await keepExisting(err);
+        return;
+      }
     }
   }
   try {
-    await renameRetrying(from, installDir);
+    await renameRetrying(from, installDir, fs);
   } catch (err) {
-    keepExisting(err);
+    await keepExisting(err);
   }
 }
 
-async function install(release: UvRelease, dir: string, opts: EnsureUvOptions): Promise<UvInstall> {
+async function install(
+  release: UvRelease,
+  dir: string,
+  opts: EnsureUvOptions,
+  fs: UvInstallFs,
+): Promise<UvInstall> {
   await mkdir(dir, { recursive: true });
   const stamp = `${process.pid}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
   const archivePath = join(dir, `.${release.assetName}.${stamp}.download`);
   const staging = join(dir, `.uv-${release.target}.${stamp}.staging`);
+  const aside = join(dir, `.uv-${release.target}.${stamp}.old`);
+  const markerTmp = join(dir, `${UV_MARKER}.${stamp}`);
   try {
     await downloadFile({
       url: uvAssetUrl(release),
@@ -256,15 +302,15 @@ async function install(release: UvRelease, dir: string, opts: EnsureUvOptions): 
     });
 
     await mkdir(staging, { recursive: true });
-    await (opts.extract ?? defaultExtract(release))(archivePath, staging);
+    await (opts.extract ?? defaultExtract(release, fs))(archivePath, staging);
     const found = await findExecutable(staging, release.binName);
     if (found === undefined) {
       throw new Error(`${release.binName} not found in ${release.assetName} after extracting it`);
     }
-    if (process.platform !== 'win32') await chmod(found, 0o755).catch(() => {});
+    if (fs.platform !== 'win32') await chmod(found, 0o755).catch(() => {});
 
     const installDir = uvInstallDir(dir, release.target);
-    await moveIntoPlace(dirname(found), installDir, release.binName);
+    await moveIntoPlace(dirname(found), installDir, aside, release.binName, fs);
     const uvPath = join(installDir, release.binName);
 
     const marker: UvInstallMarker = {
@@ -274,14 +320,15 @@ async function install(release: UvRelease, dir: string, opts: EnsureUvOptions): 
       assetName: release.assetName,
       sha256: release.sha256,
     };
-    const markerTmp = join(dir, `${UV_MARKER}.${stamp}`);
     await writeFile(markerTmp, JSON.stringify(marker, null, 2));
-    await renameRetrying(markerTmp, join(dir, UV_MARKER));
+    await renameRetrying(markerTmp, join(dir, UV_MARKER), fs);
 
     return { uvPath, source: 'download', version: release.version, target: release.target };
   } finally {
-    await rm(archivePath, { force: true }).catch(() => {});
-    await rm(staging, { recursive: true, force: true }).catch(() => {});
+    // Every temporary this install made, through a scanner's hold; none may stay.
+    for (const leftover of [archivePath, `${archivePath}.part`, staging, aside, markerTmp]) {
+      await fs.rm(leftover, REMOVE_OPTIONS).catch(() => {});
+    }
   }
 }
 
@@ -296,11 +343,12 @@ const inflight = new Map<string, Promise<UvInstall>>();
  * (and that has no uv on PATH).
  */
 export async function ensureUv(opts: EnsureUvOptions = {}): Promise<UvInstall> {
+  const fs: UvInstallFs = { ...defaultInstallFs, ...opts.fs };
   const host = opts.host ?? (opts.release === undefined ? detectUvHost() : undefined);
   const binName = opts.release?.binName ?? (host?.platform === 'win32' ? 'uv.exe' : 'uv');
 
   if (opts.ignorePath !== true) {
-    const onPath = await resolveOnPath(binName, opts.pathEnv ?? process.env.PATH);
+    const onPath = await resolveOnPath(binName, opts.pathEnv ?? process.env.PATH, fs);
     if (onPath !== undefined) return { uvPath: onPath, source: 'path' };
   }
 
@@ -321,7 +369,7 @@ export async function ensureUv(opts: EnsureUvOptions = {}): Promise<UvInstall> {
   const key = `${dir}\0${release.target}`;
   const running = inflight.get(key);
   if (running !== undefined) return running;
-  const job = install(release, dir, opts).finally(() => inflight.delete(key));
+  const job = install(release, dir, opts, fs).finally(() => inflight.delete(key));
   inflight.set(key, job);
   return job;
 }

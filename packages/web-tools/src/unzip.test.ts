@@ -1,8 +1,8 @@
 import { randomBytes } from 'node:crypto';
-import { existsSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import zlib from 'node:zlib';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -233,5 +233,85 @@ describe('extractZip on built archives', () => {
     ctl.abort();
     await expect(extractZip(zip, join(work, 'out'), { signal: ctl.signal })).rejects.toThrow();
     expect(tree(join(work, 'out'))).toEqual([]);
+  });
+});
+
+/** fs.rename, waiting out a real scanner's hold (on a Windows runner) for up to 5 s. */
+async function realRenameWaiting(from: string, to: string): Promise<void> {
+  const { rename } = await import('node:fs/promises');
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await rename(from, to);
+      return;
+    } catch (err) {
+      if (process.platform !== 'win32' || attempt >= 50) throw err;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+  }
+}
+
+describe('extractZip moves each finished file with the rename it is given', () => {
+  it('uses the caller’s rename for every file (uv passes one that waits out a scanner)', async () => {
+    const zip = await zipFile(
+      'exes.zip',
+      buildZip([
+        { name: 'uv.exe', data: 'MZ uv' },
+        { name: 'uvx.exe', data: 'MZ uvx' },
+      ]),
+    );
+    const moved: string[] = [];
+    let held = 1;
+    const rename = async (from: string, to: string): Promise<void> => {
+      moved.push(
+        `${from.slice(from.lastIndexOf(sep) + 1).replace(/\.\d+\./, '.<pid>.')} -> ${to.slice(to.lastIndexOf(sep) + 1)}`,
+      );
+      // Held once, the way a scanner holds a new .exe; a caller's retrying rename
+      // absorbs this, and extractZip reports whatever the rename finally reports.
+      if (held-- > 0) throw Object.assign(new Error('EBUSY: resource busy'), { code: 'EBUSY' });
+      await realRenameWaiting(from, to);
+    };
+    const retrying = async (from: string, to: string): Promise<void> => {
+      try {
+        await rename(from, to);
+      } catch {
+        await rename(from, to);
+      }
+    };
+    await extractZip(zip, join(work, 'out'), { rename: retrying });
+    expect(moved).toEqual([
+      'uv.exe.<pid>.unzip-part -> uv.exe',
+      'uv.exe.<pid>.unzip-part -> uv.exe',
+      'uvx.exe.<pid>.unzip-part -> uvx.exe',
+    ]);
+    expect(tree(join(work, 'out'))).toEqual(['uv.exe', 'uvx.exe']);
+
+    // A rename that keeps failing fails the extraction and leaves no part file.
+    const stuck = async (): Promise<void> => {
+      throw Object.assign(new Error('EBUSY: resource busy'), { code: 'EBUSY' });
+    };
+    await expect(extractZip(zip, join(work, 'stuck'), { rename: stuck })).rejects.toMatchObject({
+      code: 'EBUSY',
+    });
+    expect(tree(join(work, 'stuck'))).toEqual([]);
+  });
+});
+
+describe('one extractor (PLAN §2.2 R17): the files XP-02a lifts stay self-contained', () => {
+  const src = (rel: string): string =>
+    readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
+  const specifiers = (text: string): string[] =>
+    [...text.matchAll(/^\s*(?:import|export)\s[^;]*?from\s+'([^']+)'/gm)].map(
+      (m) => m[1] as string,
+    );
+
+  it('unzip.ts imports nothing but Node built-ins', () => {
+    const found = specifiers(src('./unzip.ts'));
+    expect(found.length).toBeGreaterThan(0);
+    expect(found.filter((s) => !s.startsWith('node:'))).toEqual([]);
+  });
+
+  it('its test helper imports only Node and unzip.ts itself', () => {
+    const found = specifiers(src('./testing/zip-builder.ts'));
+    expect(found.filter((s) => !s.startsWith('node:'))).toEqual(['../unzip.js']);
   });
 });

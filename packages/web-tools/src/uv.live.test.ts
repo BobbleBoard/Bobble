@@ -8,6 +8,12 @@
  *       (~25 MB), `uv --version` answers with the pinned version, and a second
  *       call reuses it through the marker without the network.
  *
+ *   PI_DESKTOP_UV_EXPECT_TARGET=<target>
+ *     - the build this machine picked must be that one. CI sets it per runner,
+ *       so the choice itself is checked on real hardware (an x64 Node on Windows
+ *       on ARM must still get `aarch64-pc-windows-msvc`, a musl Linux the static
+ *       build), not only compared with what uv-platform computes.
+ *
  *   PI_DESKTOP_UV_LIVE_TARGETS=primary | all | <target>,<target>
  *     - also installs those builds HERE, into throwaway dirs, through the same
  *       code path (download, pinned sha256, zip or tar.gz), and checks that each
@@ -29,6 +35,7 @@ import { detectUvHost, uvReleaseFor, uvReleaseForTarget } from './uv-platform.js
 
 const RUN = process.env.PI_DESKTOP_UV_LIVE === '1';
 const TARGETS = process.env.PI_DESKTOP_UV_LIVE_TARGETS ?? '';
+const EXPECT_TARGET = process.env.PI_DESKTOP_UV_EXPECT_TARGET ?? '';
 const RELEASE_BASE = `https://github.com/astral-sh/uv/releases/download/${PINNED_UV.version}`;
 
 const PRIMARY = [
@@ -148,6 +155,7 @@ describe.skipIf(!RUN)('uv live: pins and this machine', () => {
     );
     expect(install.source).toBe('download');
     expect(install.target).toBe(release.target);
+    if (EXPECT_TARGET !== '') expect(install.target).toBe(EXPECT_TARGET);
     expect(await binaryKind(install.uvPath)).toBe(expectedKind(release.target));
     const version = uvVersion(install.uvPath);
     console.log(`[LIVE] ${version}`);

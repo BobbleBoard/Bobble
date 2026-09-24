@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { PINNED_UV } from './uv-pins.js';
 import {
   detectUvHost,
+  parseRegQueryValue,
   UnsupportedUvHostError,
   type UvHost,
   uvAssetUrl,
@@ -9,6 +10,8 @@ import {
   uvReleaseForTarget,
   uvTargetCandidates,
   uvTargetFor,
+  windowsArchName,
+  windowsOsArch,
 } from './uv-platform.js';
 
 const glibc = (arch: string, v: string): UvHost => ({
@@ -30,6 +33,28 @@ describe('uvTargetFor — one row per machine class', () => {
     ['Windows x64', { platform: 'win32', arch: 'x64' }, 'x86_64-pc-windows-msvc'],
     ['Windows on ARM', { platform: 'win32', arch: 'arm64' }, 'aarch64-pc-windows-msvc'],
     ['Windows 32-bit', { platform: 'win32', arch: 'ia32' }, 'i686-pc-windows-msvc'],
+    // By the OS's architecture, as uv-installer.ps1's Get-Arch picks it:
+    [
+      'Windows on ARM, x64 app (emulated)',
+      { platform: 'win32', arch: 'x64', osArch: 'arm64' },
+      'aarch64-pc-windows-msvc',
+    ],
+    [
+      'Windows x64, 32-bit app (WOW64)',
+      { platform: 'win32', arch: 'ia32', osArch: 'x64' },
+      'x86_64-pc-windows-msvc',
+    ],
+    [
+      'Windows on ARM, 32-bit app (WOW64)',
+      { platform: 'win32', arch: 'ia32', osArch: 'arm64' },
+      'aarch64-pc-windows-msvc',
+    ],
+    ['32-bit Windows', { platform: 'win32', arch: 'ia32', osArch: 'ia32' }, 'i686-pc-windows-msvc'],
+    [
+      'Windows x64, native',
+      { platform: 'win32', arch: 'x64', osArch: 'x64' },
+      'x86_64-pc-windows-msvc',
+    ],
     ['Ubuntu 24.04 x64', glibc('x64', '2.39'), 'x86_64-unknown-linux-gnu'],
     ['Ubuntu 24.04 arm64', glibc('arm64', '2.39'), 'aarch64-unknown-linux-gnu'],
     ['CentOS 7 x64 (glibc 2.17)', glibc('x64', '2.17'), 'x86_64-unknown-linux-gnu'],
@@ -77,6 +102,8 @@ describe('uvTargetFor — one row per machine class', () => {
     ['FreeBSD', { platform: 'freebsd', arch: 'x64' }],
     ['Linux LoongArch', glibc('loong64', '2.36')],
     ['32-bit ARM Windows', { platform: 'win32', arch: 'arm' }],
+    ['Windows RT (32-bit ARM Windows)', { platform: 'win32', arch: 'arm', osArch: 'arm' }],
+    ['Itanium Windows', { platform: 'win32', arch: 'ia32', osArch: 'ia64' }],
     ['32-bit macOS', { platform: 'darwin', arch: 'ia32' }],
     ['POWER on musl (no build)', { platform: 'linux', arch: 'ppc64', libc: 'musl' }],
     ['IBM Z below its glibc floor', glibc('s390x', '2.12')],
@@ -236,11 +263,21 @@ describe('detectUvHost', () => {
     expect(uvTargetFor(intel)).toBe('x86_64-apple-darwin');
   });
 
-  it('describes Windows by platform and arch alone', () => {
-    expect(detectUvHost({ platform: 'win32', arch: 'arm64' })).toEqual({
-      platform: 'win32',
-      arch: 'arm64',
-    });
+  it('adds nothing Windows-only on other systems (no registry read, no osArch)', () => {
+    const registry = vi.fn(() => 'ARM64');
+    const env = { PROCESSOR_ARCHITEW6432: 'ARM64' };
+    for (const platform of ['darwin', 'linux']) {
+      const host = detectUvHost({
+        platform,
+        arch: 'x64',
+        env,
+        windowsRegistryArch: registry,
+        report: () => ({ header: { glibcVersionRuntime: '2.39' } }),
+        sysctl: () => '0',
+      });
+      expect(host.osArch).toBeUndefined();
+    }
+    expect(registry).not.toHaveBeenCalled();
   });
 
   it('reads the real process report and leaves its excludeNetwork setting as it was', () => {
@@ -260,5 +297,105 @@ describe('detectUvHost', () => {
     expect(detectUvHost()).toBe(a);
     // Whatever this machine is, it is one uv publishes a build for.
     expect(() => uvReleaseFor(a)).not.toThrow();
+  });
+});
+
+describe('Windows: the build follows the OS architecture, as uv-installer.ps1 picks it', () => {
+  const noRegistry = (): string => {
+    throw new Error('the registry is not needed here');
+  };
+
+  it.each<[string, string, Record<string, string>, string]>([
+    [
+      'a 32-bit app on x64 Windows (WOW64)',
+      'ia32',
+      { PROCESSOR_ARCHITEW6432: 'AMD64' },
+      'x86_64-pc-windows-msvc',
+    ],
+    [
+      'a 32-bit app on Windows on ARM (WOW64)',
+      'ia32',
+      { PROCESSOR_ARCHITEW6432: 'ARM64' },
+      'aarch64-pc-windows-msvc',
+    ],
+    ['an arm64 app (it only runs on ARM64 Windows)', 'arm64', {}, 'aarch64-pc-windows-msvc'],
+  ])('%s: known without the registry', (_label, arch, env, target) => {
+    const host = detectUvHost({ platform: 'win32', arch, env, windowsRegistryArch: noRegistry });
+    expect(uvTargetFor(host)).toBe(target);
+  });
+
+  it.each<[string, string, string | undefined, string | undefined, string]>([
+    ['an x64 app emulated on Windows on ARM', 'x64', 'ARM64', 'arm64', 'aarch64-pc-windows-msvc'],
+    ['an x64 app on x64 Windows', 'x64', 'AMD64', 'x64', 'x86_64-pc-windows-msvc'],
+    [
+      'an x64 app, registry unreadable (the process arch stands, as the installer’s fallback)',
+      'x64',
+      undefined,
+      undefined,
+      'x86_64-pc-windows-msvc',
+    ],
+    [
+      'a 32-bit app whose environment was scrubbed, on x64 Windows',
+      'ia32',
+      'AMD64',
+      'x64',
+      'x86_64-pc-windows-msvc',
+    ],
+    ['a 32-bit app on 32-bit Windows', 'ia32', 'x86', 'ia32', 'i686-pc-windows-msvc'],
+  ])('%s: asks the registry once', (_label, arch, registry, osArch, target) => {
+    const read = vi.fn(() => registry);
+    const host = detectUvHost({ platform: 'win32', arch, env: {}, windowsRegistryArch: read });
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(host.osArch).toBe(osArch);
+    expect(uvTargetFor(host)).toBe(target);
+  });
+
+  it('names both architectures when it cannot serve the machine', () => {
+    expect(() => uvTargetFor({ platform: 'win32', arch: 'ia32', osArch: 'ia64' })).toThrow(
+      /win32-ia32, on ia64 Windows/,
+    );
+  });
+
+  it('reads the value out of reg.exe’s answer', () => {
+    // What `reg query "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment"
+    // /v PROCESSOR_ARCHITECTURE` prints: a blank line, the key, the value row in
+    // four-space columns, a blank line — CRLF throughout.
+    const answer = (value: string): string =>
+      '\r\nHKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment' +
+      `\r\n    PROCESSOR_ARCHITECTURE    REG_SZ    ${value}\r\n\r\n`;
+    expect(parseRegQueryValue(answer('ARM64'), 'PROCESSOR_ARCHITECTURE')).toBe('ARM64');
+    expect(parseRegQueryValue(answer('AMD64'), 'PROCESSOR_ARCHITECTURE')).toBe('AMD64');
+    expect(parseRegQueryValue(answer('x86'), 'processor_architecture')).toBe('x86');
+    // A value with single spaces in it survives whole; other rows are ignored.
+    expect(
+      parseRegQueryValue(
+        '    PROCESSOR_IDENTIFIER    REG_SZ    ARMv8 (64-bit) Family 8 Model 1 Revision 201\r\n',
+        'PROCESSOR_IDENTIFIER',
+      ),
+    ).toBe('ARMv8 (64-bit) Family 8 Model 1 Revision 201');
+    expect(parseRegQueryValue(answer('ARM64'), 'PROCESSOR_LEVEL')).toBeUndefined();
+    expect(
+      parseRegQueryValue(
+        'ERROR: The system was unable to find the specified registry key or value.',
+        'PROCESSOR_ARCHITECTURE',
+      ),
+    ).toBeUndefined();
+  });
+
+  it('maps Windows CPU names to process.arch terms, case-insensitively', () => {
+    expect(windowsArchName('AMD64')).toBe('x64');
+    expect(windowsArchName('ARM64')).toBe('arm64');
+    expect(windowsArchName('x86')).toBe('ia32');
+    expect(windowsArchName(' arm64 ')).toBe('arm64');
+    expect(windowsArchName('ARM')).toBe('arm');
+    expect(windowsArchName('IA64')).toBe('ia64');
+    expect(windowsArchName('')).toBeUndefined();
+    expect(windowsArchName(undefined)).toBeUndefined();
+  });
+
+  it('agrees with windowsOsArch, which detectUvHost uses', () => {
+    expect(windowsOsArch('x64', {}, () => 'ARM64')).toBe('arm64');
+    expect(windowsOsArch('ia32', { PROCESSOR_ARCHITEW6432: 'AMD64' }, noRegistry)).toBe('x64');
+    expect(windowsOsArch('x64', {}, () => undefined)).toBeUndefined();
   });
 });

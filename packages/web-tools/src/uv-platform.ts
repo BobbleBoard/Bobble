@@ -7,15 +7,19 @@
  * (gen modules, ComfyUI, the office pipeline, vLLM, 3D) would have fetched a Mac
  * binary and failed (crossplatform.md §2.4 A1).
  *
- * The rules mirror the release's own installer script (`uv-installer.sh`), so
- * the app and `curl … | sh` agree on what a given machine should run:
+ * The rules mirror the release's own installers — `uv-installer.sh` on macOS and
+ * Linux, `uv-installer.ps1` on Windows — so the app and a user's own install
+ * agree on what a given machine should run:
  *
  *   - macOS: the arm64 build on Apple Silicon — also for an x64 process running
  *     under Rosetta, which the installer detects the same way (`sysctl
  *     hw.optional.arm64`). An x86_64 uv would provision x86_64 Pythons, and the
  *     MLX stack has no x86_64 wheels.
- *   - Windows: the `.zip` for the process architecture (x64, arm64, ia32); the
- *     binary inside is `uv.exe`.
+ *   - Windows: the `.zip` for the architecture of WINDOWS, not of the process,
+ *     as the PowerShell installer picks it (`Get-Arch`: .NET's
+ *     `RuntimeInformation.OSArchitecture`, else `Is64BitOperatingSystem`). An
+ *     x64 app emulated on Windows on ARM gets the arm64 build; a 32-bit app on
+ *     64-bit Windows gets the x64 one. The binary inside is `uv.exe`.
  *   - Linux: the glibc (`-gnu`) build when the host runs glibc at least as new as
  *     the build needs (the minimum is read from the installer script per release,
  *     see `scripts/pin-uv.mjs`); otherwise the fully static musl build, which runs
@@ -29,6 +33,7 @@
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { PINNED_UV } from './uv-pins.js';
 
 /** A Rust target triple uv publishes a build for, e.g. `x86_64-pc-windows-msvc`. */
@@ -87,6 +92,14 @@ export interface UvHost {
   readonly armVersion?: number;
   /** macOS: this is Apple Silicon, even if the process itself is x64 (Rosetta). */
   readonly appleSilicon?: boolean;
+  /**
+   * Windows: the architecture of Windows itself, in `process.arch` terms (`x64`,
+   * `arm64`, `ia32`, `arm`). It differs from {@link arch} for an x64 process
+   * emulated on Windows on ARM (`arm64`) and a 32-bit process under WOW64
+   * (`x64` or `arm64`). The build is chosen by it; `undefined` = unknown, and
+   * the process architecture is used.
+   */
+  readonly osArch?: string;
 }
 
 /** No uv build fits this machine. The message names the machine and the version. */
@@ -106,7 +119,9 @@ export class UnsupportedUvHostError extends Error {
 function describeHost(host: UvHost): string {
   const libc = host.platform === 'linux' ? `, ${host.libc ?? 'unknown libc'}` : '';
   const glibc = host.glibcVersion !== undefined ? ` ${host.glibcVersion}` : '';
-  return `${host.platform}-${host.arch}${libc}${host.libc === 'glibc' ? glibc : ''}`;
+  const os =
+    host.osArch !== undefined && host.osArch !== host.arch ? `, on ${host.osArch} Windows` : '';
+  return `${host.platform}-${host.arch}${libc}${host.libc === 'glibc' ? glibc : ''}${os}`;
 }
 
 /** The archive kind, read from the asset's file name. */
@@ -189,11 +204,14 @@ export function uvTargetCandidates(host: UvHost, pin: UvPin = PINNED_UV): UvTarg
         return ['aarch64-apple-darwin'];
       }
       return host.arch === 'x64' ? ['x86_64-apple-darwin'] : [];
-    case 'win32':
-      if (host.arch === 'x64') return ['x86_64-pc-windows-msvc'];
-      if (host.arch === 'arm64') return ['aarch64-pc-windows-msvc'];
-      if (host.arch === 'ia32') return ['i686-pc-windows-msvc'];
+    case 'win32': {
+      // By the OS's architecture, as uv-installer.ps1's Get-Arch picks it.
+      const arch = host.osArch ?? host.arch;
+      if (arch === 'x64') return ['x86_64-pc-windows-msvc'];
+      if (arch === 'arm64') return ['aarch64-pc-windows-msvc'];
+      if (arch === 'ia32') return ['i686-pc-windows-msvc'];
       return [];
+    }
     case 'linux': {
       const cpu = linuxCpu(host);
       if (cpu === undefined) return [];
@@ -260,6 +278,14 @@ export interface UvHostProbe {
   readonly sysctl?: (name: string) => string | undefined;
   /** 32-bit ARM version; defaults to Node's `process.config.variables.arm_version`. */
   readonly armVersion?: number;
+  /** Environment (Windows: `PROCESSOR_ARCHITEW6432`, `SystemRoot`). Default: `process.env`. */
+  readonly env?: Readonly<Record<string, string | undefined>>;
+  /**
+   * Windows: the system's own `PROCESSOR_ARCHITECTURE` as the registry holds it
+   * (`AMD64`, `ARM64`, `x86`), or `undefined` when it cannot be read. Default:
+   * `reg.exe query` with a hidden window ({@link readWindowsRegistryArch}).
+   */
+  readonly windowsRegistryArch?: () => string | undefined;
 }
 
 /**
@@ -311,6 +337,97 @@ function defaultArmVersion(): number | undefined {
   return Number.isFinite(n) && n > 0 ? n : undefined;
 }
 
+/** Windows' CPU names (`PROCESSOR_ARCHITECTURE` values) in `process.arch` terms. */
+export function windowsArchName(raw: string | undefined): string | undefined {
+  switch (raw?.trim().toUpperCase()) {
+    case 'AMD64':
+      return 'x64';
+    case 'ARM64':
+      return 'arm64';
+    case 'X86':
+      return 'ia32';
+    case 'ARM':
+      return 'arm';
+    case 'IA64':
+      return 'ia64';
+    default:
+      return undefined;
+  }
+}
+
+/** Where Windows keeps its system-wide environment, `PROCESSOR_ARCHITECTURE` included. */
+export const WINDOWS_ENVIRONMENT_KEY =
+  'HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment';
+
+/**
+ * One value out of `reg query <key> /v <name>` output, e.g.
+ * `    PROCESSOR_ARCHITECTURE    REG_SZ    ARM64` → `ARM64`.
+ */
+export function parseRegQueryValue(stdout: string, name: string): string | undefined {
+  for (const line of stdout.split(/\r?\n/)) {
+    const cells = line.trim().split(/\s{2,}|\t/);
+    if (cells.length >= 3 && cells[0]?.toUpperCase() === name.toUpperCase()) {
+      if (/^REG_(EXPAND_)?SZ$/i.test(cells[1] ?? '')) return cells.slice(2).join(' ').trim();
+    }
+  }
+  return undefined;
+}
+
+/**
+ * The system's `PROCESSOR_ARCHITECTURE` from the registry, via `reg.exe` (no
+ * console window). An x64 process emulated on ARM64 reads the registry without
+ * redirection (Microsoft: x64 apps on Arm "can access the entire OS, both
+ * filesystem and registry"), so this names the real CPU where the process's own
+ * view says x64: `PROCESSOR_ARCHITECTURE`, `GetNativeSystemInfo` (emulated, per
+ * Microsoft) and `os.machine()` (libuv reads it from `GetSystemInfo`).
+ */
+export function readWindowsRegistryArch(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): string | undefined {
+  const root = env.SystemRoot ?? env.SYSTEMROOT ?? env.windir ?? 'C:\\Windows';
+  // The host's own joiner: this runs for real only on Windows, and a test on
+  // another OS can stand a script in for reg.exe under a SystemRoot of its own.
+  const reg = join(root, 'System32', 'reg.exe');
+  try {
+    const out = execFileSync(
+      reg,
+      ['query', WINDOWS_ENVIRONMENT_KEY, '/v', 'PROCESSOR_ARCHITECTURE'],
+      {
+        encoding: 'utf8',
+        timeout: 3_000,
+        stdio: ['ignore', 'pipe', 'ignore'],
+        windowsHide: true,
+      },
+    );
+    return parseRegQueryValue(out, 'PROCESSOR_ARCHITECTURE');
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The architecture of Windows itself, as uv's PowerShell installer reads it
+ * (`RuntimeInformation.OSArchitecture`), in `process.arch` terms:
+ *   1. a 32-bit process under WOW64 is told the real one in `PROCESSOR_ARCHITEW6432`;
+ *   2. an arm64 process can only be running on ARM64 Windows;
+ *   3. anything else — an x64 process, native or emulated on ARM64 — asks the
+ *      registry, since emulation shows the process an x64 CPU through every
+ *      other API it has.
+ * `undefined` when none of that answers: the process architecture then stands,
+ * which is what the installer's own fallback (`Is64BitOperatingSystem`) comes to
+ * for any process not under WOW64.
+ */
+export function windowsOsArch(
+  arch: string,
+  env: Readonly<Record<string, string | undefined>>,
+  registryArch: () => string | undefined,
+): string | undefined {
+  const underWow64 = windowsArchName(env.PROCESSOR_ARCHITEW6432);
+  if (underWow64 !== undefined) return underWow64;
+  if (arch === 'arm64') return 'arm64';
+  return windowsArchName(registryArch());
+}
+
 function glibcFromReport(report: unknown): string | undefined {
   if (typeof report !== 'object' || report === null) return undefined;
   const header = (report as { header?: { glibcVersionRuntime?: unknown } }).header;
@@ -349,6 +466,16 @@ export function detectUvHost(probe?: UvHostProbe): UvHost {
     const arm64 =
       arch === 'arm64' || (p.sysctl ?? defaultSysctl)('hw.optional.arm64')?.trim() === '1';
     host = { ...host, appleSilicon: arm64 };
+  }
+
+  if (platform === 'win32') {
+    const env = p.env ?? process.env;
+    const osArch = windowsOsArch(
+      arch,
+      env,
+      p.windowsRegistryArch ?? (() => readWindowsRegistryArch(env)),
+    );
+    if (osArch !== undefined) host = { ...host, osArch };
   }
 
   if (probe === undefined) cachedHost = host;

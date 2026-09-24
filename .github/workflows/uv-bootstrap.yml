@@ -3,9 +3,14 @@ name: uv bootstrap
 # XP-04 (crossplatform.md §5): the pinned uv builds install, verify and run on
 # every OS the app targets. The unit tests run on each runner; the live job
 # downloads that runner's own build (~25 MB) through `ensureUv({ ignorePath:
-# true })` — pinned sha256, zip on Windows, tar.gz elsewhere — and runs
-# `uv --version`. `pins` re-reads the release (small files only) so a drifted
-# pin fails here, and runs weekly as well.
+# true })` — pinned sha256, zip on Windows, tar.gz elsewhere — runs
+# `uv --version`, and checks the build chosen is the one expected on that
+# machine (PI_DESKTOP_UV_EXPECT_TARGET). Two legs run an x64 Node on arm64
+# hardware (emulated on Windows, Rosetta on macOS): uv's own installers give
+# those machines the arm64 build, and so must the app. The musl leg runs
+# Node's Alpine image, where the host is known by its musl loader. `pins`
+# re-reads the release (small files only) so a drifted pin fails here, and
+# runs weekly as well.
 #
 # Kept apart from ci.yml (XP-03 owns it and creates crossplatform.yml); XP-03
 # can fold these jobs into its matrix.
@@ -15,7 +20,8 @@ on:
     paths:
       - 'packages/web-tools/src/uv*.ts'
       - 'packages/web-tools/src/unzip*.ts'
-      - 'packages/web-tools/src/download.ts'
+      - 'packages/web-tools/src/download*.ts'
+      - 'packages/web-tools/src/win-fs*.ts'
       - 'packages/web-tools/src/paths.ts'
       - 'packages/web-tools/src/testing/**'
       - 'packages/web-tools/src/fixtures/zip/**'
@@ -26,7 +32,8 @@ on:
     paths:
       - 'packages/web-tools/src/uv*.ts'
       - 'packages/web-tools/src/unzip*.ts'
-      - 'packages/web-tools/src/download.ts'
+      - 'packages/web-tools/src/download*.ts'
+      - 'packages/web-tools/src/win-fs*.ts'
       - 'packages/web-tools/src/paths.ts'
       - 'packages/web-tools/src/testing/**'
       - 'packages/web-tools/src/fixtures/zip/**'
@@ -58,21 +65,45 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   install:
-    name: install on ${{ matrix.os }}
+    name: install on ${{ matrix.os }} (Node ${{ matrix.node-arch }})
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, ubuntu-24.04-arm, windows-2025, windows-11-arm, macos-14]
+        include:
+          - os: ubuntu-24.04
+            node-arch: x64
+            target: x86_64-unknown-linux-gnu
+          - os: ubuntu-24.04-arm
+            node-arch: arm64
+            target: aarch64-unknown-linux-gnu
+          - os: windows-2025
+            node-arch: x64
+            target: x86_64-pc-windows-msvc
+          - os: windows-11-arm
+            node-arch: arm64
+            target: aarch64-pc-windows-msvc
+          # An x64 app on Windows on ARM runs emulated and is shown an x64 CPU;
+          # uv-installer.ps1 picks by the OS architecture, so arm64 it is.
+          - os: windows-11-arm
+            node-arch: x64
+            target: aarch64-pc-windows-msvc
+          - os: macos-14
+            node-arch: arm64
+            target: aarch64-apple-darwin
+          # An x64 app on Apple Silicon runs under Rosetta; uv-installer.sh
+          # reads hw.optional.arm64 and gives it the arm64 build.
+          - os: macos-14
+            node-arch: x64
+            target: aarch64-apple-darwin
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
-    env:
-      TURBO_TELEMETRY_DISABLED: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
+          architecture: ${{ matrix.node-arch }}
           cache: pnpm
       # web-tools and its workspace deps only: no Electron app, no native builds.
       # The root's electron devDependency would otherwise fetch its binary here.
@@ -81,14 +112,37 @@ jobs:
       - run: pnpm install --frozen-lockfile --filter '@pi-desktop/web-tools...'
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
-      - name: unit tests (uv, unzip, platform, locations)
+      - name: unit tests (uv, unzip, Windows file rules, platform, locations)
         run: >-
           pnpm --filter '@pi-desktop/web-tools' exec vitest run
           src/uv.test.ts src/uv.default-host.test.ts src/uv-platform.test.ts
-          src/uv-locations.test.ts src/unzip.test.ts
+          src/uv-locations.test.ts src/uv.windows-rules.test.ts
+          src/uv.spawn-options.test.ts src/unzip.test.ts src/win-fs.test.ts
+          src/download.test.ts
       - name: install this runner's build and run it
         run: >-
           pnpm --filter '@pi-desktop/web-tools' exec vitest run src/uv.live.test.ts
           --reporter=verbose --silent=false
         env:
           PI_DESKTOP_UV_LIVE: '1'
+          PI_DESKTOP_UV_EXPECT_TARGET: ${{ matrix.target }}
+
+  install-musl:
+    name: install on Alpine (musl libc)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      # Node's own Alpine build reports no glibc, so the host is recognised by
+      # /lib/ld-musl-*.so.1 and gets the static musl build.
+      - name: install and run the musl build in node:24-alpine
+        run: |
+          docker run --rm -v "$PWD:/w" -w /w \
+            -e CI=1 -e ELECTRON_SKIP_BINARY_DOWNLOAD=1 -e COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
+            -e PI_DESKTOP_UV_LIVE=1 -e PI_DESKTOP_UV_EXPECT_TARGET=x86_64-unknown-linux-musl \
+            node:24-alpine sh -euc '
+              corepack enable
+              pnpm install --frozen-lockfile --filter "@pi-desktop/web-tools..."
+              pnpm --filter "@pi-desktop/web-tools" exec vitest run src/uv-platform.test.ts
+              pnpm --filter "@pi-desktop/web-tools" exec vitest run src/uv.live.test.ts --reporter=verbose --silent=false
+            '

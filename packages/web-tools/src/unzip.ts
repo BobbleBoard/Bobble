@@ -17,8 +17,10 @@
  * entries, and on Windows `:` (an NTFS alternate data stream). Encrypted entries
  * and other compression methods are refused with a clear error.
  *
- * Self-contained on purpose: `packages/platform`'s `archive.ts` (XP-02) can lift
- * it as is.
+ * ONE EXTRACTOR (PLAN §2.2 R17): XP-02a's `packages/platform` `archive.ts` lifts
+ * this file — moves it, with `unzip.test.ts`, `testing/zip-builder.ts` and
+ * `fixtures/zip/`, and web-tools re-exports it — rather than writing a second
+ * one. So it imports nothing but Node built-ins, and a test keeps it that way.
  */
 import { createReadStream, createWriteStream } from 'node:fs';
 import { chmod, mkdir, open, rename, rm } from 'node:fs/promises';
@@ -54,6 +56,13 @@ export interface ExtractZipOptions {
   readonly signal?: AbortSignal;
   /** Host platform for the path rules (tests). Default: `process.platform`. */
   readonly platform?: string;
+  /**
+   * Moves each finished `.unzip-part` file to its name. Default: `fs.rename`.
+   * On Windows a scanner can hold a just-written `.exe` for a moment, so a
+   * caller installing executables passes a retrying rename (uv.ts passes
+   * web-tools' `renameRetrying`); this file stays free of imports beyond Node.
+   */
+  readonly rename?: (from: string, to: string) => Promise<void>;
 }
 
 const SIG_LOCAL = 0x04034b50;
@@ -306,6 +315,7 @@ export async function extractZip(
   opts: ExtractZipOptions = {},
 ): Promise<string[]> {
   const platform = opts.platform ?? process.platform;
+  const moveIntoName = opts.rename ?? rename;
   const entries = await listZip(zipPath, { platform });
   for (const e of entries) {
     if (e.isSymlink) throw new ZipError(`symlink entries are not supported: ${e.rawName}`);
@@ -368,7 +378,7 @@ export async function extractZip(
         if (check.crc >>> 0 !== e.crc32 >>> 0) {
           throw new ZipError(`${e.rawName}: CRC-32 mismatch`);
         }
-        await rename(part, target);
+        await moveIntoName(part, target);
       } catch (err) {
         await rm(part, { force: true }).catch(() => {});
         throw err;
