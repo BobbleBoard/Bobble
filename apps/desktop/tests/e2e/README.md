@@ -120,6 +120,11 @@ serialize; a SIGKILLed owner is taken over) and `bench-run-smoke-probe.mjs` (exi
 watchdog, interrupts — harmless commands in a private lock root). `_ts-source.mjs` lets a probe
 import workspace TypeScript source whose relative imports end in `.js`.
 
+`mock-openai-fidelity.mjs` holds the model double to the REAL server's wire format: the same
+requests to a running llama-server (`REAL_BASE_URL`) and to the mock, compared key path by key
+path; it fails only on fields the app's provider reads. It never starts a server itself — it is a
+BENCH row (`MOCK-FID` in `deliverables/bench/queue.md`).
+
 Pointing the real pi at the model double (what `mock-openai-smoke-probe.mjs` does):
 
 ```js
