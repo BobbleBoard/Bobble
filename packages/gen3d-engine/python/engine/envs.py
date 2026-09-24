@@ -263,8 +263,25 @@ def patch_gated_mirrors(registry: Registry, log) -> None:
                 log(f"patched {name} → public mirrors (no HF token)")
 
 
-#: The mflux release the image module runs (gen-service worker-command.ts).
-MFLUX_PIN = "0.18.0"
+#: The Mage-Flow port's source, pinned by commit — the fallback where the app's
+#: prebuilt tree (which ships it as a wheel, manifest key "mflux") is absent.
+#: NO mflux release carries Mage-Flow: the port (mflux-community/mflux#483) was
+#: closed unmerged, and PyPI 0.18.0 through 0.20.0 have no
+#: `mflux-generate-mage-flow`. The old pin here, `mflux==0.18.0`, was the
+#: port's own version string, so it installed the PyPI release WITHOUT the
+#: commands — a fresh Mac got no fast image path and no edits at all.
+MFLUX_MAGE_FLOW_SOURCE = (
+    "mflux @ https://github.com/ivanfioravanti/mflux/archive/"
+    "859eeeca40b0c47a7bc2d8941072f0220e3425cf.tar.gz"
+)
+
+
+def _mflux_requirement(registry: Registry) -> str:
+    """The shipped wheel when the prebuilt tree has it, else the pinned source."""
+    manifest = _prebuilt_manifest(registry)
+    name = (manifest or {}).get("mflux")
+    wheel = registry.prebuilt("darwin-arm64", name) if isinstance(name, str) and name else None
+    return str(wheel) if wheel is not None else MFLUX_MAGE_FLOW_SOURCE
 
 
 def _provision_mflux(registry: Registry, log) -> None:
@@ -273,9 +290,10 @@ def _provision_mflux(registry: Registry, log) -> None:
     jobs.py prefers this over the PyTorch Mage tree (11 s vs 71 s a picture,
     and image EDITS exist only here) and it was a venv somebody made by hand:
     a fresh Mac had no fast path and no edits at all. One venv, one wheel.
+    A venv whose mflux lacks the commands (the old PyPI pin) is repaired.
     """
-    cli = registry.mflux_cli()
-    if cli.exists():
+    cli, edit_cli = registry.mflux_cli(), registry.mflux_edit_cli()
+    if cli.exists() and edit_cli.exists():
         return
     tool = registry.tool_dir("mflux")
     tool.mkdir(parents=True, exist_ok=True)
@@ -284,8 +302,17 @@ def _provision_mflux(registry: Registry, log) -> None:
     if not python.exists():
         log("Creating the MLX image venv…")
         _run([uv, "venv", str(tool / ".venv"), "--python", "3.12"], tool, log)
-    log(f"Installing mflux {MFLUX_PIN}…")
-    _run([uv, "pip", "install", "--python", str(python), f"mflux=={MFLUX_PIN}"], tool, log)
+    log("Installing mflux with Mage-Flow…")
+    _run(
+        [
+            uv, "pip", "install", "--python", str(python),
+            "--reinstall-package", "mflux", _mflux_requirement(registry),
+        ],
+        tool,
+        log,
+    )
+    if not (cli.exists() and edit_cli.exists()):
+        raise RuntimeError("the installed mflux has no Mage-Flow commands")
 
 
 def _provision_mageflow(registry: Registry, log) -> None:

@@ -26,7 +26,7 @@ import {
 import { cp, readdir, readFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { GEN3D_MODEL_SPECS } from '@pi-desktop/gen3d-engine';
+import { repoAttribution } from '@pi-desktop/gen3d-engine';
 import { cacheRoot, getCatalogModel, legacyCacheRoot, libraryRoot } from '@pi-desktop/inference';
 import {
   defaultLibraryRoot,
@@ -396,14 +396,20 @@ async function modelNode(
   const catalog = repo === null ? getCatalogModel(base) : undefined;
   const name = repo ?? catalog?.displayName ?? base;
   const shelf = shelfOf(p);
-  // What a catalog says about it: the 3D engine's spec for a hub repo, the
-  // store's manifest for a repo it downloaded.
-  const spec =
-    repo === null ? undefined : GEN3D_MODEL_SPECS.find((m) => m.repos.some((r) => r.repo === repo));
+  // What a catalog says about it: the 3D engine's spec for a hub repo (or, for
+  // one several engine models share, that it is shared), the store's manifest
+  // for a repo it downloaded.
+  const spec = repo === null ? undefined : repoAttribution(repo);
   const manifest = await readManifestLite(p);
   const meta = {
     ...(repo !== null ? { org: repo.split('/')[0] ?? '', repo } : {}),
-    ...(spec !== undefined ? { blurb: spec.note, tasks: [spec.role], label: spec.label } : {}),
+    ...(spec !== undefined
+      ? {
+          blurb: spec.blurb,
+          tasks: [...spec.roles],
+          ...(spec.label !== undefined ? { label: spec.label } : {}),
+        }
+      : {}),
     ...(manifest !== null
       ? {
           ...(manifest.notes !== undefined ? { blurb: manifest.notes } : {}),

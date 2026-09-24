@@ -4,6 +4,7 @@ import {
   detectInstalled,
   GEN3D_MODEL_SPECS,
   installStampPath,
+  repoAttribution,
   specTotalBytes,
   TRELLIS_PIPELINE_TYPES,
   TRELLIS_RESOLUTIONS,
@@ -84,6 +85,44 @@ describe('catalog', () => {
     );
     expect(registry.pipelineTypes.high).toBe('1536_cascade');
     const mageflow = registry.models.find((m) => m.id === 'mageflow');
-    expect(mageflow?.totalBytes).toBe(17_463_920_534);
+    // Comfy-Org's transformer + VAE (8,576,589,816) + Qwen3-VL-4B (8,887,284,080).
+    expect(mageflow?.totalBytes).toBe(17_463_873_896);
+  });
+
+  it('attributes a repo to its one model, and a shared one to nobody in particular', () => {
+    // One user: the card is that model's, exactly as before.
+    expect(repoAttribution('ZhengPeng7/BiRefNet')).toEqual({
+      label: 'TRELLIS-2 (4B)',
+      blurb: GEN3D_MODEL_SPECS.find((s) => s.id === 'trellis2')?.note,
+      roles: ['geometry'],
+    });
+    // The Mage-Flow text encoder is CubePart's prompt encoder too: a CubePart
+    // user must not be told it is "Mage-Flow Turbo".
+    expect(repoAttribution('Qwen/Qwen3-VL-4B-Instruct')).toEqual({
+      blurb: 'Shared by Mage-Flow Turbo, Mage-Flow Edit and CubePart.',
+      roles: ['image', 'segment'],
+    });
+    expect(repoAttribution('Comfy-Org/Mage-Flow')?.blurb).toBe(
+      'Shared by Mage-Flow Turbo and Mage-Flow Edit.',
+    );
+    expect(repoAttribution('Comfy-Org/Mage-Flow')?.label).toBeUndefined();
+    // The old microsoft/* copies on a shelf are still that model's weights.
+    expect(repoAttribution('microsoft/Mage-Flow-Edit-Turbo')?.label).toBe('Mage-Flow Edit');
+    expect(repoAttribution('microsoft/Mage-Flow-Turbo')?.label).toBe('Mage-Flow Turbo');
+    expect(repoAttribution('someone/unrelated')).toBeUndefined();
+  });
+
+  it('models without pins, layouts or legacy repos serialize exactly as before', () => {
+    // The sidecar JSON of every other model must not change shape (keys only
+    // appear when set), or a Python side reading it strictly would break.
+    const registry = toSidecarRegistry();
+    for (const m of registry.models.filter((x) => !x.id.startsWith('mageflow'))) {
+      expect(Object.keys(m).sort()).toEqual(['env', 'id', 'repos', 'totalBytes']);
+      for (const r of m.repos) {
+        expect(Object.keys(r).every((k) => ['repo', 'allowPatterns', 'bytes'].includes(k))).toBe(
+          true,
+        );
+      }
+    }
   });
 });

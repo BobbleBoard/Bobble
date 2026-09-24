@@ -32,6 +32,14 @@ from .registry import Registry
 
 WORKERS_DIR = Path(__file__).resolve().parent.parent / "workers"
 
+#: The mflux Mage-Flow port's model config for each checkpoint. A local
+#: directory tells mflux WHERE the weights are but not WHICH model they are, so
+#: `--base-model` names it (steps, guidance, the edit vs text-to-image check).
+MFLUX_BASE_MODELS = {
+    "mageflow": "mage-flow-turbo",
+    "mageflow-edit": "mage-flow-edit-turbo",
+}
+
 
 def _worker_env(registry: Registry) -> dict:
     env = dict(os.environ)
@@ -211,7 +219,14 @@ class JobManager:
         if kind == "text":
             if not prompt:
                 return {"ok": False, "error": "a prompt is required for text → 3D"}
-            if not self.registry.is_installed("mageflow"):
+            # An edit runs the EDIT model and nothing else. Checking the
+            # generator here refused every edit on an install that had only the
+            # editor, and let one through that had only the generator — to die
+            # inside the worker.
+            if edit_from:
+                if not self.registry.is_installed("mageflow-edit"):
+                    return {"ok": False, "error": "Mage-Flow Edit is not installed yet"}
+            elif not self.registry.is_installed("mageflow"):
                 return {"ok": False, "error": "Mage-Flow is not installed yet"}
         elif kind == "image":
             image_paths = [p for p in image_paths if p and Path(p).exists()]
@@ -309,6 +324,18 @@ class JobManager:
         So the MLX path is the default; the MPS worker stays as the fallback for
         a machine where mflux was never installed.
         """
+        # The checkpoint DIRECTORY, never a repo id: the release's own repos
+        # (microsoft/Mage-Flow-*) are withdrawn, so a worker left to resolve
+        # an id would try to download from a 401. A complete legacy snapshot
+        # is used as-is; otherwise it is the directory assembled from
+        # Comfy-Org + Qwen (registry.model_dir, catalog `layout`).
+        model_id = "mageflow-edit" if edit_from else "mageflow"
+        weights = self.registry.model_dir(model_id)
+        if weights is None:
+            raise RuntimeError(
+                f"{'the edit model' if edit_from else 'the image model'}'s weights are not "
+                "complete on disk — download it again from Bobble 3D → Image"
+            )
         klein = self.registry.mflux_cli()
         if klein.exists():
             args = ["--prompt", prompt, "--out", str(out), "--cli", str(klein)]
@@ -320,7 +347,11 @@ class JobManager:
                 args += [
                     "--edit-from", edit_from,
                     "--edit-cli", str(self.registry.mflux_edit_cli()),
+                    "--edit-model", str(weights),
+                    "--edit-base-model", MFLUX_BASE_MODELS[model_id],
                 ]
+            else:
+                args += ["--model", str(weights), "--base-model", MFLUX_BASE_MODELS[model_id]]
             return (
                 self.registry.venv_python("mflux"),
                 WORKERS_DIR / "mlx_image_worker.py",
@@ -332,7 +363,7 @@ class JobManager:
         return (
             self.registry.venv_python("Mage"),
             WORKERS_DIR / "mageflow_worker.py",
-            ["--prompt", prompt, "--out", str(out), "--model", "microsoft/Mage-Flow-Turbo"],
+            ["--prompt", prompt, "--out", str(out), "--model", str(weights)],
             self.registry.tool_dir("Mage"),
         )
 

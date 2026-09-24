@@ -172,6 +172,16 @@ export function taskLabel(task: string): string {
 }
 
 /**
+ * One chip per thing a model does, judged by the words on the chip: the 3D
+ * engine's role `image` and the Recommended catalog's `text-to-image` both read
+ * "text → image", and Comfy-Org/Mage-Flow is known to both since the engine
+ * fetches Mage-Flow from there.
+ */
+export function uniqueTasks(tasks: readonly string[]): string[] {
+  return [...new Map(tasks.map((t) => [taskLabel(t), t])).values()];
+}
+
+/**
  * Where something is, as a person would say it: `Models › 3D › Generation ›
  * microsoft/TRELLIS.2-4B` — the segments under the library (or the tools
  * folder), never the absolute path. the user: "no complex var/folders path,
@@ -834,7 +844,7 @@ function Inspector({
     meta?.modality ??
     (rec !== null ? OUTPUT_LABEL[rec.family.output] : undefined) ??
     (node.kind === 'modality' ? node.name : undefined);
-  const tasks = [...new Set([...(meta?.tasks ?? []), ...(rec?.variant.tasks ?? [])])];
+  const tasks = uniqueTasks([...(meta?.tasks ?? []), ...(rec?.variant.tasks ?? [])]);
   const isFolder = node.kind === 'modality' || node.kind === 'shelf' || node.kind === 'dir';
   const subtitle = [
     meta?.params,
