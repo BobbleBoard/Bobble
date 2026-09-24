@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { layoutChart } from './layout.ts';
-import { contrastRatio, deltaE, judgePairs, lookPairs, PALETTE_GATES } from './palette-check.ts';
+import {
+  contrastRatio,
+  deltaE,
+  judgePairs,
+  lookPairs,
+  oklch,
+  PALETTE_GATES,
+} from './palette-check.ts';
 import { normalizeChartSpec } from './spec.ts';
 import {
   DARK_GROUND,
@@ -289,6 +296,22 @@ describe('every look passes the palette checks (VQ-03)', () => {
         expect(contrastRatio(c, g), `${name} ${theme}: ${c} on ${g}`).toBeGreaterThanOrEqual(
           PALETTE_GATES.markContrast,
         );
+      }
+    }
+  });
+
+  it('no lavender either: a light blue never sits past OKLCH hue 262 toward violet', () => {
+    // A lightened royal blue drifts to periwinkle, which reads as purple — the
+    // app brief rules that out — so light blues stay at the blue end. (A deep
+    // royal blue, #1D4ED8, reads blue at 264°: the drift is a light colour's.)
+    for (const l of LOOKS) {
+      for (const c of [...l.palette, l.accent, ...(l.dark?.palette ?? []), l.dark?.accent ?? '']) {
+        if (c === '') continue;
+        const { l: light, h, c: chroma } = oklch(c);
+        expect(
+          chroma < 0.04 || light < 0.6 || h <= 262 || h >= 340,
+          `${l.name} ${c} at OKLCH ${h.toFixed(0)}°`,
+        ).toBe(true);
       }
     }
   });

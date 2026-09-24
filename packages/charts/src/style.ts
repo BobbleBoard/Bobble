@@ -170,10 +170,10 @@ export const LOOKS: readonly Look[] = [
   look({
     name: 'soft',
     about: 'muted, dusty colours, pill bars, a dotted grid, smooth lines — friendly and quiet',
-    palette: ['#6A8AD6', '#6E9475', '#99506E', '#008AA5', '#CA7037', '#655D53'],
+    palette: ['#5C8CDA', '#6E9475', '#99506E', '#008AA5', '#CA7037', '#655D53'],
     accent: '#CA7037',
     dark: {
-      palette: ['#91B2FF', '#99C09E', '#D07EA4', '#28C3DD', '#FA9C5C', '#9F958A'],
+      palette: ['#84B2FD', '#99C09E', '#D07EA4', '#28C3DD', '#FA9C5C', '#9F958A'],
       accent: '#FA9C5C',
     },
     radius: 'pill',
@@ -194,7 +194,7 @@ export const LOOKS: readonly Look[] = [
     palette: ['#1F5EFF', '#009D90', '#C2187A', '#0894D9', '#F2541B', '#007C5C'],
     accent: '#F2541B',
     dark: {
-      palette: ['#6C92F0', '#2AC7C0', '#F652A0', '#57BDFF', '#FF9575', '#8BE0B1'],
+      palette: ['#5F97F7', '#2AC7C0', '#F652A0', '#57BDFF', '#FF9575', '#8BE0B1'],
       accent: '#FF9575',
     },
     radius: 10,
@@ -217,7 +217,7 @@ export const LOOKS: readonly Look[] = [
     palette: ['#1D4ED8', '#528CE5', '#606C83', '#003D88', '#026FBD', '#808DA3'],
     accent: '#D57200',
     dark: {
-      palette: ['#608AF5', '#9ECCFF', '#8F99B2', '#2875C1', '#42B5FF', '#6E798B'],
+      palette: ['#5A93F0', '#9ECCFF', '#8F99B2', '#2875C1', '#42B5FF', '#6E798B'],
       accent: '#FF9841',
     },
     radius: 3,
