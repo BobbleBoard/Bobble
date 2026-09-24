@@ -55,6 +55,26 @@ describe('statusDigest', () => {
     expect(statusDigest(parseTailscaleStatus(JSON.stringify(doc)))).not.toBe(statusDigest(a));
   });
 
+  it('changes when an address, an owner’s name or the version changes', () => {
+    const base = parseTailscaleStatus(FIXTURE);
+    const d = statusDigest(base);
+    const withV6 = {
+      ...base,
+      peers: base.peers.map((p) =>
+        p.self ? p : { ...p, ips: [...p.ips, 'fd7a:115c:a1e0::ffff'] },
+      ),
+    };
+    expect(statusDigest(withV6)).not.toBe(d);
+    const renamed = {
+      ...base,
+      users: Object.fromEntries(
+        Object.entries(base.users ?? {}).map(([k, u]) => [k, { ...u, displayName: 'The user' }]),
+      ),
+    };
+    expect(statusDigest(renamed)).not.toBe(d);
+    expect(statusDigest({ ...base, version: '1.104.0' })).not.toBe(d);
+  });
+
   it('does not depend on peer order', () => {
     const s = parseTailscaleStatus(FIXTURE);
     expect(statusDigest({ ...s, peers: [...s.peers].reverse() })).toBe(statusDigest(s));

@@ -46,6 +46,19 @@ export interface TailnetBackend {
   watch?(onChange: () => void, opts: { readonly signal: AbortSignal }): Promise<void>;
 }
 
+/**
+ * The LocalAPI target stopped being one: it refused this user (401/403) or is
+ * something else (404, 5xx on status). Thrown so the adapter chooses again.
+ */
+export class LocalApiGoneError extends Error {
+  readonly status: number;
+  constructor(status: number, body: string) {
+    super(`Tailscale's local API answered HTTP ${status}: ${body.trim().slice(0, 200)}`);
+    this.name = 'LocalApiGoneError';
+    this.status = status;
+  }
+}
+
 /** Answers from the LocalAPI, parsed exactly like the CLI's. */
 export function createLocalApiBackend(
   client: LocalApiClient,
@@ -57,21 +70,26 @@ export function createLocalApiBackend(
     async status(o = {}) {
       const res = await client.status(o);
       if (res.status === 200) return parseTailscaleStatus(res.body);
-      return {
-        available: false,
-        state: 'NotRunning',
-        reason: `Tailscale's local API answered HTTP ${res.status}: ${res.body.trim().slice(0, 200)}`,
-        peers: [],
-      };
+      /*
+       * The daemon's status route always answers 200. Anything else means this
+       * target is no longer the daemon's LocalAPI — a rotated same-user token
+       * (401), another program on the old port (403/404) — so the adapter must
+       * look again rather than report "not running" from a stale target.
+       */
+      throw new LocalApiGoneError(res.status, res.body);
     },
     async whois(addr, o = {}) {
       const res = await client.whois(addr, o);
       if (res.status === 200) return parseWhois(res.body);
+      if (res.status === 401 || res.status === 403)
+        throw new LocalApiGoneError(res.status, res.body);
       return whoisFailure(res.body.trim() || `HTTP ${res.status}`);
     },
     async ping(ip, o = {}) {
       try {
         const res = await client.ping(ip, o);
+        if (res.status === 401 || res.status === 403)
+          throw new LocalApiGoneError(res.status, res.body);
         if (res.status !== 200) {
           return { ok: false, reason: 'error', detail: res.body.trim() || `HTTP ${res.status}` };
         }

@@ -154,6 +154,45 @@ describe('chooseBackend and the adapter', () => {
     expect(cli.calls()).toBe(1);
   });
 
+  it('chooses again when the LocalAPI starts refusing (a rotated same-user token)', async () => {
+    fake = createFakeLocalApi({ token: 'first' });
+    const port = await fake.listenTcp();
+    let onDisk = 'first'; // what /Library/Tailscale/sameuserproof-<port> holds
+    const adapter = createTailnetAdapter({
+      locateLocalApi: async () => [{ kind: 'tcp', port, token: onDisk, variant: 'macsys' }],
+      locateCli: async () => null,
+    });
+    expect((await adapter.status()).state).toBe('Running');
+    // Tailscale restarts: same port, new token. The old client now gets 401.
+    fake.setToken('second');
+    onDisk = 'second';
+    const after = await adapter.status();
+    expect(after.state).toBe('Running');
+    expect(adapter.backendKind()).toBe('localapi');
+    expect(
+      fake.requests.filter((r) =>
+        r.authorization?.endsWith(Buffer.from(':second').toString('base64')),
+      ).length,
+    ).toBeGreaterThan(0);
+    // whois and ping through the fresh client work too.
+    expect(await adapter.whois('100.101.102.110')).toMatchObject({ found: true });
+  });
+
+  it('reports "not answering" rather than a stale target when nothing answers after a re-choose', async () => {
+    fake = createFakeLocalApi({ token: 'first' });
+    const port = await fake.listenTcp();
+    const adapter = createTailnetAdapter({
+      locateLocalApi: async () => [{ kind: 'tcp', port, token: 'first', variant: 'macsys' }],
+      locateCli: async () => null,
+    });
+    await adapter.status();
+    fake.setToken('rotated-but-unreadable'); // e.g. a non-admin user after an upgrade
+    const s = await adapter.status();
+    // The LocalAPI no longer counts as installed-and-answering, and no CLI: not installed here.
+    expect(s.available).toBe(false);
+    expect(['NotInstalled', 'NotRunning']).toContain(s.state);
+  });
+
   it('notices Tailscale being installed', async () => {
     let t = 0;
     let installed = false;

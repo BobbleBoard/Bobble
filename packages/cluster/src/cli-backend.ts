@@ -14,11 +14,26 @@
 import { execFile } from 'node:child_process';
 import { constants as fsConstants, promises as fsp } from 'node:fs';
 import path from 'node:path';
-import { tailscaleCliEnv } from './host.js';
 import { type PingResult, parsePingOutput, stripGoLogPrefix } from './ping-parse.js';
 import type { TailnetBackend } from './tailnet-backend.js';
 import { parseTailscaleStatus, TAILSCALE_PATHS, type TailnetStatus } from './tailscale.js';
 import { parseWhois, type WhoisResult, whoisFailure } from './whois.js';
+
+/**
+ * The environment every Tailscale CLI spawn gets.
+ *
+ * On macOS the CLI IS the app binary (`/Applications/Tailscale.app/Contents/
+ * MacOS/Tailscale`; `/usr/local/bin/tailscale` is a shim that execs it), and
+ * that binary decides between GUI and CLI from environment variables such as
+ * `TERM`, `SHLVL` and `PS1` (Tailscale CLI docs, macOS tab). A terminal has
+ * them; a Bobble launched from the Finder has none — so without this the same
+ * `status --json` that passes in a terminal-run test can start Tailscale's own
+ * window, or fail, in the shipped app. `TAILSCALE_BE_CLI=1` forces CLI mode and
+ * is ignored everywhere else, so it is set on every platform, every spawn.
+ */
+export function tailscaleCliEnv(base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  return { ...base, TAILSCALE_BE_CLI: '1' };
+}
 
 export interface CliRunResult {
   readonly stdout: string;
@@ -124,9 +139,12 @@ export interface CliBackendOptions {
 
 /** Thrown when the binary disappeared, so the adapter looks for Tailscale again. */
 export class CliMissingError extends Error {
-  constructor(bin: string) {
-    super(`The Tailscale CLI is no longer at ${bin}.`);
+  /** What the spawn said (e.g. "spawn /usr/bin/tailscale ENOENT"). */
+  readonly detail: string;
+  constructor(bin: string, detail = '') {
+    super(`The Tailscale CLI is not at ${bin}.`);
     this.name = 'CliMissingError';
+    this.detail = detail.trim() || `no file at ${bin}`;
   }
 }
 
@@ -144,7 +162,7 @@ export function createCliBackend(opts: CliBackendOptions): TailnetBackend {
       env,
       ...(signal !== undefined ? { signal } : {}),
     });
-    if (r.missing) throw new CliMissingError(opts.bin);
+    if (r.missing) throw new CliMissingError(opts.bin, r.stderr);
     return r;
   };
   return {

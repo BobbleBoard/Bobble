@@ -54,6 +54,7 @@ export {
   chooseBackend,
   createLocalApiBackend,
   createTailnetAdapter,
+  LocalApiGoneError,
   NOT_INSTALLED_REASON,
   type TailnetAdapter,
   type TailnetAdapterDeps,

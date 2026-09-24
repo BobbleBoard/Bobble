@@ -89,6 +89,12 @@ describe('whoisKey', () => {
     expect(whoisKey('[fd7a:115c:a1e0::1]:8765')).toBe('fd7a:115c:a1e0::1');
     expect(whoisKey('fd7a:115c:a1e0::1')).toBe('fd7a:115c:a1e0::1');
   });
+
+  it('unwraps an IPv4-mapped IPv6 caller, as a dual-stack listener reports it', () => {
+    expect(whoisKey('::ffff:100.101.102.110')).toBe('100.101.102.110');
+    expect(whoisKey('::FFFF:100.101.102.110')).toBe('100.101.102.110');
+    expect(whoisKey('[::ffff:100.101.102.110]:51234')).toBe('100.101.102.110');
+  });
 });
 
 describe('createWhoisCache', () => {
@@ -102,6 +108,17 @@ describe('createWhoisCache', () => {
     tags: [],
     shared: false,
     addresses: [],
+  });
+
+  it('asks Tailscale about the IPv4 address a mapped caller really is', async () => {
+    const asked: string[] = [];
+    const cache = createWhoisCache(async (addr) => {
+      asked.push(addr);
+      return found('n');
+    });
+    await cache.get('::ffff:100.101.102.110');
+    await cache.get('100.101.102.110:9');
+    expect(asked).toEqual(['100.101.102.110']);
   });
 
   it('answers from cache for a minute, then asks again', async () => {

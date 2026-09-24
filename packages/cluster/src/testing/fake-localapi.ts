@@ -59,6 +59,8 @@ export interface FakeLocalApi {
   openWatches(): number;
   /** Serve this status document from now on. */
   setStatus(body: string): void;
+  /** Require a different same-user token from now on (Tailscale restarted and rotated it). */
+  setToken(token: string): void;
   /** Write a Notify line to every open watch stream. */
   push(line: string): void;
   /** Write raw bytes (no newline) to every open watch stream: a line split across chunks. */
@@ -73,6 +75,7 @@ const WHOIS_IP = '100.101.102.110';
 
 export function createFakeLocalApi(opts: FakeLocalApiOptions = {}): FakeLocalApi {
   let status = STATUS_FIXTURE;
+  let token = opts.token;
   const requests: RecordedRequest[] = [];
   const watches = new Set<{ res: http.ServerResponse; idle: () => void }>();
   let watchCount = 0;
@@ -100,8 +103,8 @@ export function createFakeLocalApi(opts: FakeLocalApiOptions = {}): FakeLocalApi
       answer(403, 'invalid localapi request\n');
       return;
     }
-    if (opts.token !== undefined) {
-      const expected = `Basic ${Buffer.from(`:${opts.token}`).toString('base64')}`;
+    if (token !== undefined) {
+      const expected = `Basic ${Buffer.from(`:${token}`).toString('base64')}`;
       if (req.headers.authorization !== expected) {
         answer(401, 'auth required\n');
         return;
@@ -176,6 +179,9 @@ export function createFakeLocalApi(opts: FakeLocalApiOptions = {}): FakeLocalApi
     openWatches: () => watches.size,
     setStatus(body) {
       status = body;
+    },
+    setToken(next) {
+      token = next;
     },
     push(line) {
       for (const w of watches) {

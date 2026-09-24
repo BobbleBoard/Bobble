@@ -136,6 +136,7 @@ export function statusDigest(s: TailnetStatus): string {
       p.hostname,
       p.os,
       p.ip,
+      p.ips.join(','),
       p.self,
       p.online,
       p.active,
@@ -150,14 +151,19 @@ export function statusDigest(s: TailnetStatus): string {
       p.tags.join(','),
       p.sharee,
     ]);
+  const users = Object.values(s.users ?? {})
+    .map((u) => [u.id, u.loginName, u.displayName])
+    .sort((a, b) => ((a[0] ?? '') < (b[0] ?? '') ? -1 : 1));
   return JSON.stringify([
     s.available,
     s.state ?? '',
     s.reason ?? '',
     s.authUrl ?? '',
+    s.version ?? '',
     s.selfUserId ?? '',
     s.tailnet ?? null,
     s.health ?? [],
+    users,
     peers,
   ]);
 }

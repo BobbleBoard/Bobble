@@ -4,29 +4,16 @@
  * Split from {@link ./tailscale.ts} so every decision that can be wrong — which
  * peers exist, which are reachable, what a peer's answer means — is testable
  * without a tailnet, and this file holds only the parts that must touch the OS.
- */
-import { execFile as execFileCb } from 'node:child_process';
-import { arch, cpus, hostname, platform, totalmem } from 'node:os';
-import { promisify } from 'node:util';
-import { parseTailscaleStatus, TAILSCALE_PATHS, type TailnetStatus } from './tailscale.js';
-
-const execFile = promisify(execFileCb);
-
-/**
- * The environment every Tailscale CLI spawn gets.
  *
- * On macOS the CLI IS the app binary (`/Applications/Tailscale.app/Contents/
- * MacOS/Tailscale`; `/usr/local/bin/tailscale` is a shim that execs it), and
- * that binary decides between GUI and CLI from environment variables such as
- * `TERM`, `SHLVL` and `PS1` (Tailscale CLI docs, macOS tab). A terminal has
- * them; a Bobble launched from the Finder has none — so without this the same
- * `status --json` that passes in a terminal-run test can start Tailscale's own
- * window, or fail, in the shipped app. `TAILSCALE_BE_CLI=1` forces CLI mode and
- * is ignored everywhere else, so it is set on every platform, every spawn.
+ * ONE WAY TO RUN THE CLI. `readTailnet` asks each candidate through the CLI
+ * backend (cli-backend.ts), so the CLI-mode environment, the spawn options and
+ * the wording of "not installed" / "not answering" live in one place.
  */
-export function tailscaleCliEnv(base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
-  return { ...base, TAILSCALE_BE_CLI: '1' };
-}
+import { arch, cpus, hostname, platform, totalmem } from 'node:os';
+import { CliMissingError, type CliRunner, createCliBackend, runCli } from './cli-backend.js';
+import { TAILSCALE_PATHS, type TailnetStatus } from './tailscale.js';
+
+export { tailscaleCliEnv } from './cli-backend.js';
 
 /** The options every CLI spawn passes: a deadline, the CLI-mode env, no console window. */
 export interface TailscaleExecOptions {
@@ -36,7 +23,7 @@ export interface TailscaleExecOptions {
 }
 
 export interface ReadTailnetOptions {
-  /** Injected for tests; defaults to running the real CLI. */
+  /** Injected for tests; defaults to running the real CLI. Throws on a failed run, like execFile. */
   readonly execFileImpl?: (
     file: string,
     args: readonly string[],
@@ -57,6 +44,36 @@ function isMissingBinary(e: unknown): boolean {
   return typeof message === 'string' && message.includes('ENOENT');
 }
 
+/** An execFile-style function (throws on failure) as the backend's runner (never throws). */
+function runnerFrom(exec: NonNullable<ReadTailnetOptions['execFileImpl']>): CliRunner {
+  return async (bin, args, opts) => {
+    try {
+      const { stdout } = await exec(bin, args, {
+        timeout: opts.timeoutMs,
+        env: opts.env,
+        windowsHide: true,
+      });
+      return { stdout, stderr: '', code: 0, missing: false, timedOut: false };
+    } catch (e) {
+      const err = e as {
+        stdout?: unknown;
+        stderr?: unknown;
+        code?: unknown;
+        killed?: unknown;
+        message?: unknown;
+      };
+      const message = typeof err.message === 'string' ? err.message : String(e);
+      return {
+        stdout: typeof err.stdout === 'string' ? err.stdout : '',
+        stderr: typeof err.stderr === 'string' && err.stderr !== '' ? err.stderr : message,
+        code: typeof err.code === 'number' ? err.code : null,
+        missing: isMissingBinary(e),
+        timedOut: err.killed === true,
+      };
+    }
+  };
+}
+
 /**
  * Ask Tailscale who is on this tailnet.
  *
@@ -66,33 +83,31 @@ function isMissingBinary(e: unknown): boolean {
  * inside the bundle.
  */
 export async function readTailnet(opts: ReadTailnetOptions = {}): Promise<TailnetStatus> {
-  const exec = opts.execFileImpl ?? execFile;
+  const run: CliRunner = opts.execFileImpl !== undefined ? runnerFrom(opts.execFileImpl) : runCli;
   const candidates = opts.candidates ?? TAILSCALE_PATHS[platform()] ?? ['tailscale'];
-  const env = tailscaleCliEnv(opts.env ?? process.env);
-  let lastError = 'Tailscale was not found on this machine.';
-  let found = false;
+  let missingDetail = 'Tailscale was not found on this machine.';
+  let notAnswering: TailnetStatus | undefined;
   for (const bin of candidates) {
     try {
-      const { stdout } = await exec(bin, ['status', '--json'], {
-        timeout: 5000,
-        env,
-        windowsHide: true,
-      });
-      return parseTailscaleStatus(stdout);
-    } catch (e) {
+      const status = await createCliBackend({
+        bin,
+        run,
+        ...(opts.env !== undefined ? { env: opts.env } : {}),
+      }).status();
+      if (status.state !== 'NotRunning') return status;
       /*
-       * A missing binary and a broken one are different problems with the same
-       * shape here, so keep the last message and keep looking — reporting
-       * "not installed" because the FIRST candidate was absent is how a working
-       * install gets called broken.
+       * A binary that ran and failed is kept, and the search goes on: another
+       * location may be the one that works. Reporting "not installed" because
+       * the FIRST candidate was absent is how a working install gets called
+       * broken.
        */
-      const message = e instanceof Error ? e.message : String(e);
-      if (isMissingBinary(e)) {
-        if (!found) lastError = message;
-      } else {
-        found = true;
-        lastError = message;
+      notAnswering = status;
+    } catch (e) {
+      if (e instanceof CliMissingError) {
+        missingDetail = e.detail;
+        continue;
       }
+      throw e;
     }
   }
   /*
@@ -100,19 +115,14 @@ export async function readTailnet(opts: ReadTailnetOptions = {}): Promise<Tailne
    * that ran and failed is "not running" (offer to open Tailscale). The Devices
    * card says different things for the two.
    */
-  return found
-    ? {
-        available: false,
-        reason: `Tailscale is installed but did not answer: ${lastError}`,
-        peers: [],
-        state: 'NotRunning',
-      }
-    : {
-        available: false,
-        reason: `Tailscale was not found on this machine (${lastError}).`,
-        peers: [],
-        state: 'NotInstalled',
-      };
+  return (
+    notAnswering ?? {
+      available: false,
+      reason: `Tailscale was not found on this machine (${missingDetail}).`,
+      peers: [],
+      state: 'NotInstalled',
+    }
+  );
 }
 
 /** What this machine answers when another one asks what it can do. */

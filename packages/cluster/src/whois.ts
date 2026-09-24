@@ -127,10 +127,22 @@ export function whoisFailure(detail: string): WhoisResult {
   return { found: false, reason: notFound ? 'not-found' : 'error', detail: detail.trim() };
 }
 
+/** "::ffff:100.101.102.110" → "100.101.102.110"; anything else unchanged. */
+function unmapV4(addr: string): string {
+  const m = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i.exec(addr);
+  return m?.[1] ?? addr;
+}
+
 /** The IP of an `ip`, `ip:port` or `[v6]:port` address — whois identity is per address, not per port. */
 export function whoisKey(addr: string): string {
   const bracketed = /^\[([^\]]+)\](?::\d+)?$/.exec(addr);
-  if (bracketed !== null) return bracketed[1] ?? addr;
+  if (bracketed !== null) return unmapV4(bracketed[1] ?? addr);
+  /*
+   * A dual-stack listener reports an IPv4 caller as "::ffff:100.101.102.110";
+   * Tailscale knows it only as 100.101.102.110.
+   */
+  const mapped = unmapV4(addr);
+  if (mapped !== addr) return mapped;
   // v4 with a port; a bare v6 has several colons and no port.
   const v4 = /^(\d{1,3}(?:\.\d{1,3}){3})(?::\d+)?$/.exec(addr);
   if (v4 !== null) return v4[1] ?? addr;
