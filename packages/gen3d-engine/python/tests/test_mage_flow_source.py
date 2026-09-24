@@ -483,3 +483,38 @@ def test_the_worker_names_the_base_model_to_mflux_and_the_user() -> None:
         shown = [json.loads(ln) for ln in buf.getvalue().splitlines() if ln.startswith("{")]
         msg = next(e["message"] for e in shown if e.get("event") == "progress")
         assert "mage-flow-turbo" in msg and "/w/assembled" not in msg, msg
+
+
+def test_the_worker_edits_with_the_edit_directory_and_its_base_model() -> None:
+    import mlx_image_worker as worker
+
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "e.png"
+        calls: list[list[str]] = []
+
+        def run(cmd, **kw):
+            calls.append(cmd)
+            out.write_bytes(b"png")
+            return MagicMock(returncode=0, stderr="")
+
+        argv = [
+            "mlx_image_worker.py", "--prompt", "make it blue", "--out", str(out),
+            "--cli", "/bin/mflux-generate-mage-flow",
+            "--edit-from", "/in/source.png", "--edit-cli", "/bin/mflux-generate-mage-flow-edit",
+            "--edit-model", "/w/assembled/mageflow-edit", "--edit-base-model", "mage-flow-edit-turbo",
+            "--preview-max-px", "0",
+        ]
+        buf = io.StringIO()
+        with (
+            patch.object(sys, "argv", argv),
+            patch.object(worker.subprocess, "run", side_effect=run),
+            contextlib.redirect_stdout(buf),
+        ):
+            worker.main()
+        cmd = calls[0]
+        assert cmd[0] == "/bin/mflux-generate-mage-flow-edit", cmd
+        assert cmd[cmd.index("--model") + 1] == "/w/assembled/mageflow-edit", cmd
+        assert cmd[cmd.index("--base-model") + 1] == "mage-flow-edit-turbo", cmd
+        assert cmd[cmd.index("--image-paths") + 1] == "/in/source.png", cmd
+        events = [json.loads(ln) for ln in buf.getvalue().splitlines() if ln.startswith("{")]
+        assert any(e.get("event") == "artifact" and e.get("label") == "Edited image" for e in events)

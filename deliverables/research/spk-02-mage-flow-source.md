@@ -100,8 +100,8 @@ assembled directory.
     id, pins equal to the release sha256s, the layout covering what both engines open, sharing with CubePart, the card
     unchanged, a fixture lock with Python, and `repoAttribution`.
   - Against the old catalog: 7 failed. The card test was added later and passes on both catalogs by design.
-- **Python engine suite: 103/103 (11 skipped)**, run on the sidecar's Python 3.12 with `huggingface_hub==0.34.4`.
-  - Includes 19 new tests in `test_mage_flow_source.py` and 3 new provisioning tests.
+- **Python engine suite: 104/104 (11 skipped)**, run on the sidecar's Python 3.12 with `huggingface_hub==0.34.4`.
+  - Includes 20 new tests in `test_mage_flow_source.py` and 3 new provisioning tests.
   - Against the old engine: 18 fail, the worker test exits 2 because argparse rejects `--base-model`, and the 4
     provisioning tests fail (the old code installed `mflux==0.18.0`).
 - **apps/desktop: tsc clean on both configs; vitest 2637 passed (2 new chip tests), 8 skipped, 0 failed.**
@@ -122,6 +122,10 @@ assembled directory.
   - The shipped mflux wheel (installed `--offline` from the uv cache) resolves each directory locally.
   - With `HF_HUB_OFFLINE=1` it loads the Qwen3-VL tokenizer and `MageFlowQwen3VLProcessor` through the symlinks.
   - The real `server.py` boots on the new registry and answers `/catalog` and the edit gate.
+- **The assembled directory with the real weights, headers only.** The sidecar assembled Comfy-Org and Qwen snapshots
+  that point at the user's shelved `microsoft/*` blobs (same sha256), and every pin passed. After mflux's own key mapping,
+  the tensor counts match the port's expected counts exactly: transformer 397, text encoder 713, VAE 728 (the VAE file
+  holds 839 keys, and the mapping drops 111). No tensor was loaded.
 
 - **Screens, before (main `6eb58aaf`) and after, in dark and light.** Two hidden `launchApp` probes, looked at and
   pixel-diffed:
@@ -130,8 +134,11 @@ assembled directory.
     one chip. The single-use and legacy cards are identical.
   - Run against main, the storage probe fails ("the Qwen card is titled CubePart") and the card probe passes.
 
-**Not verified here (BENCH, needs a download over 200 MB and the GPU).** A real generation and a real edit through
-the assembled directory, looked at: 26 GB for both models, or 17.5 GB for the editor alone.
+**Not verified here (BENCH: needs the GPU).** A real generation and a real edit through the assembled directory, with
+both results looked at. `python/tools/bench_mageflow_assembled.sh` does it with **zero downloads**: it builds the
+Comfy-Org and Qwen snapshots from the shelved `microsoft/*` blobs, installs the shipped wheel, and runs the real
+worker. `DRY_RUN=1` has been run up to the model call. A true fresh-install download (26 GB) is a separate, optional
+BENCH run.
 
 ## PORT-01 — Qwen-Image 2.1 editing in our mflux wheel: sizing
 
