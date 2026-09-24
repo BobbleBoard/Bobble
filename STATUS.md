@@ -1,45 +1,53 @@
 # Bobble — status
 
-Updated: 2026-09-23 (2) · base commit `c9fe7098` · build on /Applications: `41cf1b60`
+Updated: 2026-09-23 (4) · wave commits `c1f7d578` `3ab7ec95` `c51638c7` `9d0d2e38` (base `c9fe7098`) · build on /Applications: `c1f7d578` (installed 17:32, packaged probe + smoke OK)
 
-## Current wave — computer use / vision (the user 2026-09-23)
+## Wave — computer use / vision (the user 2026-09-23) — DONE
 
 | # | Item | State |
 |---|------|-------|
-| 1 | Origin of the "TEXT-ONLY mode" note | FOUND: provider-llamacpp `unviewableImageNote`, fired because rapid-mlx ran its MTP text lane (`visionReady:false` for every MLX engine). Note now names the real cause |
-| 2 | Vision on by default, switch in the engine menu | BUILT + unit-tested (`loadVision`, vision plan, Vision row). Live check pending |
-| 3 | `--visual` snapshot = image only (Mac, Chrome, browser) | BUILT + tested |
-| 4 | Active app persisted | BUILT + tested (honest frontmost, last app carried across chats, exact-first app match) |
-| 5 | "scrolled element 5000" | FIXED + tested — label parser read a scroll distance as an element index |
-| 6 | Projects open/close slides the chats | BUILT; look-probe pending |
-| 7 | Open / Open with in canvas + cards | subagent finishing (new `os-open.ts`) |
-| 8 | HyperFrames 120 PNG cards | subagent finishing (one APNG, encoder + decoder test) |
-| 9 | Generating cards: no border, falloff, any aspect | DONE + probed: no plate/border, feathered fade into the chat, the grid is a field generated for the card's shape (40/40 anim tests; probe BEFORE 7 fails → AFTER 0) |
-| 10 | "Thinking for 14m" instantly | FIXED + tested (timer keyed per chain, not `thinking:0`) |
-| 11 | Delete chat instant + terminates work | DONE + tested: row hidden this frame, pi turn/subagents/team/gen+3D+SVG jobs stopped, whole chain deleted, tombstones stop resurrection (7 + 3 tests) |
-| 12 | Computer-use icon (window + traffic lights + agent cursor) | BUILT; look pending |
-| 13 | Monitor window margins | BUILT + tested; look pending |
+| 1 | Origin of the "TEXT-ONLY mode" note | DONE — it was true: rapid-mlx+MTP runs a text-only lane. The note now names the real cause |
+| 2 | Vision on by default, switch in the engine menu | DONE, live-probed on qwen3.5-4b: sees a red square by default (llama.cpp + projector, reason shown); switch Off → text-only, the model says vision is off and where to turn it on. Found + fixed: an attached image used to relaunch multimodal behind the Off switch (5 min) |
+| 3 | `--visual` snapshot = image only (Mac, Chrome, browser) | DONE + tested |
+| 4 | Active app persisted | DONE + tested |
+| 5 | "scrolled element 5000" | DONE — a scroll distance was read as an element index |
+| 6 | Projects slide open/closed | DONE — probe: 0 in-between frames before, ≥4 after; slowed mid-slide still |
+| 7 | Open / Open with in canvas + cards | DONE (subagent): menus open upward, card Open shows the canvas, text files open as real files, failures toast; probe 3/3 |
+| 8 | HyperFrames 120 PNG cards | DONE (subagent): one looping APNG, frames in `frames/`; then frames at the requested size (was 2× on Retina, 7.8 → 3.75 MB) |
+| 9 | Generating cards: no border, falloff, any aspect | DONE — probe BEFORE 7 fails → AFTER 0 |
+| 10 | "Thinking for 14m" instantly | DONE + tested |
+| 11 | Delete chat instant + terminates work | DONE — row gone in <1 frame, file gone, never returns; turn/subagents/team/all generations stopped |
+| 12 | Computer-use icon | DONE — window + three lights + agent cursor |
+| 13 | Monitor window margins | DONE — 12 px → 31 px |
 
-Also found and fixed while on 11: deleting a chat removed only the newest file of its chain, so the next-newest file became the row — the chat came back one model-switch older.
+Tests: 6,421 unit tests green across 11 packages; all typechecks clean.
+
+Follow-ups, all DONE: HyperFrames frames now stream into the chat's card as they render (`c51638c7`, 49/49 frames seen; before 0); stale probes `canvas-probe` + `round9-file-write-probe` fixed and headless (`9d0d2e38`); the dark→light flip in one probe was an E2E-only artifact (theme not applied at boot under the probe flag), not a user bug.
 
 ## Big push (tracks) — see memory `user-big-push-2026-09-23`
 
 | Track | State | Notes |
 |---|---|---|
-| 1 Hindsight memory + Memory tab | research running | |
-| 2 "bobble help" settings assistant | research running | |
-| 3 Training dashboard + export/quant | research running | |
-| 4 Linux + Windows GPU/CPU compat | research running | |
-| 5 Tailscale Devices | research running | |
-| 6 Harness LoRA (Qwen3.5-4B) | research running | |
-| 7 Cross-device training, Unsloth-Studio parity | research running (with 3) | |
-| 8 Studios as editors (click-to-comment etc.) | research running | |
-| 9 "antling ming 0.1" design models | research running | |
-| 10 Visual output quality | research running | |
-| 11 Custom workflows | research running | |
+| 1 Hindsight memory + Memory tab | research DONE (`deliverables/research/hindsight-memory.md`) | plan pending |
+| 2 "bobble help" settings assistant | research DONE (`bobble-help.md`) | plan pending |
+| 3 Training dashboard + export/quant | research DONE (`training.md`) | plan pending |
+| 4 Linux + Windows GPU/CPU compat | research DONE (`crossplatform.md`) | plan pending |
+| 5 Tailscale Devices | research DONE (`devices-tailscale.md`) | plan pending |
+| 6 Harness LoRA (Qwen3.5-4B) | research DONE (`harness-lora.md`) | plan pending |
+| 7 Cross-device training, Unsloth-Studio parity | research DONE (in `training.md`) | plan pending |
+| 8 Studios as editors (click-to-comment etc.) | research DONE (`studios-editors.md`) | plan pending |
+| 9 "antling ming 0.1" design models | research DONE (`ming-models.md`) | plan pending |
+| 10 Visual output quality | research DONE (`visual-quality.md` + samples in `deliverables/visual-quality/`) | plan pending |
+| 11 Custom workflows | research DONE (`workflows.md`) | plan pending |
 
-Implementation starts once this wave is committed (the user's order: finish, note the commit, then launch).
+The planner (one agent over all eleven) is writing the build plan; implementation launches from it.
+
+## Needs the user's go (downloads / GPU)
+- Hindsight measurement spike WP-M0: ~0.3 GB wheels + ~0.14 GB models, model runs on AC.
+- Ming design models: first real runs (GPU-heavy) — MING-4.
+- Cross-platform: a local Linux VM/container runtime (OrbStack or Colima) for smoke tests.
+- Training: the decision benchmark TR-0 (model downloads + GPU).
 
 ## Blocking / notes
-- Battery hit 1% and the Mac hibernated during engine benchmarks (15:37); on AC since 16:06. Heavy benchmarks wait for charge.
+- On AC, battery 80%. No model servers running.
 - Before/after screenshots come from a clean BEFORE build of `c9fe7098` in a scratch worktree.
