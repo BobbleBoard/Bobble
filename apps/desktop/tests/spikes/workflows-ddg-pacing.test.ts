@@ -231,6 +231,13 @@ describe('runProtocol against the stand-in', () => {
     ]);
     const lite = run.requests.filter((r: Req) => r.tier === 'lite-2-2.5s');
     expect(lite.every((r: Req) => r.endpoint === 'lite')).toBe(true);
+    // The lite tier leaves html out, and each of its searches says so.
+    const liteSearches = run.searches.filter((s: { tier: string }) => s.tier === 'lite-2-2.5s');
+    expect(liteSearches.map((s: { skipped?: string[] }) => s.skipped)).toEqual(
+      Array(4).fill(['html']),
+    );
+    const chainSearches = run.searches.filter((s: { path: string }) => s.path === 'chain');
+    expect(chainSearches.every((s: { skipped?: string[] }) => s.skipped === undefined)).toBe(true);
     // Every gap sits inside its own tier's range, so all of them sit inside 2–5 s.
     for (const row of table) {
       expect(row.actualGapMs.min).toBeGreaterThanOrEqual(row.nominalGapMs[0]);
@@ -267,6 +274,11 @@ describe('runProtocol against the stand-in', () => {
     expect(after.every((r: Req) => r.tier === 'recovery' && r.endpoint === 'html')).toBe(true);
     expect(after[0].gapMs).toBeGreaterThanOrEqual(30_000);
     expect(run.recovery.probes.map((p: { kind: string }) => p.kind)).toEqual(['blocked', 'ok']);
+    // The refused probe's backend error cites a 599: that is the lite endpoint the
+    // probes leave out, and the search records it.
+    const refusedProbe = run.searches.find((s: { tier: string }) => s.tier === 'recovery');
+    expect(refusedProbe).toMatchObject({ outcome: 'failed', skipped: ['lite'] });
+    expect(refusedProbe.error).toMatch(/last status 599/);
     expect(run.recovery.cleanAfterMs).toBeGreaterThan(90_000);
     expect(run.recovery.cleanAfterMs).toBeLessThan(100_000);
     expect(table.find((r: { tier: string }) => r.tier === 'lite-2-2.5s').verdict).toBe('not run');

@@ -191,7 +191,10 @@ const BACKEND_MARKERS = [
   ['bots-use-duckduckgo', /bots use duckduckgo/i],
   ['error-persists', /if this error persists/i],
 ];
-/** Other signs of a block that search.ts does NOT look for. Seen only on a page with no results. */
+/**
+ * Other signs of a block that search.ts does NOT look for. They are always
+ * recorded, but acted on only when a page has no results.
+ */
 const EXTRA_MARKERS = [
   ['anomaly-js', /anomaly\.js/i],
   ['captcha', /captcha/i],
@@ -381,6 +384,7 @@ export function instrumentFetch({
   onRequest,
   onRefused,
   onShape,
+  onSkip,
 }) {
   return async (input, init = {}) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
@@ -389,6 +393,7 @@ export function instrumentFetch({
       throw new Error(`the spike only talks to DuckDuckGo's html and lite endpoints, not ${url}`);
     }
     if (route(endpoint) === 'skip') {
+      onSkip?.(endpoint);
       return new Response(null, { status: 599, statusText: 'not in this phase' });
     }
     if (!budget.take()) {
@@ -481,6 +486,13 @@ export async function runProtocol({
     },
     onShape: (url, init) => {
       shape ??= describeShape(url, init);
+    },
+    // The phase left this endpoint out, so the backend saw a synthetic 599 for
+    // it. Recorded so that a "last status 599" in `error` explains itself.
+    onSkip: (endpoint) => {
+      if (!ctx.search) return;
+      ctx.search.skipped ??= [];
+      ctx.search.skipped.push(endpoint);
     },
     onRequest: ({ endpoint, start, end, actualGapMs, status, body, error }) => {
       const trailing60 = 1 + starts.filter((s) => start - s < 60_000).length;
