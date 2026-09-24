@@ -1,53 +1,45 @@
 # Bobble — status
 
-Updated: 2026-09-23 (4) · wave commits `c1f7d578` `3ab7ec95` `c51638c7` `9d0d2e38` (base `c9fe7098`) · build on /Applications: `c1f7d578` (installed 17:32, packaged probe + smoke OK)
+Updated: 2026-09-23 22:50 · **PAUSED** · main `8f52b2ce` · build on /Applications: `c1f7d578` (installed 17:32, packaged probe + smoke OK)
 
-## Wave — computer use / vision (the user 2026-09-23) — DONE
+## Why it stopped
+All five workflows stopped at about 19:35 because **the account hit its monthly spend limit** ("raise it at claude.ai/settings/usage"). This was not a crash. Every agent after that failed with the same message. Cleanup done:
+- no leftover processes: no Electron, headless browser, model server or probe running;
+- lock slots are free;
+- 8,158 stale probe homes and profiles deleted from the temp folder (2.6 GB freed);
+- in-progress changes in 6 worktrees saved as labelled WIP commits on their own branches. Nothing unverified touched main.
 
-| # | Item | State |
-|---|------|-------|
-| 1 | Origin of the "TEXT-ONLY mode" note | DONE — it was true: rapid-mlx+MTP runs a text-only lane. The note now names the real cause |
-| 2 | Vision on by default, switch in the engine menu | DONE, live-probed on qwen3.5-4b: sees a red square by default (llama.cpp + projector, reason shown); switch Off → text-only, the model says vision is off and where to turn it on. Found + fixed: an attached image used to relaunch multimodal behind the Off switch (5 min) |
-| 3 | `--visual` snapshot = image only (Mac, Chrome, browser) | DONE + tested |
-| 4 | Active app persisted | DONE + tested |
-| 5 | "scrolled element 5000" | DONE — a scroll distance was read as an element index |
-| 6 | Projects slide open/closed | DONE — probe: 0 in-between frames before, ≥4 after; slowed mid-slide still |
-| 7 | Open / Open with in canvas + cards | DONE (subagent): menus open upward, card Open shows the canvas, text files open as real files, failures toast; probe 3/3 |
-| 8 | HyperFrames 120 PNG cards | DONE (subagent): one looping APNG, frames in `frames/`; then frames at the requested size (was 2× on Retina, 7.8 → 3.75 MB) |
-| 9 | Generating cards: no border, falloff, any aspect | DONE — probe BEFORE 7 fails → AFTER 0 |
-| 10 | "Thinking for 14m" instantly | DONE + tested |
-| 11 | Delete chat instant + terminates work | DONE — row gone in <1 frame, file gone, never returns; turn/subagents/team/all generations stopped |
-| 12 | Computer-use icon | DONE — window + three lights + agent cursor |
-| 13 | Monitor window margins | DONE — 12 px → 31 px |
+## Merged to main during the push (each built, independently verified, rebased, re-checked)
 
-Tests: 6,421 unit tests green across 11 packages; all typechecks clean.
+| Track | Package | Commit(s) | What it does |
+|---|---|---|---|
+| 4 Cross-platform | XP-01 | `bf167e4e` | Off macOS the memory guardian read "0 bytes free", treated that as critical and unloaded the chat model at every reading. It now reads the real machine (Linux PSI/MemAvailable, Windows); the macOS path is byte-identical |
+| 9 Ming | MING-0 | `18d42c0a` | Ming-Image's engine: mlx-vlm at the Ming commit, patched and shipped as a pinned 3 MB wheel (it is not on PyPI) and wired into the worker command |
+| 11 Workflows | WF-00b | `056baf83` `210225f3` `1fb4c49f` | Measured finding: DuckDuckGo refuses Bobble's search after 2 requests, even at 5 s pacing, and the refusal lasts over 30 min. Deep research must not wait it out |
+| 5 Devices | DEV-0 · DEV-1 · DEV-2 · DEV-3 | `f299c754` `e0f65c4b` `0d2c988e` `5813e33c` `a5f4658c` `8f52b2ce` | Tailscale reading fixed for Finder launches; tailnet adapter (LocalAPI first, CLI fallback, whois, ping, live watch); providers send `models.json` headers/keys; device store, SAS pairing, hashed tokens with constant-time compare, trust policy, `safeStorage` secrets, 0600 files |
 
-Follow-ups, all DONE: HyperFrames frames now stream into the chat's card as they render (`c51638c7`, 49/49 frames seen; before 0); stale probes `canvas-probe` + `round9-file-write-probe` fixed and headless (`9d0d2e38`); the dark→light flip in one probe was an E2E-only artifact (theme not applied at boot under the probe flag), not a user bug.
+## Built but not merged (on branches, safe)
 
-## Big push (tracks) — see memory `user-big-push-2026-09-23`
+| Branch | State |
+|---|---|
+| `push/xp-04` | uv pinned per platform/arch with sha256 (pins spot-checked against the official release) + a zip extractor. Fixed after review; the second verification never ran |
+| `push/w0-b` | Shared mocks (OpenAI/llama-server, web, Tailscale, Hindsight), `_locks.mjs`, `bench-run.sh`, `worktree-new.sh`. Verification found 7 issues (count-based caps, locale-proof pid check, bench orphan on SIGKILL, missing net/cargo classes, untagged output dirs); the fix never ran. + WIP |
+| `push/spk-02` | Mage-Flow download source fix (the microsoft repos answer 401). Built; verification never ran |
+| `push/mac-01` · `push/vq-kit-w1` · `push/vq-office-w1` | Mid-build (2–3 commits each + WIP) |
+| `push/w0-a` | The pre-wire scaffold, mid-build (WIP: 155 new files, 29 modified). **Everything else in Wave 1 waits on this** |
+| `bench/bench-1` | Engine-capability spike scripts written (WIP); never run |
 
-| Track | State | Notes |
-|---|---|---|
-| 1 Hindsight memory + Memory tab | research DONE (`deliverables/research/hindsight-memory.md`) | plan pending |
-| 2 "bobble help" settings assistant | research DONE (`bobble-help.md`) | plan pending |
-| 3 Training dashboard + export/quant | research DONE (`training.md`) | plan pending |
-| 4 Linux + Windows GPU/CPU compat | research DONE (`crossplatform.md`) | plan pending |
-| 5 Tailscale Devices | research DONE (`devices-tailscale.md`) | plan pending |
-| 6 Harness LoRA (Qwen3.5-4B) | research DONE (`harness-lora.md`) | plan pending |
-| 7 Cross-device training, Unsloth-Studio parity | research DONE (in `training.md`) | plan pending |
-| 8 Studios as editors (click-to-comment etc.) | research DONE (`studios-editors.md`) | plan pending |
-| 9 "antling ming 0.1" design models | research DONE (`ming-models.md`) | plan pending |
-| 10 Visual output quality | research DONE (`visual-quality.md` + samples in `deliverables/visual-quality/`) | plan pending |
-| 11 Custom workflows | research DONE (`workflows.md`) | plan pending |
+## Research and design (on disk under `deliverables/`)
+- `research/` — 10 track docs + **PLAN.md** (12 lanes, waves W0–W5, file ownership, resource plan, 28 ranked questions). Committed.
+- `review/wave-0923-findings.md` — the review of today's wave: **6 confirmed bugs** (all in the vision work, 3/3 votes, unfixed) + **33 unverified candidates** (their checkers never ran). Committed.
+- `ui-design/` — Image editor (click-to-comment), Devices, Workflows/Deep research, Memory, Bobble help: **2 clickable prototypes each (10), 930 screenshots in both themes**. Critique and refinement never ran. Not committed (374 MB of PNGs).
+- `training-ui/` — 101 reference screenshots from the study phase; prototypes never started.
+- `visual-quality/exemplars/` — exemplar deck (.pptx), report (.docx) and diagrams + 450 renders; critiques and the rulebook never ran.
 
-The planner (one agent over all eleven) is writing the build plan; implementation launches from it.
+## Blocked on the user
+- **Spend limit** — raise it to continue. Every workflow resumes from its run id (`wf_bbdc6328-a58` build, `wf_de15cc75-557` training UI, `wf_ce6de857-d55` UI designs, `wf_b2330c71-d84` review, `wf_e80131e7-ca7` exemplars). Finished agents replay from cache.
+- CI runs need your OK to push to the public GitHub repo (XP-03/04).
+- Heavy downloads/GPU jobs (PLAN.md Q1): assumed yes. None ran; BENCH-1 was starting when the limit hit.
 
-## Needs the user's go (downloads / GPU)
-- Hindsight measurement spike WP-M0: ~0.3 GB wheels + ~0.14 GB models, model runs on AC.
-- Ming design models: first real runs (GPU-heavy) — MING-4.
-- Cross-platform: a local Linux VM/container runtime (OrbStack or Colima) for smoke tests.
-- Training: the decision benchmark TR-0 (model downloads + GPU).
-
-## Blocking / notes
-- On AC, battery 80%. No model servers running.
-- Before/after screenshots come from a clean BEFORE build of `c9fe7098` in a scratch worktree.
+## Earlier today — computer use / vision wave: DONE
+All 13 items + follow-ups: `c1f7d578` `3ab7ec95` `c51638c7` `9d0d2e38` (memory `pi-desktop-wave-2026-09-23`).
