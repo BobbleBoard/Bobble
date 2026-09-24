@@ -23,6 +23,7 @@ import Vision
 //               of all instances ("remove background"), and a label map
 //   instanceAt  the instance under a tap point (0 = background), optionally
 //               snapped to the nearest instance within `radius` pixels
+//               (a tap tolerance, capped at 1024)
 //   ocr         recognised text as lines (and words) with boxes, reading order
 //   forget      drop the cached analysis of one image, or all of them
 //   warm        pay the one-time model preparation now (see below)
@@ -137,12 +138,25 @@ enum PiVision {
   static let protocolVersion = 1
   /// A decoded image, its masks and its label map all live at full resolution;
   /// past this many pixels the memory cost stops being a helper's to pay.
-  static let defaultMaxPixels = 100_000_000
+  /// 64 MP holds a 48 MP phone photo with room to spare.
+  static let defaultMaxPixels = 64_000_000
   /// Analyses kept warm. Two covers "the picture being edited plus the one
   /// before it" without letting a session of 4K edits grow the helper forever.
   static let cacheCapacity = 2
+  /// …and at most this many bytes of them (decoded picture, masks, label map,
+  /// cutout pixels). The most recent analysis always stays — it is the one
+  /// being worked on — so the ceiling is this plus one picture's worth, never
+  /// two 64 MP pictures with a dozen instances each. PI_MAC_VISION_CACHE_MB
+  /// overrides it (the probe shrinks it to watch eviction happen).
+  static let cacheBudgetBytes: Int = {
+    let env = ProcessInfo.processInfo.environment["PI_MAC_VISION_CACHE_MB"]
+    if let mb = env.flatMap({ Int($0) }), mb >= 0 { return mb * 1_048_576 }
+    return 768 * 1_048_576
+  }()
   /// A soft mask value counts as "inside" at or above this (0…255).
   static let inside: UInt8 = 128
+  /// `instanceAt`'s snap radius is a tap tolerance; past this it is clamped.
+  static let maxSnapRadius = 1024.0
 
   static let liftOutputs: Set<String> = [
     "mask", "cutout", "foregroundMask", "foregroundCutout", "labels",
@@ -161,10 +175,11 @@ enum PiVision {
 
   // ── params ────────────────────────────────────────────────────────────────
 
+  /// Whole part of a finite number, clamped far inside Int's range — so a
+  /// hostile or mistaken 1e300 is a big number, never a trap.
   static func int(_ v: Any?) -> Int? {
-    if let n = v as? NSNumber { return n.intValue }
-    if let s = v as? String { return Int(s) }
-    return nil
+    guard let d = double(v), d.isFinite else { return nil }
+    return Int(max(-1e15, min(1e15, d)).rounded(.towardZero))
   }
   static func double(_ v: Any?) -> Double? {
     if let n = v as? NSNumber { return n.doubleValue }
@@ -185,9 +200,16 @@ enum PiVision {
     if let s = v as? String { return [s] }
     return nil
   }
-  static func ints(_ v: Any?) -> [Int]? {
-    guard let a = v as? [Any] else { return nil }
-    return a.compactMap { int($0) }
+  /// A list of whole numbers, or an error — 1.9 is not quietly instance 1.
+  static func wholeNumbers(_ v: Any?, _ name: String) throws -> [Int]? {
+    guard let v else { return nil }
+    guard let list = v as? [Any] else { throw Failure("\(name) must be a list of whole numbers") }
+    return try list.map { item in
+      guard let d = double(item), d.isFinite, d == d.rounded(), abs(d) < 1e9 else {
+        throw Failure("\(name) must be a list of whole numbers")
+      }
+      return Int(d)
+    }
   }
 
   /// An absolute, standardized path; a relative one resolves against the
@@ -210,6 +232,7 @@ enum PiVision {
   // ── dispatch ──────────────────────────────────────────────────────────────
 
   static func handle(method: String, params: [String: Any]) throws -> [String: Any] {
+    defer { trimCache() }
     switch method {
     case "info", "ping": return info()
     case "lift": return try lift(params)
@@ -255,9 +278,12 @@ enum PiVision {
     /// Straight-alpha RGBA of the source, decoded on the first cutout.
     var rgba: [UInt8]?
     var rgbaSpace: CGColorSpace?
-    /// Files this process already wrote for this analysis (same inputs, same
-    /// bytes) — a second tap on the same instance does not re-encode.
-    var written = Set<String>()
+
+    /// What this analysis keeps alive, for the cache budget.
+    var bytes: Int {
+      width * height * 4 + masks.values.reduce(0) { $0 + $1.count } + labels.count
+        + (rgba?.count ?? 0)
+    }
 
     init(
       key: String, path: String, width: Int, height: Int, orientation: Int, image: CGImage,
@@ -288,18 +314,44 @@ enum PiVision {
     let size = (attrs[.size] as? NSNumber)?.int64Value ?? 0
     let mtime = (attrs[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
     let key = "\(path)|\(size)|\(mtime)"
+    let maxPixels = int(params["maxPixels"]) ?? defaultMaxPixels
     if let i = cache.firstIndex(where: { $0.key == key }) {
       let hit = cache.remove(at: i)
       cache.append(hit)
+      // The limit is the caller's to set per request, cached or not.
+      try checkSize(hit.width, hit.height, maxPixels)
       return (hit, true)
     }
-    let maxPixels = int(params["maxPixels"]) ?? defaultMaxPixels
     let fresh = try load(path: path, key: key, maxPixels: maxPixels)
     // A file that changed on disk replaces its stale analysis outright.
     cache.removeAll { $0.path == path }
     cache.append(fresh)
-    while cache.count > cacheCapacity { cache.removeFirst() }
+    trimCache()
     return (fresh, false)
+  }
+
+  static func checkSize(_ w: Int, _ h: Int, _ maxPixels: Int) throws {
+    guard w * h <= maxPixels else {
+      throw Failure(
+        "image is too large to analyse (\(w)×\(h) is \(megapixels(w * h)), the limit is"
+          + " \(megapixels(maxPixels)))")
+    }
+  }
+
+  static func megapixels(_ pixels: Int) -> String {
+    String(format: "%.1f MP", Double(pixels) / 1_000_000)
+  }
+
+  static var cacheBytes: Int { cache.reduce(0) { $0 + $1.bytes } }
+
+  /// Oldest first, until both the count and the byte budget fit — never the
+  /// most recent analysis, which is the picture being worked on. Run after
+  /// every request, because an analysis grows (masks, cutout pixels) after it
+  /// is first cached.
+  static func trimCache() {
+    while cache.count > 1, cache.count > cacheCapacity || cacheBytes > cacheBudgetBytes {
+      cache.removeFirst()
+    }
   }
 
   /// Decode with the EXIF orientation APPLIED, so every coordinate and mask is
@@ -313,10 +365,7 @@ enum PiVision {
     let ph = (props[kCGImagePropertyPixelHeight] as? NSNumber)?.intValue ?? 0
     let orientation = (props[kCGImagePropertyOrientation] as? NSNumber)?.intValue ?? 1
     guard pw > 0, ph > 0 else { throw Failure("could not decode image: \(path)") }
-    guard pw * ph <= maxPixels else {
-      throw Failure(
-        "image is too large to analyse (\(pw)×\(ph), limit \(maxPixels / 1_000_000) megapixels)")
-    }
+    try checkSize(pw, ph, maxPixels)
     let decoded: CGImage?
     if orientation == 1 {
       decoded = CGImageSourceCreateImageAtIndex(
@@ -378,15 +427,19 @@ enum PiVision {
     if let observation = request.results?.first {
       var best = [UInt8](repeating: 0, count: w * h)
       for index in observation.allInstances.sorted() where index > 0 && index < 256 {
-        let buffer: CVPixelBuffer
-        do {
-          buffer = try observation.generateScaledMaskForImage(
-            forInstances: IndexSet(integer: index), from: a.handler)
-        } catch {
-          throw Failure(
-            "Vision could not scale the mask of instance \(index): \(error.localizedDescription)")
+        // One full-size float mask alive at a time (a 48 MP one is ~195 MB):
+        // the pool drains it before the next instance's is made.
+        let mask: [UInt8] = try autoreleasepool {
+          let buffer: CVPixelBuffer
+          do {
+            buffer = try observation.generateScaledMaskForImage(
+              forInstances: IndexSet(integer: index), from: a.handler)
+          } catch {
+            throw Failure(
+              "Vision could not scale the mask of instance \(index): \(error.localizedDescription)")
+          }
+          return try bytes(of: buffer, width: w, height: h)
         }
-        let mask = try bytes(of: buffer, width: w, height: h)
         guard let s = stats(of: mask, width: w, height: h) else { continue }
         // The label map: each pixel belongs to the instance that covers it
         // most, provided that one covers it at least halfway.
@@ -435,7 +488,9 @@ enum PiVision {
           for x in 0..<w {
             let sx = bw == w ? x : min(bw - 1, x * bw / w)
             let v = f[sx]
-            o[y * w + x] = v <= 0 ? 0 : v >= 1 ? 255 : UInt8((v * 255).rounded())
+            // `v > 0` is false for NaN too, so a bad value reads as outside
+            // rather than trapping in the UInt8 conversion.
+            o[y * w + x] = v > 0 ? (v < 1 ? UInt8((v * 255).rounded()) : 255) : 0
           }
         } else {
           let b = row.assumingMemoryBound(to: UInt8.self)
@@ -668,12 +723,24 @@ enum PiVision {
     try writePNG(image, to: url)
   }
 
-  /// Write (once per analysis) and return the path.
+  /// Which analysis last wrote each output file, and the file's mtime then.
+  private static var writtenBy: [String: (key: String, mtime: TimeInterval)] = [:]
+
+  static func mtime(_ path: String) -> TimeInterval? {
+    let attrs = try? FileManager.default.attributesOfItem(atPath: path)
+    return (attrs?[.modificationDate] as? Date)?.timeIntervalSince1970
+  }
+
+  /// Write and return the path — skipping the write only when THIS picture
+  /// wrote exactly this file and nothing has touched it since. A prefix two
+  /// pictures share would otherwise hand back the other picture's mask.
   static func emitFile(_ a: Analysis, _ url: URL, _ write: () throws -> Void) throws -> String {
-    if !a.written.contains(url.path) || !FileManager.default.fileExists(atPath: url.path) {
-      try write()
-      a.written.insert(url.path)
+    if let last = writtenBy[url.path], last.key == a.key, mtime(url.path) == last.mtime {
+      return url.path
     }
+    try write()
+    if writtenBy.count > 4096 { writtenBy.removeAll() }
+    writtenBy[url.path] = (a.key, mtime(url.path) ?? 0)
     return url.path
   }
 
@@ -747,7 +814,10 @@ enum PiVision {
       "ocr": true,
       "ocrLanguages": languages,
       "maxPixels": defaultMaxPixels,
-      "cache": ["entries": cache.count, "capacity": cacheCapacity],
+      "cache": [
+        "entries": cache.count, "capacity": cacheCapacity, "bytes": cacheBytes,
+        "budgetBytes": cacheBudgetBytes,
+      ],
     ]
   }
 
@@ -758,7 +828,9 @@ enum PiVision {
     let (a, cached) = try analysis(params)
     try ensureLift(a)
     var chosen = a.indices
-    if let only = ints(params["instances"]) { chosen = chosen.filter { only.contains($0) } }
+    if let only = try wholeNumbers(params["instances"], "instances") {
+      chosen = chosen.filter { only.contains($0) }
+    }
     let crop = bool(params["crop"], false)
     var dir: URL?
     if !write.isEmpty { dir = try outputDir(params) }
@@ -820,12 +892,16 @@ enum PiVision {
     let py = Int(y)
     var index = Int(a.labels[py * a.width + px])
     var distance: NSNumber?
-    let radius = max(0, double(params["radius"]) ?? 0)
+    // A tap tolerance, so capped at maxSnapRadius: an absurd radius must not
+    // overflow the pixel arithmetic below, nor scan a whole 64 MP picture.
+    let asked = double(params["radius"]) ?? 0
+    let radius = asked.isFinite ? min(max(0, asked), maxSnapRadius) : 0
     if index == 0, radius > 0 {
       // Nearest labelled pixel within the radius: a tap that lands a hair
       // outside a soft edge still means the thing it was aimed at.
       let r = Int(radius.rounded(.up))
-      var bestD = radius * radius + 1
+      let limit = radius * radius
+      var bestD = Double.infinity
       for yy in max(0, py - r)...min(a.height - 1, py + r) {
         let dy = Double(yy - py)
         for xx in max(0, px - r)...min(a.width - 1, px + r) {
@@ -833,7 +909,7 @@ enum PiVision {
           if label == 0 { continue }
           let dx = Double(xx - px)
           let d = dx * dx + dy * dy
-          if d < bestD {
+          if d <= limit, d < bestD {
             bestD = d
             index = Int(label)
           }
@@ -895,12 +971,18 @@ enum PiVision {
     var rh = a.height
     if let region = params["region"] as? [String: Any] {
       guard let rx = double(region["x"]), let ry = double(region["y"]),
-        let rwd = double(region["width"]), let rhd = double(region["height"])
-      else { throw Failure("region needs x, y, width and height (image pixels)") }
-      let x0 = max(0, Int(rx.rounded(.down)))
-      let y0 = max(0, Int(ry.rounded(.down)))
-      let x1 = min(a.width, Int((rx + rwd).rounded(.up)))
-      let y1 = min(a.height, Int((ry + rhd).rounded(.up)))
+        let rwd = double(region["width"]), let rhd = double(region["height"]),
+        rx.isFinite, ry.isFinite, rwd.isFinite, rhd.isFinite, rwd > 0, rhd > 0
+      else {
+        throw Failure("region needs finite x, y and a positive width and height (image pixels)")
+      }
+      // Clamped to the picture BEFORE becoming Ints: 1e19 must not trap.
+      let fw = Double(a.width)
+      let fh = Double(a.height)
+      let x0 = Int(min(fw, max(0, rx.rounded(.down))))
+      let y0 = Int(min(fh, max(0, ry.rounded(.down))))
+      let x1 = Int(min(fw, max(0, (rx + rwd).rounded(.up))))
+      let y1 = Int(min(fh, max(0, (ry + rhd).rounded(.up))))
       guard x1 > x0, y1 > y0,
         let crop = a.image.cropping(to: CGRect(x: x0, y: y0, width: x1 - x0, height: y1 - y0))
       else { throw Failure("region lies outside the \(a.width)×\(a.height) image") }

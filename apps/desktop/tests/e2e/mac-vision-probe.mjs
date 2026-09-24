@@ -153,8 +153,11 @@ const readPng = (file) => decodePng(readFileSync(file));
 
 // ── the NDJSON client ────────────────────────────────────────────────────────
 
-function startHelper() {
-  const child = spawn(HELPER, ['--vision-serve'], { stdio: ['pipe', 'pipe', 'pipe'] });
+function startHelper(env = {}) {
+  const child = spawn(HELPER, ['--vision-serve'], {
+    stdio: ['pipe', 'pipe', 'pipe'],
+    env: { ...process.env, ...env },
+  });
   let buf = '';
   let nextId = 0;
   const pending = new Map();
@@ -550,6 +553,158 @@ try {
   const still = await helper.call('info');
   check(still.ok, 'the helper still answers after the errors');
   sampleFront('after OCR and errors');
+
+  // ── hardening: each of these failed before the code-review fixes ────────
+  step('hardening — radius, prefixes, limits, absurd numbers');
+  {
+    // The snap radius is a real circle. From the apples' own label map, find a
+    // background pixel whose nearest labelled pixel is √D away; a radius a
+    // hair under √D must miss it (the old test `d < r² + 1` let it through)
+    // and a radius of exactly √D must reach it, reporting √D.
+    const L = apLabels;
+    let target = null;
+    for (let y = 300; y < 420 && target === null; y += 5) {
+      for (let x = 368; x > 330 && target === null; x -= 1) {
+        if (at(L, x, y) !== 0) continue;
+        let best = Number.POSITIVE_INFINITY;
+        for (let dy = -4; dy <= 4; dy += 1) {
+          for (let dx = -4; dx <= 4; dx += 1) {
+            if (at(L, x + dx, y + dy) !== 0) best = Math.min(best, dx * dx + dy * dy);
+          }
+        }
+        if (best >= 5 && best <= 16) target = { x, y, d2: best };
+      }
+    }
+    check(
+      target !== null,
+      `found a background pixel beside the middle apple (${JSON.stringify(target)})`,
+    );
+    if (target !== null) {
+      const exact = Math.sqrt(target.d2);
+      const under = await helper.call('instanceAt', {
+        image: fx('apples.jpg'),
+        x: target.x,
+        y: target.y,
+        radius: exact - 0.05,
+        write: [],
+      });
+      const onIt = await helper.call('instanceAt', {
+        image: fx('apples.jpg'),
+        x: target.x,
+        y: target.y,
+        radius: exact,
+        write: [],
+      });
+      check(
+        under.ok && under.result.hit === false,
+        `radius ${(exact - 0.05).toFixed(2)} does not reach a pixel ${exact.toFixed(2)} px away`,
+      );
+      check(
+        onIt.ok && onIt.result.hit === true && onIt.result.distance === Number(exact.toFixed(2)),
+        `radius ${exact.toFixed(2)} reaches it, reporting ${onIt.result?.distance} px`,
+      );
+    }
+
+    // A prefix two pictures share must not hand back the other one's mask.
+    const shared = path.join(work, 'shared');
+    mkdirSync(shared);
+    await helper.call('lift', {
+      image: fx('cat.jpg'),
+      out: shared,
+      prefix: 'doc',
+      write: ['mask'],
+    });
+    await helper.call('lift', {
+      image: fx('apples.jpg'),
+      out: shared,
+      prefix: 'doc',
+      write: ['mask'],
+    });
+    const back = await helper.call('lift', {
+      image: fx('cat.jpg'),
+      out: shared,
+      prefix: 'doc',
+      write: ['mask'],
+    });
+    const backMask = readPng(back.result.instances[0].maskPath);
+    check(
+      back.result.cached === true && at(backMask, 600, 240) === 255,
+      "a prefix shared with the apples still returns the cat's own mask (cat head = 255)",
+    );
+
+    // The size limit holds for a picture that is already cached.
+    await helper.call('lift', { image: fx('cat.jpg'), write: [] });
+    const capped = await helper.call('lift', {
+      image: fx('cat.jpg'),
+      maxPixels: 100_000,
+      write: [],
+    });
+    check(
+      !capped.ok && /too large/.test(capped.error ?? ''),
+      `maxPixels applies to a cached picture ("${capped.error}")`,
+    );
+
+    // 1.9 is not instance 1.
+    const frac = await helper.call('lift', {
+      image: fx('apples.jpg'),
+      instances: [1.9],
+      write: [],
+    });
+    check(
+      !frac.ok && /whole numbers/.test(frac.error ?? ''),
+      `fractional instance numbers are refused ("${frac.error}")`,
+    );
+
+    // Absurd numbers are clamped or refused — never a crash.
+    const far = await helper.call('instanceAt', {
+      image: fx('apples.jpg'),
+      x: 470,
+      y: 100,
+      radius: 1e19,
+      write: [],
+    });
+    check(
+      far.ok && far.result.hit === true,
+      `radius 1e19 is clamped, not a trap (snapped ${far.result?.distance} px)`,
+    );
+    const offRegion = await helper.call('ocr', {
+      image: fx('poster.png'),
+      region: { x: 1e19, y: 0, width: 1, height: 1 },
+    });
+    check(
+      !offRegion.ok && /outside/.test(offRegion.error ?? ''),
+      `a region at x = 1e19 is refused ("${offRegion.error}")`,
+    );
+    const wide = await helper.call('ocr', {
+      image: fx('poster.png'),
+      region: { x: -1e19, y: 0, width: 2e19, height: 300 },
+      words: false,
+    });
+    check(
+      wide.ok && wide.result.lines[0]?.text === 'MIDNIGHT',
+      'a region wider than the world is clamped to the picture',
+    );
+    const alive = await helper.call('info');
+    check(alive.ok, 'the helper is still answering after all of that');
+
+    // The cache is trimmed to its byte budget (a 4 MB budget holds one of
+    // these pictures, not two), always keeping the most recent.
+    const tight = startHelper({ PI_MAC_VISION_CACHE_MB: '4' });
+    helperPids.push(tight.child.pid);
+    await tight.call('lift', { image: fx('cat.jpg'), write: [] });
+    await tight.call('lift', { image: fx('apples.jpg'), write: [] });
+    const tightInfo = await tight.call('info');
+    const catAgain = await tight.call('lift', { image: fx('cat.jpg'), write: [] });
+    check(
+      tightInfo.result.cache.budgetBytes === 4 * 1_048_576 &&
+        tightInfo.result.cache.entries === 1 &&
+        catAgain.result.cached === false,
+      `4 MB budget: one picture kept (${tightInfo.result.cache.bytes} bytes), the older one analysed afresh`,
+    );
+    report.steps.cacheBudget = tightInfo.result.cache;
+    tight.child.stdin.end();
+    await tight.exited;
+  }
 } catch (err) {
   failures.push(`probe crashed: ${err instanceof Error ? err.stack : err}`);
   console.error(err);

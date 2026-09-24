@@ -123,7 +123,13 @@ export interface VisionInfo {
   readonly ocr: boolean;
   readonly ocrLanguages: readonly string[];
   readonly maxPixels: number;
-  readonly cache: { readonly entries: number; readonly capacity: number };
+  readonly cache: {
+    readonly entries: number;
+    readonly capacity: number;
+    /** What the cached analyses hold now, and the budget they are trimmed to. */
+    readonly bytes?: number;
+    readonly budgetBytes?: number;
+  };
 }
 
 export interface VisionWarmResult {
@@ -158,7 +164,7 @@ export const VISION_INSTANCE_OUTPUTS: readonly VisionInstanceOutput[] = ['mask',
 export interface VisionImageParams {
   /** Absolute path to a picture ImageIO can read (PNG, JPEG, HEIC, WebP…). */
   readonly image: string;
-  /** Refuse pictures larger than this many pixels (default 100 M). */
+  /** Refuse pictures larger than this many pixels (default 64 M). */
   readonly maxPixels?: number;
 }
 
@@ -181,7 +187,9 @@ export interface VisionLiftParams extends VisionImageParams, VisionOutputParams 
 export interface VisionInstanceAtParams extends VisionImageParams, VisionOutputParams {
   readonly x: number;
   readonly y: number;
-  /** Snap to the nearest instance within this many pixels (default 0). */
+  /** Snap to the nearest instance within this many pixels (default 0; a tap
+   * tolerance, capped at 1024). Image pixels: the canvas converts its screen
+   * tolerance with the zoom it alone knows. */
   readonly radius?: number;
   /** Default `['mask']`; `[]` for numbers only. */
   readonly write?: readonly VisionInstanceOutput[];

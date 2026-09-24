@@ -123,6 +123,63 @@ describe('MacHelperClient', () => {
   });
 });
 
+describe('a replaced helper', () => {
+  /** A child the test drives by hand: what it prints, and when it closes. */
+  function manualChild(): {
+    child: MacChildProcess;
+    print: (line: string) => void;
+    close: () => void;
+  } {
+    const data: Array<(c: string) => void> = [];
+    const closes: Array<() => void> = [];
+    const child: MacChildProcess = {
+      pid: 7,
+      stdin: { write: (_d, cb) => cb?.(null), end: () => undefined, on: () => undefined },
+      stdout: { on: (_e, cb) => data.push(cb as (c: string) => void) },
+      stderr: { on: () => undefined },
+      on: (event, cb) => {
+        if (event === 'close') closes.push(cb as () => void);
+      },
+      kill: () => undefined,
+    };
+    return {
+      child,
+      print: (line) => {
+        for (const f of data) f(`${line}\n`);
+      },
+      close: () => {
+        for (const f of closes) f();
+      },
+    };
+  }
+
+  /* After dispose() the next request spawns a replacement while the old child
+     is still dying. Its late 'close' and last bytes must not reach the new
+     child's requests: they used to reject them (and orphan the new child). */
+  it("ignores the old child's late close and output", async () => {
+    const children: ReturnType<typeof manualChild>[] = [];
+    const client = new MacHelperClient({
+      helperPath: '/bin/pi-mac',
+      spawnFn: () => {
+        const c = manualChild();
+        children.push(c);
+        return c.child;
+      },
+    });
+    const first = client.request('warm').catch((e: Error) => e.message);
+    client.dispose();
+    expect(await first).toBe('client disposed');
+
+    const second = client.request('lift'); // id 2, on a fresh child
+    expect(children).toHaveLength(2);
+    children[0]?.print('{"id":2,"ok":true,"result":"stale bytes from the old child"}');
+    children[0]?.close();
+    children[1]?.print('{"id":2,"ok":true,"result":"from the new child"}');
+    await expect(second).resolves.toBe('from the new child');
+    client.dispose();
+  });
+});
+
 describe("the helper's stderr", () => {
   /* It was spawned with a pipe and never read: every diagnostic the helper
      wrote — including the ones it writes precisely when something is wrong —

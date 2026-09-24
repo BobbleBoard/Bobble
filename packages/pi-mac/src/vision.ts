@@ -201,10 +201,12 @@ export function parseVisionInfo(raw: unknown): VisionInfo {
       return l;
     }),
     maxPixels: num(o, 'maxPixels', where),
-    cache: {
+    cache: compact({
       entries: num(cache, 'entries', `${where}.cache`),
       capacity: num(cache, 'capacity', `${where}.cache`),
-    },
+      bytes: optNum(cache, 'bytes', `${where}.cache`),
+      budgetBytes: optNum(cache, 'budgetBytes', `${where}.cache`),
+    }),
   };
 }
 
@@ -325,6 +327,14 @@ function checkImage(image: unknown): void {
   if (!path.isAbsolute(image)) refuse(`image must be an absolute path (got "${image}")`);
 }
 
+function checkOut(out: unknown): void {
+  if (out === undefined) return;
+  if (typeof out !== 'string' || out.length === 0) refuse('out must be a folder path');
+  // Same reason as `image`: relative to the helper's working directory is
+  // "/" in the packaged app, and wherever Electron started in dev.
+  if (!path.isAbsolute(out)) refuse(`out must be an absolute path (got "${out}")`);
+}
+
 function checkFinite(value: unknown, name: string, { min }: { min?: number } = {}): void {
   if (typeof value !== 'number' || !Number.isFinite(value)) refuse(`${name} must be a number`);
   if (min !== undefined && value < min) refuse(`${name} must be at least ${min}`);
@@ -366,29 +376,51 @@ export class MacVisionClient {
     });
   }
 
+  /**
+   * One request. A request that TIMED OUT is still running inside the
+   * single-threaded helper, and every later one would queue behind it — a
+   * hung Vision call would take every tap after it down too. So a timeout
+   * restarts the helper: the next request gets a fresh one (the analysis cache
+   * goes with it; correctness first).
+   */
+  async #request(method: string, params?: Record<string, unknown>): Promise<unknown> {
+    try {
+      return await this.#helper.request(method, params);
+    } catch (err) {
+      if (err instanceof Error && err.message.includes('timed out')) this.#helper.dispose();
+      throw err;
+    }
+  }
+
   /** What the helper can do; `version` must equal VISION_PROTOCOL_VERSION. */
   async info(): Promise<VisionInfo> {
-    return parseVisionInfo(await this.#helper.request('info'));
+    return parseVisionInfo(await this.#request('info'));
   }
 
   /** Every foreground instance (and whatever files `write` asks for). */
   async lift(params: VisionLiftParams): Promise<VisionLiftResult> {
     checkImage(params.image);
+    checkOut(params.out);
     checkWrite(params.write, VISION_LIFT_OUTPUTS);
     if (params.instances !== undefined) {
-      for (const i of params.instances) checkFinite(i, 'instances[]', { min: 1 });
+      for (const i of params.instances) {
+        checkFinite(i, 'instances[]', { min: 1 });
+        // 1.9 is not instance 1: refuse it rather than let it truncate.
+        if (!Number.isInteger(i)) refuse(`instances[] must be whole numbers (got ${i})`);
+      }
     }
-    return parseVisionLift(await this.#helper.request('lift', wire(params)));
+    return parseVisionLift(await this.#request('lift', wire(params)));
   }
 
   /** The instance under a point (0 = background). */
   async instanceAt(params: VisionInstanceAtParams): Promise<VisionInstanceAtResult> {
     checkImage(params.image);
+    checkOut(params.out);
     checkFinite(params.x, 'x', { min: 0 });
     checkFinite(params.y, 'y', { min: 0 });
     if (params.radius !== undefined) checkFinite(params.radius, 'radius', { min: 0 });
     checkWrite(params.write, VISION_INSTANCE_OUTPUTS);
-    return parseVisionInstanceAt(await this.#helper.request('instanceAt', wire(params)));
+    return parseVisionInstanceAt(await this.#request('instanceAt', wire(params)));
   }
 
   /** Text as lines (and words) with boxes, in reading order. */
@@ -403,20 +435,18 @@ export class MacVisionClient {
       if (params.minConfidence > 1) refuse('minConfidence must be at most 1');
     }
     if (params.region !== undefined) checkBox(params.region, 'region');
-    return parseVisionOcr(await this.#helper.request('ocr', wire(params)));
+    return parseVisionOcr(await this.#request('ocr', wire(params)));
   }
 
   /** Pay the one-time model preparation now (~29 s on a new build, then ms). */
   async warm(): Promise<VisionWarmResult> {
-    return parseVisionWarm(await this.#helper.request('warm'));
+    return parseVisionWarm(await this.#request('warm'));
   }
 
   /** Drop the helper's cached analysis of one picture, or of all of them. */
   async forget(image?: string): Promise<VisionForgetResult> {
     if (image !== undefined) checkImage(image);
-    return parseVisionForget(
-      await this.#helper.request('forget', image === undefined ? {} : { image }),
-    );
+    return parseVisionForget(await this.#request('forget', image === undefined ? {} : { image }));
   }
 
   /** Stop the helper (it also exits by itself when this process goes away). */

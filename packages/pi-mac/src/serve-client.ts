@@ -71,7 +71,20 @@ export class MacHelperClient {
     const child = this.#spawnFn(this.#bin, this.#args);
     this.#child = child;
     this.#buffer = '';
-    child.stdout?.on('data', (chunk) => this.#onData(String(chunk)));
+    /*
+     * EVERY HANDLER ANSWERS ONLY FOR ITS OWN CHILD.
+     *
+     * After dispose() (or a crash) the next request spawns a replacement at
+     * once, while the old child is still dying. Its late 'close' used to run
+     * #onExit against the NEW child — dropping the reference (an orphan that
+     * lives as long as the app) and rejecting requests the new child was about
+     * to answer — and its last stdout bytes landed in the new child's line
+     * buffer. A child that is no longer current is ignored.
+     */
+    const current = (): boolean => this.#child === child;
+    child.stdout?.on('data', (chunk) => {
+      if (current()) this.#onData(String(chunk));
+    });
     /*
      * READ THE CHILD'S STDERR — nobody did, and it is spawned with a PIPE.
      *
@@ -90,8 +103,12 @@ export class MacHelperClient {
         if (t !== '') this.#onStderr?.(t);
       }
     });
-    child.on('error', (err) => this.#onExit(err));
-    child.on('close', () => this.#onExit(new Error('pi-mac helper exited')));
+    child.on('error', (err) => {
+      if (current()) this.#onExit(err);
+    });
+    child.on('close', () => {
+      if (current()) this.#onExit(new Error('pi-mac helper exited'));
+    });
     return child;
   }
 

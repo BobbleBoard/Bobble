@@ -174,6 +174,28 @@ describe.skipIf(!LIVE)('pi-mac --vision live (real binary, fixture pictures)', (
     expect((await vision.ocr({ image: fx('blank.png') })).lines).toEqual([]);
   });
 
+  it('clamps or refuses absurd numbers instead of dying', async () => {
+    const far = await vision.instanceAt({
+      image: fx('apples.jpg'),
+      x: 470,
+      y: 100,
+      radius: 1e19,
+      write: [],
+    });
+    expect(far.hit).toBe(true); // clamped to a tap tolerance, not a trap
+    await expect(
+      vision.ocr({ image: fx('poster.png'), region: { x: 1e19, y: 0, width: 1, height: 1 } }),
+    ).rejects.toThrow('region lies outside');
+    expect((await vision.info()).version).toBe(VISION_PROTOCOL_VERSION); // still alive
+  });
+
+  it('applies maxPixels to a picture that is already cached', async () => {
+    await vision.lift({ image: fx('cat.jpg'), write: [] });
+    await expect(
+      vision.lift({ image: fx('cat.jpg'), maxPixels: 100_000, write: [] }),
+    ).rejects.toThrow('too large');
+  });
+
   it("returns the helper's error for a missing file", async () => {
     await expect(vision.lift({ image: fx('nope.png') })).rejects.toThrow('image not found');
   });

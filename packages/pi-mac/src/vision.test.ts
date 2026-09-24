@@ -287,7 +287,80 @@ describe('MacVisionClient', () => {
     vision.dispose();
   });
 
+  it('refuses a relative output folder and fractional instance numbers', async () => {
+    const { vision, spawns } = client(() => ({ ok: true, result: {} }));
+    await expect(vision.lift({ image: '/p/a.jpg', out: 'masks' })).rejects.toThrow(
+      'out must be an absolute path (got "masks")',
+    );
+    await expect(vision.instanceAt({ image: '/p/a.jpg', x: 1, y: 1, out: './m' })).rejects.toThrow(
+      'out must be an absolute path',
+    );
+    // 1.9 would truncate to instance 1 inside the helper.
+    await expect(vision.lift({ image: '/p/a.jpg', instances: [1.9] })).rejects.toThrow(
+      'instances[] must be whole numbers (got 1.9)',
+    );
+    expect(spawns).toHaveLength(0);
+    vision.dispose();
+  });
+
+  it("reads the cache's bytes and budget, and tolerates a helper that omits them", () => {
+    const info = parseVisionInfo(real('info'));
+    expect(info.cache.budgetBytes).toBe(768 * 1_048_576);
+    expect(info.cache.bytes).toBeGreaterThan(0);
+    const older = parseVisionInfo({ ...real('info'), cache: { entries: 1, capacity: 2 } });
+    expect(older.cache).toEqual({ entries: 1, capacity: 2 });
+  });
+
   it('allows the slow first OCR of a new build by default', () => {
     expect(VISION_DEFAULT_TIMEOUT_MS).toBeGreaterThanOrEqual(60_000);
+  });
+});
+
+describe('a request that times out', () => {
+  /* The helper is single-threaded: a request that timed out is still running
+     in it, and everything sent after would queue behind it. So a timeout
+     restarts the helper and the next request reaches a fresh one. */
+  it('restarts the helper so the next request is answered', async () => {
+    const kills: string[] = [];
+    let spawned = 0;
+    const spawnFn: MacSpawnFn = () => {
+      spawned += 1;
+      const wedged = spawned === 1; // the first helper never answers
+      const dataCbs: Array<(c: string) => void> = [];
+      const child: MacChildProcess = {
+        pid: 100 + spawned,
+        stdin: {
+          write: (data, cb) => {
+            cb?.(null);
+            if (wedged) return;
+            const req = JSON.parse(data.trim()) as { id: number };
+            queueMicrotask(() => {
+              for (const f of dataCbs) {
+                f(`${JSON.stringify({ id: req.id, ok: true, result: real('info') })}\n`);
+              }
+            });
+          },
+          end: () => undefined,
+          on: () => undefined,
+        },
+        stdout: { on: (_e, cb) => dataCbs.push(cb as (c: string) => void) },
+        stderr: { on: () => undefined },
+        on: () => undefined,
+        kill: (signal) => {
+          kills.push(`${100 + spawned}:${signal ?? ''}`);
+        },
+      };
+      return child;
+    };
+    const vision = new MacVisionClient({
+      spawnFn,
+      helperPath: '/bin/pi-mac',
+      requestTimeoutMs: 30,
+    });
+    await expect(vision.info()).rejects.toThrow('timed out');
+    expect(kills).toEqual(['101:SIGTERM']); // the wedged helper was stopped
+    await expect(vision.info()).resolves.toMatchObject({ version: 1 });
+    expect(spawned).toBe(2);
+    vision.dispose();
   });
 });

@@ -1,36 +1,20 @@
 {
   "_about": "Real pi-mac --vision-serve responses captured from the Swift helper on packages/pi-mac/fixtures/vision (paths rewritten to /fixtures and /out; the OCR language list trimmed). Pins the wire shapes the TS parsers accept.",
-  "info": {
+  "warm": {
     "id": 1,
     "ok": true,
     "result": {
-      "cache": {
-        "capacity": 2,
-        "entries": 0
-      },
-      "lift": true,
-      "maxPixels": 100000000,
-      "ocr": true,
-      "ocrLanguages": ["en-US", "fr-FR", "it-IT"],
-      "os": "27.2.0",
-      "version": 1
-    }
-  },
-  "warm": {
-    "id": 2,
-    "ok": true,
-    "result": {
-      "liftMs": 130,
-      "ms": 195,
-      "ocrMs": 61,
+      "liftMs": 238,
+      "ms": 373,
+      "ocrMs": 115,
       "text": "Warm up"
     }
   },
   "liftCat": {
-    "id": 3,
+    "id": 2,
     "ok": true,
     "result": {
-      "analysisMs": 26,
+      "analysisMs": 47,
       "cached": false,
       "count": 1,
       "foreground": {
@@ -83,16 +67,16 @@
         }
       ],
       "labelsPath": "/out/cat-17447790-labels.png",
-      "ms": 54,
+      "ms": 105,
       "orientation": 1,
       "width": 960
     }
   },
   "liftApples": {
-    "id": 4,
+    "id": 3,
     "ok": true,
     "result": {
-      "analysisMs": 23,
+      "analysisMs": 26,
       "cached": false,
       "count": 3,
       "foreground": {
@@ -162,22 +146,40 @@
           "pixels": 39876
         }
       ],
-      "ms": 41,
+      "ms": 67,
       "orientation": 1,
       "width": 960
+    }
+  },
+  "info": {
+    "id": 4,
+    "ok": true,
+    "result": {
+      "cache": {
+        "budgetBytes": 805306368,
+        "bytes": 11059200,
+        "capacity": 2,
+        "entries": 2
+      },
+      "lift": true,
+      "maxPixels": 64000000,
+      "ocr": true,
+      "ocrLanguages": ["en-US", "fr-FR", "it-IT"],
+      "os": "27.2.0",
+      "version": 1
     }
   },
   "liftBlank": {
     "id": 5,
     "ok": true,
     "result": {
-      "analysisMs": 11,
+      "analysisMs": 12,
       "cached": false,
       "count": 0,
       "height": 240,
       "image": "/fixtures/blank.png",
       "instances": [],
-      "ms": 13,
+      "ms": 14,
       "orientation": 1,
       "width": 320
     }
@@ -186,7 +188,7 @@
     "id": 6,
     "ok": true,
     "result": {
-      "analysisMs": 23,
+      "analysisMs": 26,
       "cached": true,
       "count": 3,
       "height": 640,
@@ -222,7 +224,7 @@
     "id": 7,
     "ok": true,
     "result": {
-      "analysisMs": 23,
+      "analysisMs": 26,
       "cached": true,
       "count": 3,
       "height": 640,
@@ -242,7 +244,7 @@
     "id": 8,
     "ok": true,
     "result": {
-      "analysisMs": 23,
+      "analysisMs": 26,
       "cached": true,
       "count": 3,
       "distance": 11,
@@ -342,7 +344,7 @@
           ]
         }
       ],
-      "ms": 39,
+      "ms": 53,
       "orientation": 1,
       "revision": 3,
       "text": "FRESH BRAED DAILY",
@@ -359,7 +361,7 @@
       "image": "/fixtures/blank.png",
       "level": "accurate",
       "lines": [],
-      "ms": 11,
+      "ms": 17,
       "orientation": 1,
       "revision": 3,
       "text": "",
