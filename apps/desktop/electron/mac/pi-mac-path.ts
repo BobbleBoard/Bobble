@@ -6,9 +6,9 @@
  * exec'd from inside the asar, so a packaged path is rewritten from app.asar
  * to app.asar.unpacked; in dev the resolver already yields the SwiftPM output.
  *
- * mac-agent.ts still carries its own copy of these lines (resolveMacHelperPath);
- * it moves to this one the next time its owning lane touches it, so the two
- * helpers can never drift onto different binaries.
+ * mac-agent.ts (the bridge and the overlay) and editor/mac-vision-main.ts (the
+ * vision helper) both take their path from here, so they can never drift onto
+ * different binaries.
  */
 import path from 'node:path';
 import { app } from 'electron';

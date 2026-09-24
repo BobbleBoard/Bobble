@@ -191,6 +191,20 @@ describe('segmentAt()', () => {
   });
 });
 
+describe('the size limit', () => {
+  it('passes a configured maxPixels to every analysis', async () => {
+    const { exec, fake } = executor(undefined, { maxPixels: 24_000_000 });
+    await exec.segmentAt('/doc/apples.jpg', { x: 146, y: 363 });
+    await exec.matte('/doc/cat.jpg');
+    await exec.instances('/doc/apples.jpg');
+    await exec.ocr('/doc/sign.png');
+    for (const call of fake.calls) {
+      expect(call.params, call.method).toMatchObject({ maxPixels: 24_000_000 });
+    }
+    expect(fake.calls).toHaveLength(5); // instanceAt + the foreground lift + 3
+  });
+});
+
 describe('matte()', () => {
   it('returns the foreground cutout and mask', async () => {
     const fake = fakeClient({ lift: () => parseVisionLift(real('liftCat')) });

@@ -43,7 +43,6 @@ import {
 import { MacHelperClient } from '@pi-desktop/pi-mac';
 import { createLogger } from '@pi-desktop/shared';
 import { app, globalShortcut, ipcMain, screen, systemPreferences } from 'electron';
-import { resolveBundledPackageAsset } from '../app-paths';
 import { isBackgroundMode } from '../background-mode';
 import { readSettings } from '../settings/settings-main';
 import { isTrustedIpcEvent } from '../trusted-senders';
@@ -59,6 +58,7 @@ import {
 import { macMonitorMockControl, startMacMonitorMock } from './monitor-mock';
 import { macOverlay } from './overlay-controller';
 import type { OverlayRect } from './overlay-geometry';
+import { piMacHelperPath } from './pi-mac-path';
 
 const log = createLogger('desktop:mac-agent');
 const execFileAsync = promisify(execFile);
@@ -125,23 +125,10 @@ const SELF_KEY_QUIET_MS = 400;
 /** Whether the global Escape accelerator is currently held. */
 let escArmed = false;
 
-/**
- * Resolve the packaged `pi-mac` binary to a REAL on-disk path. Like pi-afm it is
- * a mach-o that must be spawned, so it is asarUnpack'd (electron-builder.yml);
- * the resolver points inside app.asar, which we rewrite to app.asar.unpacked so
- * the path exists for `spawn`/`execve`. In dev the resolver already yields the
- * SwiftPM build output.
- */
-function resolveMacHelperPath(): string {
-  const resolved = resolveBundledPackageAsset('pi-mac', 'swift/.build/release/pi-mac');
-  if (!app.isPackaged) return resolved;
-  return resolved.replace(
-    `${path.sep}app.asar${path.sep}`,
-    `${path.sep}app.asar.unpacked${path.sep}`,
-  );
-}
-
-const HELPER_PATH = resolveMacHelperPath();
+/** The `pi-mac` binary as a real on-disk path — the one resolver every pi-mac
+ * mode shares (./pi-mac-path.ts), so the bridge, the overlay and the vision
+ * helper can never spawn different binaries. */
+const HELPER_PATH = piMacHelperPath();
 
 /** The on-device helper is Apple-silicon macOS only. */
 function isSupportedPlatform(): boolean {

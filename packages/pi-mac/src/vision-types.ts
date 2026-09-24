@@ -169,7 +169,12 @@ export interface VisionImageParams {
 }
 
 export interface VisionOutputParams {
-  /** Folder for written files (default: the helper's temp folder). */
+  /**
+   * Folder for written files (default: the helper's temp folder). A file the
+   * helper writes here always holds exactly what the response describes —
+   * one edited in place is rewritten on the next request that names it, so
+   * copy a mask into the document before refining it.
+   */
   readonly out?: string;
   /** File-name prefix (default: "<picture name>-<content tag>"). */
   readonly prefix?: string;

@@ -18,7 +18,11 @@ export {
   helperPath,
   swiftDir,
 } from './helper-path.js';
-export { MacHelperClient, type MacHelperClientOptions } from './serve-client.js';
+export {
+  MacHelperClient,
+  type MacHelperClientOptions,
+  MacHelperTimeoutError,
+} from './serve-client.js';
 export {
   defaultSpawn,
   type MacChildProcess,

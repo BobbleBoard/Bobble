@@ -56,6 +56,12 @@ export interface MacVisionExecutorOptions {
   readonly outDir?: string;
   /** Stop the helper after this long without a request. Default 90 s. */
   readonly idleMs?: number;
+  /**
+   * Largest picture the helper will analyse (pixels); unset = the helper's own
+   * 64 MP default (MEASURED at 61 MP: 3.8 s, 2.4 GB peak). A larger picture is
+   * refused with an error, and the router moves on to the next engine.
+   */
+  readonly maxPixels?: number;
   readonly platform?: NodeJS.Platform;
   readonly fileExists?: (file: string) => boolean;
   readonly createClient?: (helperPath: string) => VisionClientLike;
@@ -110,6 +116,7 @@ export class MacVisionExecutor {
   readonly #helperPath: string;
   readonly #outDir: string;
   readonly #idleMs: number;
+  readonly #maxPixels: number | undefined;
   readonly #platform: NodeJS.Platform;
   readonly #fileExists: (file: string) => boolean;
   readonly #createClient: (helperPath: string) => VisionClientLike;
@@ -125,6 +132,7 @@ export class MacVisionExecutor {
     this.#helperPath = opts.helperPath;
     this.#outDir = opts.outDir ?? path.join(os.tmpdir(), 'bobble-vision');
     this.#idleMs = opts.idleMs ?? DEFAULT_IDLE_MS;
+    this.#maxPixels = opts.maxPixels;
     this.#platform = opts.platform ?? process.platform;
     this.#fileExists = opts.fileExists ?? existsSync;
     this.#createClient = opts.createClient ?? ((helperPath) => new MacVisionClient({ helperPath }));
@@ -167,7 +175,15 @@ export class MacVisionExecutor {
   ): Promise<VisionSegmentResult> {
     const out = opts.outDir ?? this.#outDir;
     const at = await this.#run((c) =>
-      c.instanceAt({ image, x: point.x, y: point.y, radius: opts.radius, out, write: ['mask'] }),
+      c.instanceAt({
+        image,
+        x: point.x,
+        y: point.y,
+        radius: opts.radius,
+        out,
+        write: ['mask'],
+        maxPixels: this.#maxPixels,
+      }),
     );
     const base = { engine: 'apple-vision' as const, width: at.width, height: at.height };
     if (!at.hit || at.instance === undefined || at.instance.maskPath === undefined) {
@@ -187,7 +203,9 @@ export class MacVisionExecutor {
     // With several objects, "everything" is the natural larger step for `]`.
     // The analysis is warm in the helper by now, so this costs a mask write.
     if (at.count > 1) {
-      const all = await this.#run((c) => c.lift({ image, out, write: ['foregroundMask'] }));
+      const all = await this.#run((c) =>
+        c.lift({ image, out, write: ['foregroundMask'], maxPixels: this.#maxPixels }),
+      );
       if (all.foreground?.maskPath !== undefined) {
         proposals.push({
           id: 'vision:foreground',
@@ -220,6 +238,7 @@ export class MacVisionExecutor {
         out: opts.outDir ?? this.#outDir,
         write: ['foregroundMask', 'foregroundCutout'],
         crop: opts.crop,
+        maxPixels: this.#maxPixels,
       }),
     );
     const fg = lift.foreground;
@@ -242,13 +261,18 @@ export class MacVisionExecutor {
   /** Every object, with a mask each (Select's hover outlines). */
   instances(image: string, opts: { readonly outDir?: string } = {}): Promise<VisionLiftResult> {
     return this.#run((c) =>
-      c.lift({ image, out: opts.outDir ?? this.#outDir, write: ['mask', 'labels'] }),
+      c.lift({
+        image,
+        out: opts.outDir ?? this.#outDir,
+        write: ['mask', 'labels'],
+        maxPixels: this.#maxPixels,
+      }),
     );
   }
 
   /** Text with boxes. A CHECK of painted text wants `correction: false`. */
   ocr(image: string, opts: Omit<VisionOcrParams, 'image'> = {}): Promise<VisionOcrResult> {
-    return this.#run((c) => c.ocr({ ...opts, image }));
+    return this.#run((c) => c.ocr({ maxPixels: this.#maxPixels, ...opts, image }));
   }
 
   /** Pay the one-time model preparation now (a background moment is best). */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MacHelperClient } from './serve-client.js';
+import { MacHelperClient, MacHelperTimeoutError } from './serve-client.js';
 import type { MacChildProcess, MacSpawnFn } from './spawn.js';
 
 /**
@@ -176,6 +176,78 @@ describe('a replaced helper', () => {
     children[0]?.close();
     children[1]?.print('{"id":2,"ok":true,"result":"from the new child"}');
     await expect(second).resolves.toBe('from the new child');
+    client.dispose();
+  });
+});
+
+describe('a request that times out', () => {
+  function silentChildren() {
+    const kills: number[] = [];
+    let spawned = 0;
+    const spawnFn: MacSpawnFn = () => {
+      spawned += 1;
+      const pid = spawned;
+      return {
+        pid,
+        stdin: { write: (_d, cb) => cb?.(null), end: () => undefined, on: () => undefined },
+        stdout: { on: () => undefined },
+        stderr: { on: () => undefined },
+        on: () => undefined,
+        kill: () => {
+          kills.push(pid);
+        },
+      };
+    };
+    return { spawnFn, kills, spawned: () => spawned };
+  }
+
+  it('rejects with a typed MacHelperTimeoutError', async () => {
+    const { spawnFn } = silentChildren();
+    const client = new MacHelperClient({
+      spawnFn,
+      helperPath: '/bin/pi-mac',
+      requestTimeoutMs: 20,
+    });
+    const err = await client.request('snapshot').catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(MacHelperTimeoutError);
+    expect((err as MacHelperTimeoutError).method).toBe('snapshot');
+    expect((err as Error).message).toBe('pi-mac "snapshot" timed out (20ms)');
+    client.dispose();
+  });
+
+  it('keeps the helper by default (the bridge keeps its index map)', async () => {
+    const { spawnFn, kills, spawned } = silentChildren();
+    const client = new MacHelperClient({
+      spawnFn,
+      helperPath: '/bin/pi-mac',
+      requestTimeoutMs: 20,
+    });
+    await expect(client.request('snapshot')).rejects.toThrow('timed out');
+    void client.request('click').catch(() => undefined);
+    expect(kills).toEqual([]);
+    expect(spawned()).toBe(1);
+    client.dispose();
+  });
+
+  /* The helper is single-threaded: an unanswered request is still running in
+     it and everything after it queues behind. With restartOnTimeout the
+     wedged child is stopped, what queued behind it is told why, and the next
+     request reaches a fresh helper. */
+  it('restarts a wedged helper when asked to', async () => {
+    const { spawnFn, kills, spawned } = silentChildren();
+    const client = new MacHelperClient({
+      spawnFn,
+      helperPath: '/bin/pi-mac',
+      requestTimeoutMs: 20,
+      restartOnTimeout: true,
+    });
+    const first = client.request('lift').catch((e: Error) => e.message);
+    const queued = client.request('ocr', {}).catch((e: Error) => e.message);
+    expect(await first).toBe('pi-mac "lift" timed out (20ms)');
+    expect(await queued).toBe('pi-mac helper restarted: an earlier request timed out');
+    expect(kills).toEqual([1]);
+    void client.request('info').catch(() => undefined);
+    expect(spawned()).toBe(2);
     client.dispose();
   });
 });

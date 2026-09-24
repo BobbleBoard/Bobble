@@ -557,24 +557,34 @@ try {
   // ── hardening: each of these failed before the code-review fixes ────────
   step('hardening — radius, prefixes, limits, absurd numbers');
   {
-    // The snap radius is a real circle. From the apples' own label map, find a
-    // background pixel whose nearest labelled pixel is √D away; a radius a
-    // hair under √D must miss it (the old test `d < r² + 1` let it through)
-    // and a radius of exactly √D must reach it, reporting √D.
+    // The snap radius is a real circle around the TAP POINT. From the apples'
+    // own label map, find a background pixel whose nearest labelled pixel is
+    // √D away, D NOT a perfect square (sqrt(D)² lands a hair under D in
+    // floating point — the second review's catch). Tapping that pixel's
+    // centre: a radius a hair under √D must miss (the first cut's `d < r² + 1`
+    // let it through), and a radius of exactly √D must reach it, reporting √D.
     const L = apLabels;
+    // Squared distances whose square root squares back to LESS than itself in
+    // doubles (6, 12, 13, 18, 23, 24 …) — exactly where a plain `d <= r*r`
+    // misses; any other non-square D is the fallback.
+    const edge = (D) => Math.sqrt(D) * Math.sqrt(D) < D;
     let target = null;
-    for (let y = 300; y < 420 && target === null; y += 5) {
+    let fallback = null;
+    for (let y = 300; y < 420 && target === null; y += 1) {
       for (let x = 368; x > 330 && target === null; x -= 1) {
         if (at(L, x, y) !== 0) continue;
         let best = Number.POSITIVE_INFINITY;
-        for (let dy = -4; dy <= 4; dy += 1) {
-          for (let dx = -4; dx <= 4; dx += 1) {
+        for (let dy = -5; dy <= 5; dy += 1) {
+          for (let dx = -5; dx <= 5; dx += 1) {
             if (at(L, x + dx, y + dy) !== 0) best = Math.min(best, dx * dx + dy * dy);
           }
         }
-        if (best >= 5 && best <= 16) target = { x, y, d2: best };
+        if (best < 5 || best > 25 || Number.isInteger(Math.sqrt(best))) continue;
+        if (edge(best)) target = { x, y, d2: best };
+        else fallback ??= { x, y, d2: best };
       }
     }
+    target ??= fallback;
     check(
       target !== null,
       `found a background pixel beside the middle apple (${JSON.stringify(target)})`,
@@ -583,15 +593,15 @@ try {
       const exact = Math.sqrt(target.d2);
       const under = await helper.call('instanceAt', {
         image: fx('apples.jpg'),
-        x: target.x,
-        y: target.y,
+        x: target.x + 0.5,
+        y: target.y + 0.5,
         radius: exact - 0.05,
         write: [],
       });
       const onIt = await helper.call('instanceAt', {
         image: fx('apples.jpg'),
-        x: target.x,
-        y: target.y,
+        x: target.x + 0.5,
+        y: target.y + 0.5,
         radius: exact,
         write: [],
       });

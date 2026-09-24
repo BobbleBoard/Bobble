@@ -1,4 +1,6 @@
 import { readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { MacChildProcess, MacSpawnFn } from './spawn.js';
 import {
@@ -300,6 +302,17 @@ describe('MacVisionClient', () => {
       'instances[] must be whole numbers (got 1.9)',
     );
     expect(spawns).toHaveLength(0);
+    vision.dispose();
+  });
+
+  it('reads ~/ as the home folder, for the picture and the output folder', async () => {
+    const { vision, requests } = client(() => ({ ok: true, result: real('liftApples') }));
+    await vision.lift({ image: '~/pics/apples.jpg', out: '~/masks', write: [] });
+    expect(requests[0]?.params).toEqual({
+      image: path.join(homedir(), 'pics/apples.jpg'),
+      out: path.join(homedir(), 'masks'),
+      write: [],
+    });
     vision.dispose();
   });
 
