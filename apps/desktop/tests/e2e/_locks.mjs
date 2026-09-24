@@ -142,18 +142,28 @@ export function pidAlive(pid) {
   }
 }
 
+const startMemo = new Map();
+
 /** `ps -o lstart=` for one pid — stable for a process's whole life. */
 export function processStart(pid) {
+  // Memoised for a second: a dozen waiters polling every 2 s would otherwise
+  // spawn a `ps` per held slot per check, machine-wide.
+  const hit = startMemo.get(pid);
+  if (hit !== undefined && Date.now() - hit.at < 1000) return hit.value;
+  let value = null;
   try {
     const out = execFileSync('ps', ['-o', 'lstart=', '-p', String(pid)], {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
       timeout: 4000,
     }).trim();
-    return out.length > 0 ? out : null;
+    value = out.length > 0 ? out : null;
   } catch {
-    return null;
+    value = null;
   }
+  startMemo.set(pid, { value, at: Date.now() });
+  if (startMemo.size > 256) startMemo.clear();
+  return value;
 }
 
 const defaultRun = (cmd, args) =>
@@ -525,14 +535,21 @@ export function findOrphanServers(rows, opts = {}) {
  * run from the MAIN checkout? A probe's Electron runs from a worktree, or with
  * a throwaway `--user-data-dir` under the temp dir, and is never his.
  */
-export function isUserAppCommand(command) {
+export function isUserAppCommand(command, mainCheckout = MAIN_CHECKOUT) {
   if (command.includes('/Applications/Bobble.app/')) return true;
   if (!/\/Electron\.app\/Contents\/MacOS\/Electron(\s|$)/.test(command)) return false;
   if (command.includes('/.claude/worktrees/')) return false;
-  if (/--user-data-dir=\S*\/(T|tmp)\/pd-/.test(command)) return false;
-  if (/--user-data-dir=\S*\/(T|tmp)\/pi-/.test(command)) return false;
-  return /\/OSS-harness\//.test(command);
+  if (/--user-data-dir=\S*\/(T|tmp)\/(pd|pi)-/.test(command)) return false;
+  return command.includes(`${mainCheckout}/`);
 }
+
+/**
+ * The main checkout — this repo's root, or, from a lane's worktree, the
+ * checkout that `.claude/worktrees/<lane>` lives in.
+ */
+export const MAIN_CHECKOUT = path
+  .resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..')
+  .split(`${path.sep}.claude${path.sep}worktrees${path.sep}`)[0];
 
 /** A model server, or a Python worker (image/3D/audio generation), of the user's app. */
 export function busyInstalledApp(rows, opts = {}) {
@@ -712,8 +729,11 @@ function printStatus(s) {
       );
     }
   }
-  if (s.heavyBlockers.length === 0) console.log('heavy: may start now');
-  else for (const b of s.heavyBlockers) console.log(`heavy blocked: ${b.detail}`);
+  const running = s.classes.heavy.slots.find((x) => x.state === 'held');
+  if (running !== undefined)
+    console.log(`heavy: RUNNING (pid ${running.pid}) — the next one waits`);
+  for (const b of s.heavyBlockers) console.log(`heavy blocked: ${b.detail}`);
+  if (running === undefined && s.heavyBlockers.length === 0) console.log('heavy: may start now');
 }
 
 async function main(argv) {
@@ -726,6 +746,7 @@ async function main(argv) {
   }
   if (cmd === 'blockers') {
     const b = heavyBlockers();
+    if (classHeld('heavy')) b.unshift({ kind: 'running', detail: 'a heavy job holds the slot' });
     for (const x of b) console.log(`${x.kind}: ${x.detail}`);
     if (b.length === 0) console.log('none — a heavy job may start');
     return b.length === 0 ? 0 : 1;

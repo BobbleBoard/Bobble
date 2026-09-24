@@ -1,0 +1,70 @@
+{
+  "Version": "1.102.3-tf4ke0001-gf4ke0002",
+  "TUN": true,
+  "BackendState": "Stopped",
+  "HaveNodeKey": true,
+  "AuthURL": "",
+  "TailscaleIPs": ["100.101.1.10", "fd7a:115c:a1e0::1:a0a"],
+  "Self": {
+    "ID": "nSeLf01AbCD11CNTRL",
+    "PublicKey": "nodekey:a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+    "HostName": "studio-mbp",
+    "DNSName": "studio-mbp.tail1a2b3c.ts.net.",
+    "OS": "macOS",
+    "UserID": 1001,
+    "TailscaleIPs": ["100.101.1.10", "fd7a:115c:a1e0::1:a0a"],
+    "AllowedIPs": ["100.101.1.10/32", "fd7a:115c:a1e0::1:a0a/128"],
+    "Addrs": ["192.168.1.20:41641", "203.0.113.2:41641"],
+    "CurAddr": "",
+    "Relay": "sfo",
+    "PeerRelay": "",
+    "RxBytes": 0,
+    "TxBytes": 0,
+    "Created": "2025-11-02T10:00:00Z",
+    "LastWrite": "2026-09-23T17:59:00Z",
+    "LastSeen": "0001-01-01T00:00:00Z",
+    "LastHandshake": "2026-09-23T17:58:30Z",
+    "Online": false,
+    "ExitNode": false,
+    "ExitNodeOption": false,
+    "Active": false,
+    "PeerAPIURL": ["http://100.101.1.10:40001", "http://[fd7a:115c:a1e0::1:a0a]:40001"],
+    "InNetworkMap": true,
+    "InMagicSock": false,
+    "InEngine": false,
+    "KeyExpiry": "2027-03-01T10:00:00Z"
+  },
+  "Health": ["Tailscale is stopped."],
+  "MagicDNSSuffix": "tail1a2b3c.ts.net",
+  "CurrentTailnet": {
+    "Name": "example.com",
+    "MagicDNSSuffix": "tail1a2b3c.ts.net",
+    "MagicDNSEnabled": true
+  },
+  "CertDomains": ["studio-mbp.tail1a2b3c.ts.net"],
+  "Peer": null,
+  "User": {
+    "1001": {
+      "ID": 1001,
+      "LoginName": "someone@example.com",
+      "DisplayName": "The user",
+      "ProfilePicURL": "",
+      "Roles": []
+    },
+    "2002": {
+      "ID": 2002,
+      "LoginName": "friend@example.org",
+      "DisplayName": "A Friend",
+      "ProfilePicURL": "",
+      "Roles": []
+    },
+    "3003": {
+      "ID": 3003,
+      "LoginName": "tagged-devices",
+      "DisplayName": "Tagged Devices",
+      "ProfilePicURL": "",
+      "Roles": []
+    }
+  },
+  "ClientVersion": null
+}

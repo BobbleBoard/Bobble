@@ -213,17 +213,27 @@ describe('processes', () => {
   });
 
   it("knows the user's installed app and his dev checkout from a probe's app", () => {
-    expect(locks.isUserAppCommand('/Applications/Bobble.app/Contents/MacOS/Bobble')).toBe(true);
-    const dev =
-      '/Users/user/Desktop/OSS-harness/node_modules/.pnpm/electron@28.3.3/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron .';
-    expect(locks.isUserAppCommand(dev)).toBe(true);
+    const main = '/Users/user/Desktop/OSS-harness';
+    expect(locks.isUserAppCommand('/Applications/Bobble.app/Contents/MacOS/Bobble', main)).toBe(
+      true,
+    );
+    const dev = `${main}/node_modules/.pnpm/electron@28.3.3/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron .`;
+    expect(locks.isUserAppCommand(dev, main)).toBe(true);
     const probe = `${dev} --user-data-dir=/var/folders/ab/cd/T/pd-my-probe-Xy12Zz`;
-    expect(locks.isUserAppCommand(probe)).toBe(false);
-    expect(
-      locks.isUserAppCommand(
-        '/Users/user/Desktop/OSS-harness/.claude/worktrees/w/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron .',
-      ),
-    ).toBe(false);
+    expect(locks.isUserAppCommand(probe, main)).toBe(false);
+    const worktree = `${main}/.claude/worktrees/w/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron .`;
+    expect(locks.isUserAppCommand(worktree, main)).toBe(false);
+    // Someone else's Electron app is not the user's Bobble.
+    expect(locks.isUserAppCommand('/opt/other/Electron.app/Contents/MacOS/Electron .', main)).toBe(
+      false,
+    );
+  });
+
+  it('finds the main checkout from a worktree', () => {
+    expect(locks.MAIN_CHECKOUT.includes(`${path.sep}.claude${path.sep}worktrees${path.sep}`)).toBe(
+      false,
+    );
+    expect(path.resolve(__dirname, '../../../..').startsWith(locks.MAIN_CHECKOUT)).toBe(true);
   });
 
   it("names every reason a heavy job must wait: battery, the user's app, orphans, busy", () => {
