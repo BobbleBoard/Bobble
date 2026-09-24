@@ -247,6 +247,13 @@ export function parseArgv(argv: readonly string[]): ParsedArgv {
  */
 const FLAG_ALIASES: Readonly<Record<string, readonly string[]>> = {
   screenshot: ['image', 'visual', 'picture', 'shot', 'see'],
+  /*
+   * `chart --chart-type=line` — REAL, four times in one session: the 4B wrote
+   * the type as `--chart-type`, the flag passed through as an unknown key, and
+   * the tool drew its default bar chart every time (and said so, which the
+   * model did not read). `--kind` is the other spelling a model reaches for.
+   */
+  type: ['chart-type', 'chart_type', 'charttype', 'chart-kind', 'kind'],
 };
 
 /** Resolve one flag name onto a schema property, or return it unchanged. */

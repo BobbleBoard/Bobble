@@ -7,6 +7,7 @@
  * the layout computed. No DOM, no colours beyond an index into a palette.
  */
 
+import { formatTick, unitParts } from './format.ts';
 import { type ChartSpec, categoryLabels, formatValue } from './spec.ts';
 import { areaPath, linePath, type ResolvedStyle, resolveStyle } from './style.ts';
 
@@ -88,6 +89,22 @@ export interface LegendEntry {
   readonly name: string;
 }
 
+/**
+ * A series named at the end of its line (VQ-02: "line end labels for ≤ 4
+ * series"). The legend stays; this rides the marks so the eye does not have to
+ * travel. `y` is where the text sits — moved apart from its neighbours when
+ * lines end close together — and `anchorY` is the line's own end, so a leader
+ * can join them when they differ.
+ */
+export interface EndLabel {
+  readonly series: number;
+  readonly text: string;
+  readonly x: number;
+  readonly y: number;
+  readonly anchorX: number;
+  readonly anchorY: number;
+}
+
 export interface ChartLayout {
   readonly width: number;
   readonly height: number;
@@ -119,6 +136,13 @@ export interface ChartLayout {
   readonly xTicks: readonly Tick[];
   /** Where the value axis' zero line sits. */
   readonly zero: number;
+  /** Series names at the ends of their lines (line/area, 2–4 series, when asked for). */
+  readonly endLabels: readonly EndLabel[];
+  /**
+   * The value axis' title when the unit is a word ("units", "features"): too
+   * long for every tick, said once on the axis instead (unless it has a title).
+   */
+  readonly unitTitle?: string;
   /** Radar geometry, when a radar: the spokes, the rings, a polygon per series. */
   readonly radar?: {
     readonly cx: number;
@@ -153,15 +177,25 @@ export interface LayoutOptions {
   readonly compact?: boolean;
   /** The resolved look: bar width, line style, ring thickness. Default: the spec's own. */
   readonly style?: ResolvedStyle;
+  /** Name each line at its end (line/area charts with 2–4 series). */
+  readonly endLabels?: boolean;
 }
 
-/** A pleasant tick step for a span: 1, 2, 2.5, 5 × 10^k. */
-export function niceStep(span: number, ticks = 5): number {
+/**
+ * A pleasant tick step for a span: 1, 2, 2.5, 5 × 10^k. For whole-number data
+ * the step is whole too — a count of 4, 8, 12 features has no tick at 2.5 —
+ * so 2.5 × 10^0 and anything under 1 are skipped.
+ */
+export function niceStep(span: number, ticks = 5, integer = false): number {
   if (!(span > 0)) return 1;
   const raw = span / ticks;
   const mag = 10 ** Math.floor(Math.log10(raw));
-  for (const m of [1, 2, 2.5, 5, 10]) if (raw <= m * mag) return m * mag;
-  return 10 * mag;
+  for (const m of [1, 2, 2.5, 5, 10]) {
+    const step = m * mag;
+    if (integer && (step < 1 || !Number.isInteger(Number(step.toPrecision(12))))) continue;
+    if (raw <= step) return step;
+  }
+  return integer ? Math.max(1, 10 * mag) : 10 * mag;
 }
 
 interface ValueScale {
@@ -173,23 +207,75 @@ interface ValueScale {
 function valueScale(values: readonly number[], stacked = false): ValueScale {
   const vmax = Math.max(0, ...values);
   const vmin = Math.min(0, ...values);
-  const step = niceStep(vmax - vmin || 1);
+  const step = niceStep(
+    vmax - vmin || 1,
+    5,
+    values.length > 0 && values.every((v) => Number.isInteger(v)),
+  );
   const max = vmax > 0 ? Math.ceil((vmax + (stacked ? 0 : 0)) / step) * step : step;
   const min = vmin < 0 ? Math.floor(vmin / step) * step : 0;
   return { min, max, step };
 }
 
+/** The value axis' ticks, each carrying the unit's symbols ("$2M", "40%", "20 GW"). */
 function ticksFor(
   scale: ValueScale,
   unit: string | undefined,
   toPx: (v: number) => number,
 ): Tick[] {
   const out: Tick[] = [];
+  const axisMax = Math.max(Math.abs(scale.min), Math.abs(scale.max));
   for (let v = scale.min; v <= scale.max + 1e-9; v += scale.step) {
-    const value = Math.abs(v) < 1e-9 ? 0 : v;
-    out.push({ value, at: toPx(value), label: formatValue(value, unit === '%' ? '%' : undefined) });
+    const value = Math.abs(v) < 1e-9 ? 0 : Number(v.toPrecision(12));
+    out.push({ value, at: toPx(value), label: formatTick(value, unit, axisMax) });
   }
   return out;
+}
+
+/**
+ * Names at the ends of 2–4 lines, spread so no two overlap (a minimum gap of
+ * one line of type), kept inside the plot, each remembering its line's end.
+ */
+function endLabelsFor(spec: ChartSpec, lines: readonly LineShape[], plot: Rect): EndLabel[] {
+  const raw = lines
+    .map((l) => {
+      const last = l.markers[l.markers.length - 1];
+      const s = spec.series[l.series];
+      if (last === undefined || s === undefined) return null;
+      return {
+        series: l.series,
+        text: s.name !== '' ? s.name : `Series ${l.series + 1}`,
+        anchorX: last.x,
+        anchorY: last.y,
+        y: last.y,
+      };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null)
+    .sort((a, b) => a.anchorY - b.anchorY);
+  const gap = 14;
+  for (let i = 1; i < raw.length; i += 1) {
+    const prev = raw[i - 1];
+    const cur = raw[i];
+    if (prev !== undefined && cur !== undefined && cur.y - prev.y < gap) cur.y = prev.y + gap;
+  }
+  const bottom = plot.y + plot.h;
+  const lastOne = raw[raw.length - 1];
+  if (lastOne !== undefined && lastOne.y > bottom) {
+    lastOne.y = bottom;
+    for (let i = raw.length - 2; i >= 0; i -= 1) {
+      const next = raw[i + 1];
+      const cur = raw[i];
+      if (next !== undefined && cur !== undefined && next.y - cur.y < gap) cur.y = next.y - gap;
+    }
+  }
+  return raw.map((r) => ({
+    series: r.series,
+    text: r.text,
+    x: plot.x + plot.w + 10,
+    y: Math.max(plot.y + 4, r.y),
+    anchorX: r.anchorX,
+    anchorY: r.anchorY,
+  }));
 }
 
 function polar(cx: number, cy: number, r: number, a: number): [number, number] {
@@ -217,6 +303,9 @@ export function layoutChart(spec: ChartSpec, opts: LayoutOptions): ChartLayout {
       ? spec.series.map((s, i) => ({ series: i, name: s.name || `Series ${i + 1}` }))
       : [];
   const legendH = legend.length > 0 ? 22 : 0;
+  // A unit that is a word is said once on the value axis, where there is no
+  // axis title already (formatTick leaves it off the ticks).
+  const unitWord = unitParts(unit).word ? unit : undefined;
   const empty: ChartLayout = {
     width,
     height,
@@ -230,6 +319,7 @@ export function layoutChart(spec: ChartSpec, opts: LayoutOptions): ChartLayout {
     legend,
     xTicks: [],
     zero: 0,
+    endLabels: [],
   };
 
   if (isRadar) {
@@ -384,11 +474,12 @@ export function layoutChart(spec: ChartSpec, opts: LayoutOptions): ChartLayout {
 
   if (isHorizontal) {
     const labelW = Math.min(width * 0.38, 16 + 6.4 * Math.max(4, ...labels.map((l) => l.length)));
+    const axisTitle = (spec.xLabel !== undefined || unitWord !== undefined) && !compact;
     const plot: Rect = {
       x: labelW + 8,
       y: top + legendH + 6,
       w: width - labelW - 8 - 56,
-      h: Math.max(40, height - top - legendH - 6 - bottom - (spec.xLabel && !compact ? 22 : 8)),
+      h: Math.max(40, height - top - legendH - 6 - bottom - (axisTitle ? 22 : 8)),
     };
     const toPx = (v: number): number =>
       plot.x + ((v - scale.min) / (scale.max - scale.min)) * plot.w;
@@ -427,15 +518,35 @@ export function layoutChart(spec: ChartSpec, opts: LayoutOptions): ChartLayout {
         });
       });
     });
-    return { ...empty, plot, ticks, categories, bars, zero };
+    return {
+      ...empty,
+      plot,
+      ticks,
+      categories,
+      bars,
+      zero,
+      ...(unitWord !== undefined && spec.xLabel === undefined ? { unitTitle: unitWord } : {}),
+    };
   }
 
   // Vertical charts: bar / stacked / line / area / scatter.
   const yAxisW = 14 + 7 * Math.max(...ticksFor(scale, unit, () => 0).map((t) => t.label.length), 2);
+  // The value axis' title: the spec's, or a word unit said once.
+  const yTitleW =
+    !compact && (spec.yLabel !== undefined || (unitWord !== undefined && !isScatter)) ? 18 : 0;
+  // Room on the right for the lines' names (2–4 lines, when asked for).
+  const wantsEnds =
+    opts.endLabels === true &&
+    (spec.type === 'line' || spec.type === 'area') &&
+    spec.series.length >= 2 &&
+    spec.series.length <= 4;
+  const endW = wantsEnds
+    ? 18 + 6.6 * Math.max(...spec.series.map((s, i) => (s.name || `Series ${i + 1}`).length))
+    : 0;
   const plot: Rect = {
-    x: (spec.yLabel && !compact ? 18 : 0) + yAxisW,
+    x: yTitleW + yAxisW,
     y: top + legendH + 8,
-    w: Math.max(60, width - ((spec.yLabel && !compact ? 18 : 0) + yAxisW) - 12),
+    w: Math.max(60, width - (yTitleW + yAxisW) - 12 - Math.min(endW, width * 0.3)),
     h: Math.max(60, height - top - legendH - 8 - bottom - 22 - (spec.xLabel && !compact ? 18 : 0)),
   };
   const toY = (v: number): number =>
@@ -534,7 +645,15 @@ export function layoutChart(spec: ChartSpec, opts: LayoutOptions): ChartLayout {
         }
       });
     });
-    return { ...empty, plot, ticks, categories, bars, zero };
+    return {
+      ...empty,
+      plot,
+      ticks,
+      categories,
+      bars,
+      zero,
+      ...(unitWord !== undefined && spec.yLabel === undefined ? { unitTitle: unitWord } : {}),
+    };
   }
 
   // line / area
@@ -552,7 +671,16 @@ export function layoutChart(spec: ChartSpec, opts: LayoutOptions): ChartLayout {
     const area = markers.length > 0 ? areaPath(markers, style.line, zero) : '';
     return { series: si, d, area, markers };
   });
-  return { ...empty, plot, ticks, categories, lines, zero };
+  return {
+    ...empty,
+    plot,
+    ticks,
+    categories,
+    lines,
+    zero,
+    ...(wantsEnds ? { endLabels: endLabelsFor(spec, lines, plot) } : {}),
+    ...(unitWord !== undefined && spec.yLabel === undefined ? { unitTitle: unitWord } : {}),
+  };
 }
 
 /** The donut hole's reading — see `ChartLayout.donut.centre`. */

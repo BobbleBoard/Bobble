@@ -5,6 +5,7 @@
  */
 
 import { type ChartLayout, layoutChart } from './layout.ts';
+import { chartCanvas } from './sizes.ts';
 import { type ChartSpec, formatValue } from './spec.ts';
 import {
   barRadius,
@@ -15,6 +16,7 @@ import {
   type ResolvedStyle,
   resolveStyle,
   roundedBarPath,
+  sliceColour,
 } from './style.ts';
 
 function esc(s: string): string {
@@ -41,6 +43,7 @@ function text(
 }
 
 export interface SvgOptions {
+  /** The canvas; by default the spec's size preset (sizes.ts: card 960×560, …). */
   readonly width?: number;
   readonly height?: number;
   /** The ground for a theme-following look: light (default) or dark. */
@@ -49,10 +52,21 @@ export interface SvgOptions {
   readonly fallbackLook?: LookName;
 }
 
-/** Render a spec to a complete SVG document. */
+/**
+ * Render a spec to a complete SVG document.
+ *
+ * The canvas is the spec's size preset (a horizontal bar chart as tall as its
+ * rows) unless a width/height is passed. A preset with a type scale above 1 (a
+ * slide) is drawn on a smaller page and scaled up whole — type, strokes and
+ * bars together — so it reads across a room and keeps its proportions.
+ */
 export function chartToSvg(spec: ChartSpec, opts: SvgOptions = {}): string {
-  const width = opts.width ?? 960;
-  const height = opts.height ?? 560;
+  const canvas = chartCanvas(spec);
+  const outW = opts.width ?? canvas.width;
+  const outH = opts.height ?? canvas.height;
+  const scale = opts.width === undefined && opts.height === undefined ? canvas.text : 1;
+  const width = Math.round(outW / scale);
+  const height = Math.round(outH / scale);
   const style = resolveStyle(spec.style, opts.fallbackLook, { theme: opts.theme ?? 'light' });
   const ground = style.ground ?? (opts.theme === 'dark' ? DARK_GROUND : LIGHT_GROUND);
   const pad = 32;
@@ -76,10 +90,11 @@ export function chartToSvg(spec: ChartSpec, opts: SvgOptions = {}): string {
     top: 0,
     bottom: 0,
     style,
+    endLabels: true,
   });
   const { defs, body } = drawBody(spec, inner, style, ground, { idPrefix: 'c', labels: true });
   const parts = [
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(spec.title || 'chart')}">`,
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${outW}" height="${outH}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(spec.title || 'chart')}">`,
     defs.length > 0 ? `<defs>${defs.join('')}</defs>` : '',
     `<rect width="${width}" height="${height}" rx="14" fill="${ground.paper}"/>`,
     ...head,
@@ -166,13 +181,17 @@ export function drawBody(
 
   if (L.donut !== undefined) {
     // With a highlight, the accent is the highlight's alone — the other slices
-    // stay in the rest of the palette (a second accent slice read as two).
-    const shades =
-      spec.highlight !== undefined
-        ? style.palette.filter((c) => c !== style.accent)
-        : style.palette;
+    // stay in the rest of the palette (a second accent slice read as two); and
+    // a wrapped ring never meets itself in one colour (style.ts sliceColour).
     const sliceFill = (s: { highlighted: boolean; point: number }): string =>
-      s.highlighted ? style.accent : (shades[s.point % shades.length] ?? ground.ink);
+      sliceColour(
+        style,
+        s.point,
+        L.slices.length,
+        s.highlighted,
+        spec.highlight !== undefined,
+        ground.ink,
+      );
     for (const s of L.slices) {
       out.push(
         `<path d="${s.d}" fill="${sliceFill(s)}" stroke="${ground.paper}" stroke-width="2"/>`,
@@ -354,18 +373,31 @@ export function drawBody(
       `<circle cx="${f(m.x)}" cy="${f(m.y)}" r="${m.highlighted ? 6 : 4.5}" fill="${colour(m.series, m.highlighted)}" fill-opacity="0.85"/>`,
     );
   }
-  // Axis titles.
-  if (spec.xLabel !== undefined) {
+  // Each line named at its end: the name in ink beside the line's last point,
+  // a hairline leader in the line's colour when neighbours pushed it apart.
+  for (const e of L.endLabels) {
+    const c = colour(e.series, false);
+    if (Math.abs(e.y - e.anchorY) > 2) {
+      out.push(
+        `<path d="M${f(e.anchorX + 6)} ${f(e.anchorY)}L${f(e.x - 4)} ${f(e.y)}" fill="none" stroke="${c}" stroke-width="1"/>`,
+      );
+    }
+    out.push(text(e.x, e.y + 4, e.text, 12, ground.ink, font, { weight: 600 }));
+  }
+  // Axis titles — the spec's, or a unit that is a word, said once on the value axis.
+  const xTitle = spec.xLabel ?? (horizontal ? L.unitTitle : undefined);
+  const yTitle = spec.yLabel ?? (!horizontal ? L.unitTitle : undefined);
+  if (xTitle !== undefined) {
     out.push(
-      text(L.plot.x + L.plot.w / 2, L.height - 4, spec.xLabel, 12, ground.mute, font, {
+      text(L.plot.x + L.plot.w / 2, L.height - 4, xTitle, 12, ground.mute, font, {
         anchor: 'middle',
       }),
     );
   }
-  if (spec.yLabel !== undefined && !horizontal) {
+  if (yTitle !== undefined && !horizontal) {
     const cy = L.plot.y + L.plot.h / 2;
     out.push(
-      text(12, cy, spec.yLabel, 12, ground.mute, font, {
+      text(12, cy, yTitle, 12, ground.mute, font, {
         anchor: 'middle',
         extra: ` transform="rotate(-90 12 ${f(cy)})"`,
       }),

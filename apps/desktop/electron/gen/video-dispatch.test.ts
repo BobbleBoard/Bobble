@@ -1,10 +1,11 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { type GenJob, type GenOutput, getModel } from '@pi-desktop/gen-service';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { encodeApng, isApng, readPngFrame } from './apng';
+import { FRAMES_DIR, frameFileName } from './hyperframes-still';
 import {
   buildVideoJob,
   defaultExtractPosterFrame,
@@ -206,7 +207,45 @@ describe('defaultExtractPosterFrame, for a PNG', () => {
     ]);
   };
 
-  it("an animated PNG's poster is its frame 0, as a plain still beside it", async () => {
+  /*
+   * THE POSTER IS THE FRAME THE ANIMATION SETTLES TO. It was frame 0 — for a
+   * title card the words a third visible mid-entrance, for an authored scene
+   * often an empty plate — and that is the one picture the model is shown to
+   * judge its own work by (VQ-11 lite).
+   */
+  it("a HyperFrames animation's poster is its LAST frame, from the frames beside it", async () => {
+    const dir = scratch();
+    const frames = [still(10), still(120), still(250)];
+    const animation = path.join(dir, 'animation.png');
+    writeFileSync(animation, encodeApng(frames, { fps: 12 }));
+    mkdirSync(path.join(dir, FRAMES_DIR));
+    frames.forEach((f, i) => {
+      writeFileSync(path.join(dir, FRAMES_DIR, frameFileName(i, frames.length)), f);
+    });
+
+    const poster = await defaultExtractPosterFrame(animation, dir);
+    expect(poster).toBe(path.join(dir, 'poster.png'));
+    const bytes = readFileSync(poster as string);
+    expect(isApng(bytes)).toBe(false);
+    expect(readPngFrame(bytes).data.equals(readPngFrame(frames[2] as Buffer).data)).toBe(true);
+  });
+
+  it('counts from the animation, so a stale frame from a longer earlier render is not the poster', async () => {
+    const dir = scratch();
+    const frames = [still(10), still(250)];
+    writeFileSync(path.join(dir, 'animation.png'), encodeApng(frames, { fps: 12 }));
+    mkdirSync(path.join(dir, FRAMES_DIR));
+    frames.forEach((f, i) => {
+      writeFileSync(path.join(dir, FRAMES_DIR, frameFileName(i, frames.length)), f);
+    });
+    // Left over from a five-frame render into the same folder.
+    writeFileSync(path.join(dir, FRAMES_DIR, frameFileName(4, 5)), still(77));
+    const poster = await defaultExtractPosterFrame(path.join(dir, 'animation.png'), dir);
+    const bytes = readFileSync(poster as string);
+    expect(readPngFrame(bytes).data.equals(readPngFrame(frames[1] as Buffer).data)).toBe(true);
+  });
+
+  it('an animation with no frames beside it falls back to its default image, frame 0', async () => {
     const dir = scratch();
     const frames = [still(10), still(120), still(250)];
     const animation = path.join(dir, 'animation.png');

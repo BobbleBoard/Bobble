@@ -17,7 +17,8 @@ describe('chartToElements — the chart as the office pipeline measures a page',
     expect(el.look).toBe('clean');
     const bars = el.elements.filter((e) => e.tag === 'div' && (e.h ?? 0) > 20 && e.radius === 8);
     expect(bars).toHaveLength(4);
-    expect(bars[3]?.bg).toBe(cssRgb('#E8863A'));
+    // The highlight wears clean's accent (VQ-03 re-stepped it from #E8863A).
+    expect(bars[3]?.bg).toBe(cssRgb('#DD6A1A'));
     const title = el.elements.find((e) => e.text === 'Units Sold by Year');
     expect(title).toMatchObject({ tag: 'span', fontSize: 22, fontWeight: '600' });
     const cats = el.elements.filter((e) => e.tag === 'span' && /^202\d$/.test(e.text ?? ''));

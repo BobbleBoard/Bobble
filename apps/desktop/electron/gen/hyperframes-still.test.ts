@@ -215,6 +215,29 @@ describe('createStillRenderer', () => {
     });
   });
 
+  it('a text prompt with no length set runs as long as it says; a scene never reads one from its CSS', async () => {
+    const said = fakeFiles();
+    await createStillRenderer({ openWindow: async () => makeWin(), ...said.deps })(
+      { ...spec, prompt: 'a 2-second title card "Hi"', seconds: undefined, fps: 2 },
+      '/out',
+      () => {},
+    );
+    expect(said.written()).toHaveLength(5); // 0, 0.5 … 2 s
+    const scene = fakeFiles();
+    await createStillRenderer({ openWindow: async () => makeWin(), ...scene.deps })(
+      {
+        ...spec,
+        prompt: '<div class="a">x</div><style>.a { animation: rise 0.5s both; }</style>',
+        seconds: undefined,
+        fps: 2,
+      },
+      '/out',
+      () => {},
+    );
+    // The default length (3 s), not the 0.5 s of its CSS.
+    expect(scene.written()).toHaveLength(7);
+  });
+
   it('joins exactly the frames it wrote, in order, at the rate it captured them', async () => {
     const files = fakeFiles();
     const render = createStillRenderer({ openWindow: async () => makeWin(), ...files.deps });
