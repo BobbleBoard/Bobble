@@ -15,9 +15,11 @@
  *   2. GRADED. The guardian's own probe seam (PI_GUARDIAN_HOLD_FREE, read at
  *      every reading) is raised inside main, so the next reading holds. That
  *      hold must quote the OS's own free figure ("NN% of memory is free"),
- *      and it must match what the OS says right now: macOS's
- *      memorystatus_level, Linux's MemAvailable. Windows has no graded figure
- *      until XP-15, so the step is skipped there.
+ *      and it must match what the OS said around that reading: macOS's
+ *      memorystatus_level, Linux's MemAvailable, traced for the whole wait
+ *      (_os-free-window.mjs: beside another lane's heavy job the figure moves
+ *      ten points in a second). Windows has no graded figure until XP-15, so
+ *      the step is skipped there.
  *
  * Hidden, throwaway HOME, focus guard (launchApp). It starts no model, runs no
  * generation and writes no shared settings. The seam lives only in the
@@ -28,6 +30,7 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { platform } from 'node:os';
+import { quotedMatchesOs, startOsFreeTrace } from './_os-free-window.mjs';
 import { launchApp } from './harness.mjs';
 
 const IDLE_MS = Number(process.env.IDLE_MS ?? 20_000);
@@ -70,10 +73,12 @@ try {
       info(...args);
     };
   });
-  // …and what the window is told.
+  // …and what the window is told, and when it heard.
   await page.evaluate(() => {
     window.__guardianEvents = [];
-    window.piDesktop.onEvent('gen:guardian', (e) => window.__guardianEvents.push(e));
+    window.piDesktop.onEvent('gen:guardian', (e) =>
+      window.__guardianEvents.push({ ...e, receivedAt: Date.now() }),
+    );
   });
 
   say(`idle: ${IDLE_MS / 1000}s of readings with nothing running (${platform()})`);
@@ -95,6 +100,8 @@ try {
   if (platform() === 'win32') {
     say('graded: no graded free figure on Windows until XP-15; skipped');
   } else {
+    // What the OS says for the whole wait, from before the line is raised.
+    const trace = startOsFreeTrace(osFreePercent);
     await app.evaluate(() => {
       process.env.PI_GUARDIAN_HOLD_FREE = '0.999';
     });
@@ -110,11 +117,12 @@ try {
       )
       .then((handle) => handle.jsonValue())
       .catch(() => null);
-    const osPercent = osFreePercent();
+    // A beat after the window heard, so the span has its far side.
+    await page.waitForTimeout(600);
+    trace.stop();
     say(
       `window  ${hold === null ? 'no hold' : `${hold.verdict}: ${hold.reason} (memoryFree ${hold.memoryFree})`}`,
     );
-    say(`os      ${osPercent === undefined ? 'not measured' : `${osPercent}% free`}`);
     if (check(hold !== null, 'the raised hold line produced no hold within 20 s')) {
       const quoted = /^(\d+)% of memory is free$/.exec(hold.reason);
       if (check(quoted !== null, `the hold did not quote a free figure: "${hold.reason}"`)) {
@@ -123,10 +131,17 @@ try {
           typeof hold.memoryFree === 'number' && Math.round(hold.memoryFree * 100) === percent,
           `memoryFree ${hold.memoryFree} does not match the quoted ${percent}%`,
         );
-        if (osPercent !== undefined) {
+        if (trace.samples.length === 0) {
+          say('os      not measured');
+        } else {
+          const os = quotedMatchesOs(percent, trace.samples, hold.receivedAt);
+          const span = os.lo === os.hi ? `${os.lo}%` : `${os.lo}–${os.hi}%`;
+          say(
+            `os      ${os.n === 0 ? 'no look' : span} free in the 2.5 s around it (${os.n} looks)`,
+          );
           check(
-            Math.abs(percent - osPercent) <= 5,
-            `the guardian read ${percent}% free, the OS says ${osPercent}%`,
+            os.ok,
+            `the guardian read ${percent}% free, the OS said ${os.n === 0 ? 'nothing' : span} around that reading`,
           );
         }
       }
