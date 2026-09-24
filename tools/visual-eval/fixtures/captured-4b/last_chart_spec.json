@@ -1,0 +1,32 @@
+{
+ "type": "bar",
+ "title": "Units Sold by Year",
+ "subtitle": "Number of Units",
+ "x_label": "Year",
+ "y_label": "Units Sold",
+ "series": [
+  {
+   "name": "Units Sold",
+   "points": [
+    {
+     "label": "2021",
+     "value": 12
+    },
+    {
+     "label": "2022",
+     "value": 19
+    },
+    {
+     "label": "2023",
+     "value": 15
+    },
+    {
+     "label": "2024",
+     "value": 22
+    }
+   ]
+  }
+ ],
+ "highlight": "",
+ "note": ""
+}

@@ -1,0 +1,35 @@
+{
+  "type": "hbar",
+  "title": "Share of Q3 tickets",
+  "series": [
+    {
+      "name": "",
+      "points": [
+        {
+          "label": "Billing questions",
+          "value": 31
+        },
+        {
+          "label": "Login issues",
+          "value": 22
+        },
+        {
+          "label": "Shipping delays",
+          "value": 18
+        }
+      ]
+    }
+  ],
+  "highlight": "Billing questions",
+  "unit": "%",
+  "style": {
+    "look": "clean",
+    "palette": [
+      "#12343B"
+    ],
+    "accent": "#2A9D8F",
+    "radius": 4,
+    "barWidth": 0.5,
+    "labels": "on"
+  }
+}

@@ -1,0 +1,128 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<!--
+  (c) The SAME primitives — browser layout + tools/office-gen/html2pptx.py native shapes —
+  driven by a design system instead of a fixed layout menu. Every slide below is a template
+  a renderer can fill from the same six-slide content the 4B already produces; nothing here
+  needs a model to place anything. Tokens: 12-col grid on 1280x720 (72px margins, 24px
+  gutters, 8px rhythm); ONE family (Helvetica Neue); scale 15/22/30/52/72/120; ink + paper +
+  ONE accent (teal) with a deep and a tint; numbers set as the largest thing on a data slide;
+  sentence-case labels (no letter-spaced ALL CAPS), no accent rule under titles.
+-->
+<style>
+  :root { --ink:#0F1E26; --ink2:#4A5A63; --paper:#F5F7F6; --teal:#0E7C7B; --deep:#0A4F52;
+          --tint:#DCEBEA; --line:#C9D3D2; --mist:#9FB3B1; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background:#555; font-family: "Helvetica Neue"; }
+  section.slide { position: relative; width: 1280px; height: 720px; overflow: hidden; background: var(--paper); }
+  .abs { position: absolute; }
+  .label { position:absolute; left:72px; top:64px; font-size:17px; font-weight:600; color: var(--teal); }
+  .h1 { position:absolute; left:72px; top:100px; width:1000px; font-size:52px; line-height:1.08; font-weight:600; color: var(--ink); letter-spacing:-0.5px; text-wrap: balance; }
+  .foot { position:absolute; left:72px; bottom:36px; font-size:13px; color: var(--ink2); }
+  .page { position:absolute; right:72px; bottom:36px; font-size:13px; color: var(--ink2); }
+  .body { font-size:22px; line-height:1.4; color: var(--ink2); }
+  .ring { position:absolute; border-radius:50%; border-style:solid; }
+</style></head><body>
+
+<!-- 1. Cover: the name as the biggest thing, the promise, the raise; a ripple motif so the
+     right half is DRAWN, not an empty colour field. -->
+<section class="slide" style="background:var(--ink)">
+  <div class="ring" style="left:760px; top:120px; width:480px; height:480px; border-width:2px; border-color:#13383E"></div>
+  <div class="ring" style="left:820px; top:180px; width:360px; height:360px; border-width:2px; border-color:#11494D"></div>
+  <div class="ring" style="left:880px; top:240px; width:240px; height:240px; border-width:3px; border-color:#0F6263"></div>
+  <div class="ring" style="left:940px; top:300px; width:120px; height:120px; border-width:3px; border-color:#0E7C7B"></div>
+  <div class="ring" style="left:980px; top:340px; width:40px; height:40px; border-width:0; background:#3FC1B8"></div>
+  <div class="abs" style="left:72px; top:200px; font-size:17px; font-weight:600; color:#3FC1B8">Seed round · 2026</div>
+  <div class="abs" style="left:66px; top:232px; font-size:120px; font-weight:700; color:#FFFFFF; letter-spacing:-3px; line-height:1">Tidewell</div>
+  <div class="abs" style="left:72px; top:380px; width:600px; font-size:30px; line-height:1.3; color:#C9D6D4">Leak sensors that shut the water off before the ceiling comes down.</div>
+  <div class="abs" style="left:72px; top:640px; font-size:15px; color:#7F9795">$2.5M seed · 18 months of runway</div>
+</section>
+
+<!-- 2. Problem: the claim as the headline, ONE number as the hero, and the sum that makes
+     the product obvious (derived from the brief: 24,000 / 39). -->
+<section class="slide">
+  <div class="label">The problem</div>
+  <div class="h1">Water damage is the #1 insurance claim in multifamily buildings.</div>
+  <div class="abs" style="left:66px; top:300px; font-size:120px; font-weight:700; color:var(--deep); letter-spacing:-3px; line-height:1">$24,000</div>
+  <div class="abs body" style="left:72px; top:432px; width:460px">average cost of a single water-damage claim</div>
+  <div class="abs" style="left:704px; top:300px; width:1px; height:220px; background:var(--line)"></div>
+  <div class="abs" style="left:752px; top:316px; font-size:72px; font-weight:700; color:var(--teal); letter-spacing:-1.5px; line-height:1">615</div>
+  <div class="abs body" style="left:752px; top:400px; width:440px">Tidewell sensors cost the same as one claim ($24,000 ÷ $39).</div>
+  <div class="foot">Tidewell · seed</div><div class="page">2</div>
+</section>
+
+<!-- 3. Product: a process drawn as a process — numbered nodes on one rail, the step that
+     matters in the accent, captions at a readable 20px. -->
+<section class="slide">
+  <div class="label">The product</div>
+  <div class="h1">A $39 sensor that closes the valve for you.</div>
+  <div class="abs" style="left:132px; top:367px; width:776px; height:3px; background:var(--line)"></div>
+  <div class="ring" style="left:100px; top:336px; width:64px; height:64px; border-width:3px; border-color:var(--ink); background:var(--paper)"></div>
+  <div class="abs" style="left:100px; top:352px; width:64px; text-align:center; font-size:26px; font-weight:700; color:var(--ink)">1</div>
+  <div class="ring" style="left:488px; top:336px; width:64px; height:64px; border-width:3px; border-color:var(--ink); background:var(--paper)"></div>
+  <div class="abs" style="left:488px; top:352px; width:64px; text-align:center; font-size:26px; font-weight:700; color:var(--ink)">2</div>
+  <div class="ring" style="left:876px; top:336px; width:64px; height:64px; border-width:0; background:var(--teal)"></div>
+  <div class="abs" style="left:876px; top:352px; width:64px; text-align:center; font-size:26px; font-weight:700; color:#FFFFFF">3</div>
+  <div class="abs" style="left:72px; top:434px; width:340px; font-size:30px; font-weight:600; color:var(--ink)">Sense</div>
+  <div class="abs body" style="left:72px; top:478px; width:330px">A $39 stick-on sensor feels the first drop of water.</div>
+  <div class="abs" style="left:460px; top:434px; width:340px; font-size:30px; font-weight:600; color:var(--ink)">Alert</div>
+  <div class="abs body" style="left:460px; top:478px; width:330px">The building dashboard shows which unit, right away.</div>
+  <div class="abs" style="left:848px; top:434px; width:360px; font-size:30px; font-weight:600; color:var(--teal)">Shut off</div>
+  <div class="abs body" style="left:848px; top:478px; width:350px">The valve closes automatically — the leak stops at a puddle.</div>
+  <div class="foot">Tidewell · seed</div><div class="page">3</div>
+</section>
+
+<!-- 4. Traction: four numbers on one baseline, all the same size, captions under; the
+     headline says what they add up to. -->
+<section class="slide" style="background:var(--ink)">
+  <div class="label" style="color:#3FC1B8">Traction</div>
+  <div class="h1" style="color:#FFFFFF">42 buildings, growing 18% a month.</div>
+  <div class="abs" style="left:72px;  top:330px; width:262px; height:2px; background:#2B434C"></div>
+  <div class="abs" style="left:358px; top:330px; width:262px; height:2px; background:#2B434C"></div>
+  <div class="abs" style="left:644px; top:330px; width:262px; height:2px; background:#2B434C"></div>
+  <div class="abs" style="left:930px; top:330px; width:278px; height:2px; background:#3FC1B8"></div>
+  <div class="abs" style="left:68px;  top:360px; font-size:84px; font-weight:700; color:#FFFFFF; letter-spacing:-2px; line-height:1">42</div>
+  <div class="abs" style="left:354px; top:360px; font-size:84px; font-weight:700; color:#FFFFFF; letter-spacing:-2px; line-height:1">3,100</div>
+  <div class="abs" style="left:640px; top:360px; font-size:84px; font-weight:700; color:#FFFFFF; letter-spacing:-2px; line-height:1">$38k</div>
+  <div class="abs" style="left:926px; top:360px; font-size:84px; font-weight:700; color:#3FC1B8; letter-spacing:-2px; line-height:1">18%</div>
+  <div class="abs" style="left:72px;  top:466px; width:250px; font-size:20px; line-height:1.35; color:var(--mist)">buildings live</div>
+  <div class="abs" style="left:358px; top:466px; width:250px; font-size:20px; line-height:1.35; color:var(--mist)">apartment units protected</div>
+  <div class="abs" style="left:644px; top:466px; width:250px; font-size:20px; line-height:1.35; color:var(--mist)">monthly recurring revenue</div>
+  <div class="abs" style="left:930px; top:466px; width:270px; font-size:20px; line-height:1.35; color:var(--mist)">MRR growth, month over month</div>
+  <div class="foot" style="color:#7F9795">Tidewell · seed</div><div class="page" style="color:#7F9795">4</div>
+</section>
+
+<!-- 5. Market & model: the business as an equation the room can check, derived only from
+     the brief's own numbers. -->
+<section class="slide">
+  <div class="label">Market &amp; model</div>
+  <div class="h1">22 million units, $3 a unit, every month.</div>
+  <div class="abs" style="left:66px;  top:312px; font-size:84px; font-weight:700; color:var(--ink); letter-spacing:-2px; line-height:1">22M</div>
+  <div class="abs" style="left:292px; top:322px; font-size:56px; font-weight:300; color:var(--mist); line-height:1">×</div>
+  <div class="abs" style="left:360px; top:312px; font-size:84px; font-weight:700; color:var(--ink); letter-spacing:-2px; line-height:1">$3</div>
+  <div class="abs" style="left:490px; top:322px; font-size:56px; font-weight:300; color:var(--mist); line-height:1">×</div>
+  <div class="abs" style="left:558px; top:312px; font-size:84px; font-weight:700; color:var(--ink); letter-spacing:-2px; line-height:1">12</div>
+  <div class="abs" style="left:690px; top:322px; font-size:56px; font-weight:300; color:var(--mist); line-height:1">=</div>
+  <div class="abs" style="left:758px; top:312px; font-size:84px; font-weight:700; color:var(--teal); letter-spacing:-2px; line-height:1">$792M</div>
+  <div class="abs" style="left:72px;  top:414px; width:200px; font-size:18px; line-height:1.35; color:var(--ink2)">US rental units in mid &amp; large buildings</div>
+  <div class="abs" style="left:366px; top:414px; width:120px; font-size:18px; line-height:1.35; color:var(--ink2)">per unit per month (SaaS)</div>
+  <div class="abs" style="left:564px; top:414px; width:110px; font-size:18px; line-height:1.35; color:var(--ink2)">months</div>
+  <div class="abs" style="left:764px; top:414px; width:300px; font-size:18px; line-height:1.35; color:var(--ink2)">annual revenue at full coverage</div>
+  <div class="abs" style="left:72px; top:540px; width:1136px; height:1px; background:var(--line)"></div>
+  <div class="abs body" style="left:72px; top:564px; width:1100px">Hardware is sold at cost. Today: 3,100 units, $38k MRR.</div>
+  <div class="foot">Tidewell · seed</div><div class="page">5</div>
+</section>
+
+<!-- 6. Ask: the number is the slide; runway and team as quiet facts. -->
+<section class="slide" style="background:var(--deep)">
+  <div class="label" style="color:#8FE0D8">The ask</div>
+  <div class="abs" style="left:64px; top:150px; font-size:150px; font-weight:700; color:#FFFFFF; letter-spacing:-4px; line-height:1">$2.5M</div>
+  <div class="abs" style="left:72px; top:320px; font-size:32px; color:#CFE7E4">Seed round · 18 months of runway</div>
+  <div class="abs" style="left:72px;  top:460px; width:520px; height:132px; border-radius:14px; background:#0C5F62"></div>
+  <div class="abs" style="left:616px; top:460px; width:520px; height:132px; border-radius:14px; background:#0C5F62"></div>
+  <div class="abs" style="left:104px; top:490px; font-size:17px; font-weight:600; color:#8FE0D8">Hardware</div>
+  <div class="abs" style="left:104px; top:524px; font-size:28px; font-weight:600; color:#FFFFFF">Ex-Nest hardware lead</div>
+  <div class="abs" style="left:648px; top:490px; font-size:17px; font-weight:600; color:#8FE0D8">Product</div>
+  <div class="abs" style="left:648px; top:524px; font-size:28px; font-weight:600; color:#FFFFFF">Ex-Zillow product manager</div>
+</section>
+</body></html>

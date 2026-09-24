@@ -1,0 +1,15 @@
+{
+  "_note": "`chart` command lines, run through bash splitting + protectShimDollars + the harness CLI + the registered chart tool (lib/chart.mjs). 'a' copies the call shapes of the REAL 4B dataviz session (2026-09-17): JSON arrays, no title, --chart-type and --style the tool does not take; both land in one folder. 'b' is the same tool used well. 'parse' are the input-corruption lines from visual-quality.md §2.2.4 (D22, D23).",
+  "a": [
+    "chart \"--labels=[\\\"Q1 2025\\\",\\\"Q2 2025\\\",\\\"Q3 2025\\\",\\\"Q4 2025\\\"]\" \"--values=[48,61,79,102]\" --style=clean",
+    "chart --labels \"2021, 2022, 2023, 2024, 2025\" --values \"Revenue: 1.2, 1.9, 2.8, 4.1, 5.6; Costs: 1.5, 1.8, 2.2, 2.9, 3.4\" --chart-type=line --style=sunset"
+  ],
+  "b": [
+    "chart bar \"MAU more than doubled in 2025\" --labels \"Q1, Q2, Q3, Q4\" --values \"48000, 61000, 79000, 102000\" --subtitle \"Monthly active users by quarter, 2025\" --highlight Q4 --look clean --palette \"#A9BCD6\" --accent \"#1F5EFF\" --radius 4 --bars 0.42 --value_labels on --out mau-2025.svg",
+    "chart line \"Revenue passed costs in 2022 — the gap is now $2.2M\" --labels \"2021, 2022, 2023, 2024, 2025\" --values \"Revenue: 1.2, 1.9, 2.8, 4.1, 5.6; Costs: 1.5, 1.8, 2.2, 2.9, 3.4\" --unit \"$\" --subtitle \"Annual revenue and costs, $ millions\" --look clean --palette \"#1F5EFF, #E8863A\" --out revenue-vs-costs.svg"
+  ],
+  "parse": [
+    "chart bar \"Market vs today\" --labels \"Market, Today\" --values \"22M, 3,100\" --out market-vs-today.svg",
+    "chart bar \"Round sizes\" --labels \"Seed, Series A\" --values \"$1.2M, $2.4M\" --out round-sizes.svg"
+  ]
+}

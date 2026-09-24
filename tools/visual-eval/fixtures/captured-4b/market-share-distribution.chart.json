@@ -1,0 +1,31 @@
+{
+  "type": "donut",
+  "title": "Market Share Distribution",
+  "series": [
+    {
+      "name": "",
+      "points": [
+        {
+          "label": "Company A",
+          "value": 35
+        },
+        {
+          "label": "Company B",
+          "value": 25
+        },
+        {
+          "label": "Company C",
+          "value": 20
+        },
+        {
+          "label": "Company D",
+          "value": 20
+        }
+      ]
+    }
+  ],
+  "unit": "%",
+  "style": {
+    "look": "clean"
+  }
+}

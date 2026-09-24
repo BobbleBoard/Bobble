@@ -1,0 +1,129 @@
+{
+ "theme": "midnight",
+ "running_title": "Solar Decade",
+ "slides": [
+  {
+   "layout": "hero_title",
+   "title": "The Solar Power Revolution: Growth This Decade",
+   "subtitle": "How Solar Energy Transformed Globally",
+   "eyebrow": "Rapid expansion with capacity tripling every two years",
+   "footnote": "Data covers 2020-2029 trends",
+   "image_query": "Full-bleed photo of massive solar farm at sunset"
+  },
+  {
+   "layout": "bars",
+   "title": "Global Solar Power Capacity Growth (2020-2029)",
+   "kicker": "Bar chart showing cumulative capacity by year",
+   "items": [
+    {
+     "label": "2020",
+     "value": "1,200",
+     "display": "GW"
+    },
+    {
+     "label": "2021",
+     "value": "1,500",
+     "display": "GW"
+    },
+    {
+     "label": "2022",
+     "value": "2,000",
+     "display": "GW"
+    },
+    {
+     "label": "2023",
+     "value": "2,600",
+     "display": "GW"
+    },
+    {
+     "label": "2024",
+     "value": "3,200",
+     "display": "GW"
+    },
+    {
+     "label": "2025",
+     "value": "3,800",
+     "display": "GW"
+    },
+    {
+     "label": "2026",
+     "value": "4,500",
+     "display": "GW"
+    },
+    {
+     "label": "2027",
+     "value": "5,200",
+     "display": "GW"
+    },
+    {
+     "label": "2028",
+     "value": "6,000",
+     "display": "GW"
+    },
+    {
+     "label": "2029",
+     "value": "6,800",
+     "display": "GW"
+    }
+   ],
+   "highlight_index": 9,
+   "note": "Capacity in GW"
+  },
+  {
+   "layout": "matrix",
+   "title": "Key Growth Drivers",
+   "kicker": "Compare drivers: costs, policy, corporate, storage, adoption",
+   "columns": [
+    "Driver",
+    "Impact Level"
+   ],
+   "rows": [
+    {
+     "label": "Cost Reduction",
+     "values": [
+      true,
+      true
+     ]
+    },
+    {
+     "label": "Government Policy",
+     "values": [
+      true,
+      true
+     ]
+    },
+    {
+     "label": "Corporate Commitments",
+     "values": [
+      true,
+      true
+     ]
+    },
+    {
+     "label": "Storage Improvements",
+     "values": [
+      true,
+      true
+     ]
+    },
+    {
+     "label": "Distributed Adoption",
+     "values": [
+      true,
+      true
+     ]
+    }
+   ],
+   "verdict": "All drivers show high impact"
+  },
+  {
+   "layout": "closing",
+   "title": "Future Outlook",
+   "points": [
+    "Solar power is mainstream, not emerging",
+    "Projected to supply 25% of global electricity by 2030",
+    "Key challenges include grid integration and supply chains"
+   ]
+  }
+ ]
+}

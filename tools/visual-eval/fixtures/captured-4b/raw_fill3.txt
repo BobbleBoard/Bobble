@@ -1,0 +1,22 @@
+{
+  "title": "The Cycle of a Trend",
+  "kicker": "Map lifecycle from emergence to saturation",
+  "steps": [
+    {
+      "label": "Emergence",
+      "caption": "Initial viral spark (0-10% penetration)",
+      "emphasis": "true"
+    },
+    {
+      "label": "Rise",
+      "caption": "Rapid adoption (10-50% penetration)",
+      "emphasis": "false"
+    },
+    {
+      "label": "Saturation",
+      "caption": "Peak reach and decline",
+      "emphasis": "false"
+    }
+  ],
+  "note": "Data points derived from Q3 report analysis."
+}

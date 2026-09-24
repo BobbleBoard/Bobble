@@ -13,12 +13,16 @@ problem is that a default chart looks like a default chart.
 """
 from __future__ import annotations
 
-from pptx.dml.color import RGBColor
+from pptx.dml.color import RGBColor  # noqa: F401 — re-exported for callers
 from pptx.enum.shapes import MSO_SHAPE
 from pptx.enum.text import PP_ALIGN
 from pptx.util import Inches, Pt
 
+import numparse
+import textfit
+
 FONT = "Helvetica Neue"
+EMU_PT = 12700
 
 
 def _rect(sl, x, y, w, h, colour, *, radius=None, alpha_shape=MSO_SHAPE.RECTANGLE):
@@ -33,19 +37,39 @@ def _rect(sl, x, y, w, h, colour, *, radius=None, alpha_shape=MSO_SHAPE.RECTANGL
 
 
 def _label(sl, x, y, w, h, text, size, colour, *, bold=False, align=PP_ALIGN.LEFT):
-    tb = sl.shapes.add_textbox(x, y, w, h)
+    tb = sl.shapes.add_textbox(int(x), int(y), int(w), int(h))
     tf = tb.text_frame
     tf.word_wrap = True
     tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = 0
     p = tf.paragraphs[0]
     p.alignment = align
     r = p.add_run()
-    r.text = str(text)
+    r.text = numparse.as_text(text)
     r.font.size = Pt(size)
     r.font.bold = bold
     r.font.name = FONT
     r.font.color.rgb = colour
     return tb
+
+
+def _lines_label(sl, x, y, w, lines, size, colour, *, bold=False, align=PP_ALIGN.LEFT, line=1.1):
+    """Measured lines, one paragraph each, reflow off."""
+    h = Pt(textfit.height_pt(len(lines), size, line)) + Inches(0.03)
+    tb = sl.shapes.add_textbox(int(x), int(y), int(w), int(h))
+    tf = tb.text_frame
+    tf.word_wrap = False
+    tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = 0
+    for i, ln in enumerate(lines):
+        p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
+        p.alignment = align
+        p.line_spacing = line
+        r = p.add_run()
+        r.text = ln
+        r.font.size = Pt(size)
+        r.font.bold = bold
+        r.font.name = FONT
+        r.font.color.rgb = colour
+    return y + h
 
 
 def bar_rows(sl, t, x, y, w, items, *, row_h=None, gap=None, avail=None,
@@ -70,15 +94,21 @@ def bar_rows(sl, t, x, y, w, items, *, row_h=None, gap=None, avail=None,
     row_h = row_h or Inches(0.62)
     gap = gap if gap is not None else Inches(0.26)
     label_w = label_w or w * 0.34
-    vals = [float(i.get("value", 0) or 0) for i in items]
+    vals = [numparse.num(i.get("value", 0)) for i in items]
     top = max(vals) if vals and max(vals) > 0 else 1.0
     bar_x = x + label_w
-    bar_max = w - label_w - Inches(1.45)
+    # The value column is as wide as its longest value needs ("22M units" did
+    # not fit the fixed 1.25 in and wrapped under itself).
+    widest = max((textfit.width_pt(numparse.as_text(i.get("display", i.get("value", ""))), 16, bold=True)
+                  for i in items), default=0)
+    value_w = max(Inches(1.25), int(Pt(widest)) + Inches(0.12))
+    bar_max = w - label_w - value_w - Inches(0.2)
     for i, it in enumerate(items):
         cy = y + i * (row_h + gap)
         _label(sl, x, cy + row_h * 0.22, label_w - Inches(0.2), row_h,
                it.get("label", ""), 14, t.ink)
-        frac = (float(it.get("value", 0) or 0) / top) if top else 0
+        frac = (numparse.num(it.get("value", 0)) / top) if top else 0
+        frac = max(0.0, min(1.0, frac))
         bh = row_h - Inches(0.12)
         _rect(sl, bar_x, cy + Inches(0.06), bar_max, bh,
               t.faint, radius=0.5, alpha_shape=MSO_SHAPE.ROUNDED_RECTANGLE)
@@ -93,7 +123,7 @@ def bar_rows(sl, t, x, y, w, items, *, row_h=None, gap=None, avail=None,
               alpha_shape=(MSO_SHAPE.ROUNDED_RECTANGLE if fill_w > bh * 1.6
                            else MSO_SHAPE.RECTANGLE))
         _label(sl, bar_x + bar_max + Inches(0.18), cy + row_h * 0.24,
-               Inches(1.25), row_h, it.get("display", it.get("value", "")), 16,
+               value_w, row_h, it.get("display", it.get("value", "")), 16,
                t.accent if i == highlight else t.primary, bold=True)
     return y + len(items) * (row_h + gap)
 
@@ -130,12 +160,12 @@ def range_bands(sl, t, x, y, w, bands, *, row_h=None, gap=None, avail=None):
         gap = gap if gap is not None else min(Inches(0.7), pitch * 0.5)
     row_h = row_h or Inches(0.46)
     gap = gap if gap is not None else Inches(0.42)
-    lo = min(float(b.get("from", 0) or 0) for b in bands)
-    hi = max(float(b.get("to") or b.get("from") or 1) for b in bands)
+    lo = min(numparse.num(b.get("from", 0)) for b in bands)
+    hi = max(numparse.num(b.get("to") or b.get("from") or 1, 1.0) for b in bands)
     span = (hi - lo) or 1.0
     for i, b in enumerate(bands):
-        f = float(b.get("from", 0) or 0)
-        tt = float(b.get("to") or f or 0)
+        f = numparse.num(b.get("from", 0))
+        tt = numparse.num(b.get("to"), f) if b.get("to") not in (None, "") else f
         if tt < f:
             f, tt = tt, f
         cy = y + i * (row_h + gap)
@@ -150,7 +180,7 @@ def range_bands(sl, t, x, y, w, bands, *, row_h=None, gap=None, avail=None):
         _label(sl, x, cy - Inches(0.30), w * 0.6, Inches(0.26),
                b.get("label", ""), 12, t.ink, bold=True)
         _label(sl, x + w + Inches(0.12), cy + Inches(0.02), Inches(1.5), Inches(0.3),
-               f"{int(f)}–{int(tt)}", 11.5, col, bold=True)
+               f"{numparse.fmt(f)}–{numparse.fmt(tt)}", 11.5, col, bold=True)
     return y + len(bands) * (row_h + gap)
 
 
@@ -211,9 +241,19 @@ def flow(sl, t, x, y, w, steps, *, r=Inches(0.62), label_below=True):
     n = max(1, len(steps))
     pitch = w / n
     cy = y + r
+    # One label size for every node: the largest at which each label fits the
+    # circle's inner width in two lines ("Dashboard Alert" ran past the edge).
+    inner = int(r * 2 * 0.78)
+    size = 9.0
+    for cand in (11.5, 10.5, 9.5, 9.0):
+        size = cand
+        if all(textfit.fits(numparse.as_text(st.get("label", "")), inner / EMU_PT, cand, 2, bold=True)
+               for st in steps):
+            break
     for i, st in enumerate(steps):
         cx = x + pitch * i + pitch / 2
-        filled = st.get("emphasis") or i == 0
+        # `emphasis` arrives as a real bool (render_deck coerces "false").
+        filled = bool(st.get("emphasis"))
         node = sl.shapes.add_shape(MSO_SHAPE.OVAL, int(cx - r), int(cy - r),
                                    int(r * 2), int(r * 2))
         node.fill.solid()
@@ -221,9 +261,11 @@ def flow(sl, t, x, y, w, steps, *, r=Inches(0.62), label_below=True):
         node.line.color.rgb = t.primary
         node.line.width = Pt(1.5)
         node.shadow.inherit = False
-        _label(sl, int(cx - r), int(cy - Inches(0.14)), int(r * 2), Inches(0.32),
-               st.get("label", ""), 11.5, t.paper if filled else t.primary,
-               bold=True, align=PP_ALIGN.CENTER)
+        lines = textfit.wrap(numparse.as_text(st.get("label", "")), inner / EMU_PT, size, bold=True,
+                             max_lines=2)
+        lh = Pt(textfit.height_pt(len(lines), size, 1.0))
+        _lines_label(sl, cx - inner / 2, cy - lh / 2, inner, lines, size,
+                     t.paper if filled else t.primary, bold=True, align=PP_ALIGN.CENTER, line=1.0)
         if i < n - 1:
             ax0 = cx + r + Inches(0.12)
             ax1 = x + pitch * (i + 1) + pitch / 2 - r - Inches(0.12)
@@ -249,9 +291,18 @@ def matrix(sl, t, x, y, w, rows, cols, *, row_h=Inches(0.52)):
     """
     label_w = w * 0.56
     cell_w = (w - label_w) / max(1, len(cols))
-    for c, name in enumerate(cols):
-        _label(sl, x + label_w + cell_w * c, y - Inches(0.42), cell_w, Inches(0.3),
-               str(name).upper(), 10, t.primary, bold=True, align=PP_ALIGN.CENTER)
+    names = [numparse.as_text(n).upper() for n in cols]
+    size = 8.0
+    for cand in (10, 9, 8):
+        size = cand
+        if all(textfit.fits(nm, (cell_w - Inches(0.1)) / EMU_PT, cand, 2, bold=True) for nm in names):
+            break
+    for c, name in enumerate(names):
+        lines = textfit.wrap(name, (cell_w - Inches(0.1)) / EMU_PT, size, bold=True, max_lines=2)
+        lh = Pt(textfit.height_pt(len(lines), size, 1.1))
+        _lines_label(sl, x + label_w + cell_w * c + Inches(0.05), y - Inches(0.12) - lh,
+                     cell_w - Inches(0.1), lines, size, t.primary, bold=True,
+                     align=PP_ALIGN.CENTER)
     for r, row in enumerate(rows):
         cy = y + r * row_h
         if r % 2 == 0:
@@ -259,7 +310,8 @@ def matrix(sl, t, x, y, w, rows, cols, *, row_h=Inches(0.52)):
         _label(sl, x + Inches(0.14), cy + Inches(0.13), label_w - Inches(0.2),
                row_h, row.get("label", ""), 12.5, t.ink)
         for c in range(len(cols)):
-            on = bool(row.get("values", [])[c]) if c < len(row.get("values", [])) else False
+            vals = row.get("values", [])
+            on = numparse.truthy(vals[c], loose=True) if c < len(vals) else False
             cx = x + label_w + cell_w * c + cell_w / 2
             _rect(sl, cx - Inches(0.10), cy + row_h / 2 - Inches(0.10),
                   Inches(0.20), Inches(0.20),

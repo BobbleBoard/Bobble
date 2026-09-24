@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<!--
+  RECONSTRUCTION, not a capture: no model ran for this brief. It is the 4B's measured web
+  "house style" — the two pages it actually wrote in Bobble chats (hi-8/racing_simulator_mockup.html,
+  2026-09-13, and demo_animation.html, 2026-09-22; both in a-real-4b-page/) share every choice
+  below: the #1a1a2e -> #16213e -> #0f3460 gradient, the #e94560 accent with a glow text-shadow,
+  an emoji before every heading, a centered header with an "Experience the …" subtitle, glass
+  cards (rgba(255,255,255,0.1) + blur), check-mark lists, 4-up stat boxes, Segoe UI first in the
+  font stack. The CSS is the racing page's, with this brief's words.
+-->
+<html>
+<head>
+    <title>Kiln Pottery Studio</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        header { text-align: center; padding: 40px 0; border-bottom: 2px solid #e94560; margin-bottom: 40px; }
+        h1 { font-size: 3em; color: #E94560; text-shadow: 0 0 20px rgba(233, 69, 96, 0.5); margin-bottom: 10px; }
+        .subtitle { font-size: 1.2em; color: #a0a0a0; }
+        .dashboard { background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 100%); border-radius: 15px; padding: 30px; border: 1px solid rgba(233, 69, 96,0.3); margin-bottom: 30px; }
+        .dashboard h2 { color: #E94560; margin-bottom: 20px; }
+        .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
+        .stat-box { background: rgba(233,69,96,0.1); padding: 20px; border-radius: 10px; text-align: center; }
+        .stat-value { font-size: 2em; font-weight: bold; color: #E94560; }
+        .stat-label { font-size: 0.9em; color: #a0a0a0; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-bottom: 40px; }
+        .card { background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); border-radius: 15px; padding: 25px; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.3s, box-shadow 0.3s; }
+        .card:hover { transform: translateY(-5px); box-shadow: 0 10px 30px rgba(233,69,96,0.3); }
+        .card h3 { color: #E94560; margin-bottom: 15px; font-size: 1.4em; }
+        .card ul { list-style: none; padding-left: 0; }
+        .card li { padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .card li:last-child { border-bottom: none; }
+        .card li::before { content: "✓"; color: #E94560; margin-right: 10px; }
+        .price { font-size: 2.2em; font-weight: bold; color: #E94560; margin: 10px 0; }
+        .cta { text-align: center; padding: 40px; }
+        .btn { display: inline-block; background: linear-gradient(90deg, #E94560, #FF6B6B); color: #fff; padding: 15px 40px; border-radius: 30px; font-size: 1.2em; font-weight: bold; text-decoration: none; box-shadow: 0 0 20px rgba(233,69,96,0.5); }
+        .footer { text-align: center; padding: 30px; color: #a0a0a0; border-top: 1px solid rgba(255,255,255,0.1); margin-top: 40px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏺 Kiln Pottery Studio</h1>
+            <p class="subtitle">Experience the Art of Wheel-Throwing in Portland</p>
+        </header>
+        <div class="dashboard">
+            <h2>✨ Why Choose Kiln?</h2>
+            <div class="stats">
+                <div class="stat-box"><div class="stat-value">6</div><div class="stat-label">Week Course</div></div>
+                <div class="stat-box"><div class="stat-value">$280</div><div class="stat-label">Beginner Course</div></div>
+                <div class="stat-box"><div class="stat-value">$25</div><div class="stat-label">Drop-In</div></div>
+                <div class="stat-box"><div class="stat-value">∞</div><div class="stat-label">Creativity</div></div>
+            </div>
+        </div>
+        <div class="grid">
+            <div class="card">
+                <h3>🎨 Beginner Course</h3>
+                <ul>
+                    <li>6-week wheel-throwing course</li>
+                    <li>Learn centering and pulling</li>
+                    <li>All materials included</li>
+                    <li>Small class sizes</li>
+                </ul>
+                <div class="price">$280</div>
+            </div>
+            <div class="card">
+                <h3>🔥 Open Studio</h3>
+                <ul>
+                    <li>Drop-in anytime</li>
+                    <li>Access to wheels and tools</li>
+                    <li>Perfect for practice</li>
+                    <li>Friendly community</li>
+                </ul>
+                <div class="price">$25</div>
+            </div>
+            <div class="card">
+                <h3>📅 Class Schedule</h3>
+                <ul>
+                    <li>Monday: 6pm - 8pm</li>
+                    <li>Wednesday: 6pm - 8pm</li>
+                    <li>Saturday: 10am - 12pm</li>
+                    <li>Sunday: Open Studio</li>
+                </ul>
+            </div>
+        </div>
+        <div class="cta">
+            <a href="#" class="btn">🚀 Sign Up Now</a>
+        </div>
+        <div class="footer">🏺 Kiln Pottery Studio • Portland, Oregon • Made with Love</div>
+    </div>
+</body>
+</html>

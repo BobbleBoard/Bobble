@@ -1,0 +1,148 @@
+{
+ "_note": "The same pipeline, driven WELL: only layouts the planner's menu offers, the brief's own numbers, no invented provenance, emphasis as a real boolean, values short enough to survive the fixed-size numerals (3.1k, not 3,100). This is the ceiling of today's templates. The empty header cell a table's label column naturally gets crashes L_table (runs[0] of an empty cell) and leaves a blank default-blue table slide PLUS a fallback bullets slide \u2014 renders/b1-table-crash/. This version names that column 'Metric' to get past it.",
+ "plan": {
+  "theme": "ink",
+  "running_title": "Tidewell \u2014 seed",
+  "slides": [
+   {
+    "layout": "hero_title",
+    "title": "Tidewell",
+    "intent": "name + one-line promise"
+   },
+   {
+    "layout": "stats",
+    "title": "Water damage is the #1 multifamily claim",
+    "intent": "the problem in two numbers"
+   },
+   {
+    "layout": "flow",
+    "title": "A $39 sensor that closes the valve for you",
+    "intent": "the product as three steps"
+   },
+   {
+    "layout": "stats",
+    "title": "42 buildings, growing 18% a month",
+    "intent": "traction"
+   },
+   {
+    "layout": "table",
+    "title": "22M units at $3 a month",
+    "intent": "market and model"
+   },
+   {
+    "layout": "closing",
+    "title": "The ask",
+    "intent": "raise, runway, team"
+   }
+  ]
+ },
+ "fills": [
+  {
+   "layout": "hero_title",
+   "title": "Tidewell",
+   "subtitle": "Leak sensors that shut the water off before the ceiling comes down.",
+   "eyebrow": "Seed round \u00b7 $2.5M",
+   "footnote": "",
+   "image_query": "water ripples"
+  },
+  {
+   "layout": "stats",
+   "title": "Water damage is the #1 claim in multifamily insurance",
+   "kicker": "The problem",
+   "stats": [
+    {
+     "value": "#1",
+     "label": "insurance claim type for multifamily buildings"
+    },
+    {
+     "value": "$24k",
+     "label": "average cost of one water-damage claim"
+    }
+   ],
+   "note": ""
+  },
+  {
+   "layout": "flow",
+   "title": "A $39 sensor that closes the valve for you",
+   "kicker": "The product",
+   "steps": [
+    {
+     "label": "Sense",
+     "caption": "$39 stick-on sensor under every sink and heater",
+     "emphasis": false
+    },
+    {
+     "label": "Alert",
+     "caption": "The building dashboard pages the manager",
+     "emphasis": false
+    },
+    {
+     "label": "Shut off",
+     "caption": "The valve closes automatically",
+     "emphasis": true
+    }
+   ],
+   "note": ""
+  },
+  {
+   "layout": "stats",
+   "title": "42 buildings, growing 18% a month",
+   "kicker": "Traction",
+   "stats": [
+    {
+     "value": "42",
+     "label": "buildings live"
+    },
+    {
+     "value": "3.1k",
+     "label": "apartment units protected"
+    },
+    {
+     "value": "$38k",
+     "label": "monthly recurring revenue"
+    },
+    {
+     "value": "18%",
+     "label": "MRR growth, month over month"
+    }
+   ],
+   "note": ""
+  },
+  {
+   "layout": "table",
+   "title": "22M units at $3 a unit, every month",
+   "kicker": "Market & model",
+   "headers": [
+    "Metric",
+    "Today",
+    "Opportunity"
+   ],
+   "rows": [
+    [
+     "Units",
+     "3,100",
+     "22M \u2014 US rental units in mid/large buildings"
+    ],
+    [
+     "Pricing",
+     "$3 / unit / month SaaS",
+     "Hardware sold at cost"
+    ],
+    [
+     "Revenue",
+     "$38k MRR",
+     "$792M a year at full coverage (22M \u00d7 $3 \u00d7 12)"
+    ]
+   ]
+  },
+  {
+   "layout": "closing",
+   "title": "The ask",
+   "points": [
+    "$2.5M seed \u00b7 18 months of runway",
+    "Team: ex-Nest hardware lead \u00b7 ex-Zillow PM",
+    "Model: $3 / unit / month SaaS, hardware at cost"
+   ]
+  }
+ ]
+}

@@ -1,0 +1,1 @@
+Draw a flow diagram of our order fulfilment process: order placed → payment check (if it fails: email the customer and retry) → pick & pack → quality check (if it fails: back to pick & pack) → ship → delivered → send a review request.
