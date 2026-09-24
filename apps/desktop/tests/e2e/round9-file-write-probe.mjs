@@ -1,67 +1,46 @@
 /**
  * Round-9 adversarial E2E — LIVE FILE WRITING (failure point #2, deeper than R7).
  *
- * A `write` tool call opens a live canvas file tab that updates across MULTIPLE
- * streaming content deltas, then FINALIZES FROM DISK when the tool result lands:
- * the tab flips to the authoritative on-disk bytes (made to differ from the
- * streamed hint, so a passing finalize proves the file was actually re-read) and
- * drops `streaming`. Run `pnpm build` first.
+ * A `write` tool call drives the ONE Activity tab (`pi:activity`) onto the file:
+ * it updates across MULTIPLE streaming content deltas, then FINALIZES FROM DISK
+ * when the tool result lands — the tab flips to the authoritative on-disk bytes
+ * (made to differ from the streamed hint, so a passing finalize proves the file
+ * was actually re-read) and drops `streaming`. (It used to be a per-file tab;
+ * every tool call now drives the Activity tab — activity-routing.ts.)
+ * Headless through harness.mjs. Run `pnpm build` first.
  */
-import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { _electron as electron } from 'playwright-core';
-import { probeHome } from './harness.mjs';
-
-/* A throwaway $HOME. The app keeps settings, conversations and generated
-   media under it, and `--user-data-dir` isolates none of that (harness.mjs). */
-const PROBE_HOME = probeHome('round9-file-write-probe');
-
-const require = createRequire(import.meta.url);
-const electronBinary = require('electron');
-const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const repoRoot = path.resolve(appRoot, '../..');
-const mockPi = path.join(repoRoot, 'packages/engine/tools/mock-pi/mock-pi.mjs');
-const fixture = path.join(repoRoot, 'packages/engine/tools/mock-pi/fixtures/simple-chat.json');
+import { launchApp } from './harness.mjs';
 
 function assert(condition, message) {
   if (!condition) throw new Error(`round9-file-write-probe failed: ${message}`);
 }
 
-assert(
-  existsSync(path.join(appRoot, 'dist/index.html')) &&
-    existsSync(path.join(appRoot, 'dist-electron/main.js')),
-  'app is not built — run `pnpm build` first',
-);
-
-const userDataDir = mkdtempSync(path.join(tmpdir(), 'pi-e2e-udd-'));
 const workDir = mkdtempSync(path.join(tmpdir(), 'pi-e2e-work-'));
 const writePath = path.join(workDir, 'live-write.txt');
 const DISK_MARKER = 'DISK-FINALIZED-c0ffee';
 writeFileSync(writePath, `on-disk canonical content\n${DISK_MARKER}\n`, 'utf8');
 
-const app = await electron.launch({
-  executablePath: electronBinary,
-  args: [appRoot, `--user-data-dir=${userDataDir}`],
-  env: { ...process.env, HOME: PROBE_HOME, PI_BIN: mockPi, MOCK_PI_FIXTURE: fixture, PI_E2E: '1' },
+const { page, finish } = await launchApp('round9-file-write-probe', {
+  waitFor: '[data-testid="composer-input"]',
 });
 
-const tabKey = `file:${writePath}`;
+const tabKey = 'pi:activity';
 const fileTab = (page) =>
   page.evaluate((k) => {
     const t = window
       .__pi_canvas()
       .getState()
       .tabs.find((t) => t.key === k);
-    return t ? { streaming: t.streaming === true, text: t.artifact?.content.text ?? '' } : null;
+    return t
+      ? { streaming: t.streaming === true, text: t.artifact?.content.text ?? '', path: t.filePath }
+      : null;
   }, tabKey);
 
 try {
-  const page = await app.firstWindow();
   await page.waitForFunction(() => typeof window.__pi_canvas === 'function', { timeout: 8000 });
-  await page.waitForSelector('[data-testid="composer-input"]', { timeout: 8000 });
 
   const writeMsg = (content, withResult) =>
     page.evaluate(
@@ -144,6 +123,7 @@ try {
     { timeout: 8000 },
   );
   const midStream = await fileTab(page);
+  assert(midStream?.path === writePath, `the Activity tab shows the file (${midStream?.path})`);
   assert(midStream?.streaming === true, 'file tab should be streaming during the write');
   assert(
     !midStream.text.includes(DISK_MARKER),
@@ -185,8 +165,8 @@ try {
   assert(finalized?.streaming === false, 'finalized file tab should no longer be streaming');
 
   console.log(
-    'round9-file-write-probe OK — a write tool call opened a live file tab that updated across 3 streaming deltas, then finalized from disk (flipped to the authoritative on-disk bytes and dropped streaming)',
+    'round9-file-write-probe OK — a write tool call drove the Activity tab onto the file, updated across 3 streaming deltas, then finalized from disk (flipped to the authoritative on-disk bytes and dropped streaming)',
   );
 } finally {
-  await app.close();
+  await finish();
 }

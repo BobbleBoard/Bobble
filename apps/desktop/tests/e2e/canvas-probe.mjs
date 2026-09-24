@@ -4,7 +4,7 @@
  *   (a) a LARGE svg artifact auto-routes to a CANVAS TAB (shouldGoToCanvas) —
  *       the tabbed rail opens and renders the live SVG in the active tab;
  *   (b) a SMALL svg stays INLINE as a size-capped widget in the thread, and its
- *       "Move to canvas" button promotes it to a new canvas tab;
+ *       "Open in canvas" button promotes it to a new canvas tab;
  *   (c) A1: an svg authored BETWEEN two text runs renders inline BETWEEN them
  *       (not bunched at the thread foot);
  *   (d) B1: an image tab with a data-URI PNG renders (loaded), not a dead spinner.
@@ -115,9 +115,9 @@ try {
     { timeout: 8000 },
   );
 
-  // Its "Move to canvas" button promotes it to a NEW canvas tab; the inline
+  // Its "Open in canvas" button promotes it to a NEW canvas tab; the inline
   // widget then drops out of the thread (the tab now owns it).
-  await widget.locator('button[aria-label="Move to canvas"]').click();
+  await widget.locator('button[aria-label="Open in canvas"]').click();
   await page.waitForFunction(
     (marker) => {
       const el = document.querySelector('[data-testid="canvas-tabs-panel"] .pd-canvas-tabpanel');
