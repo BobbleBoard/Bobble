@@ -85,8 +85,27 @@ Other options I rejected:
    - `storage-main.ts` uses it (3 lines). `StorageView.tsx` dedupes chips by their label: Comfy-Org/Mage-Flow showed
      "text → image" twice, once from the engine and once from the hub catalog.
 
+6. **Existing copies the engine could no longer see (the user's Mac), fixed.** The legacy honour in (1) works only
+   through the hub path, and on the user's Mac that path is gone. `~/.cache/bobble/gen3d` was recreated empty on
+   2026-09-20, so every `gen3d/hf/hub/models--*` link the library migration had left behind went with it. The shelves
+   still hold every byte, including the 35 GB of `microsoft/Mage-Flow-*` that nobody can download again. Result: every
+   3D model read "not downloaded", and Download would fetch 26 GB of Mage-Flow that was already on disk.
+   - New `apps/desktop/electron/storage/hub-relink.ts` is the migration's inverse. At every boot it runs from
+     `runLibraryMigration` (2 lines in `storage-main.ts`). For each repo the 3D catalog names (its sources and its
+     `legacyRepos`), it puts the link back when two things hold:
+     - the hub cache has no entry of that name at all (a folder, a link or a dangling link is left exactly as it is);
+     - a shelf holds that repo's folder in the hub layout (`snapshots/` inside), so the model store's plain folders
+       are never linked.
+   - The link is relative, the same spelling the migration writes. Nothing is moved, copied, overwritten or deleted.
+     A repo being downloaded is skipped. A failure is logged, never thrown, so it cannot cost the boot its migration.
+   - On the user's Mac today, a plan-only dry run of the real code against the real folders lists **14 links** to put
+     back: both `microsoft/Mage-Flow-*` copies, Qwen3-VL-4B, CubePart, TRELLIS-image-large, SkinTokens, ARDY, the
+     two LLM2Vec adapters, dinov3, BiRefNet, parakeet, FluidIntelligence and Qwen3-TTS.
+   - The Download button is still needed on that Mac: the engine's venvs went with the cache. But it installs the
+     runtime only. With a complete legacy copy, the download skips every weight.
+
 The 3D studio's download cards do not change. The label, note and "17.5 GB" are pinned by a test, and before and
-after screenshots are pixel-identical in both themes.
+after screenshots of both Mage-Flow cards are pixel-identical in both themes.
 
 **What this means for the chat's `edit_image` on a fresh install.** Before this fix it could not work: the weights
 returned 401, and even with the weights on disk there was no Mage-Flow mflux build to run them. Now "Download" fetches
@@ -100,11 +119,14 @@ assembled directory.
     id, pins equal to the release sha256s, the layout covering what both engines open, sharing with CubePart, the card
     unchanged, a fixture lock with Python, and `repoAttribution`.
   - Against the old catalog: 7 failed. The card test was added later and passes on both catalogs by design.
-- **Python engine suite: 104/104 (11 skipped)**, run on the sidecar's Python 3.12 with `huggingface_hub==0.34.4`.
+- **Python engine suite: 112/112 (3 skipped)**, re-run on 2026-09-23 at 23:13 with Python 3.12,
+  `huggingface_hub==0.34.4`, numpy, trimesh, pillow, scipy and scikit-image. An earlier run in the sidecar's Python
+  gave 104/104 with 11 skipped.
   - Includes 20 new tests in `test_mage_flow_source.py` and 3 new provisioning tests.
   - Against the old engine: 18 fail, the worker test exits 2 because argparse rejects `--base-model`, and the 4
     provisioning tests fail (the old code installed `mflux==0.18.0`).
-- **apps/desktop: tsc clean on both configs; vitest 2637 passed (2 new chip tests), 8 skipped, 0 failed.**
+- **apps/desktop: tsc clean on both configs.** vitest (re-run 23:24): 2777 passed, 8 skipped, 0 failed. That includes
+  2 chip tests and 10 relink tests.
 - **`python/tools/check_sources.py`: anonymous check against the live hub.**
   - Old catalog: **FAIL**, 401 on both repos.
   - New catalog: **OK**. All 4 pinned files match size and sha256, and 10 small text-encoder files (11.6 MB) were
@@ -127,12 +149,28 @@ assembled directory.
   the tensor counts match the port's expected counts exactly: transformer 397, text encoder 713, VAE 728 (the VAE file
   holds 839 keys, and the mapping drops 111). No tensor was loaded.
 
-- **Screens, before (main `6eb58aaf`) and after, in dark and light.** Two hidden `launchApp` probes, looked at and
+- **Screens, before (main `e376f35a`) and after, in dark and light.** Two hidden `launchApp` probes, looked at and
   pixel-diffed:
-  - `gen3d-download-card-look.mjs`: the Mage-Flow cards and the whole download panel have **0 differing pixels**.
+  - `gen3d-download-card-look.mjs`: both Mage-Flow cards have **0 differing pixels** in both themes. The whole panel
+    has 0 in light and 3 stray pixels in dark, inside the 3D viewport.
   - `storage-shared-repo-look.mjs`: the Qwen3-VL-4B card changes from "CubePart" to "Shared by …", and Comfy-Org shows
     one chip. The single-use and legacy cards are identical.
   - Run against main, the storage probe fails ("the Qwen card is titled CubePart") and the card probe passes.
+- **The relink (item 6), re-checked on 2026-09-23 at 23:15–23:25.**
+  - Unit tests: `hub-relink.test.ts`, 10 tests on a real temp filesystem.
+  - `hub-relink-probe.mjs` (hidden app, scratch support root and library, `PI_DESKTOP_MIGRATE_LIBRARY=1`):
+    - on this branch: **OK**, both links relative and resolving to the shelf, the model store's folder not linked;
+    - on main's build: **FAIL**, "no hub link for microsoft/Mage-Flow-Turbo" and none for Qwen.
+  - Real weights, read only. The real relink wrote links into a scratch cache pointing at the user's real shelves, and
+    then the real sidecar `Registry` read them:
+    - before the relink: `weights_present` was False for both models and `model_dir` was None;
+    - after: both True, `model_dir` is the legacy snapshot, and the transformer, VAE and text encoder resolve to
+      the blobs named by the pinned sha256s;
+    - nothing was assembled and nothing was written outside the scratch folder.
+- **The acceptance checks, re-run on 2026-09-23 at 23:19 (no token, fresh `HF_HOME`):**
+  - `check_sources.py` is OK: 4 of 4 pins match and 10 small files (11.6 MB) were fetched;
+  - `microsoft/*` still answers 401;
+  - the `hf --dry-run` numbers are unchanged, and `HF_HOME` stayed at 12–16 KB.
 
 **Not verified here (BENCH: needs the GPU).** A real generation and a real edit through the assembled directory, with
 both results looked at. `python/tools/bench_mageflow_assembled.sh` does it with **zero downloads**: it builds the
@@ -197,10 +235,13 @@ the transformer reads, which shows up first in rendered text". mflux 0.20.0 upst
 
 ## Open points
 
-- the user's Mac today: `~/.cache/bobble/gen3d/` was recreated empty on 2026-09-20 20:34, with no `hf/hub` links. The
-  `microsoft__mage-flow-*` shelves (35 GB) are therefore invisible to the engine.
-  - This PR honours those snapshots wherever the hub path resolves.
-  - Relinking shelves that lost their hub link belongs in storage (`runLibraryMigration`). It is not fixed here.
+- The relink (item 6) covers hub repos only. The migration's other linked folder, `gen3d/models/*`, is not
+  relinked. On the user's Mac that is ARDY's baked MLX text encoder, `3D/Generation/ardy-text-encoder-mlx-8bit`, so ARDY
+  would bake it again on its first prompt. That bake needs the gated Llama-3-8B base, which is not on the shelves.
+  This belongs to ARDY, not Mage-Flow; it was noticed here and not changed.
+- The shipped mflux wheel records its files with mode `0o230` (729 of 919 entries). `uv build` (uv_build) produced
+  that: a rebuild from the pinned commit is byte-identical. pip and uv use only the executable bits of those modes,
+  so installed files come out `0755` and import normally. Checked: an install into a scratch venv reads and imports.
 - The download cards still quote each model's full size: 17.5 GB for the editor, and "Download all · 92.9 GB". Shared
   repos are now counted once per model, so these are upper bounds.
   - Beside the generator, the editor actually fetches 8.2 GB.

@@ -3,8 +3,9 @@
  *
  * Boot: put the library root on the environment (every engine child inherits
  * it), move whatever is still in `~/.cache` onto the shelves (library-migration
- * — renames, engine views kept), and keep Spotlight out of the library the
- * way it is kept out of the cache.
+ * — renames, engine views kept), put back the hub links a reset 3D cache lost
+ * (hub-relink), and keep Spotlight out of the library the way it is kept out
+ * of the cache.
  *
  * Page: a tree with sizes for the library and the support root, Reveal in
  * Finder, Trash (never rm), and a move of the whole library to another folder
@@ -38,6 +39,7 @@ import { createLogger, registerIpcHandlers } from '@pi-desktop/shared';
 import { dialog, type IpcMain, shell } from 'electron';
 import { getLoadedModel } from '../inference/llm-main';
 import { readSettings, writeSettingsPatch } from '../settings/settings-main';
+import { relinkAtBoot } from './hub-relink';
 import {
   applyLibraryMigration,
   type MigrationResult,
@@ -167,6 +169,8 @@ export function runLibraryMigration(opts: { readonly skipRepos?: readonly string
           }),
         };
   const plan = planLibraryMigration(snap);
+  // The inverse: a 3D cache that lost its links gets them back (hub-relink.ts).
+  relinkAtBoot(cache, lib, skip, log);
   if (plan.moves.length === 0) return;
   const result = applyLibraryMigration(plan);
   lastMigration = { ...result, ranAt: new Date().toISOString(), unsorted: plan.unsorted };
