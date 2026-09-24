@@ -1,0 +1,49 @@
+{
+  "Node": {
+    "ID": 7235196445369468,
+    "StableID": "nbYS7qLqVy11CNTRL",
+    "Name": "linux-ms-7e59.tail0f0f0f.ts.net.",
+    "User": 3240365473728001,
+    "Key": "nodekey:18d3b523c94cb2c4bc74dac3a23266ada338d1a29142fa12420d9b390f62c285",
+    "KeyExpiry": "2027-03-14T02:35:15Z",
+    "DiscoKey": "discokey:74bf84f1e5f96336eec6a32fb3339c3f56be8cc71688c805f9fa56a0b16349a6",
+    "Addresses": ["100.101.102.110/32", "fd7a:115c:a1e0::ab12:cd40/128"],
+    "AllowedIPs": ["100.101.102.110/32", "fd7a:115c:a1e0::ab12:cd40/128"],
+    "Endpoints": [
+      "203.0.113.111:18905",
+      "203.0.113.111:1901",
+      "[2001:db8::86a5]:41641",
+      "203.0.113.2:41641",
+      "203.0.113.2:41641",
+      "192.168.1.33:41641",
+      "[2001:db8::7562]:41641"
+    ],
+    "HomeDERP": 17,
+    "Hostinfo": {
+      "OS": "linux",
+      "Hostname": "linux-ms-7e59",
+      "Services": [
+        {
+          "Proto": "peerapi4",
+          "Port": 35633
+        },
+        {
+          "Proto": "peerapi6",
+          "Port": 54366
+        }
+      ]
+    },
+    "Created": "2026-03-17T05:51:27.624502434Z",
+    "Cap": 142,
+    "Online": true,
+    "ComputedName": "linux-ms-7e59",
+    "ComputedNameWithHost": "linux-ms-7e59"
+  },
+  "UserProfile": {
+    "ID": 3240365473728001,
+    "LoginName": "someone@github",
+    "DisplayName": "Someone",
+    "ProfilePicURL": ""
+  },
+  "CapMap": null
+}

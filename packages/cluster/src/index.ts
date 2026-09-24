@@ -7,6 +7,16 @@
  */
 
 export {
+  type CliBackendOptions,
+  CliMissingError,
+  type CliRunner,
+  type CliRunResult,
+  createCliBackend,
+  type LocateCliDeps,
+  locateCli,
+  runCli,
+} from './cli-backend.js';
+export {
   describeHost,
   type HostDescription,
   type ReadTailnetOptions,
@@ -14,6 +24,42 @@ export {
   type TailscaleExecOptions,
   tailscaleCliEnv,
 } from './host.js';
+export {
+  createLocalApiClient,
+  describeTarget,
+  LOCALAPI_HOST,
+  type LocalApiCallOptions,
+  type LocalApiClient,
+  type LocalApiResponse,
+  type LocalApiTarget,
+  type LocateLocalApiDeps,
+  locateLocalApi,
+  parseLsofSameUserProof,
+  TAILSCALE_CAP_VERSION,
+  WATCH_MASK,
+} from './localapi.js';
+export {
+  describePing,
+  type PingPath,
+  type PingResult,
+  parseGoDurationMs,
+  parsePingJson,
+  parsePingOutput,
+  stripGoLogPrefix,
+} from './ping-parse.js';
+export {
+  type BackendCallOptions,
+  type BackendChoice,
+  type ChooseBackendDeps,
+  chooseBackend,
+  createLocalApiBackend,
+  createTailnetAdapter,
+  NOT_INSTALLED_REASON,
+  type TailnetAdapter,
+  type TailnetAdapterDeps,
+  type TailnetBackend,
+  type WatchOptions,
+} from './tailnet-backend.js';
 export {
   buildHello,
   CLUSTER_HELLO_PATH,
@@ -43,3 +89,19 @@ export {
   type TailnetUser,
   timeField,
 } from './tailscale.js';
+export {
+  type LineStreamConnect,
+  notifyNeedsRefresh,
+  type ReconnectOptions,
+  runWithReconnect,
+  sleep,
+  statusDigest,
+} from './watch.js';
+export {
+  createWhoisCache,
+  parseWhois,
+  type WhoisCache,
+  type WhoisResult,
+  whoisFailure,
+  whoisKey,
+} from './whois.js';

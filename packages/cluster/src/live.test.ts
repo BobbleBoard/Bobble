@@ -72,4 +72,21 @@ describe.skipIf(!LIVE)('live, read-only (PI_CLUSTER_LIVE=1)', () => {
     expect(summary.peers).toBeGreaterThan(0);
     assertTailscaleStayedHidden(before, after);
   });
+
+  it('the adapter picks a backend, and whois/ping reach an own device', () => {
+    const before = frontmostApp();
+    const summary = runFinderLike('adapter');
+    const after = frontmostApp();
+    // eslint-disable-next-line no-console
+    console.log('[live] adapter', JSON.stringify({ ...summary, before, after }));
+    expect(summary.error).toBeUndefined();
+    expect(summary.state).toBe('Running');
+    expect(['localapi', 'cli']).toContain(summary.backend);
+    expect((summary.cli as { state?: string } | null)?.state).toBe('Running');
+    if (summary.target !== null) {
+      expect((summary.whois as { found?: boolean }).found).toBe(true);
+      expect((summary.whois as { stableIdMatches?: boolean }).stableIdMatches).toBe(true);
+    }
+    assertTailscaleStayedHidden(before, after);
+  });
 });

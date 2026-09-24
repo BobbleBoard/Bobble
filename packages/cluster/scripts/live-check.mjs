@@ -12,6 +12,8 @@
  *
  * Modes:
  *   read-tailnet  readTailnet() through the CLI (DEV-0)
+ *   adapter       the adapter's chosen backend + the CLI backend side by side:
+ *                 status, whois of this user's first online peer, one ping (DEV-1)
  *
  * The sources are TypeScript; Node strips the types itself. The one thing it
  * does not do is map the `./x.js` import specifiers the sources use to their
@@ -57,6 +59,71 @@ try {
         ms: Date.now() - t0,
         env: Object.keys(process.env),
         ...summarize(status),
+      }),
+    );
+  } else if (mode === 'adapter') {
+    const { createTailnetAdapter } = await import('../src/tailnet-backend.ts');
+    const { createCliBackend, locateCli } = await import('../src/cli-backend.ts');
+    const { sameUserPeers } = await import('../src/tailscale.ts');
+    const adapter = createTailnetAdapter();
+    const t0 = Date.now();
+    const status = await adapter.status();
+    const statusMs = Date.now() - t0;
+    const kind = adapter.backendKind();
+    const target = sameUserPeers(status).find((p) => p.online && !p.expired);
+    const whois = target === undefined ? null : await adapter.whois(target.ip);
+    const ping = target === undefined ? null : await adapter.ping(target.ip, { timeoutMs: 5000 });
+    // The CLI backend on its own, so both paths are proven on this machine.
+    const cliBin = await locateCli();
+    const cli = cliBin === null ? null : createCliBackend({ bin: cliBin });
+    const c0 = Date.now();
+    const cliStatus = cli === null ? null : await cli.status();
+    const cliMs = Date.now() - c0;
+    const cliPing =
+      cli === null || target === undefined ? null : await cli.ping(target.ip, { timeoutMs: 5000 });
+    console.log(
+      JSON.stringify({
+        mode,
+        backend: kind,
+        statusMs,
+        ...summarize(status),
+        target: target?.hostname ?? null,
+        whois:
+          whois === null
+            ? null
+            : {
+                found: whois.found,
+                ...(whois.found
+                  ? {
+                      stableIdMatches: whois.stableId === target?.id,
+                      userId: whois.userId,
+                      tags: whois.tags,
+                      shared: whois.shared,
+                    }
+                  : {}),
+              },
+        ping:
+          ping === null
+            ? null
+            : {
+                ok: ping.ok,
+                ...(ping.ok
+                  ? { path: ping.path, latencyMs: ping.latencyMs }
+                  : { reason: ping.reason }),
+              },
+        cli:
+          cli === null
+            ? null
+            : { ms: cliMs, state: cliStatus?.state, peers: cliStatus?.peers.length },
+        cliPing:
+          cliPing === null
+            ? null
+            : {
+                ok: cliPing.ok,
+                ...(cliPing.ok
+                  ? { path: cliPing.path, latencyMs: cliPing.latencyMs }
+                  : { reason: cliPing.reason }),
+              },
       }),
     );
   } else {
