@@ -802,9 +802,11 @@ export function recommend(run, table, plan = PLAN) {
   const pick = clean.find((r) => r.nominalGapMs[0] > blockedMin);
   const rec = run.recovery;
   const recovered = rec ? rec.cleanAfterMs !== null : false;
-  const retryDelaysMs = recovered
-    ? rec.probes.map((p) => p.waitMs)
-    : plan.recoveryWaitsMs.slice(0, 2);
+  // Every probe refused: waiting it out inside a run was tried, and it failed.
+  const probedInVain = Boolean(rec) && !recovered && rec.probes.length > 0;
+  let retryDelaysMs = plan.recoveryWaitsMs.slice(0, 2); // unmeasured placeholder
+  if (recovered) retryDelaysMs = rec.probes.map((p) => p.waitMs);
+  else if (probedInVain) retryDelaysMs = [];
   const giveUpAfterMs = rec && !recovered ? rec.lastBlockedAfterMs : null;
   const where =
     `${fb.reason} at request ${fb.request} (${fb.endpoint}, HTTP ${fb.status}), ` +
@@ -829,7 +831,7 @@ export function recommend(run, table, plan = PLAN) {
     // Refused at the slowest pace: no rate was shown to be safe, so none is offered.
     maxPerMinute: pick ? Math.max(1, fb.trailing60 - 1) : null,
     retryDelaysMs,
-    retryMeasured: recovered,
+    retryMeasured: recovered || probedInVain,
     giveUpAfterMs,
     basis: `${where[0].toUpperCase()}${where.slice(1)}. ${after}`,
     untested: pick
@@ -1278,7 +1280,8 @@ async function main() {
           ? '\n'
           : ` · pace ${rec.paceMinMs} ms + U(0, ${rec.paceJitterMs}) ms · ` +
             `${rec.maxPerMinute === null ? 'no safe rate shown' : `≤${rec.maxPerMinute}/min`} · ` +
-            `retry ${rec.retryDelaysMs.join(', ')} ms${rec.retryMeasured ? ' (measured)' : ' (not measured)'}\n`) +
+            `retry ${rec.retryDelaysMs.length ? `${rec.retryDelaysMs.join(', ')} ms` : 'none'}` +
+            `${rec.retryMeasured ? ' (measured)' : ' (not measured)'}\n`) +
         `${rec.basis}\n${rec.untested ?? ''}\n` +
         (report.notes.length ? `notes:\n- ${report.notes.join('\n- ')}\n` : '') +
         `written: ${base}.json\n`,

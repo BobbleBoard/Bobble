@@ -1,0 +1,555 @@
+{
+  "spike": "WF-00b workflows-ddg-pacing",
+  "schema": 1,
+  "question": "How much paced fan-out does DuckDuckGo tolerate before it refuses?",
+  "label": "repeat of run 1, 20 min after its last probe; run 1 spent 8 requests, so this run may spend 22 (package total 30)",
+  "startedAt": "2026-09-24T01:58:35.168Z",
+  "finishedAt": "2026-09-24T02:05:10.923Z",
+  "dry": false,
+  "seed": 23,
+  "runtime": {
+    "node": "24.18.0",
+    "electron": "43.1.0",
+    "undici": "7.28.0",
+    "tls": "BoringSSL",
+    "appElectron": "43.1.0",
+    "matchesApp": true
+  },
+  "plan": {
+    "budget": 22,
+    "floorMs": 2000,
+    "ceilMs": 5000,
+    "reserve": 3,
+    "requestTimeoutMs": 15000,
+    "resultsPerSearch": 10,
+    "tiers": [
+      {
+        "id": "gap-4.5-5s",
+        "path": "chain",
+        "gapMinMs": 4500,
+        "gapMaxMs": 5000,
+        "searches": 4
+      },
+      {
+        "id": "gap-3.5-4s",
+        "path": "chain",
+        "gapMinMs": 3500,
+        "gapMaxMs": 4000,
+        "searches": 4
+      },
+      {
+        "id": "gap-2.5-3s",
+        "path": "chain",
+        "gapMinMs": 2500,
+        "gapMaxMs": 3000,
+        "searches": 3
+      },
+      {
+        "id": "gap-2-2.5s",
+        "path": "chain",
+        "gapMinMs": 2000,
+        "gapMaxMs": 2500,
+        "searches": 15
+      },
+      {
+        "id": "lite-2-2.5s",
+        "path": "lite",
+        "gapMinMs": 2000,
+        "gapMaxMs": 2500,
+        "searches": 4,
+        "usesReserve": true
+      }
+    ],
+    "recoveryWaitsMs": [30000, 60000, 120000, 180000]
+  },
+  "requestShape": {
+    "method": "POST",
+    "url": "https://html.duckduckgo.com/html/",
+    "headerNames": ["accept", "accept-language", "content-type", "referer", "user-agent"],
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)",
+    "contentType": "application/x-www-form-urlencoded",
+    "body": "q=<query>&kl=wt-wt"
+  },
+  "environment": {
+    "atStart": {
+      "connections": 0,
+      "processes": []
+    },
+    "atEnd": {
+      "connections": 0,
+      "processes": []
+    }
+  },
+  "totals": {
+    "requests": 6,
+    "searches": 5,
+    "budgetUsed": 6,
+    "refusedByBudget": 0,
+    "refusedByDuckDuckGo": 6,
+    "wallMs": 395596,
+    "pacing": {
+      "minGapMs": 4547,
+      "loadMaxGapMs": 4547,
+      "floorRespected": true,
+      "loadGapsOverCeiling": 0
+    }
+  },
+  "table": [
+    {
+      "tier": "gap-4.5-5s",
+      "path": "chain",
+      "nominalGapMs": [4500, 5000],
+      "actualGapMs": {
+        "min": 4547,
+        "median": 4547,
+        "max": 4547
+      },
+      "searches": 1,
+      "requests": 2,
+      "html": {
+        "requests": 1,
+        "ok": 0,
+        "empty": 0,
+        "blocked": 1,
+        "errors": 0
+      },
+      "lite": {
+        "requests": 1,
+        "ok": 0,
+        "empty": 0,
+        "blocked": 1,
+        "errors": 0
+      },
+      "outcomes": {
+        "failed": 1
+      },
+      "resultsPerSearchMedian": null,
+      "latencyMs": {
+        "p50": 191,
+        "p95": 218,
+        "max": 218
+      },
+      "peakPerMinute": 2,
+      "blocked": 2,
+      "verdict": "challenged",
+      "note": "stopped at search 1: challenged"
+    },
+    {
+      "tier": "gap-3.5-4s",
+      "path": "chain",
+      "nominalGapMs": [3500, 4000],
+      "actualGapMs": null,
+      "searches": 0,
+      "requests": 0,
+      "html": {
+        "requests": 0,
+        "ok": 0,
+        "empty": 0,
+        "blocked": 0,
+        "errors": 0
+      },
+      "lite": {
+        "requests": 0,
+        "ok": 0,
+        "empty": 0,
+        "blocked": 0,
+        "errors": 0
+      },
+      "outcomes": {},
+      "resultsPerSearchMedian": null,
+      "latencyMs": {
+        "p50": null,
+        "p95": null,
+        "max": null
+      },
+      "peakPerMinute": 0,
+      "blocked": 0,
+      "verdict": "not run",
+      "note": "not run: the load had already stopped"
+    },
+    {
+      "tier": "gap-2.5-3s",
+      "path": "chain",
+      "nominalGapMs": [2500, 3000],
+      "actualGapMs": null,
+      "searches": 0,
+      "requests": 0,
+      "html": {
+        "requests": 0,
+        "ok": 0,
+        "empty": 0,
+        "blocked": 0,
+        "errors": 0
+      },
+      "lite": {
+        "requests": 0,
+        "ok": 0,
+        "empty": 0,
+        "blocked": 0,
+        "errors": 0
+      },
+      "outcomes": {},
+      "resultsPerSearchMedian": null,
+      "latencyMs": {
+        "p50": null,
+        "p95": null,
+        "max": null
+      },
+      "peakPerMinute": 0,
+      "blocked": 0,
+      "verdict": "not run",
+      "note": "not run: the load had already stopped"
+    },
+    {
+      "tier": "gap-2-2.5s",
+      "path": "chain",
+      "nominalGapMs": [2000, 2500],
+      "actualGapMs": null,
+      "searches": 0,
+      "requests": 0,
+      "html": {
+        "requests": 0,
+        "ok": 0,
+        "empty": 0,
+        "blocked": 0,
+        "errors": 0
+      },
+      "lite": {
+        "requests": 0,
+        "ok": 0,
+        "empty": 0,
+        "blocked": 0,
+        "errors": 0
+      },
+      "outcomes": {},
+      "resultsPerSearchMedian": null,
+      "latencyMs": {
+        "p50": null,
+        "p95": null,
+        "max": null
+      },
+      "peakPerMinute": 0,
+      "blocked": 0,
+      "verdict": "not run",
+      "note": "not run: the load had already stopped"
+    },
+    {
+      "tier": "lite-2-2.5s",
+      "path": "lite",
+      "nominalGapMs": [2000, 2500],
+      "actualGapMs": null,
+      "searches": 0,
+      "requests": 0,
+      "html": {
+        "requests": 0,
+        "ok": 0,
+        "empty": 0,
+        "blocked": 0,
+        "errors": 0
+      },
+      "lite": {
+        "requests": 0,
+        "ok": 0,
+        "empty": 0,
+        "blocked": 0,
+        "errors": 0
+      },
+      "outcomes": {},
+      "resultsPerSearchMedian": null,
+      "latencyMs": {
+        "p50": null,
+        "p95": null,
+        "max": null
+      },
+      "peakPerMinute": 0,
+      "blocked": 0,
+      "verdict": "not run",
+      "note": "not run: the load had already stopped"
+    },
+    {
+      "tier": "recovery",
+      "path": "recovery",
+      "nominalGapMs": null,
+      "actualGapMs": {
+        "min": 30192,
+        "median": 60214,
+        "max": 180206
+      },
+      "searches": 4,
+      "requests": 4,
+      "html": {
+        "requests": 4,
+        "ok": 0,
+        "empty": 0,
+        "blocked": 4,
+        "errors": 0
+      },
+      "lite": {
+        "requests": 0,
+        "ok": 0,
+        "empty": 0,
+        "blocked": 0,
+        "errors": 0
+      },
+      "outcomes": {
+        "failed": 4
+      },
+      "resultsPerSearchMedian": null,
+      "latencyMs": {
+        "p50": 202,
+        "p95": 225,
+        "max": 225
+      },
+      "peakPerMinute": 3,
+      "blocked": 4,
+      "verdict": "still refused",
+      "note": "still refused 395 s after the first block"
+    }
+  ],
+  "firstBlock": {
+    "reason": "challenged",
+    "request": 1,
+    "search": 1,
+    "tier": "gap-4.5-5s",
+    "endpoint": "html",
+    "status": 202,
+    "markers": ["anomaly-modal", "challenge-form", "bots-use-duckduckgo", "anomaly-js"],
+    "backendSeesBlock": true,
+    "afterMs": 0,
+    "requestsBefore": 0,
+    "trailing60": 1,
+    "bytes": 14281,
+    "sha256": "5b9ffacf8185f45b",
+    "title": "DuckDuckGo"
+  },
+  "recovery": {
+    "endpoint": "html",
+    "probes": [
+      {
+        "waitMs": 30000,
+        "sinceFirstBlockMs": 34740,
+        "kind": "blocked",
+        "status": 202,
+        "results": 0
+      },
+      {
+        "waitMs": 60000,
+        "sinceFirstBlockMs": 94954,
+        "kind": "blocked",
+        "status": 202,
+        "results": 0
+      },
+      {
+        "waitMs": 120000,
+        "sinceFirstBlockMs": 215183,
+        "kind": "blocked",
+        "status": 202,
+        "results": 0
+      },
+      {
+        "waitMs": 180000,
+        "sinceFirstBlockMs": 395389,
+        "kind": "blocked",
+        "status": 202,
+        "results": 0
+      }
+    ],
+    "lastBlockedAfterMs": 395389,
+    "cleanAfterMs": null,
+    "note": "still refused 395 s after the first block"
+  },
+  "recommendation": {
+    "endpointOrder": ["html", "lite"],
+    "paceScope": "every request, the lite fallback included (pace inside the fetch, not between searches)",
+    "status": "challenged-at-slowest",
+    "primaryBackend": "browser-or-key",
+    "paceMinMs": 5000,
+    "paceJitterMs": 1000,
+    "maxPerMinute": null,
+    "retryDelaysMs": [30000, 60000],
+    "retryMeasured": false,
+    "giveUpAfterMs": 395389,
+    "basis": "Challenged at request 1 (html, HTTP 202), 0 s in, with 1 request in the trailing 60 s. Still refused 395 s after it, so treat DuckDuckGo as unavailable for the rest of that run: fall back to the browser search and say so under Limits.",
+    "untested": "Even the slowest tier was refused, so pacing alone will not carry a research run from this network: use the browser search or a Brave/Tavily key.",
+    "searchDefaults": {
+      "primaryBackend": "browser-or-key",
+      "paceMinMs": 5000,
+      "paceJitterMs": 1000,
+      "maxPerMinute": null,
+      "retryDelaysMs": [30000, 60000],
+      "giveUpAfterMs": 395389,
+      "endpointOrder": ["html", "lite"]
+    }
+  },
+  "notes": [],
+  "requests": [
+    {
+      "i": 1,
+      "tier": "gap-4.5-5s",
+      "search": 1,
+      "endpoint": "html",
+      "tMs": 0,
+      "gapMs": null,
+      "latencyMs": 218,
+      "status": 202,
+      "kind": "blocked",
+      "markers": ["anomaly-modal", "challenge-form", "bots-use-duckduckgo", "anomaly-js"],
+      "backendSeesBlock": true,
+      "bytes": 14281,
+      "results": 0,
+      "topDomains": [],
+      "trailing60": 1
+    },
+    {
+      "i": 2,
+      "tier": "gap-4.5-5s",
+      "search": 1,
+      "endpoint": "lite",
+      "tMs": 4547,
+      "gapMs": 4547,
+      "latencyMs": 191,
+      "status": 202,
+      "kind": "blocked",
+      "markers": ["anomaly-modal", "challenge-form", "bots-use-duckduckgo", "anomaly-js"],
+      "backendSeesBlock": true,
+      "bytes": 14287,
+      "results": 0,
+      "topDomains": [],
+      "trailing60": 2
+    },
+    {
+      "i": 3,
+      "tier": "recovery",
+      "search": 2,
+      "endpoint": "html",
+      "tMs": 34740,
+      "gapMs": 30192,
+      "latencyMs": 211,
+      "status": 202,
+      "kind": "blocked",
+      "markers": ["anomaly-modal", "challenge-form", "bots-use-duckduckgo", "anomaly-js"],
+      "backendSeesBlock": true,
+      "bytes": 14246,
+      "results": 0,
+      "topDomains": [],
+      "trailing60": 3
+    },
+    {
+      "i": 4,
+      "tier": "recovery",
+      "search": 3,
+      "endpoint": "html",
+      "tMs": 94954,
+      "gapMs": 60214,
+      "latencyMs": 225,
+      "status": 202,
+      "kind": "blocked",
+      "markers": ["anomaly-modal", "challenge-form", "bots-use-duckduckgo", "anomaly-js"],
+      "backendSeesBlock": true,
+      "bytes": 14263,
+      "results": 0,
+      "topDomains": [],
+      "trailing60": 1
+    },
+    {
+      "i": 5,
+      "tier": "recovery",
+      "search": 4,
+      "endpoint": "html",
+      "tMs": 215183,
+      "gapMs": 120229,
+      "latencyMs": 202,
+      "status": 202,
+      "kind": "blocked",
+      "markers": ["anomaly-modal", "challenge-form", "bots-use-duckduckgo", "anomaly-js"],
+      "backendSeesBlock": true,
+      "bytes": 14243,
+      "results": 0,
+      "topDomains": [],
+      "trailing60": 1
+    },
+    {
+      "i": 6,
+      "tier": "recovery",
+      "search": 5,
+      "endpoint": "html",
+      "tMs": 395389,
+      "gapMs": 180206,
+      "latencyMs": 202,
+      "status": 202,
+      "kind": "blocked",
+      "markers": ["anomaly-modal", "challenge-form", "bots-use-duckduckgo", "anomaly-js"],
+      "backendSeesBlock": true,
+      "bytes": 14299,
+      "results": 0,
+      "topDomains": [],
+      "trailing60": 1
+    }
+  ],
+  "searches": [
+    {
+      "s": 1,
+      "tier": "gap-4.5-5s",
+      "path": "chain",
+      "query": "EU residential battery storage installations 2025",
+      "gapMs": 4546,
+      "outcome": "failed",
+      "results": 0,
+      "via": null,
+      "error": "DuckDuckGo served no usable results page (last status 202); it may be rate-limiting automated requests",
+      "requests": [1, 2]
+    },
+    {
+      "s": 2,
+      "tier": "recovery",
+      "path": "recovery",
+      "query": "home battery prices Germany per kWh",
+      "gapMs": 2000,
+      "outcome": "failed",
+      "results": 0,
+      "via": null,
+      "skipped": ["lite"],
+      "error": "DuckDuckGo served no usable results page (last status 599); it may be rate-limiting automated requests",
+      "requests": [3]
+    },
+    {
+      "s": 3,
+      "tier": "recovery",
+      "path": "recovery",
+      "query": "LFP vs NMC home battery cycle life",
+      "gapMs": 2000,
+      "outcome": "failed",
+      "results": 0,
+      "via": null,
+      "skipped": ["lite"],
+      "error": "DuckDuckGo served no usable results page (last status 599); it may be rate-limiting automated requests",
+      "requests": [4]
+    },
+    {
+      "s": 4,
+      "tier": "recovery",
+      "path": "recovery",
+      "query": "heat pump sales Europe 2025",
+      "gapMs": 2000,
+      "outcome": "failed",
+      "results": 0,
+      "via": null,
+      "skipped": ["lite"],
+      "error": "DuckDuckGo served no usable results page (last status 599); it may be rate-limiting automated requests",
+      "requests": [5]
+    },
+    {
+      "s": 5,
+      "tier": "recovery",
+      "path": "recovery",
+      "query": "IEA renewables report solar capacity additions",
+      "gapMs": 2000,
+      "outcome": "failed",
+      "results": 0,
+      "via": null,
+      "skipped": ["lite"],
+      "error": "DuckDuckGo served no usable results page (last status 599); it may be rate-limiting automated requests",
+      "requests": [6]
+    }
+  ]
+}

@@ -309,7 +309,9 @@ describe('runProtocol against the stand-in', () => {
       primaryBackend: 'browser-or-key',
       paceMinMs: 5000,
       maxPerMinute: null,
-      retryMeasured: false,
+      // Four probes over 6.5 min all refused: retrying inside a run is measured futile.
+      retryDelaysMs: [],
+      retryMeasured: true,
     });
     expect(rec.giveUpAfterMs).toBeGreaterThan(390_000);
   });
