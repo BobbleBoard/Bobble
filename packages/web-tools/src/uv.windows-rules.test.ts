@@ -231,6 +231,41 @@ describe('ensureUv under Windows file rules', () => {
     expect(readdirSync(dir).sort()).toEqual([UV_MARKER, `uv-${TARGET}`]);
   });
 
+  it('uses a copy another process finished while this one downloaded: no wait, no replace', async () => {
+    // The app and its pi child both bootstrap uv at first run. Here the other one
+    // finishes (marker written) during this download and is already running its
+    // uv.exe; replacing that copy could only wait out the running file (9.5 s).
+    const dir = join(workdir, 'finished-meanwhile');
+    const installDir = uvInstallDir(dir, TARGET);
+    const { fs, sleeps } = windowsLikeFs({ running: [join(installDir, 'uv.exe')] });
+    const otherFinishes = (async () => {
+      await oldCopy(dir);
+      await writeFile(
+        join(dir, UV_MARKER),
+        JSON.stringify({
+          version: release.version,
+          uvPath: join(installDir, 'uv.exe'),
+          target: TARGET,
+          assetName: release.assetName,
+          sha256: release.sha256,
+        }),
+      );
+      return new Response(new Uint8Array(zip));
+    }) as typeof fetch;
+    const install = await ensureUv({
+      ignorePath: true,
+      dir,
+      release,
+      fetchImpl: otherFinishes,
+      fs,
+    });
+    expect(install.uvPath).toBe(join(installDir, 'uv.exe'));
+    expect(await readFile(install.uvPath, 'utf8')).toBe('MZ old uv');
+    expect(sleeps).toEqual([]);
+    expect(readdirSync(installDir).sort()).toEqual(EXES);
+    expect(readdirSync(dir).sort()).toEqual([UV_MARKER, `uv-${TARGET}`]);
+  });
+
   it('removes the download and staging folder through a scanner’s brief hold', async () => {
     const dir = join(workdir, 'cleanup');
     const holds: Hold[] = [

@@ -227,6 +227,42 @@ describe('ensureUv download path (injected fetch + extract)', () => {
     expect(fetchImpl.urls.length).toBe(1);
   });
 
+  it('uses a copy another process finished meanwhile instead of replacing it', async () => {
+    // The app and its pi child can both start the first install; the other one
+    // completes it (binary + marker) while this download is in flight.
+    const dir = join(workdir, 'finished-meanwhile');
+    const other = join(dir, 'uv-aarch64-apple-darwin', 'uv');
+    const otherFinishes = (async () => {
+      await mkdir(join(dir, 'uv-aarch64-apple-darwin'), { recursive: true });
+      await writeFile(other, '#!/bin/sh\necho the other copy');
+      await writeFile(
+        join(dir, UV_MARKER),
+        JSON.stringify({
+          version: PINNED_UV.version,
+          uvPath: other,
+          target: 'aarch64-apple-darwin',
+        }),
+      );
+      return new Response(new Uint8Array(bytes));
+    }) as typeof fetch;
+    const install = await ensureUv({
+      ignorePath: true,
+      dir,
+      release,
+      fetchImpl: otherFinishes,
+      extract,
+    });
+    expect(install).toEqual({
+      uvPath: other,
+      source: 'download',
+      version: PINNED_UV.version,
+      target: 'aarch64-apple-darwin',
+    });
+    expect(await readFile(other, 'utf8')).toBe('#!/bin/sh\necho the other copy');
+    expect(readdirSync(join(dir, 'uv-aarch64-apple-darwin'))).toEqual(['uv']);
+    expect(readdirSync(dir).sort()).toEqual([UV_MARKER, 'uv-aarch64-apple-darwin']);
+  });
+
   it('leaves no install and no marker when extraction fails', async () => {
     const dir = join(workdir, 'broken');
     await expect(

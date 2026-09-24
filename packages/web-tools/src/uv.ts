@@ -12,7 +12,9 @@
  * The install is atomic: the archive is unpacked into a staging folder and
  * renamed into place, so a crash leaves no half-written `uv-<target>/`, and an
  * `.installed.json` marker (version, target, digest, path) lets later runs skip
- * all work. Concurrent callers in one process share a single install. Provisioning
+ * all work. Concurrent callers in one process share a single install; across
+ * processes (the app and its pi child), an install that finds the other's
+ * finished copy when its own download is done uses that copy. Provisioning
  * an isolated Python is uv's job (see python.ts) — we never touch system Python.
  *
  * Windows' file rules are followed (win-fs.ts): a virus scanner holding the fresh
@@ -308,6 +310,20 @@ async function install(
       throw new Error(`${release.binName} not found in ${release.assetName} after extracting it`);
     }
     if (fs.platform !== 'win32') await chmod(found, 0o755).catch(() => {});
+
+    // The app and its pi child (python_run) can each start this install at first
+    // run. If the other one finished while this one downloaded, its copy is used
+    // as it is: replacing it would pull it from under a caller that may already
+    // be running it, and on Windows would wait out that running uv.exe for nothing.
+    const finishedMeanwhile = readUvMarker(dir, release);
+    if (finishedMeanwhile !== undefined) {
+      return {
+        uvPath: finishedMeanwhile,
+        source: 'download',
+        version: release.version,
+        target: release.target,
+      };
+    }
 
     const installDir = uvInstallDir(dir, release.target);
     await moveIntoPlace(dirname(found), installDir, aside, release.binName, fs);
