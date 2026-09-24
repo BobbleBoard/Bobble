@@ -7,16 +7,20 @@ Layout under the cache root (~/.cache/bobble/gen3d):
   src/        cloned tool repos + their venvs (trellis-mac, Mage, cube, ...)
   bin/        the AutoRemesher .app
   installed/  <model-id>.json stamps written after weights+env verification
+  assembled/  checkpoint dirs built from other repos' files (a model's
+              `layout`): symlinks into hf/ plus a few small files
 """
 
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import tarfile
 import tempfile
 import urllib.request
+import uuid
 from pathlib import Path
 
 # Pinned tool-repo commits (verified working together on this hardware,
@@ -140,8 +144,8 @@ class Registry:
         """Mage-Flow-Edit-Turbo — edit an existing image from a text instruction.
 
         MEASURED: 9s for a 1024px edit at 4 steps, 14.76 GB peak, on the same
-        mflux venv as generation. Its weights are a SEPARATE download
-        (microsoft/Mage-Flow-Edit-Turbo) from the generator's.
+        mflux venv as generation. Its transformer is a separate download from
+        the generator's; the text encoder and VAE are the same files.
         """
         return self.tool_dir("mflux") / ".venv" / "bin" / "mflux-generate-mage-flow-edit"
 
@@ -210,14 +214,89 @@ class Registry:
     def meshtools_python(self) -> Path:
         return self.tool_dir("meshtools") / ".venv" / "bin" / "python"
 
+    # ---- hub cache --------------------------------------------------------------
+    def hub_repo_dir(self, repo: str) -> Path:
+        """`models--org--name` in the hub cache (a symlink to its library shelf
+        once the app has shelved it — every path below follows it)."""
+        return self.hf_home / "hub" / ("models--" + repo.replace("/", "--"))
+
+    def repo_snapshot(self, spec: dict) -> Path | None:
+        """The snapshot dir holding a COMPLETE copy of `spec`, or None.
+
+        Complete means every pinned file resolves to the blob its sha256 names
+        and every literal allow-pattern is a file (a glob needs one match). This
+        reads the cache layout directly rather than asking huggingface_hub:
+        `snapshot_download(local_files_only=True)` answers yes for a snapshot
+        folder that exists at all, which an interrupted download also leaves.
+        `refs/main`'s snapshot is tried first, then the rest, newest first.
+        """
+        base = self.hub_repo_dir(spec["repo"]) / "snapshots"
+        if not base.is_dir():
+            return None
+        try:
+            head = (self.hub_repo_dir(spec["repo"]) / "refs" / "main").read_text().strip()
+        except OSError:
+            head = ""
+        try:
+            others = [d for d in base.iterdir() if d.is_dir() and d.name != head]
+        except OSError:
+            return None
+        others.sort(key=lambda d: d.stat().st_mtime, reverse=True)
+        first = [base / head] if head and (base / head).is_dir() else []
+        for snap in first + others:
+            if snapshot_complete(snap, spec):
+                return snap
+        return None
+
+    def pin_mismatch(self, spec: dict) -> str | None:
+        """Why a freshly downloaded `spec` is not the pinned bytes, or None.
+
+        The hub names an LFS blob after its sha256, so a file the hub now serves
+        with different bytes lands under a different name — this says which.
+        """
+        base = self.hub_repo_dir(spec["repo"]) / "snapshots"
+        try:
+            snaps = sorted(base.iterdir(), key=lambda d: d.stat().st_mtime, reverse=True)
+        except OSError:
+            return f"{spec['repo']} left no snapshot in the cache"
+        for pin in spec.get("pinned") or []:
+            for snap in snaps:
+                path = snap / pin["path"]
+                if not path.exists():
+                    continue
+                got = Path(os.path.realpath(path)).name
+                if got != pin["sha256"] and path.is_symlink():
+                    return (
+                        f"{spec['repo']}: {pin['path']} is not the pinned file "
+                        f"(sha256 {got[:12]}…, expected {pin['sha256'][:12]}…) — refusing to use it"
+                    )
+                break
+            else:
+                return f"{spec['repo']}: {pin['path']} did not download"
+        return None
+
     # ---- installed checks ---------------------------------------------------
+    def legacy_snapshot(self, model_id: str) -> Path | None:
+        """A complete copy of a repo this model used to download, or None."""
+        model = self.model(model_id) or {}
+        for spec in model.get("legacyRepos") or []:
+            snap = self.repo_snapshot(spec)
+            if snap is not None:
+                return snap
+        return None
+
     def weights_present(self, model_id: str) -> bool:
-        """True when every repo snapshot resolves offline (hf cache complete)."""
+        """True when the weights are on disk: every repo complete, or a
+        complete legacy copy (see `legacyRepos` in the catalog)."""
         model = self.model(model_id)
         if model is None:
             return False
         if not model["repos"]:
             return True
+        if self.legacy_snapshot(model_id) is not None:
+            return True
+        if model.get("layout") or any(r.get("pinned") for r in model["repos"]):
+            return all(self.repo_snapshot(r) is not None for r in model["repos"])
         try:
             from huggingface_hub import snapshot_download
         except ImportError:
@@ -232,6 +311,72 @@ class Registry:
             except Exception:
                 return False
         return True
+
+    def model_dir(self, model_id: str) -> Path | None:
+        """The checkpoint directory a worker loads for `model_id`, or None.
+
+        A complete legacy snapshot wins (it IS the release's directory); else a
+        model with a `layout` gets its assembled directory, rebuilt if anything
+        in it no longer matches its sources; else None.
+        """
+        legacy = self.legacy_snapshot(model_id)
+        if legacy is not None:
+            return legacy
+        model = self.model(model_id) or {}
+        layout = model.get("layout")
+        if not layout:
+            return None
+        snaps: dict[str, Path] = {}
+        for spec in model["repos"]:
+            snap = self.repo_snapshot(spec)
+            if snap is None:
+                return None
+            snaps[spec["repo"]] = snap
+        return self.ensure_layout(model_id, layout, snaps)
+
+    def assembled_dir(self, model_id: str) -> Path:
+        return self.cache_dir / "assembled" / model_id
+
+    def ensure_layout(self, model_id: str, layout: list[dict], snaps: dict[str, Path]) -> Path:
+        """Build (or keep) `assembled/<model_id>` from `layout`.
+
+        Symlinks point at the SNAPSHOT paths (never the resolved blobs), so the
+        hub's own indirection — and the library shelf the app may move a repo
+        to — stays in the chain. Built beside the target and swapped in, so a
+        reader never sees half a directory.
+        """
+        dest = self.assembled_dir(model_id)
+        if _layout_matches(dest, layout, snaps):
+            return dest
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        tmp = dest.parent / f".{model_id}.{uuid.uuid4().hex[:8]}"
+        try:
+            for entry in layout:
+                target = tmp / entry["path"]
+                target.parent.mkdir(parents=True, exist_ok=True)
+                if entry["kind"] == "text":
+                    target.write_bytes(entry["text"].encode("utf-8"))
+                elif entry["kind"] == "file":
+                    os.symlink(str(snaps[entry["repo"]] / entry["source"]), target)
+                elif entry["kind"] == "dir":
+                    source = snaps[entry["repo"]]
+                    for rel in _snapshot_files(source):
+                        link = target / rel
+                        link.parent.mkdir(parents=True, exist_ok=True)
+                        os.symlink(str(source / rel), link)
+                else:
+                    raise ValueError(f"unknown layout entry kind {entry['kind']!r}")
+            old = None
+            if dest.exists() or dest.is_symlink():
+                old = dest.parent / f".{model_id}.old.{uuid.uuid4().hex[:8]}"
+                dest.rename(old)
+            tmp.rename(dest)
+            if old is not None:
+                shutil.rmtree(old, ignore_errors=True)
+        finally:
+            if tmp.exists():
+                shutil.rmtree(tmp, ignore_errors=True)
+        return dest
 
     def env_present(self, model_id: str) -> bool:
         model = self.model(model_id)
@@ -331,6 +476,86 @@ class Registry:
                 ["git", "-C", str(dest), "checkout", pin], check=True, capture_output=True
             )
         return dest
+
+
+_GLOB_CHARS = frozenset("*?[")
+
+
+def pinned_file_ok(path: Path, pin: dict) -> bool:
+    """Is `path` (a snapshot entry) the pinned file?
+
+    In the hub cache a snapshot entry is a symlink to `blobs/<etag>`, and an LFS
+    file's etag is the sha256 of its bytes — so the name the link resolves to
+    IS the check, with nothing hashed. A plain file (a cache written without
+    symlinks, as the hub library does where it cannot make them) is held to
+    its size, the one thing cheap to check.
+    """
+    try:
+        if not path.is_file():  # follows the link: a dangling one is not a file
+            return False
+        if path.is_symlink():
+            return Path(os.path.realpath(path)).name == pin["sha256"]
+        return path.stat().st_size == pin["bytes"]
+    except OSError:
+        return False
+
+
+def snapshot_complete(snap: Path, spec: dict) -> bool:
+    """Every pinned file right, and every allow-pattern satisfied, in `snap`."""
+    for pin in spec.get("pinned") or []:
+        if not pinned_file_ok(snap / pin["path"], pin):
+            return False
+    for pattern in spec.get("allowPatterns") or []:
+        if _GLOB_CHARS & set(pattern):
+            if not any(p.is_file() for p in snap.glob(pattern)):
+                return False
+        elif not (snap / pattern).is_file():
+            return False
+    return True
+
+
+def _snapshot_files(root: Path) -> list[Path]:
+    """Every file under a snapshot dir, relative to it, in a stable order."""
+    out: list[Path] = []
+    for dirpath, _dirs, files in os.walk(root, followlinks=True):
+        out.extend(Path(dirpath, name).relative_to(root) for name in files)
+    return sorted(out)
+
+
+def _link_ok(link: Path, expected: Path) -> bool:
+    try:
+        return link.is_symlink() and os.readlink(link) == str(expected) and link.exists()
+    except OSError:
+        return False
+
+
+def _layout_matches(dest: Path, layout: list[dict], snaps: dict[str, Path]) -> bool:
+    """Does `dest` already hold exactly this layout over these snapshots?"""
+    if not dest.is_dir():
+        return False
+    try:
+        for entry in layout:
+            target = dest / entry["path"]
+            kind = entry["kind"]
+            if kind == "text":
+                if target.is_symlink() or not target.is_file():
+                    return False
+                if target.read_bytes() != entry["text"].encode("utf-8"):
+                    return False
+            elif kind == "file":
+                if not _link_ok(target, snaps[entry["repo"]] / entry["source"]):
+                    return False
+            elif kind == "dir":
+                source = snaps[entry["repo"]]
+                want = _snapshot_files(source)
+                have = sorted(p.relative_to(target) for p in target.rglob("*") if p.is_symlink())
+                if want != have or not all(_link_ok(target / r, source / r) for r in want):
+                    return False
+            else:
+                return False
+    except OSError:
+        return False
+    return True
 
 
 def git_usable() -> bool:

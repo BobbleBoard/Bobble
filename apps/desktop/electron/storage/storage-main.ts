@@ -3,8 +3,9 @@
  *
  * Boot: put the library root on the environment (every engine child inherits
  * it), move whatever is still in `~/.cache` onto the shelves (library-migration
- * — renames, engine views kept), and keep Spotlight out of the library the
- * way it is kept out of the cache.
+ * — renames, engine views kept), put back the hub links a reset 3D cache lost
+ * (hub-relink), and keep Spotlight out of the library the way it is kept out
+ * of the cache.
  *
  * Page: a tree with sizes for the library and the support root, Reveal in
  * Finder, Trash (never rm), and a move of the whole library to another folder
@@ -26,7 +27,7 @@ import {
 import { cp, readdir, readFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { GEN3D_MODEL_SPECS } from '@pi-desktop/gen3d-engine';
+import { repoAttribution } from '@pi-desktop/gen3d-engine';
 import { cacheRoot, getCatalogModel, legacyCacheRoot, libraryRoot } from '@pi-desktop/inference';
 import {
   defaultLibraryRoot,
@@ -38,6 +39,7 @@ import { createLogger, registerIpcHandlers } from '@pi-desktop/shared';
 import { dialog, type IpcMain, shell } from 'electron';
 import { getLoadedModel } from '../inference/llm-main';
 import { readSettings, writeSettingsPatch } from '../settings/settings-main';
+import { relinkAtBoot } from './hub-relink';
 import {
   applyLibraryMigration,
   type MigrationResult,
@@ -168,6 +170,8 @@ export function runLibraryMigration(opts: { readonly skipRepos?: readonly string
           }),
         };
   const plan = planLibraryMigration(snap);
+  // The inverse: a 3D cache that lost its links gets them back (hub-relink.ts).
+  relinkAtBoot(cache, lib, skip, log);
   if (plan.moves.length === 0) return;
   const result = applyLibraryMigration(plan);
   lastMigration = { ...result, ranAt: new Date().toISOString(), unsorted: plan.unsorted };
@@ -397,14 +401,20 @@ async function modelNode(
   const catalog = repo === null ? getCatalogModel(base) : undefined;
   const name = repo ?? catalog?.displayName ?? base;
   const shelf = shelfOf(p);
-  // What a catalog says about it: the 3D engine's spec for a hub repo, the
-  // store's manifest for a repo it downloaded.
-  const spec =
-    repo === null ? undefined : GEN3D_MODEL_SPECS.find((m) => m.repos.some((r) => r.repo === repo));
+  // What a catalog says about it: the 3D engine's spec for a hub repo (or, for
+  // one several engine models share, that it is shared), the store's manifest
+  // for a repo it downloaded.
+  const spec = repo === null ? undefined : repoAttribution(repo);
   const manifest = await readManifestLite(p);
   const meta = {
     ...(repo !== null ? { org: repo.split('/')[0] ?? '', repo } : {}),
-    ...(spec !== undefined ? { blurb: spec.note, tasks: [spec.role], label: spec.label } : {}),
+    ...(spec !== undefined
+      ? {
+          blurb: spec.blurb,
+          tasks: [...spec.roles],
+          ...(spec.label !== undefined ? { label: spec.label } : {}),
+        }
+      : {}),
     ...(manifest !== null
       ? {
           ...(manifest.notes !== undefined ? { blurb: manifest.notes } : {}),

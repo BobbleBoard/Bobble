@@ -12,8 +12,10 @@ so the last 3% simply reads as "finishing up").
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from pathlib import Path
@@ -27,6 +29,27 @@ ENV_PHASE_FRACTION = 0.97
 
 def repo_cache_dir(hf_home: Path, repo: str) -> Path:
     return hf_home / "hub" / ("models--" + repo.replace("/", "--"))
+
+
+def pinned_bytes_on_disk(hf_home: Path, spec: dict) -> int:
+    """Bytes of exactly the pinned blobs present, partial downloads included.
+
+    A repo two models share (Comfy-Org/Mage-Flow: the generator's and the
+    editor's transformers) holds the other model's 8 GB too; counting the whole
+    blobs dir would put this download at "done" before it began. The hub names
+    an LFS blob after its sha256 and a partial one `<sha256>.incomplete`, so the
+    pins say exactly which files are this download's.
+    """
+    blobs = repo_cache_dir(hf_home, spec["repo"]) / "blobs"
+    total = 0
+    for pin in spec.get("pinned") or []:
+        for name in (pin["sha256"], pin["sha256"] + ".incomplete"):
+            try:
+                total += min((blobs / name).stat().st_size, int(pin["bytes"]))
+                break
+            except OSError:
+                continue
+    return total
 
 
 def bytes_on_disk(hf_home: Path, repo: str) -> int:
@@ -111,22 +134,51 @@ class DownloadManager:
         try:
             received_base = 0
             monotonic_max = 0
-            for repo in model["repos"]:
+            # A complete copy from where the model USED to come from is its
+            # weights (Mage-Flow's withdrawn microsoft/* repos): set up the
+            # runtime, never fetch 17 GB again from the new source.
+            repos = [] if self.registry.legacy_snapshot(model_id) is not None else model["repos"]
+            for repo in repos:
                 if task.cancelled.is_set():
                     raise InterruptedError("cancelled")
                 repo_total = int(repo["bytes"])
-                proc = self._spawn_fetch(repo)
-                task.proc = proc
-                while proc.poll() is None:
-                    if task.cancelled.is_set():
-                        proc.terminate()
-                        raise InterruptedError("cancelled")
-                    on_disk = min(bytes_on_disk(self.registry.hf_home, repo["repo"]), repo_total)
-                    monotonic_max = max(monotonic_max, min(received_base + on_disk, weights_cap))
+                pinned = bool(repo.get("pinned"))
+                # Already whole — shared with another model (the Qwen3-VL text
+                # encoder CubePart uses) or fetched before: nothing to ask the
+                # hub, which also keeps an offline re-install working.
+                if pinned and self.registry.repo_snapshot(repo) is not None:
+                    received_base += repo_total
+                    monotonic_max = max(monotonic_max, min(received_base, weights_cap))
                     self._emit(model_id, monotonic_max, total, False)
-                    time.sleep(1.0)
-                if proc.returncode != 0:
-                    raise RuntimeError(f"download failed for {repo['repo']} (exit {proc.returncode})")
+                    continue
+                proc, err_path = self._spawn_fetch(repo)
+                task.proc = proc
+                try:
+                    while proc.poll() is None:
+                        if task.cancelled.is_set():
+                            proc.terminate()
+                            raise InterruptedError("cancelled")
+                        if pinned:
+                            on_disk = pinned_bytes_on_disk(self.registry.hf_home, repo)
+                        else:
+                            on_disk = bytes_on_disk(self.registry.hf_home, repo["repo"])
+                        on_disk = min(on_disk, repo_total)
+                        monotonic_max = max(monotonic_max, min(received_base + on_disk, weights_cap))
+                        self._emit(model_id, monotonic_max, total, False)
+                        time.sleep(1.0)
+                    if proc.returncode != 0:
+                        reason = _last_line(err_path)
+                        raise RuntimeError(
+                            f"download failed for {repo['repo']} (exit {proc.returncode})"
+                            + (f": {reason}" if reason else "")
+                        )
+                finally:
+                    err_path.unlink(missing_ok=True)
+                if pinned and self.registry.repo_snapshot(repo) is None:
+                    raise RuntimeError(
+                        self.registry.pin_mismatch(repo)
+                        or f"{repo['repo']} downloaded but is not complete"
+                    )
                 received_base += repo_total
                 monotonic_max = max(monotonic_max, min(received_base, weights_cap))
                 self._emit(model_id, monotonic_max, total, False)
@@ -140,6 +192,11 @@ class DownloadManager:
             envs.provision(self.registry, model, log, task.cancelled)
             if task.cancelled.is_set():
                 raise InterruptedError("cancelled")
+            # A model whose checkpoint is assembled from several repos gets its
+            # directory now, so the first generation does not pay for it and a
+            # broken layout fails here, on the download card, not in a job.
+            if model.get("layout") and self.registry.model_dir(model_id) is None:
+                raise RuntimeError(f"could not assemble the {model_id} checkpoint directory")
             self.registry.write_stamp(model_id)
             self._emit(model_id, total, total, True)
             self.bus.publish({"type": "catalog-changed", "at": int(time.time() * 1000)})
@@ -150,8 +207,12 @@ class DownloadManager:
         finally:
             task.done = True
 
-    def _spawn_fetch(self, repo: dict) -> subprocess.Popen:
-        """snapshot_download in a child process so cancel is a clean kill."""
+    def _spawn_fetch(self, repo: dict) -> tuple[subprocess.Popen, Path]:
+        """snapshot_download in a child process so cancel is a clean kill.
+
+        Its stderr goes to a file whose last line becomes the error: "exit 1"
+        alone hid that the Mage-Flow repos were answering 401.
+        """
         payload = {
             "repo": repo["repo"],
             "allow": list(repo.get("allowPatterns") or []) or None,
@@ -164,9 +225,34 @@ class DownloadManager:
         )
         env = dict(os.environ)
         env["HF_HOME"] = str(self.registry.hf_home)
-        return subprocess.Popen(
-            [sys.executable, "-c", script, __import__("json").dumps(payload)],
-            env=env,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.STDOUT,
-        )
+        # Progress is read from the blobs on disk, not the bars; without them
+        # the log holds only what went wrong (and stays small over 17 GB).
+        env["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
+        fd, err_name = tempfile.mkstemp(prefix="gen3d-fetch-", suffix=".log")
+        with os.fdopen(fd, "wb") as err:
+            proc = subprocess.Popen(
+                [sys.executable, "-c", script, __import__("json").dumps(payload)],
+                env=env,
+                stdout=subprocess.DEVNULL,
+                stderr=err,
+            )
+        return proc, Path(err_name)
+
+
+_EXC_HEADER = re.compile(r"^[\w.]+(?:Error|Exception)\b(?::|$)")
+
+
+def _last_line(path: Path, limit: int = 300) -> str:
+    """What a failed child said: its exception line, plus the last line when the
+    message runs on (the hub's 401 ends "…Invalid username or password.")."""
+    try:
+        lines = [ln.strip() for ln in path.read_text(errors="replace").splitlines() if ln.strip()]
+    except OSError:
+        return ""
+    if not lines:
+        return ""
+    header = next((ln for ln in reversed(lines) if _EXC_HEADER.match(ln)), None)
+    if header is None or header == lines[-1]:
+        return lines[-1][:limit]
+    header = re.sub(r"\s*\(Request ID: [^)]*\)", "", header)
+    return f"{header[: limit // 2]} … {lines[-1]}"[:limit]

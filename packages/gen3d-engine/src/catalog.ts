@@ -18,9 +18,15 @@
  *    tencent/Hunyuan3D-2.1 (6.9 GB), not the whole 14.9 GB repo.
  *  - AutoRemesher is the official 1.0.0 arm64 release binary (17 MB), driven
  *    headlessly via its CLI — no weights.
+ *  - Mage-Flow's `microsoft/*` repos were WITHDRAWN (401 to everyone, checked
+ *    2026-09-23). Both Mage-Flow checkpoints now come from Comfy-Org/Mage-Flow
+ *    (transformer + VAE) and Qwen/Qwen3-VL-4B-Instruct (the text encoder),
+ *    byte-identical to the release, and the sidecar assembles the diffusers
+ *    directory the workers load — see mage-flow-release.ts.
  */
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { mageFlowSource } from './mage-flow-release';
 
 export type Gen3dModelId =
   | 'trellis2'
@@ -52,6 +58,15 @@ export type Gen3dRole =
   | 'audio';
 export type Gen3dResolution = 'low' | 'medium' | 'high';
 
+/** A file pinned by CONTENT. For an LFS file the hub's etag is the sha256 of
+ * its bytes, and the hub cache names the blob after it. */
+export interface Gen3dPinnedFile {
+  /** Path inside the repo. */
+  readonly path: string;
+  readonly bytes: number;
+  readonly sha256: string;
+}
+
 /** One HF repo (or subset of it) a model needs on disk. */
 export interface Gen3dRepoSpec {
   readonly repo: string;
@@ -59,7 +74,32 @@ export interface Gen3dRepoSpec {
   readonly allowPatterns?: readonly string[];
   /** Byte total for exactly the allowed patterns (HF API, blobs=true). */
   readonly bytes: number;
+  /**
+   * The large files, pinned by content. With these the sidecar (a) judges the
+   * repo complete from exactly these blobs, (b) counts download progress from
+   * them alone — a repo two models share (Comfy-Org/Mage-Flow) must not read as
+   * done because the OTHER model's 8 GB is already there — and (c) refuses a
+   * download whose bytes differ, so a repo that changes its weights fails
+   * loudly instead of loading something else.
+   */
+  readonly pinned?: readonly Gen3dPinnedFile[];
 }
+
+/**
+ * One entry of a checkpoint directory the sidecar assembles from other repos'
+ * files: a symlink to one file of a repo's snapshot, a folder of symlinks to
+ * every file of a snapshot, or a small file written verbatim.
+ */
+export type Gen3dLayoutEntry =
+  | {
+      readonly kind: 'file';
+      readonly path: string;
+      readonly repo: string;
+      /** Path inside the repo's snapshot. */
+      readonly source: string;
+    }
+  | { readonly kind: 'dir'; readonly path: string; readonly repo: string }
+  | { readonly kind: 'text'; readonly path: string; readonly text: string };
 
 export interface Gen3dModelSpec {
   readonly id: Gen3dModelId;
@@ -67,6 +107,17 @@ export interface Gen3dModelSpec {
   readonly role: Gen3dRole;
   readonly note: string;
   readonly repos: readonly Gen3dRepoSpec[];
+  /**
+   * The checkpoint directory the workers load, when no single repo is one: the
+   * sidecar builds it under `<cache>/assembled/<id>/` from `repos`' snapshots.
+   */
+  readonly layout?: readonly Gen3dLayoutEntry[];
+  /**
+   * Where this model USED to download from. A complete copy of one of these on
+   * disk still counts as installed and is what the workers load; they are never
+   * fetched (Mage-Flow's withdrawn `microsoft/*` repos).
+   */
+  readonly legacyRepos?: readonly Gen3dRepoSpec[];
   /**
    * Which runtime environment the sidecar must provision for this model.
    * MUST stay in step with `_provision_env`'s `env_kind` branches in
@@ -173,15 +224,14 @@ export const GEN3D_MODEL_SPECS: readonly Gen3dModelSpec[] = [
     id: 'mageflow',
     label: 'Mage-Flow Turbo',
     role: 'image',
+    // The card's attribution line (tp-dlcard-note): Microsoft's model, MIT —
+    // still true, whichever repo the bytes now come from.
     note: 'Text → image in 4 steps, the first hop of text → 3D (microsoft/Mage-Flow-Turbo, MIT)',
     env: 'mageflow',
-    repos: [
-      {
-        repo: 'microsoft/Mage-Flow-Turbo',
-        allowPatterns: ['transformer/*', 'text_encoder/*', 'vae/*', 'scheduler/*', '*.json'],
-        bytes: 17_463_920_534,
-      },
-    ],
+    // The withdrawn microsoft/Mage-Flow-Turbo, rebuilt from Comfy-Org + Qwen
+    // byte for byte (mage-flow-release.ts). 17.46 GB alone; the text encoder
+    // and VAE (9.2 GB) are shared with the editor, the encoder with CubePart.
+    ...mageFlowSource('turbo'),
   },
   {
     id: 'mageflow-edit',
@@ -189,15 +239,9 @@ export const GEN3D_MODEL_SPECS: readonly Gen3dModelSpec[] = [
     role: 'image',
     note: 'Edit a generated image from an instruction before turning it into 3D (9s per edit on MLX)',
     env: 'mageflow',
-    repos: [
-      {
-        repo: 'microsoft/Mage-Flow-Edit-Turbo',
-        allowPatterns: ['transformer/*', 'text_encoder/*', 'vae/*', 'scheduler/*', '*.json'],
-        // Measured on disk for exactly these patterns, not copied from the
-        // generator's entry.
-        bytes: 17_463_884_035,
-      },
-    ],
+    // Same pieces as the generator but its own transformer, so beside it the
+    // editor is an 8.2 GB download rather than 17.5.
+    ...mageFlowSource('edit-turbo'),
   },
   {
     id: 'cubepart',
@@ -370,6 +414,34 @@ export const GEN3D_MODEL_SPECS: readonly Gen3dModelSpec[] = [
   },
 ];
 
+/** What a hub repo on disk is, for Manage Storage's card. */
+export interface Gen3dRepoAttribution {
+  /** The model's name — only when exactly one model uses the repo. */
+  readonly label?: string;
+  readonly blurb: string;
+  readonly roles: readonly Gen3dRole[];
+}
+
+/**
+ * Which model a downloaded repo belongs to — or, for a repo several models
+ * share, that it is shared. Qwen3-VL-4B-Instruct is CubePart's prompt encoder
+ * AND both Mage-Flow text encoders, Comfy-Org/Mage-Flow holds both Mage-Flow
+ * transformers: naming the first model that lists one would tell a CubePart
+ * user that their encoder is "Mage-Flow Turbo". A legacy repo (Mage-Flow's old
+ * `microsoft/*` copies) still belongs to its model.
+ */
+export function repoAttribution(repo: string): Gen3dRepoAttribution | undefined {
+  const users = GEN3D_MODEL_SPECS.filter((m) =>
+    [...m.repos, ...(m.legacyRepos ?? [])].some((r) => r.repo === repo),
+  );
+  const only = users.length === 1 ? users[0] : undefined;
+  if (only !== undefined) return { label: only.label, blurb: only.note, roles: [only.role] };
+  if (users.length === 0) return undefined;
+  const names = users.map((u) => u.label);
+  const list = `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+  return { blurb: `Shared by ${list}.`, roles: [...new Set(users.map((u) => u.role))] };
+}
+
 /** Total bytes the download dialog shows for a model (weights only; the
  * AutoRemesher binary is its release dmg). */
 export function specTotalBytes(spec: Gen3dModelSpec): number {
@@ -421,6 +493,24 @@ export function autoremesherCli(cacheDir: string): string {
   return path.join(cacheDir, 'bin', 'autoremesher.app', 'Contents', 'MacOS', 'autoremesher');
 }
 
+/** A repo as the sidecar reads it: optional fields only when set, so a model
+ * without them serializes exactly as it always has. */
+interface SidecarRepo {
+  repo: string;
+  allowPatterns?: readonly string[];
+  bytes: number;
+  pinned?: readonly Gen3dPinnedFile[];
+}
+
+function sidecarRepo(r: Gen3dRepoSpec): SidecarRepo {
+  return {
+    repo: r.repo,
+    ...(r.allowPatterns !== undefined ? { allowPatterns: r.allowPatterns } : {}),
+    bytes: r.bytes,
+    ...(r.pinned !== undefined ? { pinned: r.pinned } : {}),
+  };
+}
+
 /** The JSON registry handed to the Python sidecar (single source of truth —
  * Python never hardcodes repos/sizes). */
 export function toSidecarRegistry(prebuiltDir?: string): {
@@ -431,7 +521,9 @@ export function toSidecarRegistry(prebuiltDir?: string): {
     id: Gen3dModelId;
     env: Gen3dModelSpec['env'];
     totalBytes: number;
-    repos: { repo: string; allowPatterns?: readonly string[]; bytes: number }[];
+    repos: SidecarRepo[];
+    layout?: readonly Gen3dLayoutEntry[];
+    legacyRepos?: SidecarRepo[];
   }[];
   gatedMirrors: Record<string, string>;
   autoremesher: { dmgUrl: string; dmgBytes: number };
@@ -443,11 +535,9 @@ export function toSidecarRegistry(prebuiltDir?: string): {
       id: s.id,
       env: s.env,
       totalBytes: specTotalBytes(s),
-      repos: s.repos.map((r) => ({
-        repo: r.repo,
-        ...(r.allowPatterns !== undefined ? { allowPatterns: r.allowPatterns } : {}),
-        bytes: r.bytes,
-      })),
+      repos: s.repos.map(sidecarRepo),
+      ...(s.layout !== undefined ? { layout: s.layout } : {}),
+      ...(s.legacyRepos !== undefined ? { legacyRepos: s.legacyRepos.map(sidecarRepo) } : {}),
     })),
     gatedMirrors: { ...GATED_MIRRORS },
     autoremesher: { dmgUrl: AUTOREMESHER_DMG_URL, dmgBytes: AUTOREMESHER_DMG_BYTES },

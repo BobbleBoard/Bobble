@@ -33,7 +33,9 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--prompt", required=True)
     ap.add_argument("--out", required=True)
-    ap.add_argument("--model", default="microsoft/Mage-Flow-Turbo")
+    # The checkpoint DIRECTORY (registry.model_dir): MageFlowPipeline takes a
+    # local dir or a repo id, and the release's repo id answers 401 now.
+    ap.add_argument("--model", required=True)
     ap.add_argument("--steps", type=int, default=4)
     ap.add_argument("--cfg", type=float, default=1.0)
     ap.add_argument("--size", type=int, default=1024)
