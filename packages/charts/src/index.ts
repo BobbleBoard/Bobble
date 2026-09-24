@@ -23,6 +23,28 @@ export {
 } from './layout.ts';
 export { type ImagePalette, paletteFromPixels, rgbaFromBase64, sortByHue } from './palette.ts';
 export {
+  type CvdKind,
+  type CvdVerdict,
+  checkPalette,
+  contrastRatio,
+  cyclicPairs,
+  deltaE,
+  fromOklch,
+  judgePairs,
+  lookPairs,
+  lowContrast,
+  measurePair,
+  normalizeHex,
+  oklab,
+  oklch,
+  PALETTE_GATES,
+  type PairMeasure,
+  type PairsVerdict,
+  type PaletteReport,
+  relativeLuminance,
+  simulateCvd,
+} from './palette-check.ts';
+export {
   CHART_TYPES,
   type ChartPoint,
   type ChartSeries,
@@ -61,6 +83,7 @@ export {
   type ResolvedStyle,
   resolveStyle,
   roundedBarPath,
+  sliceColour,
   type ValueLabelMode,
 } from './style.ts';
 export { chartToSvg, type DrawOptions, drawBody, type SvgOptions, seriesColour } from './svg.ts';

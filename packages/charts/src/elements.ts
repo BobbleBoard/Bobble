@@ -31,6 +31,7 @@ import {
   linePath,
   type ResolvedStyle,
   resolveStyle,
+  sliceColour,
 } from './style.ts';
 import { seriesColour } from './svg.ts';
 
@@ -348,10 +349,15 @@ function drawBody(
   }
 
   if (L.donut !== undefined) {
-    const shades =
-      spec.highlight !== undefined
-        ? style.palette.filter((c) => c !== style.accent)
-        : style.palette;
+    const fillOf = (s: { point: number; highlighted: boolean }): string =>
+      sliceColour(
+        style,
+        s.point,
+        L.slices.length,
+        s.highlighted,
+        spec.highlight !== undefined,
+        ground.ink,
+      );
     const { cx, cy, r, ring } = L.donut;
     let a0 = -Math.PI / 2;
     for (const s of L.slices) {
@@ -367,7 +373,7 @@ function drawBody(
         pts.push({ x: ox + cx + (r - ring) * Math.cos(a), y: oy + cy + (r - ring) * Math.sin(a) });
       }
       a0 = a1;
-      const fill = s.highlighted ? style.accent : (shades[s.point % shades.length] ?? ground.ink);
+      const fill = fillOf(s);
       out.push({
         tag: 'polygon',
         ...bbox(pts),
@@ -391,7 +397,7 @@ function drawBody(
     for (const c of L.categories) {
       const s = L.slices[c.index];
       if (s === undefined) continue;
-      const fill = s.highlighted ? style.accent : (shades[s.point % shades.length] ?? ground.ink);
+      const fill = fillOf(s);
       const y = c.band.y + c.band.h / 2;
       out.push({
         tag: 'div',

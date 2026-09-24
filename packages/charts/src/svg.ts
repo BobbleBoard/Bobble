@@ -15,6 +15,7 @@ import {
   type ResolvedStyle,
   resolveStyle,
   roundedBarPath,
+  sliceColour,
 } from './style.ts';
 
 function esc(s: string): string {
@@ -166,13 +167,17 @@ export function drawBody(
 
   if (L.donut !== undefined) {
     // With a highlight, the accent is the highlight's alone — the other slices
-    // stay in the rest of the palette (a second accent slice read as two).
-    const shades =
-      spec.highlight !== undefined
-        ? style.palette.filter((c) => c !== style.accent)
-        : style.palette;
+    // stay in the rest of the palette (a second accent slice read as two); and
+    // a wrapped ring never meets itself in one colour (style.ts sliceColour).
     const sliceFill = (s: { highlighted: boolean; point: number }): string =>
-      s.highlighted ? style.accent : (shades[s.point % shades.length] ?? ground.ink);
+      sliceColour(
+        style,
+        s.point,
+        L.slices.length,
+        s.highlighted,
+        spec.highlight !== undefined,
+        ground.ink,
+      );
     for (const s of L.slices) {
       out.push(
         `<path d="${s.d}" fill="${sliceFill(s)}" stroke="${ground.paper}" stroke-width="2"/>`,

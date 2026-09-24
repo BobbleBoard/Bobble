@@ -1,17 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import { layoutChart } from './layout.ts';
+import { contrastRatio, deltaE, judgePairs, lookPairs, PALETTE_GATES } from './palette-check.ts';
 import { normalizeChartSpec } from './spec.ts';
 import {
+  DARK_GROUND,
   EVERYDAY_LOOKS,
   hue,
+  LIGHT_GROUND,
   LOOK_NAMES,
   LOOKS,
+  liftForDark,
   lightness,
   linePath,
   normalizeStyle,
   pickLook,
   resolveStyle,
   roundedBarPath,
+  sliceColour,
 } from './style.ts';
 import { chartToSvg } from './svg.ts';
 
@@ -26,7 +31,8 @@ describe('the looks', () => {
 
   it('never reach for purple (the app brief) — no hue between 255° and 300° anywhere', () => {
     for (const l of LOOKS) {
-      for (const c of [...l.palette, l.accent]) {
+      for (const c of [...l.palette, l.accent, ...(l.dark?.palette ?? []), l.dark?.accent ?? '']) {
+        if (c === '') continue;
         const h = hue(c);
         expect(h < 255 || h > 300, `${l.name} ${c} is ${Math.round(h)}°`).toBe(true);
       }
@@ -200,23 +206,139 @@ describe('the SVG wears the look', () => {
 
   it('a chart with no look takes the caller’s fallback, so the file matches the card', () => {
     const plain = normalizeChartSpec({ labels: ['a'], values: [1] });
-    expect(chartToSvg(plain, { fallbackLook: 'sunset' })).toContain('#F0563C');
+    expect(chartToSvg(plain, { fallbackLook: 'sunset' })).toContain(
+      LOOKS.find((l) => l.name === 'sunset')?.palette[0],
+    );
     expect(chartToSvg(plain)).toContain('#2F6FE4');
   });
 });
 
-describe('a dark ground lifts the darkest inks', () => {
-  it('editorial\u2019s navy reads on charcoal; a mid colour is left alone; a fixed ground decides for itself', () => {
+describe('a dark ground', () => {
+  it('a theme-following look wears its own dark steps; a fixed ground decides for itself', () => {
     const light = resolveStyle({ look: 'editorial' });
     const dark = resolveStyle({ look: 'editorial' }, 'clean', { theme: 'dark' });
-    expect(light.palette[0]).toBe('#1F3A5F');
-    expect(dark.palette[0]).not.toBe('#1F3A5F');
+    const editorial = LOOKS.find((l) => l.name === 'editorial');
+    expect(light.palette).toEqual(editorial?.palette);
+    expect(dark.palette).toEqual(editorial?.dark?.palette);
+    expect(dark.accent).toBe(editorial?.dark?.accent);
+    // The navy that sank into the charcoal reads now.
     expect(lightness(dark.palette[0] ?? '')).toBeGreaterThan(lightness('#1F3A5F'));
-    expect(dark.palette[1]).toBe('#C0504D');
-    // Slate brings its own dark ground: lifted whatever the app's theme.
-    expect(resolveStyle({ look: 'slate' }).palette).toEqual(
-      resolveStyle({ look: 'slate' }, 'clean', { theme: 'light' }).palette,
+    // A dark background of the chart's own is a dark ground too.
+    expect(resolveStyle({ look: 'editorial', background: '#101820' }).palette).toEqual(
+      editorial?.dark?.palette,
     );
+    // Slate brings its own dark ground: the same colours whatever the app's theme.
+    expect(resolveStyle({ look: 'slate' }).palette).toEqual(
+      resolveStyle({ look: 'slate' }, 'clean', { theme: 'dark' }).palette,
+    );
+  });
+
+  it('colours the chart brought itself are lifted just enough to read — nobody stepped them for the dark', () => {
+    const own = resolveStyle({ palette: ['#1F3A5F', '#C0504D'], accent: '#102030' }, 'clean', {
+      theme: 'dark',
+    });
+    expect(own.palette[0]).toBe(liftForDark('#1F3A5F'));
+    expect(own.palette[0]).not.toBe('#1F3A5F');
+    expect(own.palette[1]).toBe('#C0504D'); // already readable: left alone
+    expect(own.accent).toBe(liftForDark('#102030'));
+  });
+});
+
+/**
+ * THE ACCEPTANCE FOR VQ-03. Every look, on every ground it is drawn on:
+ *   - neighbours (series i ↔ i+1, wrapping; the highlight against every other
+ *     colour; a highlighted donut's shorter ring) ≥ 15 ΔE in normal vision and
+ *     ≥ 8 for protan/deutan readers — 6–8 only on a look that writes its values
+ *     on the marks (labels 'on');
+ *   - every mark ≥ 3:1 against the ground.
+ * The grounds: a fixed-ground look's own paper; a theme-following look's light
+ * steps on the static SVG's white and on the app's light thread grounds, its
+ * dark steps on the SVG's dark paper and the app's dark thread grounds (the
+ * card is transparent over the thread: bobble / claude / codex flavours).
+ */
+const APP_LIGHT_GROUNDS = ['#F5F5F7', '#FAF9F5', '#FFFFFF'];
+const APP_DARK_GROUNDS = ['#151517', '#262624', '#181818'];
+
+describe('every look passes the palette checks (VQ-03)', () => {
+  const cases: Array<{ name: string; theme: 'light' | 'dark'; grounds: string[] }> = [];
+  for (const l of LOOKS) {
+    if (l.ground !== undefined) {
+      cases.push({ name: l.name, theme: 'light', grounds: [l.ground.paper] });
+    } else {
+      cases.push({
+        name: l.name,
+        theme: 'light',
+        grounds: [LIGHT_GROUND.paper, ...APP_LIGHT_GROUNDS],
+      });
+      cases.push({
+        name: l.name,
+        theme: 'dark',
+        grounds: [DARK_GROUND.paper, ...APP_DARK_GROUNDS],
+      });
+    }
+  }
+
+  it.each(cases)('$name on $theme', ({ name, theme, grounds }) => {
+    const st = resolveStyle({ look: name as never }, 'clean', { theme });
+    const v = judgePairs(lookPairs(st.palette, st.accent));
+    const worst = `worst CVD ${v.worstCvd?.cvd.toFixed(1)} (${v.worstCvd?.where}), worst normal ${v.worstNormal?.normal.toFixed(1)} (${v.worstNormal?.where})`;
+    expect(v.normal, worst).toBe(true);
+    expect(v.cvd === 'pass' || (v.cvd === 'floor' && st.labels === 'on'), worst).toBe(true);
+    for (const g of grounds) {
+      for (const c of [...st.palette, st.accent]) {
+        expect(contrastRatio(c, g), `${name} ${theme}: ${c} on ${g}`).toBeGreaterThanOrEqual(
+          PALETTE_GATES.markContrast,
+        );
+      }
+    }
+  });
+
+  it('the highlight is never a look\u2019s first colour (a highlighted bar must show)', () => {
+    for (const l of LOOKS) {
+      expect(l.accent, l.name).not.toBe(l.palette[0]);
+      if (l.dark !== undefined) expect(l.dark.accent, `${l.name} dark`).not.toBe(l.dark.palette[0]);
+    }
+  });
+
+  it('every theme-following look has dark steps, six of them, and a fixed-ground look has none', () => {
+    for (const l of LOOKS) {
+      if (l.ground === undefined) expect(l.dark?.palette.length, l.name).toBe(6);
+      else expect(l.dark, l.name).toBeUndefined();
+    }
+  });
+});
+
+describe('a donut never meets itself in one colour', () => {
+  const clean = resolveStyle({ look: 'clean' });
+  const ring = (count: number, highlight: number | null) =>
+    Array.from({ length: count }, (_v, i) =>
+      sliceColour(clean, i, count, i === highlight, highlight !== null),
+    );
+  const seams = (fills: string[]) =>
+    fills.map((c, i) => [c, fills[(i + 1) % fills.length] as string] as const);
+
+  it('six slices round a highlight (five colours left): the last slice is not the first colour', () => {
+    const fills = ring(6, 2);
+    expect(fills[2]).toBe(clean.accent);
+    expect(fills.filter((c) => c === clean.accent).length).toBe(1);
+    for (const [a, b] of seams(fills)) expect(a).not.toBe(b);
+  });
+
+  it('seven slices on six colours: the seam is two different colours that read apart', () => {
+    const fills = ring(7, null);
+    for (const [a, b] of seams(fills)) expect(a).not.toBe(b);
+    const last = fills[6] as string;
+    expect(
+      Math.min(
+        deltaE(last, fills[5] as string, 'deutan'),
+        deltaE(last, fills[0] as string, 'deutan'),
+      ),
+    ).toBeGreaterThan(6);
+  });
+
+  it('a ring that fits its palette is the plain cycle', () => {
+    expect(ring(6, null)).toEqual([...clean.palette]);
+    expect(ring(4, null)).toEqual(clean.palette.slice(0, 4));
   });
 });
 
