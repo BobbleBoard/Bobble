@@ -8445,7 +8445,7 @@ body[data-media-expanded="true"] .pd-studio-compose {
   background: linear-gradient(var(--pd-bg-overlay), var(--pd-bg-overlay)), var(--pd-bg-raised);
   font-size: var(--pd-font-size-caption);
   color: var(--pd-text-primary);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.16);
+  box-shadow: var(--pd-shadow-lg);
 }
 .pd-storage-spin {
   animation: pd-storage-spin 1s linear infinite;

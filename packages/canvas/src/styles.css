@@ -5717,10 +5717,10 @@
   z-index: 3;
   min-width: 120px;
   padding: var(--pd-space-xs) var(--pd-space-sm);
-  border: 1px solid var(--pd-border-subtle);
+  border: 1px solid var(--pd-border-default);
   border-radius: var(--pd-radius-md);
   background: var(--pd-bg-raised);
-  box-shadow: 0 6px 20px rgb(0 0 0 / 0.12);
+  box-shadow: var(--pd-shadow-md);
   pointer-events: none;
   font-size: var(--pd-font-size-caption);
 }
