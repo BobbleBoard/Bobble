@@ -143,6 +143,10 @@ jobs:
             node:24-alpine sh -euc '
               corepack enable
               pnpm install --frozen-lockfile --filter "@pi-desktop/web-tools..."
-              pnpm --filter "@pi-desktop/web-tools" exec vitest run src/uv-platform.test.ts
+              pnpm --filter "@pi-desktop/web-tools" exec vitest run \
+                src/uv.test.ts src/uv.default-host.test.ts src/uv-platform.test.ts \
+                src/uv-locations.test.ts src/uv.windows-rules.test.ts \
+                src/uv.spawn-options.test.ts src/unzip.test.ts src/win-fs.test.ts \
+                src/download.test.ts
               pnpm --filter "@pi-desktop/web-tools" exec vitest run src/uv.live.test.ts --reporter=verbose --silent=false
             '
