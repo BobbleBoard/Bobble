@@ -211,9 +211,44 @@ export function registerBrowserUseTools(pi: ExtensionAPI, options: BrowserUseOpt
             'disk to open with code. Default false.',
         }),
       ),
+      visual: Type.Optional(
+        Type.Boolean({
+          description:
+            'Return ONLY a picture of the page — no element list, no text. Use it to SEE the ' +
+            'layout, a chart, a canvas. Click by x,y read straight off it: its pixels are the ' +
+            "page's own (top-left 0,0), the same numbers browser_click x/y take.",
+        }),
+      ),
     }),
     async execute(_id, params): Promise<AgentToolResult<BrowserDetails>> {
       if (bridge === null) return unavailable('browser_snapshot');
+      /*
+       * --visual: THE PICTURE AND NOTHING ELSE. the user (2026-09-23): "the
+       * snapshot tool should accept a flag that gives a visual snapshot no
+       * text, when this flag is here it just passes an image back." Taken at
+       * the page's own CSS size, so a point read off it IS a click coordinate.
+       */
+      if (params.visual === true) {
+        try {
+          const shot = await bridge.request<{ dataUrl: string | null }>('screenshot', {
+            css: true,
+          });
+          const dataUrl = shot?.dataUrl ?? null;
+          const comma = dataUrl?.indexOf(',') ?? -1;
+          if (dataUrl === null || comma === -1) {
+            return errResult(
+              'browser_snapshot',
+              'the browser returned an empty picture — take a plain browser_snapshot and act by [index]',
+            );
+          }
+          return {
+            content: [{ type: 'image', data: dataUrl.slice(comma + 1), mimeType: 'image/png' }],
+            details: { action: 'snapshot', ok: true },
+          };
+        } catch (err) {
+          return errResult('browser_snapshot', messageOf(err));
+        }
+      }
       try {
         const snap = await snapshot();
         const text = formatSnapshot(snap);

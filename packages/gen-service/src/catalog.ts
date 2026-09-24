@@ -836,9 +836,10 @@ export const MODALITY_CATALOG: readonly ModalityModel[] = [
     reserved: false,
     recommended: true,
     notes:
-      'The genuinely-local, non-diffusion motion path: the agent authors HTML/CSS/JS and it is ' +
-      "rendered to a deterministic sequence of PNG stills through the app's own Chromium — no " +
-      'weights, no network, no ffmpeg, same pixels every run. Frames, not a clip. Not photoreal.',
+      'The genuinely-local, non-diffusion motion path: the agent authors HTML/CSS/JS, it is ' +
+      "rendered frame by frame through the app's own Chromium, and the stills are joined into " +
+      'one looping animated PNG — no weights, no network, no ffmpeg, same pixels every run. ' +
+      'An animation, not a video file. Not photoreal.',
   },
   {
     id: 'wan2.1-t2v-1.3b',

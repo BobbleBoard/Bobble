@@ -14,10 +14,13 @@
  * (see ./permissions.ts), on top of the harness's permission mode. The
  * architecture / the extension→helper seam is documented in ./protocol.ts.
  */
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import type { ExtensionAPI } from '@mariozechner/pi-coding-agent';
 import { MacAgentClient, type MacBridge } from './bridge-client.js';
 import { createMacConsentGate } from './permissions.js';
 import type { ComputerUsePolicy } from './policy.js';
+import { createMacSessionState } from './session-state.js';
 import {
   type MacComputerUseOptions,
   registerChromeTools,
@@ -34,15 +37,17 @@ export * from './tools.js';
 
 /** Register the mac tool set with an explicit bridge (test / app seam). */
 export function registerMacComputerUse(pi: ExtensionAPI, options: MacComputerUseOptions): void {
-  registerMacComputerUseTools(pi, options);
+  /* ONE controlled-app state for both sets, so work done through Chrome's own
+     commands leaves Chrome as the app a bare `mac snapshot` looks at. */
+  const session = options.session ?? createMacSessionState();
+  registerMacComputerUseTools(pi, { ...options, session });
   /* Chrome's own set. It prefers the real DOM over Apple Events and falls back
      to Accessibility when Chrome refuses those — which is the usual case — so
      it takes the bridge as well. */
-  registerChromeTools(
-    pi,
-    options.bridge,
-    options.isChromeRunning === undefined ? {} : { isChromeRunning: options.isChromeRunning },
-  );
+  registerChromeTools(pi, options.bridge, {
+    session,
+    ...(options.isChromeRunning === undefined ? {} : { isChromeRunning: options.isChromeRunning }),
+  });
 }
 
 /** pi extension factory (zero-config; reads the bridge socket from env).
@@ -59,9 +64,14 @@ export default function activate(pi: ExtensionAPI): void {
     bridge === null
       ? undefined
       : async () => bridge.request<ComputerUsePolicy | null>('policy').catch(() => null);
+  const session = createMacSessionState();
   registerMacComputerUseTools(pi, {
     bridge,
+    session,
+    lastControlFile:
+      process.env.PI_MAC_LAST_CONTROL_FILE ??
+      join(homedir(), '.pi', 'agent', 'mac-last-control.json'),
     consent: createMacConsentGate({ preConsented, ...(policy === undefined ? {} : { policy }) }),
   });
-  registerChromeTools(pi, bridge);
+  registerChromeTools(pi, bridge, { session });
 }

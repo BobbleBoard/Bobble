@@ -42,6 +42,13 @@ export interface EngineLaunchConfig {
   readonly draftDir?: string;
   /** oMLX: the directory whose SUBDIRECTORIES are the models it serves. */
   readonly modelRoot?: string;
+  /**
+   * rapid-mlx: serve the VISION lane (`--mllm`) so images can be read.
+   * MEASURED 2026-09-23: that lane does not honour a speculative decoder
+   * (asked for both, rapid-mlx "auto-downgraded to the text-only lane"), so a
+   * vision launch carries no spec flags at all — see vision-launch.ts.
+   */
+  readonly vision?: boolean;
 }
 
 export interface EngineLaunch {
@@ -131,7 +138,9 @@ export function assembleEngineLaunch(
           ...hostPort,
           '--served-model-name',
           cfg.servedModelId,
-          ...rapidSpec(profile.spec, profile.spec === 'dflash' ? needsDraft() : cfg.draftDir),
+          ...(cfg.vision === true
+            ? ['--mllm']
+            : rapidSpec(profile.spec, profile.spec === 'dflash' ? needsDraft() : cfg.draftDir)),
         ],
         healthPath: '/v1/models',
         servedModelId: cfg.servedModelId,

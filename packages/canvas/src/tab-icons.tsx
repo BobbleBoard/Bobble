@@ -263,14 +263,13 @@ export function IconSituation(props: IconProps) {
   );
 }
 
-/** Display on a stand — the Mac computer-use monitor tab (a watched screen). */
-export function IconDisplay(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <rect x="1.75" y="2.75" width="12.5" height="8.5" rx="1.6" />
-      <path d="M6 14h4M8 11.25V14" />
-    </Icon>
-  );
+/**
+ * The computer-use monitor tab — the same mark as everywhere computer use is
+ * named (the user 2026-09-23): an app window with its traffic lights, and the
+ * agent's own cursor in the corner (Glyph `computerUse`).
+ */
+export function IconDisplay({ size = 16, className }: IconProps) {
+  return <Glyph name="computerUse" size={size} className={className} />;
 }
 
 /** A line chart glyph — the chart half of the chart ⇄ table toggle. */

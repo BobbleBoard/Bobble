@@ -24,6 +24,7 @@ import {
   type TextContent,
   type ToolCall,
 } from '@mariozechner/pi-ai';
+import { type BlindReason, blindNote } from '@pi-desktop/inference/vision-launch';
 import {
   cleanProviderError,
   dropStaleScreenshots,
@@ -212,59 +213,59 @@ export function serverCanSeeImages(
    * The env var stays the fallback, and an unreadable file means "assume we can
    * see" — which can only ever downgrade a KNOWN-blind server, never the reverse.
    */
+  return visionState(env, readFileImpl).canSee;
+}
+
+/**
+ * The host's vision state: `1`, or `0` with the reason it cannot see —
+ * `0:off` (the user switched vision off), `0:model` (no vision at all),
+ * `0:engine` (a text-only engine), `0:projector` (could not load). A bare `0`
+ * is a host that predates the reasons.
+ */
+export function visionState(
+  env: Record<string, string | undefined> = process.env,
+  readFileImpl: (p: string) => string = (p) => readFileSync(p, 'utf8'),
+): { canSee: boolean; reason?: BlindReason } {
   const file = env[VISION_STATE_FILE_ENV];
   if (file !== undefined && file.length > 0) {
     try {
-      return readFileImpl(file).trim() !== '0';
+      const raw = readFileImpl(file).trim();
+      if (!raw.startsWith('0')) return { canSee: true };
+      const reason = raw.slice(2);
+      return reason === 'off' || reason === 'model' || reason === 'engine' || reason === 'projector'
+        ? { canSee: false, reason }
+        : { canSee: false };
     } catch {
       // Fall through to the env snapshot.
     }
   }
-  return env.PI_DESKTOP_VISION !== '0';
+  return { canSee: !(env.PI_DESKTOP_VISION ?? '1').startsWith('0') };
 }
 
 /**
- * What a blind server is told in place of an image.
+ * What a blind server is told in place of an image — the REASON it cannot see.
  *
  * THE FAILURE THIS REPLACES. Asked to screenshot a page and rebuild it, the 4B
  * captured the image, was handed tokens it had no encoder for, saw nothing, and
- * tried again — four times — before concluding "the browser_snapshot tool isn't
- * giving me useful information". It was right about the outcome and wrong about
- * the cause, and it had no way to tell the difference, because nothing in its
- * context said the image had not arrived.
- *
- * So say it. A model that reads this stops looping and reports the truth to the
- * user, which is the correct behaviour and is available immediately; the host
- * separately switches the server into multimodal so the NEXT turn can see.
+ * tried again — four times. So the model is told plainly that the image did not
+ * arrive, and why: the user (2026-09-23) kept reading "this model is currently
+ * running in TEXT-ONLY mode" on a machine where vision was never switched off —
+ * the ENGINE (rapid-mlx on its MTP lane) could not take images. The words now
+ * name the cause (inference/vision-launch.ts `blindNote`).
  */
-export function unviewableImageNote(): string {
-  /*
-   * Say only what is TRUE. An earlier draft of this promised "vision is being
-   * switched on" — it is not; nothing yet requests the multimodal relaunch when
-   * a TOOL produces an image (see LIVE-TEST-FINDINGS.md §2b). Telling the model
-   * to expect sight that is not coming would just move the retry loop one turn
-   * later. The honest instruction is to stop and hand it back to the user, who
-   * CAN turn vision on — attaching any image in the composer relaunches the
-   * server multimodal for the rest of the session.
-   */
-  return (
-    '[An image was attached here, but it could not be shown to you: this model is ' +
-    'currently running in TEXT-ONLY mode, so images cannot be read. Retrying will not ' +
-    'help — the next capture will be just as invisible. Do NOT loop. Say plainly that ' +
-    'you cannot see images right now, and either carry on without looking or tell the ' +
-    'user that seeing it requires vision to be switched on.]'
-  );
+export function unviewableImageNote(reason?: BlindReason): string {
+  return blindNote(reason);
 }
 
 function contentToOAI(
   content: string | (TextContent | ImageContent)[],
 ): string | Array<Record<string, unknown>> {
   if (typeof content === 'string') return content;
-  const canSee = serverCanSeeImages();
+  const vision = visionState();
   return content.map((part) => {
     if (part.type === 'text') return { type: 'text', text: part.text };
     // A blind server gets an explanation instead of tokens it cannot decode.
-    if (!canSee) return { type: 'text', text: unviewableImageNote() };
+    if (!vision.canSee) return { type: 'text', text: unviewableImageNote(vision.reason) };
     return { type: 'image_url', image_url: { url: `data:${part.mimeType};base64,${part.data}` } };
   });
 }

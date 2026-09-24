@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { ExpandedScrim } from '../media/ExpandedScrim';
-import { useImagesUnsupported } from '../state/local-model';
+import { useImageBlindness, useImagesUnsupported } from '../state/local-model';
 import { IconWarning } from './icons-pill';
 
 /**
@@ -76,11 +76,13 @@ export function UserImage({
  * a vision-capable model clears both the badge and this line together.
  */
 export function BlindImageNote(): ReactNode {
-  const blind = useImagesUnsupported();
-  if (!blind) return null;
+  const blind = useImageBlindness();
+  if (blind === null) return null;
   return (
     <span className="text-caption text-text-muted" data-testid="blind-image-note">
-      This model couldn’t see the image.
+      {blind === 'off'
+        ? 'Vision is off, so the model couldn’t see the image.'
+        : 'This model couldn’t see the image.'}
     </span>
   );
 }

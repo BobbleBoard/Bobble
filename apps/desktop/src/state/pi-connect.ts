@@ -17,6 +17,7 @@ import { ensureChatServerReady, maybeRouteAuto } from '../chat/auto-router';
 import { ADVANCED_GROUNDTRUTH_KEY } from './advanced-store';
 import { resetCanvasForNewSession, restoreCanvas, snapshotCanvas } from './canvas-store';
 import { renameChat } from './chat-org';
+import { isChatDeleted } from './deleted-chats';
 import { ensureVisionMode } from './local-model';
 import {
   type BgRun,
@@ -404,6 +405,83 @@ export async function newSession(): Promise<{ ok: boolean; cancelled?: boolean; 
   const settled = await rpc;
   if (pendingNewSessionRpc === rpc) pendingNewSessionRpc = null;
   return settled;
+}
+
+/**
+ * LEAVE A CHAT THAT IS BEING DELETED — at once — and stop its turn.
+ *
+ * the user (2026-09-23): "clicking delete on a chat should instantly terminate any
+ * generation of any kind happening and immediately remove it from the user
+ * interface". A chat can be alive here in two places:
+ *
+ *  - ON SCREEN. The view moves to a fresh chat first — `newSession` paints
+ *    before it asks pi anything, and parks a running turn in `bgRun` so what
+ *    the dying turn still streams never lands in the new, empty chat — and
+ *    only then is the turn stopped.
+ *  - RUNNING BEHIND ANOTHER CHAT (`bgRun`). Its turn is stopped where it is;
+ *    the chat on screen does not move.
+ *
+ * Then pi is moved OFF the deleted file, to the chat on screen, as soon as the
+ * turn has ended rather than at the next send: while pi sits on a file,
+ * anything it writes — the aborted reply, a model change — writes the deleted
+ * chat back into existence. (Main sweeps such a file away again; this keeps
+ * the window short.) Subagents, teams and generations are the caller's; this
+ * is only about the one pi.
+ */
+export async function abandonChats(files: readonly string[]): Promise<void> {
+  const gone = (f: string | null | undefined): boolean =>
+    typeof f === 'string' && files.includes(f);
+  const store = usePiStore.getState();
+  // A question the deleted chat asked, and its unread dot, go with it.
+  usePiStore.setState((s) => ({ uiRequests: s.uiRequests.filter((r) => !gone(r.sessionFile)) }));
+  for (const f of files) store.clearUnread(f);
+
+  if (gone(store.session?.sessionFile)) {
+    const running = store.agent.isStreaming || store.promptInFlight;
+    if (store.resuming) {
+      await window.piDesktop.invoke('pi:resume-abort', undefined).catch(() => undefined);
+    }
+    const opened = newSession();
+    for (const f of files) sessionSnapshots.delete(f);
+    if (running) await window.piDesktop.invoke('pi:abort', undefined).catch(() => undefined);
+    await opened;
+  } else if (store.bgRun !== null && gone(store.bgRun.sessionFile) && store.bgRun.streaming) {
+    await window.piDesktop.invoke('pi:abort', undefined).catch(() => undefined);
+  }
+  for (const f of files) sessionSnapshots.delete(f);
+
+  if (!gone(usePiStore.getState().bgRun?.sessionFile)) return;
+  /*
+   * WAIT FOR THE TURN TO END — and stop it again if it has not. A prompt that
+   * reached pi a moment before the abort starts its turn AFTER it, and would
+   * run to the end on a chat that no longer exists.
+   */
+  const stopped = (): boolean => {
+    const bg = usePiStore.getState().bgRun;
+    return bg === null || !gone(bg.sessionFile) || !bg.streaming;
+  };
+  for (let attempt = 0; attempt < 3 && !stopped(); attempt++) {
+    await new Promise<void>((resolve) => {
+      const timer = setTimeout(() => {
+        off();
+        resolve();
+      }, 1_500);
+      const off = usePiStore.subscribe(() => {
+        if (!stopped()) return;
+        clearTimeout(timer);
+        off();
+        resolve();
+      });
+    });
+    if (!stopped()) await window.piDesktop.invoke('pi:abort', undefined).catch(() => undefined);
+  }
+  /* A turn that will not end is let go: moving pi disposes it. */
+  if (!stopped()) {
+    usePiStore.setState((s) =>
+      s.bgRun === null ? {} : { bgRun: { ...s.bgRun, streaming: false } },
+    );
+  }
+  await ensurePiOnViewedSession();
 }
 
 /** `data:<mime>;base64,<data>` → pi ImageContent. */
@@ -1357,6 +1435,8 @@ async function loadViewedThread(sessionPath: string): Promise<{ truncated: boole
  * any still-streaming marker) so returning to that chat later shows the completed
  * reply. Preserves its canvas/queue/paused if already snapshotted. */
 function stashBgRun(bg: BgRun): void {
+  // A deleted chat has nothing to come back to.
+  if (isChatDeleted(bg.sessionFile)) return;
   const existing = sessionSnapshots.get(bg.sessionFile);
   sessionSnapshots.set(bg.sessionFile, {
     messages: bg.messages.map((m) =>
@@ -1524,7 +1604,22 @@ let pendingPiSwitch: Promise<void> | null = null;
  * clear the run. A STILL-streaming bg run is not switched here — such a send is
  * queued upstream (the composer) rather than dispatched.
  */
-async function ensurePiOnViewedSession(): Promise<void> {
+let ensureChain: Promise<void> = Promise.resolve();
+function ensurePiOnViewedSession(): Promise<void> {
+  /*
+   * ONE AT A TIME. Two callers can reach this in the same moment — the queue
+   * drain firing as a background run ends, and a deleted chat's cleanup moving
+   * pi off it (abandonChats). Both would see the same finished run and both
+   * would switch pi; the second switch lands after the drained message was
+   * dispatched and disposes its turn. Serialized, the second caller finds the
+   * run already cleared and does nothing.
+   */
+  const run = ensureChain.then(ensurePiOnViewedSessionNow);
+  ensureChain = run.catch(() => undefined);
+  return run;
+}
+
+async function ensurePiOnViewedSessionNow(): Promise<void> {
   // A chat switch paints before pi has moved (Case D). A send must not dispatch
   // into a chat pi is not on, so this is where that debt is settled.
   if (pendingPiSwitch !== null) {
@@ -1604,4 +1699,7 @@ if (typeof window !== 'undefined' && new URLSearchParams(window.location.search)
   // Open a chat by its session file — the sidebar click, for probes that
   // check what a chat looks like when you come back to it.
   window.__pi_switch_session = (sessionPath: string) => switchSession(sessionPath);
+  // Send with images attached — the composer's own path, for probes that check
+  // what the model can SEE (typing cannot attach a picture).
+  window.__pi_send = (text: string, images: string[] = []) => sendPrompt(text, images);
 }

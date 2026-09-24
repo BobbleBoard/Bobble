@@ -328,6 +328,7 @@ export function AssistantGroup({
         return (
           <div key={`${groupId}-a${activityN++}`} className="flex min-w-0 flex-col gap-2">
             <ThreadActivityChain
+              chainKey={`${groupId}-a${activityN - 1}`}
               blocks={seg.blocks}
               resultForBlock={resultForBlock}
               runningToolCalls={runningToolCalls}

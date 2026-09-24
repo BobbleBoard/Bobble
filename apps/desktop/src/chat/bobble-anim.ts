@@ -62,8 +62,51 @@ export const SPLIT_LEVELS = 2;
 export const GRID = 8;
 /** Sub-cells across ONE icon cell. */
 const PER = GRID / 2;
-/** Blocks in a scene, always. */
+/** Blocks in a scene with no field around it — the icon's own grid. */
 export const TOTAL = GRID * GRID;
+
+/**
+ * THE FIELD IS AS WIDE AS THE CARD.
+ *
+ * the user (2026-09-23): "the animations need to be procedural and not locked to a
+ * square aspect ratio or anything." The board is the icon's square, so a 16:9
+ * clip or a wide 3D viewport got a large centred square with empty plate
+ * either side. The grid acts now run on a FIELD: the icon's 8x8 plus `x` more
+ * columns on each side and `y` more rows above and below, generated for the
+ * box being filled — the cascade crosses the whole card, the film runs its
+ * full width, the spectrum stands in every column.
+ *
+ * The mark itself stays square (a stretched icon is a broken icon): the field's
+ * cells are nothing while the mark plays, arrive with the split as dots — the
+ * way the hole's cells do — and leave with the merge. The icon's 64 blocks keep
+ * indices 0..63, so every rule about them still holds; the field's follow in
+ * reading order.
+ */
+export interface Field {
+  /** Extra columns on EACH side of the icon's grid. */
+  readonly x: number;
+  /** Extra rows above AND below it. */
+  readonly y: number;
+}
+export const NO_FIELD: Field = { x: 0, y: 0 };
+
+/** The field's cells outside the icon's grid, in reading order. */
+export function fieldCells(field: Field): { i: number; j: number }[] {
+  const out: { i: number; j: number }[] = [];
+  // `0 -`, not unary minus: a field of 0 must start at 0, not at -0.
+  for (let j = 0 - field.y; j < GRID + field.y; j++) {
+    for (let i = 0 - field.x; i < GRID + field.x; i++) {
+      if (i >= 0 && i < GRID && j >= 0 && j < GRID) continue;
+      out.push({ i, j });
+    }
+  }
+  return out;
+}
+
+/** Blocks in a scene played on this field. */
+export function blockCount(field: Field = NO_FIELD): number {
+  return (GRID + 2 * field.x) * (GRID + 2 * field.y);
+}
 
 /** One drawable square. Everything the renderer needs and nothing it doesn't. */
 export interface Block {
@@ -287,6 +330,32 @@ export function tileNoOf(index: number): number {
   return BOBBLE_TILES.findIndex((t) => t.from === cell.id);
 }
 
+/** A block's grid cell on a field — the icon's own for 0..63, the field's after. */
+function cellIJ(
+  index: number,
+  cells: readonly { i: number; j: number }[],
+): { i: number; j: number } {
+  if (index < TOTAL) {
+    const { i, j } = cellOf(index);
+    return { i, j };
+  }
+  return cells[index - TOTAL] as { i: number; j: number };
+}
+
+/** Where block `index` rests on a field — `seatOf` for the icon's blocks. */
+function seatIn(
+  index: number,
+  cells: readonly { i: number; j: number }[],
+): { cx: number; cy: number; size: number } {
+  if (index < TOTAL) return seatOf(index);
+  const { i, j } = cells[index - TOTAL] as { i: number; j: number };
+  const g = gridCell(i, j);
+  return { cx: g.cx, cy: g.cy, size: g.size * (1 - AIR) };
+}
+
+/** A non-negative remainder, for rows and columns that go below zero. */
+const mod = (a: number, n: number): number => ((a % n) + n) % n;
+
 // ─── act 1: the puzzle ───────────────────────────────────────────────────────
 
 /**
@@ -351,10 +420,20 @@ export function cascadeHeat(cx: number, cy: number, t: number): number {
  * every cell a dot. */
 export const SWEEPS = 2;
 
+/**
+ * How far past the board's corners the line has to start and finish for the
+ * wave to enter and leave the whole field rather than popping out mid-grid.
+ * The icon's own board with no field; one pitch more per extra cell each way.
+ */
+export function reachFor(field: Field = NO_FIELD): number {
+  const step = (BOBBLE_TILE.pitch + BOBBLE_TILE.size) / GRID;
+  return BOARD + (field.x + field.y) * step + BAND * Math.SQRT2;
+}
+
 /** The sweep's range: far enough past both corners that the wave leaves the
  * board at each end instead of popping out mid-grid. */
-export function cascadeT(progress: number): number {
-  const reach = BOARD + BAND * Math.SQRT2;
+export function cascadeT(progress: number, field: Field = NO_FIELD): number {
+  const reach = reachFor(field);
   const within = (clamp01(progress) * SWEEPS) % 1;
   // The last instant of the act is the end of a pass, not the start of a new one.
   const s = progress >= 1 ? 1 : within;
@@ -381,16 +460,11 @@ export function cascadeT(progress: number): number {
  */
 export const EXIT_MS = 1150;
 
-/** How far past the corner the line starts and ends, so the sweep enters and
- * leaves the board rather than appearing mid-grid. */
-function reach(): number {
-  return BOARD + BAND * Math.SQRT2;
-}
-
 /** The line's position at exit progress `p` — the same `y = x - t` as the
- * cascade, travelling once, all the way across. */
-export function exitT(p: number): number {
-  return lerp(reach(), -reach(), clamp01(p));
+ * cascade, travelling once, all the way across the field. */
+export function exitT(p: number, field: Field = NO_FIELD): number {
+  const reach = reachFor(field);
+  return lerp(reach, -reach, clamp01(p));
 }
 
 /**
@@ -417,11 +491,12 @@ const EXIT_BAND = BAND * 0.62;
  * same one it has been performing all along; it simply does not come back down
  * the far side, because by then it has been let go.
  */
-export function exitSceneAt(p: number): Scene {
-  const t = exitT(p);
+export function exitSceneAt(p: number, field: Field = NO_FIELD): Scene {
+  const t = exitT(p, field);
+  const cells = fieldCells(field);
   const blocks: Block[] = [];
-  for (let index = 0; index < TOTAL; index++) {
-    const seat = seatOf(index);
+  for (let index = 0; index < TOTAL + cells.length; index++) {
+    const seat = seatIn(index, cells);
     const heat = cascadeHeat(seat.cx, seat.cy, t);
     const cellSize = seat.size / (1 - AIR);
     /* Signed, not absolute: which SIDE of the line a block is on is the whole
@@ -446,10 +521,10 @@ export function exitSceneAt(p: number): Scene {
 
 /** The flat grid state every post-split act starts from: dots where the wave is
  * not, rounded squares where it is. */
-function cascadeBlocks(t: number): Block[] {
+function cascadeBlocks(t: number, cells: readonly { i: number; j: number }[] = []): Block[] {
   const out: Block[] = [];
-  for (let index = 0; index < TOTAL; index++) {
-    const seat = seatOf(index);
+  for (let index = 0; index < TOTAL + cells.length; index++) {
+    const seat = seatIn(index, cells);
     const heat = cascadeHeat(seat.cx, seat.cy, t);
     const cellSize = seat.size / (1 - AIR);
     const size = lerp(cellSize * DOT, seat.size, heat);
@@ -472,7 +547,12 @@ function cascadeBlocks(t: number): Block[] {
 /**
  * The whole animation, sampled at `ms`.
  */
-export function sceneAt(ms: number, variant: LoaderVariant = 'image'): Scene {
+export function sceneAt(
+  ms: number,
+  variant: LoaderVariant = 'image',
+  field: Field = NO_FIELD,
+): Scene {
+  const cells = fieldCells(field);
   const span = loopMs(variant);
   const at = ((ms % span) + span) % span;
   const acts = timeline(variant);
@@ -512,7 +592,7 @@ export function sceneAt(ms: number, variant: LoaderVariant = 'image'): Scene {
     const centres = BOBBLE_TILES.map((t) => tilePos(t, beat));
     // merge: 0 → grid, 1 → mark. puzzle: fully the mark.
     const k = current.act === 'merge' ? smooth(p) : 1;
-    const from = cascadeBlocks(cascadeT(1));
+    const from = cascadeBlocks(cascadeT(1, field), cells);
     blocks = [];
     for (let index = 0; index < TOTAL; index++) {
       const seat = seatOf(index);
@@ -551,6 +631,19 @@ export function sceneAt(ms: number, variant: LoaderVariant = 'image'): Scene {
         size,
         radius: size * lerp(startRound, ICON_ROUND, k),
         alpha: 1,
+        lift: 0,
+      });
+    }
+    /* The field's cells leave the way the hole's do: in place, shrinking. */
+    for (let index = TOTAL; index < TOTAL + cells.length; index++) {
+      const seat = seatIn(index, cells);
+      const start = from[index] as Block;
+      blocks.push({
+        cx: seat.cx,
+        cy: seat.cy,
+        size: lerp(start.size, 0, k),
+        radius: lerp(start.radius, 0, k),
+        alpha: 1 - k,
         lift: 0,
       });
     }
@@ -607,10 +700,16 @@ export function sceneAt(ms: number, variant: LoaderVariant = 'image'): Scene {
         lift: 0,
       });
     }
+    /* The field arrives with the hole: dots growing in where the card is. */
+    for (let index = TOTAL; index < TOTAL + cells.length; index++) {
+      const seat = seatIn(index, cells);
+      const size = (seat.size / (1 - AIR)) * DOT * fill;
+      blocks.push({ cx: seat.cx, cy: seat.cy, size, radius: size / 2, alpha: fill, lift: 0 });
+    }
   } else {
     /* Every remaining act plays on the grid, which is why they follow one
        another with no transition: they are all the same 64 squares. */
-    blocks = cascadeBlocks(cascadeT(p));
+    blocks = cascadeBlocks(cascadeT(p, field), cells);
 
     if (current.act === 'filmstrip') {
       /*
@@ -622,13 +721,14 @@ export function sceneAt(ms: number, variant: LoaderVariant = 'image'): Scene {
        * unmistakably the icon's squares rather than some new object.
        */
       const step = gridCell(1, 0).cx - gridCell(0, 0).cx;
-      const lo = gridCell(0, 0).cx - step / 2;
-      const width = step * GRID;
-      const shutter = p * (GRID + 4) - 2;
+      const cols = GRID + 2 * field.x;
+      const lo = gridCell(-field.x, 0).cx - step / 2;
+      const width = step * cols;
+      const shutter = -field.x + p * (cols + 4) - 2;
       blocks = blocks.map((b, index) => {
-        const seat = seatOf(index);
-        const { i, j } = cellOf(index);
-        const dir = j % 2 === 0 ? 1 : -1;
+        const seat = seatIn(index, cells);
+        const { i, j } = cellIJ(index, cells);
+        const dir = mod(j, 2) === 0 ? 1 : -1;
         const drift = p * dir * width;
         const cx = lo + ((((b.cx + drift - lo) % width) + width) % width);
         const near = smooth(Math.max(0, 1 - Math.abs(i - shutter) / 1.6));
@@ -641,11 +741,12 @@ export function sceneAt(ms: number, variant: LoaderVariant = 'image'): Scene {
        * standing wave, so it moves like a level meter without pretending to be
        * anybody's actual spectrum.
        */
+      const rows = GRID + 2 * field.y;
       blocks = blocks.map((b, index) => {
-        const seat = seatOf(index);
-        const { i, j } = cellOf(index);
+        const seat = seatIn(index, cells);
+        const { i, j } = cellIJ(index, cells);
         const height = (Math.sin(p * Math.PI * 4 + i * 0.7) * 0.5 + 0.5) * 0.75 + 0.2;
-        const lit = GRID - 1 - j <= height * GRID ? 1 : 0;
+        const lit = rows - 1 - (j + field.y) <= height * rows ? 1 : 0;
         const size = lerp(b.size * 0.9, seat.size, lit);
         return { ...b, size, radius: size * roundnessAt(lit), alpha: lit === 1 ? 1 : 0.2 };
       });
@@ -726,4 +827,26 @@ export function spreadAt(act: ActName, p: number): number {
     default:
       return 1;
   }
+}
+
+/**
+ * The field a box needs — enough cells beyond the icon's grid, each way, that
+ * the dot field reaches every edge of the box and one cell past it, so the
+ * falloff at the rim fades real dots rather than a gap.
+ *
+ * `boardFill` is how much of the box's short side the square board takes when
+ * the field is out (the renderer's wide fill). At that point the grid's pitch is
+ * exactly BOARD / GRID board units (see `expand`), so the count is a division.
+ * A square box needs none: the board already runs past it.
+ */
+export function fieldFor(width: number, height: number, boardFill: number): Field {
+  const short = Math.min(width, height);
+  if (!(short > 0) || !(boardFill > 0)) return NO_FIELD;
+  const unit = (short * boardFill) / BOARD;
+  const pitch = BOARD / GRID;
+  const cells = (extent: number): number => {
+    const beyond = (extent / unit - BOARD) / 2;
+    return beyond <= 0.001 ? 0 : Math.ceil(beyond / pitch) + 1;
+  };
+  return { x: cells(width), y: cells(height) };
 }

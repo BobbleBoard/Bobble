@@ -34,7 +34,10 @@ import {
   EXIT_MS,
   exitReveal,
   exitSceneAt,
+  type Field,
+  fieldFor,
   type LoaderVariant,
+  NO_FIELD,
   sceneAt,
 } from './bobble-anim';
 
@@ -73,9 +76,11 @@ export interface BobbleLoaderProps {
    * the user: "just that part that does all the animations … but scaled to a rounded
    * corner large square/rect". The card the result will occupy is the frame, and
    * the mark plays at card scale inside it rather than as a stamp in the middle
-   * of an empty plate. The BOARD stays square whatever shape the box is — the
-   * mark is the app's icon and a stretched icon is a broken icon — so on a 16:9
-   * frame it is a large centred square, which is what it should be.
+   * of an empty plate. The MARK stays square whatever shape the box is — the
+   * mark is the app's icon and a stretched icon is a broken icon — but the grid
+   * it splits into is a field generated for the box (`fieldFor`), so on a 16:9
+   * frame the dots, the wave and the film run edge to edge (the user, 2026-09-23:
+   * "not locked to a square aspect ratio or anything").
    */
   fill?: boolean;
   /**
@@ -188,6 +193,9 @@ export function BobbleLoader({
        before its own min-width applied. */
     let boxW = size;
     let boxH = size;
+    /* The grid acts fill the whole box, whatever its shape (the user, 2026-09-23:
+       "not locked to a square aspect ratio"). A stamp keeps the icon's board. */
+    let field: Field = NO_FIELD;
     const resize = (): void => {
       canvas.width = Math.max(1, Math.round(boxW * dpr));
       canvas.height = Math.max(1, Math.round(boxH * dpr));
@@ -201,6 +209,7 @@ export function BobbleLoader({
         if (r.width < 1 || r.height < 1) return;
         boxW = r.width;
         boxH = r.height;
+        field = fieldFor(boxW, boxH, BOARD_FILL_WIDE);
         resize();
       };
       measure();
@@ -223,10 +232,10 @@ export function BobbleLoader({
 
     const draw = (now: number) => {
       if (exitStarted === undefined && exitRef.current) exitStarted = now;
-      let scene = sceneAt(reduced ? 0 : now - started, variant);
+      let scene = sceneAt(reduced ? 0 : now - started, variant, field);
       if (exitStarted !== undefined) {
         const p = reduced ? 1 : Math.min(1, (now - exitStarted) / EXIT_MS);
-        scene = exitSceneAt(p);
+        scene = exitSceneAt(p, field);
         // The card masks the finished media with this same number — see
         // `exitReveal`. One value, so the blocks and the picture cannot
         // disagree about where the edge of the sweep is.
@@ -243,7 +252,8 @@ export function BobbleLoader({
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       /* One transform for the whole scene: board units in, device pixels out.
          The board is square and centred, so a wide frame gets a large centred
-         mark rather than a stretched one. */
+         mark rather than a stretched one — and the field's cells, laid out
+         around it on the same pitch, carry the grid acts out to every edge. */
       const fillNow = fill
         ? BOARD_FILL_TIGHT + (BOARD_FILL_WIDE - BOARD_FILL_TIGHT) * scene.spread
         : 1;

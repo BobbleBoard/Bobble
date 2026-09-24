@@ -132,8 +132,12 @@ describe("browser rows — the app's own kinds, not terminal lines (the user 202
     });
     expect(cliCommandLabel('browser scroll --direction=down --amount=300')).toMatchObject({
       kind: 'browser-click',
-      target: 'down',
+      target: 'down 300 px',
     });
+    // the user: "scrolled element 5000" — a scroll's number is a distance, never an index.
+    expect(cliCommandLabel('browser scroll 5000')?.target).toBe('5,000 px');
+    expect(cliCommandLabel('browser scroll down 10000')?.target).toBe('down 10,000 px');
+    expect(cliCommandLabel('browser scroll 5000')?.target).not.toContain('element');
     expect(cliCommandLabel('browser snapshot')).toMatchObject({
       running: 'Reading the page in the browser',
       kind: 'browser-read',

@@ -11,7 +11,8 @@
     "./catalog": "./src/catalog.ts",
     "./engine-flags": "./src/engine-flags.ts",
     "./portable-knobs": "./src/portable-knobs.ts",
-    "./reasoning-budget": "./src/reasoning-budget.ts"
+    "./reasoning-budget": "./src/reasoning-budget.ts",
+    "./vision-launch": "./src/vision-launch.ts"
   },
   "scripts": {
     "lint": "biome check .",

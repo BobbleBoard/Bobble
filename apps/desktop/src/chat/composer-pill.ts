@@ -113,7 +113,9 @@ export interface PillInput {
   /** {@link modelReadyStage}: the model is coming up, or the prompt is loading. */
   readyStage: 'loading' | 'preparing' | null;
   /** An image is attached (or in the thread) and the model cannot read images. */
-  imageOnBlindModel: boolean;
+  /** An image is attached that will go unseen: `true`/`'unsupported'` = the
+   * setup cannot see, `'off'` = the user switched vision off. */
+  imageOnBlindModel: boolean | 'off' | 'unsupported';
   /** Milliseconds in the current wait — the number that is going UP. */
   elapsedMs: number | null;
   /** How long this wait has typically taken ON THIS MAC, or null before it has
@@ -156,9 +158,12 @@ export function composerPill(input: PillInput): PillView | null {
       kind: 'preparing',
     };
   }
-  if (imageOnBlindModel) {
+  if (imageOnBlindModel !== false) {
     return {
-      text: 'Selected model does not support images',
+      text:
+        imageOnBlindModel === 'off'
+          ? 'Vision is off — turn it on in the engine menu to send pictures'
+          : 'Selected model does not support images',
       tone: 'warn',
       percent: null,
       kind: 'no-vision',

@@ -1,7 +1,13 @@
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import zlib from 'node:zlib';
 import { type GenJob, type GenOutput, getModel } from '@pi-desktop/gen-service';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { encodeApng, isApng, readPngFrame } from './apng';
 import {
   buildVideoJob,
+  defaultExtractPosterFrame,
   HyperFramesRunner,
   hyperFramesRenderUnavailable,
   makeVideoAwareRunner,
@@ -145,5 +151,87 @@ describe('HyperFramesRunner', () => {
 
     await expect(runner.run(job, { onEvent })).rejects.toThrow(/not installed/);
     expect(onEvent).toHaveBeenCalledWith(expect.objectContaining({ event: 'error' }));
+  });
+});
+
+/*
+ * THE POSTER NEEDS NO FFMPEG FOR A PNG. HyperFrames' one output is an animated
+ * PNG (or, if joining failed, a lone frame); ffmpeg is not bundled, so the model
+ * would otherwise get no picture of its own animation on any Mac but a
+ * developer's.
+ */
+describe('defaultExtractPosterFrame, for a PNG', () => {
+  const dirs: string[] = [];
+  afterEach(() => {
+    for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+  });
+  const scratch = () => {
+    const d = mkdtempSync(path.join(tmpdir(), 'poster-test-'));
+    dirs.push(d);
+    return d;
+  };
+
+  /** A real 8x4 RGB PNG of one shade. */
+  const still = (shade: number): Buffer => {
+    const table = Array.from({ length: 256 }, (_, n) => {
+      let c = n;
+      for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+      return c >>> 0;
+    });
+    const crc = (b: Buffer) => {
+      let c = 0xffffffff;
+      for (const x of b) c = (table[(c ^ x) & 0xff] as number) ^ (c >>> 8);
+      return (c ^ 0xffffffff) >>> 0;
+    };
+    const chunk = (type: string, data: Buffer) => {
+      const body = Buffer.concat([Buffer.from(type, 'latin1'), data]);
+      const out = Buffer.alloc(body.length + 8);
+      out.writeUInt32BE(data.length, 0);
+      body.copy(out, 4);
+      out.writeUInt32BE(crc(body), body.length + 4);
+      return out;
+    };
+    const ihdr = Buffer.alloc(13);
+    ihdr.writeUInt32BE(8, 0);
+    ihdr.writeUInt32BE(4, 4);
+    ihdr[8] = 8;
+    ihdr[9] = 2;
+    const raw = Buffer.alloc((8 * 3 + 1) * 4, shade);
+    for (let y = 0; y < 4; y++) raw[y * 25] = 0;
+    return Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      chunk('IHDR', ihdr),
+      chunk('IDAT', zlib.deflateSync(raw)),
+      chunk('IEND', Buffer.alloc(0)),
+    ]);
+  };
+
+  it("an animated PNG's poster is its frame 0, as a plain still beside it", async () => {
+    const dir = scratch();
+    const frames = [still(10), still(120), still(250)];
+    const animation = path.join(dir, 'animation.png');
+    writeFileSync(animation, encodeApng(frames, { fps: 12 }));
+
+    const poster = await defaultExtractPosterFrame(animation, dir);
+    expect(poster).toBe(path.join(dir, 'poster.png'));
+    const bytes = readFileSync(poster as string);
+    expect(isApng(bytes)).toBe(false);
+    expect(readPngFrame(bytes).data.equals(readPngFrame(frames[0] as Buffer).data)).toBe(true);
+  });
+
+  it('a PNG that is not animated is its own poster, and nothing is written', async () => {
+    const dir = scratch();
+    const frame = path.join(dir, 'frame_036.png');
+    writeFileSync(frame, still(90));
+    expect(await defaultExtractPosterFrame(frame, dir)).toBe(frame);
+    expect(existsSync(path.join(dir, 'poster.png'))).toBe(false);
+  });
+
+  it('has no poster, rather than an error, for a PNG it cannot read', async () => {
+    const dir = scratch();
+    expect(await defaultExtractPosterFrame(path.join(dir, 'missing.png'), dir)).toBeUndefined();
+    const broken = path.join(dir, 'broken.png');
+    writeFileSync(broken, 'not a png');
+    expect(await defaultExtractPosterFrame(broken, dir)).toBeUndefined();
   });
 });

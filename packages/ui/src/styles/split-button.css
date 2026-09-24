@@ -84,6 +84,16 @@
 }
 
 /*
+ * …or OVER it, when there is no room below (menu-placement.ts). The card at the
+ * foot of the thread opened its menu under the composer, out of reach. The
+ * shared recipe's [data-side="top"] already flips the reveal's origin.
+ */
+.pd-split-menu[data-side="top"] {
+  top: auto;
+  bottom: calc(100% + 4px);
+}
+
+/*
  * PRIMARY TONE — the present card's Open. the user: "open could be blue". The
  * accent fills both segments; the divider is a lighter line through it so the
  * caret still reads as a second target.

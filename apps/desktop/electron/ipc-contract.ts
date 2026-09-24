@@ -243,7 +243,8 @@ export type FsInvokeMap = {
   /** Delete a session's JSONL file (the sidebar "Delete chat" action). Fenced to
    * the sessions dir — refuses any path outside it. */
   'fs:delete-session': {
-    request: { file: string };
+    /** `chain`: the row's `supersedes` — the older files of the same chat. */
+    request: { file: string; chain?: readonly string[] };
     response: { ok: boolean; error?: string };
   };
   /**
@@ -324,6 +325,15 @@ export interface LlmStatus {
    * multimodal on the first image to gain a capability it already had.
    */
   visionReady?: boolean;
+  /**
+   * WHY it cannot see, when it cannot — said to the model in those words
+   * (provider note) and shown in the engine menu: 'off' (the user switched
+   * vision off), 'model' (no vision at all), 'engine' (a text-only engine and
+   * nothing that sees could take the launch), 'projector' (could not load).
+   */
+  blindReason?: 'off' | 'model' | 'engine' | 'projector';
+  /** Set when vision moved the launch off the chosen engine (e.g. rapid-mlx → llama.cpp). */
+  visionFallback?: { from: string; why: string };
   /**
    * Set while an ENGINE is being compiled rather than a model loaded.
    *
@@ -1009,7 +1019,9 @@ export type CanvasInvokeMap = {
     request: { path: string };
     response: { apps: CanvasOpenApp[]; defaultAppId: string | null };
   };
-  /** File operation bar "Open ▾" → shell out to open the file in the chosen app. */
+  /** File operation bar "Open ▾" → shell out to open the file in the chosen app.
+   * `error` is one sentence saying WHY it could not (canvas/os-open.ts), for the
+   * renderer to show — a refusal must never look like nothing happened. */
   'canvas:open-with': {
     request: { path: string; appId: CanvasOpenWithAppId };
     response: { ok: boolean; error?: string };
@@ -1017,8 +1029,8 @@ export type CanvasInvokeMap = {
   /** Open with the OS default handler — LaunchServices directly, no `duti` and
    * no Apple Events, so it works on a machine with neither. */
   'canvas:open-default': { request: { path: string }; response: { ok: boolean; error?: string } };
-  /** File operation bar "Open in folder" → shell.showItemInFolder. */
-  'canvas:reveal': { request: { path: string }; response: { ok: boolean } };
+  /** File operation bar "Open in folder" / the card's Show → select it in Finder. */
+  'canvas:reveal': { request: { path: string }; response: { ok: boolean; error?: string } };
   /**
    * Put a generated file on the clipboard: a picture as its pixels (so it
    * pastes into anything that takes an image) AND as a file, anything else as

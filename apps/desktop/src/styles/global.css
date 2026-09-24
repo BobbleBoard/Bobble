@@ -2539,6 +2539,37 @@ h2.text-heading {
   padding-left: 4px;
   border-left: 1px solid var(--pd-border-subtle);
 }
+/* The slide (SessionSidebar ProjectChats): height from nothing to the list,
+   the rows drifting in with it, in step with the folder glyph's 240 ms fold. */
+.pd-project-chats-slide {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 240ms var(--pd-easing-standard, cubic-bezier(0.2, 0, 0, 1));
+}
+.pd-project-chats-slide[data-open="true"] {
+  grid-template-rows: 1fr;
+}
+.pd-project-chats-clip {
+  min-height: 0;
+  overflow: hidden;
+}
+.pd-project-chats-slide .pd-project-chats {
+  opacity: 0;
+  transform: translateY(-6px);
+  transition:
+    opacity 200ms var(--pd-easing-standard, ease),
+    transform 240ms var(--pd-easing-standard, ease);
+}
+.pd-project-chats-slide[data-open="true"] .pd-project-chats {
+  opacity: 1;
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pd-project-chats-slide,
+  .pd-project-chats-slide .pd-project-chats {
+    transition: none;
+  }
+}
 .pd-chat-rename-input {
   width: 100%;
   box-sizing: border-box;
@@ -6756,48 +6787,52 @@ body[data-media-expanded="true"] .pd-studio-compose {
 }
 
 /*
- * A WAITING PICTURE HAS NO EDGE. the user (2026-09-17): "image and I assume video
- * generating animations need to be unbordered cards, just with some subtle but
- * smooth falloff so it's not a hard unbordered edge." The frame's border goes
- * while the mark plays; a layer over the plate fades its rim into the page
- * (the page's own ground, so the plate melts rather than darkens), and both
- * come back with the picture — the border returns, the layer fades out — so
- * the card that arrives is the card every other picture wears.
+ * A CARD THAT IS STILL BEING MADE HAS NO EDGE AND NO PLATE.
+ *
+ * the user (2026-09-17): "image and I assume video generating animations need to
+ * be unbordered cards, just with some subtle but smooth falloff so it's not a
+ * hard unbordered edge." And again (2026-09-23), for every kind: "image/video/
+ * other 'generating' inline cards should have no border at all, but with some
+ * falloff into the background color of the chat".
+ *
+ * The first answer kept the plate and painted the page colour over its rim — an
+ * 8% band that still read as a dark card with soft corners. Now there is no card
+ * while it waits: no border, no ground, the blocks drawn straight onto the chat,
+ * and the loader itself fading out toward every edge (a mask, so what it fades
+ * into is whatever the chat's background really is, in either theme). The
+ * border and the ground come back with the result, so the card that arrives is
+ * the card every other picture wears.
  */
-.pd-media-card--pending[data-kind="image"] .pd-media-frame,
-.pd-media-card--pending[data-kind="video"] .pd-media-frame {
+.pd-media-card--pending .pd-media-frame {
   border-color: transparent;
+  background-color: transparent;
   transition:
     aspect-ratio 380ms var(--pd-easing-standard, ease),
     width 380ms var(--pd-easing-standard, ease),
-    border-color 520ms var(--pd-easing-standard, ease);
+    border-color 520ms var(--pd-easing-standard, ease),
+    background-color 520ms var(--pd-easing-standard, ease);
 }
-.pd-media-card--pending[data-kind="image"][data-revealing="true"] .pd-media-frame,
-.pd-media-card--pending[data-kind="video"][data-revealing="true"] .pd-media-frame {
+.pd-media-card--pending[data-revealing="true"]:not([data-kind="audio"]) .pd-media-frame {
   border-color: color-mix(in oklab, var(--pd-text-primary) 10%, transparent);
+  background-color: var(--pd-bg-sunken, var(--pd-bg-raised));
 }
-.pd-pending-falloff {
-  position: absolute;
-  inset: 0;
-  z-index: 3;
-  pointer-events: none;
-  --pd-falloff: var(--pd-bg-base);
-  background:
-    linear-gradient(to right, var(--pd-falloff), transparent 8%, transparent 92%, var(--pd-falloff)),
-    linear-gradient(
-      to bottom,
-      var(--pd-falloff),
-      transparent 8%,
-      transparent 92%,
-      var(--pd-falloff)
-    );
-  transition: opacity 420ms var(--pd-easing-standard, ease);
+/* The falloff: a feathered rectangle, not a vignette — the field reaches the
+   edges and fades there, rather than shrinking to an oval in the middle. */
+.pd-media-card--pending .pd-bobble-loader-host[data-fill="true"] {
+  -webkit-mask-image:
+    linear-gradient(to right, transparent, #000 13%, #000 87%, transparent),
+    linear-gradient(to bottom, transparent, #000 15%, #000 85%, transparent);
+  -webkit-mask-composite: source-in;
+  mask-image:
+    linear-gradient(to right, transparent, #000 13%, #000 87%, transparent),
+    linear-gradient(to bottom, transparent, #000 15%, #000 85%, transparent);
+  mask-composite: intersect;
 }
-.pd-media-card--pending[data-kind="model"] .pd-pending-falloff {
-  display: none;
-}
-.pd-media-card--pending[data-revealing="true"] .pd-pending-falloff {
-  opacity: 0;
+/* With no plate under them, white blocks on a light chat would be invisible:
+   on the light theme the ink is the text's own colour, softened. */
+:root:not([data-mode="dark"]) .pd-media-card--pending .pd-bobble-loader-host[data-fill="true"] {
+  --pd-bobble-ink: color-mix(in srgb, var(--pd-text-primary) 82%, transparent);
+  --pd-bobble-scrim: transparent;
 }
 
 /*
@@ -6814,9 +6849,9 @@ body[data-media-expanded="true"] .pd-studio-compose {
   z-index: 4;
   padding: 2px 8px;
   border-radius: 8px;
-  /* The dot field reaches the rim now (bobble-anim `expand`), so the words
-     sit on a soft plate of the frame's own ground instead of over the dots. */
-  background: color-mix(in srgb, var(--pd-bg-sunken, var(--pd-bg-raised)) 62%, transparent);
+  /* The dot field runs under the words, so they sit on a soft plate of the
+     chat's own ground — the card has no ground of its own while it waits. */
+  background: color-mix(in srgb, var(--pd-bg-base) 66%, transparent);
   -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
   font-size: var(--pd-font-size-caption);
@@ -6824,10 +6859,15 @@ body[data-media-expanded="true"] .pd-studio-compose {
   font-weight: var(--pd-font-weight-medium);
   pointer-events: none;
 }
+/* The words take the ink's colour: near-white on the dark theme, the text's
+   own on the light one, where there is no longer a dark plate behind them. */
 .pd-pending-phase .pd-shimmer {
-  /* On the mark's dark plate the floor is near-white; the sweep is the app's own. */
   --pd-shimmer-base: rgb(255 255 255 / 62%);
   --pd-shimmer-highlight: rgb(255 255 255 / 100%);
+}
+:root:not([data-mode="dark"]) .pd-pending-phase .pd-shimmer {
+  --pd-shimmer-base: color-mix(in srgb, var(--pd-text-primary) 55%, transparent);
+  --pd-shimmer-highlight: var(--pd-text-primary);
 }
 
 .pd-pending-bar {
@@ -7124,6 +7164,22 @@ body[data-media-expanded="true"] .pd-studio-compose {
   background: var(--pd-bg-inset);
   color: var(--pd-text-primary);
   border: 1px solid var(--pd-border-default);
+}
+/* The Vision switch under the head (EngineMenu VisionRow): the setting, and
+   one line saying what is true of the running server. */
+.pd-engine-vision {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--pd-border-subtle);
+}
+.pd-engine-vision-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
 }
 .pd-engine-note {
   margin: 8px 12px 0;
@@ -8753,4 +8809,27 @@ body[data-media-expanded="true"] .pd-studio-compose {
   margin: 0;
   width: 100%;
   max-width: 100%;
+}
+/*
+ * THE DRAWING WHILE IT IS BEING DRAWN is a generating card like the picture's:
+ * no border, no ground, no card head, and a soft fade into the chat at every
+ * edge (the user, 2026-09-23: "image/video/other 'generating' inline cards should
+ * have no border at all, but with some falloff into the background color of
+ * the chat"). The finished drawing is presented as the normal card.
+ */
+.pd-live-svg .pd-inline-widget {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  -webkit-mask-image:
+    linear-gradient(to right, transparent, #000 8%, #000 92%, transparent),
+    linear-gradient(to bottom, transparent, #000 8%, #000 92%, transparent);
+  -webkit-mask-composite: source-in;
+  mask-image:
+    linear-gradient(to right, transparent, #000 8%, #000 92%, transparent),
+    linear-gradient(to bottom, transparent, #000 8%, #000 92%, transparent);
+  mask-composite: intersect;
+}
+.pd-live-svg .pd-inline-widget-head {
+  display: none;
 }

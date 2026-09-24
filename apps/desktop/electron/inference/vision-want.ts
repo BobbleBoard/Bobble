@@ -17,9 +17,25 @@
 
 let wanted = false;
 
-/** Record that an image was produced while the server could not read images. */
+/**
+ * Record that an image was produced while the server could not read images.
+ *
+ * NOT when the user switched vision OFF (engine menu → Vision, the user
+ * 2026-09-23: "always be on unless the user says to turn it off"). Off means
+ * off: a tool's screenshot does not relaunch the model into vision behind the
+ * user's back — the model is told "vision is switched off" instead (provider
+ * note). An image the USER attaches still loads it (the composer's own path).
+ */
 export function wantVision(): void {
+  if (!visionAllowed()) return;
   wanted = true;
+}
+
+let visionAllowed: () => boolean = () => true;
+
+/** Main wires this to the setting once (settings-main is not importable from every test). */
+export function setVisionAllowed(fn: () => boolean): void {
+  visionAllowed = fn;
 }
 
 /** Take the want (and clear it). True at most once per set. */

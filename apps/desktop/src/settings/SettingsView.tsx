@@ -23,7 +23,7 @@ import {
 } from '@pi-desktop/ui';
 import { type ReactNode, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { cx } from '../onboarding/cx';
-import { IconCursor, IconShield, IconSlider, IconSun } from './icons';
+import { IconShield, IconSlider, IconSun } from './icons';
 import { AgentPanel } from './panels/AgentPanel';
 import { AppearancePanel } from './panels/AppearancePanel';
 import { CapabilitiesPanel } from './panels/CapabilitiesPanel';
@@ -56,7 +56,8 @@ const NAV: Array<{ id: SettingsSection; label: string; icon: ReactNode }> = [
   { id: 'appearance', label: 'Appearance', icon: <IconSun /> },
   { id: 'interface', label: 'Interface', icon: <IconSlider /> },
   { id: 'agent', label: 'Agent', icon: <IconShield /> },
-  { id: 'computer-use', label: 'Computer use', icon: <IconCursor /> },
+  // A window with its traffic lights and the agent's cursor (the user 2026-09-23).
+  { id: 'computer-use', label: 'Computer use', icon: <Glyph name="computerUse" /> },
   { id: 'search', label: 'Web search', icon: <IconSearch /> },
   // "Extensions" on screen (the user, 2026-09-20); the section id stays.
   { id: 'connectors', label: 'Extensions', icon: <Glyph name="extensions" /> },

@@ -101,6 +101,13 @@ describe('composerPill', () => {
     expect(v?.kind).toBe('no-vision');
   });
 
+  it('says it is the SWITCH when vision is off, and where to turn it on', () => {
+    const v = composerPill({ ...base, imageOnBlindModel: 'off' });
+    expect(v?.text).toContain('Vision is off');
+    expect(v?.text).toContain('engine menu');
+    expect(v?.kind).toBe('no-vision');
+  });
+
   /*
    * A model that is still loading cannot answer at all, so it outranks a warning
    * about an attachment nobody has asked it about yet.

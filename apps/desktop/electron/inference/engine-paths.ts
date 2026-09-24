@@ -20,6 +20,35 @@ export function mlxVenvRoot(): string {
   return path.join(cacheRoot(), 'engines', 'mlx-venv');
 }
 
+/**
+ * rapid-mlx's VISION RUNTIME, in a venv of its own.
+ *
+ * Its vision lane needs `rapid-mlx[vision]` — mlx-vlm pinned to exactly 0.6.17,
+ * plus torch, torchvision and opencv — and the shared venv cannot hold that:
+ * oMLX pins mlx-vlm to a git commit (0.6.3 is what is installed), and rapid-mlx
+ * refuses to start the lane on anything else ("this release validates exactly
+ * 0.6.17"). MEASURED 2026-09-23: 1.2 GB, 3 s from a warm uv cache. Same rapid-mlx
+ * version as the shared venv's, so the text lane and the vision lane are one
+ * engine.
+ */
+export function rapidVisionVenvRoot(): string {
+  return path.join(cacheRoot(), 'engines', 'rapid-mlx-vision');
+}
+
+/** The CLI a vision-lane launch execs. */
+export function rapidVisionCommand(): string {
+  return path.join(rapidVisionVenvRoot(), 'bin', 'rapid-mlx');
+}
+
+/** Written once the install finished — a venv the install died halfway into is not ready. */
+export function rapidVisionMarker(): string {
+  return path.join(rapidVisionVenvRoot(), '.bobble-vision-ready');
+}
+
+export function rapidVisionReady(): boolean {
+  return existsSync(rapidVisionCommand()) && existsSync(rapidVisionMarker());
+}
+
 /** The managed venv for vLLM (Linux; CUDA/ROCm wheels are their own world). */
 export function vllmVenvRoot(): string {
   return path.join(cacheRoot(), 'engines', 'vllm-venv');

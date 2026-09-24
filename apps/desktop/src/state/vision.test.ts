@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { useLlmStore } from './llm-store';
-import { ensureVisionMode, resolveVisionTarget } from './local-model';
+import { ensureVisionMode, imageBlindness, resolveVisionTarget } from './local-model';
 import { messageNeedsVision } from './pi-connect';
 
 describe('messageNeedsVision', () => {
@@ -17,6 +17,45 @@ describe('resolveVisionTarget', () => {
     { id: 'nemotron-3-nano-30b-a3b', vision: false },
     { id: 'gemma-4-12b-it', vision: true },
   ];
+
+  it('OFF means off: no relaunch to see, however able the model is (the user, 2026-09-23)', () => {
+    // MEASURED before: the switch said Off, a picture relaunched the server
+    // multimodal (five minutes), and the model read it.
+    const d = resolveVisionTarget({
+      launchMode: 'fast-text',
+      visionReady: false,
+      model: { id: 'gemma-4-e2b-it', quant: 'Q4_K_M' },
+      catalog,
+      visionOff: true,
+    });
+    expect(d).toEqual({ action: 'off' });
+    expect(
+      imageBlindness({
+        visionReady: false,
+        model: { id: 'gemma-4-e2b-it' },
+        catalog,
+        visionOff: true,
+      }),
+    ).toBe('off');
+    // A server that can still see (not yet relaunched) is simply used.
+    expect(
+      resolveVisionTarget({
+        visionReady: true,
+        model: { id: 'gemma-4-e2b-it' },
+        catalog,
+        visionOff: true,
+      }).action,
+    ).toBe('already-on');
+    // And a text-only setup with vision on is still "unsupported", not "off".
+    expect(
+      imageBlindness({
+        visionReady: false,
+        model: { id: 'nemotron-3-nano-30b-a3b' },
+        catalog,
+        pinnedModelId: 'nemotron-3-nano-30b-a3b',
+      }),
+    ).toBe('unsupported');
+  });
 
   it('no-ops when the server is already multimodal (vision is sticky)', () => {
     expect(resolveVisionTarget({ launchMode: 'multimodal', catalog }).action).toBe('already-on');

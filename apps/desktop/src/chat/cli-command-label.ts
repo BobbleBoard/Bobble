@@ -196,18 +196,34 @@ function browserLabel(verb: string, pair: [string, string], line: string): CliCo
   const { flags, bare } = cliFlags(argsOf(line));
   // The words after the verb: `browser type 14 "hello"` → ['14', 'hello'].
   const after = bare.slice(bare.indexOf(verb) + 1);
-  const leadIndex = after[0] !== undefined && /^\d+$/.test(after[0]) ? after[0] : undefined;
+  /*
+   * A LEADING NUMBER IS AN INDEX ONLY FOR THE VERBS THAT TAKE ONE. the user
+   * (2026-09-23): "what's all this about 'scrolled element 5000' or 10000 …
+   * there's certainly not 10 thousand elements on page." `browser scroll 5000`
+   * is a DISTANCE, and this read it as element 5000.
+   */
+  const takesIndex = verb === 'click' || verb === 'type';
+  const leadIndex =
+    takesIndex && after[0] !== undefined && /^\d+$/.test(after[0]) ? after[0] : undefined;
   const rest = leadIndex === undefined ? after : after.slice(1);
   const url = flags.url ?? (verb === 'navigate' ? after[0] : undefined);
   const index = flags.index ?? leadIndex;
   const key = flags.key ?? (verb === 'key' ? after[0] : undefined);
-  const direction = flags.direction ?? (verb === 'scroll' ? after[0] : undefined);
+  const scrollWords = new Set(['up', 'down', 'left', 'right', 'top', 'bottom']);
+  const direction =
+    flags.direction ?? (verb === 'scroll' ? after.find((w) => scrollWords.has(w)) : undefined);
+  const amount =
+    verb === 'scroll' ? (flags.amount ?? after.find((w) => /^\d+$/.test(w))) : undefined;
+  const distance =
+    amount === undefined ? undefined : `${Number(amount).toLocaleString('en-US')} px`;
   const target =
     index !== undefined
       ? `element ${index}`
       : flags.x !== undefined && flags.y !== undefined
         ? `(${flags.x}, ${flags.y})`
-        : (flags.selector ?? direction ?? key);
+        : verb === 'scroll'
+          ? [direction, distance].filter((w) => w !== undefined).join(' ') || undefined
+          : (flags.selector ?? direction ?? key);
   const typed = verb === 'type' ? (flags.text ?? rest[0]) : verb === 'key' ? key : undefined;
   const detail = url ?? (verb === 'type' ? brief(typed) : target);
   return {

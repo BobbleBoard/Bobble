@@ -5,6 +5,7 @@ import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { GenBridgeClient } from './gen-bridge-client.ts';
 import {
+  GEN_AGENT_ENV,
   GEN_SOCK_ENV,
   GEN_TOKEN_ENV,
   type GenBridgeRequest,
@@ -75,6 +76,22 @@ describe('GenBridgeClient', () => {
       params: { prompt: 'a cat', model: 'z-image-turbo' },
     });
     client.dispose();
+  });
+
+  it('names the asking pi on the wire — a subagent by its id, the chat itself by nothing', async () => {
+    const h = await startServer(() => ({ result: { jobId: 'j', outputs: [] } }));
+    const child = GenBridgeClient.fromEnv({
+      [GEN_SOCK_ENV]: h.socketPath,
+      [GEN_TOKEN_ENV]: 't',
+      [GEN_AGENT_ENV]: 'child-7',
+    });
+    const chat = GenBridgeClient.fromEnv({ [GEN_SOCK_ENV]: h.socketPath, [GEN_TOKEN_ENV]: 't' });
+    await child?.generate({ prompt: 'a' });
+    await chat?.generate({ prompt: 'b' });
+    expect(h.received[0]?.agent).toBe('child-7');
+    expect(h.received[1]).not.toHaveProperty('agent');
+    child?.dispose();
+    chat?.dispose();
   });
 
   it('round-trips generateVideo, carries the video params, and returns a poster frame', async () => {

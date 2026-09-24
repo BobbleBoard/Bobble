@@ -1,8 +1,12 @@
+import { mkdtempSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { ExtensionAPI, ExtensionContext, ToolDefinition } from '@mariozechner/pi-coding-agent';
 import { describe, expect, it, vi } from 'vitest';
 import type { MacBridge } from './bridge-client.js';
 import { createMacConsentGate, type MacConsentGate } from './permissions.js';
 import type { MacAgentMethod } from './protocol.js';
+import { createMacSessionState } from './session-state.js';
 import { registerChromeTools, registerMacComputerUseTools } from './tools.js';
 
 type Handler = (params: Record<string, unknown> | undefined) => unknown;
@@ -155,15 +159,57 @@ describe('registerMacComputerUseTools', () => {
 
   /* the user (2026-09-15): "add a flag … 'visual' or 'screenshot' … to force
      visual even on text based control apps". */
-  it('`visual` is the same ask as `screenshot`, and reaches the helper as one', async () => {
+  /*
+   * the user (2026-09-23): "the snapshot tool should accept a flag that gives a
+   * visual snapshot no text, when this flag is here it just passes an image
+   * back." And with no text to print the picture's offset, a coordinate click
+   * right after it is read straight off the picture.
+   */
+  it('`visual` returns the picture and nothing else', async () => {
     const bridge = new FakeBridge().on('snapshot', () => ({
       ...SNAP([{ index: 1, role: 'AXButton', name: 'OK' }]),
-      screenshot: { path: '/tmp/x.png', base64: 'BBBB', mimeType: 'image/png' },
+      screenshot: {
+        path: '/tmp/x.png',
+        base64: 'BBBB',
+        mimeType: 'image/jpeg',
+        rect: { x: 244, y: 45, w: 1024, h: 822 },
+        inlineWidth: 1024,
+        inlineHeight: 822,
+      },
     }));
     const tools = collectTools(bridge);
     const r = await run(tools, 'mac_snapshot', { visual: true });
     expect(bridge.calls[0]).toMatchObject({ method: 'snapshot', params: { screenshot: true } });
-    expect(r.content.find((c) => c.type === 'image')).toMatchObject({ data: 'BBBB' });
+    expect(r.content).toHaveLength(1);
+    expect(r.content[0]).toMatchObject({ type: 'image', data: 'BBBB' });
+  });
+
+  it('a click right after a visual look is a point ON the picture; after a plain look it is screen points', async () => {
+    let withRect = true;
+    const bridge = new FakeBridge()
+      .on('snapshot', () => ({
+        ...SNAP([{ index: 1, role: 'AXButton', name: 'OK' }]),
+        screenshot: withRect
+          ? {
+              path: '/tmp/x.png',
+              base64: 'BBBB',
+              rect: { x: 244, y: 45, w: 1024, h: 822 },
+              inlineWidth: 512,
+              inlineHeight: 411,
+            }
+          : undefined,
+      }))
+      .on('click', () => ({ found: true }));
+    const tools = collectTools(bridge);
+    await run(tools, 'mac_snapshot', { visual: true });
+    const r = await run(tools, 'mac_click', { x: 100, y: 50 });
+    // Half-size picture: (100, 50) on it is (244 + 200, 45 + 100) on screen.
+    expect(bridge.lastParams('click')).toMatchObject({ x: 444, y: 145 });
+    expect((r.content[0] as { text: string }).text).toContain('(100, 50) on the picture');
+    withRect = false;
+    await run(tools, 'mac_snapshot', {});
+    await run(tools, 'mac_click', { x: 100, y: 50 });
+    expect(bridge.lastParams('click')).toMatchObject({ x: 100, y: 50 });
   });
 
   it('a picture asked for and not taken says why, first — and names the grant', async () => {
@@ -173,11 +219,15 @@ describe('registerMacComputerUseTools', () => {
       permissions: { accessibility: true, screenRecording: false },
     }));
     const tools = collectTools(bridge);
-    const r = await run(tools, 'mac_snapshot', { visual: true });
+    const r = await run(tools, 'mac_snapshot', { screenshot: true });
     const text = (r.content[0] as { text: string }).text;
     expect(text.startsWith('You asked for a picture and none could be taken')).toBe(true);
     expect(text).toContain('Allow Screen Recording');
     expect(r.content.find((c) => c.type === 'image')).toBeUndefined();
+    // --visual says the same, and points at the plain snapshot instead.
+    const v = await run(tools, 'mac_snapshot', { visual: true });
+    expect((v.content[0] as { text: string }).text).toContain('Screen Recording');
+    expect((v.content[0] as { text: string }).text).toContain('plain mac_snapshot');
   });
 
   it('click by index re-snapshots + retries once on a stale index', async () => {
@@ -1126,5 +1176,110 @@ describe('chrome_* never launch Chrome by addressing it (the user: "chrome … s
     } finally {
       chromeUp = true;
     }
+  });
+});
+
+describe('chrome snapshot --visual (the user 2026-09-23: "it just passes an image back")', () => {
+  it('returns the window picture and no text, through Accessibility', async () => {
+    const bridge = new FakeBridge().on('snapshot', () => ({
+      ...SNAP([]),
+      app: 'Google Chrome',
+      screenshot: { path: '/tmp/c.png', base64: 'CCCC', mimeType: 'image/jpeg' },
+    }));
+    const tools = collectTools(bridge);
+    const r = await run(tools, 'chrome_snapshot', { visual: true });
+    expect(r.content).toHaveLength(1);
+    expect(r.content[0]).toMatchObject({ type: 'image', data: 'CCCC' });
+    expect(bridge.lastParams('snapshot')).toMatchObject({ app: 'Google Chrome', screenshot: true });
+  });
+});
+
+/*
+ * the user (2026-09-23): "the active application should be persisted better … the
+ * model seems to at times randomly say 'the user is on activity monitor'."
+ */
+describe('the controlled app is remembered, and a fallback says what it is', () => {
+  /** A pi stub that records `on` handlers so session_start can be fired. */
+  function piWithEvents(tools: Map<string, ToolDefinition>) {
+    const handlers = new Map<string, (e: unknown, ctx: unknown) => void>();
+    const pi = {
+      registerTool: (def: ToolDefinition) => tools.set(def.name, def),
+      on: (name: string, fn: (e: unknown, ctx: unknown) => void) => handlers.set(name, fn),
+      appendEntry: () => undefined,
+    } as unknown as ExtensionAPI;
+    const start = (entries: unknown[] = []) =>
+      handlers.get('session_start')?.({}, { sessionManager: { getEntries: () => entries } });
+    return { pi, start };
+  }
+
+  it('a look with no app named and nothing controlled is labelled as the USER’s front app', async () => {
+    const bridge = new FakeBridge().on('snapshot', () => ({
+      ...SNAP([{ index: 1, role: 'AXButton', name: 'CPU' }]),
+      app: 'Activity Monitor',
+    }));
+    const tools = collectTools(bridge);
+    const r = await run(tools, 'mac_snapshot', {});
+    const text = (r.content[0] as { text: string }).text;
+    expect(text).toContain('the app the USER has in front');
+    // Named, it is just a look at that app.
+    const named = await run(tools, 'mac_snapshot', { app: 'TextEdit' });
+    expect((named.content[0] as { text: string }).text).not.toContain('USER has in front');
+  });
+
+  it('a new chat picks up the app the last one controlled — and says it was carried over', async () => {
+    const file = join(mkdtempSync(join(tmpdir(), 'mac-last-')), 'last.json');
+    const bridge = new FakeBridge().on('snapshot', () => SNAP([], process.pid));
+    // Chat one controls "TextEdit" (this test process stands in for a live pid).
+    const toolsA = new Map<string, ToolDefinition>();
+    const a = piWithEvents(toolsA);
+    registerMacComputerUseTools(a.pi, {
+      bridge,
+      consent: createMacConsentGate({ preConsented: true }),
+      readChromeTabs: async () => null,
+      lastControlFile: file,
+    });
+    a.start();
+    await run(toolsA, 'mac_snapshot', { app: 'TextEdit' });
+    expect(JSON.parse(readFileSync(file, 'utf8'))).toMatchObject({
+      app: 'TextEdit',
+      pid: process.pid,
+    });
+    // Chat two starts with no entries of its own.
+    const toolsB = new Map<string, ToolDefinition>();
+    const b = piWithEvents(toolsB);
+    registerMacComputerUseTools(b.pi, {
+      bridge,
+      consent: createMacConsentGate({ preConsented: true }),
+      readChromeTabs: async () => null,
+      lastControlFile: file,
+    });
+    b.start();
+    const r = await run(toolsB, 'mac_snapshot', {});
+    expect(bridge.lastParams('snapshot')).toMatchObject({ pid: process.pid });
+    expect((r.content[0] as { text: string }).text).toContain('Carried over from an earlier chat');
+    // Said once.
+    const again = await run(toolsB, 'mac_snapshot', {});
+    expect((again.content[0] as { text: string }).text).not.toContain('Carried over');
+  });
+
+  it('Chrome’s own commands leave Chrome under control of the shared state', async () => {
+    const session = createMacSessionState();
+    const bridge = new FakeBridge().on('snapshot', () => ({
+      ...SNAP([]),
+      app: 'Google Chrome',
+      screenshot: { path: '/tmp/c.png', base64: 'CCCC' },
+    }));
+    const tools = new Map<string, ToolDefinition>();
+    const pi = {
+      registerTool: (def: ToolDefinition) => tools.set(def.name, def),
+    } as unknown as ExtensionAPI;
+    registerChromeTools(pi, bridge, {
+      session,
+      isChromeRunning: async () => true,
+      chromePid: async () => 4321,
+    });
+    expect(session.controlled()).toBeNull();
+    await run(tools, 'chrome_snapshot', { visual: true });
+    expect(session.controlled()).toMatchObject({ app: 'Google Chrome', pid: 4321 });
   });
 });

@@ -76,6 +76,8 @@ export type LlmRequestBody =
       /** The cross-engine knobs (portable-knobs.ts), spelled per engine at launch. */
       portableKnobs?: Record<string, EngineFlagValue>;
       modelSpec: Record<string, ModelSpecChoice>;
+      /** Launch with vision (default true) — see SettingsState.loadVision. */
+      loadVision?: boolean;
     }
   /** Restart the running server with the current flags and profile. */
   | { type: 'relaunch' }

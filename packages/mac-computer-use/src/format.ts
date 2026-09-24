@@ -624,12 +624,34 @@ function truncationLine(snap: MacSnapshot): string {
 export interface MacSnapshotView {
   /** The model's own last act, in its own vocabulary: `clicked [7] "Save"`. */
   readonly lastAct?: string;
+  /**
+   * This look named no app and nothing was under control, so the helper
+   * answered with whatever the USER has in front. Said so in the header: the user
+   * (2026-09-23) watched a model announce "the user is on Activity Monitor"
+   * off a look that had simply fallen back to his frontmost window.
+   */
+  readonly frontmostFallback?: boolean;
+  /** The controlled app was carried over from an earlier chat (tools.ts). */
+  readonly carriedOver?: boolean;
 }
 
 export function formatMacSnapshot(snap: MacSnapshot, view: MacSnapshotView = {}): string {
   const dialog = dialogOf(snap);
   const head: string[] = [
     `App: "${snap.app}"${snap.window ? ` — window "${snap.window}"` : ''}`,
+    ...(view.frontmostFallback === true
+      ? [
+          `(No app was named and none was under your control, so this is the app the USER has ` +
+            `in front. It is under your control now; if the task is in another app, name it: ` +
+            `mac snapshot "<app>" — or launch it.)`,
+        ]
+      : []),
+    ...(view.carriedOver === true
+      ? [
+          '(Carried over from an earlier chat: the last app computer use worked in. If the ' +
+            'task is in another app, name it: mac snapshot "<app>".)',
+        ]
+      : []),
     contextLine(snap, view),
     /* Not wrapped: this one is fixed authored copy, and a sentence a model has
      * to reassemble across a line break is a sentence it can miss. */

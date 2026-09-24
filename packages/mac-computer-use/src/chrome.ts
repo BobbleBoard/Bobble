@@ -141,8 +141,15 @@ export function explainChromeFailure(stderr: string): string {
  * launch instead, which watches the focus and returns it.
  */
 export async function chromeRunning(): Promise<boolean> {
+  return (await chromePid()) !== null;
+}
+
+/** Chrome's main process id, or null when it is not running. */
+export async function chromePid(): Promise<number | null> {
   const res = await run('pgrep', ['-x', 'Google Chrome']);
-  return res.ok && res.stdout !== '';
+  if (!res.ok) return null;
+  const pid = Number.parseInt(res.stdout.split('\n')[0] ?? '', 10);
+  return Number.isFinite(pid) && pid > 0 ? pid : null;
 }
 
 /** Run JS in Chrome's active tab and return whatever it evaluated to. */

@@ -17,7 +17,7 @@
 import { useCanvasTabs } from '@pi-desktop/canvas';
 import type { ToolResultMsg } from '@pi-desktop/engine';
 import { ActivityChain } from '@pi-desktop/ui';
-import type { ReactNode } from 'react';
+import { type ReactNode, useRef } from 'react';
 import { useCanvasStore } from '../state/canvas-store';
 import { useLlmStore } from '../state/llm-store';
 import { usePiStore } from '../state/pi-slice';
@@ -96,6 +96,7 @@ export function ThreadActivityChain({
   turnStartedAt,
   tps,
   onOpenFile,
+  chainKey,
 }: {
   blocks: ActivityBlock[];
   /** Tool result keyed by tool-call id (owner-scoped by the caller). */
@@ -132,6 +133,15 @@ export function ThreadActivityChain({
    * streaming corp-peek instead (the workspace has no renderer-addressable path).
    */
   onOpenFile?: (path: string) => void;
+  /**
+   * What makes THIS chain's step ids unique across the whole app — the owning
+   * group and segment (AssistantGroup). A thinking block has no id of its own,
+   * and its slot (`thinking:0`) is the same in every chat, while the running
+   * timer remembers the first time it saw an id for the life of the renderer:
+   * the user (2026-09-23), a new chat two seconds old reading "Thinking for 14m" —
+   * the start time of the first thought he saw that session.
+   */
+  chainKey?: string;
 }): ReactNode {
   const canvas = useCanvasTabs();
   // The folder the TOOLS resolve a relative path against (the chat's working
@@ -150,6 +160,11 @@ export function ThreadActivityChain({
    * in a row. Drop them BEFORE the running flags are computed, so the indices
    * stay aligned and they also stop inflating the collapsed summary's count. */
   const blocks = allBlocks.filter((b) => !isEmptyThinking(b));
+  /* No key from the caller: this mount's own, so a timer never inherits another
+     chain's start (a remount restarts the clock — honest, where a borrowed
+     start time is not). */
+  const ownScope = useRef(`chain-${Math.random().toString(36).slice(2, 10)}`);
+  const chainScope = chainKey ?? ownScope.current;
   const firstToolResultTs = blocks.reduce<number | undefined>((min, b) => {
     if (b.type !== 'toolCall') return min;
     const ts = resultForBlock.get(b.id)?.timestamp;
@@ -292,7 +307,7 @@ export function ThreadActivityChain({
     // same-kind row settled, remounting a row that was still RUNNING and
     // restarting its spinner mid-turn. A tool call's id never moves; a thinking
     // block has none, so its slot in the append-only block list stands in.
-    const id = block.type === 'thinking' ? `thinking:${i}` : block.id;
+    const id = block.type === 'thinking' ? `${chainScope}:thinking:${i}` : block.id;
     return { ...mapped, data: { ...mapped.data, id } };
   });
 

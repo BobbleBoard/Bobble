@@ -15,6 +15,7 @@
  * PD_PREVIEW_HARNESS_HOST).
  */
 import { execFile } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
   copyFileSync,
   createReadStream,
@@ -26,7 +27,7 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { Readable } from 'node:stream';
 import { pathToFileURL } from 'node:url';
@@ -53,6 +54,15 @@ import type {
   CanvasOpenWithAppId,
 } from '../ipc-contract';
 import { isTrustedIpcEvent } from '../trusted-senders';
+import {
+  describeOpenFailure,
+  type OpenOutcome,
+  type OpenRequest,
+  openArgv,
+  openPolicy,
+  openRequestsFor,
+  resolveOpenTarget,
+} from './os-open';
 
 const execFileAsync = promisify(execFile);
 
@@ -404,6 +414,13 @@ export function registerCanvasIpc(
     guard(event, 'canvas:open-external');
     // Only ever hand http(s) URLs to the OS (never file:/custom schemes).
     if (!/^https?:\/\//i.test(req.url.trim())) return { ok: false };
+    // A probe clicking "Open in external browser" must not open a browser over
+    // someone's work — the renderer used to skip this call under E2E, now it
+    // makes it, and the line is drawn here (see openPolicy).
+    if (process.env.PI_E2E === '1') {
+      noteForProbes({ channel: 'canvas:open-external', argv: [req.url.trim()], ran: false });
+      return { ok: true };
+    }
     try {
       await shell.openExternal(req.url.trim());
       return { ok: true };
@@ -420,12 +437,13 @@ export function registerCanvasIpc(
     return listOpenApps(req.path);
   });
 
-  // File operation bar "Open ▾" → shell out to the chosen app.
+  // File operation bar "Open ▾" → shell out to the chosen app. The answer says
+  // WHY when it could not (os-open.ts) — the renderer shows it.
   ipcMain.handle(
     'canvas:open-with',
     async (event, req: { path: string; appId: CanvasOpenWithAppId }) => {
       guard(event, 'canvas:open-with');
-      return openWithApp(req.path, req.appId);
+      return openFile('canvas:open-with', req.path, req.appId);
     },
   );
 
@@ -438,22 +456,22 @@ export function registerCanvasIpc(
    * open with, so the button did nothing while the dropdown's individual apps
    * worked fine — exactly what the user reported.
    *
-   * `shell.openPath` asks LaunchServices to do what a double-click in Finder
-   * does. It needs no third-party tool and no Apple Events permission (the
-   * osascript route asks Finder and is refused with -1743 until the user grants
-   * automation access).
+   * `open <file>` asks LaunchServices to do what a double-click in Finder does
+   * (shell.openPath off macOS). It needs no third-party tool and no Apple Events
+   * permission (the osascript route asks Finder and is refused with -1743 until
+   * the user grants automation access).
    */
   ipcMain.handle('canvas:open-default', async (event, req: { path: string }) => {
     guard(event, 'canvas:open-default');
-    const error = await shell.openPath(path.resolve(req.path));
-    return error === '' ? { ok: true } : { ok: false, error };
+    return openFile('canvas:open-default', req.path, 'default');
   });
 
-  // File operation bar "Open in folder" → reveal the file in Finder.
-  ipcMain.handle('canvas:reveal', (event, req: { path: string }) => {
+  // File operation bar "Open in folder" / the card's Show → select it in Finder.
+  ipcMain.handle('canvas:reveal', async (event, req: { path: string }) => {
     guard(event, 'canvas:reveal');
-    shell.showItemInFolder(path.resolve(req.path));
-    return { ok: true };
+    const resolved = resolveOpenTarget(req.path, { home: homedir(), exists: existsSync });
+    if (!resolved.ok) return resolved;
+    return launch('canvas:reveal', { kind: 'reveal', target: resolved.target });
   });
 
   /*
@@ -603,53 +621,112 @@ function openApp(appName: string, target: string): Promise<void> {
 }
 
 /**
- * Shell out to open a file in the requested app. `vscode-insiders` falls back to
- * stable VS Code when Insiders isn't installed; `terminal` opens the file's
- * directory; `default` uses the OS default handler via shell.openPath.
- * macOS-only shell-outs (`open -a`); other platforms use the default handler.
+ * Open a file with the app the user chose ('default' = whatever the OS uses).
+ *
+ * The path is checked BEFORE anything is launched: it must be absolute and on
+ * disk (os-open.ts resolveOpenTarget) — `path.resolve` used to quietly turn a
+ * relative path into one under `/`, main's cwd when launched from Finder.
+ *
+ * A chosen app that cannot open it is REPORTED, not swapped: this used to fall
+ * back to the OS default and answer `ok: true`, so picking Photos could open
+ * Preview with no word about why. Only the legacy `vscode-insiders` id keeps
+ * its deliberate fallback to stable VS Code.
  */
-async function openWithApp(
-  filePath: string,
-  appId: CanvasOpenWithAppId,
-): Promise<{ ok: boolean; error?: string }> {
-  const target = path.resolve(filePath);
-  try {
-    if (appId === 'default' || process.platform !== 'darwin') {
-      const error = await shell.openPath(target);
-      return error ? { ok: false, error } : { ok: true };
-    }
-    // Round-8 #14: real system apps arrive as a `.app` path (`open -a`) or a
-    // bundle id (`open -b`). The legacy named ids below stay as fallbacks.
-    if (appId.endsWith('.app')) {
-      await openApp(appId, target);
-      return { ok: true };
-    }
-    if (isBundleId(appId)) {
-      await execFileAsync('open', ['-b', appId, target]);
-      return { ok: true };
-    }
-    if (appId === 'terminal') {
-      const dir = isDirectory(target) ? target : path.dirname(target);
-      await openApp('Terminal', dir);
-      return { ok: true };
-    }
-    if (appId === 'xcode') {
-      await openApp('Xcode', target);
-      return { ok: true };
-    }
-    // vscode-insiders → Insiders, else stable VS Code.
-    try {
-      await openApp('Visual Studio Code - Insiders', target);
-    } catch {
-      await openApp('Visual Studio Code', target);
-    }
-    return { ok: true };
-  } catch (error) {
-    log.warn('open-with failed', { appId, error: String(error) });
-    // Last resort: hand it to the OS default handler.
-    const fallback = await shell.openPath(target).catch(() => 'open failed');
-    return fallback ? { ok: false, error: String(error) } : { ok: true };
+async function openFile(channel: string, filePath: string, appId: string): Promise<OpenOutcome> {
+  const resolved = resolveOpenTarget(filePath, { home: homedir(), exists: existsSync });
+  if (!resolved.ok) {
+    noteForProbes({ channel, argv: null, ran: false, outcome: resolved, path: filePath });
+    return resolved;
   }
+  const requests = openRequestsFor(appId, resolved.target, isDirectory(resolved.target));
+  let outcome: OpenOutcome = { ok: false, error: 'The Mac did not say why.' };
+  for (const req of requests) {
+    outcome = await launch(channel, req);
+    if (outcome.ok) return outcome;
+  }
+  log.warn('open failed', {
+    appId,
+    target: resolved.target,
+    error: outcome.ok ? '' : outcome.error,
+  });
+  return outcome;
+}
+
+/**
+ * Hand ONE request to the OS — or, under a probe, record it (openPolicy).
+ * macOS: `open` (os-open.ts explains why one binary for everything). Elsewhere:
+ * Electron's LaunchServices equivalents, which have no "with this app".
+ */
+async function launch(channel: string, req: OpenRequest): Promise<OpenOutcome> {
+  const argv = openArgv(req);
+  if (openPolicy(process.env) === 'record') {
+    noteForProbes({ channel, argv, ran: false, outcome: { ok: true } });
+    return { ok: true };
+  }
+  let outcome: OpenOutcome;
+  if (process.platform !== 'darwin' && process.env.PI_E2E_FAKE_OPEN !== '1') {
+    if (req.kind === 'reveal') {
+      shell.showItemInFolder(req.target);
+      outcome = { ok: true };
+    } else {
+      const error = await shell.openPath(req.target);
+      outcome = error === '' ? { ok: true } : { ok: false, error: describeOpenFailure(req, error) };
+    }
+  } else {
+    try {
+      await runOpen(argv);
+      outcome = { ok: true };
+    } catch (error) {
+      const detail = (error as { stderr?: string }).stderr?.trim() || String(error);
+      outcome = { ok: false, error: describeOpenFailure(req, detail) };
+    }
+  }
+  noteForProbes({ channel, argv, ran: true, outcome });
+  return outcome;
+}
+
+/**
+ * `open <argv>`, found on PATH — which is where a probe's fake one goes first.
+ * A stripped PATH without /usr/bin must not break every Open, so ENOENT retries
+ * the system binary by its full path — never under a probe, where reaching the
+ * real one would launch an app over someone's work.
+ *
+ * The timeout is long on purpose: `open` returns once the app has taken the
+ * file, and a cold launch behind Gatekeeper's first-run check can take many
+ * seconds. Killing `open` would not stop that launch — it would only report a
+ * failure for a file that is about to appear.
+ */
+function runOpen(argv: string[]): Promise<void> {
+  const attempt = (bin: string): Promise<void> =>
+    new Promise((resolve, reject) => {
+      execFile(bin, argv, { timeout: 60_000 }, (error, _stdout, stderr) => {
+        if (error === null) resolve();
+        else reject(Object.assign(error, { stderr: String(stderr ?? '') }));
+      });
+    });
+  return attempt('open').catch((error: NodeJS.ErrnoException) =>
+    error.code === 'ENOENT' && process.env.PI_E2E !== '1'
+      ? attempt('/usr/bin/open')
+      : Promise.reject(error),
+  );
+}
+
+/**
+ * E2E: every hand-to-the-OS request, the argv it became, whether it ran and
+ * what came back — read by probes through Playwright's `app.evaluate`
+ * (`globalThis.__pdOsOpens`). Nothing is kept outside PI_E2E.
+ */
+function noteForProbes(entry: {
+  channel: string;
+  argv: string[] | null;
+  ran: boolean;
+  outcome?: OpenOutcome;
+  path?: string;
+}): void {
+  if (process.env.PI_E2E !== '1') return;
+  const g = globalThis as { __pdOsOpens?: unknown[] };
+  if (g.__pdOsOpens === undefined) g.__pdOsOpens = [];
+  g.__pdOsOpens.push({ ...entry, at: Date.now() });
 }
 
 function isDirectory(p: string): boolean {
@@ -668,11 +745,6 @@ function isDirectory(p: string): boolean {
 // of installed editors/terminals; each app's icon is extracted from its bundle
 // (Info.plist → .icns → PNG via `sips`) and returned as a data URL. Results are
 // cached by extension; icons are cached by app path — the extraction shells out.
-
-/** Reverse-DNS bundle id (has a dot, no slash, not a `.app` path). */
-function isBundleId(value: string): boolean {
-  return value.includes('.') && !value.includes('/') && !value.endsWith('.app');
-}
 
 // Candidate apps by FILE CATEGORY, probed at their standard install locations —
 // only the ones present on THIS machine are offered (existsSync filter in
@@ -781,8 +853,18 @@ function categoryForExt(ext: string): AppCategory {
   return 'code';
 }
 
-const appMetaCache = new Map<string, CanvasOpenApp>();
-const openAppsByExt = new Map<string, { apps: CanvasOpenApp[]; defaultAppId: string | null }>();
+/*
+ * Both caches hold PROMISES, so callers asking at the same moment share one
+ * build. They do ask at the same moment: one `present:show` fetches the list
+ * for the card AND for the canvas tab, and two builds ran side by side — each
+ * shelling out to `sips` for every icon (see extractIconDataUrl for what that
+ * collided on).
+ */
+const appMetaCache = new Map<string, Promise<CanvasOpenApp>>();
+const openAppsByExt = new Map<
+  string,
+  Promise<{ apps: CanvasOpenApp[]; defaultAppId: string | null }>
+>();
 
 function extOf(filePath: string): string {
   const base = path.basename(filePath);
@@ -816,9 +898,17 @@ async function extractIconDataUrl(appPath: string, iconFile: string): Promise<st
   const name = /\.icns$/i.test(iconFile) ? iconFile : `${iconFile}.icns`;
   const icns = path.join(appPath, 'Contents', 'Resources', name);
   if (!existsSync(icns)) return undefined;
+  /*
+   * ONE FILE PER APP. The name used to be the first 12 bytes of the path in
+   * hex — "/Application" or "/System/Appl" — so every app's icon went through
+   * one of TWO temp files, and two lists built at once read each other's
+   * icons. SEEN 2026-09-23 (open-buttons-probe): the same .md offered TextEdit
+   * with a blank page and Terminal with no icon in the canvas menu, and TextEdit
+   * blank with Terminal's real icon on the card beside it.
+   */
   const out = path.join(
     tmpdir(),
-    `pi-appicon-${Buffer.from(appPath).toString('hex').slice(0, 24)}.png`,
+    `pi-appicon-${createHash('sha1').update(appPath).digest('hex').slice(0, 16)}.png`,
   );
   try {
     // -Z 32: cap the longest side at 32px so the data URL stays tiny.
@@ -829,17 +919,20 @@ async function extractIconDataUrl(appPath: string, iconFile: string): Promise<st
   }
 }
 
-/** Bundle id + display name + icon data URL for an app, cached by path. */
-async function appMeta(appPath: string): Promise<CanvasOpenApp> {
+/** Bundle id + display name + icon data URL for an app, cached by path.
+ * Never rejects: both reads fall back (the name from the path, no icon). */
+function appMeta(appPath: string): Promise<CanvasOpenApp> {
   const cached = appMetaCache.get(appPath);
   if (cached !== undefined) return cached;
-  const info = await readBundleInfo(appPath);
-  const iconDataUrl =
-    info.iconFile !== undefined ? await extractIconDataUrl(appPath, info.iconFile) : undefined;
-  // Prefer the bundle id (stable, `open -b`) as the app id; fall back to path.
-  const meta: CanvasOpenApp = { id: info.id || appPath, name: info.name, iconDataUrl };
-  appMetaCache.set(appPath, meta);
-  return meta;
+  const pending = (async (): Promise<CanvasOpenApp> => {
+    const info = await readBundleInfo(appPath);
+    const iconDataUrl =
+      info.iconFile !== undefined ? await extractIconDataUrl(appPath, info.iconFile) : undefined;
+    // Prefer the bundle id (stable, `open -b`) as the app id; fall back to path.
+    return { id: info.id || appPath, name: info.name, iconDataUrl };
+  })();
+  appMetaCache.set(appPath, pending);
+  return pending;
 }
 
 /** LaunchServices default app for an extension via `duti -x` (optional tool). */
@@ -862,7 +955,7 @@ async function appMeta(appPath: string): Promise<CanvasOpenApp> {
  * BROWSER, via Electron's own API — and for the artefacts this app presents
  * (.html pages, rendered reports, SVG) the browser IS the OS default. So the
  * browser answers the common case, and everything else falls back to the
- * generic glyph while `shell.openPath` still opens correctly.
+ * generic glyph while the plain `open <file>` still opens it correctly.
  */
 async function defaultAppPath(ext: string): Promise<string | null> {
   if (ext === '') return null;
@@ -903,14 +996,23 @@ async function browserAppPathFor(ext: string): Promise<string | null> {
   return null;
 }
 
-async function listOpenApps(
+function listOpenApps(
   filePath: string,
 ): Promise<{ apps: CanvasOpenApp[]; defaultAppId: string | null }> {
-  if (process.platform !== 'darwin') return { apps: [], defaultAppId: null };
+  if (process.platform !== 'darwin') return Promise.resolve({ apps: [], defaultAppId: null });
   const ext = extOf(filePath);
   const cached = openAppsByExt.get(ext);
   if (cached !== undefined) return cached;
+  const pending = buildOpenApps(ext);
+  openAppsByExt.set(ext, pending);
+  // A build that failed is not remembered — the next ask tries again.
+  pending.catch(() => openAppsByExt.delete(ext));
+  return pending;
+}
 
+async function buildOpenApps(
+  ext: string,
+): Promise<{ apps: CanvasOpenApp[]; defaultAppId: string | null }> {
   // LaunchServices default first (primary "Open"), then the category's installed
   // candidates. existsSync keeps it to apps actually on this machine.
   const defPath = await defaultAppPath(ext);
@@ -930,7 +1032,5 @@ async function listOpenApps(
     apps.push(meta);
     if (p === defPath) defaultAppId = meta.id;
   }
-  const result = { apps, defaultAppId };
-  openAppsByExt.set(ext, result);
-  return result;
+  return { apps, defaultAppId };
 }

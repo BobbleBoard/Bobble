@@ -28,12 +28,24 @@
  * The pure parts (frame timing, filenames, document assembly, the seek script)
  * are exported and unit-tested; the Electron window is injected so none of that
  * needs a display.
+ *
+ * ONE ANIMATION, ONE FILE. the user: "rendered 120 induvidual frames, each of which
+ * was placed as it's own png card in the chat, severely cluttering it." The
+ * stills still land one by one — in a `frames/` folder, each shown live as it
+ * arrives — and are then joined into ONE animated PNG (./apng.ts: no encoder, no
+ * ffmpeg, the frames' own compressed data), which is the single output the job
+ * returns and the single card the thread shows.
  */
 
 import { createHash } from 'node:crypto';
+import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import type { GenOutput } from '@pi-desktop/gen-service';
+import { createLogger } from '@pi-desktop/shared';
+import { writeApngFile } from './apng.js';
 import type { HyperFramesRender } from './video-dispatch.js';
+
+const log = createLogger('desktop:hyperframes');
 
 /** A scene the renderer can drive, and the window it draws into. */
 export interface StillSceneOptions {
@@ -49,6 +61,15 @@ export const DEFAULT_FPS = 12;
 export const DEFAULT_SECONDS = 3;
 /** A ceiling so a mistyped duration cannot ask for ten thousand captures. */
 export const MAX_FRAMES = 300;
+/** The folder, inside the job's output folder, the stills are written to. */
+export const FRAMES_DIR = 'frames';
+/** The one file a render becomes: every frame, joined into an animated PNG. */
+export const ANIMATION_FILE = 'animation.png';
+
+/** The rate frames are captured at — and so the rate the animation plays at. */
+export function frameRate(fps: number): number {
+  return Number.isFinite(fps) && fps > 0 ? fps : DEFAULT_FPS;
+}
 
 /**
  * The instants to capture, in seconds.
@@ -60,7 +81,7 @@ export const MAX_FRAMES = 300;
  */
 export function frameTimes(seconds: number, fps: number): number[] {
   const secs = Number.isFinite(seconds) && seconds > 0 ? seconds : DEFAULT_SECONDS;
-  const rate = Number.isFinite(fps) && fps > 0 ? fps : DEFAULT_FPS;
+  const rate = frameRate(fps);
   const count = Math.min(MAX_FRAMES, Math.max(1, Math.round(secs * rate) + 1));
   const out: number[] = [];
   for (let i = 0; i < count; i++) out.push(Number((i / rate).toFixed(6)));
@@ -171,31 +192,60 @@ export interface StillWindow {
 export interface StillRendererDeps {
   readonly openWindow: (width: number, height: number) => Promise<StillWindow>;
   readonly writeFile: (filePath: string, data: Buffer) => Promise<void>;
+  /** Create a folder and its parents. Default: `fs.mkdir(dir, { recursive: true })`. */
+  readonly makeDir?: (dir: string) => Promise<void>;
+  /**
+   * Join the frames, in order, into one animated PNG at `outPath`, each shown
+   * for 1/fps s. Default: {@link writeApngFile}, which streams them from disk.
+   */
+  readonly assemble?: (
+    framePaths: readonly string[],
+    outPath: string,
+    fps: number,
+  ) => Promise<void>;
+  /** Where a join that failed is reported. Default: the app log. */
+  readonly warn?: (message: string, detail: Record<string, unknown>) => void;
 }
+
+const defaultMakeDir = async (dir: string): Promise<void> => {
+  await mkdir(dir, { recursive: true });
+};
+
+const defaultAssemble = (framePaths: readonly string[], outPath: string, fps: number) =>
+  writeApngFile(framePaths, outPath, { fps });
 
 /**
  * Build the renderer that replaces {@link hyperFramesRenderUnavailable}.
  *
  * Emits progress per frame, honours an abort between frames (a capture itself is
  * short, so mid-capture cancellation would buy nothing and risks a half-written
- * file), and returns one {@link GenOutput} per frame — modality `image`, because
- * that is genuinely what these are.
+ * file), writes each frame into `<outputDir>/frames/`, and returns ONE
+ * {@link GenOutput}: the frames joined into `<outputDir>/animation.png`, an
+ * animated PNG — modality `image`, because that is what an `<img>` shows it as.
+ * If the join fails, the one output is the last frame on its own; never one
+ * output per frame, which is what put 120 cards in the thread.
  */
 export function createStillRenderer(deps: StillRendererDeps): HyperFramesRender {
+  const makeDir = deps.makeDir ?? defaultMakeDir;
+  const assemble = deps.assemble ?? defaultAssemble;
+  const warn = deps.warn ?? ((message, detail) => log.warn(message, detail));
   return async (spec, outputDir, onEvent, signal) => {
     const width = spec.width ?? DEFAULT_WIDTH;
     const height = spec.height ?? DEFAULT_HEIGHT;
-    const times = frameTimes(spec.seconds ?? DEFAULT_SECONDS, spec.fps ?? DEFAULT_FPS);
+    const fps = frameRate(spec.fps ?? DEFAULT_FPS);
+    const times = frameTimes(spec.seconds ?? DEFAULT_SECONDS, fps);
     const seed = spec.seeds[0];
     const html = buildSceneDocument(spec.prompt, {
       width,
       height,
       seconds: spec.seconds ?? DEFAULT_SECONDS,
-      fps: spec.fps ?? DEFAULT_FPS,
+      fps,
     });
 
+    const framesDir = path.join(outputDir, FRAMES_DIR);
+    await makeDir(framesDir);
     const win = await deps.openWindow(width, height);
-    const outputs: GenOutput[] = [];
+    const frames: string[] = [];
     /*
      * A RENDER THAT DID NOT MOVE IS NOT A SUCCESS.
      *
@@ -221,16 +271,9 @@ export function createStillRenderer(deps: StillRendererDeps): HyperFramesRender 
         if (typeof found === 'number') seekedAnimations = Math.max(seekedAnimations, found);
         const png = await win.capture();
         digests.add(createHash('sha1').update(png).digest('hex'));
-        const file = path.join(outputDir, frameFileName(i, times.length));
+        const file = path.join(framesDir, frameFileName(i, times.length));
         await deps.writeFile(file, png);
-        outputs.push({
-          outputPath: file,
-          modality: 'image',
-          model: spec.modelId,
-          width,
-          height,
-          ...(seed !== undefined ? { seed } : {}),
-        });
+        frames.push(file);
         /*
          * SHOW THE FRAME AS IT LANDS. the user: "ensure we can see hyperframes stuff
          * being generated and iterating in the canvas."
@@ -255,12 +298,12 @@ export function createStillRenderer(deps: StillRendererDeps): HyperFramesRender 
       // the app, so this is not optional and not conditional on success.
       await win.dispose().catch(() => {});
     }
-    if (outputs.length === 0) {
+    if (frames.length === 0) {
       throw new Error('hyperframes rendered no frames');
     }
-    if (outputs.length > 1 && digests.size === 1) {
+    if (frames.length > 1 && digests.size === 1) {
       throw new Error(
-        `hyperframes rendered ${outputs.length} IDENTICAL frames — the scene did not animate. ` +
+        `hyperframes rendered ${frames.length} IDENTICAL frames — the scene did not animate. ` +
           `${seekedAnimations === 0 ? 'No CSS/Web animations were found to seek: ' : ''}` +
           'every frame is rendered by pinning a virtual clock, so motion must come from CSS ' +
           'animations/transitions or Web Animations, or from a `window.hyperframesSeek(t)` ' +
@@ -268,6 +311,37 @@ export function createStillRenderer(deps: StillRendererDeps): HyperFramesRender 
           'SMIL cannot be seeked and renders the same instant every time.',
       );
     }
-    return outputs;
+
+    const output = (outputPath: string, animated: boolean): GenOutput => ({
+      outputPath,
+      modality: 'image',
+      model: spec.modelId,
+      width,
+      height,
+      ...(seed !== undefined ? { seed } : {}),
+      frames: { dir: framesDir, count: frames.length, fps, animated },
+    });
+    const animation = path.join(outputDir, ANIMATION_FILE);
+    try {
+      await assemble(frames, animation, fps);
+      return [output(animation, true)];
+    } catch (err) {
+      /*
+       * The frames are on disk and fine; only the join failed. So the job still
+       * delivers something honest — the frame the scene settles to, as ONE
+       * output — and the frames folder is still named alongside it.
+       */
+      const last = frames[frames.length - 1] as string;
+      warn(
+        'hyperframes: could not join the frames into an animated PNG; returning the last frame alone',
+        {
+          error: err instanceof Error ? err.message : String(err),
+          frames: frames.length,
+          framesDir,
+          returned: last,
+        },
+      );
+      return [output(last, false)];
+    }
   };
 }

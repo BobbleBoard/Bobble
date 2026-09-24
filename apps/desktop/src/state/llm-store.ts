@@ -685,6 +685,12 @@ export async function ensureDefaultEngines(): Promise<void> {
       appleSilicon: info.platform === 'darwin' && info.arch === 'arm64',
       gpu: hostGpuOf(useLlmStore.getState().hardware),
     });
+    /* VISION ON BY DEFAULT (the user 2026-09-23): rapid-mlx can only read an image
+       through its vision runtime, which lives in a venv of its own — so while
+       Vision is on it comes with rapid-mlx. */
+    if (ids.includes('rapid-mlx') && useSettingsStore.getState().settings.loadVision !== false) {
+      ids.push('rapid-mlx-vision');
+    }
     if (ids.length === 0) return;
     const listed = await window.piDesktop.invoke('engines:list', undefined);
     const missing = ids.filter((id) => listed.engines.find((e) => e.id === id)?.installed !== true);

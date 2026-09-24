@@ -147,6 +147,7 @@ export const DEFAULT_SETTINGS: DesktopSettings = {
   experimentalProductionHarness: false,
   // Retired 2026-09-20 (generation is always on); parsed for old files, ignored.
   experimentalGeneration: true,
+  loadVision: true,
   advanced: DEFAULT_ADVANCED,
   engineLaunch: {},
   portableKnobs: {},
@@ -410,6 +411,7 @@ export function clampSettings(raw: unknown): DesktopSettings {
       d.experimentalProductionHarness,
     ),
     experimentalGeneration: bool(o.experimentalGeneration, d.experimentalGeneration),
+    loadVision: bool(o.loadVision, d.loadVision),
     advanced: clampAdvanced(o.advanced),
     engineLaunch: clampEngineLaunch(o.engineLaunch),
     portableKnobs: clampPortableKnobs(o.portableKnobs),

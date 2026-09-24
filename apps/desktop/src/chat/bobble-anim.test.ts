@@ -11,6 +11,7 @@ import {
   BAND,
   type Block,
   BOARD,
+  blockCount,
   cascadeHeat,
   cascadeT,
   cellOf,
@@ -20,10 +21,14 @@ import {
   exitReveal,
   exitSceneAt,
   exitT,
+  type Field,
+  fieldCells,
+  fieldFor,
   GRID,
   gridCell,
   type LoaderVariant,
   loopMs,
+  NO_FIELD,
   radiusFor,
   SWEEPS,
   sceneAt,
@@ -519,5 +524,126 @@ describe('the closing sweep', () => {
   it('is long enough to read and short enough not to delay the result', () => {
     expect(EXIT_MS).toBeGreaterThan(600);
     expect(EXIT_MS).toBeLessThan(1800);
+  });
+});
+
+describe('the field — the grid acts fill a box of any shape (the user, 2026-09-23)', () => {
+  /* A 16:9 card and a tall one, at the renderer's wide fill. */
+  const WIDE: Field = fieldFor(640, 360, 1.04);
+  const TALL: Field = fieldFor(300, 520, 1.04);
+  const FIELDS: [string, Field][] = [
+    ['wide', WIDE],
+    ['tall', TALL],
+  ];
+
+  it('asks for cells only along the long side, and none for a square', () => {
+    expect(fieldFor(400, 400, 1.04)).toEqual(NO_FIELD);
+    expect(WIDE.x).toBeGreaterThan(0);
+    expect(WIDE.y).toBe(0);
+    expect(TALL.y).toBeGreaterThan(0);
+    expect(TALL.x).toBe(0);
+  });
+
+  it('reaches every edge of the box, and a cell past it', () => {
+    // 640x360 at fill 1.04: the board is 374.4px, a pitch 46.8px. The field's
+    // outermost cell centre must sit beyond the box edge.
+    const unit = (360 * 1.04) / BOARD;
+    const pitch = BOARD / GRID;
+    const halfSpanPx = (BOARD / 2 + WIDE.x * pitch) * unit;
+    expect(halfSpanPx).toBeGreaterThan(320);
+  });
+
+  it('keeps the icon`s 64 blocks first, and the field in reading order after them', () => {
+    const cells = fieldCells(WIDE);
+    expect(cells).toHaveLength(blockCount(WIDE) - TOTAL);
+    expect(cells[0]).toEqual({ i: -WIDE.x, j: 0 });
+    for (const c of cells) expect(c.i >= 0 && c.i < GRID && c.j >= 0 && c.j < GRID).toBe(false);
+  });
+
+  it('emits the same number of blocks on every frame', () => {
+    for (const [, field] of FIELDS) {
+      for (const v of VARIANTS) {
+        for (const t of frames(v, 50)) {
+          expect(sceneAt(t, v, field).blocks).toHaveLength(blockCount(field));
+        }
+      }
+    }
+  });
+
+  it('flows: no field block teleports or pops, at a join or anywhere else', () => {
+    const STEP = 1000 / 60;
+    const jumps: string[] = [];
+    for (const [name, field] of FIELDS) {
+      // The film wraps the whole field's width — in the spread-out board's units.
+      const wrap = (BOARD / GRID) * (GRID + 2 * field.x) + 1;
+      for (const v of VARIANTS) {
+        let prev = sceneAt(0, v, field).blocks;
+        for (let t = STEP; t < loopMs(v); t += STEP) {
+          const now = sceneAt(t, v, field).blocks;
+          for (let i = 0; i < now.length; i++) {
+            const a = prev[i] as Block;
+            const b = now[i] as Block;
+            const moved = Math.hypot(a.cx - b.cx, a.cy - b.cy);
+            const limit = v === 'video' ? wrap : 3.2;
+            if (moved > limit || Math.abs(a.size - b.size) > 3.2) {
+              jumps.push(`${name} ${v} t=${Math.round(t)} block ${i}: moved ${moved.toFixed(2)}`);
+            }
+          }
+          prev = now;
+        }
+      }
+    }
+    expect(jumps.slice(0, 5)).toEqual([]);
+  });
+
+  it('is nothing while the mark plays, and dots across the whole card in the cascade', () => {
+    for (const [, field] of FIELDS) {
+      const extra = sceneAt(0, 'image', field).blocks.slice(TOTAL);
+      expect(extra.every((b) => b.alpha <= 0.001 || b.size <= 0.001)).toBe(true);
+      const cascade = timeline('image').find((a) => a.act === 'cascade');
+      const mid = sceneAt(((cascade?.start ?? 0) + (cascade?.end ?? 0)) / 2, 'image', field);
+      expect(mid.act).toBe('cascade');
+      expect(mid.blocks.slice(TOTAL).every((b) => b.alpha > 0.99 && b.size > 0)).toBe(true);
+    }
+  });
+
+  it('carries the wave out to the outermost cells', () => {
+    const cells = fieldCells(WIDE);
+    const outer = cells.findIndex((c) => c.i === -WIDE.x);
+    const cascade = timeline('image').find((a) => a.act === 'cascade');
+    let biggest = 0;
+    for (let t = cascade?.start ?? 0; t < (cascade?.end ?? 0); t += 1000 / 60) {
+      const b = sceneAt(t, 'image', WIDE).blocks[TOTAL + outer] as Block;
+      biggest = Math.max(biggest, b.size);
+    }
+    // A dot is DOT of a cell; on the line it is a full rounded square.
+    const cell = gridCell(0, 0).size;
+    expect(biggest).toBeGreaterThan(cell * 0.7);
+  });
+
+  it('leaves the whole field empty when the closing sweep is done', () => {
+    for (const [, field] of FIELDS) {
+      const end = exitSceneAt(1, field).blocks;
+      expect(end).toHaveLength(blockCount(field));
+      expect(end.every((b) => b.alpha <= 0.001)).toBe(true);
+      const start = exitSceneAt(0, field).blocks;
+      expect(start.every((b) => b.alpha > 0.99)).toBe(true);
+    }
+  });
+
+  it('keeps every field block physically sane', () => {
+    const bad: string[] = [];
+    for (const [name, field] of FIELDS) {
+      for (const v of VARIANTS) {
+        for (const t of frames(v, 40)) {
+          for (const b of sceneAt(t, v, field).blocks) {
+            if (b.size < -1e-9 || b.radius < -1e-9 || b.radius > b.size / 2 + 1e-6)
+              bad.push(`${name} ${v} t=${Math.round(t)}`);
+            if (b.alpha < 0 || b.alpha > 1) bad.push(`${name} ${v} alpha ${b.alpha}`);
+          }
+        }
+      }
+    }
+    expect(bad.slice(0, 5)).toEqual([]);
   });
 });

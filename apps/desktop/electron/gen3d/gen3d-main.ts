@@ -477,6 +477,17 @@ export interface ImageJobRequest {
   readonly prompt: string;
   /** Absolute path of an image to EDIT instead of generating fresh. */
   readonly editFrom?: string;
+  /** The asking pi — a subagent's id; absent for the chat's own pi. */
+  readonly agent?: string;
+}
+
+/**
+ * Tell the renderer an AGENT owns this job, the moment it has an id — so the
+ * chat that started it can stop it when the chat is deleted (the user, 2026-09-23).
+ * Studio jobs never pass through here.
+ */
+function noteAgentJob(jobId: string, agent: string | undefined): void {
+  broadcast('gen3d:agent-job', { jobId, ...(agent !== undefined ? { agent } : {}) });
 }
 
 /** Image gen is ~11 s warm, but a cold call loads a ~15 GB model first. Generous
@@ -555,6 +566,7 @@ export async function runImageJob(
   }
   jobPlans.set(res.jobId, planGenerate('text', false));
   guardSidecarJob(res.jobId, 'the picture');
+  noteAgentJob(res.jobId, req.agent);
   return imageJobs.wait(res.jobId, timeoutMs);
 }
 
@@ -574,6 +586,8 @@ export interface Model3dJobRequest {
   readonly imagePath?: string;
   readonly finish?: Gen3dFinish;
   readonly resolution?: Gen3dResolution;
+  /** The asking pi — a subagent's id; absent for the chat's own pi. */
+  readonly agent?: string;
 }
 
 export type Stage3dOp = 'texture' | 'segment' | 'rig' | 'retopo';
@@ -582,6 +596,8 @@ export interface Stage3dJobRequest {
   readonly op: Stage3dOp;
   readonly modelPath: string;
   readonly prompt?: string;
+  /** The asking pi — a subagent's id; absent for the chat's own pi. */
+  readonly agent?: string;
 }
 
 const MODEL_JOB_TIMEOUT_MS = 40 * 60_000;
@@ -625,6 +641,7 @@ export async function run3dJob(
   if (!res.ok || res.jobId === undefined) {
     return { ok: false, error: res.error ?? 'the engine refused the request' };
   }
+  noteAgentJob(res.jobId, req.agent);
   return withEndReason(res.jobId, await imageJobs.wait(res.jobId, timeoutMs, 'model-glb'));
 }
 
@@ -651,6 +668,7 @@ export async function runStage3dJob(
   if (!res.ok || res.jobId === undefined) {
     return { ok: false, error: res.error ?? 'the engine refused the request' };
   }
+  noteAgentJob(res.jobId, req.agent);
   return withEndReason(res.jobId, await imageJobs.wait(res.jobId, timeoutMs, 'model-glb'));
 }
 

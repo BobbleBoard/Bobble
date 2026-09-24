@@ -21,6 +21,14 @@ import type { GenOutput } from '@pi-desktop/gen-service';
 export const GEN_SOCK_ENV = 'PI_GEN_SOCK';
 /** Env var carrying the shared secret every request must echo. */
 export const GEN_TOKEN_ENV = 'PI_GEN_TOKEN';
+/**
+ * Env var naming WHICH pi process is asking — `main` for the chat's own pi (the
+ * default when unset), a child id for a subagent. The app stamps it on every
+ * pi it spawns so a job can be traced back to the chat that started it:
+ * deleting a chat stops its generations (the user, 2026-09-23: "clicking delete on
+ * a chat should instantly terminate any generation of any kind").
+ */
+export const GEN_AGENT_ENV = 'PI_DESKTOP_AGENT_ID';
 
 /**
  * RPC methods the app's gen bridge implements.
@@ -49,6 +57,8 @@ export interface GenBridgeRequest {
   readonly token: string;
   readonly method: GenBridgeMethod;
   readonly params?: Record<string, unknown>;
+  /** The asking pi ({@link GEN_AGENT_ENV}); absent = the chat's own pi. */
+  readonly agent?: string;
 }
 
 /** One response on the wire. Never throws across the boundary. */

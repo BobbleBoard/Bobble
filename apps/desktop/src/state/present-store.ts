@@ -18,7 +18,7 @@ import { create } from 'zustand';
 import { previewKindForExt } from '../chat/canvas/file-preview';
 import { fileTabKey, openFileInCanvas } from '../chat/canvas/file-tabs';
 import { svgCardPayload } from '../chat/svg-size';
-import { getCanvasController } from './canvas-store';
+import { getCanvasController, useCanvasStore } from './canvas-store';
 import { usePiStore } from './pi-slice';
 
 export interface PresentedRecord {
@@ -440,15 +440,26 @@ export async function openPresented(
    * 2026-09-15 (tool-surface probe pass 3, then present-canvas-probe): the
    * thread showed the cow, the canvas tab could not. Every kind the preview
    * surfaces stream over pd-file:// goes through openFileInCanvas; only the
-   * text-shaped kinds (a page, code, an SVG's markup) are read as text.
+   * text-shaped kinds (a page, an SVG's markup) are read as text.
+   *
+   * …AND A TEXT FILE OPENS AS THE FILE. A presented .md / .py / .json took the
+   * text path below into a tab that carried the file's TEXT and not its PATH,
+   * so the bar's Open, every app in its ▾ and "Open in folder" had no file to
+   * act on and did nothing at all — the user: "open buttons in the canvas … don't
+   * work". SEEN 2026-09-23 (open-buttons-probe): the ▾ offered "Open in folder"
+   * alone, and clicking it did nothing. openFileInCanvas is the door every other
+   * file tab comes through — the path, the breadcrumb, the tree, the apps.
    */
-  if (previewKindForExt(extOf(item.path)) !== null) {
+  if (previewKindForExt(extOf(item.path)) !== null || tab === 'file') {
     const ctl = controller as unknown as CanvasController;
-    const findTab = (): CanvasTab | undefined =>
-      ctl.getState().tabs.find((t) => t.filePath === item.path || t.key === fileTabKey(item.path));
-    const already = findTab();
+    const byKey = (): CanvasTab | undefined =>
+      ctl.getState().tabs.find((t) => t.key === fileTabKey(item.path));
+    const already = byKey();
     await openFileInCanvas(ctl, item.path);
-    const opened = findTab();
+    /* The tab just opened, by its key first: the Activity tab is usually showing
+     * this very file (the model has just written it), comes earlier in the
+     * strip, and owns its own subtitle — a path match alone found IT. */
+    const opened = byKey() ?? ctl.getState().tabs.find((t) => t.filePath === item.path);
     if (opened !== undefined && item.note !== undefined) {
       ctl.updateTab(opened.id, { subtitle: item.note });
     }
@@ -500,6 +511,26 @@ export async function openPresented(
     },
     ...(item.note !== undefined ? { subtitle: item.note } : {}),
   } as never);
+}
+
+/**
+ * The card's Open, and a click on the card itself: the artefact in the canvas
+ * AND the canvas on screen.
+ *
+ * openPresented alone focused the tab and left a closed canvas closed. The rail
+ * opens itself only when the tab COUNT grows, so an artefact whose tab already
+ * existed — which is every artefact the model has presented, since presenting
+ * opens it — was focused inside a drawer nobody could see, and the blue Open
+ * did nothing visible (SEEN 2026-09-23, open-buttons-probe: canvas closed before
+ * and after the click). The Activity rows learned the same lesson (ThreadActivity
+ * onOpenCanvas); the inline chart card already opens the rail itself.
+ */
+export function showPresented(
+  controller: Parameters<typeof openPresented>[0],
+  item: Parameters<typeof openPresented>[1],
+): Promise<void> {
+  if (controller !== null) useCanvasStore.getState().setCanvasOpen(true);
+  return openPresented(controller, item);
 }
 
 export function connectPresent(): () => void {

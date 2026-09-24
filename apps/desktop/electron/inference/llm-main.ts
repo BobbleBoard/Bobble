@@ -180,10 +180,18 @@ function writeUtilityState(): void {
  * projector was actually attached) and falls back to the old test only when a
  * status predates the field.
  */
-function writeVisionState(status: { visionReady?: boolean; launchMode?: string } | null): void {
+function writeVisionState(
+  status: { visionReady?: boolean; launchMode?: string; blindReason?: string } | null,
+): void {
   const canSee = status?.visionReady ?? status?.launchMode === 'multimodal';
   try {
-    writeFileSync(visionStateFilePath(), canSee ? '1' : '0');
+    /* `0:<reason>` when it cannot — the provider says the reason to the model
+       instead of claiming the whole model is "in TEXT-ONLY mode" (the user saw that
+       note on an engine that could not take images, with vision never off). */
+    writeFileSync(
+      visionStateFilePath(),
+      canSee ? '1' : status?.blindReason !== undefined ? `0:${status.blindReason}` : '0',
+    );
   } catch {
     // Best effort — the env snapshot remains the fallback.
   }
@@ -340,8 +348,13 @@ function ensureChild(): UtilityProcess {
     if (message.kind === 'status') {
       const before = lastStatus?.launchMode;
       const sawBefore = lastStatus?.visionReady;
+      const reasonBefore = lastStatus?.blindReason;
       lastStatus = message.status;
-      if (message.status.launchMode !== before || message.status.visionReady !== sawBefore) {
+      if (
+        message.status.launchMode !== before ||
+        message.status.visionReady !== sawBefore ||
+        message.status.blindReason !== reasonBefore
+      ) {
         writeVisionState(message.status);
       }
       // The endpoint file tracks EVERY status change, not just a launch-mode
@@ -466,6 +479,7 @@ export function pushEngineLaunchSettings(): void {
     engineLaunch: s.engineLaunch,
     portableKnobs: s.portableKnobs,
     modelSpec: s.modelSpec,
+    loadVision: s.loadVision,
   }).catch(() => {
     // Not up yet, or going down — the next push carries it.
   });

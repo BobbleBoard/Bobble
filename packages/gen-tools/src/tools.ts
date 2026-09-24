@@ -357,12 +357,7 @@ export function registerGenTools(pi: ExtensionAPI, options: GenToolsOptions): vo
         if (outputs.length === 0) return videoErrResult('the generator produced no video');
 
         const footnote = `Model: ${model.label} (${model.id}, ${model.license})`;
-        const lines = outputs.map(
-          (o, i) => `  ${i + 1}. ${o.outputPath}${o.seed !== undefined ? ` (seed ${o.seed})` : ''}`,
-        );
-        const text =
-          `Generated ${outputs.length} video${outputs.length === 1 ? '' : 's'} on the canvas:\n` +
-          `${lines.join('\n')}\n${footnote}`;
+        const text = videoResultText(outputs, footnote);
 
         const content: AgentToolResult<GenerateDetails>['content'] = [{ type: 'text', text }];
         // A chat model can't watch an MP4 — attach the extracted poster frame so a
@@ -397,6 +392,43 @@ export function registerGenTools(pi: ExtensionAPI, options: GenToolsOptions): vo
       }
     },
   });
+}
+
+/**
+ * What the model reads back from `generate_video` — and what the thread reads
+ * its cards out of (apps/desktop/src/chat/thread-media.ts mounts every absolute
+ * media path in this text as a card).
+ *
+ * ONE ANIMATION IS ONE FILE. HyperFrames renders stills and joins them into one
+ * animated PNG. The text used to list every still — 121 numbered paths for five
+ * seconds at 24 fps — so the chat filled with 121 picture cards (the user: "each of
+ * which was placed as it's own png card in the chat, severely cluttering it").
+ * Now the one file is listed, and the frames are named by their FOLDER: a path
+ * with no file extension, which the thread does not read as media, and which
+ * the model can still open a single frame from.
+ */
+export function videoResultText(outputs: readonly GenOutput[], footnote: string): string {
+  const lines = outputs.map(
+    (o, i) => `  ${i + 1}. ${o.outputPath}${o.seed !== undefined ? ` (seed ${o.seed})` : ''}`,
+  );
+  const frames = outputs.length === 1 ? outputs[0]?.frames : undefined;
+  if (frames === undefined) {
+    return (
+      `Generated ${outputs.length} video${outputs.length === 1 ? '' : 's'} on the canvas:\n` +
+      `${lines.join('\n')}\n${footnote}`
+    );
+  }
+  const n = frames.count;
+  const clip = `${n} frame${n === 1 ? '' : 's'} at ${frames.fps} fps (${(n / frames.fps).toFixed(1)} s)`;
+  const head = frames.animated
+    ? `Generated 1 animation — ${clip}, looping — as ONE animated PNG:`
+    : `Rendered ${clip}, but the frames could not be joined into one animated PNG, so this is the last frame on its own:`;
+  const folder = `${frames.dir.replace(/\/+$/, '')}/`;
+  const each = n === 1 ? 'The frame is' : `Each of the ${n} frames is`;
+  return (
+    `${head}\n${lines.join('\n')}\n` +
+    `${each} also saved as its own PNG in the folder ${folder}\n${footnote}`
+  );
 }
 
 /** Error result for an audio tool, named so the model reads which one failed. */

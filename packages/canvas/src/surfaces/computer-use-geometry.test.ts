@@ -266,15 +266,15 @@ describe('visibleRegion', () => {
   });
 });
 
-describe('stagePadding', () => {
-  it('is 18 on a stage with room to spare', () => {
-    expect(stagePadding({ w: 1600, h: 1000 })).toBe(18);
+describe('stagePadding — a margin that reads as one (the user 2026-09-23)', () => {
+  it('is 44 on a stage with room to spare', () => {
+    expect(stagePadding({ w: 1600, h: 1000 })).toBe(44);
   });
-  it('tightens on the narrow axis, which is what a docked rail is', () => {
-    expect(stagePadding({ w: 440, h: 960 })).toBe(13);
+  it('is 31 in the docked rail — the window never meets its edges', () => {
+    expect(stagePadding({ w: 440, h: 960 })).toBe(31);
   });
-  it('never disappears entirely', () => {
-    expect(stagePadding({ w: 60, h: 60 })).toBe(4);
+  it('never drops below 16', () => {
+    expect(stagePadding({ w: 60, h: 60 })).toBe(16);
   });
 });
 

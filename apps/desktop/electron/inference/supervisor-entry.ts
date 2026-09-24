@@ -29,6 +29,7 @@ import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import {
   assembleEngineLaunch,
+  type BlindReason,
   benchPrompts,
   buildMlxProviderBlock,
   buildProviderBlock,
@@ -74,6 +75,7 @@ import {
   listHfGgufFiles,
   listHfRepoFiles,
   MANAGED_LLAMA_FLAGS,
+  mlxWeightsHaveVision,
   mmprojFileFor,
   modelDir,
   modelEngine,
@@ -82,6 +84,7 @@ import {
   parseLlamaHelp,
   patchModelDirTemplate,
   planCandidates,
+  planVisionEngine,
   powerBudgetGB,
   probeServerFeatures,
   profileOf,
@@ -129,6 +132,9 @@ import {
   installedVenvEngines,
   mlxVenvRoot,
   omlxModelRoot,
+  rapidVisionCommand,
+  rapidVisionReady,
+  rapidVisionVenvRoot,
   type VenvEngine,
 } from './engine-paths';
 import { dedupeFlags } from './launch-args';
@@ -372,6 +378,10 @@ interface CurrentServer {
    * could not.
    */
   visionReady: boolean;
+  /** Why it cannot see, when it cannot (vision-launch.ts BlindReason). */
+  blindReason?: BlindReason;
+  /** Set when vision moved the launch off the engine that was chosen. */
+  visionFallback?: { from: string; why: string };
   /** How this server was launched — the engine and the speculative method. */
   profile: LaunchProfile;
   /** The models.json block it is registered under (see LlmStatus.provider). */
@@ -521,6 +531,8 @@ function status(): LlmStatus {
     /* A projector was attached → the server can read an image, whatever mode it
        was launched in. MLX has no projector path, so it reports false. */
     visionReady: current?.visionReady ?? false,
+    ...(current?.blindReason !== undefined ? { blindReason: current.blindReason } : {}),
+    ...(current?.visionFallback !== undefined ? { visionFallback: current.visionFallback } : {}),
     ...(current !== null
       ? {
           profile: current.profile,
@@ -1225,6 +1237,8 @@ async function startMlxServer(
 let engineLaunch: EngineLaunchSettings = {};
 let portableKnobs: Record<string, EngineFlagValue> = {};
 let modelSpec: Record<string, ModelSpecChoice> = {};
+/** Settings → engine menu → Vision (default ON). See SettingsState.loadVision. */
+let loadVision = true;
 
 const REFUSED_LLAMA_FLAGS = Object.keys(MANAGED_LLAMA_FLAGS).filter(
   (k) => MANAGED_LLAMA_FLAGS[k] === 'refused',
@@ -1411,6 +1425,23 @@ async function companionsOf(modelId: string, quant?: string): Promise<LlmCompani
       });
     }
   }
+  /*
+   * RAPID-MLX'S EYES. With Vision on, rapid-mlx reads an image only through
+   * its vision runtime (engine-paths `rapidVisionVenvRoot`), and without it a
+   * vision launch goes to llama.cpp instead (vision-launch.ts). Listed here so
+   * "Fetch missing" offers it; `engine:` kinds are INSTALLED, not downloaded.
+   */
+  if (loadVision && isMlxSupported() && engineInstalled('rapid-mlx')) {
+    const twinDir = await mlxDirFor(model);
+    if (twinDir !== undefined && mlxTwinHasVision(twinDir)) {
+      out.push({
+        kind: 'engine:rapid-mlx-vision',
+        what: 'rapid-mlx vision runtime',
+        source: 'rapid-mlx[vision]',
+        present: rapidVisionReady(),
+      });
+    }
+  }
   void quant;
   return out;
 }
@@ -1461,6 +1492,61 @@ function mlxTwinHasMtp(dir: string): boolean {
     return Object.keys(index.weight_map ?? {}).some((k) => k.startsWith('mtp.'));
   } catch {
     return false;
+  }
+}
+
+/**
+ * Does the MLX twin carry a VISION TOWER? The evidence rapid-mlx's own lane
+ * router reads (`vision_config` plus vision tensors — vision-launch.ts): the
+ * qwen3.5-4b 8-bit twin on the user's Mac has 297 `vision_tower.*` tensors, the
+ * MTP sidecar none. Read from the index (or a single file's header), never
+ * from the repo's name.
+ */
+function mlxTwinHasVision(dir: string): boolean {
+  try {
+    const config = JSON.parse(readFileSync(join(dir, 'config.json'), 'utf8')) as {
+      vision_config?: unknown;
+    };
+    let names: string[] = [];
+    const indexPath = join(dir, 'model.safetensors.index.json');
+    if (existsSync(indexPath)) {
+      const index = JSON.parse(readFileSync(indexPath, 'utf8')) as {
+        weight_map?: Record<string, string>;
+      };
+      names = Object.keys(index.weight_map ?? {});
+    } else {
+      const single = join(dir, 'model.safetensors');
+      if (existsSync(single)) {
+        const buf = readFileSync(single);
+        const n = Number(buf.readBigUInt64LE(0));
+        const header = JSON.parse(buf.subarray(8, 8 + n).toString('utf8')) as Record<
+          string,
+          unknown
+        >;
+        names = Object.keys(header).filter((k) => k !== '__metadata__');
+      }
+    }
+    return mlxWeightsHaveVision(config, names);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Which lane a rapid-mlx server is ACTUALLY serving. It says so in `/v1/models`
+ * (`serving_lane: "vision" | "text"`, with the reason) — the one answer that
+ * cannot drift from what the launch meant to do.
+ */
+async function rapidServingLane(baseUrl: string): Promise<string | undefined> {
+  try {
+    const res = await fetch(`${baseUrl.replace(/\/v1\/?$/, '')}/v1/models`, {
+      signal: AbortSignal.timeout(4000),
+    });
+    const body = (await res.json()) as { data?: Array<{ serving_lane?: unknown }> };
+    const lane = body.data?.[0]?.serving_lane;
+    return typeof lane === 'string' ? lane : undefined;
+  } catch {
+    return undefined;
   }
 }
 
@@ -1569,8 +1655,16 @@ async function startExternalEngine(
   file: CatalogFile,
   profile: LaunchProfile,
   force = false,
+  /** From the vision plan: serve rapid-mlx's vision lane, or why this launch is blind. */
+  visionOpts: { vision?: boolean; blindReason?: BlindReason } = {},
 ): Promise<{ success: boolean; baseUrl?: string; error?: string }> {
   const engine = profile.engine as VenvEngine;
+  /* rapid-mlx's vision lane runs from its OWN runtime (engine-paths
+     `rapidVisionVenvRoot`): mlx-vlm 0.6.17 + torch, which the shared venv
+     cannot hold beside oMLX's pin. Same rapid-mlx, other venv. */
+  const laneVision = engine === 'rapid-mlx' && visionOpts.vision === true;
+  const command = laneVision ? rapidVisionCommand() : engineCommand(engine);
+  const venvBin = laneVision ? join(rapidVisionVenvRoot(), 'bin') : join(mlxVenvRoot(), 'bin');
   if (engine !== 'vllm' && !isMlxSupported()) {
     return { success: false, error: `${engine} needs Apple Silicon` };
   }
@@ -1599,7 +1693,8 @@ async function startExternalEngine(
     current.model.id === model.id &&
     current.file.quant === file.quant &&
     sameProfile(current.profile, profile) &&
-    current.launchConfigFingerprint === launchFingerprint(engine, model.id)
+    current.launchConfigFingerprint === launchFingerprint(engine, model.id) &&
+    current.launchCommand === command
   ) {
     return { success: true, baseUrl: current.baseUrl };
   }
@@ -1655,7 +1750,7 @@ async function startExternalEngine(
     const host = '127.0.0.1';
     let servedModelId = servedName;
     const supervisor = new LlamaServerSupervisor({
-      serverPath: engineCommand(engine),
+      serverPath: command,
       modelPath: modelDirPath,
       launchMode: 'fast-text',
       host,
@@ -1666,20 +1761,21 @@ async function startExternalEngine(
       maxRestarts: 0,
       buildArgsFn: (port) => {
         const launch = assembleEngineLaunch(profile, {
-          command: engineCommand(engine),
+          command,
           modelDir: modelDirPath,
           servedModelId: servedName,
           host,
           port,
           ...(draftDir !== undefined ? { draftDir } : {}),
           modelRoot: omlxModelRoot(),
+          ...(laneVision ? { vision: true } : {}),
         });
         servedModelId = launch.servedModelId;
         return [...launch.args, ...userArgsFor(engine)];
       },
       env: {
         ...process.env,
-        PATH: `${join(mlxVenvRoot(), 'bin')}:${process.env.PATH ?? ''}`,
+        PATH: `${venvBin}:${process.env.PATH ?? ''}`,
         // The whole point: a launch that would fetch from the hub fails
         // instead, with the hub's own message.
         HF_HUB_OFFLINE: '1',
@@ -1733,6 +1829,11 @@ async function startExternalEngine(
     });
     const started = await startTracked(supervisor);
     const baseUrl = supervisor.baseUrl;
+    /* WHAT IT ACTUALLY SERVES, from its own mouth: rapid-mlx names its lane in
+       /v1/models. Only the vision lane can read an image; everything else on
+       this path is text-only. */
+    const lane = laneVision ? await rapidServingLane(baseUrl) : undefined;
+    const sees = lane === 'vision';
     current = {
       supervisor,
       model,
@@ -1740,11 +1841,18 @@ async function startExternalEngine(
       contextWindow,
       baseUrl,
       launchMode: 'fast-text',
-      visionReady: false,
+      visionReady: sees,
+      ...(sees
+        ? {}
+        : {
+            blindReason:
+              visionOpts.blindReason ??
+              (laneVision || loadVision ? ('engine' as const) : ('off' as const)),
+          }),
       profile,
       provider: 'mlx',
       servedModelId,
-      launchCommand: engineCommand(engine),
+      launchCommand: command,
       launchArgs: supervisor.argv(),
       launchConfigFingerprint: launchFingerprint(engine, model.id),
     };
@@ -2376,7 +2484,7 @@ async function startServerExclusive(
      Speculative) outranks the calibrated verdict: the verdict is what we
      measured, the choice is what they asked for. */
   const chosen = requestedProfile ?? userProfileFor(model) ?? calibrated ?? defaultProfile(model);
-  const profile: LaunchProfile =
+  const wished: LaunchProfile =
     launchMode === 'multimodal'
       ? {
           engine: 'llamacpp',
@@ -2384,8 +2492,47 @@ async function startServerExclusive(
           ...(chosen.custom !== undefined ? { custom: chosen.custom } : {}),
         }
       : chosen;
+  /*
+   * VISION DECIDES THE ENGINE (vision-launch.ts). the user: "mmproj/vision should
+   * always be loaded and usable by default unless explicitly turned off". The
+   * wished profile is what calibration measured or the user picked; this is
+   * where it meets the setting — rapid-mlx is asked for its vision lane (no
+   * MTP there), and an engine that cannot see hands a calibrated launch to
+   * llama.cpp with the projector, saying so, rather than coming up blind.
+   */
+  const visionWanted = launchMode === 'multimodal' || loadVision;
+  const twinDir =
+    wished.engine !== 'llamacpp' && modelEngine(model) !== 'mlx' && isMlxSupported()
+      ? await mlxDirFor(model)
+      : undefined;
+  const plan =
+    modelEngine(model) === 'mlx'
+      ? null
+      : planVisionEngine(
+          {
+            profile: wished,
+            visionWanted,
+            explicit: requestedProfile !== undefined,
+            modelHasProjector: model.mmproj !== undefined,
+            ggufOnDisk: existsSync(modelPathFor(model, file)),
+            mlxTwinHasVision: twinDir !== undefined && mlxTwinHasVision(twinDir),
+            rapidVisionReady: rapidVisionReady(),
+          },
+          defaultProfile(model).spec,
+        );
+  const profile: LaunchProfile = plan?.profile ?? wished;
+  const visionFallback =
+    plan?.fallback !== undefined ? { from: plan.fallback.from, why: plan.fallback.why } : undefined;
+  if (visionFallback !== undefined) {
+    console.log(
+      `[engine] vision: ${visionFallback.from} → llama.cpp for ${model.id} (${visionFallback.why})`,
+    );
+  }
   if (profile.engine !== 'llamacpp' && modelEngine(model) !== 'mlx') {
-    const external = await startExternalEngine(model, file, profile, force);
+    const external = await startExternalEngine(model, file, profile, force, {
+      vision: plan?.vision === 'lane',
+      ...(plan?.blindReason !== undefined ? { blindReason: plan.blindReason } : {}),
+    });
     /*
      * A VERDICT THAT CAN NO LONGER BE HONOURED must not stop the model. The
      * calibrated engine may have been uninstalled or its weights deleted since
@@ -2425,7 +2572,19 @@ async function startServerExclusive(
   }
 
   // MLX engine → the mlx_lm.server path (its artifact is not a local GGUF).
-  if (modelEngine(model) === 'mlx') return startMlxServer(model, file);
+  if (modelEngine(model) === 'mlx') {
+    const res = await startMlxServer(model, file);
+    if (res.success && current !== null) {
+      // mlx_lm.server takes no images; say which of the three reasons it is.
+      current.blindReason = !model.input.includes('image')
+        ? 'model'
+        : loadVision
+          ? 'engine'
+          : 'off';
+      emitStatus();
+    }
+    return res;
+  }
 
   const modelPath = modelPathFor(model, file);
   if (!existsSync(modelPath)) return { success: false, error: 'model not downloaded' };
@@ -2444,7 +2603,9 @@ async function startServerExclusive(
     current.file.quant === file.quant &&
     current.launchMode === launchMode &&
     sameProfile(current.profile, profile) &&
-    current.launchConfigFingerprint === launchFingerprint('llamacpp', model.id)
+    current.launchConfigFingerprint === launchFingerprint('llamacpp', model.id) &&
+    // Vision switched on or off since: the projector is a launch argument.
+    (current.blindReason === 'off') === !visionWanted
   ) {
     return { success: true, baseUrl: current.baseUrl };
   }
@@ -2486,7 +2647,10 @@ async function startServerExclusive(
   // vision is on is the bug that had a model spend five turns trying to read a
   // screenshot it was never going to see. On a default launch the same
   // situation only means this model cannot see, and text must still work.
-  const mmprojFile = mmprojFileFor(model, launchMode);
+  /* …UNLESS VISION IS OFF. The user's switch (engine menu → Vision) is the one
+     thing that keeps a projector off a launch; an explicit multimodal launch
+     still wants it whatever the switch says. */
+  const mmprojFile = visionWanted ? mmprojFileFor(model, launchMode) : undefined;
   let mmprojPath: string | undefined;
   if (mmprojFile === undefined) {
     if (launchMode === 'multimodal') {
@@ -2816,6 +2980,18 @@ async function startServerExclusive(
       baseUrl,
       launchMode,
       visionReady: mmprojPath !== undefined,
+      ...(mmprojPath !== undefined
+        ? {}
+        : {
+            blindReason: !visionWanted
+              ? model.mmproj !== undefined
+                ? ('off' as const)
+                : ('model' as const)
+              : mmprojFile === undefined
+                ? ('model' as const)
+                : ('projector' as const),
+          }),
+      ...(visionFallback !== undefined ? { visionFallback } : {}),
       profile,
       provider: 'llamacpp',
       servedModelId: model.id,
@@ -2953,6 +3129,7 @@ async function handle(req: LlmRequest): Promise<unknown> {
       engineLaunch = req.engineLaunch;
       portableKnobs = req.portableKnobs ?? {};
       modelSpec = req.modelSpec;
+      loadVision = req.loadVision !== false;
       return { success: true };
     case 'relaunch':
       return relaunch();

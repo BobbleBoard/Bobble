@@ -13,6 +13,8 @@
  * an AX-opaque surface (games / some Electron apps), the analogue of browser-
  * use's canvasHeavy coordinate fallback.
  */
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 import type {
   AgentToolResult,
   ExtensionAPI,
@@ -26,6 +28,7 @@ import {
   chromeActionJs,
   chromeEval,
   chromeJsAllowed,
+  chromePid,
   chromeRunning,
   chromeTabs,
   enableChromeJs,
@@ -139,6 +142,12 @@ export interface MacComputerUseOptions {
   readonly consent?: MacConsentGate;
   /** The controlled-app state machine; defaults to a fresh one (test seam). */
   readonly session?: MacSessionState;
+  /**
+   * Where the LAST app computer use controlled is remembered across chats
+   * (production: ~/.pi/agent/mac-last-control.json). Absent = not remembered,
+   * which is what a unit test wants.
+   */
+  readonly lastControlFile?: string;
   readonly elementCap?: number;
   /**
    * How the Chrome tab list is read over Apple Events. Injectable because the
@@ -335,11 +344,57 @@ export function registerMacComputerUseTools(
    * that has quit since resolves by the name that rides with it.
    */
   const MAC_CONTROL_ENTRY = 'mac-control';
+  /*
+   * …AND ACROSS CHATS. the user (2026-09-23): "the active application should be
+   * persisted better". A new chat started with nothing under control, so its
+   * first bare `mac snapshot` fell back to whatever the user had in front —
+   * Activity Monitor, in his runs — and the model reported that as where the
+   * user was. The last controlled app is kept in one small file, restored by a
+   * chat that has no control of its own (while the app still runs, within 12 h),
+   * and the look that uses it SAYS it was carried over.
+   */
+  const LAST_CONTROL_TTL_MS = 12 * 3600_000;
+  const writeLastControl = (c: { app: string; pid: number }): void => {
+    const file = options.lastControlFile;
+    if (file === undefined) return;
+    try {
+      mkdirSync(dirname(file), { recursive: true });
+      writeFileSync(file, JSON.stringify({ app: c.app, pid: c.pid, at: Date.now() }));
+    } catch {
+      /* a convenience; never worth failing an act over */
+    }
+  };
+  const readLastControl = (): { app: string; pid: number } | null => {
+    const file = options.lastControlFile;
+    if (file === undefined) return null;
+    try {
+      const d = JSON.parse(readFileSync(file, 'utf8')) as {
+        app?: unknown;
+        pid?: unknown;
+        at?: unknown;
+      };
+      if (typeof d.app !== 'string' || typeof d.pid !== 'number' || typeof d.at !== 'number') {
+        return null;
+      }
+      if (Date.now() - d.at > LAST_CONTROL_TTL_MS) return null;
+      try {
+        process.kill(d.pid, 0); // throws when the process is gone (EPERM means alive)
+      } catch (err) {
+        if ((err as { code?: string }).code !== 'EPERM') return null;
+      }
+      return { app: d.app, pid: d.pid };
+    } catch {
+      return null;
+    }
+  };
+  /** The next look uses an app carried over from an earlier chat — said once. */
+  let carriedOver = false;
   let recordedPid: number | null = null;
   const recordControl = (): void => {
     const c = session.controlled();
     if (c === null || c.pid === recordedPid) return;
     recordedPid = c.pid;
+    writeLastControl(c);
     try {
       pi.appendEntry?.(MAC_CONTROL_ENTRY, {
         app: c.app,
@@ -371,6 +426,13 @@ export function registerMacComputerUseTools(
     if (last !== null) {
       session.restore?.(last);
       recordedPid = last.pid;
+    } else {
+      const carried = readLastControl();
+      if (carried !== null) {
+        session.restore?.(carried);
+        recordedPid = carried.pid;
+        carriedOver = true;
+      }
     }
   });
 
@@ -407,6 +469,15 @@ export function registerMacComputerUseTools(
    * time and costs one map, so there is no reason to make the model do the join.
    */
   let names = new Map<number, string>();
+  /**
+   * The PICTURE the last look was, when it was a `--visual` one — its screen
+   * rect and its pixel size. the user (2026-09-23): the visual snapshot "just
+   * passes an image back", no text, so the offsets a text snapshot prints are
+   * not there to add; a coordinate click right after one is read straight off
+   * the picture and translated here. Any other look clears it.
+   */
+  let visualFrame: { x: number; y: number; w: number; h: number; iw: number; ih: number } | null =
+    null;
 
   /** What an act should be remembered as: `clicked [7] "Save"`. */
   function actOn(verb: string, index: number): string {
@@ -416,8 +487,16 @@ export function registerMacComputerUseTools(
 
   /** What the tool layer knows and the snapshot does not — today, the model's
    * own last act, which the header reads back so it is not re-derived. */
+  /** Set by a look that fell back to the user's frontmost app (see MacSnapshotView). */
+  let lastLookFrontmost = false;
   function view(): MacSnapshotView {
-    return { lastAct: session.controlled()?.lastAct };
+    const v: MacSnapshotView = {
+      lastAct: session.controlled()?.lastAct,
+      ...(lastLookFrontmost ? { frontmostFallback: true } : {}),
+      ...(carriedOver ? { carriedOver: true } : {}),
+    };
+    carriedOver = false;
+    return v;
   }
 
   /** Gate helper: consent + denylist, returns null when allowed. */
@@ -443,12 +522,16 @@ export function registerMacComputerUseTools(
     page: SnapshotPage = {},
   ): Promise<MacSnapshot> {
     if (bridge === null) throw new Error('bridge unavailable');
+    // Any look replaces the last picture; a --visual look sets it again after.
+    visualFrame = null;
     const params: Record<string, unknown> = {};
     // Explicit app wins; otherwise target the CONTROLLED app (the one the model
     // launched / last snapshotted), falling back to frontmost only before any
     // control exists. The resolved snapshot then takes/refreshes control.
     if (app !== undefined && app !== '') params.app = app;
     else Object.assign(params, session.targetParams());
+    // No app named and nothing controlled: the helper answers with the frontmost.
+    lastLookFrontmost = params.app === undefined && params.pid === undefined;
     if (screenshot === true) params.screenshot = true;
     if (typeof page.find === 'string' && page.find.trim() !== '') params.find = page.find.trim();
     if (typeof page.from === 'number' && page.from > 0) params.from = Math.floor(page.from);
@@ -711,9 +794,10 @@ export function registerMacComputerUseTools(
       visual: Type.Optional(
         Type.Boolean({
           description:
-            'The same as --screenshot: attach a picture of the app even when its controls are ' +
-            'listed as text. Use it when the layout matters — where things are, what is drawn, ' +
-            'a chart, a canvas — and act by x,y read off the image.',
+            'Return ONLY a picture of the app — no element list, no text. Use it to SEE: ' +
+            'layout, a chart, a canvas, what is drawn. Then click by x,y read straight off ' +
+            'that picture (its top-left is 0,0) — mac_click x/y right after a visual look ' +
+            'are pixels on it. For indexes, take a plain snapshot.',
         }),
       ),
     }),
@@ -737,7 +821,59 @@ export function registerMacComputerUseTools(
          * window and tells the model to work in coordinates.
          */
         const page = { find: params.find, from: params.from };
-        const askedForPicture = params.screenshot === true || params.visual === true;
+        /*
+         * --visual: THE PICTURE AND NOTHING ELSE. the user (2026-09-23): "the
+         * snapshot tool should accept a flag that gives a visual snapshot no
+         * text, when this flag is here it just passes an image back."
+         */
+        if (params.visual === true) {
+          const snapV = await snapshot(params.app, true, page);
+          const shotV = snapV.screenshot;
+          const rect = shotV?.rect;
+          if (shotV?.base64 === undefined || shotV.base64 === '' || rect === undefined) {
+            visualFrame = null;
+            return textResult(
+              snapV.permissions?.screenRecording === false
+                ? 'No picture could be taken: macOS has not granted Bobble Screen Recording (the ' +
+                    'user can allow it on the computer-use monitor). Take a plain mac_snapshot ' +
+                    'and act by [index].'
+                : 'No picture could be taken (the app may have no window on screen). Take a ' +
+                    'plain mac_snapshot and act by [index].',
+              { action: 'snapshot', ok: false, app: snapV.app, pid: snapV.pid },
+            );
+          }
+          const inline = shotV as { inlineWidth?: number; inlineHeight?: number };
+          visualFrame = {
+            x: rect.x,
+            y: rect.y,
+            w: rect.w,
+            h: rect.h,
+            iw:
+              typeof inline.inlineWidth === 'number' && inline.inlineWidth > 0
+                ? inline.inlineWidth
+                : rect.w,
+            ih:
+              typeof inline.inlineHeight === 'number' && inline.inlineHeight > 0
+                ? inline.inlineHeight
+                : rect.h,
+          };
+          return {
+            content: [
+              { type: 'image', data: shotV.base64, mimeType: shotV.mimeType ?? 'image/jpeg' },
+            ],
+            details: {
+              action: 'snapshot',
+              ok: true,
+              app: snapV.app,
+              pid: snapV.pid,
+              window: snapV.window,
+              elementCount: snapV.summary.elementCount,
+              visualOnly: true,
+            },
+          };
+        }
+        visualFrame = null;
+        const askedForPicture = params.screenshot === true;
         let snap = await snapshot(params.app, askedForPicture, page);
         if (!askedForPicture && isAxOpaque(snap)) {
           snap = await snapshot(params.app, true, page);
@@ -880,8 +1016,9 @@ export function registerMacComputerUseTools(
       x: Type.Optional(
         Type.Number({
           description:
-            'Screen x (points) for a raw coordinate click; pass with y. Read it off the ' +
-            'snapshot image using the image bounds the snapshot prints.',
+            'x for a raw coordinate click; pass with y. Right after a --visual snapshot: pixels ' +
+            'on that picture (top-left 0,0). Otherwise screen points, read off a snapshot image ' +
+            'using the image bounds the snapshot prints.',
         }),
       ),
       y: Type.Optional(
@@ -915,6 +1052,18 @@ export function registerMacComputerUseTools(
         }
         if (typeof params.x === 'number' && typeof params.y === 'number') {
           /*
+           * RIGHT AFTER A --visual LOOK, x/y ARE PIXELS ON THAT PICTURE — the
+           * picture came with no text to say where it sits on screen, so the
+           * offset is added here rather than by the model.
+           */
+          const onPicture = visualFrame;
+          const px = params.x;
+          const py = params.y;
+          if (onPicture !== null) {
+            params.x = Math.round(onPicture.x + (px * onPicture.w) / onPicture.iw);
+            params.y = Math.round(onPicture.y + (py * onPicture.h) / onPicture.ih);
+          }
+          /*
            * THE POINT GOES THROUGH UNTOUCHED — no clamping, no nudging toward
            * the controlled window's frame.
            *
@@ -933,7 +1082,9 @@ export function registerMacComputerUseTools(
           // A point that hit nothing must not read like a point that worked.
           const miss = session.missAt(params.x, params.y);
           return textResult(
-            `Clicked at (${params.x}, ${params.y}).${backgroundNote(ack)}` +
+            `Clicked at (${params.x}, ${params.y})${
+              onPicture !== null ? ` — (${px}, ${py}) on the picture` : ''
+            }.${backgroundNote(ack)}` +
               (miss === null ? '' : `\n\n${miss}`) +
               describeOpened(ack.dialog, ack.opened),
             {
@@ -1535,10 +1686,30 @@ const CHROME_APP = 'Google Chrome';
 export function registerChromeTools(
   pi: ExtensionAPI,
   bridge: MacBridge | null = null,
-  options: { readonly isChromeRunning?: () => Promise<boolean> } = {},
+  options: {
+    readonly isChromeRunning?: () => Promise<boolean>;
+    /** The mac set's controlled-app state — shared, so Chrome work is remembered. */
+    readonly session?: MacSessionState;
+    /** Chrome's pid (test seam; default pgrep). */
+    readonly chromePid?: () => Promise<number | null>;
+  } = {},
 ): void {
   let askedThisSession = false;
   const isChromeRunning = options.isChromeRunning ?? chromeRunning;
+  const pidOfChrome = options.chromePid ?? chromePid;
+  /**
+   * WORK IN CHROME LEAVES CHROME UNDER CONTROL. The chrome_* commands used to
+   * touch no state at all, so after a run of them a bare `mac snapshot` found
+   * nothing controlled and fell back to whatever the user had in front — the user
+   * (2026-09-23): the model "at times randomly say[s] 'the user is on activity
+   * monitor'". One shared state; Chrome takes it whenever these act.
+   */
+  const noteChrome = async (): Promise<void> => {
+    const session = options.session;
+    if (session === undefined || session.controlled()?.app === CHROME_APP) return;
+    const pid = await pidOfChrome().catch(() => null);
+    if (pid !== null) session.restore({ app: CHROME_APP, pid });
+  };
 
   /**
    * THE ROUTE THAT ACTUALLY WORKS.
@@ -1624,6 +1795,7 @@ export function registerChromeTools(
     if (blocked !== null) return { text: blocked, ok: false };
     const notUp = await ensureChromeRunning();
     if (notUp !== null) return { text: notUp, ok: false };
+    await noteChrome();
     const res = await chromeEval(js);
     if (!res.ok) return { text: res.error ?? 'Chrome did not respond.', ok: false };
     return { text: res.value, ok: true };
@@ -1646,8 +1818,48 @@ export function registerChromeTools(
             'what is below the fold, so you can reach a control without scrolling to it.',
         }),
       ),
+      visual: Type.Optional(
+        Type.Boolean({
+          description:
+            "Return ONLY a picture of Chrome's window — no element list, no text. Use it to " +
+            'SEE the page; take a plain snapshot for indexes to click.',
+        }),
+      ),
     }),
     async execute(_id, params, _signal, _upd, ctx) {
+      /*
+       * --visual: THE PICTURE AND NOTHING ELSE (the user 2026-09-23). Taken of the
+       * window through Accessibility's capture, which needs no Chrome setting —
+       * and only once Chrome is up, so looking never launches it in front.
+       */
+      if (params.visual === true) {
+        const notUp = await ensureChromeRunning();
+        if (notUp !== null) return { content: [{ type: 'text', text: notUp }], details: undefined };
+        await noteChrome();
+        const snap = await ax<MacSnapshot>('snapshot', { screenshot: true });
+        const shot = snap?.screenshot;
+        if (shot?.base64 === undefined || shot.base64 === '') {
+          return {
+            content: [
+              {
+                type: 'text',
+                text:
+                  snap?.permissions?.screenRecording === false
+                    ? 'No picture could be taken: macOS has not granted Bobble Screen Recording ' +
+                      '(the user can allow it on the computer-use monitor). Take a plain chrome ' +
+                      'snapshot instead.'
+                    : 'No picture could be taken of Chrome right now. Take a plain chrome ' +
+                      'snapshot instead.',
+              },
+            ],
+            details: undefined,
+          };
+        }
+        return {
+          content: [{ type: 'image', data: shot.base64, mimeType: shot.mimeType ?? 'image/jpeg' }],
+          details: undefined,
+        };
+      }
       const out = await evalInChrome(ctx, CHROME_SNAPSHOT_JS);
       if (out.ok) return { content: [{ type: 'text', text: out.text }], details: undefined };
       const snap = await ax<MacSnapshot>('snapshot', {

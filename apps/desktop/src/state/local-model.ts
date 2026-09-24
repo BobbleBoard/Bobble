@@ -223,6 +223,11 @@ export interface VisionState {
    * see {@link resolveVisionTarget}.
    */
   readonly pinnedModelId?: string | null;
+  /**
+   * The user switched vision OFF (engine menu → Vision; `loadVision: false`).
+   * Then nothing relaunches to see — see {@link resolveVisionTarget}.
+   */
+  readonly visionOff?: boolean;
   /** Resolved tier picks (for the text-only-model fallback), when loaded. */
   readonly tierModels?: Record<
     'fast' | 'balanced' | 'intelligent',
@@ -238,7 +243,9 @@ export interface VisionState {
 export type VisionDecision =
   | { readonly action: 'already-on' }
   | { readonly action: 'relaunch'; readonly modelId: string; readonly quant?: string }
-  | { readonly action: 'none'; readonly reason: string };
+  | { readonly action: 'none'; readonly reason: string }
+  /** The user switched vision off: send as it is, the image described as unseen. */
+  | { readonly action: 'off' };
 
 /**
  * Pure: decide how to get the running setup into a vision-capable state.
@@ -270,22 +277,29 @@ export type VisionDecision =
  * whole stores, so an unrelated status push does not re-render the composer.
  */
 export function useImagesUnsupported(): boolean {
+  return useImageBlindness() !== null;
+}
+
+/** The live {@link imageBlindness}: 'off' when the user switched vision off. */
+export function useImageBlindness(): 'off' | 'unsupported' | null {
   const launchMode = useLlmStore((s) => s.status.launchMode);
   const visionReady = useLlmStore((s) => s.status.visionReady);
   const model = useLlmStore((s) => s.status.model);
   const catalog = useLlmStore((s) => s.catalog);
   const tierModels = useLlmStore((s) => s.recommendation?.tierModels);
   const selection = useSettingsStore((s) => s.settings.modelSelection);
+  const visionOff = useSettingsStore((s) => s.settings.loadVision === false);
   // Nothing resident yet ⇒ nothing to warn about; the model is still coming up
   // and the pill is already saying so.
-  if (model === null) return false;
-  return imagesUnsupported({
+  if (model === null) return null;
+  return imageBlindness({
     launchMode,
     visionReady,
     model,
     catalog,
     pinnedModelId: selection?.mode === 'model' ? selection.modelId : null,
     tierModels,
+    visionOff,
   });
 }
 
@@ -303,13 +317,28 @@ export function useImagesUnsupported(): boolean {
  * machine with no vision-capable model downloaded.
  */
 export function imagesUnsupported(s: VisionState): boolean {
-  return resolveVisionTarget(s).action === 'none';
+  return imageBlindness(s) !== null;
+}
+
+/** Why an attached image will go unseen — the switch, or the setup — or null. */
+export function imageBlindness(s: VisionState): 'off' | 'unsupported' | null {
+  const action = resolveVisionTarget(s).action;
+  return action === 'off' ? 'off' : action === 'none' ? 'unsupported' : null;
 }
 
 export function resolveVisionTarget(s: VisionState): VisionDecision {
   // Already able to see: either a projector is attached (the normal case now)
   // or this server was explicitly launched multimodal.
   if (s.visionReady === true || s.launchMode === 'multimodal') return { action: 'already-on' };
+  /*
+   * OFF MEANS OFF. the user (2026-09-23): vision is on "unless the user says to turn
+   * it off". MEASURED before this line: with the switch off, attaching a picture
+   * relaunched the server multimodal behind the user's back — five minutes of
+   * reload, the model then read the picture, and the switch said Off the whole
+   * time. The image goes as it is; the provider tells the model, in the note,
+   * that vision is switched off and where to turn it on.
+   */
+  if (s.visionOff === true) return { action: 'off' };
 
   const currentId = s.model?.id ?? null;
   const currentVision =
@@ -359,7 +388,8 @@ export async function ensureVisionMode(): Promise<{
   reason?: string;
 }> {
   const llm = useLlmStore.getState();
-  const selection = useSettingsStore.getState().settings.modelSelection;
+  const settings = useSettingsStore.getState().settings;
+  const selection = settings.modelSelection;
   const decision = resolveVisionTarget({
     launchMode: llm.status.launchMode,
     visionReady: llm.status.visionReady,
@@ -367,9 +397,14 @@ export async function ensureVisionMode(): Promise<{
     catalog: llm.catalog,
     pinnedModelId: selection?.mode === 'model' ? selection.modelId : null,
     tierModels: llm.recommendation?.tierModels,
+    visionOff: settings.loadVision === false,
   });
 
-  if (decision.action === 'already-on') return { ok: true, changed: false };
+  // Switched off: send as it is — the provider's note tells the model why it
+  // cannot see, and the composer already told the user.
+  if (decision.action === 'already-on' || decision.action === 'off') {
+    return { ok: true, changed: false };
+  }
   if (decision.action === 'none') return { ok: false, changed: false, reason: decision.reason };
 
   // Never over a running turn: the relaunch is a hard restart of the server pi

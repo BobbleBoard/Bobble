@@ -36,4 +36,5 @@ export * from './pressure.js';
 export * from './reasoning-budget.js';
 export * from './recommender.js';
 export * from './supervisor.js';
+export * from './vision-launch.js';
 export * from './watchdog.js';

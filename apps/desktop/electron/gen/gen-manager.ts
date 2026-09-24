@@ -107,6 +107,15 @@ import { preparedDir } from './weights-on-shelf';
 
 const log = createLogger('desktop:gen');
 
+/**
+ * A job an agent asked for over the bridge. `agent` is the asking pi's
+ * `PI_DESKTOP_AGENT_ID` — a subagent's id — and absent for the chat's own pi.
+ * The studios call the handlers without one.
+ */
+interface AgentSource {
+  readonly agent?: string;
+}
+
 export interface GenManagerOptions {
   /** Yields the app window to stream surface updates to. */
   readonly getWindow: () => WebContents | null;
@@ -586,7 +595,34 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
     return detail !== undefined && detail.length > 0 ? noteFrom(detail) : 'Fetching model weights';
   }
 
-  async function handleGenerate(raw: GenerateImageParams): Promise<GenerateImageResult> {
+  /**
+   * AN AGENT'S JOB IS ANNOUNCED, a studio's is not. Sent as the job gets its id —
+   * before the queue runs it — so a chat deleted while its picture is still
+   * waiting its turn stops that picture too (the user, 2026-09-23). `from` is absent
+   * on the studios' own path (`gen:generate`).
+   */
+  /** OmniSVG drawings in flight, by the id `announceAgentJob` gave them. */
+  const svgRuns = new Map<string, AbortController>();
+  let svgSeq = 0;
+  /** Stop a job by id — a queue job, or a drawing (`svg-<n>`). */
+  const cancelJob = (jobId: string): boolean => {
+    const drawing = svgRuns.get(jobId);
+    if (drawing !== undefined) {
+      drawing.abort();
+      return true;
+    }
+    return jobQueue.cancel(jobId);
+  };
+
+  const announceAgentJob = (jobId: string, from: AgentSource | undefined): void => {
+    if (from === undefined) return;
+    send('gen:agent-job', { jobId, ...(from.agent !== undefined ? { agent: from.agent } : {}) });
+  };
+
+  async function handleGenerate(
+    raw: GenerateImageParams,
+    from?: AgentSource,
+  ): Promise<GenerateImageResult> {
     const model = getModel(raw.model ?? defaultImageModel().id);
     // An image model runs one of two ways: the mflux worker (its `mflux`
     // command) or a ComfyUI graph (`comfy`, Qwen-Image 2.1 — image-dispatch).
@@ -605,6 +641,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
       );
     }
     const jobId = `gen_${Date.now()}_${randomBytes(3).toString('hex')}`;
+    announceAgentJob(jobId, from);
     // The FOLDER is named after what was asked for; jobId stays the internal id.
     const outputDir = path.join(outputRoot, uniqueName(outputRoot, slug(raw.prompt, 'image')));
     await mkdir(outputDir, { recursive: true });
@@ -808,12 +845,16 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
     }
   }
 
-  async function handleGenerateVideo(raw: GenerateVideoParams): Promise<GenerateVideoResult> {
+  async function handleGenerateVideo(
+    raw: GenerateVideoParams,
+    from?: AgentSource,
+  ): Promise<GenerateVideoResult> {
     const model = getModel(raw.model ?? defaultVideoModel().id);
     if (model === undefined || model.modality !== 'video') {
       throw new Error(`unknown or non-video model "${raw.model ?? ''}"`);
     }
     const jobId = `gen_${Date.now()}_${randomBytes(3).toString('hex')}`;
+    announceAgentJob(jobId, from);
     // The FOLDER is named after what was asked for; jobId stays the internal id.
     const outputDir = path.join(outputRoot, uniqueName(outputRoot, slug(raw.prompt, 'animation')));
     await mkdir(outputDir, { recursive: true });
@@ -940,7 +981,10 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
    * queue means one cancel path, one heavy-job gate and one place where a
    * second request waits rather than fighting the first for the GPU.
    */
-  async function handleGenerateAudio(raw: GenerateAudioParams): Promise<GenerateAudioResult> {
+  async function handleGenerateAudio(
+    raw: GenerateAudioParams,
+    from?: AgentSource,
+  ): Promise<GenerateAudioResult> {
     const kind = raw.kind ?? 'speech';
     const fallback = defaultAudioModel(kind, activeModels());
     const requested = raw.model ?? fallback?.id ?? '';
@@ -967,6 +1011,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
     }
 
     const jobId = `gen_${Date.now()}_${randomBytes(3).toString('hex')}`;
+    announceAgentJob(jobId, from);
     const outputDir = path.join(
       outputRoot,
       uniqueName(outputRoot, slug(raw.prompt, audioOutputName(kind, raw.prompt))),
@@ -1100,14 +1145,18 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
     }
   }
 
-  async function dispatch(method: string, params: Record<string, unknown>): Promise<unknown> {
+  async function dispatch(
+    method: string,
+    params: Record<string, unknown>,
+    from: AgentSource = {},
+  ): Promise<unknown> {
     switch (method) {
       case 'generate':
-        return handleGenerate(params as unknown as GenerateImageParams);
+        return handleGenerate(params as unknown as GenerateImageParams, from);
       case 'generateVideo':
-        return handleGenerateVideo(params as unknown as GenerateVideoParams);
+        return handleGenerateVideo(params as unknown as GenerateVideoParams, from);
       case 'generateAudio':
-        return handleGenerateAudio(params as unknown as GenerateAudioParams);
+        return handleGenerateAudio(params as unknown as GenerateAudioParams, from);
       case 'generateSvg': {
         /* OmniSVG: its own short-lived llama-server, not the worker queue —
            see omnisvg.ts. The folder is named after the ask like every other
@@ -1121,15 +1170,27 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
         const name = slug(p.prompt ?? p.images?.[0] ?? 'svg', 'svg');
         const outputDir = path.join(outputRoot, uniqueName(outputRoot, name));
         const prompt = p.prompt === undefined ? {} : { prompt: p.prompt };
+        /* A drawing is not a queue job, so it gets an id of its own that
+           `cancel` understands — the chat that asked for it can stop it. */
+        const svgId = `svg-${++svgSeq}`;
+        const stop = new AbortController();
+        svgRuns.set(svgId, stop);
+        announceAgentJob(svgId, from);
         let result: Awaited<ReturnType<typeof generateSvg>>;
         try {
-          result = await generateSvg({ ...p, outputDir }, (partial) =>
+          result = await generateSvg({ ...p, outputDir, signal: stop.signal }, (partial) =>
             send('gen:svg-live', { status: 'drawing', ...partial, ...prompt }),
           );
         } catch (err) {
-          const message = err instanceof Error ? err.message : String(err);
+          const message = stop.signal.aborted
+            ? 'stopped — the chat that asked for this drawing was deleted'
+            : err instanceof Error
+              ? err.message
+              : String(err);
           send('gen:svg-live', { status: 'error', error: message, ...prompt });
           throw err;
+        } finally {
+          svgRuns.delete(svgId);
         }
         /*
          * THE FINISHED DRAWING GOES TO THE THREAD, IN PLACE OF THE LIVE ONE.
@@ -1155,7 +1216,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
         return omniSvgFiles();
       case 'cancel': {
         const jobId = String((params as { jobId?: unknown }).jobId ?? '');
-        return { canceled: jobQueue.cancel(jobId) };
+        return { canceled: cancelJob(jobId) };
       }
       case 'listModels':
         return activeModels().map(summariseModel);
@@ -1185,7 +1246,9 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
       return;
     }
     try {
-      respond({ ok: true, result: await dispatch(req.method, req.params ?? {}) });
+      const from: AgentSource =
+        typeof req.agent === 'string' && req.agent !== '' ? { agent: req.agent } : {};
+      respond({ ok: true, result: await dispatch(req.method, req.params ?? {}, from) });
     } catch (err) {
       respond({ ok: false, error: err instanceof Error ? err.message : String(err) });
     }
@@ -1335,7 +1398,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
 
   ipcMain.handle('gen:cancel', (event, req: { jobId: string }) => {
     guard(event, 'gen:cancel');
-    return { canceled: jobQueue.cancel(req.jobId) };
+    return { canceled: cancelJob(req.jobId) };
   });
   ipcMain.handle('gen:register', (event) => {
     guard(event, 'gen:register');

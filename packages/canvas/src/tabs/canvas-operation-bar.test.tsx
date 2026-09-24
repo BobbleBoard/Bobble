@@ -211,6 +211,25 @@ describe('CanvasOperationBar — file', () => {
     expect(onReveal).toHaveBeenCalledTimes(1);
   });
 
+  /* A file tab that is NOT a file on disk (its text, no path) offered Open, a ▾
+     and "Open in folder" that all did nothing — every presented text file's tab
+     (open-buttons-probe, 2026-09-23). No path, no Open. */
+  it('offers no Open for a file tab with no path on disk', async () => {
+    const { container } = await render(
+      <CanvasOperationBar
+        tab={tab({
+          kind: 'file',
+          title: 'notes.md',
+          artifact: { id: 'a', filename: 'notes.md', content: { kind: 'markdown', text: '# Hi' } },
+        })}
+        onOpen={vi.fn()}
+        onReveal={vi.fn()}
+      />,
+    );
+    expect(container.querySelector('.pd-canvas-opbar')).toBeTruthy();
+    expect(container.querySelector('.pd-split-root')).toBeNull();
+  });
+
   it('falls back to a generic app glyph when no default app is supplied', async () => {
     const { container } = await render(
       <CanvasOperationBar tab={tab({ kind: 'file', filePath: 'a.txt' })} />,

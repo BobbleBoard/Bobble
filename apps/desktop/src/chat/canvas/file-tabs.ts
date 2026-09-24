@@ -32,10 +32,6 @@ import { useHarnessStatus } from '../harness-status';
 import { pdFileUrl, previewKindForExt } from './file-preview';
 import { basename, detectFileWrites, dirname, type EditHunk } from './file-writes';
 
-/** Same `?piE2E=1` opt-in as the other E2E hooks — skips the real app-list
- * shell-out (sips/duti) so probes stay fast + deterministic. */
-const IS_E2E = new URLSearchParams(window.location.search).has('piE2E');
-
 /**
  * The file-tree root for a file tab: the active project's working folder (round-8
  * #15), else the session cwd, else the file's own directory. The label names the
@@ -358,15 +354,18 @@ function previewTabSpec(
 /**
  * Fetch the system apps that can open this file (round-8 #14) and set the tab's
  * `defaultApp` + `openApps` so the "Open" split button shows the default's icon
- * and lists the rest. Lazy + best-effort; skipped under E2E (the real
- * sips/duti shell-out is slow + machine-specific — probes inject apps directly).
+ * and lists the rest. Lazy + best-effort.
+ *
+ * It runs under E2E too. It used to be skipped there ("slow + machine-specific
+ * — probes inject apps directly"), which meant no probe ever clicked an app the
+ * real list had put in the ▾; main caches the list per extension, and the card
+ * beside the canvas was already asking for the same list under E2E.
  */
 async function hydrateOpenApps(
   controller: CanvasController,
   key: string,
   absPath: string,
 ): Promise<void> {
-  if (IS_E2E) return;
   try {
     const res = await window.piDesktop.invoke('canvas:list-open-apps', { path: absPath });
     const tab = controller.getState().tabs.find((t) => t.key === key);

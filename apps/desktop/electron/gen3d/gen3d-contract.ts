@@ -363,6 +363,12 @@ export type Gen3dInvokeMap = {
 /** Broadcast events (renderer subscribes via window.piDesktop.onEvent). */
 export type Gen3dEventMap = {
   'gen3d:job': Gen3dJobUpdate;
+  /**
+   * A job a pi AGENT started over the gen3d bridge (never the studio's own) —
+   * sent the moment it has an id, so the chat that owns it can stop it when the
+   * chat is deleted. `agent` is a subagent's id, absent for the chat's own pi.
+   */
+  'gen3d:agent-job': { readonly jobId: string; readonly agent?: string };
   'gen3d:download': Gen3dDownloadUpdate;
   /** Catalog changed (a download finished / the sidecar came up). */
   'gen3d:catalog-changed': { readonly at: number };

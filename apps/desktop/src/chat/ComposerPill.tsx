@@ -25,7 +25,11 @@ import { usePillStore } from './pill-store';
 import { useRePrefillWarning } from './use-reprefill-warning';
 import { useWaitClock } from './use-wait-clock';
 
-export function ComposerPill({ imageOnBlindModel = false }: { imageOnBlindModel?: boolean }) {
+export function ComposerPill({
+  imageOnBlindModel = false,
+}: {
+  imageOnBlindModel?: boolean | 'off' | 'unsupported';
+}) {
   /*
    * The one thing in this app that CANNOT be made instant, said out loud before
    * it costs you. the user: "flagged to the user to my face right there whenever

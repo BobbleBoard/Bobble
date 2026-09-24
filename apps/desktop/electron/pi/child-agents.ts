@@ -47,7 +47,7 @@ export interface ChildAgentsDeps<S extends SessionSender> {
    * the same base config as the main chat + `--no-session` + a bumped subagent
    * depth so a child can't recursively spawn its own children). */
   createChildBridge: (
-    opts: { cwd?: string; specialist?: string },
+    opts: { cwd?: string; specialist?: string; agentId?: string },
     onEvent: (event: PiBridgeEvent) => void,
   ) => ChildBridge;
   /** Fan one tagged child event out to the renderer (the 'pi:child-event' wire). */
@@ -106,6 +106,7 @@ export function createChildAgents<S extends SessionSender>(
       {
         cwd: req.cwd,
         ...(req.specialist !== undefined ? { specialist: req.specialist } : {}),
+        agentId: req.childId,
       },
       (event) => {
         if (!sender.isDestroyed()) {
@@ -177,6 +178,7 @@ export function createChildAgents<S extends SessionSender>(
       {
         cwd: req.cwd,
         ...(req.specialist !== undefined ? { specialist: req.specialist } : {}),
+        agentId: req.childId,
       },
       (event) => {
         if (!sender.isDestroyed()) {

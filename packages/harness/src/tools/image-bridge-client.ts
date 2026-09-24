@@ -18,6 +18,10 @@ import net from 'node:net';
 
 const SOCK_ENV = 'PI_DESKTOP_GEN3D_SOCK';
 const TOKEN_ENV = 'PI_DESKTOP_GEN3D_TOKEN';
+/** Which pi is asking — a subagent's id, absent for the chat's own pi (the app
+ * stamps it on every pi it spawns; gen-tools' GEN_AGENT_ENV names the same key).
+ * The app uses it to stop the jobs of a chat the user deletes. */
+const AGENT_ENV = 'PI_DESKTOP_AGENT_ID';
 const CONNECT_TIMEOUT_MS = 5_000;
 /** The app enforces the real per-job cap; this is a generous backstop so a dead
  * main process can never leave a tool call hanging forever. */
@@ -63,6 +67,7 @@ function request(
   params: Record<string, unknown>,
   signal: AbortSignal | undefined,
   replyTimeoutMs: number = REPLY_TIMEOUT_MS,
+  agent?: string,
 ): Promise<ImageBridgeResult> {
   return new Promise<ImageBridgeResult>((resolve) => {
     const socket = net.connect(socketPath);
@@ -93,7 +98,9 @@ function request(
     socket.on('connect', () => {
       clearTimeout(connectTimer);
       socket.setEncoding('utf8');
-      socket.write(`${JSON.stringify({ id: 1, token, method, params })}\n`);
+      socket.write(
+        `${JSON.stringify({ id: 1, token, method, params, ...(agent !== undefined ? { agent } : {}) })}\n`,
+      );
     });
     socket.on('data', (chunk: string) => {
       buffer += chunk;
@@ -128,11 +135,21 @@ export function imageBridgeFromEnv(env: NodeJS.ProcessEnv = process.env): ImageB
   if (socketPath === undefined || socketPath === '' || token === undefined || token === '') {
     return null;
   }
+  const named = env[AGENT_ENV];
+  const agent = named !== undefined && named !== '' ? named : undefined;
   return {
     generateImage: (prompt, signal) =>
-      request(socketPath, token, 'generate_image', { prompt }, signal),
+      request(socketPath, token, 'generate_image', { prompt }, signal, REPLY_TIMEOUT_MS, agent),
     editImage: (imagePath, instruction, signal) =>
-      request(socketPath, token, 'edit_image', { imagePath, instruction }, signal),
+      request(
+        socketPath,
+        token,
+        'edit_image',
+        { imagePath, instruction },
+        signal,
+        REPLY_TIMEOUT_MS,
+        agent,
+      ),
     call: (method, params, signal) =>
       request(
         socketPath,
@@ -141,6 +158,7 @@ export function imageBridgeFromEnv(env: NodeJS.ProcessEnv = process.env): ImageB
         params,
         signal,
         method.endsWith('_3d') ? MODEL_REPLY_TIMEOUT_MS : REPLY_TIMEOUT_MS,
+        agent,
       ),
   };
 }

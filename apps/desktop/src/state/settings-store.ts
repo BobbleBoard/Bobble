@@ -72,6 +72,7 @@ const DEFAULTS: DesktopSettings = {
   hfToken: '',
   experimentalProductionHarness: false,
   experimentalGeneration: true,
+  loadVision: true,
   advanced: DEFAULT_ADVANCED,
   engineLaunch: {},
   portableKnobs: {},

@@ -43,7 +43,14 @@ import {
   COMFY_MESH_ON_CPU_FILENAME,
   COMFY_MESH_ON_CPU_PY,
 } from './comfy-h3-shim';
-import { engineInstalled, mlxVenvRoot, vllmVenvRoot } from './engine-paths';
+import {
+  engineInstalled,
+  mlxVenvRoot,
+  rapidVisionMarker,
+  rapidVisionReady,
+  rapidVisionVenvRoot,
+  vllmVenvRoot,
+} from './engine-paths';
 
 /** Where the managed Python venv for the MLX engines lives. */
 function pyRoot(): string {
@@ -104,6 +111,29 @@ function dirBytes(dir: string, budget = 20_000): number {
 }
 
 /** Does the managed venv have this Python package? */
+/**
+ * The version of a distribution installed in the shared venv, or undefined —
+ * read off its dist-info directory name (`rapid_mlx-0.14.1.dist-info`).
+ */
+function venvPackageVersion(pkg: string): string | undefined {
+  const site = path.join(pyRoot(), 'lib');
+  if (!existsSync(site)) return undefined;
+  const norm = pkg.toLowerCase().replace(/-/g, '_');
+  try {
+    for (const py of readdirSync(site)) {
+      const pkgs = path.join(site, py, 'site-packages');
+      if (!existsSync(pkgs)) continue;
+      for (const e of readdirSync(pkgs)) {
+        const m = /^(.+)-([^-]+)\.dist-info$/.exec(e);
+        if (m !== null && m[1]?.toLowerCase().replace(/-/g, '_') === norm) return m[2];
+      }
+    }
+  } catch {
+    /* unreadable venv: no version */
+  }
+  return undefined;
+}
+
 function venvHasPackage(pkg: string): boolean {
   const site = path.join(pyRoot(), 'lib');
   if (!existsSync(site)) return false;
@@ -521,6 +551,45 @@ const OPS: Record<string, EngineOps> = {
       const uv = uvPath();
       if (uv === null) return;
       await run(uv, ['pip', 'uninstall', '--python', pyRoot(), 'rapid-mlx']).catch(() => undefined);
+    },
+  },
+  /*
+   * RAPID-MLX'S VISION RUNTIME — its own venv, because its vision lane needs
+   * `rapid-mlx[vision]` (mlx-vlm pinned to exactly 0.6.17, torch, torchvision,
+   * opencv) and the shared venv holds oMLX's git pin of mlx-vlm instead.
+   * MEASURED 2026-09-23: 1.2 GB. the user: vision "should always be on unless the
+   * user says to turn it off" — so this is fetched with the default engines
+   * while Vision is on (llm-store ensureDefaultEngines), and until it lands a
+   * vision launch on rapid-mlx goes to llama.cpp (vision-launch.ts).
+   */
+  'rapid-mlx-vision': {
+    installed: () => rapidVisionReady(),
+    bytes: () =>
+      existsSync(rapidVisionVenvRoot()) ? dirBytes(rapidVisionVenvRoot(), 400_000) : undefined,
+    install: async () => {
+      const uv = await ensureUvPath();
+      const root = rapidVisionVenvRoot();
+      rmSync(rapidVisionMarker(), { force: true });
+      if (!existsSync(path.join(root, 'bin', 'python'))) {
+        await run(uv, ['venv', root, '--python', '3.12']);
+      }
+      // The same rapid-mlx the shared venv runs, so its two lanes are one engine.
+      const version = venvPackageVersion('rapid-mlx');
+      await run(
+        uv,
+        [
+          'pip',
+          'install',
+          '--python',
+          root,
+          version === undefined ? 'rapid-mlx[vision]' : `rapid-mlx[vision]==${version}`,
+        ],
+        30 * 60_000,
+      );
+      writeFileSync(rapidVisionMarker(), `${new Date().toISOString()}\n`);
+    },
+    uninstall: async () => {
+      rmSync(rapidVisionVenvRoot(), { recursive: true, force: true });
     },
   },
   /*

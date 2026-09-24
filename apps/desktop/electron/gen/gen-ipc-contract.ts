@@ -107,6 +107,13 @@ export type GenEventMap = {
   /** A job has started: its first surface state. `tabId` is the stream's id. */
   'gen:open': { tabId: string; payload: GenSurfacePayload };
   /**
+   * A job a pi AGENT started (never a studio's) — sent as it is enqueued, so the
+   * chat that owns it can stop it (`gen:cancel` with this id) when the chat is
+   * deleted. `agent` is a subagent's id, absent for the chat's own pi. An
+   * OmniSVG drawing has no queue job; its id is `svg-<n>` and cancels the same way.
+   */
+  'gen:agent-job': { jobId: string; agent?: string };
+  /**
    * THE DRAWING, AS IT IS DRAWN. (This replaced `gen:open-file`, which opened
    * a finished SVG as a canvas file tab: the drawing lives in the thread now.) OmniSVG's ids stream in and every few
    * hundred milliseconds the shapes finished so far — plus an outline of the
@@ -300,6 +307,7 @@ export type GenInvokeMap = {
 
 export const GEN_EVENT_CHANNELS = [
   'gen:open',
+  'gen:agent-job',
   'gen:svg-live',
   'gen:update',
   'gen:comfy-install',

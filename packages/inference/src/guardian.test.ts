@@ -8,6 +8,7 @@ import {
   BUSY_INTERVAL_MS,
   createGuardian,
   fits,
+  type GuardianVerdict,
   IDLE_INTERVAL_MS,
   judge,
   limitsFor,
@@ -325,7 +326,7 @@ describe('createGuardian', () => {
 });
 
 describe('settle — the pause', () => {
-  const at = (v, extra = {}) => ({ verdict: v, reason: 'r', ...extra });
+  const at = (v: GuardianVerdict, extra = {}) => ({ verdict: v, reason: 'r', ...extra });
 
   it('pauses at once and resumes after a short calm streak', () => {
     let st = settle(at('pause'), 'calm', 0, AUTO);
@@ -373,7 +374,13 @@ describe('settle — the pause', () => {
   });
 
   it('a pause that does not bring the memory back becomes a shed', () => {
-    let st = { verdict: 'calm', calmStreak: 0, hotStreak: 0, pausedStreak: 0, reason: '' };
+    let st = {
+      verdict: 'calm' as GuardianVerdict,
+      calmStreak: 0,
+      hotStreak: 0,
+      pausedStreak: 0,
+      reason: '',
+    };
     for (let i = 0; i < AUTO.pausedReadingsBeforeShed - 1; i += 1) {
       st = settle(at('pause'), st.verdict, st.calmStreak, AUTO, st.hotStreak, st.pausedStreak);
       expect(st.verdict).toBe('pause');

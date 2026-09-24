@@ -27,7 +27,12 @@ const log = createLogger('desktop:gen3d-bridge');
 
 /** Runs one image job. Injected (gen3d-main's `runImageJob` in the app) so this
  * module stays electron-free and testable over a real socket. */
-export type RunImageJob = (req: { prompt: string; editFrom?: string }) => Promise<ImageJobResult>;
+export type RunImageJob = (req: {
+  prompt: string;
+  editFrom?: string;
+  /** The asking pi — a subagent's id; absent for the chat's own pi. */
+  agent?: string;
+}) => Promise<ImageJobResult>;
 /** The 3D side (gen3d-main run3dJob / runStage3dJob), wired beside the image runner. */
 export interface ModelRunners {
   readonly generate: (req: {
@@ -35,11 +40,13 @@ export interface ModelRunners {
     imagePath?: string;
     finish?: 'grey' | 'color' | 'pbr';
     resolution?: 'low' | 'medium' | 'high';
+    agent?: string;
   }) => Promise<ImageJobResult>;
   readonly stage: (req: {
     op: 'texture' | 'segment' | 'rig' | 'retopo';
     modelPath: string;
     prompt?: string;
+    agent?: string;
   }) => Promise<ImageJobResult>;
 }
 
@@ -58,6 +65,8 @@ interface BridgeRequest {
   id: number;
   token: string;
   method: string;
+  /** Which pi is asking (PI_DESKTOP_AGENT_ID); absent = the chat's own pi. */
+  agent?: string;
   params?: {
     prompt?: string;
     imagePath?: string;
@@ -78,7 +87,10 @@ export async function handleMethod(
   params: BridgeRequest['params'],
   run: RunImageJob | null = runJob,
   models: ModelRunners | null = runModel,
+  agent?: string,
 ): Promise<ImageJobResult> {
+  /* Who asked travels with the job, so the chat that owns it can stop it. */
+  const who = agent !== undefined && agent !== '' ? { agent } : {};
   /* THE 3D METHODS — the connector's tools (harness model-tools.ts). */
   if (method === 'generate_3d') {
     if (models === null) return fail('the 3D engine is not available');
@@ -93,6 +105,7 @@ export async function handleMethod(
       ...(resolution === 'low' || resolution === 'medium' || resolution === 'high'
         ? { resolution }
         : {}),
+      ...who,
     });
   }
   if (method === 'refine_3d') {
@@ -104,18 +117,18 @@ export async function handleMethod(
     }
     if (modelPath === '') return fail('model_path is required');
     const prompt = typeof params?.prompt === 'string' ? params.prompt : undefined;
-    return models.stage({ op, modelPath, ...(prompt !== undefined ? { prompt } : {}) });
+    return models.stage({ op, modelPath, ...(prompt !== undefined ? { prompt } : {}), ...who });
   }
   if (run === null) return fail('the image engine is not available');
   if (method === 'generate_image') {
     const prompt = typeof params?.prompt === 'string' ? params.prompt : '';
-    return run({ prompt });
+    return run({ prompt, ...who });
   }
   if (method === 'edit_image') {
     const imagePath = typeof params?.imagePath === 'string' ? params.imagePath.trim() : '';
     const instruction = typeof params?.instruction === 'string' ? params.instruction : '';
     if (imagePath === '') return fail('image_path is required');
-    return run({ prompt: instruction, editFrom: imagePath });
+    return run({ prompt: instruction, editFrom: imagePath, ...who });
   }
   return fail(`unknown method: ${method}`);
 }
@@ -162,7 +175,7 @@ async function handleLine(socket: net.Socket, line: string): Promise<void> {
     return;
   }
   try {
-    respond(await handleMethod(req.method, req.params));
+    respond(await handleMethod(req.method, req.params, runJob, runModel, req.agent));
   } catch (err) {
     respond({ ok: false, error: err instanceof Error ? err.message : String(err) });
   }

@@ -40,10 +40,10 @@ import type { SessionSummary } from '../../electron/ipc-contract';
 import type { ChatProject } from '../../electron/settings/settings-contract';
 import { IconMoon, IconSun } from '../settings/icons';
 import type { SettingsSection } from '../settings/SettingsView';
+import { deleteChatNow } from '../state/chat-delete';
 import {
   assignChat,
   createProject,
-  deleteChat,
   deleteProject,
   displayTitle,
   groupChats,
@@ -55,6 +55,7 @@ import {
 } from '../state/chat-org';
 import { useChildAgentStore, useChildrenByParent } from '../state/child-agent-store';
 import { useCorpStore } from '../state/corp-store';
+import { isChatDeleted, useDeletedChats } from '../state/deleted-chats';
 import { useModalityStore } from '../state/modality-store';
 import { listSessions, newSession, restartPi, switchSession } from '../state/pi-connect';
 import { usePiStore } from '../state/pi-slice';
@@ -214,6 +215,52 @@ function slideMs(): number {
   return Number.isFinite(ms) ? ms : 300;
 }
 
+/** How long a project's chats take to slide open or shut — the folder's own morph. */
+const PROJECT_SLIDE_MS = 240;
+
+/**
+ * A PROJECT'S CHATS SLIDE, they do not pop. the user (2026-09-23): "'projects'
+ * opening/closing animation needs to be cleaner and slide up and down the
+ * chats in the project." The list was mounted and unmounted in one frame
+ * while only the folder glyph animated. Now the rows stay mounted for the
+ * length of the slide and the box eases its height between nothing and its
+ * content (grid-template-rows 0fr ↔ 1fr — no measuring), in step with the
+ * folder's 240 ms fold.
+ */
+function ProjectChats({
+  open,
+  projectId,
+  children,
+}: {
+  open: boolean;
+  projectId: string;
+  children: ReactNode;
+}) {
+  const [mounted, setMounted] = useState(open);
+  const [shown, setShown] = useState(open);
+  useEffect(() => {
+    if (open) {
+      setMounted(true);
+      // One frame at 0fr first, so the opening has somewhere to slide from.
+      const raf = requestAnimationFrame(() => setShown(true));
+      return () => cancelAnimationFrame(raf);
+    }
+    setShown(false);
+    const t = window.setTimeout(() => setMounted(false), PROJECT_SLIDE_MS + 40);
+    return () => window.clearTimeout(t);
+  }, [open]);
+  if (!mounted) return null;
+  return (
+    <div className="pd-project-chats-slide" data-open={shown ? 'true' : 'false'}>
+      <div className="pd-project-chats-clip">
+        <div className="pd-project-chats" data-testid={`project-chats-${projectId}`}>
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** A 40×40 icon-only button for the collapsed rail (tooltip = its label). */
 function _RailButton({
   label,
@@ -347,6 +394,7 @@ export function SessionSidebar({
   }, [open]);
 
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
+  const deletedFiles = useDeletedChats((s) => s.files);
   const [query, setQuery] = useState('');
   const currentFile = usePiStore((s) => s.session?.sessionFile ?? null);
   const sessionId = usePiStore((s) => s.session?.sessionId ?? null);
@@ -530,7 +578,12 @@ export function SessionSidebar({
   useEffect(() => {
     const streaming = bgRun?.streaming === true;
     if (streaming && bgStartedAt.current === null) bgStartedAt.current = Date.now();
-    if (prevBgStreaming.current && !streaming && bgRun !== null) {
+    if (
+      prevBgStreaming.current &&
+      !streaming &&
+      bgRun !== null &&
+      !isChatDeleted(bgRun.sessionFile)
+    ) {
       markUnread(bgRun.sessionFile, 'finished');
       /*
        * AND TELL THEM IF THEY ARE NOT HERE.
@@ -723,11 +776,10 @@ export function SessionSidebar({
   // as soon as the first message is sent, that snappy") from the live session
   // pointer; the real disk row replaces it (same file key) on the next refresh.
   const displaySessions = useMemo(() => {
-    // Hide fork-branch files (they belong to a base chat's ‹/› switcher).
-    let list =
-      nonBaseBranchFiles.size > 0
-        ? sessions.filter((s) => !nonBaseBranchFiles.has(s.file))
-        : sessions;
+    // Hide fork-branch files (they belong to a base chat's ‹/› switcher), and
+    // chats deleted this run — gone the frame Delete is pressed, whatever the
+    // disk and the next listing are still doing (chat-delete.ts).
+    let list = sessions.filter((s) => !nonBaseBranchFiles.has(s.file) && !deletedFiles.has(s.file));
     const now = new Date().toISOString();
     const optimisticRow = (file: string, title: string): SessionSummary => ({
       file,
@@ -747,6 +799,7 @@ export function SessionSidebar({
     // reply lands — keep it visible + spinning via an optimistic row.
     if (
       bgRun?.streaming &&
+      !deletedFiles.has(bgRun.sessionFile) &&
       !list.some((s) => s.file === bgRun.sessionFile || s.supersedes.includes(bgRun.sessionFile)) &&
       bgRun.sessionFile !== effectiveCurrentFile
     ) {
@@ -766,6 +819,7 @@ export function SessionSidebar({
      */
     if (
       effectiveCurrentFile !== null &&
+      !deletedFiles.has(effectiveCurrentFile) &&
       !list.some(
         (s) => s.file === effectiveCurrentFile || s.supersedes.includes(effectiveCurrentFile),
       )
@@ -779,6 +833,7 @@ export function SessionSidebar({
   }, [
     sessions,
     nonBaseBranchFiles,
+    deletedFiles,
     effectiveCurrentFile,
     sessionId,
     cwd,
@@ -846,21 +901,22 @@ export function SessionSidebar({
     }
   };
 
-  // Delete: skip the dialog when the user chose "don't ask again".
+  // Delete: skip the dialog when the user chose "don't ask again". Either way the
+  // row is gone at once and the chat's work stops; the disk catches up behind.
   const requestDeleteChat = (s: SessionSummary) => {
     if (hideDeleteConfirm) {
-      void deleteChat(s.file).then(refresh);
+      void deleteChatNow(s).then(refresh);
       return;
     }
     setDontAskDelete(false);
     setDeleteTarget(s);
   };
-  const confirmDeleteChat = async () => {
+  const confirmDeleteChat = () => {
     if (deleteTarget === null) return;
-    if (dontAskDelete) await useSettingsStore.getState().update({ hideDeleteChatConfirm: true });
-    await deleteChat(deleteTarget.file);
+    const target = deleteTarget;
     setDeleteTarget(null);
-    refresh();
+    if (dontAskDelete) void useSettingsStore.getState().update({ hideDeleteChatConfirm: true });
+    void deleteChatNow(target).then(refresh);
   };
   const createProjectAndAssign = async (file?: string) => {
     const id = await createProject('New project');
@@ -1506,15 +1562,13 @@ export function SessionSidebar({
                       </div>
                     )}
                   </div>
-                  {pExpanded ? (
-                    <div className="pd-project-chats" data-testid={`project-chats-${project.id}`}>
-                      {chats.length === 0 ? (
-                        <div className="px-2 py-1 text-footnote text-text-muted">Empty</div>
-                      ) : (
-                        chats.map(renderChat)
-                      )}
-                    </div>
-                  ) : null}
+                  <ProjectChats open={pExpanded} projectId={project.id}>
+                    {chats.length === 0 ? (
+                      <div className="px-2 py-1 text-footnote text-text-muted">Empty</div>
+                    ) : (
+                      chats.map(renderChat)
+                    )}
+                  </ProjectChats>
                 </div>
               );
             })

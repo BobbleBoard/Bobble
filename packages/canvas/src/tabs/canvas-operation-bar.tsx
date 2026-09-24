@@ -381,7 +381,12 @@ function FileOps({
           </div>
         ) : null}
       </div>
-      <OpenSplit tab={tab} onOpen={onOpen} onOpenWith={onOpenWith} onReveal={onReveal} />
+      {/* Only a tab that IS a file on disk can hand it to an app. A file tab with
+          no path offered Open, a ▾ and "Open in folder" that all did nothing —
+          SEEN on every presented text file (open-buttons-probe, 2026-09-23). */}
+      {tab.filePath ? (
+        <OpenSplit tab={tab} onOpen={onOpen} onOpenWith={onOpenWith} onReveal={onReveal} />
+      ) : null}
     </>
   );
 }

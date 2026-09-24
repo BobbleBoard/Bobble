@@ -50,6 +50,11 @@ export interface OmniSvgParams {
   /** Where the numbered files land (Generated/<slug>/01.svg …). */
   readonly outputDir: string;
   /**
+   * Stops the drawing: the server is killed, the stream ends, and the call
+   * throws. The chat that asked for it was deleted (the user, 2026-09-23).
+   */
+  readonly signal?: AbortSignal;
+  /**
    * The model's own destination — a site's `assets/logo.svg`. Already fenced
    * to the working folder by the tool. One input: this exact file; several:
    * a folder holding 01.svg, 02.svg …. The Generated copy is still written, so
@@ -264,6 +269,13 @@ export async function generateSvg(
     if (stderr.length > 40) stderr.shift();
   });
   const exited = new Promise<void>((resolve) => child.once('exit', () => resolve()));
+  /* Stopping is killing the server: every fetch against it then fails, the
+     race below throws, and `finally` reaps what is left. */
+  const onStop = (): void => {
+    child.kill('SIGTERM');
+  };
+  if (params.signal?.aborted === true) onStop();
+  else params.signal?.addEventListener('abort', onStop, { once: true });
 
   await mkdir(params.outputDir, { recursive: true });
   const outputs: OmniSvgOutput[] = [];
@@ -287,6 +299,7 @@ export async function generateSvg(
     for (const job of jobs) {
       let best: (OmniSvgOutput & { svg: string }) | null = null;
       for (let k = 0; k < candidates; k++) {
+        if (params.signal?.aborted === true) throw new Error('the drawing was stopped');
         /*
          * STREAMED, so the drawing can be watched forming (the user: the thread
          * should show "the model streaming the svg … render live as drawing").
@@ -368,10 +381,12 @@ export async function generateSvg(
       outputs.push({ ...out, outputPath });
     }
   } finally {
+    params.signal?.removeEventListener('abort', onStop);
     child.kill('SIGTERM');
     await Promise.race([exited, new Promise((r) => setTimeout(r, 3000))]);
     if (child.exitCode === null) child.kill('SIGKILL');
   }
+  if (params.signal?.aborted === true) throw new Error('the drawing was stopped');
   if (outputs.length === 0) throw new Error('OmniSVG produced no valid SVG for this input');
   return { outputs };
 }

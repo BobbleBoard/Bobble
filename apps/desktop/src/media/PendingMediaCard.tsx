@@ -360,8 +360,6 @@ export function PendingMediaCard({
               }}
               onExitDone={() => setSwept(true)}
             />
-            {/* The soft edge a waiting picture wears — see .pd-pending-falloff. */}
-            <div className="pd-pending-falloff" aria-hidden="true" />
           </>
         )}
       </div>

@@ -38,6 +38,7 @@ import { isDarkColor } from './color-luma';
 import { setOfficeEditorsAvailable } from './file-preview';
 import { fileArtifactFromText, openFileInCanvas } from './file-tabs';
 import { freezeFrame } from './freeze-frame';
+import { type OpenOutcome, reportOpen } from './open-outcome';
 
 const MONO_STACK =
   'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace';
@@ -141,23 +142,40 @@ const IS_E2E = new URLSearchParams(window.location.search).has('piE2E');
 const MIRROR_CURSOR_ON = '\x1b[?1049h\x1b[?1049l';
 
 /**
- * Invoke a canvas shell-out channel (open-with / reveal / open-external). Under
- * the E2E opt-in it records the call to `window.__pi_canvas_ipc` and SKIPS the
- * real shell-out, so probes can assert the wiring without popping Finder /
- * Terminal / the browser. `window.piDesktop` is a frozen contextBridge object,
- * so a test can't wrap `invoke` itself — hence this seam.
+ * Invoke a canvas shell-out channel (open-with / reveal / open-external) and
+ * SAY so when main could not do it (open-outcome.ts).
+ *
+ * Under the E2E opt-in the call is also recorded to `window.__pi_canvas_ipc`
+ * (`window.piDesktop` is a frozen contextBridge object, so a probe cannot wrap
+ * `invoke` itself). It used to be recorded INSTEAD of made — which is why no
+ * probe ever saw an Open fail: the half that failed never ran. The call is
+ * always made now; main is what keeps a probe from launching Preview, Finder or
+ * a browser (electron/canvas/os-open.ts openPolicy).
  */
-function canvasShellInvoke(channel: 'canvas:open-with', req: { path: string; appId: string }): void;
+function canvasShellInvoke(
+  channel: 'canvas:open-with',
+  req: { path: string; appId: string },
+  appName?: string,
+): void;
 function canvasShellInvoke(channel: 'canvas:reveal', req: { path: string }): void;
 function canvasShellInvoke(channel: 'canvas:open-external', req: { url: string }): void;
-function canvasShellInvoke(channel: string, req: unknown): void {
+function canvasShellInvoke(channel: string, req: unknown, appName?: string): void {
   if (IS_E2E) {
     if (window.__pi_canvas_ipc === undefined) window.__pi_canvas_ipc = [];
     window.__pi_canvas_ipc.push({ channel, req });
-    return;
   }
   // biome-ignore lint/suspicious/noExplicitAny: narrowed by the overloads above.
-  void window.piDesktop.invoke(channel as any, req as any);
+  const run = () => window.piDesktop.invoke(channel as any, req as any) as Promise<OpenOutcome>;
+  if (channel === 'canvas:open-external') {
+    void run().catch(() => undefined);
+    return;
+  }
+  const { path } = req as { path: string };
+  void reportOpen(run, {
+    verb: channel === 'canvas:reveal' ? 'reveal' : 'open',
+    path,
+    ...(appName !== undefined ? { appName } : {}),
+  });
 }
 
 /**
@@ -309,8 +327,10 @@ export class NativeSurfaces {
         if (filePath) canvasShellInvoke('canvas:open-with', { path: filePath, appId: 'default' });
       },
       onOpenWith: (tabId, appId) => {
-        const filePath = this.#tab(tabId)?.filePath;
-        if (filePath) canvasShellInvoke('canvas:open-with', { path: filePath, appId });
+        const tab = this.#tab(tabId);
+        const filePath = tab?.filePath;
+        const app = [tab?.defaultApp, ...(tab?.openApps ?? [])].find((a) => a?.id === appId);
+        if (filePath) canvasShellInvoke('canvas:open-with', { path: filePath, appId }, app?.name);
       },
       onReveal: (tabId) => {
         const filePath = this.#tab(tabId)?.filePath;

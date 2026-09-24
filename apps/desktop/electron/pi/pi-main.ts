@@ -313,7 +313,7 @@ const sessions = createPiSessions<WebContents>({
  * recursion of children spawning children.
  */
 function createChildBridge(
-  opts: { cwd?: string; specialist?: string },
+  opts: { cwd?: string; specialist?: string; agentId?: string },
   onEvent: (event: PiBridgeEvent) => void,
 ): PiBridge {
   /*
@@ -333,6 +333,12 @@ function createChildBridge(
         // Matches SUBAGENT_DEPTH_ENV (packages/harness subagent/types.ts): a child
         // at depth >= 1 does NOT register the spawn tool.
         PI_DESKTOP_SUBAGENT_DEPTH: '1',
+        /*
+         * WHO IS ASKING, on every job this child starts (gen-tools' GEN_AGENT_ENV).
+         * The renderer maps it back to the chat that owns the child, so deleting
+         * that chat stops the picture, the clip or the mesh it was making.
+         */
+        ...(opts.agentId !== undefined ? { PI_DESKTOP_AGENT_ID: opts.agentId } : {}),
         /*
          * A SPECIALIST CHILD IS PINNED TO ITS OWN TOOLS. the user: "with just these
          * tools loaded, those subagents are only for that purpose, we aren't

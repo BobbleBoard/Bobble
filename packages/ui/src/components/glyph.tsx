@@ -210,6 +210,28 @@ export const GLYPHS = {
       'M5.49707 14.0183C5.74095 14.0063 5.99072 14 6.24707 14C9.99707 14 13.7471 17 17.4971 17C18.2729 17 18.9332 16.9384 19.4971 16.8334',
     ),
   ],
+  /**
+   * Computer use — the user (2026-09-23): "the fake cursor svg outline but on the
+   * bottom right ish of an icon for a window … added three circles to the top
+   * left of that window to represent it as an app (the traffic light
+   * buttons)". The window and its title bar are from the Hugeicons drawing he
+   * pasted; the pointer is the AGENT CURSOR's own outline (@pi-desktop/shared
+   * agent-cursor — his artwork, the phantom every surface draws), placed in
+   * the corner the window leaves open for it, tip at (12.9, 12.9).
+   */
+  computerUse: [
+    P(
+      'M21 11V8C21 5.17157 21 3.75736 20.1213 2.87868C19.2426 2 17.8284 2 15 2H8C5.17157 2 3.75736 2 2.87868 2.87868C2 3.75736 2 5.17157 2 8V13C2 15.8284 2 17.2426 2.87868 18.1213C3.75736 19 5.17157 19 8 19H10',
+    ),
+    P('M2 6H21'),
+    P('M3.70 4A0.7 0.7 0 1 0 5.10 4A0.7 0.7 0 1 0 3.70 4Z'),
+    P('M5.90 4A0.7 0.7 0 1 0 7.30 4A0.7 0.7 0 1 0 5.90 4Z'),
+    P('M8.10 4A0.7 0.7 0 1 0 9.50 4A0.7 0.7 0 1 0 8.10 4Z'),
+    P(
+      'M12.702 14.276A1.12 1.169 -36 0 1 14.35 13.079L20.391 16.613A0.849 0.885 -36 0 1 20.167 18.224A5.457 5.693 -36 0 0 16.091 21.765A0.915 0.955 -36 0 1 14.303 21.6Z',
+      { join: 'round' },
+    ),
+  ],
 } as const satisfies Record<string, readonly GlyphPath[]>;
 
 export type GlyphName = keyof typeof GLYPHS;

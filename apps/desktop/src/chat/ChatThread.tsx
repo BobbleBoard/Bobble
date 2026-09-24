@@ -42,9 +42,9 @@ import { forkAndReprompt, switchBranch } from '../state/pi-connect';
 import { usePiStore } from '../state/pi-slice';
 import {
   isInlinePresented,
-  openPresented,
   type PresentedRecord,
   presentedFor,
+  showPresented,
   UNSAVED_CHAT,
   usePresentStore,
 } from '../state/present-store';
@@ -52,6 +52,7 @@ import { useTurnPrefilling } from '../state/running-chats';
 import { AssistantGroup } from './AssistantGroup';
 import { AttachedFileCard } from './AttachedFileCard';
 import { type AttachedFile, splitAttachedFiles } from './attached-files';
+import { reportOpen } from './canvas/open-outcome';
 import { buildAgentMessage } from './composer/agent-message';
 import { useDropStore } from './composer/drop-store';
 import { corpChatView } from './corp/corp-thread-view';
@@ -352,15 +353,24 @@ export function ChatThread() {
         key={item.path}
         item={item}
         /* Body AND the blue Open → the canvas (the user: "by default it opens
-         * in the canvas or it should"). The dropdown is "Open with": every
-         * application, the OS default among them. */
-        onActivate={() => void openPresented(canvasController, item)}
-        onOpen={() => void openPresented(canvasController, item)}
+         * in the canvas or it should") — opened onto the screen, not just
+         * focused behind a closed rail (showPresented). The dropdown is "Open
+         * with": every application, the OS default among them. Each hand-off
+         * reads main's answer and says why when it could not (open-outcome). */
+        onActivate={() => void showPresented(canvasController, item)}
+        onOpen={() => void showPresented(canvasController, item)}
         onOpenWith={(_it, appId) => {
-          void window.piDesktop.invoke('canvas:open-with', { path: item.path, appId });
+          const app = [item.defaultApp, ...(item.openApps ?? [])].find((a) => a?.id === appId);
+          void reportOpen(
+            () => window.piDesktop.invoke('canvas:open-with', { path: item.path, appId }),
+            { verb: 'open', path: item.path, ...(app !== undefined ? { appName: app.name } : {}) },
+          );
         }}
         onReveal={() => {
-          void window.piDesktop.invoke('canvas:reveal', { path: item.path });
+          void reportOpen(() => window.piDesktop.invoke('canvas:reveal', { path: item.path }), {
+            verb: 'reveal',
+            path: item.path,
+          });
         }}
       />
     );

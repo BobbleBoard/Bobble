@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fileTabKey } from '../chat/canvas/file-tabs';
+import { useCanvasStore } from './canvas-store';
 import {
   chartsInTranscript,
   classifyPresented,
@@ -9,6 +11,7 @@ import {
   presentedFor,
   presentTabKey,
   rehydratePresented,
+  showPresented,
   UNSAVED_CHAT,
   usePresentStore,
 } from './present-store';
@@ -160,6 +163,64 @@ describe('openPresented — what door a presented file goes through', () => {
     await openPresented(c as never, { path: '/work/image-of-a-cow/cow-on-moon.png' });
     const tab = c.tabs.find((t) => t.kind === 'image');
     expect(tab?.mediaSrc).toMatch(/^pd-file:\/\/f\/work\/image-of-a-cow\/cow-on-moon\.png$/);
+  });
+
+  /* SEEN 2026-09-23 (open-buttons-probe): a presented .md opened into a tab with
+     its TEXT and no PATH, so the bar's Open, its ▾ and "Open in folder" had no
+     file to act on and did nothing. It goes through the file door now. */
+  it('opens a presented text file AS the file, its path on the tab', async () => {
+    const c = controller();
+    (window as unknown as { piDesktop: unknown }).piDesktop = {
+      invoke: vi.fn(async (channel: string) =>
+        channel === 'fs:read-file'
+          ? { text: '# Notes', truncated: false, tooLarge: false, binary: false, bytes: 7 }
+          : { entries: [] },
+      ),
+    };
+    await openPresented(c as never, { path: '/work/notes/notes.md', note: 'the notes' });
+    const tab = c.tabs.find((t) => t.filePath === '/work/notes/notes.md');
+    expect(tab?.kind).toBe('file');
+    expect(tab?.key).toBe(fileTabKey('/work/notes/notes.md'));
+    expect(c.tabs.some((t) => t.key.startsWith('present:'))).toBe(false);
+  });
+
+  /* The Activity tab is usually showing the file the model just presented, and
+     sits earlier in the strip — a path match alone put the note on IT. */
+  it('puts the note on the file tab it opened, not on the Activity tab showing the same file', async () => {
+    const c = controller();
+    c.tabs.push({ id: 'act', key: 'pi:activity', filePath: '/work/notes/notes.md', kind: 'file' });
+    (window as unknown as { piDesktop: unknown }).piDesktop = {
+      invoke: vi.fn(async (channel: string) =>
+        channel === 'fs:read-file'
+          ? { text: '# Notes', truncated: false, tooLarge: false, binary: false, bytes: 7 }
+          : { entries: [] },
+      ),
+    };
+    await openPresented(c as never, { path: '/work/notes/notes.md', note: 'the notes' });
+    const fileTab = c.tabs.find((t) => t.key === fileTabKey('/work/notes/notes.md'));
+    expect(fileTab).toBeDefined();
+    expect(c.updateTab).toHaveBeenCalledWith(fileTab?.id, { subtitle: 'the notes' });
+    expect(c.updateTab).not.toHaveBeenCalledWith('act', { subtitle: 'the notes' });
+  });
+
+  /* The rail opens itself only when the tab COUNT grows, so the blue Open on a
+     card whose tab already existed focused it behind a closed canvas. */
+  it('the card’s Open puts the canvas on screen even when its tab is already there', async () => {
+    const c = controller();
+    c.tabs.push({
+      id: 't1',
+      key: fileTabKey('/work/a.png'),
+      filePath: '/work/a.png',
+      kind: 'image',
+    });
+    (window as unknown as { piDesktop: unknown }).piDesktop = {
+      invoke: vi.fn(async () => ({ entries: [] })),
+    };
+    useCanvasStore.getState().setCanvasOpen(false);
+    await showPresented(c as never, { path: '/work/a.png' });
+    expect(useCanvasStore.getState().canvasOpen).toBe(true);
+    expect(c.focusTab).toHaveBeenCalledWith('t1');
+    expect(c.tabs).toHaveLength(1);
   });
 
   it('still reads a page as text, so the html surface renders it', async () => {

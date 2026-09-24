@@ -24,7 +24,7 @@
  * Every row that was measured is clickable: it relaunches the model on that
  * engine + method by hand, calibration's verdict notwithstanding.
  */
-import { Glyph, IconButton, Popover, PopoverContent, PopoverTrigger } from '@pi-desktop/ui';
+import { Glyph, IconButton, Popover, PopoverContent, PopoverTrigger, Switch } from '@pi-desktop/ui';
 import { useEffect, useMemo, useState } from 'react';
 import type { EngineState, LlmCompanion } from '../../electron/ipc-contract';
 import {
@@ -39,9 +39,11 @@ import { hostGpuOf } from '../settings/host-gpu';
 import { type CalibrationView, useLlmStore } from '../state/llm-store';
 import { pausePi } from '../state/pi-connect';
 import { usePiStore } from '../state/pi-slice';
+import { useSettingsStore } from '../state/settings-store';
 
 /** How the menu names an engine id (matches the catalogue where it has a row). */
 function engineName(id: string): string {
+  if (id === 'rapid-mlx-vision') return "rapid-mlx's vision runtime";
   return ENGINES.find((e) => e.id === id)?.name ?? id;
 }
 
@@ -353,15 +355,24 @@ function FetchMissingButton({
     };
   }, [open, modelId, quant, fetching, anyInstalling]);
   if (modelId === null) return null;
+  /* An `engine:<id>` companion is something to INSTALL (rapid-mlx's vision
+     runtime), not a file to download with the model. */
+  const runtimes = missing
+    .filter((c) => c.kind.startsWith('engine:'))
+    .map((c) => c.kind.slice('engine:'.length));
+  const files = missing.filter((c) => !c.kind.startsWith('engine:'));
   const toInstall = [
-    ...new Set((plan ?? []).filter((k) => k.fix === 'install').map((k) => k.engine)),
+    ...new Set([
+      ...(plan ?? []).filter((k) => k.fix === 'install').map((k) => k.engine),
+      ...runtimes,
+    ]),
   ];
-  const count = missing.length + toInstall.length;
+  const count = files.length + toInstall.length;
   const busy = fetching || installing !== null;
   const nothing = count === 0 && !busy;
   const what = [
     ...toInstall.map((e) => `install ${engineName(e)}`),
-    ...missing.map((c) => c.what),
+    ...files.map((c) => c.what),
   ].join(', ');
   const run = async (): Promise<void> => {
     onNote(null);
@@ -371,7 +382,7 @@ function FetchMissingButton({
       if (!r.success) onNote(r.error ?? `could not install ${engineName(e)}`);
     }
     setInstalling(null);
-    if (missing.length > 0) await downloadModel(modelId, quant);
+    if (files.length > 0) await downloadModel(modelId, quant);
   };
   return (
     <button
@@ -457,6 +468,83 @@ function EngineRow({
           </button>
         )}
       </span>
+    </div>
+  );
+}
+
+/**
+ * VISION — ON UNLESS SAID OTHERWISE.
+ *
+ * the user (2026-09-23): "mmproj/vision should always be loaded and usable by
+ * default unless explicitly turned off, put this in the engines option and
+ * leave a setting to not load vision by default." The switch is the setting;
+ * the line under it is what is TRUE of the running server — it reads images,
+ * or which engine took the launch so it could, or exactly why it cannot. A
+ * change relaunches the model (the projector / lane is a launch argument), and
+ * a reply in flight is paused first so it can be resumed.
+ */
+function VisionRow({ onNote }: { onNote: (text: string | null) => void }) {
+  const loadVision = useSettingsStore((s) => s.settings.loadVision !== false);
+  const update = useSettingsStore((s) => s.update);
+  const relaunch = useLlmStore((s) => s.relaunch);
+  const status = useLlmStore((s) => s.status);
+  const busyTurn = usePiStore((s) => s.agent.isStreaming || s.promptInFlight || s.resuming);
+  const [switching, setSwitching] = useState(false);
+  const sees = status.visionReady === true;
+  const line = !status.serverRunning
+    ? loadVision
+      ? 'On — the next model loads with its vision.'
+      : 'Off — models load text-only.'
+    : sees
+      ? status.visionFallback !== undefined
+        ? `Reads images — on llama.cpp, because ${status.visionFallback.why}.`
+        : status.profile?.engine === 'rapid-mlx'
+          ? "Reads images — rapid-mlx's vision lane (no MTP there)."
+          : 'Reads images — screenshots, pictures, pages.'
+      : status.blindReason === 'off'
+        ? 'Off — text-only. An image a tool takes is described as unseen.'
+        : status.blindReason === 'model'
+          ? 'This model has no vision.'
+          : status.blindReason === 'engine'
+            ? 'This engine is text-only — images are described as unseen.'
+            : status.blindReason === 'projector'
+              ? 'The vision projector could not be loaded.'
+              : 'Cannot read images right now.';
+  const onChange = async (on: boolean): Promise<void> => {
+    onNote(null);
+    setSwitching(true);
+    try {
+      await update({ loadVision: on });
+      if (status.serverRunning) {
+        if (busyTurn) await pausePi();
+        const r = await relaunch();
+        if (!r.success) onNote(r.error ?? 'could not relaunch the model');
+      }
+    } finally {
+      setSwitching(false);
+    }
+  };
+  return (
+    <div
+      className="pd-engine-vision"
+      data-testid="engine-vision"
+      data-on={loadVision ? 'yes' : 'no'}
+      data-sees={sees ? 'yes' : 'no'}
+    >
+      <span className="pd-engine-vision-text">
+        <span className="pd-engine-row-name">Vision</span>
+        <span className="pd-engine-row-sub" data-testid="engine-vision-line">
+          {switching ? 'Relaunching…' : line}
+        </span>
+      </span>
+      <Switch
+        size="sm"
+        checked={loadVision}
+        disabled={switching}
+        aria-label="Load vision"
+        data-testid="engine-vision-switch"
+        onCheckedChange={(v) => void onChange(v)}
+      />
     </div>
   );
 }
@@ -630,6 +718,7 @@ export function EngineMenu() {
               <FetchMissingButton open={open} plan={plan} onNote={setNote} />
             </div>
           </div>
+          <VisionRow onNote={setNote} />
           {model !== null && model !== undefined && record === null && !running ? (
             /* Per model: a model that has never been measured says so, whatever
                another model's verdict was. */

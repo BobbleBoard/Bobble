@@ -332,7 +332,11 @@ async function dispatch(
        * screenshot for a capability that was already there.
        */
       if (!getInferenceVisionReady()) wantVision();
-      return { dataUrl: await browserManager.capture(id) };
+      // `css`: the picture at the page's own size (a --visual look), so a point
+      // read off it is a click coordinate rather than twice one on Retina.
+      return {
+        dataUrl: await browserManager.capture(id, params.css === true ? { css: true } : {}),
+      };
     }
     case 'click': {
       const id = await ensureAgentTab();

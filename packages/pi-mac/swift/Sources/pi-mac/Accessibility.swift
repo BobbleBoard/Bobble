@@ -135,13 +135,30 @@ func resolveTargetPid(_ target: SnapshotTarget) -> (pid: pid_t, name: String)? {
     let running = NSRunningApplication(processIdentifier: pid)
     return (pid, running?.localizedName ?? "pid \(pid)")
   case .app(let query):
+    /*
+     * EXACT BEFORE LOOSE, and loose only among apps a person runs. The single
+     * pass took the FIRST running process whose name merely contained the
+     * query — a helper process ("Google Chrome Helper (Renderer)" for
+     * "chrome"), or the wrong app entirely ("Monitor" → Activity Monitor)
+     * depending on launch order. the user (2026-09-23) watched a model decide "the
+     * user is on Activity Monitor"; the name matching is one of the ways a
+     * look lands on the wrong app, so it is made deterministic: exact name or
+     * bundle id first, then a prefix, then a substring — the last two only
+     * over regular (Dock) apps.
+     */
     let q = query.lowercased()
-    for app in NSWorkspace.shared.runningApplications {
-      let name = (app.localizedName ?? "").lowercased()
-      let bundle = (app.bundleIdentifier ?? "").lowercased()
-      if name == q || bundle == q || name.contains(q) {
-        return (app.processIdentifier, app.localizedName ?? query)
-      }
+    let apps = NSWorkspace.shared.runningApplications
+    if let exact = apps.first(where: {
+      ($0.localizedName ?? "").lowercased() == q || ($0.bundleIdentifier ?? "").lowercased() == q
+    }) {
+      return (exact.processIdentifier, exact.localizedName ?? query)
+    }
+    let regular = apps.filter { $0.activationPolicy == .regular }
+    if let prefix = regular.first(where: { ($0.localizedName ?? "").lowercased().hasPrefix(q) }) {
+      return (prefix.processIdentifier, prefix.localizedName ?? query)
+    }
+    if let loose = regular.first(where: { ($0.localizedName ?? "").lowercased().contains(q) }) {
+      return (loose.processIdentifier, loose.localizedName ?? query)
     }
     return nil
   }

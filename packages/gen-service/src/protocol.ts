@@ -287,6 +287,20 @@ export interface GenOutput {
   readonly seed?: number;
   readonly width?: number;
   readonly height?: number;
+  /**
+   * The separately rendered stills this output was made from, when it is an
+   * animation built frame by frame (HyperFrames): the folder they are in, how
+   * many, and the rate they play at. `animated` says what `outputPath` is — the
+   * one animated PNG they were joined into, or (false) the last frame alone,
+   * because joining them failed. Only the one output is listed either way; the
+   * frames are named by their folder, never one by one.
+   */
+  readonly frames?: {
+    readonly dir: string;
+    readonly count: number;
+    readonly fps: number;
+    readonly animated: boolean;
+  };
 }
 
 /**

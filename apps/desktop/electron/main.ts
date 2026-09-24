@@ -58,6 +58,7 @@ import {
   resumeChatModel,
   shutdownInference,
 } from './inference/llm-main';
+import { setVisionAllowed } from './inference/vision-want';
 import type { AppEventMap, CoreInvokeMap, FsInvokeMap } from './ipc-contract';
 import { disposeMacAgent, registerMacAgentIpc } from './mac/mac-agent';
 import { registerStoreIpc } from './model-store/store-main';
@@ -966,6 +967,8 @@ function registerAppIpc(): void {
   registerMacAgentIpc();
 
   // Desktop settings (theme/permissions/effort/search keys/mcp mode/capabilities).
+  // A tool's screenshot never relaunches the model into vision the user switched off.
+  setVisionAllowed(() => readSettings().loadVision !== false);
   registerSettingsIpc(ipcMain, allowSender, {
     // The power choice acts in the inference worker; settings is only where it
     // is kept. See pushPowerSettings.

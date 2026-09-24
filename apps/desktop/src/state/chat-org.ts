@@ -107,23 +107,36 @@ export async function renameChat(file: string, title: string): Promise<void> {
   await write({ ...c, titles });
 }
 
-/** Forget everything this app tracked about a chat file (called after delete). */
-export async function forgetChat(file: string): Promise<void> {
+/** Forget everything this app tracked about a chat's files (called after delete). */
+export async function forgetChat(file: string | readonly string[]): Promise<void> {
+  const files: readonly string[] = typeof file === 'string' ? [file] : file;
   const c = current();
   const assignments = { ...c.assignments };
   const titles = { ...c.titles };
-  delete assignments[file];
-  delete titles[file];
-  await write({ ...c, assignments, titles, pinned: c.pinned.filter((f) => f !== file) });
+  for (const f of files) {
+    delete assignments[f];
+    delete titles[f];
+  }
+  await write({
+    ...c,
+    assignments,
+    titles,
+    pinned: c.pinned.filter((f) => !files.includes(f)),
+  });
 }
 
 /**
- * Delete a chat: remove its session file from disk AND forget its org state.
+ * Delete a chat: remove its session files from disk AND forget its org state.
+ * `chain` is the row's `supersedes` — the older files of the same conversation,
+ * which would otherwise step up and become the row (see keepChainTips).
  * Returns the IPC result so the caller can surface a failure.
  */
-export async function deleteChat(file: string): Promise<{ ok: boolean; error?: string }> {
-  const res = await window.piDesktop.invoke('fs:delete-session', { file });
-  if (res.ok) await forgetChat(file);
+export async function deleteChat(
+  file: string,
+  chain: readonly string[] = [],
+): Promise<{ ok: boolean; error?: string }> {
+  const res = await window.piDesktop.invoke('fs:delete-session', { file, chain });
+  if (res.ok) await forgetChat([file, ...chain]);
   return res;
 }
 

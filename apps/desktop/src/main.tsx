@@ -5,6 +5,7 @@ import { App } from './App';
 import { AppErrorBoundary } from './AppErrorBoundary';
 import { completeSoftReload, onSoftReload, reloadGeneration, softReload } from './app-reload';
 import { CrashSeam } from './crash-seam';
+import { connectChatJobs } from './state/chat-jobs';
 import { connectChildAgents } from './state/child-agent-store';
 import { connectGen } from './state/gen-store';
 import { connectHf } from './state/hf-store';
@@ -29,6 +30,8 @@ installFocusRingTracking();
 if (!new URLSearchParams(window.location.search).has('canvasPopout')) {
   connectPi();
   connectChildAgents();
+  // Which chat started which generation — a deleted chat's jobs are stopped.
+  connectChatJobs();
   connectLlm();
   // The default engines for this machine, in the background (see llm-store).
   setTimeout(() => void ensureDefaultEngines(), 8_000);

@@ -9,19 +9,22 @@
  * dispatching runner splits by `job.backend`:
  *
  *   - `comfyui`     → the persistent ComfyUI adapter (LTX / Wan text→video),
- *   - `hyperframes` → the Node HyperFrames runner (ffmpeg + headless Chrome
- *                     motion graphics — deterministic, CPU, commercial-safe),
+ *   - `hyperframes` → the Node HyperFrames runner (motion graphics rendered as
+ *                     stills in the app's own Chromium and joined into one
+ *                     animated PNG — deterministic, no ffmpeg, commercial-safe),
  *   - everything else (mflux image / mlx-audio / triposr / trellis) → the uv
  *     worker fallback, exactly as before (image generation is unchanged).
  *
  * {@link buildVideoJob} resolves a catalog {@link ModalityModel} + normalised
  * params into the right {@link GenJob} arm (`comfy` for ComfyUI, `video` for
  * HyperFrames). {@link defaultExtractPosterFrame} pulls a still first frame out
- * of the produced MP4 (ffmpeg, best-effort) so a chat model can critique output
- * it cannot watch. Everything real-runtime is injectable so the routing/builder
+ * of the produced clip (an animated PNG in plain TypeScript, an MP4 with ffmpeg;
+ * best-effort) so a chat model can critique output it cannot watch.
+ * Everything real-runtime is injectable so the routing/builder
  * logic unit-tests against fakes — no ComfyUI, ffmpeg, or Chrome is required.
  */
 import { spawn } from 'node:child_process';
+import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type {
   ComfyJobSpec,
@@ -33,6 +36,7 @@ import type {
   ModalityModel,
   VideoJobSpec,
 } from '@pi-desktop/gen-service';
+import { readPngHead, stillOfApng } from './apng.js';
 
 /** Options a runner accepts (the {@link JobRunner} tail). */
 export interface VideoRunOptions {
@@ -44,10 +48,11 @@ export interface VideoRunOptions {
 }
 
 /**
- * The Node HyperFrames renderer: authors an HTML/CSS/JS scene from the spec and
- * encodes it to an MP4 with ffmpeg + headless Chrome, emitting {@link GenEvent}s
- * as it goes. Injected so the routing/dispatch is testable without ffmpeg/Chrome
- * installed. Resolves with the produced artifact(s).
+ * The Node HyperFrames renderer: renders an HTML/CSS/JS scene from the spec frame
+ * by frame in the app's own Chromium and joins the stills into one animated PNG
+ * (./hyperframes-still.ts), emitting {@link GenEvent}s as it goes. Injected so
+ * the routing/dispatch is testable without a display. Resolves with the produced
+ * artifact(s).
  */
 export type HyperFramesRender = (
   spec: VideoJobSpec,
@@ -206,13 +211,38 @@ export function buildVideoJob(
 export type FrameExtractor = (videoPath: string, outDir: string) => Promise<string | undefined>;
 
 /**
- * Default poster-frame extractor: pull the FIRST frame of the clip with ffmpeg
- * (universal Mac binary, already a HyperFrames aux dep) into `<outDir>/poster.png`.
- * Best-effort — resolves `undefined` if ffmpeg is missing or exits non-zero so a
- * failed extraction never fails the generation itself (the video is still on
+ * Default poster-frame extractor: the FIRST frame of the clip, as
+ * `<outDir>/poster.png`. Best-effort — resolves `undefined` when it cannot, so a
+ * failed extraction never fails the generation itself (the output is still on
  * disk); the `generate_video` tool simply omits the self-critique image.
+ *
+ * A PNG needs no decoder: HyperFrames' animated PNG carries frame 0 as its
+ * default image, lifted out in plain TypeScript (and a lone frame is already a
+ * still). Only a real video goes to ffmpeg — which is not bundled, so on a Mac
+ * without it a clip gets no poster.
  */
 export const defaultExtractPosterFrame: FrameExtractor = (videoPath, outDir) =>
+  /\.png$/i.test(videoPath) ? pngPoster(videoPath, outDir) : ffmpegPoster(videoPath, outDir);
+
+/**
+ * An animated PNG's poster is frame 0 as a plain still: a vision model's decoder
+ * is not an APNG player, and the whole animation is far over the size a tool
+ * result may attach. Only the file's head is read — frame 0 and nothing after
+ * it. A PNG that is not animated is its own poster.
+ */
+async function pngPoster(pngPath: string, outDir: string): Promise<string | undefined> {
+  try {
+    const still = stillOfApng(await readPngHead(pngPath));
+    if (still === undefined) return pngPath;
+    const outPath = path.join(outDir, 'poster.png');
+    await writeFile(outPath, still);
+    return outPath;
+  } catch {
+    return undefined;
+  }
+}
+
+const ffmpegPoster: FrameExtractor = (videoPath, outDir) =>
   new Promise<string | undefined>((resolve) => {
     const outPath = path.join(outDir, 'poster.png');
     try {

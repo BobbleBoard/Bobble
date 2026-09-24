@@ -17,6 +17,7 @@ import type { FsInvokeMap, FsTreeNode, SessionSummary } from './ipc-contract';
 import { activeProjectFullAccess } from './project/project-main';
 import { sandboxBaseDir } from './sandbox';
 import { renderSessionMarkdown } from './session-export';
+import { createSessionTombstones } from './session-tombstones';
 
 const HOME = os.homedir();
 
@@ -49,6 +50,10 @@ function resolveUserPath(p: string): string {
 const AGENT_DIR = path.join(HOME, '.pi', 'agent');
 const SESSIONS_DIR = path.join(AGENT_DIR, 'sessions');
 const PROJECTS_PATH = path.join(HOME, '.pi', 'desktop', 'projects.json');
+/** Chats the user deleted — see session-tombstones.ts for why they are remembered. */
+const tombstones = createSessionTombstones({
+  storePath: path.join(HOME, '.pi', 'desktop', 'deleted-sessions.json'),
+});
 
 function safeRead(file: string): string | null {
   try {
@@ -286,11 +291,14 @@ function listAllSessions(filterCwd?: string, query?: string): SessionSummary[] {
   const needle = (query ?? '').trim().toLowerCase();
   const wantCwd = filterCwd ? normalizeCwd(filterCwd) : undefined;
   const out: SessionSummary[] = [];
+  // A deleted chat that pi wrote back is removed again before anyone sees it.
+  tombstones.sweep();
   for (const p of listDir(SESSIONS_DIR)) {
     const dir = path.join(SESSIONS_DIR, p);
     if (statSafe(dir)?.isDirectory() !== true) continue;
     for (const f of listDir(dir)) {
       if (!f.endsWith('.jsonl')) continue;
+      if (tombstones.has(path.join(dir, f))) continue;
       const summary = readSessionSummary(path.join(dir, f));
       if (summary === null) continue;
       if (!summary.cwd) summary.cwd = decodeCwd(p);
@@ -481,19 +489,39 @@ function readSession(file: string): string | null {
   return safeRead(resolved);
 }
 
-/** Delete a session JSONL, fenced to the sessions dir (the sidebar "Delete chat"
- * action). Only `.jsonl` files under SESSIONS_DIR are eligible. */
-function deleteSession(file: string): { ok: boolean; error?: string } {
-  const resolved = resolveUserPath(file);
-  if (!resolved.startsWith(SESSIONS_DIR + path.sep) || !resolved.endsWith('.jsonl')) {
-    return { ok: false, error: 'refused: not a session file' };
+/**
+ * Delete a chat, fenced to the sessions dir (the sidebar "Delete chat" action).
+ * Only `.jsonl` files under SESSIONS_DIR are eligible.
+ *
+ * THE WHOLE CHAIN, not the row's file. A sidebar row is the newest member of a
+ * chain of files (pi writes a new file on every resume — see `keepChainTips`),
+ * and deleting only that one made the next-newest member the row: the chat
+ * came back, one model switch older. `chain` is the row's `supersedes`.
+ */
+function deleteSession(
+  file: string,
+  chain: readonly string[] = [],
+): { ok: boolean; error?: string } {
+  const targets = [file, ...chain].map(resolveUserPath);
+  for (const t of targets) {
+    if (!t.startsWith(SESSIONS_DIR + path.sep) || !t.endsWith('.jsonl')) {
+      return { ok: false, error: 'refused: not a session file' };
+    }
   }
-  try {
-    fs.rmSync(resolved, { force: true });
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  // Remembered FIRST, so a listing racing this delete already hides them.
+  tombstones.add(targets);
+  let error: string | undefined;
+  for (const t of targets) {
+    try {
+      fs.rmSync(t, { force: true });
+    } catch (e) {
+      error ??= e instanceof Error ? e.message : String(e);
+    }
   }
+  /* A running chat's pi writes its aborted reply after this returns; these two
+     sweeps take the file away again even if nothing lists sessions meanwhile. */
+  for (const ms of [2_000, 10_000]) setTimeout(() => tombstones.sweep(), ms).unref?.();
+  return error === undefined ? { ok: true } : { ok: false, error };
 }
 
 /**
@@ -908,7 +936,7 @@ export const fsHandlers: {
   }),
   'fs:read-file': (req) => readFileBounded(req.path, req.maxBytes ?? READ_FILE_DEFAULT_MAX),
   'fs:write-file': (req) => writeFileFenced(req.path, req.content),
-  'fs:delete-session': (req) => deleteSession(req.file),
+  'fs:delete-session': (req) => deleteSession(req.file, req.chain ?? []),
   'fs:export-session': (req) => exportSession(req),
   'fs:project-instructions': (req) => projectInstructions(req.cwd),
 };

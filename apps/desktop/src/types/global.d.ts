@@ -21,6 +21,7 @@ declare global {
     /** The chat's working folder once the first send has made one (E2E). */
     __pi_workspace?: () => string | null;
     __pi_switch_session?: (sessionPath: string) => Promise<unknown>;
+    __pi_send?: (text: string, images?: string[]) => Promise<unknown>;
     /** Probe-only: stop the running turn (see pi-connect abortPi). */
     __pi_abort?: () => void;
     /** E2E hook: accessor for the canvas controller (open browser/terminal
@@ -30,9 +31,9 @@ declare global {
     // biome-ignore lint/suspicious/noExplicitAny: probe-only escape hatch
     __pi_theme?: () => any;
     /** E2E hook: recorded canvas shell-out invokes (open-with / reveal /
-     * open-external). Populated (and the real shell-out suppressed) only under
-     * ?piE2E=1 so probes can assert the wiring without launching Finder/Terminal
-     * (see chat/canvas/native-surfaces.ts). */
+     * open-external), populated only under ?piE2E=1. The invoke itself is still
+     * made — MAIN keeps a probe from launching Finder/Terminal/a browser
+     * (electron/canvas/os-open.ts openPolicy; see chat/canvas/native-surfaces.ts). */
     __pi_canvas_ipc?: Array<{ channel: string; req: unknown }>;
     /** E2E hook: accessor for the desktop-settings store. Present only when
      * loaded with ?piE2E=1 (see state/settings-store.ts). */

@@ -15,6 +15,7 @@ import {
   serverCanSeeImages,
   unviewableImageNote,
   VISION_STATE_FILE_ENV,
+  visionState,
 } from './stream.js';
 
 function makeModel(baseUrl = 'http://127.0.0.1:8080/v1'): Model<'openai-completions'> {
@@ -1081,9 +1082,29 @@ describe('images on a text-only server', () => {
     expect(serverCanSeeImages(withVision('0'))).toBe(false);
   });
 
+  /*
+   * THE REASON, NOT "TEXT-ONLY MODE". the user (2026-09-23) read "this model is
+   * currently running in TEXT-ONLY mode" on a Mac where vision was never off:
+   * the engine (rapid-mlx on its MTP lane) could not take images. The host
+   * writes `0:<reason>` and the model is told that reason.
+   */
+  it('reads the reason the host wrote and says it', () => {
+    const file = { PI_DESKTOP_VISION_FILE: '/vision-state' };
+    expect(serverCanSeeImages(file, () => '0:engine')).toBe(false);
+    expect(visionState(file, () => '0:engine')).toEqual({ canSee: false, reason: 'engine' });
+    expect(visionState(file, () => '0:off\n')).toEqual({ canSee: false, reason: 'off' });
+    expect(visionState(file, () => '1')).toEqual({ canSee: true });
+    // A host from before the reasons.
+    expect(visionState(file, () => '0')).toEqual({ canSee: false });
+    expect(unviewableImageNote('off')).toContain('vision is switched off');
+    expect(unviewableImageNote('engine')).toContain('text-only');
+    expect(unviewableImageNote('model')).toContain('has no vision');
+    expect(unviewableImageNote()).not.toContain('TEXT-ONLY mode');
+  });
+
   it('tells the model not to retry in a loop', () => {
     const note = unviewableImageNote();
-    expect(note).toMatch(/TEXT-ONLY/);
+    expect(note).toMatch(/could not be shown to you/);
     expect(note).toMatch(/Do NOT loop/);
     // And it must NOT promise sight that is not coming — nothing yet requests
     // the multimodal relaunch for a tool-produced image, so a promise here would
@@ -1115,7 +1136,7 @@ describe('images on a text-only server', () => {
       const last = body.messages[body.messages.length - 1];
       expect(last?.role).toBe('user');
       expect(String(last?.content)).toContain('browser_snapshot');
-      expect(String(last?.content)).toContain('TEXT-ONLY');
+      expect(String(last?.content)).toContain('could not be shown to you');
       // The whole point: no base64 image ever reaches a server that cannot read it.
       expect(JSON.stringify(body)).not.toContain('QUJD');
     } finally {

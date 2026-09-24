@@ -369,10 +369,18 @@ function navigate(tabId: string, url: string): void {
   if (target !== '') void entry.view.webContents.loadURL(target);
 }
 
-async function capture(tabId: string): Promise<string | null> {
+async function capture(tabId: string, opts: { css?: boolean } = {}): Promise<string | null> {
   const entry = entries.get(tabId);
   if (entry === undefined) return null;
+  // The view's bounds are DIP = the page's CSS pixels (1280 when it has none:
+  // the off-screen reveal below lays a hidden view out at that width).
+  const cssWidth = entry.view.getBounds().width > 0 ? entry.view.getBounds().width : 1280;
   let image = await entry.view.webContents.capturePage();
+  const toCss = (img: Electron.NativeImage): Electron.NativeImage => {
+    if (opts.css !== true || img.isEmpty()) return img;
+    // The capture is at the display's backing scale; downscaled once here.
+    return img.getSize().width > cssWidth ? img.resize({ width: cssWidth, quality: 'good' }) : img;
+  };
   /*
    * THE AGENT'S VIEW IS HIDDEN, AND A HIDDEN VIEW CAPTURES NOTHING.
    *
@@ -423,7 +431,7 @@ async function capture(tabId: string): Promise<string | null> {
       entry.view.setBounds(prev);
     }
   }
-  return image.isEmpty() ? null : image.toDataURL();
+  return image.isEmpty() ? null : toCss(image).toDataURL();
 }
 
 async function snapshotDom(tabId: string): Promise<string | null> {

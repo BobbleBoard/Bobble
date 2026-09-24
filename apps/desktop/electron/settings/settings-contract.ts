@@ -435,6 +435,17 @@ export interface DesktopSettings {
    * query param). Sibling to {@link experimentalProductionHarness}.
    */
   experimentalGeneration: boolean;
+  /**
+   * VISION, ON UNLESS SAID OTHERWISE. the user (2026-09-23): "mmproj/vision should
+   * always be loaded and usable by default unless explicitly turned off, put
+   * this in the engines option and leave a setting to not load vision by
+   * default." True: every launch is one that can read an image — llama.cpp
+   * attaches the model's projector, rapid-mlx serves its vision lane, and an
+   * engine that cannot see hands the launch to one that can. False: text-only
+   * launches (a little less memory; rapid-mlx keeps MTP), and an image a tool
+   * produces is described to the model as "vision is switched off".
+   */
+  loadVision: boolean;
   /** Launch flags per engine (see EngineLaunchSettings). Empty by default. */
   engineLaunch: EngineLaunchSettings;
   /**
@@ -540,6 +551,8 @@ export interface DesktopSettingsPatch {
   experimentalProductionHarness?: boolean;
   /** Experimental generation-stack toggle (default FALSE). */
   experimentalGeneration?: boolean;
+  /** Load each model's vision (default TRUE) — see SettingsState.loadVision. */
+  loadVision?: boolean;
   /** Full replacement of the advanced knobs (renderer read-modify-writes the
    * whole object; deep-merged one level over the two nested groups in the store). */
   advanced?: Partial<AdvancedSettings>;

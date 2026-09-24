@@ -26,7 +26,7 @@ import { IconMic, IconPause, IconPlay, IconStop } from '../settings/icons';
 import { useConnectorsStore } from '../state/connectors-store';
 import { abortCorpTask } from '../state/corp-connect';
 import { useCorpStore } from '../state/corp-store';
-import { useImagesUnsupported } from '../state/local-model';
+import { useImageBlindness } from '../state/local-model';
 import {
   abortPi,
   compactSession,
@@ -388,7 +388,8 @@ export function ChatComposer({
    * question (ensureVisionReady) and could only ever answer once it was too
    * late to matter.
    */
-  const blindToImages = useImagesUnsupported();
+  const blindness = useImageBlindness();
+  const blindToImages = blindness !== null;
   /*
    * SELECTION, UNDO AND THE CLIPBOARD for attachments — the user: "cmd/ctrl Z needs
    * to be able to undo accidental file removals, clicking a file needs to
@@ -1427,7 +1428,9 @@ export function ChatComposer({
           relative root so it anchors to the card, and absolutely positioned so
           appearing never moves the card.
         */}
-        <ComposerPill imageOnBlindModel={blindToImages && hasImageAttached} />
+        <ComposerPill
+          imageOnBlindModel={blindness !== null && hasImageAttached ? blindness : false}
+        />
         <Autocomplete
           items={token.mode !== null ? items : []}
           selectedIndex={selectedIndex}

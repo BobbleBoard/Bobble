@@ -7,13 +7,14 @@ import { describe, expect, it } from 'vitest';
 import type { GenBridge } from './gen-bridge-client.ts';
 import type { GenBridgeMethod } from './gen-contract.ts';
 import {
+  dataChartPrompt,
   GENERATE_IMAGE_TOOL,
   GENERATE_SVG_TOOL,
   GENERATE_VIDEO_TOOL,
   parseSize,
   registerGenTools,
   saveOutputs,
-  dataChartPrompt,
+  videoResultText,
 } from './tools.ts';
 
 type Handler = (params: Record<string, unknown> | undefined) => unknown;
@@ -323,6 +324,92 @@ describe('generate_video tool', () => {
     const res = await runVideo(tools, { prompt: 'a wave', model: 'wan2.1-t2v-1.3b' });
     expect(details(res).ok).toBe(false);
     expect(details(res).error).toContain('comfyui not configured');
+  });
+
+  /*
+   * ONE ANIMATION, ONE FILE IN THE TEXT. the user: "rendered 120 induvidual frames,
+   * each of which was placed as it's own png card in the chat, severely
+   * cluttering it." The thread mounts every absolute media path this text names
+   * (apps/desktop/src/chat/thread-media.ts), so the text must name exactly one.
+   */
+  describe('a HyperFrames animation', () => {
+    const DIR = '/Users/j/Bobble/generated/rising-bars';
+    const animation = (animated: boolean) => ({
+      jobId: 'vid-hf',
+      outputs: [
+        {
+          outputPath: animated ? `${DIR}/animation.png` : `${DIR}/frames/frame_120.png`,
+          modality: 'image',
+          model: 'hyperframes',
+          seed: 42,
+          width: 640,
+          height: 352,
+          frames: { dir: `${DIR}/frames`, count: 121, fps: 24, animated },
+        },
+      ],
+      posterFramePath: `${DIR}/poster.png`,
+    });
+    /** Every absolute path in the text that ends in a media extension — what becomes a card. */
+    const mediaPaths = (text: string) =>
+      [...text.matchAll(/(?<![:\w/])(\/[^\s()]+\.(png|jpe?g|webp|gif|mp4|webm|mov|wav|mp3))/g)].map(
+        (m) => m[1],
+      );
+    const textOf = (res: { content: ReadonlyArray<{ type: string; text?: string }> }) =>
+      res.content.find((c) => c.type === 'text')?.text ?? '';
+
+    it('names ONE file — the animated PNG — however many frames made it', async () => {
+      const bridge = new FakeBridge().on('generateVideo', () => animation(true));
+      const tools = collectTools(bridge, async () => Buffer.from('poster'));
+      const text = textOf(
+        await runVideo(tools, { prompt: 'kinetic typography', model: 'hyperframes' }),
+      );
+      expect(mediaPaths(text)).toEqual([`${DIR}/animation.png`]);
+      expect(text.match(/^\s+\d+\. /gm)).toHaveLength(1);
+      expect(text).toContain('121 frames at 24 fps (5.0 s), looping');
+      expect(text).toContain('ONE animated PNG');
+    });
+
+    it('names the frames by their FOLDER, never one by one', async () => {
+      const bridge = new FakeBridge().on('generateVideo', () => animation(true));
+      const tools = collectTools(bridge, async () => Buffer.from('poster'));
+      const text = textOf(
+        await runVideo(tools, { prompt: 'kinetic typography', model: 'hyperframes' }),
+      );
+      expect(text).toContain(`in the folder ${DIR}/frames/\n`);
+      expect(text).not.toContain('frame_0');
+    });
+
+    it('still attaches the poster, so the model can see what it made', async () => {
+      const reads: string[] = [];
+      const bridge = new FakeBridge().on('generateVideo', () => animation(true));
+      const tools = collectTools(bridge, async (p) => {
+        reads.push(p);
+        return Buffer.from('poster');
+      });
+      const res = await runVideo(tools, { prompt: 'kinetic typography', model: 'hyperframes' });
+      expect(reads).toEqual([`${DIR}/poster.png`]);
+      expect(res.content.filter((c) => c.type === 'image')).toHaveLength(1);
+      expect(details(res).outputs).toHaveLength(1);
+    });
+
+    it('says plainly when the frames could not be joined, and still names one file', async () => {
+      const bridge = new FakeBridge().on('generateVideo', () => animation(false));
+      const tools = collectTools(bridge, async () => Buffer.from('poster'));
+      const text = textOf(
+        await runVideo(tools, { prompt: 'kinetic typography', model: 'hyperframes' }),
+      );
+      expect(text).toContain('could not be joined into one animated PNG');
+      expect(text).toContain('the last frame on its own');
+      expect(mediaPaths(text)).toEqual([`${DIR}/frames/frame_120.png`]);
+    });
+  });
+
+  it('lists a real video exactly as before', () => {
+    const text = videoResultText(
+      [{ outputPath: '/out/clip.mp4', modality: 'video', model: 'wan', seed: 3 }],
+      'Model: Wan',
+    );
+    expect(text).toBe('Generated 1 video on the canvas:\n  1. /out/clip.mp4 (seed 3)\nModel: Wan');
   });
 });
 

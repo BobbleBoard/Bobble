@@ -9,6 +9,7 @@
  */
 import net from 'node:net';
 import {
+  GEN_AGENT_ENV,
   GEN_SOCK_ENV,
   GEN_TOKEN_ENV,
   type GenBridgeMethod,
@@ -34,6 +35,8 @@ export interface GenBridgeClientOptions {
   readonly requestTimeoutMs?: number;
   /** Connection attempt timeout (ms). Default 5000. */
   readonly connectTimeoutMs?: number;
+  /** Which pi is asking ({@link GEN_AGENT_ENV}); absent = the chat's own pi. */
+  readonly agent?: string;
 }
 
 const DEFAULT_REQUEST_TIMEOUT = 15 * 60_000;
@@ -49,6 +52,7 @@ export class GenBridgeClient implements GenBridge {
   readonly #token: string;
   readonly #requestTimeoutMs: number;
   readonly #connectTimeoutMs: number;
+  readonly #agent: string | undefined;
   readonly #pending = new Map<number, Pending>();
   #socket: net.Socket | null = null;
   #connecting: Promise<net.Socket> | null = null;
@@ -60,6 +64,7 @@ export class GenBridgeClient implements GenBridge {
     this.#token = opts.token;
     this.#requestTimeoutMs = opts.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT;
     this.#connectTimeoutMs = opts.connectTimeoutMs ?? DEFAULT_CONNECT_TIMEOUT;
+    this.#agent = opts.agent;
   }
 
   /** Build a client from the env the app injects, or `null` when unavailable
@@ -68,7 +73,12 @@ export class GenBridgeClient implements GenBridge {
     const socketPath = env[GEN_SOCK_ENV];
     const token = env[GEN_TOKEN_ENV];
     if (socketPath === undefined || socketPath === '' || token === undefined) return null;
-    return new GenBridgeClient({ socketPath, token });
+    const agent = env[GEN_AGENT_ENV];
+    return new GenBridgeClient({
+      socketPath,
+      token,
+      ...(agent !== undefined && agent !== '' ? { agent } : {}),
+    });
   }
 
   #connect(): Promise<net.Socket> {
@@ -146,7 +156,13 @@ export class GenBridgeClient implements GenBridge {
   ): Promise<T> {
     const socket = await this.#connect();
     const id = this.#nextId++;
-    const payload: GenBridgeRequest = { id, token: this.#token, method, params };
+    const payload: GenBridgeRequest = {
+      id,
+      token: this.#token,
+      method,
+      params,
+      ...(this.#agent !== undefined ? { agent: this.#agent } : {}),
+    };
     return new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.#pending.delete(id);

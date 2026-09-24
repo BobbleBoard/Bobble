@@ -1,7 +1,8 @@
 import { clsx } from 'clsx';
 import type { CSSProperties } from 'react';
-import { type RefObject, useEffect, useRef, useState } from 'react';
+import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { IconChevronDown } from './icons.tsx';
+import { clipBounds, type MenuPlacement, menuPlacement } from './menu-placement.ts';
 
 /*
  * THE "OPEN" CONTROL, IN ONE PLACE.
@@ -144,9 +145,35 @@ export function OpenSplitButton({
 }: OpenSplitButtonProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [placement, setPlacement] = useState<MenuPlacement>({ side: 'bottom' });
   useOutsideClose(ref, open, () => setOpen(false));
   const others = (apps ?? []).filter((app) => app.id !== defaultApp?.id);
   const primary = tone === 'primary';
+  const rows = others.length + (extraItem !== undefined ? 1 : 0);
+
+  /*
+   * OPEN WHERE IT CAN BE SEEN (menu-placement.ts). The card this control sits on
+   * is usually the last thing in the thread, directly above the composer; a
+   * menu dropping below it was clipped by the thread's scroller and its rows
+   * sat under the composer, where a click could not reach them. Measured before
+   * paint, so the menu never flashes on the wrong side.
+   */
+  useLayoutEffect(() => {
+    if (!open || rows === 0) return;
+    const root = ref.current;
+    const menu = menuRef.current;
+    if (root === null || menu === null) return;
+    const control = root.getBoundingClientRect();
+    setPlacement(
+      menuPlacement({
+        control: { top: control.top, bottom: control.bottom },
+        menuHeight: menu.scrollHeight,
+        clip: clipBounds(root),
+        gap: 4,
+      }),
+    );
+  }, [open, rows]);
 
   return (
     <div ref={ref} className={clsx('pd-split-root', className)} data-tone={tone}>
@@ -185,7 +212,13 @@ export function OpenSplitButton({
         ) : null}
       </div>
       {open && (others.length > 0 || extraItem !== undefined) ? (
-        <div className="pd-menu pd-split-menu" role="menu">
+        <div
+          ref={menuRef}
+          className="pd-menu pd-split-menu"
+          role="menu"
+          data-side={placement.side}
+          style={placement.maxHeight !== undefined ? { maxHeight: placement.maxHeight } : undefined}
+        >
           {menuHeading !== undefined ? (
             <div className="pd-menu-heading" aria-hidden="true">
               {menuHeading}

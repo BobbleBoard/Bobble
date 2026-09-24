@@ -151,15 +151,6 @@ export function IconCheckCircle(props: LocalIconProps) {
   );
 }
 
-/** The phantom cursor's own shape — the Computer use section. */
-export function IconCursor(props: LocalIconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M3.5 2.5l9.5 5.2-4.3 1.3-2.4 4L3.5 2.5z" />
-    </Svg>
-  );
-}
-
 export function IconShield(props: LocalIconProps) {
   return (
     <Svg {...props}>

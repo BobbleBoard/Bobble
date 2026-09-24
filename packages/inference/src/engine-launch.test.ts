@@ -120,3 +120,23 @@ describe('assembleEngineLaunch — one argv per (engine, spec), local paths only
     ]);
   });
 });
+
+describe('rapid-mlx vision lane (the user 2026-09-23: vision on by default)', () => {
+  it('asks for the vision lane and carries no speculative flags — that lane does not honour them', () => {
+    const l = assembleEngineLaunch(
+      { engine: 'rapid-mlx', spec: 'none' },
+      {
+        command: '/v/bin/rapid-mlx',
+        modelDir: '/m/qwen',
+        servedModelId: 'q@rapid-mlx',
+        host: '127.0.0.1',
+        port: 9000,
+        draftDir: '/m/mtp',
+        vision: true,
+      },
+    );
+    expect(l.args).toContain('--mllm');
+    expect(l.args).not.toContain('--speculative-config');
+    expect(l.args).not.toContain('--no-spec-decode');
+  });
+});

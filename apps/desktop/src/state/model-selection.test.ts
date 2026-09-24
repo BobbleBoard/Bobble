@@ -32,6 +32,7 @@ const base: DesktopSettings = {
   hfToken: '',
   experimentalProductionHarness: false,
   experimentalGeneration: true,
+  loadVision: true,
   iconScale: 1,
   advanced: DEFAULT_ADVANCED,
   chatOrg: { projects: [], assignments: {}, pinned: [], titles: {} },

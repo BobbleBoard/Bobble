@@ -174,13 +174,17 @@ export function visibleRegion(content: Rect, viewport: Size, drawn: DrawnWindow)
 /**
  * Breathing room around a window that has to be scaled down.
  *
- * Proportional to the TIGHT axis rather than fixed at 18: in the docked rail
- * the review measured ~190px of dead wallpaper above the window and ~150 below,
- * and a fixed pad is a bigger share of a 440px rail than of a 1680px stage.
+ * Proportional to the TIGHT axis rather than fixed: a fixed pad is a bigger
+ * share of a 440px rail than of a 1680px stage. It was 3% (13px in the rail),
+ * which read as the window touching the panel's edges — the user (2026-09-23):
+ * "shrink the window such that there is some margin buffer space and it's not
+ * touching the left right top or bottom of the canvas area, some reasonable
+ * margin." Now 7% of the tight axis, 16px at the least and 44px at the most:
+ * 31px in the docked rail, 44px on a wide stage.
  */
 export function stagePadding(viewport: Size): number {
   const tight = Math.min(viewport.w, viewport.h);
-  return Math.round(Math.min(18, Math.max(4, tight * 0.03)));
+  return Math.round(Math.min(44, Math.max(16, tight * 0.07)));
 }
 
 /**
