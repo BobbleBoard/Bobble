@@ -1,9 +1,20 @@
 # Bobble — status
 
-Updated: 2026-09-23 23:50 · **PAUSED for the user's testing** · main `e376f35a` · **installed in /Applications: the candidate `candidate/2026-09-23-night` (`e55163af`)**, packaged probe + smoke OK, signed with the stable identity
+Updated: 2026-09-24 · **PAUSED for the user's testing** · main `9135cb54` · **installed in /Applications: `candidate/2026-09-24` (`fec48c2d`)** = last night's candidate + the elevation fix below, packaged probe + smoke OK, signed with the stable identity
+
+## Since your review (2026-09-24): "everything has the same softness" / the History card looks "flimsy"
+| Where | Before | After | Proof |
+|---|---|---|---|
+| Every Bobble surface (theme tokens) | one diffuse blur per level (md `0 4px 14px` 9%) — a haze on all sides, no contact | contact + cast (+ ambient) stacks with negative spread; dark adds a lit top rim; `edge` 2px not a 14px glow | design-audit probe, 50 surfaces before/after |
+| Overlays / menus / dialogs | 85% sheet × 0.78 translucency (≈66%) | 95% sheet × 0.92 — still frosted, no longer grey | chat menu + settings pairs |
+| 3D studio floating panels (History, generate panel, tool groups, strip pill, action bar) | 70% near-white (#f9f9fb on #f5f5f7), 6% edge, History 18px corners | one overlay sheet, border-default edge, History on radius-lg (14px) | `elevation-look.mjs` (real model dropped in), light + dark |
+| Four cards with hard-coded haze (install card 0 24px 60px 36%, image-stage picture, storage bar, chart tooltip) | own literal shadows — the tokens never reached them | popover / lg / lg / md tokens | install-card pair |
+| Prototypes (gallery) | same soft cards + 12 proto rules edged with the divider colour | follow the live tokens; those 12 edges on border-default; **all 10 prototypes re-shot** (804 shots; the gallery shows the 437 at 1440 wide). Help (B) links the app's compiled CSS by content hash — re-pointed at the current build | `deliverables/gallery.html` |
+
+Commits: `b493d344` (tokens + studio material), `bc44d674` (four hard-coded shadows; `fec48c2d` on the candidate), `9135cb54` (the studio probe `elevation-look.mjs`). Themes suite 27/27, token-hygiene + terminal-surface CSS tests pass.
 
 ## What is in the installed candidate (built by agents; NOT independently verified — the user tests)
-main (today's computer-use/vision wave + the merged push units) plus these branches, merged cleanly:
+Everything below plus the elevation fix above. main (today's computer-use/vision wave + the merged push units) plus these branches, merged cleanly:
 
 | Unit | Kind | What it does | How to try it |
 |---|---|---|---|
