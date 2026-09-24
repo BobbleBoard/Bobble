@@ -22,6 +22,7 @@
  */
 
 import { type ChartLayout, layoutChart } from './layout.ts';
+import { chartCanvas } from './sizes.ts';
 import { type ChartSpec, formatValue } from './spec.ts';
 import {
   barRadius,
@@ -76,6 +77,29 @@ export interface ElementsOptions {
 }
 
 const f = (n: number): string => (Number.isInteger(n) ? String(n) : n.toFixed(1));
+
+/** One element at `k` times its size: position, box, type, strokes and points together. */
+function scaleElement(e: MeasuredElement, k: number): MeasuredElement {
+  const n = (v: number | undefined): number | undefined => (v === undefined ? undefined : v * k);
+  const points =
+    e.points === undefined
+      ? undefined
+      : e.points
+          .split(' ')
+          .map((pair) =>
+            pair
+              .split(',')
+              .map((v) => f(Number(v) * k))
+              .join(','),
+          )
+          .join(' ');
+  const out: Record<string, unknown> = { ...e, x: e.x * k, y: e.y * k, w: e.w * k, h: e.h * k };
+  for (const key of ['radius', 'fontSize', 'strokeWidth', 'cx', 'cy', 'rr'] as const) {
+    if (e[key] !== undefined) out[key] = n(e[key]);
+  }
+  if (points !== undefined) out.points = points;
+  return out as unknown as MeasuredElement;
+}
 
 /** "#RRGGBB" → "rgb(r, g, b)" — the form a computed style reports. */
 export function cssRgb(hex: string): string {
@@ -203,10 +227,30 @@ function label(
   };
 }
 
-/** Compute the chart's elements at a size (default 960×560, the file's). */
+/**
+ * Compute the chart's elements at a size — by default the spec's size preset,
+ * the same canvas as the SVG beside it (sizes.ts), scaled the same way.
+ */
 export function chartToElements(spec: ChartSpec, opts: ElementsOptions = {}): ChartElements {
-  const width = opts.width ?? 960;
-  const height = opts.height ?? 560;
+  const canvas = chartCanvas(spec);
+  const custom = opts.width !== undefined || opts.height !== undefined;
+  const scale = custom ? 1 : canvas.text;
+  if (scale !== 1) {
+    // Drawn on the smaller page and scaled up whole, like the SVG.
+    const small = chartToElements(spec, {
+      ...opts,
+      width: Math.round(canvas.width / scale),
+      height: Math.round(canvas.height / scale),
+    });
+    return {
+      ...small,
+      width: canvas.width,
+      height: canvas.height,
+      elements: small.elements.map((e) => scaleElement(e, scale)),
+    };
+  }
+  const width = opts.width ?? canvas.width;
+  const height = opts.height ?? canvas.height;
   const style = resolveStyle(spec.style, opts.fallbackLook, { theme: 'light' });
   const ground = style.ground ?? LIGHT_GROUND;
   const out: MeasuredElement[] = [];
@@ -237,6 +281,7 @@ export function chartToElements(spec: ChartSpec, opts: ElementsOptions = {}): Ch
     top: 0,
     bottom: 0,
     style,
+    endLabels: true,
   });
   const ox = pad;
   const oy = top;
@@ -629,17 +674,34 @@ function drawBody(
       radius: rr,
     });
   }
-  if (spec.xLabel !== undefined) {
+  // Each line named at its end, as the SVG does.
+  for (const e of L.endLabels) {
+    if (Math.abs(e.y - e.anchorY) > 2) {
+      const lead = [
+        { x: ox + e.anchorX + 6, y: oy + e.anchorY },
+        { x: ox + e.x - 4, y: oy + e.y },
+      ];
+      out.push({
+        tag: 'polyline',
+        ...bbox(lead),
+        points: pointsAttr(lead),
+        stroke: cssRgb(colour(e.series, false)),
+        strokeWidth: 1,
+      });
+    }
+    push(label(ox + e.x, oy + e.y + 4, e.text, 12, ink, font, { weight: 600 }));
+  }
+  const xTitle = spec.xLabel ?? (horizontal ? L.unitTitle : undefined);
+  const yTitle = spec.yLabel ?? (!horizontal ? L.unitTitle : undefined);
+  if (xTitle !== undefined) {
     push(
-      label(ox + L.plot.x + L.plot.w / 2, oy + L.height - 4, spec.xLabel, 12, mute, font, {
+      label(ox + L.plot.x + L.plot.w / 2, oy + L.height - 4, xTitle, 12, mute, font, {
         anchor: 'middle',
       }),
     );
   }
-  if (spec.yLabel !== undefined && !horizontal) {
+  if (yTitle !== undefined && !horizontal) {
     // No rotated text in the converters: the axis title sits above the axis.
-    push(
-      label(ox + L.plot.x - 8, oy + L.plot.y - 8, spec.yLabel, 11, mute, font, { anchor: 'end' }),
-    );
+    push(label(ox + L.plot.x - 8, oy + L.plot.y - 8, yTitle, 11, mute, font, { anchor: 'end' }));
   }
 }

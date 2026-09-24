@@ -135,14 +135,23 @@ export function buildShim(
  * call — so `$` before a digit is escaped there and only there. The rest of
  * the shell (`$HOME`, `$(…)`) is untouched; a script the model runs on its own
  * is untouched.
+ *
+ * The same goes for a dollar MAGNITUDE: `chart … --unit "$M"` (millions of
+ * dollars) reached the tool as an empty unit — bash expanded `$M`, a variable
+ * nobody set. A `$` followed by k/M/B/T, mm/mn/bn and nothing else of a name
+ * (`"$M"`, `$bn,`, `$k)`) is money on our commands; `$MY_VAR` is still a
+ * variable.
  */
+const DOLLAR_DIGIT_OR_MAGNITUDE =
+  /(^|[^\\])\$(?=\d|(?:[kKmMbBtT]|mm|MM|mn|bn|BN)(?![A-Za-z0-9_]))/g;
+
 export function protectShimDollars(command: string, shimCommands: readonly string[]): string {
-  if (!/\$\d/.test(command)) return command;
+  if (!/\$(?:\d|(?:[kKmMbBtT]|mm|MM|mn|bn|BN)(?![A-Za-z0-9_]))/.test(command)) return command;
   const segments = command.split(/&&|\|\||;|\|/);
   const leads = segments.map((seg) => seg.trim().split(/\s+/)[0] ?? '');
   const ours = leads.some((w) => shimCommands.includes(w));
   if (!ours) return command;
-  return command.replace(/(^|[^\\])\$(?=\d)/g, '$1\\$');
+  return command.replace(DOLLAR_DIGIT_OR_MAGNITUDE, '$1\\$');
 }
 
 /** The real command a group name shadows, when one exists on this machine. */

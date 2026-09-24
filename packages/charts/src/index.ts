@@ -1,3 +1,4 @@
+export { type Coerced, coerceChartForm, titleFromData } from './coerce.ts';
 export {
   type ChartElements,
   chartToElements,
@@ -7,10 +8,12 @@ export {
   type MeasuredElement,
   over,
 } from './elements.ts';
+export { formatTick, type UnitParts, unitParts } from './format.ts';
 export {
   type BarShape,
   type Category,
   type ChartLayout,
+  type EndLabel,
   type LayoutOptions,
   type LegendEntry,
   type LineShape,
@@ -21,6 +24,14 @@ export {
   type SliceShape,
   type Tick,
 } from './layout.ts';
+export {
+  ACCEPTED_NUMBER_FORMS,
+  ChartDataError,
+  type ParsedList,
+  type ParsedNumber,
+  parseNumber,
+  parseNumberList,
+} from './numbers.ts';
 export { type ImagePalette, paletteFromPixels, rgbaFromBase64, sortByHue } from './palette.ts';
 export {
   type CvdKind,
@@ -45,6 +56,14 @@ export {
   simulateCvd,
 } from './palette-check.ts';
 export {
+  CHART_SIZE_NAMES,
+  CHART_SIZES,
+  type ChartCanvas,
+  type ChartSize,
+  chartCanvas,
+  chartSizeOf,
+} from './sizes.ts';
+export {
   CHART_TYPES,
   type ChartPoint,
   type ChartSeries,
@@ -52,6 +71,7 @@ export {
   type ChartType,
   categoryLabels,
   formatValue,
+  type NormalizeOptions,
   normalizeChartSpec,
   pointCount,
 } from './spec.ts';

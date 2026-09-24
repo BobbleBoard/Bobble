@@ -44,26 +44,36 @@
  * chart the chat asks for.
  */
 
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { ExtensionAPI } from '@mariozechner/pi-coding-agent';
 import {
+  ACCEPTED_NUMBER_FORMS,
+  CHART_SIZE_NAMES,
+  CHART_SIZES,
   CHART_TYPES,
+  ChartDataError,
   type ChartSpec,
   type ChartStyle,
   type ChartType,
+  chartCanvas,
   chartToElements,
   chartToSvg,
+  coerceChartForm,
   formatValue,
   LOOK_NAMES,
   LOOKS,
   type LookName,
+  lookByName,
   normalizeChartSpec,
   normalizeStyle,
   paletteFromPixels,
+  parseNumber,
+  parseNumberList,
   pickLook,
   pointCount,
   rgbaFromBase64,
+  titleFromData,
 } from '@pi-desktop/charts';
 import { Type } from '@sinclair/typebox';
 import type { PresentBridge } from './present.js';
@@ -280,7 +290,15 @@ export function chartInputFromParams(input: Record<string, unknown>): Record<str
   if (title !== '') out.title = title;
   if (p.labels !== undefined && p.labels !== '') out.labels = jsonListIfAny(p.labels);
   if (values !== undefined && values !== '') out.values = values;
-  for (const key of ['subtitle', 'x_label', 'y_label', 'unit', 'highlight', 'note'] as const) {
+  for (const key of [
+    'subtitle',
+    'x_label',
+    'y_label',
+    'unit',
+    'highlight',
+    'note',
+    'size',
+  ] as const) {
     const v = p[key];
     if (typeof v === 'string' && v.trim() !== '') out[key] = v.trim();
   }
@@ -336,13 +354,156 @@ export function withTitle(spec: ChartSpec): ChartSpec {
 }
 
 /**
- * A chart that names no look gets one from its title — baked INTO the spec,
- * so the file on disk, the card in the chat and every later edit agree.
+ * A chart that names no look gets one — baked INTO the spec, so the file on
+ * disk, the card in the chat and every later edit agree.
+ *
+ * THE LOOK IS STICKY (VQ-02). It used to be picked from each chart's title, so
+ * the charts of one answer came out in different clothes on purpose (the
+ * research's D29: the MAU bars and the revenue line of one brief in two unrelated
+ * looks). Now a conversation's first chart takes the look it names, or one
+ * picked from its title, and every later chart that names none wears the same
+ * — variety comes across conversations, and a chart that names a look gets it.
+ * `sticky` is that conversation's look, when it has one.
  */
-export function withLook(spec: ChartSpec): ChartSpec {
+export function withLook(spec: ChartSpec, sticky?: LookName): ChartSpec {
   if (spec.style?.look !== undefined) return spec;
-  const look = pickLook(spec.title !== '' ? spec.title : describeData(spec));
+  const look = sticky ?? pickLook(spec.title !== '' ? spec.title : describeData(spec));
   return { ...spec, style: { ...spec.style, look } };
+}
+
+/**
+ * The look each conversation's charts wear, by session (or, with no session to
+ * key on, by folder). pi imports the extension per session, so this map is
+ * per conversation in practice; after a restart the newest chart in the folder
+ * carries the look forward (a Bobble chat has a folder of its own).
+ */
+const conversationLooks = new Map<string, LookName>();
+
+function conversationKey(
+  ctx: { sessionManager?: { getSessionId?: () => string } } | undefined,
+  dir: string,
+): string {
+  let id: string | undefined;
+  try {
+    id = ctx?.sessionManager?.getSessionId?.();
+  } catch {
+    id = undefined;
+  }
+  return typeof id === 'string' && id !== '' ? `session:${id}` : `dir:${dir}`;
+}
+
+/** The look of the newest chart already in `dir`, if any (read from its spec). */
+async function lookOfNewestChart(dir: string): Promise<LookName | undefined> {
+  let names: string[];
+  try {
+    names = (await readdir(dir)).filter((n) => n.endsWith(CHART_SIDECAR_SUFFIX));
+  } catch {
+    return undefined;
+  }
+  let newest: { at: number; file: string } | null = null;
+  for (const n of names.slice(0, 400)) {
+    const file = path.join(dir, n);
+    try {
+      const at = (await stat(file)).mtimeMs;
+      if (newest === null || at > newest.at) newest = { at, file };
+    } catch {
+      /* gone meanwhile */
+    }
+  }
+  if (newest === null) return undefined;
+  try {
+    const look = (JSON.parse(await readFile(newest.file, 'utf8')) as { style?: { look?: unknown } })
+      .style?.look;
+    return typeof look === 'string' ? lookByName(look)?.name : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** The look a call asked for by name (`--look`, `--style clean`, a style JSON), valid or not. */
+function lookAskedFor(p: Record<string, unknown>): string | undefined {
+  if (typeof p.look === 'string' && p.look.trim() !== '') return p.look.trim();
+  if (typeof p.style === 'string') {
+    const t = p.style.trim();
+    if (t.startsWith('{')) {
+      try {
+        const look = (JSON.parse(t) as { look?: unknown }).look;
+        return typeof look === 'string' ? look : undefined;
+      } catch {
+        return undefined;
+      }
+    }
+    // `--style=terminal`: a single word that is not a knob is a look's name.
+    if (
+      /^[a-z][a-z-]*$/i.test(t) &&
+      !/^(pill|rounded|square|thin|wide|smooth|curved|step|serif|dots|dotted)$/i.test(t)
+    ) {
+      return t;
+    }
+  }
+  return undefined;
+}
+
+/** "drawn as bars instead: …" → "Drawn as bars instead: ….": a note as a sentence. */
+function sentence(note: string): string {
+  const t = note.trim();
+  const s = `${t.charAt(0).toUpperCase()}${t.slice(1)}`;
+  return /[.!?]$/.test(s) ? s : `${s}.`;
+}
+
+/**
+ * Where a chart may be written without destroying another one.
+ *
+ * REAL: twelve untitled charts were all written to `bar-chart.svg`, each over
+ * the last, and the model then said it had made "10 different charts". A file
+ * is overwritten only by the SAME chart made again — the same title and labels
+ * when the title was the model's own, the same data when it came from the data
+ * (a retry). Anything else — another chart, or a file the chart tool did not
+ * write — keeps its name, and this one takes the next free "-2", "-3".
+ */
+async function placeChart(
+  deps: ChartToolDeps,
+  target: string,
+  spec: ChartSpec,
+  titleWasGiven: boolean,
+): Promise<string> {
+  const read = deps.readFileImpl ?? ((f: string) => readFile(f, 'utf8'));
+  const stem = target.slice(0, -4);
+  for (let n = 1; n < 200; n += 1) {
+    const candidate = n === 1 ? target : `${stem}-${n}.svg`;
+    let there = true;
+    try {
+      await stat(candidate);
+    } catch {
+      there = false;
+    }
+    if (!there) return candidate;
+    let existing: ChartSpec | null = null;
+    try {
+      existing = normalizeChartSpec(
+        JSON.parse(await read(`${candidate.slice(0, -4)}${CHART_SIDECAR_SUFFIX}`)),
+      );
+    } catch {
+      existing = null; // a file the chart tool did not write is never overwritten
+    }
+    if (existing !== null && sameChart(existing, spec, titleWasGiven)) return candidate;
+  }
+  return `${stem}-${Date.now()}.svg`;
+}
+
+/**
+ * Whether a chart on disk is this chart made again (see placeChart): the same
+ * kind of chart, and the same title and categories — or, for a chart titled
+ * from its data, the same data. REAL: the demo drew the same six months as a
+ * line and then as an area; those are two charts, not one remade.
+ */
+function sameChart(a: ChartSpec, b: ChartSpec, titleWasGiven: boolean): boolean {
+  if (a.type !== b.type) return false;
+  const labels = (s: ChartSpec): string => JSON.stringify(s.series[0]?.points.map((p) => p.label));
+  if (titleWasGiven) return a.title === b.title && labels(a) === labels(b);
+  const data = (s: ChartSpec): string =>
+    JSON.stringify(s.series.map((x) => [x.name, x.points.map((p) => [p.label, p.value])]));
+  return data(a) === data(b);
 }
 
 /** The data, read back in one line so the model can check it against the ask. */
@@ -375,6 +536,10 @@ export function describeLook(spec: ChartSpec): string {
   if (st.font !== undefined) parts.push(`font ${st.font}`);
   if (st.labels !== undefined) parts.push(`labels ${st.labels}`);
   if (st.background !== undefined) parts.push(`background ${st.background}`);
+  if (spec.size !== undefined) {
+    const c = chartCanvas(spec);
+    parts.push(`size ${spec.size} (${c.width}×${c.height})`);
+  }
   return parts.join(', ');
 }
 
@@ -414,7 +579,7 @@ function styleParams() {
       Type.Union(
         LOOK_NAMES.map((n) => Type.Literal(n)),
         {
-          description: `A named look. Pick one that fits the subject and vary between charts: ${LOOKS_LINE}. Left out, one is chosen for you.`,
+          description: `A named look. Pick one that fits the subject: ${LOOKS_LINE}. Left out, the chart wears the conversation's look.`,
         },
       ),
     ),
@@ -481,6 +646,14 @@ function styleParams() {
         description:
           'Style it like this picture: a path to an image whose colours (and ground) become the palette — a screenshot, a poster, a brand page.',
       }),
+    ),
+    size: Type.Optional(
+      Type.Union(
+        CHART_SIZE_NAMES.map((n) => Type.Literal(n)),
+        {
+          description: `Where the .svg is going: ${CHART_SIZE_NAMES.map((n) => `${n} — ${CHART_SIZES[n].about}`).join('; ')}. Default card.`,
+        },
+      ),
     ),
   };
 }
@@ -581,7 +754,7 @@ export function registerChartTool(pi: ExtensionAPI, deps: ChartToolDeps): void {
       'second from the labels and values you pass; put the real numbers in, never a summary of them. ' +
       'Every chart has a LOOK: name one that fits the subject (--look), set the knobs (--palette, ' +
       '--accent, --radius, --bars, --grid, --line, --font), or --from_image a picture to take its ' +
-      'colours; left alone, a look is chosen so charts vary. Never image generation for a chart (a ' +
+      "colours; left alone, it wears the conversation's look. Never image generation for a chart (a " +
       'painting cannot put a value on an axis), never matplotlib, never hand-written SVG, never a ' +
       'whole deck for one chart. It writes a .svg (and the spec beside it) into the project, so the ' +
       'same chart can go into a page or document. To change a chart afterwards, use chart_edit.',
@@ -655,13 +828,18 @@ export function registerChartTool(pi: ExtensionAPI, deps: ChartToolDeps): void {
       const root = deps.root(ctx?.cwd);
       let spec: ChartSpec;
       try {
-        spec = withScatterX(normalizeChartSpec(chartInputFromParams(p)));
+        // STRICT: a value that is not a number, a list that reads two ways, or
+        // a series that does not match its labels is named back — never a
+        // dropped token, a shifted value or a silent zero (VQ-02).
+        spec = withScatterX(normalizeChartSpec(chartInputFromParams(p), { strict: true }));
       } catch (err) {
+        if (err instanceof ChartDataError) return errorResult(`chart: ${sentence(err.message)}`);
         return errorResult(
           `chart needs its data: ${err instanceof Error ? err.message : String(err)}. Pass --labels "A, B, C" --values "1, 2, 3" (several series: "Name: 1, 2; Other: 3, 4"), or --data with the JSON spec.`,
         );
       }
       if (pointCount(spec) === 0) return errorResult('chart needs at least one value.');
+      const notes: string[] = [];
       let imageNote = '';
       if (typeof p.from_image === 'string' && p.from_image.trim() !== '') {
         const img = await styleFromImage(deps.bridge, resolveAgainst(root, p.from_image));
@@ -670,18 +848,51 @@ export function registerChartTool(pi: ExtensionAPI, deps: ChartToolDeps): void {
         spec = { ...spec, style: { ...spec.style, ...img.style } };
         imageNote = `\n${img.note}`;
       }
-      spec = withLook(withTitle(spec));
-      const svgPath = resolveOut(
+      // A form that cannot show the data becomes one that can, said in one line.
+      const coerced = coerceChartForm(spec);
+      spec = coerced.spec;
+      notes.push(...coerced.notes.map(sentence));
+      spec = withTitle(spec);
+      const titleWasGiven = spec.title !== '';
+      if (!titleWasGiven) {
+        const fromData = titleFromData(spec);
+        if (fromData !== '') {
+          spec = { ...spec, title: fromData };
+          notes.push(
+            `It had no title, so it is titled "${fromData}" from its data; a title that says what it shows reads better (chart_edit --title).`,
+          );
+        }
+      }
+      const target = resolveOut(
         root,
         typeof p.out === 'string' ? p.out : undefined,
         chartSlug(spec.title, spec.type),
       );
+      // The conversation's look, unless this chart names one (and a name that
+      // is not a look is said, with the ones that are).
+      const key = conversationKey(ctx, path.dirname(target));
+      const asked = lookAskedFor(p);
+      const sticky = conversationLooks.get(key) ?? (await lookOfNewestChart(path.dirname(target)));
+      spec = withLook(spec, sticky);
+      if (asked !== undefined && lookByName(asked) === undefined) {
+        notes.push(
+          `There is no look called "${asked}" (the looks: ${LOOK_NAMES.join(', ')}); it wears ${spec.style?.look ?? 'clean'}.`,
+        );
+      }
+      if (spec.style?.look !== undefined) conversationLooks.set(key, spec.style.look);
+      const svgPath = await placeChart(deps, target, spec, titleWasGiven);
+      if (svgPath !== target) {
+        notes.push(
+          `${path.basename(target)} already holds a different chart, so this one is ${path.basename(svgPath)}.`,
+        );
+      }
       const written = await writeChart(deps, spec, svgPath);
       if ('error' in written) return errorResult(`chart ${written.error}`);
       const what = whatIs(spec);
       const shown = await present(deps.bridge, written.svgPath, what);
       const text = [
         `Drew ${what}: ${pathForModel(written.svgPath, root)} (the spec beside it: ${path.basename(written.specPath)}).${shown}`,
+        ...notes,
         `Data: ${describeData(spec)}`,
         `Look: ${describeLook(spec)}${imageNote}`,
         '',
@@ -779,6 +990,10 @@ export function registerChartTool(pi: ExtensionAPI, deps: ChartToolDeps): void {
       } catch (err) {
         return errorResult(`chart_edit: ${err instanceof Error ? err.message : String(err)}`);
       }
+      // A look chosen for this chart becomes the conversation's look too.
+      if (next.style?.look !== undefined && next.style.look !== current.style?.look) {
+        conversationLooks.set(conversationKey(ctx, path.dirname(svgPath)), next.style.look);
+      }
       let imageNote = '';
       if (typeof p.from_image === 'string' && p.from_image.trim() !== '') {
         const img = await styleFromImage(deps.bridge, resolveAgainst(root, p.from_image));
@@ -810,21 +1025,28 @@ export function registerChartTool(pi: ExtensionAPI, deps: ChartToolDeps): void {
   });
 }
 
-/** "Cost: 8, 12" → [{ name, values }]; "A: 1; B: 2" → two. */
-function namedSeries(text: string): { name: string; values: number[] }[] {
-  return text
-    .split(/\s*;\s*|\n+/)
+/**
+ * "Cost: 8, 12" → [{ name, values }]; "A: 1; B: 2" → two. The numbers are read
+ * the way `chart` reads them (22M, $1.2M, 3,100 counted against `expected`
+ * labels); a token that is not a number throws a ChartDataError naming it.
+ */
+function namedSeries(text: string, expected?: number): { name: string; values: number[] }[] {
+  const groups = /:/.test(text) ? text.split(/\s*;\s*|\n+/) : [text];
+  return groups
     .map((s) => s.trim())
     .filter((s) => s !== '')
     .map((s) => {
       const m = /^([^:]+?)\s*:\s*(.+)$/.exec(s);
       const name = m !== null ? (m[1] ?? '').trim() : '';
       const body = m !== null ? (m[2] ?? '') : s;
-      const values = body
-        .split(/[,\s]+/)
-        .map((v) => Number(v.replace(/[$%€£]/g, '').replace(/[kK]$/, '000')))
-        .filter((n) => Number.isFinite(n));
-      return { name, values };
+      try {
+        return { name, values: parseNumberList(body, expected).values };
+      } catch (err) {
+        if (err instanceof ChartDataError && name !== '') {
+          throw new ChartDataError(`series "${name}": ${err.message}`);
+        }
+        throw err;
+      }
     })
     .filter((g) => g.values.length > 0);
 }
@@ -861,7 +1083,7 @@ export function applyEdits(current: ChartSpec, p: Record<string, unknown>): Char
           .map((s) => s.trim())
           .filter((s) => s !== '');
     if (newValues !== undefined) {
-      const groups = namedSeries(newValues);
+      const groups = namedSeries(newValues, labelArr.length);
       if (groups.length === 0) throw new Error('--values had no numbers in it');
       series = groups.map((g, gi) => ({
         name: g.name || series[gi]?.name || '',
@@ -877,7 +1099,7 @@ export function applyEdits(current: ChartSpec, p: Record<string, unknown>): Char
   // Add series.
   const add = str(p.add);
   if (add !== undefined) {
-    const groups = namedSeries(add);
+    const groups = namedSeries(add, labels().length);
     if (groups.length === 0) throw new Error('--add needs a series like "Cost: 8, 12, 10, 14"');
     const ls = labels();
     // A lone unnamed series gets a name the moment it has company, or the
@@ -902,8 +1124,10 @@ export function applyEdits(current: ChartSpec, p: Record<string, unknown>): Char
   const set = str(p.set);
   if (set !== undefined) {
     for (const [key, valueText] of pairs(set)) {
-      const value = Number(valueText.replace(/[$%€£,\s]/g, ''));
-      if (!Number.isFinite(value)) throw new Error(`--set "${key}: ${valueText}" is not a number`);
+      const value = parseNumber(valueText)?.value;
+      if (value === undefined) {
+        throw new Error(`--set "${key}: ${valueText}": ${ACCEPTED_NUMBER_FORMS}`);
+      }
       const slash = key.indexOf('/');
       const seriesName = slash > 0 ? key.slice(0, slash).trim() : undefined;
       const label = slash > 0 ? key.slice(slash + 1).trim() : key;
@@ -986,7 +1210,7 @@ export function applyEdits(current: ChartSpec, p: Record<string, unknown>): Char
   }
 
   const words: Record<string, unknown> = {};
-  for (const key of ['title', 'subtitle', 'unit', 'x_label', 'y_label', 'note'] as const) {
+  for (const key of ['title', 'subtitle', 'unit', 'x_label', 'y_label', 'note', 'size'] as const) {
     const v = str(p[key]);
     if (v !== undefined) words[key] = v;
   }
@@ -1045,6 +1269,7 @@ export function summarizeChange(a: ChartSpec, b: ChartSpec): string[] {
     out.push(`the highlight${b.highlight !== undefined ? ` (${b.highlight})` : ' (none)'}`);
   }
   if (a.xLabel !== b.xLabel || a.yLabel !== b.yLabel) out.push('the axis titles');
+  if (a.size !== b.size) out.push(`the size (${b.size ?? 'card'})`);
   const nameOf = (s: { name: string }): string => s.name || 'a series';
   if (b.series.length > a.series.length) {
     out.push(`added ${b.series.slice(a.series.length).map(nameOf).join(', ')}`);
