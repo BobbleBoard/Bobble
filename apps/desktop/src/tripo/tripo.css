@@ -2053,22 +2053,39 @@
   transform: rotate(180deg);
 }
 .tp-history-list {
+  --tp-history-line: color-mix(in srgb, var(--pd-text-muted) 45%, transparent);
   position: relative;
   margin: 0;
   padding: 6px 0 4px;
   list-style: none;
 }
-/* The dashed line the dots sit on. */
-.tp-history-list::before {
+.tp-history-item {
+  position: relative;
+}
+/*
+ * The dashed line the dots sit on, one stretch per stage: from under its dot to above
+ * the next. It was one dashed border behind every dot, cut wherever a dot fell — a dash
+ * and a stub in one gap, a lone dash in the next (the user 2026-09-24: "not well done dotted
+ * lines"). Each stretch now holds whole dashes with the same 3px of air above and below
+ * every dot: the stretch starts half a gap early and ends half a gap late, and `round`
+ * fits the dash tile to it. The rows are one height (the label never wraps), so the next
+ * dot's centre is one row down.
+ */
+.tp-history-item:not(:last-child)::after {
   content: "";
   position: absolute;
   left: 8px;
-  top: 14px;
-  bottom: 14px;
-  border-left: 2px dashed color-mix(in srgb, var(--pd-text-muted) 45%, transparent);
-}
-.tp-history-item {
-  position: relative;
+  top: calc(50% + 10.5px);
+  bottom: calc(-50% + 10.5px);
+  width: 2px;
+  background: linear-gradient(
+      to bottom,
+      transparent 1.5px,
+      var(--tp-history-line) 1.5px,
+      var(--tp-history-line) 5px,
+      transparent 5px
+    )
+    0 0 / 2px 6.5px round;
 }
 .tp-history-node {
   display: flex;
@@ -2096,7 +2113,6 @@
   height: 18px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--pd-text-muted) 55%, var(--pd-bg-raised));
-  box-shadow: 0 0 0 2px var(--pd-bg-overlay);
   transition:
     background var(--pd-duration-fast) var(--pd-easing-standard),
     transform var(--pd-duration-fast) var(--pd-easing-standard);
@@ -2123,7 +2139,11 @@
   background: #fff;
 }
 .tp-history-label {
+  min-width: 0;
+  overflow: hidden;
   line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* material strip — at the foot now that the action bar under it is gone */
