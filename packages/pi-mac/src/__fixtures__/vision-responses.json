@@ -1,0 +1,397 @@
+{
+  "_about": "Real pi-mac --vision-serve responses captured from the Swift helper on packages/pi-mac/fixtures/vision (paths rewritten to /fixtures and /out; the OCR language list trimmed). Pins the wire shapes the TS parsers accept.",
+  "info": {
+    "id": 1,
+    "ok": true,
+    "result": {
+      "cache": {
+        "capacity": 2,
+        "entries": 0
+      },
+      "lift": true,
+      "maxPixels": 100000000,
+      "ocr": true,
+      "ocrLanguages": ["en-US", "fr-FR", "it-IT"],
+      "os": "27.2.0",
+      "version": 1
+    }
+  },
+  "warm": {
+    "id": 2,
+    "ok": true,
+    "result": {
+      "liftMs": 130,
+      "ms": 195,
+      "ocrMs": 61,
+      "text": "Warm up"
+    }
+  },
+  "liftCat": {
+    "id": 3,
+    "ok": true,
+    "result": {
+      "analysisMs": 26,
+      "cached": false,
+      "count": 1,
+      "foreground": {
+        "area": 0.141364,
+        "bbox": {
+          "height": 380,
+          "width": 338,
+          "x": 382,
+          "y": 166
+        },
+        "center": {
+          "x": 528.17,
+          "y": 375.69
+        },
+        "cutoutBox": {
+          "height": 386,
+          "width": 348,
+          "x": 376,
+          "y": 163
+        },
+        "cutoutPath": "/out/cat-17447790-cutout-fg-crop.png",
+        "maskPath": "/out/cat-17447790-mask-fg.png",
+        "pixels": 86854
+      },
+      "height": 640,
+      "image": "/fixtures/cat.jpg",
+      "instances": [
+        {
+          "area": 0.141364,
+          "bbox": {
+            "height": 380,
+            "width": 338,
+            "x": 382,
+            "y": 166
+          },
+          "center": {
+            "x": 528.17,
+            "y": 375.69
+          },
+          "cutoutBox": {
+            "height": 386,
+            "width": 348,
+            "x": 376,
+            "y": 163
+          },
+          "cutoutPath": "/out/cat-17447790-cutout-1-crop.png",
+          "index": 1,
+          "maskPath": "/out/cat-17447790-mask-1.png",
+          "pixels": 86854
+        }
+      ],
+      "labelsPath": "/out/cat-17447790-labels.png",
+      "ms": 54,
+      "orientation": 1,
+      "width": 960
+    }
+  },
+  "liftApples": {
+    "id": 4,
+    "ok": true,
+    "result": {
+      "analysisMs": 23,
+      "cached": false,
+      "count": 3,
+      "foreground": {
+        "area": 0.187894,
+        "bbox": {
+          "height": 212,
+          "width": 870,
+          "x": 30,
+          "y": 255
+        },
+        "center": {
+          "x": 465.55,
+          "y": 360.98
+        },
+        "maskPath": "/out/apples-87193e64-mask-fg.png",
+        "pixels": 115442
+      },
+      "height": 640,
+      "image": "/fixtures/apples.jpg",
+      "instances": [
+        {
+          "area": 0.060835,
+          "bbox": {
+            "height": 211,
+            "width": 216,
+            "x": 684,
+            "y": 255
+          },
+          "center": {
+            "x": 790.79,
+            "y": 359.99
+          },
+          "index": 1,
+          "maskPath": "/out/apples-87193e64-mask-1.png",
+          "pixels": 37377
+        },
+        {
+          "area": 0.062157,
+          "bbox": {
+            "height": 211,
+            "width": 220,
+            "x": 371,
+            "y": 256
+          },
+          "center": {
+            "x": 480,
+            "y": 362.42
+          },
+          "index": 2,
+          "maskPath": "/out/apples-87193e64-mask-2.png",
+          "pixels": 38189
+        },
+        {
+          "area": 0.064902,
+          "bbox": {
+            "height": 205,
+            "width": 232,
+            "x": 30,
+            "y": 259
+          },
+          "center": {
+            "x": 146.85,
+            "y": 360.53
+          },
+          "index": 3,
+          "maskPath": "/out/apples-87193e64-mask-3.png",
+          "pixels": 39876
+        }
+      ],
+      "ms": 41,
+      "orientation": 1,
+      "width": 960
+    }
+  },
+  "liftBlank": {
+    "id": 5,
+    "ok": true,
+    "result": {
+      "analysisMs": 11,
+      "cached": false,
+      "count": 0,
+      "height": 240,
+      "image": "/fixtures/blank.png",
+      "instances": [],
+      "ms": 13,
+      "orientation": 1,
+      "width": 320
+    }
+  },
+  "instanceAtHit": {
+    "id": 6,
+    "ok": true,
+    "result": {
+      "analysisMs": 23,
+      "cached": true,
+      "count": 3,
+      "height": 640,
+      "hit": true,
+      "image": "/fixtures/apples.jpg",
+      "index": 3,
+      "instance": {
+        "area": 0.064902,
+        "bbox": {
+          "height": 205,
+          "width": 232,
+          "x": 30,
+          "y": 259
+        },
+        "center": {
+          "x": 146.85,
+          "y": 360.53
+        },
+        "index": 3,
+        "maskPath": "/out/apples-87193e64-mask-3.png",
+        "pixels": 39876
+      },
+      "ms": 0,
+      "orientation": 1,
+      "point": {
+        "x": 146,
+        "y": 363
+      },
+      "width": 960
+    }
+  },
+  "instanceAtMiss": {
+    "id": 7,
+    "ok": true,
+    "result": {
+      "analysisMs": 23,
+      "cached": true,
+      "count": 3,
+      "height": 640,
+      "hit": false,
+      "image": "/fixtures/apples.jpg",
+      "index": 0,
+      "ms": 0,
+      "orientation": 1,
+      "point": {
+        "x": 470,
+        "y": 100
+      },
+      "width": 960
+    }
+  },
+  "instanceAtSnapped": {
+    "id": 8,
+    "ok": true,
+    "result": {
+      "analysisMs": 23,
+      "cached": true,
+      "count": 3,
+      "distance": 11,
+      "height": 640,
+      "hit": true,
+      "image": "/fixtures/apples.jpg",
+      "index": 2,
+      "instance": {
+        "area": 0.062157,
+        "bbox": {
+          "height": 211,
+          "width": 220,
+          "x": 371,
+          "y": 256
+        },
+        "center": {
+          "x": 480,
+          "y": 362.42
+        },
+        "index": 2,
+        "pixels": 38189
+      },
+      "ms": 0,
+      "orientation": 1,
+      "point": {
+        "x": 360,
+        "y": 360
+      },
+      "width": 960
+    }
+  },
+  "ocrSign": {
+    "id": 9,
+    "ok": true,
+    "result": {
+      "cached": false,
+      "correction": false,
+      "height": 320,
+      "image": "/fixtures/sign-misspelt.png",
+      "level": "accurate",
+      "lines": [
+        {
+          "box": {
+            "height": 76,
+            "width": 928,
+            "x": 36,
+            "y": 126
+          },
+          "confidence": 1,
+          "quad": [
+            {
+              "x": 36,
+              "y": 126
+            },
+            {
+              "x": 964,
+              "y": 126
+            },
+            {
+              "x": 964,
+              "y": 202
+            },
+            {
+              "x": 36,
+              "y": 202
+            }
+          ],
+          "text": "FRESH BRAED DAILY",
+          "words": [
+            {
+              "box": {
+                "height": 76,
+                "width": 304,
+                "x": 36,
+                "y": 126
+              },
+              "text": "FRESH"
+            },
+            {
+              "box": {
+                "height": 76,
+                "width": 323,
+                "x": 349.5,
+                "y": 126
+              },
+              "text": "BRAED"
+            },
+            {
+              "box": {
+                "height": 76,
+                "width": 282,
+                "x": 682,
+                "y": 126
+              },
+              "text": "DAILY"
+            }
+          ]
+        }
+      ],
+      "ms": 39,
+      "orientation": 1,
+      "revision": 3,
+      "text": "FRESH BRAED DAILY",
+      "width": 1000
+    }
+  },
+  "ocrBlank": {
+    "id": 10,
+    "ok": true,
+    "result": {
+      "cached": false,
+      "correction": true,
+      "height": 240,
+      "image": "/fixtures/blank.png",
+      "level": "accurate",
+      "lines": [],
+      "ms": 11,
+      "orientation": 1,
+      "revision": 3,
+      "text": "",
+      "width": 320
+    }
+  },
+  "errorNotFound": {
+    "error": "image not found: /fixtures/nope.png",
+    "id": 11,
+    "ok": false
+  },
+  "errorOutside": {
+    "error": "point (5000.00, 1.00) is outside the 960×640 image",
+    "id": 12,
+    "ok": false
+  },
+  "errorWrite": {
+    "error": "unknown write option bogus (allowed: cutout, foregroundCutout, foregroundMask, labels, mask)",
+    "id": 13,
+    "ok": false
+  },
+  "errorMethod": {
+    "error": "unknown method: frobnicate",
+    "id": 14,
+    "ok": false
+  },
+  "forget": {
+    "id": 15,
+    "ok": true,
+    "result": {
+      "dropped": 2,
+      "entries": 0
+    }
+  }
+}

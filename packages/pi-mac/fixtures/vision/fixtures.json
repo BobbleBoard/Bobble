@@ -1,0 +1,93 @@
+{
+  "about": "Fixtures for pi-mac --vision (MAC-01). Photos are CC0 downloads, byte-identical to the Wikimedia Commons 960px thumbnails named in `download`; everything else is drawn by scripts/make-vision-fixtures.swift. Boxes are image pixels, top-left origin, {x, y, width, height}. Every expected box was measured WITHOUT Vision (see `measured`), so the tests compare Vision against an independent reference rather than against itself.",
+  "files": {
+    "cat.jpg": {
+      "sha256": "cca5084118c8806d053a9a10be395015d40178f4da66d9b30e21ac0769606790",
+      "source": "https://commons.wikimedia.org/wiki/File:Cat_and_mouse_(Unsplash).jpg",
+      "download": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e0/Cat_and_mouse_%28Unsplash%29.jpg/960px-Cat_and_mouse_%28Unsplash%29.jpg",
+      "license": "CC0 1.0 (photo by Sarah Dorweiler, published on Unsplash, via Wikimedia Commons)",
+      "width": 960,
+      "height": 640,
+      "instances": 1,
+      "subject": {
+        "name": "the cat",
+        "box": { "x": 386, "y": 171, "width": 289, "height": 373 },
+        "measured": "pixels darker than mean(RGB) 150 above the chair legs (y < 555), trimmed to the 0.2nd-99.8th percentiles; excludes the white toy mouse Vision lifts with the cat",
+        "minIoU": 0.8,
+        "inside": [[600, 240], [480, 430]],
+        "outside": [[100, 100], [880, 560], [480, 600]]
+      }
+    },
+    "apples.jpg": {
+      "sha256": "7f75e01e961a3ecc50f5a939263c75e61e6fcc366554da601b98cdee2e108654",
+      "source": "https://commons.wikimedia.org/wiki/File:Row_of_Apples_(Unsplash).jpg",
+      "download": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a6/Row_of_Apples_%28Unsplash%29.jpg/960px-Row_of_Apples_%28Unsplash%29.jpg",
+      "license": "CC0 1.0 (Unsplash photo via Wikimedia Commons)",
+      "width": 960,
+      "height": 640,
+      "instances": 3,
+      "measured": "green chroma (G > 30 and G - max(R, B) > 8), one box per column cluster, 0.1st-99.9th percentiles; the darkest shadowed rim of the right apple falls under the threshold, so its box is ~20 px short on the right",
+      "apples": [
+        {
+          "name": "left",
+          "box": { "x": 31, "y": 258, "width": 230, "height": 211 },
+          "tap": [146, 363]
+        },
+        {
+          "name": "middle",
+          "box": { "x": 371, "y": 258, "width": 215, "height": 204 },
+          "tap": [478, 360]
+        },
+        {
+          "name": "right",
+          "box": { "x": 686, "y": 256, "width": 193, "height": 212 },
+          "tap": [782, 362]
+        }
+      ],
+      "minIoU": 0.8,
+      "background": [[470, 100], [480, 580]],
+      "nearMiss": {
+        "point": [360, 360],
+        "radius": 20,
+        "apple": "middle",
+        "note": "on the dark wall ~11 px left of the middle apple's rim: background as tapped, the middle apple with the radius"
+      }
+    },
+    "cat-rotated.jpg": {
+      "sha256": "3640a97ece88c4445500245a9c587ed815b240ef49978bcfcedd9a2abb2e8173",
+      "derivedFrom": "cat.jpg",
+      "orientation": 6,
+      "stored": { "width": 640, "height": 960 },
+      "displayed": { "width": 960, "height": 640 },
+      "note": "cat.jpg's pixels stored a quarter turn counter-clockwise with EXIF orientation 6 (rotate 90° clockwise to display): it displays exactly like cat.jpg, so results must match cat.jpg's display coordinates"
+    },
+    "poster.png": {
+      "sha256": "c50391ba984b5ebded6dcb77b293bf1955ca2f7de84e85c8fe3c0d2401ea4149",
+      "width": 900,
+      "height": 1200,
+      "lines": [
+        "MIDNIGHT",
+        "MARKET",
+        "LIVE MUSIC",
+        "Street food, vinyl and lanterns",
+        "Friday 12 June 2026 at 7 PM",
+        "Harbour Warehouse, Pier 9",
+        "Free entry. Bring a friend."
+      ]
+    },
+    "sign-misspelt.png": {
+      "sha256": "a26cc58d067c7a049f8684b567c13013ce79e9baa62e107aef1446cd6b5898d3",
+      "width": 1000,
+      "height": 320,
+      "text": "FRESH BRAED DAILY",
+      "note": "the misspelling an OCR check must report; read with correction off"
+    },
+    "blank.png": {
+      "sha256": "edbbc1fb1f52aa2de070420f49b492812d3502064de2a766c788677980c12086",
+      "width": 320,
+      "height": 240,
+      "instances": 0,
+      "lines": []
+    }
+  }
+}

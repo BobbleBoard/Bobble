@@ -1,6 +1,27 @@
 import AppKit
 import Foundation
 
+// VISION FIRST, BEFORE APPKIT EXISTS.
+//
+// `--vision*` reads image files; it needs no app identity and no permission.
+// Initialising NSApplication (the line below) is not free even with
+// `.prohibited`: MEASURED in the unified log, it checks the process in with
+// LaunchServices as a FOREGROUND app first and only then applies the policy.
+// Dispatching the vision modes before that line means they are never
+// registered as an app at all (absent from `lsappinfo list`), so a dock tile is
+// impossible by construction rather than suppressed. The only TCC traffic left
+// is the Input Monitoring check the window server makes when Vision's model
+// runtime connects to it — MEASURED `preflight=true`, which cannot prompt.
+switch CommandLine.arguments.dropFirst().first {
+case "--vision-serve":
+  runVisionServe()
+  exit(0)
+case "--vision":
+  runVisionCommand(Array(CommandLine.arguments.dropFirst(2)))
+default:
+  break
+}
+
 // Run as a background agent: no dock tile, no menu bar, never in the app
 // switcher. pi-mac links AppKit (NSWorkspace/CGEvent/screenshot), and an
 // AppKit-linked executable otherwise defaults to a REGULAR activation policy —
@@ -36,6 +57,15 @@ NSApplication.shared.setActivationPolicy(.prohibited)
 //                                          NSApplication (a live runloop), which
 //                                          is why it is a second process rather
 //                                          than a `--serve` method.
+//   pi-mac --vision-serve               → Apple Vision on image FILES for the
+//                                          image editor (lift / instanceAt /
+//                                          ocr), NDJSON like --serve. Its own
+//                                          process so a Vision request never
+//                                          queues in front of a click; needs
+//                                          no permission (see Vision.swift).
+//                                          Dispatched above, before AppKit.
+//   pi-mac --vision <method> [json|path]
+//                                       → one Vision request, one line, exit.
 //
 // Deliberately no arg-parsing dependency: positional subcommands only.
 let arguments = Array(CommandLine.arguments.dropFirst())
@@ -62,6 +92,7 @@ case "--overlay":
 default:
   writeStderr(
     "usage: pi-mac [--check | --snapshot [--frontmost|--pid N|--app NAME] [--screenshot]"
-      + " | --act <json> | --serve | --apps [dir …] | --app-icon <app> <px> <out> | --overlay]\n")
+      + " | --act <json> | --serve | --apps [dir …] | --app-icon <app> <px> <out> | --overlay"
+      + " | --vision-serve | --vision <method> [json|path]]\n")
   exit(2)
 }
