@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_FEATURE_SETTINGS } from '../../electron/settings/features';
 import { DEFAULT_ADVANCED, type DesktopSettings } from '../../electron/settings/settings-contract';
 import {
   EFFORT_STEPS,
@@ -22,7 +23,7 @@ const base: DesktopSettings = {
   effortMode: 'auto',
   search: { brave: '', tavily: '' },
   mcpMode: 'lite',
-  capabilities: { image: false, video: false, audio: false, threeD: false },
+  capabilities: { image: false, video: false, audio: false, threeD: false, training: false },
   customInstructions: '',
   iconStroke: 1.25,
   sidebarScale: 1.0,
@@ -52,6 +53,7 @@ const base: DesktopSettings = {
   portableKnobs: {},
   modelsRoot: null,
   modelSpec: {},
+  ...DEFAULT_FEATURE_SETTINGS,
 };
 
 describe('sliderToLevel / levelToSlider', () => {

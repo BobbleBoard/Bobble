@@ -35,6 +35,7 @@ export {
   summarizeActivity,
 } from './components/activity-chain.tsx';
 export type {
+  AddMenuEntry,
   ComposerAddMenuProps,
   GenActionDescriptor,
   GenActionHandlers,

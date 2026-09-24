@@ -12,113 +12,28 @@
  * because the composer's model chip and the sidebar both address it; App routes
  * that id to the standalone view instead of opening this panel.
  */
-import {
-  Glyph,
-  IconClose,
-  IconPencil,
-  IconSearch,
-  IconSparkles,
-  IconTerminal,
-  ScrollArea,
-} from '@pi-desktop/ui';
-import { type ReactNode, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { IconClose, ScrollArea } from '@pi-desktop/ui';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { cx } from '../onboarding/cx';
-import { IconShield, IconSlider, IconSun } from './icons';
-import { AgentPanel } from './panels/AgentPanel';
-import { AppearancePanel } from './panels/AppearancePanel';
-import { CapabilitiesPanel } from './panels/CapabilitiesPanel';
-import { ComputerUsePanel } from './panels/ComputerUsePanel';
-import { ConnectorsPanel } from './panels/ConnectorsPanel';
-import { ExperimentalPanel } from './panels/ExperimentalPanel';
-import { HarnessPanel } from './panels/HarnessPanel';
-import { InterfacePanel } from './panels/InterfacePanel';
-import { PersonalizationPanel } from './panels/PersonalizationPanel';
-import { SearchPanel } from './panels/SearchPanel';
+import {
+  isCurrentNav,
+  SETTINGS_NAV,
+  type SettingsSection,
+  type SettingsSectionContext,
+  settingsSection,
+} from './sections';
 
-export type SettingsSection =
-  | 'models'
-  | 'engines'
-  | 'harness'
-  | 'personalization'
-  | 'appearance'
-  | 'interface'
-  | 'agent'
-  | 'search'
-  | 'connectors'
-  | 'capabilities'
-  | 'computer-use'
-  | 'experimental';
+/*
+ * THE SECTIONS ARE A REGISTRY NOW (the W0-A pre-wire, deliverables/research/
+ * PLAN.md §2.3): the nav row, the title and the body of each live in one file
+ * under ./sections, in the order ./sections/index.tsx lists them. A new section
+ * is a new file there, never an edit here. The union keeps its name and home
+ * for every caller that addresses a section by id.
+ */
+export type { SettingsSection } from './sections';
 
-/** Sections this panel renders. `models` is deliberately absent — it is a view. */
-const NAV: Array<{ id: SettingsSection; label: string; icon: ReactNode }> = [
-  { id: 'personalization', label: 'Custom instructions', icon: <IconPencil /> },
-  { id: 'harness', label: 'Harness', icon: <IconTerminal /> },
-  { id: 'appearance', label: 'Appearance', icon: <IconSun /> },
-  { id: 'interface', label: 'Interface', icon: <IconSlider /> },
-  { id: 'agent', label: 'Agent', icon: <IconShield /> },
-  // A window with its traffic lights and the agent's cursor (the user 2026-09-23).
-  { id: 'computer-use', label: 'Computer use', icon: <Glyph name="computerUse" /> },
-  { id: 'search', label: 'Web search', icon: <IconSearch /> },
-  // "Extensions" on screen (the user, 2026-09-20); the section id stays.
-  { id: 'connectors', label: 'Extensions', icon: <Glyph name="extensions" /> },
-  { id: 'capabilities', label: 'Capabilities', icon: <IconSparkles /> },
-  // The memory guard and the alternative inference engines — both experimental,
-  // and marked the way everything experimental is: the flask.
-  { id: 'experimental', label: 'Experimental', icon: <Glyph name="experimental" /> },
-];
-
-const TITLES: Record<SettingsSection, string> = {
-  models: 'Models',
-  engines: 'Engines',
-  harness: 'Harness',
-  personalization: 'Custom instructions',
-  appearance: 'Appearance',
-  interface: 'Interface',
-  agent: 'Agent',
-  search: 'Web search',
-  connectors: 'Extensions',
-  capabilities: 'Capabilities',
-  'computer-use': 'Computer use',
-  experimental: 'Experimental',
-};
-
-function SectionBody({
-  section,
-  onOpenGallery,
-  onOpenConnectors,
-  onRedoOnboarding,
-}: {
-  section: SettingsSection;
-  onOpenGallery?: () => void;
-  onOpenConnectors?: () => void;
-  onRedoOnboarding?: () => void;
-}) {
-  switch (section) {
-    // `engines` stays addressable (the composer's engine chip opens it) and
-    // lands on the Experimental page, where the engines now live.
-    case 'models':
-    case 'engines':
-    case 'experimental':
-      return <ExperimentalPanel />;
-    case 'harness':
-      return <HarnessPanel />;
-    case 'personalization':
-      return <PersonalizationPanel />;
-    case 'appearance':
-      return <AppearancePanel />;
-    case 'interface':
-      return <InterfacePanel onOpenGallery={onOpenGallery} onRedoOnboarding={onRedoOnboarding} />;
-    case 'agent':
-      return <AgentPanel />;
-    case 'search':
-      return <SearchPanel />;
-    case 'connectors':
-      return <ConnectorsPanel onOpenConnectors={onOpenConnectors} />;
-    case 'capabilities':
-      return <CapabilitiesPanel />;
-    case 'computer-use':
-      return <ComputerUsePanel />;
-  }
+function SectionBody({ section, ...ctx }: { section: SettingsSection } & SettingsSectionContext) {
+  return settingsSection(section).render(ctx);
 }
 
 export function SettingsView({
@@ -172,7 +87,9 @@ export function SettingsView({
 
   const nav = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return q.length === 0 ? NAV : NAV.filter((i) => i.label.toLowerCase().includes(q));
+    return q.length === 0
+      ? SETTINGS_NAV
+      : SETTINGS_NAV.filter((i) => i.label.toLowerCase().includes(q));
   }, [query]);
 
   return (
@@ -229,15 +146,11 @@ export function SettingsView({
               key={item.id}
               type="button"
               data-testid={`settings-nav-${item.id}`}
-              aria-current={
-                item.id === section || (item.id === 'experimental' && section === 'engines')
-                  ? 'page'
-                  : undefined
-              }
+              aria-current={isCurrentNav(item.id, section) ? 'page' : undefined}
               onClick={() => onSection(item.id)}
               className={cx(
                 'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-body',
-                item.id === section || (item.id === 'experimental' && section === 'engines')
+                isCurrentNav(item.id, section)
                   ? 'bg-bg-active text-text-primary'
                   : 'text-text-secondary hover:bg-bg-hover',
               )}
@@ -265,7 +178,7 @@ export function SettingsView({
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="flex shrink-0 items-start justify-between gap-4 px-7 pt-6 pb-2">
             <h2 id={titleId} className="text-title text-text-primary">
-              {TITLES[section]}
+              {settingsSection(section).title}
             </h2>
             <button
               type="button"

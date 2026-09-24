@@ -50,6 +50,11 @@ export interface StorageOverview {
   readonly library: StorageNode;
   /** Engines, venvs, tool binaries, scratch — beside the library, not in it. */
   readonly support: readonly StorageNode[];
+  /**
+   * Rows a feature registered for its own data (storage-rows.ts) — what memory
+   * learned, training runs, the studios' documents. Empty until one does.
+   */
+  readonly features: readonly StorageNode[];
   /** What the last boot-time migration did, for the page to say. */
   readonly migration: {
     readonly ranAt: string | null;

@@ -34,6 +34,9 @@ const WANT = {
   minimax: 'siMinimax',
   kimi: 'siKimi',
   moonshotai: 'siMoonshotai',
+  // Devices (track 5): the tailnet the Devices panel is built on. Its own
+  // mark, never a drawing of one (devices-tailscale.md §3; the W0-A glyph batch).
+  tailscale: 'siTailscale',
 };
 
 const rows = [];

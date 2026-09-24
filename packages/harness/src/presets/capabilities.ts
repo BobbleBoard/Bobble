@@ -36,25 +36,26 @@
  * every definition (execute included) as it is registered, and `use` dispatches
  * through that. Then activation is pure text and costs nothing.
  */
-import { BROWSER_TOOL_NAMES } from '@pi-desktop/browser-use/tool-names';
-import {
-  CHROME_TOOL_NAMES,
-  MAC_COMPUTER_USE_TOOL_NAMES,
-} from '@pi-desktop/mac-computer-use/tool-names';
-import { MAC_CONNECTOR_TOOLS } from '@pi-desktop/mac-connectors/tool-names';
+import { threeD } from './capabilities/3d.js';
+import { browser } from './capabilities/browser.js';
+import { chart } from './capabilities/chart.js';
+import { chrome } from './capabilities/chrome.js';
+import { computerUse } from './capabilities/computer-use.js';
+import { connectors } from './capabilities/connectors.js';
+import { diagram } from './capabilities/diagram.js';
+import { generation } from './capabilities/generation.js';
+import { memory } from './capabilities/memory.js';
+import { office } from './capabilities/office.js';
+import { personal } from './capabilities/personal.js';
+import { svg } from './capabilities/svg.js';
+import type { Capability } from './capabilities/types.js';
+import { webResearch } from './capabilities/web-research.js';
+import { workflows } from './capabilities/workflows.js';
+
+export type { Capability } from './capabilities/types.js';
 
 /** The tool that activates a capability — named here so prompt + runtime agree. */
 export const CAPABILITY_TOOL_NAME = 'capability';
-
-export interface Capability {
-  /** What the model asks for. Lowercase, hyphenated, guessable. */
-  readonly name: string;
-  /** One line: what it is FOR. Shown when the model lists capabilities. */
-  readonly summary: string;
-  /** When to reach for this one rather than a neighbour. */
-  readonly guidance: string;
-  readonly tools: readonly string[];
-}
 
 /**
  * The capabilities on offer.
@@ -62,280 +63,32 @@ export interface Capability {
  * Grouped the way a person would ask for them, not the way the code is organised
  * — "calendar, mail and reminders" is one thing to a user even though it is five
  * connectors, and the user asked for exactly that bundling.
+ *
+ * ONE FILE PER CAPABILITY, this list the only place their order lives (the W0-A
+ * pre-wire, deliverables/research/PLAN.md §2.3). The order IS prompt bytes — the
+ * CLI preamble, the capability menu and the tool description list them in it —
+ * so the split changed nothing the model reads: the snapshot test in
+ * ../prompt/canonical-prompt.snapshot.test.ts holds the prompt and the tool
+ * surface byte-identical to the code before it. `diagram`, `memory` and
+ * `workflows` are placeholders, `undefined` until their lanes fill them, and a
+ * placeholder is left out rather than listed empty.
  */
 export const CAPABILITIES: readonly Capability[] = [
-  {
-    name: 'browser',
-    /*
-     * THE WEB GOES HERE, BY DEFAULT. the user (2026-09-13): the model was reaching
-     * for computer use on the user's Chrome for ordinary web tasks. In bash-CLI
-     * mode this line is all it reads about the group, so the default lives in
-     * the summary: any page, any site, this browser — the user's own Chrome
-     * only when they name it.
-     */
-    summary:
-      "Drive the app's own built-in browser: navigate, click, type, read a page. THE way onto " +
-      "the web for any site or page — not the user's own Chrome, unless they name it.",
-    guidance:
-      'Your PRIMARY web control. browser_navigate and browser_snapshot are always in your ' +
-      'list; this adds the rest — click, type, scroll, read, wait, back, forward, key. Never ' +
-      're-navigate to a page you are already on just to look at it: snapshot it. If a tab is ' +
-      'already open, act on THAT tab rather than opening another.',
-    tools: [...BROWSER_TOOL_NAMES],
-  },
-  {
-    name: 'computer-use',
-    /*
-     * NAME THE REQUEST, not just the ability. the user asked for the Mac tools to be
-     * "described as computer use so it knows when the user asks for 'use this
-     * app' it can do that" — and in bash-CLI mode this one line is ALL the model
-     * gets about the group, because the capability section that spells it out is
-     * stripped there. So the phrasings a person actually uses have to be in the
-     * summary itself.
-     */
-    summary:
-      "Computer use: see and control any app on the user's Mac — its windows, menu bar, and its " +
-      'own dialogs, sheets and file pickers. "Use <app>", "open <app> and…", "do it in <app>", ' +
-      '"click that", "type it in there". Not for the web: a web page is the built-in browser\'s ' +
-      'job unless the user names their own browser.',
-    guidance:
-      "For work inside the user's OWN applications — Notes, Finder, Photoshop, a game — and " +
-      'for their own browsers (Safari, Chrome, Arc) when they ask for those specifically. A web ' +
-      "page in any of them comes back as TEXT from the ordinary snapshot — the page's own " +
-      'headings, prices and labels, each with the point to click it — so read a page that way ' +
-      'first rather than reaching for a screenshot. (The chrome_* tools read the real DOM, but ' +
-      'they need a Chrome setting that is off by default and that only the user can turn on, so ' +
-      'they usually fail; the snapshot needs nothing.) The window AROUND the page — which tabs ' +
-      'are open, switching between them, opening and closing one — is mac_tabs / mac_tab, and no ' +
-      'page can tell you any of it. An app that ' +
-      'exposes nothing to Accessibility returns a screenshot automatically; act by x,y then. A ' +
-      'save sheet or file picker is part of the app that opened it — same snapshot, same clicks. ' +
-      'A third of what an app can do is in its menu bar, which is in no window: mac_click takes ' +
-      'menu:"File > New". It runs in the background — the app never comes to the front. Document ' +
-      'commands (Save, Bold, Close) are the exception: macOS runs those only for the frontmost ' +
-      'app, so pass activate:true to borrow the focus for one command. Open an app with the ' +
-      'launch here, NEVER with `open -a` in a shell — that yanks it in front of whatever the ' +
-      'user is doing.',
-    tools: [...MAC_COMPUTER_USE_TOOL_NAMES],
-  },
-  {
-    /*
-     * the user: "instead of integrating into mac, add a chrome connector and have
-     * chrome be its own set." A browser is not just another app you click at.
-     * It has tabs, an address bar, a page, and the user's own logged-in
-     * session — and folding that into the generic Mac tools made a model asked
-     * to work "in Chrome" reach for `mac` and find nothing about any of it.
-     */
-    name: 'chrome',
-    summary:
-      "The user's OWN Google Chrome — its open tabs, the page in front, and their logged-in " +
-      'session. ONLY when they say so: "in Chrome", "in my browser", "the tab I have open". A web ' +
-      "task they did not tie to Chrome is the built-in browser's.",
-    guidance:
-      'For work in the browser the USER already has open, with their logins and their tabs — ' +
-      "not the app's built-in browser (that is `browser`). chrome_tabs lists what is open and " +
-      'chrome_tab switches between them; SWITCHING is invisible to the user, but OPENING or ' +
-      'CLOSING a tab brings Chrome to the front and cannot be undone, so prefer switching. ' +
-      "Read a page with a snapshot: it carries the page's own text with the point to click on " +
-      'each line, so a page can be read and driven without a screenshot and without any Chrome ' +
-      'setting. Everything else about the window — profiles, settings, the toolbar — is ' +
-      'ordinary computer use on the Chrome app.',
-    tools: [...CHROME_TOOL_NAMES],
-  },
-  {
-    name: 'personal',
-    summary: "The user's Calendar, Mail, Reminders, Contacts and Messages.",
-    guidance:
-      'Call these DIRECTLY for "what\'s on my calendar", "remind me to…", "email…", "text…", ' +
-      "or anything needing today's date. Never read a file to work out the date, and never " +
-      'drive the Calendar or Mail UI with computer use when a connector answers.',
-    tools: [...MAC_CONNECTOR_TOOLS],
-  },
-  {
-    name: 'web-research',
-    summary: 'Search the web and fetch a page as readable text.',
-    guidance:
-      'Search to FIND things, fetch to read one quickly. When you need to interact with a page ' +
-      'rather than just read it, activate the browser capability instead.',
-    tools: ['web_search', 'web_fetch'],
-  },
-  {
-    name: 'generation',
-    /* MEASURED: with this line present AND the standing "imaging libraries …
-       are not how this works" below it, a 2B asked for a picture still probed
-       the shell, found Pillow, and wrote a script that draws the subject out of
-       rectangles. So the line names the mistake directly — and handmade-media.ts
-       catches it at the write, because a line among nine abilities does not
-       outweigh what a model already knows how to do. */
-    summary:
-      'Create images, video, speech, music and sound effects on-device. Every request for a ' +
-      'picture, a clip or a sound goes here — never draw or synthesise one in code.',
-    guidance:
-      'Use when the deliverable IS the media, rather than a description of it. NEVER write a ' +
-      'script that draws a picture or synthesises a sound (Pillow, cairo, wave, ffmpeg): a ' +
-      'drawing library makes the shapes you described, this makes the thing itself. Code is ' +
-      'right for a CHART or a diagram, which is a rendering of data and not a picture of ' +
-      'something. For a picture that has to be GOOD rather than merely produced, commission ' +
-      'the image specialist with spawn_subagent instead — it works in passes and keeps the best.',
-    /*
-     * ONLY WHAT IS REGISTERED. This listed nine names; four existed. `image_generate`,
-     * `image_edit`, `video_generate`, `video_edit`, `extract_frames`, `probe` and
-     * `motion_graphics_render` were aspirational — activating this capability handed
-     * the model seven tools it could not call, and (per the coercion this codebase has
-     * measured twice) a bid for one of them lands on whichever advertised name is
-     * nearest. the user: "you can remove things from being explicitly in the ui gallery
-     * card." So: the four that a real extension registers, and nothing else.
-     */
-    /*
-     * AUDIO ADDED. The three audio tools were registered by the gen-tools
-     * extension and reachable through `use`, but this capability's summary said
-     * "images, video, motion graphics and 3D models" and its list named none of
-     * them — so a model asked to read a sentence aloud answered, correctly from
-     * what it could see, "I don't have a speech or text-to-speech tool
-     * available." MEASURED: exactly that reply, on a real turn.
-     *
-     * Same rule as the note above — only names a real extension registers.
-     */
-    tools: [
-      'generate_image',
-      'edit_image',
-      'generate_video',
-      'generate_speech',
-      'generate_music',
-      'generate_sfx',
-    ],
-  },
-  {
-    name: 'svg',
-    /* MEASURED: with "Make an SVG — a vector drawing …" a 2B model asked for an
-       SVG heart typed <svg><circle …/></svg> into `write` — it knows the markup,
-       so "make an SVG" read as "write the file". The line has to say that
-       hand-writing the markup is the thing NOT to do, or the command is never
-       reached for. */
-    /* …and the user, after the first run: "if asked to make a website of some sort
-       utilize the svgs firsthand instead of writing its own or if asked for
-       simple illustrations even without 'svg' mentioned". So the line names
-       the cases where the word never comes up — a site's graphics, "a simple
-       illustration" — and says where a site's file goes. */
-    summary:
-      'Draw any icon, logo, symbol or simple flat illustration as an SVG file — a ' +
-      'website\'s graphics too, and whether or not "SVG" was said. One call per graphic; ' +
-      '--out puts it in the project (assets/logo.svg). Never write SVG markup yourself.',
-    guidance:
-      'Every graphic goes through this: icons, logos, symbols, pictograms, simple flat ' +
-      'illustrations, and the logo and icons of a site or app you are building — whether ' +
-      'or not anyone said "SVG". Draw first, then reference the file (<img src>); never ' +
-      'write SVG markup by hand. One call per graphic; describe subject, shape and colour ' +
-      'plainly, or hand it a reference image to trace. Photos and realistic pictures are ' +
-      'not vectors — those are generation.',
-    /* One tool, and in CLI mode it IS the command: `svg <prompt> --image <path>`
-       (tool-cli.ts maps generate_svg to an empty path under this group). */
-    tools: ['generate_svg'],
-  },
-  {
-    name: 'chart',
-    /* the user (2026-09-16), Claude's inline chart beside Bobble's pipeline
-       picture: "we need parity on these datavisuals, it's a common use case
-       and very formulaic and doable … not just bar charts, all datavisuals".
-       The line names every way the ask arrives — chart, plot, graph,
-       visualise, "show me … over the years" — and the habits it replaces,
-       because MEASURED on a 4B the same four numbers went to image generation
-       once and to the office pipeline once before either was told otherwise. */
-    summary:
-      'Draw an interactive chart of numbers in the chat — bar, stacked, horizontal bar, line, ' +
-      'area, scatter, donut, pie, radar — from the labels and values, in a second, in a look you choose; ' +
-      'and change a chart that exists (colour, bar thickness, a second series, a new style, ' +
-      'colours from a picture). Every request to chart, plot, graph or visualise data, and every ' +
-      'change to a chart, goes here; never image generation, matplotlib or hand-written SVG.',
-    guidance:
-      'chart takes the type, the title, the labels and the values (several series as "Name: 1, 2; ' +
-      'Other: 3, 4"; a unit, a highlight, a source note) and puts the chart in the chat as a card ' +
-      'the user can hover, flip to a table, or open larger in the canvas. Put the real numbers in ' +
-      '— it draws exactly what it is given. Give it a LOOK that fits the subject and vary between ' +
-      'charts: clean (everyday), soft (pastel pills), bold (loud, values on), mono (one hue, ' +
-      'rankings), editorial (serif, muted — reports), ocean, forest, sunset, candy (playful), ' +
-      'slate (its own dark ground — dashboards), ' +
-      'paper (cream, book-like); or set --palette/--accent/--radius/--bars/--grid/--line/--font, ' +
-      'or --from_image a picture for its colours. chart_edit changes a chart that exists — ' +
-      '--add "Cost: 8, 12, 10, 14" for a second bar per category, --set "2023: 17", --remove, ' +
-      '--sort desc, --bars thin, --accent coral, --look …, --from_image — and redraws it in place. ' +
-      'Several charts in one answer are fine — one call each. A chart goes INTO a document with ' +
-      'office_edit: `office edit deck.pptx --chart units.svg --slide 2` (a native, editable group ' +
-      'on the slide), `--after p3` for a .docx paragraph, `--anchor B12` for a .xlsx cell, ' +
-      '`--page 2` for a .pdf (it lands in free space on that page, or on a new page after it). ' +
-      'Then say in one line what the chart shows; the values are in front of the user already.',
-    /* Two tools: in CLI mode `chart` IS the command (tool-cli.ts maps it to an
-       empty path under this group) and the other is `chart edit`. */
-    tools: ['chart', 'chart_edit'],
-  },
-  {
-    name: 'office',
-    /* the user, reading the canvas assessment: "model should not be using
-       python-pptx, there is a dedicated subagent for each pptx/docx/xlsx
-       creation and editing right?" The pipeline existed and was reachable from
-       a corp run only; asked for a deck in chat, the model had bash and a habit
-       and looped on `from pptx import Presentation`. So the line says what the
-       thing is AND names the habit it replaces — the same finding as the two
-       generators above: a line among abilities does not outweigh what a model
-       already knows how to type, unless it says so. handmade-office.ts catches
-       the rest at the call. */
-    summary:
-      'Make a real slide deck (.pptx), document (.docx), workbook (.xlsx) or PDF from a brief, and ' +
-      'edit or read existing ones. Every deck, report, memo or spreadsheet goes here — never ' +
-      'python-pptx, python-docx, openpyxl or hand-written XML, and never `read` on an office file. ' +
-      '(A chart on its own is the chart capability.)',
-    guidance:
-      'office_make takes a brief and returns a NEW file, open in the canvas, with a ' +
-      'slide-by-slide summary (a file that exists is changed with office_edit, never re-made). ' +
-      'Put EVERYTHING the file should say into the brief — the facts, the ' +
-      'numbers, the names, the sections in order — because the pipeline writes only what it is ' +
-      'given. office_edit changes wording, style, position or slide order in a file that exists, ' +
-      'and puts a chart in it: draw it with chart first, then `office edit file --chart <svg>` ' +
-      'with --slide N (pptx), --after <paragraph id> (docx), --anchor B12 (xlsx) or --page N ' +
-      '(pdf; free space on that page, else a new page after it). "Reformat to fit" is the same ' +
-      'call with an instruction — move/resize/shrink the shapes office_inspect names by id. ' +
-      'office_inspect reads a file as an outline with ids. Never write these formats with a ' +
-      'library or by assembling XML: the pipeline owns the format so the file opens and stays ' +
-      'editable. An open document reloads in the canvas by itself after every edit.',
-    tools: ['office_make', 'office_edit', 'office_inspect'],
-  },
-  {
-    name: '3d',
-    /* the user (2026-09-17): "3d should be a connector". The two tools register
-       only when the Bobble 3D connector is on and an engine that makes meshes
-       is on this Mac (PI_BOBBLE_3D_READY) — so this group, like `svg`, exists
-       for the model exactly when it can be honoured and not otherwise. The
-       line names the habit it replaces, because a model with bash and a
-       memory of trimesh/blender scripts will otherwise write geometry by hand
-       — the same finding as the image and chart lines above. */
-    summary:
-      'Make a 3D model (.glb) from a description or a picture, and texture, split into parts, ' +
-      'rig or retopologise one — on-device, shown in the chat as a card the user can turn. ' +
-      'Every request for a 3D model, mesh, asset or figure goes here; never write geometry ' +
-      'in code (trimesh, bpy, OBJ by hand).',
-    guidance:
-      'generate_3d takes a prompt ("a low-poly fox sitting"), an image_path (a picture the chat ' +
-      'has — a generate_image result, an attachment), or both, and a finish: pbr (default, the ' +
-      'full material), color (base colour only) or grey (the shape alone, quickest). One object ' +
-      'on a plain ground works; a scene does not. It takes minutes — say so in one line and wait; ' +
-      'do not poll or retry. refine_3d works on a model the chat has: texture (paint a grey one, ' +
-      'or repaint with a prompt), segment (named parts — the card gets an Explode control), rig ' +
-      '(a skeleton — the card gets a Skeleton control), retopo (a clean low-poly version). Each ' +
-      'result is a NEW file beside the original. Refer to a model by the path the result names.',
-    /* In CLI mode: `3d generate <prompt> --image <path>` and `3d refine <model>
-       --op texture` (tool-cli.ts states both paths — deriving them would read
-       "3d generate 3d"). */
-    tools: ['generate_3d', 'refine_3d'],
-  },
-  {
-    name: 'connectors',
-    summary: 'Anything reachable over MCP — Notion, Slack, Jira, and whatever else is installed.',
-    guidance:
-      'List what is connected first, read the schema of the one you want, then call it. The set ' +
-      'depends on what this user has installed, so never assume a particular service is there.',
-    tools: ['mcp_list', 'mcp_schema', 'mcp_call'],
-  },
-];
+  browser,
+  computerUse,
+  chrome,
+  personal,
+  webResearch,
+  generation,
+  svg,
+  diagram,
+  chart,
+  office,
+  threeD,
+  memory,
+  workflows,
+  connectors,
+].filter((c): c is Capability => c !== undefined);
 
 /** Look one up by name, tolerantly — "computer use" and "computer_use" both work. */
 export function findCapability(name: string): Capability | undefined {

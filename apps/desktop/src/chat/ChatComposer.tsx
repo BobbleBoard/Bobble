@@ -15,6 +15,7 @@ import { CAPABILITIES } from '@pi-desktop/harness/presets/capabilities';
 import {
   ComposerAddMenu,
   type GenActionKey,
+  Glyph,
   IconArrowUp,
   IconButton,
   IconClose,
@@ -63,6 +64,13 @@ import {
 import { useDropStore } from './composer/drop-store';
 import type { PillData } from './composer/pill-node';
 import { type AcToken, EMPTY_TOKEN } from './composer/tokens';
+import {
+  composerMenuEntries,
+  hasSubmitInterceptors,
+  interceptSubmit,
+  useComposerActionsVersion,
+  useComposerModeChips,
+} from './composer-entries';
 import { GEN_ACTION_PLANS } from './composer-gen-actions';
 import { DictationBar } from './DictationBar';
 import { IconWarning } from './icons-pill';
@@ -1119,6 +1127,12 @@ export function ChatComposer({
     apiRef.current?.insertPill({ label: plan.pill, payload: plan.scaffold, icon: plan.icon });
   };
 
+  /* What features add to the composer (./composer-entries.ts): + menu rows,
+     the chip of a mode that is on. Nothing until one registers. */
+  useComposerActionsVersion();
+  const modeChips = useComposerModeChips();
+  const extraMenuEntries = composerMenuEntries((glyph) => <Glyph name={glyph} size={16} />);
+
   const submit = async () => {
     const raw = text.trim();
     if (raw === '' && attachments.length === 0) return;
@@ -1141,6 +1155,21 @@ export function ChatComposer({
     // composer now mounted across the empty→thread transition, this refocus makes
     // the caret sticky even if the browser blurred on submit.
     apiRef.current?.focus();
+    /*
+     * A MODE MAY TAKE THE SEND — help mode sends to the help pi, a workflow
+     * starts a run (./composer-entries.ts). Asked only when one is registered,
+     * so without one this path does not even await.
+     */
+    if (
+      hasSubmitInterceptors() &&
+      (await interceptSubmit({
+        text: raw,
+        agentMessage: buildAgentMessage(raw, textFiles, activatable),
+        images: imageUris,
+      }))
+    ) {
+      return;
+    }
     if (raw.startsWith('!')) {
       await runBash(raw.slice(1).trim());
       return;
@@ -1559,6 +1588,7 @@ export function ChatComposer({
               onGenerateVideo={() => onGenAction('video')}
               onGenerateMotion={() => onGenAction('motion')}
               onPerception={() => onGenAction('perception')}
+              {...(extraMenuEntries.length > 0 ? { entries: extraMenuEntries } : {})}
             />
             <IconButton
               aria-label="Dictate a message"
@@ -1569,6 +1599,11 @@ export function ChatComposer({
             >
               <IconMic size={14} />
             </IconButton>
+            {/* The chip of any mode that is on (Bobble help ×) — none until a
+                feature registers one. */}
+            {modeChips.map((chip) => (
+              <chip.Component key={chip.id} />
+            ))}
             <div className="pd-composer-footer-spacer" />
             <ComposerFooter piModels={piModels} onOpenModels={onOpenModels} />
             {isBusy ? (

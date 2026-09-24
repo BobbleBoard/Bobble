@@ -62,6 +62,7 @@ import { MessageErrorBoundary } from './MessageErrorBoundary';
 import { type PendingChartArgs, PendingChartCard, pendingChartArgs } from './PendingChartCard';
 import { PresentedInline } from './PresentedInline';
 import { awaitingReplyAfterLatestTurn, sentAttachmentsPrefilling } from './sent-prefill';
+import { useThreadSlots } from './thread-slots';
 import { BlindImageNote, UserImage } from './UserImage';
 
 /** Concatenated visible text of an assistant response group (for copy). */
@@ -592,6 +593,9 @@ export function ChatThread() {
   })();
   const awaitingReply = awaitingReplyAfterLatestTurn(messages);
 
+  /* Cards a feature hangs under a turn (./thread-slots.ts) — none until one
+     registers, and then the row renders exactly as below plus the slot. */
+  const threadSlotDefs = useThreadSlots();
   const items = toRenderItems(messages, claimed);
   /*
    * Presented artefacts, bucketed by the row they were handed over after. A
@@ -680,7 +684,7 @@ export function ChatThread() {
             </div>
           ) : null}
 
-          {items.map((item) => {
+          {items.map((item, itemIndex) => {
             /*
              * A PRESENTED ARTEFACT STAYS WHERE IT WAS HANDED OVER.
              *
@@ -943,11 +947,31 @@ export function ChatThread() {
                 </ActivityRow>
               );
             })();
-            if (cards === undefined && (slots === undefined || slots.length === 0)) return node;
+            const hasPresented = !(
+              cards === undefined &&
+              (slots === undefined || slots.length === 0)
+            );
+            // Every registered feature slot, told which row it is under.
+            const featureSlots =
+              threadSlotDefs.length === 0
+                ? null
+                : threadSlotDefs.map((slot) => (
+                    <slot.Component
+                      key={`slot-${slot.id}`}
+                      kind={item.kind}
+                      anchorId={threadItemId(item)}
+                      messageIds={
+                        item.kind === 'assistant' ? item.group.map((m) => m.id) : [item.message.id]
+                      }
+                      isLast={itemIndex === items.length - 1}
+                    />
+                  ));
+            if (!hasPresented && featureSlots === null) return node;
             return (
               <Fragment key={`anchored-${threadItemId(item)}`}>
                 {node}
-                {renderPresented(cards ?? [], slots)}
+                {hasPresented ? renderPresented(cards ?? [], slots) : null}
+                {featureSlots}
               </Fragment>
             );
           })}

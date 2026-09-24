@@ -1,21 +1,21 @@
 import { CanvasProvider, createCanvasController } from '@pi-desktop/canvas';
 import { Spinner, ToastProvider, TooltipProvider } from '@pi-desktop/ui';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { AppInfo } from '../electron/ipc-contract';
 import { CandidatesRoute, candidateSet } from './candidates/CandidatesRoute';
 import { ChatApp } from './chat/ChatApp';
 import { CanvasPopoutView } from './chat/canvas/CanvasPopoutView';
 import { useGenStream } from './chat/gen-stream';
-import { ConnectorsScreen } from './connectors/ConnectorsScreen';
 import { SituationDemoView } from './demo/SituationDemoView';
 import { GalleryView } from './gallery/GalleryView';
-import { ModelsView } from './models/ModelsView';
+import { appNavAllowList } from './nav-allow';
 import { FirstRunTips, resetFirstRunTips } from './onboarding/FirstRunTips';
 import { OnboardingWizard } from './onboarding/OnboardingWizard';
 import { lazyRoute } from './RouteBoundary';
-import { ScheduledView } from './scheduled/ScheduledView';
+import { type MainView, type RouteContext, useContentRoute } from './routes';
 import { startTaskRunner } from './scheduled/tasks-store';
 import { type SettingsSection, SettingsView } from './settings/SettingsView';
+import { type NavTarget, navHandler, setNavAllowList, useAppNavStore } from './state/app-nav-store';
 import { exitModality, useModalityStore } from './state/modality-store';
 import { newSession } from './state/pi-connect';
 import { usePiStore } from './state/pi-slice';
@@ -104,12 +104,12 @@ function ProbeHooks() {
   );
 }
 
-/**
+/*
  * `settings` is NOT a view any more — it floats over whichever of these is
  * showing (see `settingsOpen`). `models` became one, because model management
- * is now a full surface of its own rather than a settings page.
+ * is now a full surface of its own rather than a settings page. The views and
+ * their screens and titles are the route registry (./routes.ts).
  */
-type MainView = 'chat' | 'gallery' | 'models' | 'connectors' | 'scheduled';
 
 export function App() {
   const flavor = useThemeStore((s) => s.flavor);
@@ -136,6 +136,9 @@ export function App() {
   useEffect(() => {
     if (new URLSearchParams(window.location.search).has('piE2E')) {
       window.__pi_theme = () => useThemeStore.getState();
+      // Deep links for probes (BH-2's settings-deeplink-probe): the same
+      // `navigate` a help card or a guide link calls.
+      window.__app_nav = () => useAppNavStore;
     }
   }, []);
 
@@ -187,6 +190,78 @@ export function App() {
     setSettingsSection(section);
     setSettingsOpen(true);
   };
+
+  /*
+   * THE CONTENT ROUTE — the workspace screen for the current view (routes.ts),
+   * or none for the chat and the gallery. Its title replaces the chat's name.
+   */
+  const route = useContentRoute(view);
+  const routeContext: RouteContext = {
+    /* "Try in chat": a NEW chat, because pi reads the connector registry when a
+       session starts, so the thing just turned on is only certainly there in
+       the next one. The prompt lands in the composer through the same
+       hand-off the Edit action uses. */
+    tryInChat: (prompt) => {
+      setView('chat');
+      exitModality();
+      void newSession().then(() => {
+        usePiStore.setState({ composerText: prompt });
+      });
+    },
+  };
+
+  /*
+   * "TAKE ME THERE", FROM ANYWHERE (state/app-nav-store.ts). A deep link, a
+   * help card or a guide page calls `navigate`; this is where it lands, through
+   * the same handlers the sidebar and the settings gear use. The handler is
+   * re-bound every render (it closes over `openSettings`), the subscription
+   * once.
+   */
+  const handleNav = useRef<(target: NavTarget) => void>(() => undefined);
+  handleNav.current = (target) => {
+    switch (target.kind) {
+      case 'settings':
+        openSettings(target.section as SettingsSection);
+        return;
+      case 'view':
+        // Model management keeps its one entry point (it has to leave Settings).
+        if (target.view === 'models') {
+          openSettings('models');
+          return;
+        }
+        setSettingsOpen(false);
+        setView(target.view as MainView);
+        exitModality();
+        return;
+      case 'studio':
+        setSettingsOpen(false);
+        useModalityStore.getState().setView(target.studio);
+        return;
+      case 'chat':
+        setSettingsOpen(false);
+        setView('chat');
+        exitModality();
+        return;
+      case 'guide':
+        navHandler('guide')?.(target);
+        return;
+    }
+  };
+  useEffect(() => {
+    const offAllow = setNavAllowList(appNavAllowList);
+    const run = () => {
+      const req = useAppNavStore.getState().take();
+      if (req !== null) handleNav.current(req.target);
+    };
+    run();
+    const offNav = useAppNavStore.subscribe((s) => {
+      if (s.pending !== null) run();
+    });
+    return () => {
+      offNav();
+      offAllow();
+    };
+  }, []);
 
   // "Redo onboarding" (Settings → Interface): clear the persisted first-run flag,
   // re-arm the first-run tips, and re-open the wizard. Settings persist; the
@@ -349,17 +424,7 @@ export function App() {
                   setView('chat');
                   exitModality();
                 }}
-                contentTitle={
-                  modalityView === 'chat'
-                    ? view === 'models'
-                      ? 'Model management'
-                      : view === 'scheduled'
-                        ? 'Scheduled'
-                        : view === 'connectors'
-                          ? 'Extensions'
-                          : undefined
-                    : undefined
-                }
+                contentTitle={modalityView === 'chat' ? route?.title : undefined}
                 contentOverride={
                   /*
                    * THE STUDIOS ARE A CONTENT ROUTE NOW, not a window takeover.
@@ -383,32 +448,13 @@ export function App() {
                     <VideoStudio />
                   ) : modalityView === 'audio' ? (
                     <AudioStudio />
-                  ) : view === 'models' ? (
-                    <ModelsView />
-                  ) : view === 'scheduled' ? (
-                    /* Same seam as the model hub: a content route inside the chat
-                       shell, so the sidebar and top bar stay put. */
-                    <ScheduledView />
-                  ) : view === 'connectors' ? (
-                    /* ...and so is this, now. It was the one screen in that
-                       sidebar section that took the window instead, which is why
-                       it needed a back button and a traffic-light inset of its
-                       own. See the note at the top of ConnectorsScreen. */
-                    <ConnectorsScreen
-                      /* "Try in chat": a NEW chat, because pi reads the
-                         connector registry when a session starts, so the
-                         thing just turned on is only certainly there in the
-                         next one. The prompt lands in the composer through
-                         the same hand-off the Edit action uses. */
-                      onTryInChat={(prompt) => {
-                        setView('chat');
-                        exitModality();
-                        void newSession().then(() => {
-                          usePiStore.setState({ composerText: prompt });
-                        });
-                      }}
-                    />
-                  ) : undefined
+                  ) : (
+                    /* Model management, Scheduled, Extensions — and whatever a
+                       lane registers (Training, Workflows): the same seam, a
+                       content route inside the chat shell, so the sidebar and
+                       top bar stay put. See routes.ts. */
+                    route?.render(routeContext)
+                  )
                 }
               />
               {/* Onboarding `tutorial` flag consumer: dismissible first-run tips. */}
