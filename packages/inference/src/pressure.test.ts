@@ -207,6 +207,112 @@ describe('samplePressure', () => {
   });
 });
 
+describe('samplePressure off macOS', () => {
+  /*
+   * os.freemem() on Windows is GlobalMemoryStatusEx's ullAvailPhys (free +
+   * zeroed + standby lists): the honest "available" figure, not the page-cache
+   * fiction it is on a Mac. The reading says Windows gave it.
+   */
+  it('reads Windows from available memory, labelled as its own', async () => {
+    const p = await samplePressure({
+      ...silent,
+      platform: 'win32',
+      memory: () => ({ total: 16e9, free: 6.4e9 }),
+    });
+    expect(p.memory).toBe('normal');
+    expect(p.sources).toContain('windows-available');
+    expect(p.sources).not.toContain('free-memory');
+    // The graded fraction waits for the commit charge and a pause that can
+    // land on Windows (XP-14/XP-15); until then the verdict alone.
+    expect(p.memoryFree).toBeUndefined();
+  });
+
+  it('reads the Windows wall as the wall', async () => {
+    const warm = await samplePressure({
+      ...silent,
+      platform: 'win32',
+      memory: () => ({ total: 16e9, free: 2e9 }),
+    });
+    expect(warm.memory).toBe('warn');
+    const tight = await samplePressure({
+      ...silent,
+      platform: 'win32',
+      memory: () => ({ total: 16e9, free: 0.4e9 }),
+    });
+    expect(tight.memory).toBe('critical');
+  });
+
+  it('says nothing, rather than critical, when a Windows host reports no total', async () => {
+    const p = await samplePressure({
+      ...silent,
+      platform: 'win32',
+      memory: () => ({ total: 0, free: 0 }),
+    });
+    expect(p.memory).toBeUndefined();
+    expect(p.sources).not.toContain('windows-available');
+    expect(p.sources).not.toContain('free-memory');
+  });
+
+  it('reads no files and runs nothing on Windows without a card to ask', async () => {
+    const read: string[] = [];
+    const ran: string[] = [];
+    await samplePressure({
+      ...silent,
+      platform: 'win32',
+      readFile: async (path) => {
+        read.push(path);
+        return null;
+      },
+      run: async (cmd) => {
+        ran.push(cmd);
+        return null;
+      },
+    });
+    expect(read).toEqual([]);
+    expect(ran).toEqual([]);
+  });
+
+  /*
+   * The guardian reads every half second while heavy work runs and judges
+   * memory and swap alone, so its quick reading leaves the GPU-busy and
+   * battery files for the power manager's full one, as on the Mac.
+   */
+  it('reads memory and swap only on a quick Linux reading', async () => {
+    const files: Record<string, string> = {
+      '/proc/pressure/memory': 'some avg10=0.00 avg60=0.00 avg300=0.00 total=0\n',
+      '/proc/meminfo': 'MemTotal:       16000000 kB\nMemAvailable:    9600000 kB\n',
+      '/proc/vmstat': 'pswpin 1\npswpout 2\n',
+      '/sys/class/drm/card0/device/gpu_busy_percent': '37\n',
+      '/sys/class/power_supply/BAT0/status': 'Discharging\n',
+    };
+    const read: string[] = [];
+    const readFile = async (path: string): Promise<string | null> => {
+      read.push(path);
+      return files[path] ?? null;
+    };
+
+    const quick = await samplePressure({ ...silent, platform: 'linux', quick: true, readFile });
+    expect(read).toEqual(['/proc/pressure/memory', '/proc/vmstat', '/proc/meminfo']);
+    expect(quick.memory).toBe('normal');
+    expect(quick.memoryFree).toBeCloseTo(0.6, 3);
+    expect(quick.swapCounters).toMatchObject({ ins: 1, outs: 2 });
+    expect(quick.gpu).toBeUndefined();
+    expect(quick.onBattery).toBeUndefined();
+
+    read.length = 0;
+    const full = await samplePressure({ ...silent, platform: 'linux', readFile });
+    expect(read).toEqual(
+      expect.arrayContaining([
+        '/sys/class/drm/card0/device/gpu_busy_percent',
+        '/sys/class/power_supply/BAT0/status',
+      ]),
+    );
+    expect(full.gpu).toBeCloseTo(0.37, 2);
+    expect(full.onBattery).toBe(true);
+    expect(full.sources).toEqual(expect.arrayContaining(['linux-amd', 'linux-battery']));
+  });
+});
+
 describe('swap: the flow, not the stock', () => {
   /*
    * The bug a live run caught. MEASURED on a 24 GB Mac: 65% of swap in use,

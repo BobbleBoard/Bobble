@@ -353,8 +353,9 @@ export interface PressureProbes {
    *
    * The guardian reads the machine every second while heavy work runs, and
    * thermal state and the power source do not move at that rate; `pmset` is
-   * also the slowest of these to answer. The full reading still runs on the
-   * power manager's own slow clock.
+   * also the slowest of these to answer. On Linux the GPU-busy and battery
+   * files are skipped the same way. The full reading still runs on the power
+   * manager's own slow clock.
    */
   readonly quick?: boolean;
 }
@@ -466,22 +467,55 @@ export async function samplePressure(probes: PressureProbes): Promise<SystemPres
       const usedFrac = meminfo === null ? undefined : parseMemInfoAvailable(meminfo);
       if (usedFrac !== undefined) out.memoryFree = 1 - usedFrac;
     }
-    const amd = await probes.readFile('/sys/class/drm/card0/device/gpu_busy_percent');
-    const busy = amd === null ? undefined : parseAmdBusy(amd);
-    if (busy !== undefined) {
-      out.gpu = busy;
-      sources.push('linux-amd');
+    /*
+     * Memory and swap only on a quick reading, as on the Mac: the guardian
+     * reads every half second while heavy work runs, and neither the GPU's
+     * busy figure nor the power source is part of its judgement. The sysfs
+     * busy file is also not free to read: on amdgpu as of Linux 6.1 LTS a
+     * read resumes a runtime-suspended card (`pm_runtime_get_sync`; current
+     * kernels answer EPERM instead).
+     */
+    if (probes.quick !== true) {
+      const amd = await probes.readFile('/sys/class/drm/card0/device/gpu_busy_percent');
+      const busy = amd === null ? undefined : parseAmdBusy(amd);
+      if (busy !== undefined) {
+        out.gpu = busy;
+        sources.push('linux-amd');
+      }
+      const bat = await probes.readFile('/sys/class/power_supply/BAT0/status');
+      const onBattery = bat === null ? undefined : parseLinuxBattery(bat);
+      if (onBattery !== undefined) {
+        out.onBattery = onBattery;
+        sources.push('linux-battery');
+      }
     }
-    const bat = await probes.readFile('/sys/class/power_supply/BAT0/status');
-    const onBattery = bat === null ? undefined : parseLinuxBattery(bat);
-    if (onBattery !== undefined) {
-      out.onBattery = onBattery;
-      sources.push('linux-battery');
+  } else if (probes.platform === 'win32') {
+    /*
+     * WINDOWS ANSWERS IN AVAILABLE BYTES. What the host reports as free there
+     * (`os.freemem()`, GlobalMemoryStatusEx's `ullAvailPhys`) is the free,
+     * zeroed and standby lists: what could be handed out without writing
+     * anything to disk. That is the figure Linux calls MemAvailable, not the
+     * page-cache fiction `freemem` is on a Mac. The source is labelled as
+     * Windows' own, so a reading says which OS answered rather than looking
+     * like a Linux whose /proc could not be read.
+     *
+     * The verdict only, at the portable floor's lines. The graded fraction
+     * (`memoryFree`) is left undefined on purpose. It is what the guardian's
+     * pause line reads, and a pause cannot land on Windows yet (there is no
+     * SIGSTOP; crossplatform.md XP-14). The fraction alone also cannot see
+     * Windows' real wall, the commit limit. Both come together in XP-15.
+     */
+    const { total, free } = probes.memory();
+    const verdict = verdictFromFree(free, total);
+    if (verdict !== undefined) {
+      out.memory = verdict;
+      sources.push('windows-available');
     }
   }
 
-  // Windows, and anything the branches above could not answer, fall back to the
-  // portable figures. Skipped on macOS on purpose (free memory means nothing there).
+  // Anything the branches above could not answer (a Linux whose /proc cannot be
+  // read, a Windows host that reports no total) falls back to the portable
+  // figures. Skipped on macOS on purpose (free memory means nothing there).
   if (out.memory === undefined && probes.platform !== 'darwin') {
     const { total, free } = probes.memory();
     const verdict = verdictFromFree(free, total);

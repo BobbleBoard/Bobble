@@ -4,9 +4,10 @@
  * packages/inference/src/guardian.ts decides; this file gives it eyes and hands:
  *
  *   EYES   a one-second reading of the OS's own memory numbers while heavy work
- *          runs (fifteen seconds when idle), and a quarter-second heartbeat on
- *          main's event loop — the app's own starvation, which is the pointer
- *          freezing measured from the inside.
+ *          runs (fifteen seconds when idle), each OS asked in its own language
+ *          (guardian-probes.ts), and a quarter-second heartbeat on main's event
+ *          loop — the app's own starvation, which is the pointer freezing
+ *          measured from the inside.
  *   HANDS  `shed` cancels the running heavy generation with the reason the user
  *          will read; `hold` closes admission; `calm` reopens it and pumps the
  *          queue. Admission itself asks `fits` about the SPECIFIC job.
@@ -19,9 +20,7 @@
  * absolutely never happen". The two jetsam reports from the same day are in
  * /Library/Logs/DiagnosticReports; both name a 6 GB python worker.
  */
-import { execFile } from 'node:child_process';
-import { cpus, loadavg, platform, totalmem } from 'node:os';
-import { promisify } from 'node:util';
+import { totalmem } from 'node:os';
 import {
   createGuardian,
   defaultReserveGB,
@@ -34,9 +33,8 @@ import {
   samplePressure,
 } from '@pi-desktop/inference';
 import type { GenQueueControl } from './gen-manager';
+import { guardianProbes, nodeGuardianHost } from './guardian-probes';
 import { createPausables, type Pausable, type PausablesRegistry } from './pausables';
-
-const execFileAsync = promisify(execFile);
 
 /**
  * THE MEMORY GUARD'S HANDS, shared by every heavy run in the app.
@@ -109,33 +107,18 @@ const TOTAL_GB = totalmem() / 1024 ** 3;
 
 export function startGuardian(opts: GuardianMainOptions): GuardianMain {
   const log = opts.log ?? ((line: string) => console.log(`[pi-guardian] ${line}`));
-  const plat = platform();
-  const platformName: 'darwin' | 'win32' | 'linux' =
-    plat === 'darwin' ? 'darwin' : plat === 'win32' ? 'win32' : 'linux';
+  /*
+   * THE MACHINE, AS ITS OWN OS DESCRIBES IT. This handed every OS `free: 0`
+   * and a readFile that read nothing; macOS never looks at either, but off
+   * macOS "0 bytes free" read as critical and every reading shed (XP-01).
+   */
+  const host = nodeGuardianHost();
 
   let lastVerdict: GuardianVerdict = 'calm';
   let lastReason = '';
 
   const guardian: Guardian = createGuardian({
-    sample: () =>
-      samplePressure({
-        quick: true,
-        platform: platformName,
-        cpuCount: cpus().length,
-        loadAvg: () => loadavg(),
-        memory: () => ({ total: totalmem(), free: 0 }),
-        run: async (cmd, args) => {
-          try {
-            // Bounded hard: under a real thrash even `sysctl` can take a while
-            // to get scheduled, and a reading that never returns is no reading.
-            const { stdout } = await execFileAsync(cmd, [...args], { timeout: 1500 });
-            return stdout;
-          } catch {
-            return null;
-          }
-        },
-        readFile: async () => null,
-      }),
+    sample: () => samplePressure(guardianProbes(host)),
     // Heavy work anywhere in the app, not only the queue's own jobs.
     busy: () => opts.queue()?.running() === true || pausables.active(),
     limits: () => {
