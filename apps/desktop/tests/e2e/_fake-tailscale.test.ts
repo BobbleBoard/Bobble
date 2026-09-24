@@ -40,7 +40,8 @@ describe('readTailnet over the fake', () => {
   ])('reports %s as unavailable, with the state as the reason', async (state, backend) => {
     ts = fake.createFakeTailscale({ state });
     const status = await readTailnet({ candidates: [ts.bin] });
-    expect(status).toEqual({
+    // The fields this double is about; DEV-0/1 added more to the status on purpose.
+    expect(status).toMatchObject({
       available: false,
       reason: `Tailscale is installed but not running (${backend}).`,
       peers: [],
