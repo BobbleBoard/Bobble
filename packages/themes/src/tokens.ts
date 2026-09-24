@@ -1037,28 +1037,46 @@ const bobbleLayout: ThemeTokens['layout'] = {
   menuPadding: '5px',
 };
 
-// THE bobble signature: liquid glass. Overlays/menus/dialogs are translucent
-// with a heavy backdrop blur; the scrim itself frosts what's behind it.
+// THE bobble signature: liquid glass. Overlays/menus/dialogs keep a backdrop
+// blur, but the material is nearly opaque: at 0.78 over a 0.85 overlay a card
+// on the page was 70% near-white — #f9f9fb on #f5f5f7, a 1.02:1 step — so it
+// read as a milky film instead of a sheet (the user 2026-09-24, "flimsy"). The
+// blur still frosts whatever passes under it.
 const bobbleSurface: ThemeTokens['surface'] = {
-  translucency: '0.78',
+  translucency: '0.92',
   blurOverlay: '20px',
   blurBackdrop: '8px',
 };
 
-// Soft, diffuse, low-contrast elevation — depth from blur, not darkness.
+/*
+ * Grounded elevation (light). the user 2026-09-24, on the 3D studio's History card:
+ * "it looks 'flimsy' not like it's a card firmly placed on top" — and before
+ * that, "everything has the same softness". The old scale was one diffuse
+ * blur per level (md was 0 4px 14px at 9%): a haze on all four sides and no
+ * point where the card meets the page, so every level looked equally unsure.
+ *
+ * Each level now stacks what a real sheet on a surface shows:
+ *   contact  0 1px 2px   — dark and tight, right under the edge (it touches)
+ *   cast     0 3-10px    — negative spread, so it falls below, not around
+ *   ambient  (md and up) — the lift, also pulled in by its spread
+ * The EDGE is drawn separately (shadow.hairline, or a border-default on the
+ * studio's floating panels); `edge` itself is now a 2px definition, not a
+ * 14px glow.
+ */
 const bobbleShadowBase = {
-  sm: '0 1px 3px rgba(0, 0, 0, 0.07)',
-  md: '0 4px 14px rgba(0, 0, 0, 0.09)',
-  lg: '0 12px 32px -6px rgba(0, 0, 0, 0.14)',
-  popover: '0 18px 50px -10px rgba(0, 0, 0, 0.22)',
-  edge: '0 0 14px rgba(0, 0, 0, 0.08)',
+  sm: '0 0.5px 1px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.07)',
+  md: '0 1px 2px rgba(0, 0, 0, 0.07), 0 3px 8px -2px rgba(0, 0, 0, 0.09), 0 12px 24px -10px rgba(0, 0, 0, 0.12)',
+  lg: '0 1px 2px rgba(0, 0, 0, 0.06), 0 6px 14px -4px rgba(0, 0, 0, 0.1), 0 22px 44px -14px rgba(0, 0, 0, 0.18)',
+  popover:
+    '0 1px 2px rgba(0, 0, 0, 0.06), 0 10px 24px -8px rgba(0, 0, 0, 0.14), 0 30px 60px -18px rgba(0, 0, 0, 0.24)',
+  edge: '0 0 2px rgba(0, 0, 0, 0.05)',
 };
 
 const bobbleLight: ThemeTokens = {
   bg: {
     base: '#f5f5f7', // Apple's soft platform gray
     raised: '#ffffff',
-    overlay: '#fbfbfdd9', // translucent white — frosts via surface.blurOverlay
+    overlay: '#fefefff2', // white sheet, 95% — still frosts via surface.blurOverlay
     inset: '#ececee',
     hover: '#0000000a',
     active: '#00000014',
@@ -1160,7 +1178,8 @@ const bobbleLight: ThemeTokens = {
   radius: bobbleRadius,
   shadow: {
     ...bobbleShadowBase,
-    hairline: '0 0 0 0.5px rgba(0, 0, 0, 0.10)',
+    // One device pixel on Retina; 12% so a card's outline is drawn, not implied.
+    hairline: '0 0 0 0.5px rgba(0, 0, 0, 0.12)',
   },
   surface: bobbleSurface,
   motion: bobbleMotion,
@@ -1173,7 +1192,7 @@ const bobbleDark: ThemeTokens = {
   bg: {
     base: '#151517', // graphite, never pure black
     raised: '#1e1e21',
-    overlay: '#232327d9', // translucent — frosts via surface.blurOverlay
+    overlay: '#262629f2', // a step above raised, 95% — frosts via surface.blurOverlay
     inset: '#121214',
     hover: '#ffffff0f',
     active: '#ffffff1a',
@@ -1255,12 +1274,16 @@ const bobbleDark: ThemeTokens = {
   font: { ...bobbleFont, response: bobbleResponse },
   radius: bobbleRadius,
   shadow: {
-    // Dark glass needs slightly stronger separation than light.
-    sm: '0 1px 3px rgba(0, 0, 0, 0.28)',
-    md: '0 4px 14px rgba(0, 0, 0, 0.34)',
-    lg: '0 12px 32px -6px rgba(0, 0, 0, 0.45)',
-    popover: '0 18px 50px -10px rgba(0, 0, 0, 0.55)',
-    edge: '0 0 16px rgba(0, 0, 0, 0.32)',
+    /* The light scale's contact/cast/ambient stack, darker because a shadow on
+     * graphite barely shows; plus a half-pixel rim of light along the top edge
+     * (inset) — on a dark ground that lit edge is what says "a sheet sits
+     * here". */
+    sm: '0 0.5px 1px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.3)',
+    md: 'inset 0 0.5px 0 rgba(255, 255, 255, 0.08), 0 1px 2px rgba(0, 0, 0, 0.45), 0 4px 10px -2px rgba(0, 0, 0, 0.35), 0 14px 28px -10px rgba(0, 0, 0, 0.5)',
+    lg: 'inset 0 0.5px 0 rgba(255, 255, 255, 0.08), 0 1px 2px rgba(0, 0, 0, 0.5), 0 8px 18px -6px rgba(0, 0, 0, 0.45), 0 26px 52px -16px rgba(0, 0, 0, 0.6)',
+    popover:
+      'inset 0 0.5px 0 rgba(255, 255, 255, 0.09), 0 1px 2px rgba(0, 0, 0, 0.5), 0 12px 28px -8px rgba(0, 0, 0, 0.5), 0 34px 68px -20px rgba(0, 0, 0, 0.65)',
+    edge: '0 0 2px rgba(0, 0, 0, 0.4)',
     hairline: '0 0 0 0.5px rgba(255, 255, 255, 0.14)',
   },
   surface: bobbleSurface,
