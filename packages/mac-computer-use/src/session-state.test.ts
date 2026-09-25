@@ -86,6 +86,22 @@ describe('createMacSessionState (controlled-app state machine)', () => {
 });
 
 /*
+ * Holding control is not driving: a restored record is control without a
+ * single act this turn. Only a turn that drove ends the driving (tools.ts).
+ */
+describe('whether this turn drove anything', () => {
+  it('is false for control that was only restored, true once something drove', () => {
+    const s = createMacSessionState();
+    s.restore({ app: 'Google Chrome', pid: 8131 });
+    expect(s.endTurn()).toBe(false);
+    s.noteDriving();
+    expect(s.endTurn()).toBe(true);
+    // Each turn starts clean.
+    expect(s.endTurn()).toBe(false);
+  });
+});
+
+/*
  * Which KIND of app is being controlled decides whether index-less typing is a
  * mistake or the only option — see the refusal in tools.ts. An app that answers
  * Accessibility has indices to pass; one that does not has nothing else.

@@ -18,6 +18,10 @@
  *     first snapshot moves control to the snapshotted app; a default snapshot
  *     of the already-controlled app just refreshes its metadata.
  *   - `release()`                → drops control (app gone / session reset).
+ *
+ * And, beside control, whether this session DROVE anything this turn
+ * (`noteDriving` / `endTurn`) — which is not the same question: a chat can hold
+ * control it restored from a record and not touch the Mac all turn.
  */
 
 /** The app this session is currently driving. */
@@ -111,6 +115,20 @@ export interface MacSessionState {
   targetParams(): Record<string, unknown>;
   /** One human/model-readable line naming the controlled target ('' if none). */
   describe(): string;
+  /** A look or an act went to the Mac — the overlay and the monitor follow those. */
+  noteDriving(): void;
+  /**
+   * The turn ended: whether THIS session drove anything in it, and a clean
+   * slate for the next.
+   *
+   * Only a session that drove may put the driving away (tools.ts, agent_end).
+   * The overlay, the monitor and the user's Stop / Take-over brake belong to the
+   * app, not to whichever session's turn happens to end: a chat that carried an
+   * app over from another chat — or a subagent, a corp role, a scheduled run —
+   * holds control without having touched anything, and its turn ending used to
+   * tear down another chat's live run and lift the brake the user had pressed.
+   */
+  endTurn(): boolean;
   /**
    * What a click at this point ACTUALLY hit, when the answer is "nothing".
    *
@@ -156,9 +174,20 @@ function contains(el: SnapElementLike, x: number, y: number): boolean {
 /** Build a fresh session state (one per extension instance / pi session). */
 export function createMacSessionState(): MacSessionState {
   let current: ControlledApp | null = null;
+  let drove = false;
 
   return {
     controlled: () => current,
+
+    noteDriving(): void {
+      drove = true;
+    },
+
+    endTurn(): boolean {
+      const did = drove;
+      drove = false;
+      return did;
+    },
 
     noteLaunched(app: string, pid: number, windowId?: number): void {
       current = { pid, app, windowId, lastAct: `opened ${app}` };

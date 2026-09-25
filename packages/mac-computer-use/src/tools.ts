@@ -241,6 +241,35 @@ function describeOpened(
   return '';
 }
 
+/**
+ * The requests that put something on the user's screen: the phantom cursor and
+ * the monitor follow each of them (apps/desktop/electron/mac/mac-agent.ts).
+ * Reads — the policy, the grants, a tab list — do not.
+ */
+const DRIVING_METHODS: ReadonlySet<MacAgentMethod> = new Set<MacAgentMethod>([
+  'snapshot',
+  'click',
+  'type',
+  'key',
+  'scroll',
+  'launch',
+  'menuClick',
+  'tabSelect',
+  'tabNew',
+  'tabClose',
+]);
+
+/** The bridge, noting on the session every request that drives (see `endTurn`). */
+function noticed(bridge: MacBridge | null, session: MacSessionState | undefined): MacBridge | null {
+  if (bridge === null || session === undefined) return bridge;
+  return {
+    request<T>(method: MacAgentMethod, params?: Record<string, unknown>): Promise<T> {
+      if (DRIVING_METHODS.has(method)) session.noteDriving();
+      return bridge.request<T>(method, params);
+    },
+  };
+}
+
 function errResult(action: string, message: string): AgentToolResult<MacDetails> {
   return textResult(`${action} failed: ${message}`, { action, ok: false, error: message });
 }
@@ -307,7 +336,6 @@ export function registerMacComputerUseTools(
   pi: ExtensionAPI,
   options: MacComputerUseOptions,
 ): void {
-  const bridge = options.bridge;
   const cap = options.elementCap ?? DEFAULT_ELEMENT_CAP;
   const consent = options.consent ?? createMacConsentGate();
   const readChromeTabs = options.readChromeTabs ?? chromeTabs;
@@ -325,6 +353,7 @@ export function registerMacComputerUseTools(
    * pid only (postToPid — background, no focus steal).
    */
   const session = options.session ?? createMacSessionState();
+  const bridge = noticed(options.bridge, session);
 
   /*
    * THE CONTROLLED APP IS REMEMBERED ACROSS TURNS AND RESTARTS.
@@ -444,9 +473,17 @@ export function registerMacComputerUseTools(
    * running — indefinitely, long after the model had finished and the user had
    * moved on. A "Thinking…" bubble hovering over an app nobody is driving is
    * the most alarming thing this feature can do, and it costs battery to say it.
+   *
+   * ONLY THE TURN THAT DROVE. `setDriving` is global — it puts away the one
+   * overlay and the one monitor session, and lifts the user's brake — so a turn
+   * that touched nothing must not send it. It used to be sent whenever an app
+   * was under control, and control can be RESTORED without driving: the app
+   * another chat last used, carried into every new session (a subagent, a
+   * corp role, a scheduled run) — each of whose turns then ended a live run in
+   * another chat and released the Stop its user had pressed.
    */
   pi.on?.('agent_end', () => {
-    if (bridge === null || session.controlled() === null) return;
+    if (bridge === null || !session.endTurn()) return;
     void bridge.request('setDriving', { driving: false }).catch(() => {
       /* the app may already be gone; nothing to release */
     });
@@ -1693,7 +1730,7 @@ const CHROME_APP = 'Google Chrome';
 
 export function registerChromeTools(
   pi: ExtensionAPI,
-  bridge: MacBridge | null = null,
+  appBridge: MacBridge | null = null,
   options: {
     readonly isChromeRunning?: () => Promise<boolean>;
     /** The mac set's controlled-app state — shared, so Chrome work is remembered. */
@@ -1710,6 +1747,9 @@ export function registerChromeTools(
     readonly chromeEval?: (js: string) => Promise<{ ok: boolean; value: string; error?: string }>;
   } = {},
 ): void {
+  // Chrome's own commands drive through the helper too (ax below), so the turn
+  // that used them is the turn that ends the driving.
+  const bridge = noticed(appBridge, options.session);
   let askedThisSession = false;
   const isChromeRunning = options.isChromeRunning ?? chromeRunning;
   const pidOfChrome = options.chromePid ?? chromePid;

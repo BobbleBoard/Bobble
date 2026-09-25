@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ExtensionAPI, ExtensionContext, ToolDefinition } from '@mariozechner/pi-coding-agent';
@@ -1301,7 +1301,109 @@ describe('the controlled app is remembered, and a fallback says what it is', () 
  * no real Chrome, no real screen.
  */
 
+/** A pi stub that keeps its tools, its event handlers and what it appended. */
+function piStub() {
+  const tools = new Map<string, ToolDefinition>();
+  const handlers = new Map<string, (e: unknown, ctx: unknown) => void>();
+  const appended: { customType: string; data: unknown }[] = [];
+  const pi = {
+    registerTool: (def: ToolDefinition) => tools.set(def.name, def),
+    on: (name: string, fn: (e: unknown, ctx: unknown) => void) => handlers.set(name, fn),
+    appendEntry: (customType: string, data: unknown) => appended.push({ customType, data }),
+  } as unknown as ExtensionAPI;
+  /** session_start, with the session's own entries — what a reopened chat has. */
+  const start = (own: readonly { customType: string; data: unknown }[] = []) =>
+    handlers.get('session_start')?.(
+      {},
+      { sessionManager: { getEntries: () => own.map((e) => ({ type: 'custom', ...e })) } },
+    );
+  const end = () => handlers.get('agent_end')?.({}, {});
+  return { pi, tools, start, end, appended };
+}
+
+/** The last-control file as another chat left it. `pid` must be alive. */
+function lastControl(app: string, pid: number): string {
+  const file = join(mkdtempSync(join(tmpdir(), 'mac-last-')), 'last.json');
+  writeFileSync(file, JSON.stringify({ app, pid, at: Date.now() }));
+  return file;
+}
+
+const preConsented = () => createMacConsentGate({ preConsented: true });
 const OK_BUTTON = { index: 1, role: 'AXButton', name: 'OK' };
+
+describe('only a session that drove the Mac this turn ends the driving', () => {
+  it('a chat that carried an app over and touched nothing sends no setDriving', async () => {
+    const bridge = new FakeBridge().on('setDriving', () => ({ ok: true }));
+    const s = piStub();
+    registerMacComputerUseTools(s.pi, {
+      bridge,
+      consent: preConsented(),
+      readChromeTabs: async () => null,
+      lastControlFile: lastControl('Google Chrome', process.pid),
+    });
+    s.start();
+    s.end();
+    expect(bridge.countOf('setDriving')).toBe(0);
+  });
+
+  it('nor does a reopened chat whose own record names an app it did not touch this turn', async () => {
+    const bridge = new FakeBridge().on('setDriving', () => ({ ok: true }));
+    const s = piStub();
+    registerMacComputerUseTools(s.pi, {
+      bridge,
+      consent: preConsented(),
+      readChromeTabs: async () => null,
+    });
+    s.start([{ customType: 'mac-control', data: { app: 'TextEdit', pid: 555 } }]);
+    s.end();
+    expect(bridge.countOf('setDriving')).toBe(0);
+  });
+
+  it('a turn that drove the Mac puts the overlay away when it ends — and only that turn', async () => {
+    const bridge = new FakeBridge()
+      .on('snapshot', () => SNAP([OK_BUTTON]))
+      .on('setDriving', () => ({ ok: true }));
+    const s = piStub();
+    registerMacComputerUseTools(s.pi, {
+      bridge,
+      consent: preConsented(),
+      readChromeTabs: async () => null,
+    });
+    s.start();
+    await run(s.tools, 'mac_snapshot', { app: 'TextEdit' });
+    s.end();
+    expect(bridge.countOf('setDriving')).toBe(1);
+    expect(bridge.lastParams('setDriving')).toMatchObject({ driving: false });
+    s.end(); // the next turn did nothing with the Mac
+    expect(bridge.countOf('setDriving')).toBe(1);
+  });
+
+  it("a turn whose driving was Chrome's own commands ends it too", async () => {
+    const session = createMacSessionState();
+    const bridge = new FakeBridge()
+      .on('snapshot', () => ({ ...SNAP([OK_BUTTON], 4321), app: 'Google Chrome' }))
+      .on('setDriving', () => ({ ok: true }))
+      .on('brake' as MacAgentMethod, () => ({ refusal: null }));
+    const s = piStub();
+    registerMacComputerUseTools(s.pi, {
+      bridge,
+      session,
+      consent: preConsented(),
+      readChromeTabs: async () => null,
+    });
+    registerChromeTools(s.pi, bridge, {
+      session,
+      isChromeRunning: async () => true,
+      chromePid: async () => 4321,
+      ...NO_APPLE_EVENTS,
+      chromeJsAllowed: async () => false,
+    });
+    s.start();
+    await run(s.tools, 'chrome_snapshot', {}, ctxStub(false));
+    s.end();
+    expect(bridge.countOf('setDriving')).toBe(1);
+  });
+});
 
 describe('a --visual click maps the picture the helper actually sent', () => {
   it('uses the image’s own size when the helper sent no inline copy', async () => {
