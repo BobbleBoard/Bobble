@@ -81,7 +81,7 @@ Every row below was reproduced first (a failing test, or a probe/filmstrip on th
 | "custom mermaid arrows and box styling … animate/build in real time" | ✅ |
 | "arrows should not be triangles … elbow arrows … clean solid borders" | ✅ (and class/ER) |
 | "status for everything else … I don't believe it's totally all finished" | ✅ recalled (the list below), kept current |
-| "keep going on the list, bugs can go first, verify" | ✅ bugs: 39 review findings + 4 thread bugs + 11 follow-ups + 14 of mine, all verified; the open ones are listed under Open bugs. Next: the visual list |
+| "keep going on the list, bugs can go first, verify" | ✅ bugs: 39 review findings + 4 thread bugs (1 refuted) + 10 follow-ups the agents found + 17 of mine, all verified; the open ones are listed under Open bugs. Next: the visual list |
 | "add to the harness + ui/ux report + visuals status + overall … a table documenting the bugfixes/suggested worktree runs" | ✅ this section |
 
 ## Morning 2026-09-25 (the user back)
