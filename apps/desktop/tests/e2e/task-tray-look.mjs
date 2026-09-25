@@ -412,7 +412,7 @@ try {
   await closeCard();
   await corner('03-news-corner-dark');
 
-  /* ── 05 collapsed: the button stays, and the title did not move for it ── */
+  /* ── 05 collapsed: the button stays, and the title slides clear of it ── */
   await page.click('[data-testid="collapse-sidebar"]');
   await sleep(700);
   const collapsedWith = await layout();
@@ -421,10 +421,18 @@ try {
     JSON.stringify([collapsedEmpty, collapsedWith]),
   );
   check((await button()) !== null, 'with the sidebar collapsed the button is still there');
+  /* The slot opens with the button (TaskTray.tsx) and the title slides aside:
+     with a task it starts clear of the bell; with none the corner is narrower,
+     so there is no empty gap between the toggle and the title. */
+  const textStart = (l) => l.titleLeft + Number.parseFloat(l.titlePad ?? '0');
   check(
-    collapsedWith.titleLeft === collapsedEmpty.titleLeft &&
-      collapsedWith.zoneRight === collapsedEmpty.zoneRight,
-    `the button appearing moves nothing (title ${collapsedEmpty.titleLeft} → ${collapsedWith.titleLeft})`,
+    textStart(collapsedWith) >= collapsedWith.zoneRight,
+    `the title clears the bell (${textStart(collapsedWith)} ≥ ${collapsedWith.zoneRight})`,
+  );
+  check(
+    collapsedEmpty.zoneRight < collapsedWith.zoneRight &&
+      textStart(collapsedEmpty) < textStart(collapsedWith),
+    `with nothing in the tray the title sits closer (${textStart(collapsedEmpty)} vs ${textStart(collapsedWith)})`,
   );
   await corner('04-collapsed-dark');
   await openCard();

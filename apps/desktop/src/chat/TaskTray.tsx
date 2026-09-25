@@ -223,12 +223,19 @@ export function TaskTray({
 
   return (
     /*
-     * THE SLOT IS ALWAYS THERE; the button only sometimes. The corner cluster
-     * is measured (chrome-corner.ts) and the collapsed top bar's title starts
-     * after it — a button that brought its own width would shove the title
-     * sideways every time a task was left. The slot pays that width once.
+     * THE SLOT OPENS WITH THE BUTTON. The corner cluster is measured
+     * (chrome-corner.ts) and the collapsed top bar's title starts after it. A
+     * slot reserved all the time left an unexplained 34px gap between the
+     * toggle and the title whenever there was nothing in the tray; a button that
+     * simply appeared would shove the title. So the slot's width eases open when
+     * a task is left and closed when the last one clears, and the title slides
+     * with it (global.css).
      */
-    <div className="pd-task-tray-slot" data-testid="task-tray-slot">
+    <div
+      className="pd-task-tray-slot"
+      data-testid="task-tray-slot"
+      data-open={rows.length > 0 ? 'true' : undefined}
+    >
       {rows.length > 0 ? (
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>

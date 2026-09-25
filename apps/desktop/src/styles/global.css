@@ -3166,14 +3166,27 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
  * way there. Compact on purpose — a two-line row is 40px.
  */
 .pd-task-tray-slot {
-  /* Reserved whether or not the button is in it: the collapsed top bar's title
-     starts after this corner (chrome-corner.ts), and a slot that appeared with
-     the button would shove the title sideways. */
+  /* Closed until there is a task to show, then eased open — the collapsed top
+     bar's title starts after this corner (chrome-corner.ts measures it), so it
+     slides aside rather than being shoved, and there is no empty gap when the
+     tray is empty (TaskTray.tsx). */
   display: flex;
   flex: none;
-  width: 32px;
+  width: 0;
   height: 32px;
+  margin-left: 0;
+  transition:
+    width 220ms var(--pd-easing-standard, ease),
+    margin-left 220ms var(--pd-easing-standard, ease);
+}
+.pd-task-tray-slot[data-open="true"] {
+  width: 32px;
   margin-left: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pd-task-tray-slot {
+    transition: none;
+  }
 }
 .pd-task-tray-button {
   position: relative;
