@@ -94,7 +94,9 @@ function icon(bg, fg, mark) {
 /**
  * A 480×320 "figure": glowing strands on a dark field in the page's own
  * colours — the kind of image a connectomics article leads with, without
- * being anyone's actual picture.
+ * being anyone's actual picture. Blues, teals, ambers and corals only: these
+ * land in screenshots the user reads, and his brief for the app is "NOT violet
+ * blue purple" — two strands crossing must not mix into it either.
  */
 function figure(seed, a, b) {
   const w = 480;
@@ -147,7 +149,7 @@ const PAGES = [
     snippet:
       'Researchers have mapped all 139,255 neurons and 54.5 million synapses of an adult fruit fly brain, the largest complete connectome to date.',
     icon: { bg: [24, 88, 160], fg: [255, 255, 255], mark: 'ring' },
-    image: { seed: 11, a: [90, 170, 255], b: [255, 120, 180] },
+    image: { seed: 11, a: [90, 170, 255], b: [255, 196, 96] },
   },
   {
     url: 'https://neurojournal.example/articles/flywire-whole-brain',
@@ -174,7 +176,7 @@ const PAGES = [
     snippet:
       'Machine learning did the first pass on 7,050 electron-microscope sections; human proofreaders spent roughly 33 person-years correcting it.',
     icon: { bg: [20, 20, 20], fg: [255, 214, 60], mark: 'tri' },
-    image: { seed: 41, a: [255, 214, 90], b: [110, 150, 255] },
+    image: { seed: 41, a: [255, 214, 90], b: [96, 190, 255] },
   },
   {
     url: 'https://medschool.example/news/fly-nerve-cord-connectome',
@@ -210,7 +212,7 @@ const PAGES = [
     snippet:
       'The Drosophila connectome is the complete map of neural connections in the brain of the fruit fly, published in stages from 2020.',
     icon: { bg: [235, 235, 235], fg: [40, 40, 40], mark: 'ring' },
-    image: { seed: 79, a: [200, 200, 210], b: [140, 170, 255] },
+    image: { seed: 79, a: [200, 205, 210], b: [110, 205, 255] },
   },
 ];
 
