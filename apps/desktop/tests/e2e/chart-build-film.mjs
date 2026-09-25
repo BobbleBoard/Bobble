@@ -24,7 +24,8 @@ const SHOT_DIR = process.env.SHOT_DIR ?? '/tmp/chart-film';
 mkdirSync(SHOT_DIR, { recursive: true });
 
 const ARGS = {
-  type: 'bar',
+  // CHART_TYPE=line films a line (it keeps its shape while typed and eases).
+  type: process.env.CHART_TYPE ?? 'bar',
   title: 'Units sold by month',
   labels: 'Jan, Feb, Mar, Apr, May, Jun, Jul, Aug',
   values: '12, 19, 15, 22, 31, 27, 36, 41',
@@ -76,6 +77,13 @@ const read = () =>
     return {
       pending: pending !== null,
       bars: pending?.querySelectorAll('.pd-chart-bar').length ?? 0,
+      // A line's shape: how many commands its path has (it eases only while that holds).
+      lineCmds: (
+        pending
+          ?.querySelector('.pd-chart-line')
+          ?.getAttribute('d')
+          ?.match(/[MLCQSTAHV]/gi) ?? []
+      ).length,
       pendingSvg: box(pending?.querySelector('.pd-chart-svg')),
       done: done !== null,
       doneSvg: box(done?.querySelector('.pd-chart-svg')),
@@ -164,11 +172,21 @@ try {
   const frameLog = await readFrameLog(page);
   await film.stop();
 
-  const bars = samples.filter((s) => s.pending).map((s) => s.bars);
-  check(
-    bars.length > 2 && bars.at(-1) > bars[0],
-    `the bars grow as the values land: ${bars.join(' → ')}`,
-  );
+  if (ARGS.type === 'line') {
+    const shapes = [
+      ...new Set(samples.filter((s) => s.pending && s.lineCmds > 0).map((s) => s.lineCmds)),
+    ];
+    check(
+      shapes.length === 1,
+      `the line keeps its shape while the values land (path commands: ${shapes.join(', ')})`,
+    );
+  } else {
+    const bars = samples.filter((s) => s.pending).map((s) => s.bars);
+    check(
+      bars.length > 2 && bars.at(-1) > bars[0],
+      `the bars grow as the values land: ${bars.join(' → ')}`,
+    );
+  }
   const delta = (a, b) =>
     a && b ? { dx: b.x - a.x, dy: b.y - a.y, dw: b.w - a.w, dh: b.h - a.h } : null;
   const moved = delta(before.pendingSvg, onPresent.doneSvg);

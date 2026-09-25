@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { pendingChartArgs, pendingChartSpec, skeletonShape } from './PendingChartCard';
+import {
+  padLineValues,
+  pendingChartArgs,
+  pendingChartSpec,
+  skeletonShape,
+} from './PendingChartCard';
 
 /*
  * the user (2026-09-17): "when a chart is generating show a skeleton card with
@@ -75,5 +80,27 @@ describe('skeletonShape — the placeholder for a type word still being typed', 
     expect(skeletonShape('rad')).toBe('web');
     expect(skeletonShape('scatter')).toBe('dots');
     expect(skeletonShape(undefined)).toBe('bars');
+  });
+});
+
+describe('padLineValues — a line keeps its shape while it is typed', () => {
+  it('gives every named label a point, waiting ones level with the last value', () => {
+    expect(padLineValues('Jan, Feb, Mar, Apr', '12, 19')).toBe('12, 19, 19, 19');
+  });
+  it('leaves a complete (or over-full) list alone, and an empty one', () => {
+    expect(padLineValues('Jan, Feb', '12, 19')).toBe('12, 19');
+    expect(padLineValues('Jan, Feb', '12, 19, 7')).toBe('12, 19, 7');
+    expect(padLineValues('Jan, Feb', '')).toBe('');
+  });
+  it('holds a line level while its values arrive — not diving to the axis the way zeros would', () => {
+    const values = (typed: string, type: string) =>
+      pendingChartSpec({
+        type,
+        labels: 'Jan, Feb, Mar, Apr, May',
+        values: typed,
+      })?.series[0]?.points.map((p) => p.value);
+    expect(values('12, 19', 'line')).toEqual([12, 19, 19, 19, 19]);
+    // A bar still waiting for its value stands at zero and rises into place.
+    expect(values('12, 19', 'bar')).toEqual([12, 19, 0, 0, 0]);
   });
 });

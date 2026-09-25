@@ -88,15 +88,42 @@ export function pendingChartArgs(block: {
   };
 }
 
+/** A typed list's items, split the way the chart's own parser splits them. */
+function listItems(text: string): string[] {
+  const sep = /,\s/.test(text) ? /\s*;\s*|\n+|,\s+/ : /[,;\n]+/;
+  return text
+    .split(sep)
+    .map((s) => s.trim())
+    .filter((s) => s !== '');
+}
+
+/**
+ * A LINE KEEPS ITS SHAPE WHILE IT IS TYPED. A bar is a path of one shape, so
+ * it eases from height to height; a line gained a point with every value, a
+ * path of a new shape, and snapped (the user, 2026-09-25: "animate/build in real
+ * time smoothly"). Every label the call has named gets its point from the
+ * start — one still waiting for its value sits level with the last one typed
+ * — so the path's shape holds and each value eases its point into place.
+ */
+export function padLineValues(labels: string, values: string): string {
+  const want = listItems(labels).length;
+  const have = listItems(values);
+  const last = have[have.length - 1];
+  if (last === undefined || have.length >= want) return values;
+  return [...have, ...Array.from({ length: want - have.length }, () => last)].join(', ');
+}
+
 /** The chart these arguments already describe, when they describe one. */
 export function pendingChartSpec(args: PendingChartArgs): ChartSpec | null {
   if (args.labels === undefined || args.values === undefined) return null;
   try {
+    const values =
+      skeletonShape(args.type) === 'line' ? padLineValues(args.labels, args.values) : args.values;
     const spec = normalizeChartSpec({
       type: args.type ?? 'bar',
       title: args.title ?? '',
       labels: args.labels,
-      values: args.values,
+      values,
     });
     const points = spec.series.reduce((n, s) => n + s.points.length, 0);
     return points > 0 ? spec : null;

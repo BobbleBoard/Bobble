@@ -5993,6 +5993,17 @@
 .pd-chart--building .pd-chart-bar {
   animation: pd-chart-grow 420ms var(--pd-easing-standard, ease-out) both;
 }
+/* A line or area keeps its shape while it is typed (PendingChartCard
+   padLineValues), so it eases the way a bar does, and its dots with it. */
+.pd-chart--building .pd-chart-line,
+.pd-chart--building .pd-chart-area {
+  transition: d 280ms var(--pd-easing-standard, ease-out);
+}
+.pd-chart--building .pd-chart-marker {
+  transition:
+    cx 280ms var(--pd-easing-standard, ease-out),
+    cy 280ms var(--pd-easing-standard, ease-out);
+}
 /* The finished card, taking over from a live one that drew it: no second
    entrance (live-handover.ts) — it only firms up out of the build's dim. */
 .pd-chart--landed {
@@ -6086,6 +6097,9 @@
     animation: none;
   }
   .pd-chart--building .pd-chart-bar,
+  .pd-chart--building .pd-chart-line,
+  .pd-chart--building .pd-chart-area,
+  .pd-chart--building .pd-chart-marker,
   .pd-chart--building .pd-chart-slice {
     transition: none;
   }
