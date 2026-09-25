@@ -440,6 +440,38 @@ try {
   await shot('05-sent-message');
   await clip('05b-sent-message-cards', '[data-user-turn]', 24);
 
+  /* ── 05c. editing that message keeps what it named by path ────────────── */
+  await page.locator('[data-user-turn]').first().hover();
+  await sleep(300);
+  await page.locator('[data-user-turn] button[aria-label="Edit message"]').first().click();
+  const editing = await page
+    .waitForSelector('[data-testid="editing-attachments"]', { timeout: 4000 })
+    .then(() => true)
+    .catch(() => false);
+  // A folder dropped into the message being edited joins it, by path.
+  const PHOTOS = path.join(DESK, 'photos');
+  mkdirSync(PHOTOS, { recursive: true });
+  writeFileSync(path.join(PHOTOS, 'a.jpg'), 'x');
+  if (editing) await dropFinder([PHOTOS]);
+  const edit = await page.evaluate(() =>
+    [...document.querySelectorAll('[data-testid="editing-attachments"] > *')].map((el) => ({
+      kind: el.getAttribute('data-kind') ?? (el.classList.contains('pd-pasted') ? 'text' : null),
+      name: (el.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 40),
+    })),
+  );
+  log('05c editing →', JSON.stringify(edit));
+  check(
+    editing &&
+      JSON.stringify(edit.map((e) => e.kind)) ===
+        JSON.stringify(['file', 'folder', 'file', 'text', 'folder']),
+    `the edit did not keep the PDF, the folder, the picture (as its file) and the notes, plus the dropped folder: ${JSON.stringify(edit)}`,
+  );
+  await clip('05c-editing-message', '[data-testid="editing-message"]', 24);
+  if (editing) {
+    await page.locator('[data-testid="editing-message"] button', { hasText: 'Cancel' }).click();
+    await sleep(400);
+  }
+
   /* ── 06. the sent picture, clicked ────────────────────────────────────── */
   await page.click('.pd-user-image');
   await sleep(1400);
