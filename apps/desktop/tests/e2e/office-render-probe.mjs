@@ -88,7 +88,7 @@ for (const [kind, name] of [
   files[kind] = out;
 }
 
-const { page, finish } = await launchApp('office-render', {
+const { app, page, finish } = await launchApp('office-render', {
   env: { HOME: home },
   timeout: 120_000,
 });
@@ -195,6 +195,63 @@ try {
   await sleep(7000);
   await widen();
   await composite(doc, 'report-top');
+  // The app is light: so is the editor's chrome — also after a trip to dark
+  // and back with the document open. Its theme sheets used to pile up, and the
+  // dark ones outranked the light: a light app's report wore a black status
+  // bar (2026-09-25).
+  await page.evaluate(() => window.__pi_theme?.()?.setMode?.('dark'));
+  await sleep(1500);
+  await page.evaluate(() => window.__pi_theme?.()?.setMode?.('light'));
+  await sleep(1500);
+  const statusBg = await app.evaluate(async ({ webContents }) => {
+    for (const wc of webContents.getAllWebContents()) {
+      if (!/\/apps\/docs\//.test(wc.getURL())) continue;
+      const bg = await wc
+        .executeJavaScript(
+          "(() => { const b = document.querySelector('.status-bar'); return b ? getComputedStyle(b).backgroundColor : null; })()",
+          true,
+        )
+        .catch(() => null);
+      if (bg) return bg;
+    }
+    return null;
+  });
+  const lum = (() => {
+    const m = /rgba?\(([^)]+)\)/.exec(statusBg ?? '');
+    if (!m) return null;
+    const [r, g, b] = m[1].split(',').map((v) => Number.parseFloat(v));
+    return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  })();
+  note('a light app’s report has a light status bar', lum !== null && lum > 0.7, String(statusBg));
+  // …and a dark app's has a dark one (the swap takes sheets out in both directions).
+  await page.evaluate(() => window.__pi_theme?.()?.setMode?.('dark'));
+  await sleep(1500);
+  const darkBg = await app.evaluate(async ({ webContents }) => {
+    for (const wc of webContents.getAllWebContents()) {
+      if (!/\/apps\/docs\//.test(wc.getURL())) continue;
+      const bg = await wc
+        .executeJavaScript(
+          "(() => { const b = document.querySelector('.status-bar'); return b ? getComputedStyle(b).backgroundColor : null; })()",
+          true,
+        )
+        .catch(() => null);
+      if (bg) return bg;
+    }
+    return null;
+  });
+  const darkLum = (() => {
+    const m = /rgba?\(([^)]+)\)/.exec(darkBg ?? '');
+    if (!m) return null;
+    const [r, g, b] = m[1].split(',').map((v) => Number.parseFloat(v));
+    return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  })();
+  note(
+    'a dark app’s report has a dark status bar',
+    darkLum !== null && darkLum < 0.3,
+    String(darkBg),
+  );
+  await page.evaluate(() => window.__pi_theme?.()?.setMode?.('light'));
+  await sleep(1500);
   for (const [label, top] of [
     ['report-middle', 900],
     ['report-sources', 99999],

@@ -28,6 +28,7 @@ import sys
 from pathlib import Path
 
 from docx import Document
+from docx_fonts import own_fonts
 from docx.enum.section import WD_ORIENT
 from docx.oxml import OxmlElement
 from docx.shared import Emu, Pt
@@ -189,6 +190,8 @@ SKIP = {"svg", "g", "defs", "style", "script", "br"}
 
 def build(elements: list[dict], out: Path, *, margin_in: float = 0.4) -> dict:
     doc = Document()
+    # Word's template names Calibri and Cambria; the document names its own.
+    own_fonts(doc, "Helvetica Neue")
     sec = doc.sections[0]
     # Landscape, sized so the 1280px design fills the text area. A design laid
     # out for 16:9 dropped into a portrait page is the other way this silently

@@ -22,6 +22,7 @@ import { app, BrowserWindow, type WebContents, type WebContentsView } from 'elec
 import type { AppEventMap } from '../ipc-contract';
 import { officeChromeCss, officeChromeScript } from './office-chrome';
 import type { OfficeBounds, OfficeKind } from './office-contract';
+import { swapCss } from './office-css-swap';
 import { type OfficeThemeTokens, officeThemeCss } from './office-theme';
 
 const log = createLogger('desktop:office');
@@ -224,8 +225,9 @@ let themeDark = false;
  */
 function applyToView(wc: WebContents | undefined): void {
   if (!wc || wc.isDestroyed()) return;
-  void wc.insertCSS(themeCss).catch(() => undefined);
-  void wc.insertCSS(officeChromeCss(themeDark)).catch(() => undefined);
+  // Swapped, not added: an earlier theme's `!important` sheets would outrank
+  // the new ones (a light app's report wore the dark status bar).
+  void swapCss(wc, [themeCss, officeChromeCss(themeDark)]);
   void wc
     .executeJavaScript(
       `document.documentElement.dataset.pdDark = ${JSON.stringify(themeDark ? '1' : '0')};` +

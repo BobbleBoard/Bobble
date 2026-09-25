@@ -48,6 +48,7 @@ import sys
 from pathlib import Path
 
 from docx import Document
+from docx_fonts import own_fonts
 from docx.enum.text import WD_BREAK
 from docx.opc.constants import RELATIONSHIP_TYPE as RT
 from docx.oxml import OxmlElement
@@ -636,6 +637,8 @@ def build(spec: dict, out: Path, drawn: list | None = None, warnings: list | Non
     normal = doc.styles["Normal"]
     normal.font.name = SANS
     normal.font.size = Pt(11)
+    # Word's template names Calibri and Cambria; the document names its own.
+    own_fonts(doc, SANS)
 
     blocks = list(spec.get("blocks", []))
     registry = BLOCKS
