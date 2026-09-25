@@ -560,9 +560,39 @@ try {
   await shot('10-paste-from-outside-light');
   await clip('10b-paste-from-outside-composer', '.pd-composer-root', 16);
 
+  /*
+   * THE NEWEST COPY WINS ⌘V. Copy the chip with the composer's own clipboard
+   * (click it, ⌘C), then copy the card: ⌘V must paste the CARD's picture. The
+   * chip clipboard used to claim every ⌘V once it held anything, so this pasted
+   * the 320×200 chip again. Told apart by size.
+   */
+  await page.locator('[data-testid="attach-chip"]').first().click();
+  await sleep(200);
+  await page.keyboard.press('Meta+c');
+  await sleep(200);
+  await page.locator('[data-testid="media-card"]').first().hover();
+  await sleep(400);
+  await page.click('[data-testid="media-copy"]');
+  await sleep(600);
+  const lastWrite = pasteboardCount();
+  await pasteIntoComposer();
+  const newest = await page.evaluate(async () => {
+    const chips = [...document.querySelectorAll('[data-testid="attach-chip"] img.pd-attach-thumb')];
+    const src = chips[chips.length - 1]?.getAttribute('src') ?? '';
+    const img = new Image();
+    img.src = src;
+    await img.decode().catch(() => undefined);
+    return { count: chips.length, w: img.naturalWidth, h: img.naturalHeight };
+  });
+  log('chip copied, then the card copied, ⌘V →', JSON.stringify(newest));
+  check(
+    newest.count === 2 && newest.w === 1024 && newest.h === 1024,
+    `⌘V after a newer card copy did not paste the card's picture: ${JSON.stringify(newest)}`,
+  );
+
   // Our picture off the clipboard, if nothing newer landed there meanwhile.
   const count3 = pasteboardCount();
-  if (count2 !== null && count3 === count2) {
+  if (lastWrite !== null && count3 === lastWrite) {
     await app.evaluate(({ clipboard }) => clipboard.clear());
     log('cleared the probe picture off the clipboard');
   } else {
@@ -634,6 +664,11 @@ try {
       const b = document.querySelector('[data-testid="viewer-picture"]')?.getBoundingClientRect();
       return b === undefined ? null : { x: b.x, y: b.y, w: b.width, h: b.height };
     });
+    if (process.env.STRENGTH !== undefined) {
+      await page.click('[data-testid="viewer-strength"]');
+      await page.click(`[data-testid="viewer-strength-${process.env.STRENGTH}"]`);
+      await sleep(300);
+    }
     await page.fill('[data-testid="viewer-edit-input"]', INSTRUCTION);
     const t0 = Date.now();
     await page.keyboard.press('Enter');
@@ -642,20 +677,40 @@ try {
       8000,
     );
     check(waiting, 'no waiting card appeared in the viewer while the edit ran');
-    // Past the first steps, so the bar and the phrase are showing progress.
-    await page
-      .waitForFunction(
-        () =>
-          Number(
-            document
-              .querySelector('[data-testid="image-viewer"] [role="progressbar"]')
-              ?.getAttribute('aria-valuenow') ?? '0',
-          ) >= 20,
-        undefined,
-        { timeout: REAL ? CAP_MS : 15_000, polling: 500 },
-      )
-      .catch(() => undefined);
+    if (REAL) {
+      /* MID-RUN ON A CLOCK. Qwen-Image 2.1 runs without step previews, and its
+         step counter only reaches the bar in a burst at the end — waiting for
+         20% caught the reveal, not the run (SEEN on the first real run). */
+      await sleep(Number(process.env.RUNNING_SHOT_S ?? 30) * 1000);
+    } else {
+      // Past the first steps, so the bar and the phrase are showing progress.
+      await page
+        .waitForFunction(
+          () =>
+            Number(
+              document
+                .querySelector('[data-testid="image-viewer"] [role="progressbar"]')
+                ?.getAttribute('aria-valuenow') ?? '0',
+            ) >= 20,
+          undefined,
+          { timeout: 15_000, polling: 500 },
+        )
+        .catch(() => undefined);
+    }
     await shot('11-edit-running-light');
+    log(
+      'the waiting card says',
+      JSON.stringify(
+        await page.evaluate(() => ({
+          phase: document.querySelector(
+            '[data-testid="image-viewer"] [data-testid="pending-phase"]',
+          )?.textContent,
+          caption: document.querySelector(
+            '[data-testid="image-viewer"] [data-testid="pending-pct"]',
+          )?.textContent,
+        })),
+      ),
+    );
     const pendingBox = await page.evaluate(() => {
       const card = document.querySelector(
         '[data-testid="image-viewer"] [data-testid="pending-media-card"]',
@@ -722,7 +777,10 @@ try {
       const q = reqs[0] ?? {};
       check(q.inputImage === PICTURE, `the edit did not start from the picture: ${q.inputImage}`);
       check(q.prompt === INSTRUCTION, `the edit's words were "${q.prompt}"`);
-      check(q.strength === 0.6 && q.size === '1024x1024', `strength/size: ${q.strength} ${q.size}`);
+      check(
+        q.strength === Number(process.env.STRENGTH ?? 0.6) && q.size === '1024x1024',
+        `strength/size: ${q.strength} ${q.size}`,
+      );
       check(
         onStage.includes('fox-in-snow-golden.png'),
         'the result is not the picture on the stage',
@@ -732,6 +790,8 @@ try {
          of light and dark survives an edit and does not survive a new
          generation. 32×32 luminance, Pearson r. */
       const made = decodeURIComponent(onStage.replace(/^pd-file:\/\/f/, ''));
+      copyFileSync(PICTURE, path.join(SHOT_DIR, `${PHASE}-edit-input.png`));
+      copyFileSync(made, path.join(SHOT_DIR, `${PHASE}-edit-output.png`));
       const stats = await page.evaluate(
         async ([a, b]) => {
           const read = async (p) => {
