@@ -158,10 +158,12 @@ export const OMNISVG_MAX_TOKENS = 1536;
  * temperature, then top-k, then top-p, and nothing else. llama-server's
  * defaults differ three ways: the temperature LAST, a min_p of 0.05 on top, and
  * a penalty window of only the last 64 tokens. MEASURED 2026-09-25 on the
- * authors' own prompts through the app's pipeline (17 prompts × 3): with the
- * defaults 22% of the samples ran into a loop — one command of no length, over
- * and over, to the 1,536-id limit — and with this chain 10%. The rest are cut
- * at the loop and drawn again (loopStart, the app's generateSvg).
+ * authors' own 19 prompts through the app's pipeline (× 3 samples): with the
+ * defaults 25% of the samples ran into a loop — one command of no length, over
+ * and over, to the 1,536-id limit — and with this chain 17% (caption-style
+ * rewrites of our own prompts: 50% either way). The chain is theirs, so it is
+ * the right one; the loops left are cut and drawn again (loopStart, the app's
+ * generateSvg).
  */
 export const OMNISVG_SAMPLER_CHAIN = {
   samplers: ['penalties', 'temperature', 'top_k', 'top_p'],
