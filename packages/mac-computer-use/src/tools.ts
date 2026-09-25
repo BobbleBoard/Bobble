@@ -421,9 +421,14 @@ export function registerMacComputerUseTools(
   let recordedPid: number | null = null;
   const recordControl = (): void => {
     const c = session.controlled();
-    if (c === null || c.pid === recordedPid) return;
-    recordedPid = c.pid;
+    if (c === null) return;
+    /* On EVERY use, not only on a change: `at` is when the app was last used,
+       which is what the 12 h window means, and another chat may have written
+       its own app since — the app this chat is working in is the last one
+       again the moment it is used. The session entry stays once per change. */
     writeLastControl(c);
+    if (c.pid === recordedPid) return;
+    recordedPid = c.pid;
     try {
       pi.appendEntry?.(MAC_CONTROL_ENTRY, {
         app: c.app,
@@ -456,10 +461,13 @@ export function registerMacComputerUseTools(
       session.restore?.(last);
       recordedPid = last.pid;
     } else {
+      /* NOT recorded as this chat's own until it is used. It was, by setting
+         recordedPid here, so the chat never wrote its entry: after a restart
+         it read the file again and took whatever another chat had driven since.
+         The first look that uses it records it like any other take. */
       const carried = readLastControl();
       if (carried !== null) {
         session.restore?.(carried);
-        recordedPid = carried.pid;
         carriedOver = true;
       }
     }

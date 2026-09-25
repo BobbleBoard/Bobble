@@ -1405,6 +1405,57 @@ describe('only a session that drove the Mac this turn ends the driving', () => {
   });
 });
 
+describe('carried-over control becomes the chat’s own once used, and the record stays fresh', () => {
+  it('the first look at a carried app records it, so a restart does not take another chat’s app', async () => {
+    const file = lastControl('TextEdit', process.pid);
+    const bridge = new FakeBridge().on('snapshot', (p) => ({
+      ...SNAP([OK_BUTTON], typeof p?.pid === 'number' ? p.pid : process.pid),
+      app: typeof p?.app === 'string' ? p.app : 'TextEdit',
+    }));
+    const b = piStub();
+    registerMacComputerUseTools(b.pi, {
+      bridge,
+      consent: preConsented(),
+      readChromeTabs: async () => null,
+      lastControlFile: file,
+    });
+    b.start();
+    await run(b.tools, 'mac_snapshot', {});
+    expect(b.appended).toContainEqual({
+      customType: 'mac-control',
+      data: expect.objectContaining({ app: 'TextEdit', pid: process.pid }),
+    });
+    // Another chat moves on to Blender; this chat's pi child restarts.
+    writeFileSync(file, JSON.stringify({ app: 'Blender', pid: process.ppid, at: Date.now() }));
+    b.start(b.appended);
+    await run(b.tools, 'mac_snapshot', {});
+    expect(bridge.lastParams('snapshot')).toMatchObject({ pid: process.pid, app: 'TextEdit' });
+  });
+
+  it('every use refreshes the record, so the app a chat is working in is the last one again', async () => {
+    const file = join(mkdtempSync(join(tmpdir(), 'mac-last-')), 'last.json');
+    const bridge = new FakeBridge().on('snapshot', () => SNAP([OK_BUTTON], process.pid));
+    const a = piStub();
+    registerMacComputerUseTools(a.pi, {
+      bridge,
+      consent: preConsented(),
+      readChromeTabs: async () => null,
+      lastControlFile: file,
+    });
+    a.start();
+    await run(a.tools, 'mac_snapshot', { app: 'TextEdit' });
+    // Another chat drives Blender and says so — hours ago, as far as the file knows.
+    writeFileSync(
+      file,
+      JSON.stringify({ app: 'Blender', pid: process.ppid, at: Date.now() - 11 * 3600_000 }),
+    );
+    await run(a.tools, 'mac_snapshot', {});
+    const now = JSON.parse(readFileSync(file, 'utf8')) as { app: string; pid: number; at: number };
+    expect(now).toMatchObject({ app: 'TextEdit', pid: process.pid });
+    expect(Date.now() - now.at).toBeLessThan(60_000);
+  });
+});
+
 describe('a --visual click maps the picture the helper actually sent', () => {
   it('uses the image’s own size when the helper sent no inline copy', async () => {
     const bridge = new FakeBridge()
