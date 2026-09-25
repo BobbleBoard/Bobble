@@ -42,6 +42,9 @@ const jobs = new Map<string, ChatJob>();
 /** The subagents of chats deleted this run — see {@link noteAgentJob}. */
 const orphanedAgents = new Set<string>();
 
+/** Jobs stopped the moment they were announced, because their chat was gone. */
+const stoppedOnArrival = new Set<string>();
+
 /** Pure: the chat a job belongs to, from who asked and what was running. */
 export function ownerOfJob(input: {
   readonly agent: string | undefined;
@@ -73,6 +76,12 @@ export function noteAgentJob(kind: ChatJobKind, jobId: string, agent: string | u
    * the child store no longer knows — is stopped the moment it appears.
    */
   if (isChatDeleted(owner) || (agent !== undefined && orphanedAgents.has(agent))) {
+    stoppedOnArrival.add(jobId);
+    while (stoppedOnArrival.size > MAX_TRACKED) {
+      const oldest = stoppedOnArrival.values().next().value;
+      if (oldest === undefined) break;
+      stoppedOnArrival.delete(oldest);
+    }
     void cancelJob({ jobId, kind, owner });
     return;
   }
@@ -92,6 +101,22 @@ export function forgetJob(jobId: string): void {
 /** The chat a tracked job belongs to — null when none could be named. */
 export function ownerOfTrackedJob(jobId: string): string | null {
   return jobs.get(jobId)?.owner ?? null;
+}
+
+/**
+ * Where the situation room puts a production's roles: under the chat whose pi
+ * asked for it — the chat on screen when that is not known. (ChatApp's rule,
+ * kept here so it can be tested without a window.)
+ *
+ * NOWHERE (null) for a production whose chat was deleted before it was
+ * announced. It is being stopped, and it is not tracked, so "the chat on
+ * screen" was the fallback: its roles nested under the fresh chat that
+ * replaced the deleted one, and the room bound that chat to a team that was
+ * not its own until the team had wound down.
+ */
+export function productionHome(taskId: string, viewed: string | null): { parentId: string } | null {
+  if (stoppedOnArrival.has(taskId)) return null;
+  return { parentId: ownerOfTrackedJob(taskId) ?? viewed ?? '' };
 }
 
 /**
