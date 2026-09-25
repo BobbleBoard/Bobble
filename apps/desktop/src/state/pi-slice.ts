@@ -18,6 +18,7 @@ import {
 } from '@pi-desktop/engine';
 import { create } from 'zustand';
 import { useCorpStore } from './corp-store';
+import { isChatDeleted } from './deleted-chats';
 import type { QueueReason } from './send-feasibility';
 import { adoptFinalText, appendOrMergeBlock, mutateAssistant } from './transcript-fold';
 
@@ -532,6 +533,10 @@ export function createQueueDrain(
 /** The StoreSink the event router drives. Exported for tests. */
 export function createPiSink(
   store: Pick<typeof usePiStore, 'setState' | 'getState'> = usePiStore,
+  opts: {
+    /** Answer a dialog "no answer" without showing it (pi-connect wires the IPC). */
+    readonly refuseUiRequest?: (id: string) => void;
+  } = {},
 ): StoreSink {
   const set = store.setState;
   // Route a thread mutation to the BACKGROUND buffer while a non-viewed session is
@@ -744,25 +749,37 @@ export function createPiSink(
     // Idempotent dedupe-by-id (foundation-hardening handoff, Lane B): a renderer
     // reload replays pending dialogs via pi:start, and the router can re-emit the
     // same request; a duplicate id must never stack a second dialog over the first.
-    uiRequest: (request) =>
-      set((s) => {
-        if (s.uiRequests.some((r) => r.id === request.id)) return {};
-        // Tag the request with the session that raised it — a background chat's
-        // ask_user blocks pi mid-turn, so `bgRun.streaming` is true iff the bg chat
-        // asked (same invariant threadSet uses). A bg request is NOT shown as a
-        // dialog over the viewed chat; instead its chat gets a needs-input dot +
-        // the top banner picks it up (UiRequestDialogs gates on this tag).
-        const bgAsking = s.bgRun?.streaming;
-        const sessionFile = bgAsking ? s.bgRun?.sessionFile : (s.session?.sessionFile ?? undefined);
-        const tagged = { ...request, ...(sessionFile !== undefined ? { sessionFile } : {}) };
-        if (bgAsking && s.bgRun !== null) {
-          return {
-            uiRequests: [...s.uiRequests, tagged],
-            unread: { ...s.unread, [s.bgRun.sessionFile]: 'needs-input' as const },
-          };
-        }
-        return { uiRequests: [...s.uiRequests, tagged] };
-      }),
+    uiRequest: (request) => {
+      const s = store.getState();
+      if (s.uiRequests.some((r) => r.id === request.id)) return;
+      // Tag the request with the session that raised it — a background chat's
+      // ask_user blocks pi mid-turn, so `bgRun.streaming` is true iff the bg chat
+      // asked (same invariant threadSet uses). A bg request is NOT shown as a
+      // dialog over the viewed chat; instead its chat gets a needs-input dot +
+      // the top banner picks it up (UiRequestDialogs gates on this tag).
+      const bgAsking = s.bgRun?.streaming;
+      const sessionFile = bgAsking ? s.bgRun?.sessionFile : (s.session?.sessionFile ?? undefined);
+      /*
+       * A DELETED CHAT CANNOT ASK ANYTHING. Its dying turn can still raise a
+       * question after the delete began, and nobody will ever see it: pi's turn
+       * would wait on it forever (the harness's dialog has no abort signal),
+       * and the chat would get an orange dot, a dock badge and a "needs you"
+       * notification that nothing can clear. Answer "no answer" at once.
+       */
+      if (isChatDeleted(sessionFile)) {
+        opts.refuseUiRequest?.(request.id);
+        return;
+      }
+      const tagged = { ...request, ...(sessionFile !== undefined ? { sessionFile } : {}) };
+      if (bgAsking && s.bgRun !== null) {
+        set({
+          uiRequests: [...s.uiRequests, tagged],
+          unread: { ...s.unread, [s.bgRun.sessionFile]: 'needs-input' as const },
+        });
+        return;
+      }
+      set({ uiRequests: [...s.uiRequests, tagged] });
+    },
 
     resolveUiRequest: (id) => set((s) => ({ uiRequests: s.uiRequests.filter((r) => r.id !== id) })),
 

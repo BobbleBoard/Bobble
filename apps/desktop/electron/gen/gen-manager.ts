@@ -94,6 +94,7 @@ import { openStillWindow } from './hyperframes-window';
 import { buildComfyImageJob, isComfyImageModel } from './image-dispatch';
 import { createRoomKeeper, type RoomKeeper } from './make-room';
 import { generateSvg, omniSvgFiles } from './omnisvg';
+import { PendingJobs, unlessStopped } from './pending-jobs';
 import { canEnhance, type EnhancerEndpoint, enhancePrompt } from './prompt-enhancer';
 import { parseTqdm } from './tqdm';
 import {
@@ -355,6 +356,12 @@ export interface Run3dParams {
   /** Where the GLB lands. */
   readonly outputDir: string;
   /**
+   * Stops the job — at the gates or in the queue. The caller knows it by an id
+   * of its own (gen3d-main's `c3d_…`), not the queue's, so this is the only
+   * way its cancel reaches the job.
+   */
+  readonly signal?: AbortSignal;
+  /**
    * A line about the wait, when there is one — "Waiting for memory — needs
    * about 14.8 GB and only 18.5 GB is available (keeping 4 GB for you)".
    * The chat and the studios get these through their note sinks; without this
@@ -607,22 +614,25 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
   }
 
   /**
-   * AN AGENT'S JOB IS ANNOUNCED, a studio's is not. Sent as the job gets its id —
-   * before the queue runs it — so a chat deleted while its picture is still
-   * waiting its turn stops that picture too (the user, 2026-09-23). `from` is absent
-   * on the studios' own path (`gen:generate`).
+   * AN AGENT'S JOB IS ANNOUNCED, a studio's is not. Sent as the job reaches the
+   * gates — before the queue runs it, and with `pendingJobs` already holding it
+   * — so a chat deleted while its picture is still waiting its turn, or waiting
+   * for its runtime to install, stops that picture too (the user, 2026-09-23).
+   * `from` is absent on the studios' own path (`gen:generate`).
    */
   /** OmniSVG drawings in flight, by the id `announceAgentJob` gave them. */
   const svgRuns = new Map<string, AbortController>();
   let svgSeq = 0;
-  /** Stop a job by id — a queue job, or a drawing (`svg-<n>`). */
+  /** Jobs that have an id and are still at the gates, not yet queued. */
+  const pendingJobs = new PendingJobs();
+  /** Stop a job by id — one at the gates, a queue job, or a drawing (`svg-<n>`). */
   const cancelJob = (jobId: string): boolean => {
     const drawing = svgRuns.get(jobId);
     if (drawing !== undefined) {
       drawing.abort();
       return true;
     }
-    return jobQueue.cancel(jobId);
+    return pendingJobs.cancel(jobId) || jobQueue.cancel(jobId);
   };
 
   const announceAgentJob = (jobId: string, from: AgentSource | undefined): void => {
@@ -653,7 +663,6 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
       );
     }
     const jobId = `gen_${Date.now()}_${randomBytes(3).toString('hex')}`;
-    announceAgentJob(jobId, from);
     // The FOLDER is named after what was asked for; jobId stays the internal id.
     const outputDir = path.join(outputRoot, uniqueName(outputRoot, slug(raw.prompt, 'image')));
     await mkdir(outputDir, { recursive: true });
@@ -838,18 +847,23 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
       }
     };
 
+    const stop = pendingJobs.open(jobId);
+    announceAgentJob(jobId, from);
     try {
       // Download-then-continue: an mflux image needs no up-front pack, so this is
       // a no-op here; the seam is uniform so a future comfyui-backed image gates too.
-      await ensureModule(job.backend);
-      await ensureWeights(model);
+      await unlessStopped(stop, ensureModule(job.backend));
+      await unlessStopped(stop, ensureWeights(model));
       const need = needForModel(model);
-      if (need !== undefined && ensureAsset !== undefined) await ensureAsset(need);
+      if (need !== undefined && ensureAsset !== undefined) {
+        await unlessStopped(stop, ensureAsset(need));
+      }
       noteSinks.set(jobId, (line) => {
         note = line;
         send('gen:update', { tabId, payload: payload('generating') });
       });
-      await opts.freshReading?.();
+      await unlessStopped(stop, opts.freshReading?.());
+      pendingJobs.admit(jobId);
       const outputs = await jobQueue.enqueue(job, {
         heavy: model.heavy,
         footprintGB,
@@ -874,6 +888,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
       send('gen:update', { tabId, payload: payload('error', message) });
       throw err;
     } finally {
+      pendingJobs.close(jobId);
       noteSinks.delete(jobId);
       await settleRoom();
     }
@@ -889,7 +904,6 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
       throw new Error(`unknown or non-video model "${raw.model ?? ''}"`);
     }
     const jobId = `gen_${Date.now()}_${randomBytes(3).toString('hex')}`;
-    announceAgentJob(jobId, from);
     // The FOLDER is named after what was asked for; jobId stays the internal id.
     const outputDir = path.join(outputRoot, uniqueName(outputRoot, slug(raw.prompt, 'animation')));
     await mkdir(outputDir, { recursive: true });
@@ -963,18 +977,23 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
       }
     };
 
+    const stop = pendingJobs.open(jobId);
+    announceAgentJob(jobId, from);
     try {
       // Download-then-continue: a comfyui-backed video (LTX / Wan) whose weights
       // pack is missing PROMPTS the user, downloads on accept, then continues here.
-      await ensureModule(job.backend);
-      await ensureWeights(model);
+      await unlessStopped(stop, ensureModule(job.backend));
+      await unlessStopped(stop, ensureWeights(model));
       const need = needForModel(model);
-      if (need !== undefined && ensureAsset !== undefined) await ensureAsset(need);
+      if (need !== undefined && ensureAsset !== undefined) {
+        await unlessStopped(stop, ensureAsset(need));
+      }
       noteSinks.set(jobId, (line) => {
         note = line;
         send('gen:update', { tabId, payload: payload('generating') });
       });
-      await opts.freshReading?.();
+      await unlessStopped(stop, opts.freshReading?.());
+      pendingJobs.admit(jobId);
       const outputs = await jobQueue.enqueue(job, {
         heavy: model.heavy,
         footprintGB: jobFootprintGB(model, width * height),
@@ -1007,6 +1026,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
       send('gen:update', { tabId, payload: payload('error', message) });
       throw err;
     } finally {
+      pendingJobs.close(jobId);
       noteSinks.delete(jobId);
       await settleRoom();
     }
@@ -1056,7 +1076,6 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
     }
 
     const jobId = `gen_${Date.now()}_${randomBytes(3).toString('hex')}`;
-    announceAgentJob(jobId, from);
     const outputDir = path.join(
       outputRoot,
       uniqueName(outputRoot, slug(raw.prompt, audioOutputName(kind, raw.prompt))),
@@ -1141,18 +1160,23 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
       }
     };
 
+    const stop = pendingJobs.open(jobId);
+    announceAgentJob(jobId, from);
     try {
       // Same download-then-continue courtesy the video path gets: a ComfyUI music
       // or SFX model whose weights pack is missing prompts, downloads, continues.
-      await ensureModule(job.backend);
-      await ensureWeights(model);
+      await unlessStopped(stop, ensureModule(job.backend));
+      await unlessStopped(stop, ensureWeights(model));
       const need = needForModel(model);
-      if (need !== undefined && ensureAsset !== undefined) await ensureAsset(need);
+      if (need !== undefined && ensureAsset !== undefined) {
+        await unlessStopped(stop, ensureAsset(need));
+      }
       noteSinks.set(jobId, (line) => {
         note = line;
         send('gen:update', { tabId, payload: payload('generating') });
       });
-      await opts.freshReading?.();
+      await unlessStopped(stop, opts.freshReading?.());
+      pendingJobs.admit(jobId);
       const outputs = await jobQueue.enqueue(job, {
         heavy: model.heavy,
         footprintGB: jobFootprintGB(model),
@@ -1186,6 +1210,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
       canvasPush('gen:update', payload('error', message));
       throw err;
     } finally {
+      pendingJobs.close(jobId);
       noteSinks.delete(jobId);
       await settleRoom();
     }
@@ -1233,7 +1258,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
             : err instanceof Error
               ? err.message
               : String(err);
-          send('gen:svg-live', { status: 'error', error: message, ...prompt });
+          send('gen:svg-live', { status: 'error', error: message, ...prompt, jobId: svgId });
           throw err;
         } finally {
           svgRuns.delete(svgId);
@@ -1255,7 +1280,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
           }
           outputs.push({ path: o.outputPath, svg, paths: o.paths });
         }
-        send('gen:svg-live', { status: 'done', outputs, ...prompt });
+        send('gen:svg-live', { status: 'done', outputs, ...prompt, jobId: svgId });
         return result;
       }
       case 'omnisvgStatus':
@@ -1579,18 +1604,24 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
       },
     };
     if (params.onNote !== undefined) noteSinks.set(jobId, params.onNote);
+    const stop = pendingJobs.open(jobId, params.signal);
     try {
-      await ensureModule(job.backend);
-      await ensureWeights(model);
-      await opts.freshReading?.();
-      const outputs = await jobQueue.enqueue(job, {
+      await unlessStopped(stop, ensureModule(job.backend));
+      await unlessStopped(stop, ensureWeights(model));
+      await unlessStopped(stop, opts.freshReading?.());
+      pendingJobs.admit(jobId);
+      const queued = jobQueue.enqueue(job, {
         heavy: model.heavy,
         footprintGB: jobFootprintGB(model),
         onEvent,
-      }).result;
+      });
+      // The caller knows this job by its own id; its signal is how it stops it.
+      params.signal?.addEventListener('abort', () => jobQueue.cancel(jobId), { once: true });
+      const outputs = await queued.result;
       moduleSucceeded(job.backend);
       return { jobId, outputs };
     } finally {
+      pendingJobs.close(jobId);
       noteSinks.delete(jobId);
       await settleRoom();
     }

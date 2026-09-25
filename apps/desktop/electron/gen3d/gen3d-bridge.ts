@@ -32,6 +32,8 @@ export type RunImageJob = (req: {
   editFrom?: string;
   /** The asking pi — a subagent's id; absent for the chat's own pi. */
   agent?: string;
+  /** Aborted when the tool that asked hangs up before the reply (see handleLine). */
+  signal?: AbortSignal;
 }) => Promise<ImageJobResult>;
 /** The 3D side (gen3d-main run3dJob / runStage3dJob), wired beside the image runner. */
 export interface ModelRunners {
@@ -41,12 +43,14 @@ export interface ModelRunners {
     finish?: 'grey' | 'color' | 'pbr';
     resolution?: 'low' | 'medium' | 'high';
     agent?: string;
+    signal?: AbortSignal;
   }) => Promise<ImageJobResult>;
   readonly stage: (req: {
     op: 'texture' | 'segment' | 'rig' | 'retopo';
     modelPath: string;
     prompt?: string;
     agent?: string;
+    signal?: AbortSignal;
   }) => Promise<ImageJobResult>;
 }
 
@@ -116,9 +120,14 @@ export async function handleMethod(
   models: ModelRunners | null = runModel,
   agent?: string,
   preview: ImagePreviewer | null = previewImage,
+  signal?: AbortSignal,
 ): Promise<ImageJobResult> {
-  /* Who asked travels with the job, so the chat that owns it can stop it. */
-  const who = agent !== undefined && agent !== '' ? { agent } : {};
+  /* Who asked travels with the job, so the chat that owns it can stop it —
+     and so does whether they are still there to receive it. */
+  const who = {
+    ...(agent !== undefined && agent !== '' ? { agent } : {}),
+    ...(signal !== undefined ? { signal } : {}),
+  };
   /* THE 3D METHODS — the connector's tools (harness model-tools.ts). */
   if (method === 'generate_3d') {
     if (models === null) return fail('the 3D engine is not available');
@@ -167,9 +176,19 @@ function defaultSocketPath(): string {
 
 function handleConnection(socket: net.Socket): void {
   let buffer = '';
+  /*
+   * The requests this connection is still waiting on. The harness's client
+   * opens one connection per request and CLOSES it when its turn is aborted —
+   * "cancelled" is already the tool's answer by then — so a close with a
+   * request unanswered means nobody is left to receive the result.
+   */
+  const unanswered = new Set<AbortController>();
   socket.setEncoding('utf8');
   socket.on('error', () => {
     /* a peer reset must never crash main */
+  });
+  socket.on('close', () => {
+    for (const asker of unanswered) asker.abort();
   });
   socket.on('data', (chunk: string) => {
     buffer += chunk;
@@ -177,13 +196,17 @@ function handleConnection(socket: net.Socket): void {
     while (nl !== -1) {
       const line = buffer.slice(0, nl);
       buffer = buffer.slice(nl + 1);
-      if (line.trim() !== '') void handleLine(socket, line);
+      if (line.trim() !== '') void handleLine(socket, line, unanswered);
       nl = buffer.indexOf('\n');
     }
   });
 }
 
-async function handleLine(socket: net.Socket, line: string): Promise<void> {
+async function handleLine(
+  socket: net.Socket,
+  line: string,
+  unanswered: Set<AbortController>,
+): Promise<void> {
   let req: BridgeRequest;
   try {
     req = JSON.parse(line) as BridgeRequest;
@@ -202,9 +225,22 @@ async function handleLine(socket: net.Socket, line: string): Promise<void> {
     respond({ ok: false, error: 'unauthorized' });
     return;
   }
+  const asker = new AbortController();
+  unanswered.add(asker);
   try {
-    respond(await handleMethod(req.method, req.params, runJob, runModel, req.agent));
+    const res = await handleMethod(
+      req.method,
+      req.params,
+      runJob,
+      runModel,
+      req.agent,
+      previewImage,
+      asker.signal,
+    );
+    unanswered.delete(asker);
+    respond(res);
   } catch (err) {
+    unanswered.delete(asker);
     respond({ ok: false, error: err instanceof Error ? err.message : String(err) });
   }
 }

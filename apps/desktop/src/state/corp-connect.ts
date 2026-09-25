@@ -17,6 +17,7 @@ import type {
   TaskContext,
   WorkerTranscriptView,
 } from '@pi-desktop/coordination';
+import { forgetJob, noteAgentJob } from './chat-jobs';
 import { resolveEffort } from './model-selection';
 import { conversationId as piConversationId, resolvedWorkspace } from './pi-connect';
 import { usePiStore } from './pi-slice';
@@ -78,6 +79,8 @@ export function connectCorp(): void {
   if (connected) return;
   connected = true;
   window.piDesktop.onEvent('corp:event', ({ taskId, event }) => {
+    // A finished production is nothing a chat delete has to stop (chat-jobs).
+    if (event.type === 'done') forgetJob(taskId);
     const inbox = inboxFor(taskId);
     if (inbox.stream !== null) {
       inbox.stream.push(event);
@@ -153,6 +156,8 @@ export async function startCorpTask(prompt: string, ctx?: TaskContext): Promise<
     ctx: withCwd,
     effort,
   });
+  // Deleting the chat stops it, the same as a team its CEO asked for.
+  noteAgentJob('corp', taskId, undefined);
   return attachCorpTask(taskId);
 }
 

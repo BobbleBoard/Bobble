@@ -24,39 +24,53 @@ vi.mock('./chat-org', () => ({
       }),
   ),
 }));
-vi.mock('./corp-connect', () => ({
-  abortCorpTask: vi.fn(async (id: string) => {
-    calls.push(`corp:${id}`);
-  }),
-}));
-
 const invoke = vi.fn(async (channel: string, req: unknown) => {
   calls.push(`${channel}:${JSON.stringify(req)}`);
   return { ok: true, success: true, canceled: true };
 });
+/** What main broadcasts, delivered to whoever the app subscribed. */
+const listeners = new Map<string, Array<(payload: unknown) => void>>();
+const emit = (channel: string, payload: unknown): void => {
+  for (const fn of listeners.get(channel) ?? []) fn(payload);
+};
 (globalThis as unknown as { window: unknown }).window = {
   location: { search: '' },
-  piDesktop: { invoke, onEvent: () => () => {} },
+  piDesktop: {
+    invoke,
+    onEvent: (channel: string, fn: (payload: unknown) => void) => {
+      listeners.set(channel, [...(listeners.get(channel) ?? []), fn]);
+      return () => undefined;
+    },
+  },
 };
 
 const { deleteChatNow } = await import('./chat-delete');
-const { noteAgentJob } = await import('./chat-jobs');
+const { connectChatJobs, noteAgentJob } = await import('./chat-jobs');
 const { useChildAgentStore } = await import('./child-agent-store');
 const { useCorpStore } = await import('./corp-store');
 const { useDeletedChats } = await import('./deleted-chats');
 const { usePiStore } = await import('./pi-slice');
+connectChatJobs();
 
 const A = '/s/A.jsonl';
 const A0 = '/s/A-older.jsonl';
+const B = '/s/B.jsonl';
 
 beforeEach(() => {
   calls.length = 0;
   diskResult = { ok: true };
   useDeletedChats.setState({ files: new Set() });
   usePiStore.setState({ session: { sessionFile: A }, bgRun: null });
-  useCorpStore.setState({ taskId: 'task-1', corpRunning: true });
+  useCorpStore.setState({ taskId: null, corpRunning: false });
   useChildAgentStore.setState({ children: {}, viewedChildId: null });
 });
+
+/** A's CEO called talk_to_manager: main starts the run and announces it. */
+function productionStarted(taskId: string): void {
+  emit('corp:attached', { taskId });
+  // ChatApp binds the situation room to it — whichever chat is on screen.
+  useCorpStore.getState().setTask(taskId);
+}
 
 describe('deleteChatNow', () => {
   it('hides every file of the chain BEFORE the disk answers', async () => {
@@ -70,6 +84,7 @@ describe('deleteChatNow', () => {
   });
 
   it('stops the turn, the team, the subagents and the generations it owns', async () => {
+    productionStarted('task-1');
     useChildAgentStore.getState().ensureChild('kid-1', A, 'Researcher');
     useChildAgentStore.getState().ensureChild('kid-2', '/s/other.jsonl', 'Someone else');
     noteAgentJob('gen', 'gen_1', undefined); // the chat's own pi, while A is on screen
@@ -79,7 +94,7 @@ describe('deleteChatNow', () => {
     await done;
     await new Promise((r) => setTimeout(r, 0));
     expect(calls).toContain(`abandon:${A}`);
-    expect(calls).toContain('corp:task-1');
+    expect(calls).toContain('corp:abort:{"taskId":"task-1"}');
     expect(calls).toContain('pi:child-dispose:{"childId":"kid-1"}');
     expect(calls).not.toContain('pi:child-dispose:{"childId":"kid-2"}');
     expect(calls).toContain('gen:cancel:{"jobId":"gen_1"}');
@@ -90,9 +105,47 @@ describe('deleteChatNow', () => {
 
   it('leaves another chat’s team alone when the deleted chat is not on screen', async () => {
     usePiStore.setState({ session: { sessionFile: '/s/other.jsonl' } });
+    productionStarted('task-other');
     const done = deleteChatNow({ file: A, supersedes: [] });
     releaseDisk();
     await done;
+    expect(calls.some((c) => c.startsWith('corp:'))).toBe(false);
+  });
+
+  /*
+   * THE TEAM BELONGS TO THE CHAT WHOSE CEO STARTED IT — not to whatever the
+   * store's team pointer says at delete time (review wave-0923, delete #2).
+   * Every chat switch drops that pointer, and the situation room binds it to
+   * the chat on screen, so the pointer is right only while nothing moved.
+   */
+  it('stops the production its CEO started, after the view has moved off the chat', async () => {
+    productionStarted('task-A'); // A on screen, its CEO talking to the manager
+    // The user opens B; A keeps running behind it and the switch drops the pointer.
+    usePiStore.setState({
+      session: { sessionFile: B },
+      bgRun: { sessionFile: A, messages: [], streaming: true, title: null },
+    });
+    useCorpStore.getState().setTask(null);
+
+    const done = deleteChatNow({ file: A, supersedes: [] });
+    releaseDisk();
+    await done;
+    await new Promise((r) => setTimeout(r, 0));
+    expect(calls).toContain('corp:abort:{"taskId":"task-A"}');
+  });
+
+  it('does not stop the production of the chat running behind the one deleted', async () => {
+    // A runs in the background; its CEO starts a production while B is on screen.
+    usePiStore.setState({
+      session: { sessionFile: B },
+      bgRun: { sessionFile: A, messages: [], streaming: true, title: null },
+    });
+    productionStarted('task-A');
+
+    const done = deleteChatNow({ file: B, supersedes: [] });
+    releaseDisk();
+    await done;
+    await new Promise((r) => setTimeout(r, 0));
     expect(calls.some((c) => c.startsWith('corp:'))).toBe(false);
   });
 

@@ -17,6 +17,7 @@ import { instructionsPreamble } from '../chat/attached-files';
 import { ensureChatServerReady, maybeRouteAuto } from '../chat/auto-router';
 import { ADVANCED_GROUNDTRUTH_KEY } from './advanced-store';
 import { resetCanvasForNewSession, restoreCanvas, snapshotCanvas } from './canvas-store';
+import { ownerOfJob } from './chat-jobs';
 import { deleteChat, renameChat } from './chat-org';
 import { isChatDeleted, useDeletedChats } from './deleted-chats';
 import { ensureVisionMode } from './local-model';
@@ -175,7 +176,7 @@ function withPendingInstructions(message: string): string {
 
 export function connectPi(): () => void {
   if (disconnect !== null) return disconnect;
-  const router = createEventRouter(createPiSink());
+  const router = createEventRouter(createPiSink(usePiStore, { refuseUiRequest }));
   // Subscribing at module-init time (pre-mount) — the preload event hub
   // buffers anything main pushed before this point and flushes it here.
   const unsubscribe = window.piDesktop.onEvent('pi:event', (event) => router.handleEvent(event));
@@ -190,11 +191,20 @@ export function connectPi(): () => void {
     createQueueDrain((head) => sendPrompt(head.text, head.images, head.agentMessage)),
   );
 
-  // Report the viewed chat's session to main so a model-spawned subagent
-  // (spawn_subagent → app bridge) nests under it in the sidebar dropdown.
+  // Report the chat pi is working for to main so a model-spawned subagent
+  // (spawn_subagent → app bridge) nests under it in the sidebar dropdown. That
+  // is the chat running in the background while one runs, not the one on
+  // screen: nested under the viewed chat, a background chat's subagent was
+  // killed with the wrong chat and outlived its own (chat-jobs has the rule).
   let lastReportedSession = '';
   const unsubscribeSession = usePiStore.subscribe((state) => {
-    const file = state.session?.sessionFile ?? '';
+    const file =
+      ownerOfJob({
+        agent: undefined,
+        childParent: undefined,
+        bgRun: state.bgRun,
+        viewed: state.session?.sessionFile ?? null,
+      }) ?? '';
     if (file === lastReportedSession) return;
     lastReportedSession = file;
     void window.piDesktop.invoke('pi:report-active-session', { sessionFile: file });
@@ -444,6 +454,38 @@ export async function newSession(): Promise<{ ok: boolean; cancelled?: boolean; 
   return settled;
 }
 
+/** Answer one of pi's dialogs "no answer" — what dismissing it does. */
+function refuseUiRequest(id: string): void {
+  void window.piDesktop
+    .invoke('pi:respond-ui', { id, answer: { cancelled: true } })
+    .catch(() => undefined);
+}
+
+/** How long a delete waits for pi to acknowledge an abort. */
+const ABORT_ANSWER_MS = 3_000;
+
+/**
+ * Abort pi's turn and wait for the acknowledgement — but not forever. pi sends
+ * it only once the turn has ended, and a turn inside a tool that ignores the
+ * abort (the CEO's `talk_to_manager`, a generation waiting on its job) ends
+ * when that tool does, which can be the better part of an hour. True when pi
+ * answered in time.
+ */
+async function abortTurn(): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const answered = await Promise.race([
+    window.piDesktop.invoke('pi:abort', undefined).then(
+      () => true,
+      () => true,
+    ),
+    new Promise<false>((resolve) => {
+      timer = setTimeout(() => resolve(false), ABORT_ANSWER_MS);
+    }),
+  ]);
+  clearTimeout(timer);
+  return answered;
+}
+
 /**
  * LEAVE A CHAT THAT IS BEING DELETED — at once — and stop its turn.
  *
@@ -469,10 +511,21 @@ export async function abandonChats(files: readonly string[]): Promise<void> {
   const gone = (f: string | null | undefined): boolean =>
     typeof f === 'string' && files.includes(f);
   const store = usePiStore.getState();
-  // A question the deleted chat asked, and its unread dot, go with it.
+  /*
+   * A question the deleted chat asked, and its unread dot, go with it — and
+   * the question is ANSWERED ("no answer"), not just hidden. pi acknowledges
+   * an abort only once its turn has ended, and a turn inside `ask_user` or a
+   * permission prompt ends only when that dialog is answered. Hidden, it could
+   * never be, and the abort below never came back: every later message in
+   * every chat queued behind a chat that no longer existed.
+   */
+  const asked = store.uiRequests.filter((r) => gone(r.sessionFile));
   usePiStore.setState((s) => ({ uiRequests: s.uiRequests.filter((r) => !gone(r.sessionFile)) }));
+  for (const r of asked) refuseUiRequest(r.id);
   for (const f of files) store.clearUnread(f);
 
+  // Did pi acknowledge the abort? One it did not is a turn that will not end.
+  let answered = true;
   if (gone(store.session?.sessionFile)) {
     const running = store.agent.isStreaming || store.promptInFlight;
     if (store.resuming) {
@@ -480,10 +533,10 @@ export async function abandonChats(files: readonly string[]): Promise<void> {
     }
     const opened = newSession();
     for (const f of files) sessionSnapshots.delete(f);
-    if (running) await window.piDesktop.invoke('pi:abort', undefined).catch(() => undefined);
+    if (running) answered = await abortTurn();
     await opened;
   } else if (store.bgRun !== null && gone(store.bgRun.sessionFile) && store.bgRun.streaming) {
-    await window.piDesktop.invoke('pi:abort', undefined).catch(() => undefined);
+    answered = await abortTurn();
   }
   for (const f of files) sessionSnapshots.delete(f);
 
@@ -497,7 +550,7 @@ export async function abandonChats(files: readonly string[]): Promise<void> {
     const bg = usePiStore.getState().bgRun;
     return bg === null || !gone(bg.sessionFile) || !bg.streaming;
   };
-  for (let attempt = 0; attempt < 3 && !stopped(); attempt++) {
+  for (let attempt = 0; answered && attempt < 3 && !stopped(); attempt++) {
     await new Promise<void>((resolve) => {
       const timer = setTimeout(() => {
         off();
@@ -510,7 +563,7 @@ export async function abandonChats(files: readonly string[]): Promise<void> {
         resolve();
       });
     });
-    if (!stopped()) await window.piDesktop.invoke('pi:abort', undefined).catch(() => undefined);
+    if (!stopped()) answered = await abortTurn();
   }
   /* A turn that will not end is let go: moving pi disposes it. */
   if (!stopped()) {
@@ -1721,6 +1774,16 @@ function setViewPointer(sessionPath: string, isStreaming?: boolean): void {
 export async function switchSession(
   sessionPath: string,
 ): Promise<{ ok: boolean; truncated: boolean; cancelled?: boolean; error?: string }> {
+  /*
+   * A DELETED CHAT CANNOT BE OPENED. A notification about it outlives it in
+   * Notification Center, and clicking that lands here: pi would open its file
+   * — pi creates a fresh session at a missing path — and everything written
+   * there would be swept away by the tombstones, its row never appearing. A
+   * parked background run of it would come back on screen instead.
+   */
+  if (isChatDeleted(sessionPath)) {
+    return { ok: false, truncated: false, error: 'that chat was deleted' };
+  }
   const store = usePiStore.getState();
   const viewed = store.session?.sessionFile ?? null;
   if (sessionPath === viewed) return { ok: true, truncated: false };

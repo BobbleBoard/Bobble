@@ -54,7 +54,7 @@ describe('bridge ↔ harness client (real socket)', () => {
 
     const res = await clientFor(sock, token).generateImage('a red bicycle');
 
-    expect(run).toHaveBeenCalledWith({ prompt: 'a red bicycle' });
+    expect(run).toHaveBeenCalledWith({ prompt: 'a red bicycle', signal: expect.any(AbortSignal) });
     expect(res).toEqual({ ok: true, path: '/out/prompt-image.png' });
   });
 
@@ -67,6 +67,7 @@ describe('bridge ↔ harness client (real socket)', () => {
     expect(run).toHaveBeenCalledWith({
       prompt: 'make the jacket red',
       editFrom: '/tmp/src.png',
+      signal: expect.any(AbortSignal),
     });
     expect(res).toEqual({ ok: true, path: '/out/edited-image.png' });
   });
@@ -196,6 +197,7 @@ describe('bridge ↔ harness client — 3D', () => {
       imagePath: '/pics/fox.png',
       finish: 'grey',
       resolution: 'low',
+      signal: expect.any(AbortSignal),
     });
     expect(res).toEqual({ ok: true, path: '/out/fox/model.glb' });
   });
@@ -214,8 +216,64 @@ describe('bridge ↔ harness client — 3D', () => {
       op: 'rig',
       modelPath: '/out/fox/model.glb',
     });
-    expect(stage).toHaveBeenCalledWith({ op: 'rig', modelPath: '/out/fox/model.glb' });
+    expect(stage).toHaveBeenCalledWith({
+      op: 'rig',
+      modelPath: '/out/fox/model.glb',
+      signal: expect.any(AbortSignal),
+    });
     expect(res).toEqual({ ok: true, path: '/out/fox/rigged.glb' });
+  });
+
+  /*
+   * THE TOOL THAT ASKED HUNG UP (review wave-0923, delete #4). The harness's
+   * client answers "cancelled" the moment its turn is aborted and closes the
+   * socket, while the job — still waiting for memory or a cold engine — gets
+   * its id later and was announced into whichever chat was current by then:
+   * after a chat's delete, that is the next chat, never the deleted one. The
+   * runner is told instead, so a job nobody is waiting for is not started.
+   */
+  it('tells the runner when the tool that asked hangs up before the reply', async () => {
+    let seen: AbortSignal | undefined;
+    let reply: () => void = () => {};
+    const generate = vi.fn<ModelRunners['generate']>(
+      (req) =>
+        new Promise((resolve) => {
+          seen = req.signal;
+          reply = () => resolve({ ok: true, path: '/out/teapot.glb' });
+        }),
+    );
+    const stage = vi.fn<ModelRunners['stage']>(async () => ({ ok: true, path: '/x.glb' }));
+    const { sock, token } = startBridge(async () => ({ ok: true, path: '/a.png' }), {
+      generate,
+      stage,
+    });
+    const turn = new AbortController();
+    const asked = clientFor(sock, token).call('generate_3d', { prompt: 'a teapot' }, turn.signal);
+    await vi.waitFor(() => expect(generate).toHaveBeenCalled());
+    expect(seen?.aborted).toBe(false);
+
+    turn.abort(); // the chat's turn is stopped: the tool gives up and hangs up
+    expect(await asked).toEqual({ ok: false, error: 'cancelled' });
+    await vi.waitFor(() => expect(seen?.aborted).toBe(true));
+    reply();
+  });
+
+  it('a reply already delivered is not taken back when the tool closes the socket', async () => {
+    let seen: AbortSignal | undefined;
+    const generate = vi.fn<ModelRunners['generate']>(async (req) => {
+      seen = req.signal;
+      return { ok: true, path: '/out/teapot.glb' };
+    });
+    const stage = vi.fn<ModelRunners['stage']>(async () => ({ ok: true, path: '/x.glb' }));
+    const { sock, token } = startBridge(async () => ({ ok: true, path: '/a.png' }), {
+      generate,
+      stage,
+    });
+    const res = await clientFor(sock, token).call('generate_3d', { prompt: 'a teapot' });
+    expect(res).toEqual({ ok: true, path: '/out/teapot.glb' });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(seen).toBeDefined();
+    expect(seen?.aborted).toBe(false);
   });
 });
 

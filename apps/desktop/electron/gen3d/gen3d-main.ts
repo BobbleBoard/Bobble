@@ -479,6 +479,8 @@ export interface ImageJobRequest {
   readonly editFrom?: string;
   /** The asking pi — a subagent's id; absent for the chat's own pi. */
   readonly agent?: string;
+  /** Aborted when the tool that asked has given up (gen3d-bridge). */
+  readonly signal?: AbortSignal;
 }
 
 /**
@@ -488,6 +490,19 @@ export interface ImageJobRequest {
  */
 function noteAgentJob(jobId: string, agent: string | undefined): void {
   broadcast('gen3d:agent-job', { jobId, ...(agent !== undefined ? { agent } : {}) });
+}
+
+/**
+ * A JOB WHOSE ASKER IS GONE BEFORE IT HAD AN ID. A job waits for memory (up to
+ * 20 s) or a cold engine before it has one, and in that time the tool that
+ * asked can be stopped — its chat deleted, most likely — and has already
+ * answered "cancelled". Nobody will receive what it makes, and announced now
+ * it would belong to whichever chat is current, not the one that asked
+ * (review wave-0923, delete #4). It is cancelled instead of announced.
+ */
+async function dropJob(jobId: string): Promise<ImageJobResult> {
+  await cancelGen3dJob(jobId);
+  return { ok: false, error: 'cancelled' };
 }
 
 /** Image gen is ~11 s warm, but a cold call loads a ~15 GB model first. Generous
@@ -566,6 +581,7 @@ export async function runImageJob(
   }
   jobPlans.set(res.jobId, planGenerate('text', false));
   guardSidecarJob(res.jobId, 'the picture');
+  if (req.signal?.aborted === true) return dropJob(res.jobId);
   noteAgentJob(res.jobId, req.agent);
   return imageJobs.wait(res.jobId, timeoutMs);
 }
@@ -588,6 +604,8 @@ export interface Model3dJobRequest {
   readonly resolution?: Gen3dResolution;
   /** The asking pi — a subagent's id; absent for the chat's own pi. */
   readonly agent?: string;
+  /** Aborted when the tool that asked has given up (gen3d-bridge). */
+  readonly signal?: AbortSignal;
 }
 
 export type Stage3dOp = 'texture' | 'segment' | 'rig' | 'retopo';
@@ -598,6 +616,8 @@ export interface Stage3dJobRequest {
   readonly prompt?: string;
   /** The asking pi — a subagent's id; absent for the chat's own pi. */
   readonly agent?: string;
+  /** Aborted when the tool that asked has given up (gen3d-bridge). */
+  readonly signal?: AbortSignal;
 }
 
 const MODEL_JOB_TIMEOUT_MS = 40 * 60_000;
@@ -641,6 +661,7 @@ export async function run3dJob(
   if (!res.ok || res.jobId === undefined) {
     return { ok: false, error: res.error ?? 'the engine refused the request' };
   }
+  if (req.signal?.aborted === true) return dropJob(res.jobId);
   noteAgentJob(res.jobId, req.agent);
   return withEndReason(res.jobId, await imageJobs.wait(res.jobId, timeoutMs, 'model-glb'));
 }
@@ -668,6 +689,7 @@ export async function runStage3dJob(
   if (!res.ok || res.jobId === undefined) {
     return { ok: false, error: res.error ?? 'the engine refused the request' };
   }
+  if (req.signal?.aborted === true) return dropJob(res.jobId);
   noteAgentJob(res.jobId, req.agent);
   return withEndReason(res.jobId, await imageJobs.wait(res.jobId, timeoutMs, 'model-glb'));
 }
@@ -734,6 +756,12 @@ let comfy3dRunner: Run3dFn | null = null;
 export function setComfy3dRunner(fn: Run3dFn): void {
   comfy3dRunner = fn;
 }
+/**
+ * The ComfyUI meshes in flight, by the `c3d_` id this file gave them. Their
+ * queue job has an id of its own that nothing here sees, so `gen3d:cancel`
+ * reaches one through this — the sidecar has never heard of it.
+ */
+const comfyJobs = new Map<string, AbortController>();
 
 /*
  * THE SIDECAR'S JOBS UNDER THE MEMORY GUARD.
@@ -990,12 +1018,15 @@ function runComfy3d(req: Gen3dInvokeMap['gen3d:generate']['request']): {
     );
   };
 
+  const stop = new AbortController();
+  comfyJobs.set(jobId, stop);
   void runner(
     {
       imagePath,
       outputDir,
       model: COMFY_3D_MODEL_IDS[req.model ?? 'trellis2'],
       finish,
+      signal: stop.signal,
       // A hold's reason, or the room being made — said where the studio's
       // panels read, instead of "Getting the 3D module ready…" for the wait.
       onNote: (text) => say('geometry', text, 0, 0),
@@ -1035,7 +1066,10 @@ function runComfy3d(req: Gen3dInvokeMap['gen3d:generate']['request']): {
         error: message,
       });
     })
-    .finally(() => stopMemorySampling());
+    .finally(() => {
+      comfyJobs.delete(jobId);
+      stopMemorySampling();
+    });
   return { ok: true, jobId };
 }
 
@@ -1225,11 +1259,25 @@ const handlers: IpcHandlers<Gen3dInvokeMap & DictationInvokeMap> = {
     }
     return res;
   },
-  'gen3d:cancel': async (req) => {
-    const res = await sidecarPost<{ ok: boolean }>('/cancel', { jobId: req.jobId });
-    return res ?? { ok: false };
-  },
+  'gen3d:cancel': (req) => cancelGen3dJob(req.jobId),
 };
+
+/** Stop a job by the id `gen3d:generate` / `gen3d:stage` gave it. */
+async function cancelGen3dJob(jobId: string): Promise<{ ok: boolean }> {
+  /*
+   * A ComfyUI mesh is not the sidecar's. Posting its id there cancelled
+   * nothing — and booted the engine, uv and all, to do it — while the real
+   * job kept the GPU for its full 5–25 minutes.
+   */
+  const comfy = comfyJobs.get(jobId);
+  if (comfy !== undefined) {
+    comfy.abort();
+    return { ok: true };
+  }
+  if (jobId.startsWith('c3d_')) return { ok: false }; // already over
+  const res = await sidecarPost<{ ok: boolean }>('/cancel', { jobId });
+  return res ?? { ok: false };
+}
 
 export function registerGen3dIpc(
   ipcMain: IpcMain,
