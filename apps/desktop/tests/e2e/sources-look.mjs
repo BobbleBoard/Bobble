@@ -381,7 +381,16 @@ const turn1 = [
   },
 ];
 
-const ANSWER2 = `Roughly **33 person-years** of human proofreading, spread across hundreds of volunteers and 76 labs, on top of the automated tracing. [Science News Daily](${SECOND[1].url})`;
+/* A model's own reading list: each line a link and nothing else — those keep
+   their words (the "standalone" citation), with the site's icon in front. */
+const ANSWER2 = [
+  `Roughly **33 person-years** of human proofreading, spread across hundreds of volunteers and 76 labs, on top of the automated tracing. [Science News Daily](${SECOND[1].url})`,
+  '',
+  '**Read more**',
+  '',
+  `- [How AI traced fifty million synapses](${SECOND[0].url})`,
+  `- [Hundreds of volunteers proofread the fly brain](${SECOND[1].url})`,
+].join('\n');
 const turn2 = [
   { kind: 'user', id: 'u2', text: 'How long did the proofreading take?', timestamp: 60 },
   {
@@ -482,8 +491,12 @@ try {
   console.log(JSON.stringify(links, null, 2));
 
   // Turn 1: [atlas journal health], [tech], ([atlas], [tech]), [medschool],
-  // [forum journal]; turn 2: [sciencenews] — six runs, six chips.
-  check(links.chips.length === 6, `the answers' source links became chips (${links.chips.length})`);
+  // [forum journal]; turn 2: [sciencenews] and its two reading-list lines —
+  // eight citations.
+  check(
+    links.chips.length === 8,
+    `the answers' source links became citations (${links.chips.length})`,
+  );
   check(
     links.chips.some((c) => c.count === 3 && /\+2$/.test(c.label)),
     `three links in a row merged into ONE chip reading "+2" (${JSON.stringify(links.chips.map((c) => c.label))})`,
@@ -508,6 +521,18 @@ try {
   check(
     links.sourcesCards === 2,
     `each researched answer ends in a Sources card (${links.sourcesCards})`,
+  );
+  const lines = await page.evaluate(() =>
+    [...document.querySelectorAll('[data-testid="source-chip"][data-standalone="true"]')].map(
+      (c) => ({ text: c.textContent?.trim() ?? '', icon: c.querySelector('img') !== null }),
+    ),
+  );
+  console.log('reading-list lines:', JSON.stringify(lines));
+  check(
+    lines.length === 2 &&
+      lines.every((l) => l.icon) &&
+      /volunteers proofread/.test(lines[1]?.text ?? ''),
+    `a reading-list line keeps the model's words, with the site's icon (${JSON.stringify(lines)})`,
   );
 
   for (const mode of ['dark', 'light']) {
