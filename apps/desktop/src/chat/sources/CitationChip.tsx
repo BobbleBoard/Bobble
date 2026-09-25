@@ -131,10 +131,10 @@ function SourceCitation({
         onPointerEnter={clear}
         onPointerLeave={hoverClose}
         onOpenAutoFocus={(e) => {
-          // A hover must not pull focus out of whatever the person is doing.
-          if (via.current === 'hover') e.preventDefault();
-          else {
-            e.preventDefault();
+          // A hover must not pull focus out of whatever the person is doing;
+          // opened on purpose, focus goes to the first source's link.
+          e.preventDefault();
+          if (via.current !== 'hover') {
             firstLink.current?.querySelector<HTMLElement>('.pd-src-row-title')?.focus();
           }
         }}

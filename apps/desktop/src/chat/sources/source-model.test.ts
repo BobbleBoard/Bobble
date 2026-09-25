@@ -92,6 +92,10 @@ describe('which calls were web research', () => {
 
   it('knows the CLI lines, wherever they sit in the shell line', () => {
     expect(webCommandKinds('web search "fly connectome"')).toEqual({ search: true, fetch: false });
+    expect(webCommandKinds('  web fetch https://a.example')).toEqual({
+      search: false,
+      fetch: true,
+    });
     expect(webCommandKinds('cd /tmp && web fetch https://a.example | head -40')).toEqual({
       search: false,
       fetch: true,

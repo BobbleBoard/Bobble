@@ -105,7 +105,7 @@ function str(value: unknown): string | undefined {
  * returns, so what the line ran decides which parser reads its output.
  */
 export function webCommandKinds(command: string): { search: boolean; fetch: boolean } {
-  const re = /(?:^|[;&|(\n]\s*)web\s+(search|fetch)\b/g;
+  const re = /(?:^|[;&|(\n])\s*web\s+(search|fetch)\b/g;
   const kinds = { search: false, fetch: false };
   for (const m of command.matchAll(re)) {
     if (m[1] === 'search') kinds.search = true;
