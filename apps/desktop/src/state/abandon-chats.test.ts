@@ -84,6 +84,9 @@ const invoke = vi.fn(async (channel: string, req: unknown) => {
 const A = '/s/A.jsonl';
 const B = '/s/B.jsonl';
 
+// A fresh import of the pi store's whole module graph for every test: under a
+// loaded full suite (a model run beside it) the first one took over vitest's
+// 10 s hook limit, and the delete tests failed without running.
 beforeEach(async () => {
   vi.useFakeTimers();
   vi.resetModules();
@@ -101,7 +104,7 @@ beforeEach(async () => {
     abortRequested: false,
     waitingAborts: [],
   });
-});
+}, 60_000);
 
 afterEach(() => {
   vi.useRealTimers();
