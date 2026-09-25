@@ -7,7 +7,8 @@
  * effort-gated reviewer pass — so they prove the bridge, not just the library.
  */
 
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import net from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type {
@@ -18,7 +19,7 @@ import type {
   ToolInfo,
 } from '@mariozechner/pi-coding-agent';
 import { repairToolCallArguments } from '@pi-desktop/provider-llamacpp';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   HARNESS_CONFIG_ENTRY,
   HARNESS_LOOP_ENTRY,
@@ -38,6 +39,7 @@ import {
 } from './loop/loop-detector.js';
 import type { CallModel } from './model-call/call-model.js';
 import type { ToolSchemaLike } from './repair/rungs.js';
+import { TOOL_CLI_SOCK_ENV, TOOL_CLI_TOKEN_ENV } from './tools/tool-cli-bridge.js';
 
 const SCHEMA: ToolSchemaLike = {
   type: 'object',
@@ -59,6 +61,8 @@ function makeRig(
       detectCheck?: (cwd: string) => ProjectCheck | null;
     };
     cwd?: string;
+    /** What `getAllTools` reports — the guards and the CLI both read it. */
+    allTools?: readonly string[];
   } = {},
 ) {
   const handlers = new Map<string, AnyHandler[]>();
@@ -93,7 +97,7 @@ function makeRig(
     },
     registerCommand: () => {},
     getAllTools: (): ToolInfo[] =>
-      ['read', 'bash', 'tool_search', 'web_search', 'web_fetch'].map((name) => ({
+      (opts.allTools ?? ['read', 'bash', 'tool_search', 'web_search', 'web_fetch']).map((name) => ({
         name,
         description: `${name} tool`,
         // biome-ignore lint/suspicious/noExplicitAny: stub schema.
@@ -916,22 +920,24 @@ describe("the README's promises reach the model (reachability, not logic)", () =
   });
 });
 
+/** The refusal from whichever `tool_call` handler produced one, or null. */
+const blockOf = (results: unknown): { reason?: string } | null => {
+  const list = Array.isArray(results) ? results : [results];
+  const hit = list.find((r) => (r as { block?: boolean })?.block === true);
+  return (hit as { reason?: string } | undefined) ?? null;
+};
+
 /**
  * c1: an unattended run cannot call a forbidden tool, whatever it tries.
  *
- * The fence is at `tool_call` on purpose, because that is the ONE place every
- * dispatch path passes through — an advertised call, the `use` dispatcher, a
- * bash-CLI command, or a capability the model activates mid-turn. A test that
- * only checked the advertised list would be testing a suggestion.
+ * The fence is at `tool_call` on purpose, because every dispatch path is held
+ * to it — an advertised call, a capability the model activates mid-turn, and
+ * the two dispatchers that run a tool themselves (`use`, a bash-CLI command),
+ * which apply the same per-tool rules before they execute (see the next
+ * block). A test that only checked the advertised list would be testing a
+ * suggestion.
  */
 describe('forbidden tools', () => {
-  /** The refusal from whichever handler produced one, or null. */
-  const blockOf = (results: unknown): { reason?: string } | null => {
-    const list = Array.isArray(results) ? results : [results];
-    const hit = list.find((r) => (r as { block?: boolean })?.block === true);
-    return (hit as { reason?: string } | undefined) ?? null;
-  };
-
   const withEnv = async (value: string | undefined, fn: () => Promise<void>) => {
     const prev = process.env.PI_DESKTOP_FORBID_TOOLS;
     if (value === undefined) delete process.env.PI_DESKTOP_FORBID_TOOLS;
@@ -989,6 +995,239 @@ describe('forbidden tools', () => {
       await startTurn(rig);
       expect(blockOf(await rig.fire('tool_call', sendCall))).toBeNull();
     });
+  });
+});
+
+/**
+ * THE PER-TOOL RULES HOLD HOWEVER THE CALL ARRIVES.
+ *
+ * pi fires `tool_call` for the call the MODEL made. In CLI mode that call is
+ * `bash`, and the tool its command line runs — `file write …` is `write` — was
+ * executed by the CLI host directly, so every rule keyed on the tool's own name
+ * was skipped. SEEN during VQ-10: a flow diagram typed as `file write --path
+ * flow.svg --content '<svg …>'` went straight to disk, while the same markup
+ * through the `write` tool was refused toward `diagram`. `use` is the same
+ * shape of door in schemas mode.
+ */
+describe('the per-tool rules hold at every door', () => {
+  /* Diagram-shaped (handwritten-svg.ts): three labels, three boxes, two arrows. */
+  const FLOW_SVG = [
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200">',
+    '  <rect x="20" y="20" width="120" height="40"/><text x="30" y="45">Order placed</text>',
+    '  <rect x="20" y="120" width="120" height="40"/><text x="30" y="145">Payment ok?</text>',
+    '  <rect x="220" y="120" width="140" height="40"/><text x="230" y="145">Email customer</text>',
+    '  <line x1="80" y1="60" x2="80" y2="120" marker-end="url(#a)"/>',
+    '  <line x1="140" y1="140" x2="220" y2="140" marker-end="url(#a)"/>',
+    '</svg>',
+  ].join('\n');
+  /* A VQ-10 session: the file tools the fence registers, and `diagram`. */
+  const TOOLS = ['read', 'write', 'edit', 'ls', 'bash', 'diagram'];
+
+  /* The bridge writes its socket, its token and its shim dir into process.env,
+     so everything a session touches is put back. */
+  const ENV_KEYS = [
+    'PI_DESKTOP_TOOL_CLI',
+    'PI_DESKTOP_FS_FENCE',
+    'PI_DESKTOP_WORKSPACE_ROOT',
+    'PATH',
+    TOOL_CLI_SOCK_ENV,
+    TOOL_CLI_TOKEN_ENV,
+  ];
+  let saved: [string, string | undefined][] = [];
+  /* The sessions' folders, and each bridge's socket and shim dir — the bridge
+     removes those on process exit, which a test worker never reaches. */
+  const leftovers: string[] = [];
+  beforeEach(() => {
+    saved = ENV_KEYS.map((k) => [k, process.env[k]]);
+  });
+  afterEach(() => {
+    for (const [k, v] of saved) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+    for (const p of leftovers.splice(0)) rmSync(p, { recursive: true, force: true });
+  });
+
+  interface Bridge {
+    readonly sock: string | undefined;
+    readonly token: string | undefined;
+  }
+
+  /** A session in a fresh folder, with the fenced file tools. */
+  const session = async (
+    mode: 'cli' | 'schemas',
+    ask = 'Draw a flow diagram of our order fulfilment process',
+    tools: readonly string[] = TOOLS,
+  ) => {
+    process.env.PI_DESKTOP_TOOL_CLI = mode === 'cli' ? '1' : '0';
+    process.env.PI_DESKTOP_FS_FENCE = '1';
+    delete process.env.PI_DESKTOP_WORKSPACE_ROOT;
+    const cwd = mkdtempSync(path.join(tmpdir(), 'pd-doors-'));
+    leftovers.push(cwd);
+    const before = process.env[TOOL_CLI_SOCK_ENV];
+    const rig = makeRig({ cwd, allTools: tools });
+    /* Read now: the next session's bridge moves the env on. Only a bridge THIS
+       session installed counts — schemas mode installs none. */
+    const sock = process.env[TOOL_CLI_SOCK_ENV];
+    const bridge: Bridge =
+      sock !== before
+        ? { sock, token: process.env[TOOL_CLI_TOKEN_ENV] }
+        : { sock: undefined, token: undefined };
+    if (bridge.sock !== undefined) {
+      leftovers.push(bridge.sock);
+      /* …and its shim dir is the one it put first on PATH. */
+      const shims = process.env.PATH?.split(path.delimiter)[0] ?? '';
+      if (path.basename(shims).startsWith('pi-toolcli-')) leftovers.push(shims);
+    }
+    await startSession(rig);
+    await startTurn(rig, ask);
+    return { rig, cwd, bridge };
+  };
+
+  /** One command line through a session's bridge — the request its shim sends. */
+  const run = (bridge: Bridge, argv: readonly string[]) =>
+    new Promise<{ text: string; isError: boolean }>((resolve, reject) => {
+      if (bridge.sock === undefined) {
+        reject(new Error('no CLI bridge in this session'));
+        return;
+      }
+      const socket = net.createConnection(bridge.sock);
+      let buf = '';
+      socket.on('connect', () =>
+        socket.write(`${JSON.stringify({ token: bridge.token, argv })}\n`),
+      );
+      socket.on('data', (d) => {
+        buf += d.toString();
+        const nl = buf.indexOf('\n');
+        if (nl < 0) return;
+        socket.end();
+        resolve(JSON.parse(buf.slice(0, nl)) as { text: string; isError: boolean });
+      });
+      socket.on('error', reject);
+    });
+
+  /** The `bash` call that carries a command line — what `tool_call` sees in CLI mode. */
+  const bashCall = (argv: readonly string[]) => ({
+    type: 'tool_call' as const,
+    toolName: 'bash',
+    toolCallId: 'b1',
+    input: {
+      command: argv
+        .map((a) => (/^[\w./=-]+$/.test(a) ? a : `'${a.replaceAll("'", `'\\''`)}'`))
+        .join(' '),
+    },
+  });
+  const writeCall = (file: string, content: string) => ({
+    type: 'tool_call' as const,
+    toolName: 'write',
+    toolCallId: 'w1',
+    input: { path: file, content },
+  });
+
+  it('refuses a diagram typed at the shell exactly as the write tool refuses it', async () => {
+    /* The door that always had the rule. `write` is pinned in CLI mode too. */
+    const direct = await session('cli');
+    const refused = blockOf(await direct.rig.fire('tool_call', writeCall('flow.svg', FLOW_SVG)));
+    expect(refused?.reason).toContain('diagram "Order fulfilment" --out flow.svg');
+
+    /* The door that did not: the same markup, as a command line. */
+    const shell = await session('cli');
+    const argv = ['file', 'write', '--path', 'flow.svg', '--content', FLOW_SVG];
+    /* `bash` reaches the hook first, and nothing about the LINE is wrong… */
+    expect(blockOf(await shell.rig.fire('tool_call', bashCall(argv)))).toBeNull();
+    /* …it is the write the line runs. */
+    expect(await run(shell.bridge, argv)).toEqual({ text: refused?.reason, isError: true });
+    expect(existsSync(path.join(shell.cwd, 'flow.svg'))).toBe(false);
+  });
+
+  /*
+   * ONE RULE, ONE ESCAPE. A plotting script typed as `file write` is on the
+   * command line, where the shell-text chart scan reads it too; with the write
+   * rule now running as well, the same text met two refusals with two separate
+   * escapes. Only `chart` is registered here — it is in every chat — so this
+   * also pins that the write rule is on without any other drawing tool.
+   */
+  it('gives a plotting script typed at the shell one refusal and one way through', async () => {
+    const PLOT = [
+      'import matplotlib.pyplot as plt',
+      "plt.bar(['2023', '2024'], [12, 19])",
+      "plt.savefig('sales.png')",
+    ].join('\n');
+    const ask = 'Write me a Python script that plots our sales by year';
+    const tools = ['read', 'write', 'edit', 'ls', 'bash', 'chart'];
+
+    const direct = await session('cli', ask, tools);
+    const refused = blockOf(await direct.rig.fire('tool_call', writeCall('plot.py', PLOT)));
+    expect(refused?.reason).toContain('chart bar');
+    /* …and the identical write again is the way through: one refusal. */
+    expect(blockOf(await direct.rig.fire('tool_call', writeCall('plot.py', PLOT)))).toBeNull();
+
+    const shell = await session('cli', ask, tools);
+    const argv = ['file', 'write', '--path', 'plot.py', '--content', PLOT];
+    expect(blockOf(await shell.rig.fire('tool_call', bashCall(argv)))).toBeNull();
+    expect(await run(shell.bridge, argv)).toEqual({ text: refused?.reason, isError: true });
+    expect(blockOf(await shell.rig.fire('tool_call', bashCall(argv)))).toBeNull();
+    expect((await run(shell.bridge, argv)).isError).toBe(false);
+    expect(readFileSync(path.join(shell.cwd, 'plot.py'), 'utf8')).toBe(PLOT);
+  });
+
+  /*
+   * What the move must NOT take with it: the bookkeeping that belongs to the
+   * `bash` call. The result hook spots a verbatim repeat by comparing the
+   * result with `lastCallInput` — the bash call, in CLI mode — so the write
+   * inside the line must not have replaced it.
+   */
+  it('lets an ordinary command write, and records it like the write tool', async () => {
+    const { rig, cwd, bridge } = await session('cli');
+    const notes = path.join(cwd, 'notes.md');
+    const argv = ['file', 'write', '--path', notes, '--content', 'hello'];
+    let said = '';
+    for (let i = 0; i < 3; i += 1) {
+      expect(blockOf(await rig.fire('tool_call', bashCall(argv)))).toBeNull();
+      expect((await run(bridge, argv)).isError).toBe(false);
+      const results = await rig.fire('tool_result', {
+        type: 'tool_result',
+        toolName: 'bash',
+        toolCallId: `b${i}`,
+        input: bashCall(argv).input,
+        content: [{ type: 'text', text: `Successfully wrote 5 bytes to ${notes}` }],
+        isError: false,
+      });
+      said =
+        results
+          .map((r) => (r as { content?: { text?: string }[] } | undefined)?.content?.[0]?.text)
+          .find((t) => typeof t === 'string') ?? '';
+    }
+    expect(readFileSync(notes, 'utf8')).toBe('hello');
+    /* Checkpointed before it ran, like a write-tool write: the changed-files
+       list and `/harness restore` see it. */
+    expect(rig.handle.getStatus(rig.ctx).changedFiles).toEqual([{ path: notes, created: true }]);
+    expect(said).toContain('this exact `bash` call 3 times');
+  });
+
+  it('refuses the same markup through `use`, which also runs the tool itself', async () => {
+    const direct = await session('schemas');
+    const refused = blockOf(await direct.rig.fire('tool_call', writeCall('flow.svg', FLOW_SVG)));
+    expect(refused?.reason).toContain('Call the diagram tool');
+
+    const viaUse = await session('schemas');
+    const use = viaUse.rig.registeredTools.get('use');
+    expect(use, 'use was never registered').toBeDefined();
+    const failed = await (use as unknown as { execute: (...a: unknown[]) => Promise<unknown> })
+      .execute(
+        'u1',
+        { tool: 'write', args: { path: 'flow.svg', content: FLOW_SVG } },
+        undefined,
+        undefined,
+        viaUse.rig.ctx,
+      )
+      .then(
+        () => null,
+        (e: unknown) => e as Error,
+      );
+    /* Thrown, so pi hands it back as an error result — what a blocked call is. */
+    expect(failed?.message).toBe(refused?.reason);
+    expect(existsSync(path.join(viaUse.cwd, 'flow.svg'))).toBe(false);
   });
 });
 

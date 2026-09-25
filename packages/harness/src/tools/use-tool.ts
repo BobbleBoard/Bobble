@@ -47,6 +47,15 @@ export interface UseToolOptions {
    * `mac snapshot`.
    */
   readonly cliCommandForTool?: (toolName: string) => string | null;
+  /**
+   * The harness's per-tool rules, for the call this tool makes itself.
+   *
+   * pi fires `tool_call` for `use`, not for the tool it names, so a rule keyed
+   * on that tool's name never saw it: `use({tool: "write", …})` put on disk
+   * what the same `write` made directly is refused. Returns the refusal, or
+   * undefined to let the call run.
+   */
+  readonly admit?: (toolName: string, args: unknown) => string | undefined;
 }
 
 export function registerUseTool(pi: ExtensionAPI, opts: UseToolOptions): void {
@@ -112,6 +121,10 @@ export function registerUseTool(pi: ExtensionAPI, opts: UseToolOptions): void {
         };
       }
       const args = p.args !== undefined && p.args !== null ? p.args : {};
+      /* Thrown, so pi hands it back as an error result — exactly what the same
+         call made directly gets when the hook refuses it. */
+      const refused = opts.admit?.(name, args);
+      if (refused !== undefined) throw new Error(refused);
       // The target's own errors belong to the target — let them surface as its
       // result rather than being reworded here.
       return (await target.execute(id, args, ...rest)) as never;
