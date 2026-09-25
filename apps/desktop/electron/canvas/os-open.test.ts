@@ -157,6 +157,30 @@ describe('describeOpenFailure — why, in words a person can act on', () => {
     expect(describeOpenFailure(doc, 'The file /w/level.gd does not exist.')).toBe(
       'It is not there any more — it may have been moved or deleted.',
     );
+    // With an app named, a missing FILE is still the file.
+    expect(
+      describeOpenFailure(
+        { kind: 'app', app: '/Applications/Preview.app', target: '/w/a.png' },
+        'The file /w/a.png does not exist.',
+      ),
+    ).toBe('It is not there any more — it may have been moved or deleted.');
+  });
+
+  /*
+   * AN .app PATH THAT IS GONE IS THE APP, NOT THE FILE. Real `open -a` on a
+   * path that no longer holds the app (an Open-with list cached before it was
+   * uninstalled or moved) answers with the app's own "no such file" — which
+   * read as the user's file having vanished while it sat there on disk.
+   */
+  it('an uninstalled app given as its .app path is named as the missing one', () => {
+    expect(
+      describeOpenFailure(
+        { kind: 'app', app: '/Applications/Foo.app', target: '/w/report.md' },
+        'The application /Applications/Foo.app cannot be opened for an unexpected reason, ' +
+          'error=Error Domain=NSCocoaErrorDomain Code=260 "The file “Foo.app” couldn’t be opened ' +
+          'because there is no such file." UserInfo={NSFilePath=/Applications/Foo.app}',
+      ),
+    ).toBe('Foo is not installed on this Mac.');
   });
 
   it('passes anything else through, first line only', () => {

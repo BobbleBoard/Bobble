@@ -145,6 +145,16 @@ function appLabel(app: string): string {
 export function describeOpenFailure(req: OpenRequest, detail: string): string {
   const text = detail.trim();
   const firstLine = text.split('\n')[0]?.trim() ?? '';
+  /* An .app PATH that no longer holds the app (moved, uninstalled, still in a
+     cached Open-with list): `open -a` answers "The application … cannot be
+     opened … no such file" (NSCocoaErrorDomain 260) — about the APP. Read as
+     the file below, it sent the user looking for a file that is fine. */
+  if (
+    req.kind === 'app' &&
+    /the application .+ cannot be opened.*(no such file|Code=260)/is.test(text)
+  ) {
+    return `${appLabel(req.app)} is not installed on this Mac.`;
+  }
   if (/does not exist|no such file/i.test(text)) {
     return 'It is not there any more — it may have been moved or deleted.';
   }
