@@ -93,6 +93,18 @@ export const PENDING_PHASES: Record<PendingKind, readonly string[]> = {
   audio: ['Warming up…', 'Composing…', 'Mixing…', 'Finishing…'],
 };
 
+/**
+ * AN EDIT SAYS SO. The viewer's Edit bar and the chat's `edit_image` wait on the
+ * same card, which said "Creating your image…" over a picture being changed.
+ */
+export const EDIT_PHASES: readonly string[] = [
+  'Warming up…',
+  'Editing your image…',
+  'Drafting…',
+  'Refining…',
+  'Finalizing…',
+];
+
 /** The stand-in shape the pulsing bars hold before there is a sound. */
 const IDLE_WAVE = idleWave(WAVE_BUCKETS);
 
@@ -376,6 +388,7 @@ export function PendingMediaCard({
   onRevealed,
   progressKey,
   steps,
+  edit = false,
 }: {
   kind: PendingKind;
   /** width / height, as soon as the job says — the box takes it immediately. */
@@ -406,6 +419,8 @@ export function PendingMediaCard({
   progressKey?: string;
   /** The engine's step count, when `progress` is steps / total. */
   steps?: number;
+  /** The job changes a picture rather than making one — the words say so. */
+  edit?: boolean;
 }): JSX.Element {
   const frameRef = useRef<HTMLDivElement | null>(null);
   const [swept, setSwept] = useState(false);
@@ -463,7 +478,7 @@ export function PendingMediaCard({
     const id = setInterval(() => setElapsed(Date.now() - startedAt.current), 1000);
     return () => clearInterval(id);
   }, [progress, revealing]);
-  const phases = PENDING_PHASES[kind];
+  const phases = edit && kind === 'image' ? EDIT_PHASES : PENDING_PHASES[kind];
   /* Never backwards: a counter that dips (a second candidate starting) or a
      clock that resets keeps the furthest phrase the card has already said. */
   const furthest = useRef(0);

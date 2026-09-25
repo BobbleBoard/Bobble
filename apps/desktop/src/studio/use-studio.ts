@@ -96,6 +96,8 @@ export interface StudioJobState {
    * rectangle however the room's knobs are set when you come back to it.
    */
   readonly size?: string;
+  /** The job changes an input picture (the Image Studio's Edit) — the card says so. */
+  readonly edit?: boolean;
   /** Step progress, when the backend streams it (image + video do). */
   readonly step?: number;
   readonly total?: number;

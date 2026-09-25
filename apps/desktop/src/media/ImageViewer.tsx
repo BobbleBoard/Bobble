@@ -377,6 +377,7 @@ function ViewerStage({
             aspect={job.aspect}
             width={Math.round(job.width)}
             label="Editing image"
+            edit
             /* The edit's own id keys its % — a viewer closed and reopened mid-run
                picks the number up where it was instead of starting at nothing. */
             progressKey={job.requestId}

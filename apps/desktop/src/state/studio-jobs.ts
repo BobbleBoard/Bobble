@@ -151,6 +151,7 @@ export async function runStudioJob(modality: StudioModality, req: StudioRequest)
       startedAt: flight.startedAt,
       cancellable: false,
       ...(req.size !== undefined ? { size: req.size } : {}),
+      ...(req.inputImage !== undefined ? { edit: true } : {}),
     },
   });
   const tray = useTaskTray.getState();

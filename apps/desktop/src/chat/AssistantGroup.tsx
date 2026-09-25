@@ -439,6 +439,7 @@ export function AssistantGroup({
                    steps, a clip's rendered frames (HyperFrames names each). */
                 live={jobHere.kind === 'image' || jobHere.kind === 'video'}
                 label={`Generating ${jobHere.kind}`}
+                edit={effectiveToolName(b.name, b.arguments) === 'edit_image'}
                 note={
                   generating?.note ??
                   live3d?.note ??
@@ -480,6 +481,10 @@ export function AssistantGroup({
                 /* The same job's number and shape, so the handover neither
                    restarts the pill nor reopens the frame square. */
                 progressKey={handing.callId}
+                edit={
+                  effectiveToolName(handingResult?.toolName, callArgsFor(group, handing.callId)) ===
+                  'edit_image'
+                }
                 onRevealed={() => setRevealed((cur) => new Set([...cur, handingItem.path]))}
               />,
             );

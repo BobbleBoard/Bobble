@@ -151,6 +151,7 @@ export function StudioJob({
         /* One number per job across leaving and coming back: the card that
            mounts on return continues the pill rather than counting up from 0. */
         progressKey={`studio:${kind}:${job.startedAt}`}
+        edit={job.edit === true}
         {...(aspect === undefined ? {} : { aspect })}
         {...(width === undefined ? {} : { width })}
         {...(hasSteps ? { progress: frac, steps: job.total } : {})}

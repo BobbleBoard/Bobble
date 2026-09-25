@@ -356,8 +356,13 @@ async function pasteIntoComposer() {
   await page.evaluate(async ({ image, text }) => {
     const data = new DataTransfer();
     if (image !== null) {
-      const blob = await (await fetch(image)).blob();
-      data.items.add(new File([blob], 'image.png', { type: 'image/png' }));
+      // Decoded by hand: the renderer's CSP refuses fetch() of a data: URL.
+      const [head, b64] = image.split(',');
+      const type = /data:([^;,]+)/.exec(head)?.[1] ?? 'image/png';
+      const bin = atob(b64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      data.items.add(new File([bytes], 'image.png', { type }));
     }
     if (text !== null) data.setData('text/plain', text);
     const target =
