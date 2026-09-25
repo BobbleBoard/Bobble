@@ -32,6 +32,15 @@
  * nothing to start, and nothing is ever sent, so nothing starts for them — the
  * last check proves it.
  *
+ * WHAT IS ON DISK, SEEN FROM THE REPO. A Recommended pick and a Hub search hit
+ * are cards for a REPO, while the files are held by catalog entries with ids of
+ * their own: the curated one, or one `hf:register` made. So the staged library
+ * is read from the repo's card too, first with only the curated entry holding a
+ * file and then with only a registered entry holding one, of a quant no machine
+ * is recommended fresh. That file must say "On disk", be the pick (a downloaded
+ * quant beats fetching a better one) and be the file Top Recommended names. No
+ * Download may fetch it again, or fetch another quant in its place.
+ *
  * WHICH FILE EACH DOWNLOAD ASKS FOR, WITHOUT A DOWNLOAD. The channels that start
  * one are refused in main (harness.mjs `refuseIpc` — a wrapper around
  * `window.piDesktop.invoke` in the page cannot work, the bridge is frozen), so a
@@ -280,6 +289,53 @@ function printRows(rows) {
 
 try {
   await page.waitForSelector('[data-testid="composer-input"]', { timeout: 30_000 });
+  /*
+   * AN ENTRY `hf:register` MADE, for the repo-card checks near the end. It is
+   * registered now because the channel is refused from the next step on, and
+   * through the app's own path, the one every Download takes. It is the repo's
+   * smallest single-file quant, which no machine this runs on is recommended
+   * fresh. Registering fetches nothing; its file is staged later, as a hole.
+   */
+  const atStart = await page.evaluate(
+    (repoId) => window.piDesktop.invoke('hf:list-files', { repoId }),
+    model.hfRepo,
+  );
+  const perLabel = new Map();
+  for (const f of atStart.files ?? []) {
+    if (f.mmproj === true || f.mtp === true || f.quant === undefined || /imatrix/i.test(f.path))
+      continue;
+    perLabel.set(f.quant, [...(perLabel.get(f.quant) ?? []), f]);
+  }
+  const smallest = [...perLabel.values()]
+    .filter((parts) => parts.length === 1 && !SPLIT_PART.test(parts[0].path))
+    .map(([f]) => f)
+    .filter((f) => f.sizeBytes > 0)
+    .sort((a, b) => a.sizeBytes - b.sizeBytes)[0];
+  need(
+    smallest !== undefined,
+    `${model.hfRepo} lists a single-file quant to register (${atStart.error ?? `${atStart.files?.length ?? 0} files`})`,
+  );
+  const [author, repoName] = model.hfRepo.split('/');
+  const registered = await page.evaluate(
+    (req) => window.piDesktop.invoke('hf:register', req).then((r) => r.entry),
+    {
+      hit: {
+        id: model.hfRepo,
+        author,
+        name: repoName,
+        downloads: 0,
+        likes: 0,
+        tags: [],
+        gated: false,
+      },
+      file: smallest,
+    },
+  );
+  need(
+    registered?.hfRepo === model.hfRepo && registered.downloaded === false,
+    `hf:register made ${registered?.id} for ${smallest.path}, and fetched nothing`,
+  );
+
   // Every phase the inference status passes through, for the last check.
   await page.waitForFunction(() => window.__llm_store !== undefined, undefined, {
     timeout: 10_000,
@@ -660,10 +716,9 @@ try {
   const sparse = statSync(canary).blocks * 512 < 1024 ** 2;
   rmSync(canary);
   need(sparse, 'this disk makes sparse files, so a staged model costs nothing');
-  /** A model's first file at the catalog's own path and size — a hole, not data. */
-  const stage = (m) => {
-    const file = m.files[0];
-    const at = path.join(libraryRoot, 'LLM', m.id, file.name);
+  /** One file of a model at the app's own path and size — a hole, not data. */
+  const stageFile = (id, file) => {
+    const at = path.join(libraryRoot, 'LLM', id, file.name);
     mkdirSync(path.dirname(at), { recursive: true });
     writeFileSync(at, '');
     truncateSync(at, file.bytes);
@@ -672,6 +727,8 @@ try {
     );
     return { at, bytes: file.bytes, quant: file.quant };
   };
+  /** A model's first file at the catalog's own path and size. */
+  const stage = (m) => stageFile(m.id, m.files[0]);
   /* The near miss: the smallest catalog model this machine cannot hold, so the
      fit filter has something real to hide. */
   const tooBig = CATALOG.filter(
@@ -809,6 +866,221 @@ try {
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
   await dialog.waitFor({ state: 'detached', timeout: 3000 });
   check(existsSync(staged.at), 'Cancel closes the dialog without deleting');
+
+  /*
+   * ── What is on disk, seen from the REPO's card ───────────────────────────
+   * The picker read above is a catalog ENTRY's, and knows its own files. A
+   * Recommended pick and a Hub search hit are cards for the REPO, and a repo's
+   * files are held by entries with ids of their own: the curated one, or the
+   * one hf:register made at the start. Each step stages exactly the library it
+   * names (every staged file of the repo is cleared first, from this probe's
+   * own library in its throwaway home), then re-reads the catalog and the
+   * status, as a finished download leaves them.
+   */
+  const repoLibrary = async (label, holdings) => {
+    const known = await page.evaluate(() => window.__llm_store?.().getState().catalog ?? []);
+    for (const e of known.filter((k) => k.hfRepo === model.hfRepo)) {
+      rmSync(path.join(libraryRoot, 'LLM', e.id), { recursive: true, force: true });
+    }
+    for (const { id, file } of holdings) stageFile(id, file);
+    await page.evaluate(async () => {
+      const llm = window.__llm_store?.().getState();
+      await Promise.all([llm?.refreshCatalog(), llm?.refreshStatus()]);
+    });
+    const ids = holdings.map((h) => h.id).sort();
+    need(
+      await page
+        .waitForFunction(
+          ([repo, want]) =>
+            (window.__llm_store?.().getState().catalog ?? [])
+              .filter((e) => e.hfRepo === repo && e.downloaded === true)
+              .map((e) => e.id)
+              .sort()
+              .join() === want.join(),
+          [model.hfRepo, ids],
+          { timeout: 10_000 },
+        )
+        .then(
+          () => true,
+          () => false,
+        ),
+      `${label}: of ${model.hfRepo}, the catalog has ${ids.join(', ')} on disk and nothing else`,
+    );
+  };
+  const onDiskRows = (menu) => menu.filter((r) => r.onDisk).map((r) => r.quant);
+  const brief = (s) =>
+    JSON.stringify({ selected: s.selected, action: s.action, enabled: s.enabled });
+  /** The picker's state, then its menu, read and printed. The menu is left open for a shot. */
+  const readPicker = async (label) => {
+    const state = await actionState();
+    await current.click();
+    await page.waitForSelector('[data-testid="quant-menu"]', { timeout: 3000 });
+    await page.waitForTimeout(300);
+    const menu = await readMenu();
+    console.log(`${label}: ${brief(state)}`);
+    printRows(menu);
+    return { ...state, menu };
+  };
+  const closeMenu = async () => {
+    await page.keyboard.press('Escape');
+    await page.waitForSelector('[data-testid="quant-menu"]', { state: 'detached', timeout: 3000 });
+  };
+  /** The repo's card as a person opens it: Discover → Recommended → its family → the version. */
+  const openRecommendedCard = async () => {
+    await page.click('[data-testid="models-tab-discover"]');
+    await page.click('[data-testid="hub-scope-recommended"]');
+    await page.waitForSelector('[data-testid="curated-families"]', { timeout: 30_000 });
+    const familyCard = page.locator(`[data-testid="family-card-${family}"]`);
+    if ((await familyCard.getAttribute('data-open')) !== 'true') {
+      await page.click(`[data-testid="family-toggle-${family}"]`);
+      await page.waitForTimeout(400);
+    }
+    if ((await variant.getAttribute('data-selected')) !== 'true') {
+      await variant.locator('button').first().click();
+    }
+    await page.waitForSelector('[data-testid="quant-picker"]', { timeout: 45_000 });
+  };
+
+  // 1 · Only the curated entry holds a file.
+  const curatedFile = model.files[0];
+  await repoLibrary(`1 · only ${model.id}'s ${curatedFile.quant}`, [
+    { id: model.id, file: curatedFile },
+  ]);
+  await openRecommendedCard();
+  let seen = await readPicker(
+    `the Recommended card, with ${curatedFile.quant} held by ${model.id}`,
+  );
+  check(
+    seen.selected === curatedFile.quant && seen.action === 'On disk' && !seen.enabled,
+    `on the repo's Recommended card, ${curatedFile.quant} (held by ${model.id}) is the pick and says On disk (${brief(seen)})`,
+  );
+  check(
+    onDiskRows(seen.menu).length > 0 && onDiskRows(seen.menu).every((q) => q === curatedFile.quant),
+    `there, "on disk" marks the ${curatedFile.quant} rows and nothing else (${onDiskRows(seen.menu).join(', ') || 'no row'})`,
+  );
+  await shot('9-repo-card-curated-on-disk');
+  await closeMenu();
+  // Where the button is offered, what pressing it asks for.
+  const again = seen.enabled
+    ? await registerAfter(
+        () => action.click(),
+        `the Recommended card's Download on ${seen.selected}, which ${model.id} holds`,
+      )
+    : undefined;
+  check(
+    again?.file === undefined,
+    `nothing on that card fetches ${curatedFile.quant} again${again?.file === undefined ? '' : `: its Download asked for ${again.file.path}, ${(again.file.sizeBytes / 1e9).toFixed(2)} GB into a second entry`}`,
+  );
+
+  // 2 · Only the registered entry holds a file, of a quant that is not the fresh pick.
+  const held = smallest.quant;
+  await repoLibrary(`2 · only ${registered.id}'s ${held}`, [
+    { id: registered.id, file: { name: smallest.path, bytes: smallest.sizeBytes, quant: held } },
+  ]);
+  if (held === preselected) {
+    console.log(`  --   ${held} is what a fresh hub recommends here too; the float cannot show`);
+  }
+  seen = await readPicker(`the Recommended card, with only ${held} on disk (${registered.id})`);
+  check(
+    seen.selected === held && seen.action === 'On disk' && !seen.enabled,
+    `with only ${registered.id} holding a file, the card pins its ${held} over the ${preselected} a fresh hub recommends, and says On disk (${brief(seen)})`,
+  );
+  const pinnedHeld = seen.menu[0];
+  check(
+    pinnedHeld?.from === 'pinned' && pinnedHeld.quant === held && pinnedHeld.onDisk,
+    `the menu's pinned "Recommended" row is ${held}, on disk (${pinnedHeld?.quant})`,
+  );
+  check(
+    onDiskRows(seen.menu).length > 0 && onDiskRows(seen.menu).every((q) => q === held),
+    `"on disk" marks the ${held} rows and nothing else (${onDiskRows(seen.menu).join(', ') || 'no row'})`,
+  );
+  await shot('10-repo-card-registered-on-disk');
+  await closeMenu();
+  const quickUse = page.locator(`[data-testid="family-quick-use-${family}"]`);
+  if ((await quickUse.count()) > 0 && (await quickUse.getAttribute('data-repo')) === model.hfRepo) {
+    const title = (await quickUse.getAttribute('title')) ?? '';
+    check(
+      title.endsWith(` · ${held}`),
+      `the family's quick button says Use, and names ${held} ("${title}")`,
+    );
+  }
+  if (topRepo === model.hfRepo) {
+    const line = ((await page.locator('[data-testid="best-size-text"]').textContent()) ?? '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    check(
+      (await page.locator('[data-testid="best-use-text"]').count()) === 1 &&
+        line === `${pinnedHeld?.size} · ${held}`,
+      `Top Recommended says Use and names the file you have: "${line}" (held: ${held}, ${pinnedHeld?.size})`,
+    );
+    // Painted before it is photographed: two frames and a beat after the jump.
+    await page.locator('[data-testid="best-text"]').scrollIntoViewIfNeeded();
+    await page.evaluate(
+      () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
+    );
+    await page.waitForTimeout(400);
+    await shot('10b-top-recommended');
+  }
+
+  /*
+   * 3 · The same repo, found by a Hub search. Searched as "<org> <name>": the
+   * name alone is a crowd of re-uploads under the default "Newest" sort, and
+   * the repo id with its slash is dropped by the hub's own word match.
+   */
+  await page.click('[data-testid="hub-scope-all"]');
+  const query = `${author} ${repoName}`;
+  await page.fill('[data-testid="models-search"]', query);
+  const hubRow = page.locator(`[data-testid="model-row-${model.hfRepo}"]`).first();
+  const found = await hubRow.waitFor({ timeout: 30_000 }).then(
+    () => true,
+    () => false,
+  );
+  check(found, `a Hub search for "${query}" finds ${model.hfRepo}`);
+  if (found) {
+    await hubRow.click();
+    await page.waitForSelector('[data-testid="quant-picker"]', { timeout: 45_000 });
+    seen = await readPicker(`the Hub search hit, with only ${held} on disk`);
+    check(
+      seen.selected === held && seen.action === 'On disk' && !seen.enabled,
+      `as a Hub search hit too, ${held} is the pick and says On disk (${brief(seen)})`,
+    );
+    check(
+      onDiskRows(seen.menu).length > 0 && onDiskRows(seen.menu).every((q) => q === held),
+      `there, "on disk" marks the ${held} rows and nothing else (${onDiskRows(seen.menu).join(', ') || 'no row'})`,
+    );
+    await shot('11-hub-hit-on-disk');
+    await closeMenu();
+    const headline = page.locator('[data-testid="detail-download"]');
+    const fetched =
+      (await headline.count()) > 0
+        ? await registerAfter(() => headline.click(), "the Hub card's headline Download")
+        : undefined;
+    check(
+      fetched?.file === undefined,
+      `the Hub card has no Download that fetches another quant in place of ${held}, or ${held} again${fetched?.file === undefined ? '' : `: its headline asked for ${fetched.file.path}`}`,
+    );
+    // What you have is the default, not a lock: another quant still downloads.
+    if (preselected !== held) {
+      await current.click();
+      await page.waitForSelector('[data-testid="quant-menu"]', { timeout: 3000 });
+      await page.locator(`[data-testid="quant-opt-list-${preselected}"]`).first().click();
+      const other = await actionState();
+      check(
+        other.selected === preselected && other.action === 'Download' && other.enabled,
+        `picking ${preselected}, which is not on disk, still offers Download (${brief(other)})`,
+      );
+      const asked2 = await registerAfter(
+        () => action.click(),
+        `the picker's Download on ${preselected}`,
+      );
+      check(
+        asked2.repo === model.hfRepo && asked2.file?.quant === preselected,
+        `…and asks for ${preselected}'s file (${asked2.file?.path ?? `nothing: ${asked2.banner ?? 'no message'}`})`,
+      );
+    }
+  }
+  await page.fill('[data-testid="models-search"]', '');
+  await page.click('[data-testid="hub-scope-recommended"]');
 
   /*
    * ── The chat-screen download indicator, LOOKED AT ────────────────────────
