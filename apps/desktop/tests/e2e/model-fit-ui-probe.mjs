@@ -49,6 +49,16 @@
  * picker pins; a label picked in the picker must name that model, not the speed
  * head that shares its label; a quant split across files is not offered.
  *
+ * WHAT "USE" STARTS, WITHOUT A START. Once the repo is on disk Top Recommended
+ * says Use, and Use starts a model — so for those clicks `llm:start-server` is
+ * refused in main as well. Its request must name an entry whose file is on disk,
+ * at a quant that is on disk (the pinned pick whenever that is here), and the
+ * card must name that same file. Staged three ways: a quant that is not the pick
+ * under the curated entry; only the hub's own download, registered through
+ * `hf:register` before that channel is refused; the curated entry holding the
+ * pick as well. It asked for the recommender's Q3_K_M on the curated entry in
+ * all three — a download of it, in the second.
+ *
  *   node scripts/with-lock.mjs probe -- node apps/desktop/tests/e2e/model-fit-ui-probe.mjs
  *
  * Build first. MODEL_ID picks another catalog model (default: the 27B).
@@ -347,6 +357,45 @@ try {
       if (window.__phases.at(-1) !== s.status.phase) window.__phases.push(s.status.phase);
     });
   });
+  /*
+   * A DOWNLOAD THE HUB MADE, registered the way the hub's Download registers
+   * one — `hf:register`, the app's own path, with the hit it builds for a
+   * curated pick — before that channel is refused below. Only the entry: its
+   * file is staged later, as a hole, once the boot-time check has passed. It is
+   * what Top Recommended's "Use" finds on disk when the model came from the hub
+   * rather than from the curated catalog, which gives the repo two entries.
+   */
+  const listed0 = await page.evaluate(
+    (repoId) => window.piDesktop.invoke('hf:list-files', { repoId }),
+    model.hfRepo,
+  );
+  const hubFiles = listed0.files ?? [];
+  const hubFile = hubFiles.find(
+    (f) => f.quant === model.files[0].quant && f.mtp !== true && f.mmproj !== true,
+  );
+  const hubEntry =
+    hubFile === undefined
+      ? null
+      : await page.evaluate((req) => window.piDesktop.invoke('hf:register', req), {
+          hit: {
+            id: model.hfRepo,
+            author: model.hfRepo.split('/')[0],
+            name: model.hfRepo.split('/')[1],
+            downloads: 0,
+            likes: 0,
+            tags: [],
+            gated: false,
+          },
+          file: hubFile,
+          mmproj: hubFiles.find((f) => f.mmproj === true),
+          mtpFile: hubFiles.find((f) => f.mtp === true),
+        });
+  console.log(
+    hubEntry === null
+      ? `  --   ${model.hfRepo} lists no ${model.files[0].quant} (${listed0.error ?? 'no error'}); nothing registered`
+      : `registered ${hubEntry.modelId} (${hubFile.path}, a ${hubEntry.entry.contextWindow}-token window; the curated entry's is ${model.contextWindow}), as the hub's Download registers one`,
+  );
+
   /*
    * The refusal goes in before anything on the page can be clicked, and proves
    * itself: a page-side invoke must come back refused, and be heard in main.
@@ -738,7 +787,117 @@ try {
       m.files.length > 0 &&
       (m.engine ?? 'llamacpp') === 'llamacpp',
   ).sort((a, b) => a.minRamGB - b.minRamGB)[0];
+  /*
+   * ── "Use" starts what is on disk ───────────────────────────────────────
+   * Once its repo is here, Top Recommended says Use, and Use STARTS a model: it
+   * must start an entry whose file is on disk, at a quant that is on disk —
+   * the pinned pick whenever that is here. Three libraries, each staged as
+   * holes and each heard in main with the start refused as well as the
+   * download, so no server ever sees a sparse file:
+   *   A · the curated entry holds only a quant that is not the pick;
+   *   B · only the hub's own download is here (the curated entry is not);
+   *   C · the curated entry holds the pick as well.
+   */
+  const USE_CHANNELS = [...STARTS_A_DOWNLOAD, 'llm:start-server'];
+  /** What a finished download leaves the hub knowing: catalog and status, re-read. */
+  const rescan = () =>
+    page.evaluate(async () => {
+      const llm = window.__llm_store().getState();
+      await llm.refreshCatalog();
+      await llm.refreshStatus();
+    });
+  const heldBy = (catalog) =>
+    catalog
+      .filter((e) => e.hfRepo === model.hfRepo && (e.downloadedQuants ?? []).length > 0)
+      .map((e) => `${e.id}: ${e.downloadedQuants.join(', ')}`)
+      .join('; ');
+  async function pressUse(what, shotName) {
+    await rescan();
+    const use = page.locator('[data-testid="best-use-text"]');
+    need(
+      await use.waitFor({ timeout: 10_000 }).then(
+        () => true,
+        () => false,
+      ),
+      `${what}: Top Recommended says Use once ${model.hfRepo} is on disk`,
+    );
+    const line = ((await page.locator('[data-testid="best-size-text"]').textContent()) ?? '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    refused = await refuseIpc(app, USE_CHANNELS);
+    const before = (await refused.calls()).length;
+    await use.click({ timeout: 5000 });
+    const until = Date.now() + 8000;
+    while ((await refused.calls()).length === before && Date.now() < until) {
+      await page.waitForTimeout(100);
+    }
+    // Whatever the first request sets off (a download, then a start) lands in this.
+    await page.waitForTimeout(1500);
+    const heard = (await refused.calls()).slice(before);
+    const catalog = await page.evaluate(() => window.__llm_store().getState().catalog);
+    const banner = await page
+      .locator('[data-testid="models-error"]')
+      .textContent({ timeout: 500 })
+      .catch(() => null);
+    const asked = heard.map(
+      (c) => `${c.channel} ${c.request?.modelId ?? c.request?.hit?.id} · ${c.request?.quant}`,
+    );
+    console.log(`       ${what}: on disk ${heldBy(catalog)}; the card reads "${line}"`);
+    console.log(`       Use → ${asked.join(' ; ') || 'nothing'}  (the page says: ${banner})`);
+    await shot(shotName);
+    const start = heard.length === 1 && heard[0].channel === 'llm:start-server';
+    const { modelId, quant } = start ? heard[0].request : {};
+    check(
+      start,
+      `${what}: Use asks for one start and nothing else — no download, no registration (${asked.join(' ; ') || 'nothing'})`,
+    );
+    const entry = catalog.find((e) => e.id === modelId);
+    check(
+      entry?.hfRepo === model.hfRepo && (entry.downloadedQuants ?? []).includes(quant),
+      `${what}: it starts an entry of ${model.hfRepo} at a quant that entry holds on disk (${modelId} · ${quant}; on disk: ${heldBy(catalog)})`,
+    );
+    if (
+      catalog.some(
+        (e) => e.hfRepo === model.hfRepo && (e.downloadedQuants ?? []).includes(pick.quant),
+      )
+    ) {
+      check(
+        quant === pick.quant,
+        `${what}: the pinned pick, ${pick.quant}, is on disk, so that is what it starts (${quant})`,
+      );
+    }
+    check(
+      quant !== undefined && line.endsWith(` · ${quant}`),
+      `${what}: the card names the file Use starts ("${line}", starts ${quant})`,
+    );
+    // The start was refused, and a refusal is said where Use was pressed.
+    check(
+      /llm:start-server/.test(banner ?? ''),
+      `${what}: the failed start is shown on the page, not dropped ("${banner}")`,
+    );
+  }
+  const useHere = topRepo === model.hfRepo;
+  if (!useHere) console.log(`  --   Top Recommended's text pick is not ${model.hfRepo}; no Use`);
+  const notPick = model.files.find((f) => f.quant !== pick.quant);
+  if (useHere && notPick !== undefined) {
+    const lone = stageFile(model.id, notPick);
+    await pressUse(`A · only ${model.id}'s ${notPick.quant} is here`, '9a-use-not-the-pick');
+    // The picker and delete checks below expect one file of this model on disk.
+    rmSync(lone.at);
+  }
+  if (useHere && hubEntry !== null) {
+    stageFile(hubEntry.modelId, {
+      name: hubFile.path,
+      bytes: hubFile.sizeBytes,
+      quant: hubFile.quant,
+    });
+    await pressUse(
+      `B · only the hub's download ${hubEntry.modelId} is here`,
+      '9b-use-hub-download',
+    );
+  }
   const staged = stage(model);
+  if (useHere) await pressUse(`C · ${model.id}'s ${staged.quant} is here too`, '9c-use-curated');
   if (tooBig !== undefined) stage(tooBig);
 
   // ── On Device, and "Only show models that fit" ──────────────────────────
