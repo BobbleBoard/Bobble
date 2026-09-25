@@ -50,11 +50,13 @@ import {
 } from '../state/present-store';
 import { useTurnPrefilling } from '../state/running-chats';
 import { AssistantGroup } from './AssistantGroup';
-import { AttachedFileCard } from './AttachedFileCard';
-import { type AttachedFile, splitAttachedFiles } from './attached-files';
+import { AttachedFileCard, AttachedPathCard } from './AttachedFileCard';
+import { baseName, splitAttachedFiles } from './attached-files';
 import { reportOpen } from './canvas/open-outcome';
-import { buildAgentMessage } from './composer/agent-message';
+import { attachmentLine, buildAgentMessage } from './composer/agent-message';
 import { useDropStore } from './composer/drop-store';
+import { pathOfFile } from './composer/file-paths';
+import { attachPlan } from './composer/incoming-files';
 import { corpChatView } from './corp/corp-thread-view';
 import { HarnessChecklistPanel, ThreadStatusIndicator } from './HarnessStatus';
 import { HistoryPole } from './HistoryPole';
@@ -65,6 +67,35 @@ import { awaitingReplyAfterLatestTurn, sentAttachmentsPrefilling } from './sent-
 import { followToLatest, useThreadFollow } from './thread-follow';
 import { attributeRecords, type CallResultFacts } from './turn-cards';
 import { BlindImageNote, UserImage } from './UserImage';
+
+/**
+ * An attachment on a message being edited: a folded text file, or a file or
+ * folder named by its path (composer/agent-message.ts writes both back).
+ */
+type EditAttachment =
+  | {
+      readonly id: string;
+      readonly kind: 'text';
+      readonly name: string;
+      readonly text: string;
+      readonly path?: string;
+    }
+  | {
+      readonly id: string;
+      readonly kind: 'file' | 'folder';
+      readonly name: string;
+      readonly path: string;
+      /** What its line said it is, kept word for word from the message. */
+      readonly detail?: string;
+      readonly bytes?: number;
+    };
+
+/** What an edit card says a file is — the line's own words when it has them. */
+function editDetail(a: Extract<EditAttachment, { kind: 'file' | 'folder' }>): string | undefined {
+  if (a.detail !== undefined) return a.detail;
+  // A file dropped into the edit: the same words its line will carry.
+  return /\(([^()]*)\)$/.exec(attachmentLine(a) ?? '')?.[1];
+}
 
 /** Concatenated visible text of an assistant response group (for copy). */
 function groupPlainText(group: AssistantMsg[]): string {
@@ -230,36 +261,87 @@ export function ChatThread() {
    * Seeded from the message when the edit opens, mutated by the ✕ on each card
    * and by "Add files", and folded back into pi's copy on save.
    */
-  const [editFiles, setEditFiles] = useState<readonly AttachedFile[]>([]);
+  const [editFiles, setEditFiles] = useState<readonly EditAttachment[]>([]);
   const editFileInput = useRef<HTMLInputElement>(null);
 
-  /** Open the editor on a message, seeded with its current attachments. */
+  /**
+   * Open the editor on a message, seeded with its current attachments — the
+   * folded text files AND everything it named by path, so correcting a typo
+   * does not quietly drop the folder the question was about.
+   *
+   * A picture comes along as its FILE. An edit re-sends text only (it forks the
+   * chat and prompts again — pi-connect forkAndReprompt), so its pixels do not
+   * go; naming it as a file at least keeps it within the model's reach, and the
+   * card says so rather than the picture vanishing without a word.
+   */
   const beginEdit = (message: { id: string; text: string; agentText?: string }): void => {
-    setEditFiles(splitAttachedFiles(message.agentText ?? message.text).files);
+    const split = splitAttachedFiles(message.agentText ?? message.text);
+    setEditFiles([
+      ...split.refs.map(
+        (r): EditAttachment => ({
+          id: r.id,
+          kind: r.kind === 'folder' ? 'folder' : 'file',
+          name: r.name,
+          path: r.path,
+          ...(r.detail !== undefined ? { detail: r.detail } : {}),
+        }),
+      ),
+      ...split.images.map(
+        (r): EditAttachment => ({
+          id: r.id,
+          kind: 'file',
+          name: r.name,
+          path: r.path,
+          ...(r.detail !== undefined ? { detail: r.detail } : {}),
+        }),
+      ),
+      ...split.files.map(
+        (f): EditAttachment => ({
+          id: f.id,
+          kind: 'text',
+          name: f.name,
+          text: f.text,
+          ...(f.path !== undefined ? { path: f.path } : {}),
+        }),
+      ),
+    ]);
     setEditingId(message.id);
   };
 
-  /** Read chosen files as text attachments (binaries are skipped, as elsewhere). */
+  /**
+   * Files dropped or picked while editing: the composer's rules
+   * (composer/incoming-files.ts), minus pixels — an edit re-sends text only, so
+   * a picture joins as its file, by path.
+   */
   const addEditFiles = async (files: readonly File[]): Promise<void> => {
-    const read = await Promise.all(
-      files.map(
-        (file) =>
-          new Promise<AttachedFile | null>((resolve) => {
-            const reader = new FileReader();
-            reader.onerror = () => resolve(null);
-            reader.onload = () => {
-              const text = typeof reader.result === 'string' ? reader.result : '';
-              // A NUL byte is the same binary test the read channel uses; a
-              // binary pasted into a prompt is noise, not content.
-              resolve(
-                text.includes('\u0000') ? null : { id: crypto.randomUUID(), name: file.name, text },
-              );
-            };
-            reader.readAsText(file);
-          }),
-      ),
-    );
-    const kept = read.filter((f): f is AttachedFile => f !== null);
+    const incoming = files.map((file) => ({ file, path: pathOfFile(file) }));
+    const paths = incoming.map((i) => i.path).filter((p) => p !== '');
+    const found =
+      paths.length === 0
+        ? []
+        : await window.piDesktop
+            .invoke('attachments:inspect', { paths })
+            .then((r) => r.items)
+            .catch(() => []);
+    const onDisk = new Map(found.map((item) => [item.path, item]));
+    const kept: EditAttachment[] = [];
+    for (const { file, path } of incoming) {
+      const disk = path === '' ? null : (onDisk.get(path) ?? null);
+      const plan = attachPlan(file, path, disk);
+      const id = crypto.randomUUID();
+      if (plan.as === 'text') {
+        const text = await file.text().catch(() => null);
+        // A NUL byte is the same binary test the read channel uses; a binary
+        // pasted into a prompt is noise, not content.
+        if (text !== null && !text.includes('\u0000')) {
+          kept.push({ id, kind: 'text', name: file.name, text, ...(path !== '' ? { path } : {}) });
+        }
+      } else if (plan.as === 'folder') {
+        kept.push({ id, kind: 'folder', name: file.name, path });
+      } else if (path !== '' && plan.as !== 'skip') {
+        kept.push({ id, kind: 'file', name: file.name, path, bytes: disk?.bytes ?? file.size });
+      }
+    }
     if (kept.length > 0) setEditFiles((prev) => [...prev, ...kept]);
   };
 
@@ -748,16 +830,27 @@ export function ChatThread() {
                         onAddFiles={() => editFileInput.current?.click()}
                         attachments={
                           editFiles.length > 0
-                            ? editFiles.map((f) => (
-                                <AttachedFileCard
-                                  key={f.id}
-                                  name={f.name}
-                                  text={f.text}
-                                  onRemove={() =>
-                                    setEditFiles((prev) => prev.filter((x) => x.id !== f.id))
-                                  }
-                                />
-                              ))
+                            ? editFiles.map((f) => {
+                                const remove = () =>
+                                  setEditFiles((prev) => prev.filter((x) => x.id !== f.id));
+                                return f.kind === 'text' ? (
+                                  <AttachedFileCard
+                                    key={f.id}
+                                    name={f.name}
+                                    text={f.text}
+                                    onRemove={remove}
+                                  />
+                                ) : (
+                                  <AttachedPathCard
+                                    key={f.id}
+                                    kind={f.kind}
+                                    name={f.name}
+                                    path={f.path}
+                                    detail={editDetail(f)}
+                                    onRemove={remove}
+                                  />
+                                );
+                              })
                             : undefined
                         }
                       />
@@ -781,6 +874,18 @@ export function ChatThread() {
                 // `agentText` first makes a live bubble and a reloaded one show
                 // the same cards (see UserMsg.agentText).
                 const attached = splitAttachedFiles(message.agentText ?? message.text);
+                /*
+                 * WHICH FILE EACH PICTURE IS. The message names its pictures in
+                 * the order it sent their pixels, so the n-th line is the n-th
+                 * picture — trusted only when the two counts agree (a picture
+                 * whose pixels could not be saved has no line). Unpaired, a
+                 * click still opens it: its pixels are saved then.
+                 */
+                const pixels = message.images ?? [];
+                const picturePaths =
+                  attached.images.length === pixels.length
+                    ? attached.images.map((r) => r.path)
+                    : [];
                 return (
                   /* `data-user-turn` marks the thread's landmarks for the
                      history pole — the one place that knows where each question
@@ -800,9 +905,14 @@ export function ChatThread() {
                     {message.images !== undefined && message.images.length > 0 ? (
                       <div className="flex flex-col items-end gap-2">
                         <div className="flex flex-wrap justify-end gap-2">
-                          {message.images.map((src) => (
-                            <UserImage key={src} src={src} />
-                          ))}
+                          {pixels.map((src, i) => {
+                            const at = picturePaths[i];
+                            return at !== undefined ? (
+                              <UserImage key={src} src={src} path={at} name={baseName(at)} />
+                            ) : (
+                              <UserImage key={src} src={src} />
+                            );
+                          })}
                         </div>
                         {/*
                           WORDS, NOT ONLY A COLOURED MARK. The tester: "a
@@ -816,11 +926,20 @@ export function ChatThread() {
                         <BlindImageNote />
                       </div>
                     ) : null}
-                    {attached.files.length > 0 ? (
+                    {attached.files.length + attached.refs.length > 0 ? (
                       <div
                         className="flex flex-wrap justify-end gap-2"
                         data-testid="user-attachments"
                       >
+                        {attached.refs.map((r) => (
+                          <AttachedPathCard
+                            key={r.id}
+                            kind={r.kind}
+                            name={r.name}
+                            path={r.path}
+                            {...(r.detail !== undefined ? { detail: r.detail } : {})}
+                          />
+                        ))}
                         {(() => {
                           const stillReading = sentAttachmentsPrefilling({
                             files: attached.files,

@@ -583,20 +583,29 @@ try {
   await shot('09-paste-from-card-light');
   await clip('09b-paste-from-card-composer', '.pd-composer-root', 16);
 
-  /* The composer's own look-closer view (the other user of the shared scrim):
-     double-click the pasted picture, Escape, and focus is back in the box.
-     (Only when the paste attached something — on a build where it does not,
-     that failure is already recorded above.) */
+  /* The pasted picture opens where every picture opens — the image viewer, on
+     the file its pixels were saved to (attachments-main.ts) — then Escape, and
+     focus is back in the box. (Only when the paste attached something — on a
+     build where it does not, that failure is already recorded above.) */
   const pastedThumb = await exists('[data-testid="attach-chip"] img.pd-attach-thumb');
   if (pastedThumb) await page.dblclick('[data-testid="attach-chip"] img.pd-attach-thumb');
-  const preview = pastedThumb && (await waitFor('[data-testid="attachment-expanded"]', 3000));
-  if (pastedThumb) check(preview, 'double-clicking the pasted picture did not open it');
+  const preview = pastedThumb && (await waitFor('[data-testid="image-viewer"]', 3000));
+  if (pastedThumb) {
+    check(preview, 'double-clicking the pasted picture did not open it in the image viewer');
+  }
   if (preview) {
-    await sleep(400);
+    await page
+      .waitForFunction(
+        () => (document.querySelector('[data-testid="viewer-picture"]')?.naturalWidth ?? 0) > 0,
+        undefined,
+        { timeout: 5000 },
+      )
+      .catch(() => undefined);
+    await shot('09c-pasted-picture-in-viewer');
     await page.keyboard.press('Escape');
     await sleep(400);
     const back = await page.evaluate(() => ({
-      closed: document.querySelector('[data-testid="attachment-expanded"]') === null,
+      closed: document.querySelector('[data-testid="image-viewer"]') === null,
       inComposer: document.activeElement?.closest('.pd-composer-root') !== null,
       inert: document.getElementById('root')?.inert === true,
     }));

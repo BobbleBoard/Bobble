@@ -63,13 +63,20 @@ export function formatCount(n: number): string {
 }
 
 export interface AttachmentMeta {
-  /** "10.1 MB", or '' when the size is unknown. */
+  /** "10.1 MB" (a folder: "12 items"), or '' when the size is unknown. */
   size: string;
-  /** "PNG", "MD", "FILE". */
+  /** "PNG", "MD", "FILE" — '' for a folder, which has none. */
   ext: string;
   /** "2,480 tokens", or null when this kind carries no prompt text. */
   tokens: string | null;
 }
+
+/**
+ * A folder's item count stops at this, so the chip says "1,000+ items" rather
+ * than a number main never finished counting. Mirrors FOLDER_COUNT_CAP in
+ * electron/attachments/attachments-contract.ts.
+ */
+const FOLDER_COUNT_CAP = 1000;
 
 /**
  * The two lines the chip reveals on hover.
@@ -78,14 +85,28 @@ export interface AttachmentMeta {
  * from prefill on purpose (the vision encode re-runs per request on the pinned
  * llama.cpp build, so priming one buys nothing), and their cost in tokens
  * depends on a projector we do not measure. A number we cannot stand behind is
- * worse than a blank.
+ * worse than a blank. Nor do a file or a folder named by path: they cost the
+ * model one line, whatever is inside them.
  */
 export function attachmentMeta(a: {
   name: string;
-  kind: 'image' | 'text';
+  kind: 'image' | 'text' | 'file' | 'folder';
   bytes?: number;
   text?: string;
+  /** A folder's item count. */
+  entries?: number;
 }): AttachmentMeta {
+  if (a.kind === 'folder') {
+    const n = a.entries;
+    return {
+      size:
+        n === undefined
+          ? 'Folder'
+          : `${formatCount(n)}${n >= FOLDER_COUNT_CAP ? '+' : ''} ${n === 1 ? 'item' : 'items'}`,
+      ext: '',
+      tokens: null,
+    };
+  }
   return {
     size: a.bytes === undefined ? '' : formatBytes(a.bytes),
     ext: extensionOf(a.name),

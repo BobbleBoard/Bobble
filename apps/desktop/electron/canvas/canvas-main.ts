@@ -45,6 +45,7 @@ import {
   shell,
   type WebContents,
 } from 'electron';
+import { isHandedFile } from '../attachments/attachments-main';
 import { bobbleDir, GENERATED_DIR } from '../bobble-paths';
 import { allowedWriteRoots } from '../fs-handlers';
 import type {
@@ -237,7 +238,9 @@ export function registerFileProtocol(): void {
     } catch {
       return new Response('not found', { status: 404, headers: cors });
     }
-    if (!isUnderAllowedRoot(target, real)) {
+    /* …or a picture the person opened in the image viewer: THEIR file, where
+       they keep it, handed over one file at a time (attachments-main.ts). */
+    if (!isUnderAllowedRoot(target, real) && !isHandedFile(real)) {
       log.warn('pd-file rejected: outside allowed roots', { target });
       return new Response('forbidden', { status: 403, headers: cors });
     }
