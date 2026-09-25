@@ -317,7 +317,7 @@ function CalibrationSection({
  * Re-asked whenever the menu opens and whenever a download or an install
  * settles, so the count is the disk's truth and not a stored record's.
  */
-function FetchMissingButton({
+export function FetchMissingButton({
   open,
   plan,
   onNote,
@@ -337,7 +337,10 @@ function FetchMissingButton({
   const quant = model?.quant;
   const fetching = download !== null && modelId !== null && download.modelId === modelId;
   const anyInstalling = Object.values(engines).some((e) => e.busy === 'installing');
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `fetching` and `anyInstalling` ARE triggers — the answer changes when either settles
+  /* `installing` too: rapid-mlx's vision runtime is not an engine the store
+     lists, so `anyInstalling` never moves for it — without this the count
+     held it as missing after it landed, and a second press reinstalled it. */
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `fetching`, `anyInstalling` and `installing` ARE triggers — the answer changes when any settles
   useEffect(() => {
     if (!open || modelId === null) {
       setMissing([]);
@@ -353,7 +356,7 @@ function FetchMissingButton({
     return () => {
       live = false;
     };
-  }, [open, modelId, quant, fetching, anyInstalling]);
+  }, [open, modelId, quant, fetching, anyInstalling, installing]);
   if (modelId === null) return null;
   /* An `engine:<id>` companion is something to INSTALL (rapid-mlx's vision
      runtime), not a file to download with the model. */
