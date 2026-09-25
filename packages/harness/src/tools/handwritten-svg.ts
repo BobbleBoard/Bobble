@@ -1,4 +1,25 @@
 /**
+ * AN SVG WRITTEN BY HAND — NOW ONLY A DIAGRAM IS REFUSED.
+ *
+ * the user (2026-09-24): "I feel like there's something wrong with omnisvg or maybe
+ * just how it's used right now also, svg is a big and versatile thing". MEASURED
+ * the same night (visual suite, 9B, a ceramics studio's landing page): the page's
+ * seven inline icons were refused toward OmniSVG, then its logo four times over,
+ * and the turn ended with OmniSVG — which cannot write a word — drawing a logo
+ * "with the text Kiln and Co". Most of fifteen minutes went into the fence. An
+ * icon set in one consistent stroke, a logo with its name, a pattern, a page's
+ * inline glyphs: those are geometry and type, which a model writes well and a
+ * drawing model cannot. So the refusal toward `svg` (OmniSVG) is gone — the
+ * model writes SVG, and `present` hands it back RENDERED so it can see what it
+ * drew and fix it (present-bridge). OmniSVG stays the tool for an organic
+ * illustration from a description, or tracing a picture into vectors.
+ *
+ * What still stands is the DIAGRAM route below: boxes, arrows and labels typed
+ * as markup are refused toward `diagram`, which lays out and labels them.
+ *
+ * (The history, for why the fence was built:)
+ */
+/*
  * AN SVG WRITTEN BY HAND WHILE A DRAWING MODEL IS ON.
  *
  * MEASURED, the OmniSVG connector's first real-user run (MiniCPM5 2B, bash-cli):
@@ -158,8 +179,8 @@ export function handwrittenSvgRoute(input: {
   if (input.diagramAvailable === true && isDiagramShaped(input.content, input.request)) {
     return isMarkupTheDeliverable(input, { selfExplaining: false }) ? null : 'diagram';
   }
-  if (!input.svgCommandAvailable || input.exists) return null;
-  return isMarkupTheDeliverable(input) ? null : 'svg';
+  // A drawing the model writes is its to write (see the header).
+  return null;
 }
 
 /** How many hand-drawn inline graphics a page's markup carries. */
@@ -200,7 +221,8 @@ export function inlineSvgRoute(input: {
   if (input.diagramAvailable === true && drawn.some((d) => isDiagramShaped(d, input.request))) {
     return 'diagram';
   }
-  return input.svgCommandAvailable ? 'svg' : null;
+  // A page's own icons and marks are the page's (see the header).
+  return null;
 }
 
 /**

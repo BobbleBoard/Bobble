@@ -19,6 +19,7 @@ import { abortPi } from '../state/pi-connect';
 import type { PresentedRecord } from '../state/present-store';
 import { segmentGroup } from './activity-mapping';
 import { InlineArtifact } from './canvas/InlineArtifacts';
+import { withViewTransition } from './canvas/view-transition';
 import { useGeneratingJob, useModel3dLive } from './GeneratingMedia';
 import { jobSamples, recordJobDuration } from './job-history';
 import { LiveSvgCard } from './LiveSvgCard';
@@ -32,6 +33,13 @@ import { ThreadActivityChain } from './ThreadActivity';
 import { ThreadMedia } from './ThreadMedia';
 import { mediaFromToolResult, type ThreadMediaItem } from './thread-media';
 import { type CardPlace, placeTurnCards, type TurnCall, type TurnCard } from './turn-cards';
+
+/** A View Transition name for one file's card — a CSS ident, stable per path. */
+function handoverName(path: string): string {
+  let h = 0;
+  for (let i = 0; i < path.length; i += 1) h = (Math.imul(h, 31) + path.charCodeAt(i)) | 0;
+  return `pd-handover-${(h >>> 0).toString(36)}`;
+}
 
 /** The pending card's kind for a job kind, or null for jobs with no media. */
 function pendingKindFor(kind: JobKind): PendingKind | null {
@@ -309,7 +317,7 @@ export function AssistantGroup({
       });
     }
   }
-  const placed = placeTurnCards(turnCalls, turnCards);
+  const placed = placeTurnCards(turnCalls, turnCards, liveChain);
   const placeOf = (kind: 'm' | 'r', callId: string, path: string): CardPlace =>
     placed.get(`${kind}:${callId}:${path}`) ?? 'beneath';
   // The picture still coming out from under the sweep is the pending card's
@@ -405,7 +413,19 @@ export function AssistantGroup({
             inside.set(
               b.id,
               <>
-                {mediaIn.length > 0 ? <ThreadMedia items={mediaIn} /> : null}
+                {mediaIn.length > 0 ? (
+                  /* Named for the handover: the result that just came out from
+                     under its generating card travels into this row. */
+                  <div
+                    style={
+                      mediaIn.length === 1 && mediaIn[0] !== undefined
+                        ? { viewTransitionName: handoverName(mediaIn[0].path) }
+                        : undefined
+                    }
+                  >
+                    <ThreadMedia items={mediaIn} />
+                  </div>
+                ) : null}
                 {recordsIn.map(drawRecord)}
               </>,
             );
@@ -484,20 +504,36 @@ export function AssistantGroup({
           /* The result, coming out from under the sweep — see `handing`. */
           if (handing !== null && handing.callId === b.id && handingLive && handingItem) {
             beneath.push(
-              <PendingMediaCard
+              <div
                 key={`hand:${b.id}`}
-                kind={pendingKindFor(handing.kind) ?? 'image'}
-                live={handing.kind === 'image' || handing.kind === 'video'}
-                item={handingItem}
-                /* The same job's number and shape, so the handover neither
+                style={{ viewTransitionName: handoverName(handingItem.path) }}
+              >
+                <PendingMediaCard
+                  kind={pendingKindFor(handing.kind) ?? 'image'}
+                  live={handing.kind === 'image' || handing.kind === 'video'}
+                  item={handingItem}
+                  /* The same job's number and shape, so the handover neither
                    restarts the pill nor reopens the frame square. */
-                progressKey={handing.callId}
-                edit={
-                  effectiveToolName(handingResult?.toolName, callArgsFor(group, handing.callId)) ===
-                  'edit_image'
-                }
-                onRevealed={() => setRevealed((cur) => new Set([...cur, handingItem.path]))}
-              />,
+                  progressKey={handing.callId}
+                  edit={
+                    effectiveToolName(
+                      handingResult?.toolName,
+                      callArgsFor(group, handing.callId),
+                    ) === 'edit_image'
+                  }
+                  /* THE HANDOVER IS A RESIZE, NOT A JUMP. the user (2026-09-24): the
+                   waiting card and the result should be "the same sizes and if
+                   not there's a smooth animation for resizing". An un-presented
+                   result files into its chain row at the chain's size
+                   (turn-cards.ts), so the full-size card travels there under a
+                   View Transition (the same name marks both boxes). */
+                  onRevealed={() =>
+                    withViewTransition(() =>
+                      setRevealed((cur) => new Set([...cur, handingItem.path])),
+                    )
+                  }
+                />
+              </div>,
             );
           }
           /*

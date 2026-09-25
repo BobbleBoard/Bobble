@@ -20,11 +20,16 @@
  *    part of the work, and files into the chain under the row of the call that
  *    made it, small, clickable, without the card's controls (global.css
  *    `.pd-chain-step-attachment`). It folds away with the chain.
- *  - Whatever the model PRESENTS is the answer: the `present` call's card stands
- *    beneath the chain, full size, with its controls. Presenting is the model's
- *    one deliberate act of showing — the tool that also hands it a look at what
- *    the user will see — so the answer is exactly what it chose to show, and an
+ *  - Whatever the model PRESENTS is the answer: its card stands beneath the
+ *    chain, full size, with its controls. Presenting is the model's deliberate
+ *    act of showing: `present` (which also hands it a look at what the user will
+ *    see), and the chart and diagram tools, whose whole job is to show — their
+ *    results tell the model the card is already in front of the user. An
  *    iteration's drafts never pose as results.
+ *  - While the chain that presented something is still working — it has called
+ *    something since — the card files in with the work, so the answer does not
+ *    hang at the foot of a chain that is still growing above it; it comes out
+ *    when the chain is done.
  *  - The generating card is neither: it stands beneath the live chain while the
  *    job runs (the wait is the one thing a folding chain must never hide), plays
  *    its reveal there, and the result then files in.
@@ -108,13 +113,24 @@ export function argsNamePath(args: unknown, absPath: string): boolean {
   return false;
 }
 
-/** The tool whose card is the answer — see the header. */
-const PRESENT = 'present';
+/** The tools whose card is the answer — see the header. */
+const PRESENTING: ReadonlySet<string> = new Set([
+  'present',
+  'chart',
+  'chart_edit',
+  'diagram',
+  'diagram_edit',
+]);
 
-/** Where each card goes: beneath the chain if the model presented it, else in it. */
+/**
+ * Where each card goes: beneath the chain if the model presented it and that
+ * chain is done with it, else in the chain. `liveChain` is the chain the turn is
+ * working in right now (the last segment of a streaming turn), or null.
+ */
 export function placeTurnCards(
   calls: readonly TurnCall[],
   cards: readonly TurnCard[],
+  liveChain: number | null = null,
 ): Map<string, CardPlace> {
   const order = new Map(calls.map((c, i) => [c.id, i]));
   /* The same file from two calls — a picture saved over itself, a chart the
@@ -140,7 +156,13 @@ export function placeTurnCards(
       out.set(card.key, 'none');
       continue;
     }
-    out.set(card.key, call.tool === PRESENT ? 'beneath' : 'inside');
+    if (call.tool === undefined || !PRESENTING.has(call.tool)) {
+      out.set(card.key, 'inside');
+      continue;
+    }
+    const stillWorking =
+      call.chain === liveChain && calls.slice(at + 1).some((c) => c.chain === call.chain);
+    out.set(card.key, stillWorking ? 'inside' : 'beneath');
   }
   return out;
 }

@@ -239,6 +239,8 @@ async function seedChat() {
                 name: 'generate_image',
                 arguments: { prompt: 'a red fox sitting in deep snow, soft winter light' },
               },
+              // …and handed over: only what the model presents is the full card.
+              { type: 'toolCall', id: 'p1', name: 'present', arguments: { path: picture } },
             ],
             timestamp: 2,
             isStreaming: false,
@@ -253,6 +255,15 @@ async function seedChat() {
             timestamp: 3,
           },
           {
+            kind: 'toolResult',
+            id: 'tr-p1',
+            toolCallId: 'p1',
+            toolName: 'present',
+            text: `Presented ${picture} to the user.`,
+            isError: false,
+            timestamp: 3,
+          },
+          {
             kind: 'assistant',
             id: 'a2',
             blocks: [{ type: 'text', text: 'Here it is — a fox in deep snow.' }],
@@ -263,6 +274,10 @@ async function seedChat() {
       });
     },
     { pdUrl, picture: PICTURE },
+  );
+  await page.evaluate(
+    (p) => window.__present_store().getState().add({ path: p, chat: '', afterMessageId: 'a1' }),
+    PICTURE,
   );
   const card = await waitFor('[data-testid="media-card"] [data-testid="media-image"]', 15_000);
   check(card, 'the finished picture never mounted as a card in the chat');

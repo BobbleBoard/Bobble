@@ -446,7 +446,7 @@ describe('generate_svg tool', () => {
   it("names the cases where nobody says 'SVG': a site's graphics, a simple illustration", () => {
     const tool = collectSvgTools(new FakeBridge()).get(GENERATE_SVG_TOOL);
     expect(tool?.description).toMatch(/website|logo|illustration/i);
-    expect(tool?.description).toContain('Never write SVG markup by hand');
+    expect(tool?.description).toContain('checked with present');
   });
 
   it('passes a fenced out path through to the bridge', async () => {

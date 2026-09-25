@@ -108,3 +108,22 @@ describe('buildPreview', () => {
     expect((await buildPreview('/definitely/not/here.png', 'image')).error).toBeDefined();
   });
 });
+
+describe('an SVG is previewed as its drawing', () => {
+  it('rendered when the app can draw it, with the head of its source', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'svg-preview-'));
+    const file = path.join(dir, 'icon.svg');
+    writeFileSync(
+      file,
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M1 1h22"/></svg>',
+    );
+    const shown = await buildPreview(file, 'image', { renderSvg: async () => 'UE5H' });
+    expect(shown.imageBase64).toBe('UE5H');
+    expect(shown.mimeType).toBe('image/png');
+    expect(shown.text).toContain('<path d="M1 1h22"/>');
+    // Without the renderer it is the source, as it was.
+    const text = await buildPreview(file, 'image', {});
+    expect(text.imageBase64).toBeUndefined();
+    expect(text.text).toContain('<svg');
+  });
+});

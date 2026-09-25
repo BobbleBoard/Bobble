@@ -14,7 +14,7 @@ import {
 const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M1 1"/></svg>';
 
 describe('isHandwrittenSvg', () => {
-  it('catches the measured case: a fresh .svg of markup while svg is on', () => {
+  it('lets a drawing through now — the model writes SVG and present shows it back (2026-09-24)', () => {
     expect(
       isHandwrittenSvg({
         path: 'heart.svg',
@@ -22,7 +22,7 @@ describe('isHandwrittenSvg', () => {
         exists: false,
         svgCommandAvailable: true,
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it('is nothing without the command — there is nothing to point at', () => {
@@ -70,10 +70,10 @@ describe('isHandwrittenSvg', () => {
 describe('hasHandwrittenInlineSvg', () => {
   const page = `<!doctype html><header><a class="logo">${svg}</a></header><main>text</main>`;
 
-  it('catches a logo drawn inline in a page — the website shape of the mistake', () => {
+  it("a page's own inline logo and icons are the page's (2026-09-24)", () => {
     expect(
       hasHandwrittenInlineSvg({ path: 'index.html', content: page, svgCommandAvailable: true }),
-    ).toBe(true);
+    ).toBe(false);
     expect(countInlineDrawnSvgs(`${page}${svg}<svg viewBox="0 0 1 1"><circle r="1"/></svg>`)).toBe(
       3,
     );
@@ -186,7 +186,7 @@ describe('isHandwrittenSvg — when the markup is what was asked for', () => {
     }
   });
 
-  it('still catches a hand-drawn picture asked for as a picture', () => {
+  it("a hand-drawn picture asked for as a picture is the model's to write now", () => {
     for (const request of [
       'make me an svg icon of a red heart',
       'draw a logo for my coffee shop',
@@ -199,11 +199,11 @@ describe('isHandwrittenSvg — when the markup is what was asked for', () => {
           svgCommandAvailable: true,
           request,
         }),
-      ).toBe(true);
+      ).toBe(false);
     }
   });
 
-  it('a one-word comment is not a lesson', () => {
+  it('a one-word comment changes nothing either way', () => {
     expect(
       isHandwrittenSvg({
         path: 'heart.svg',
@@ -212,7 +212,7 @@ describe('isHandwrittenSvg — when the markup is what was asked for', () => {
         svgCommandAvailable: true,
         request: 'make me an svg icon of a red heart',
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 });
 
@@ -277,26 +277,25 @@ describe('a diagram drawn by hand routes to the diagram tool', () => {
     ).toBeNull();
   });
 
-  it('without the diagram tool it is the old guard exactly (OmniSVG, a fresh file only)', () => {
+  it('without the diagram tool nothing is refused', () => {
     const old = { ...base, diagramAvailable: false };
-    // The comments are self-explaining, so the OmniSVG guard lets it by — as before.
     expect(handwrittenSvgRoute(old)).toBeNull();
-    expect(handwrittenSvgRoute({ ...old, content: svg })).toBe('svg');
+    expect(handwrittenSvgRoute({ ...old, content: svg })).toBeNull();
   });
 
-  it('a drawn picture still goes to svg even with the diagram tool on', () => {
-    expect(handwrittenSvgRoute({ ...base, content: svg, request: 'draw me a heart icon' })).toBe(
-      'svg',
-    );
+  it('a drawn picture is not a diagram: it passes with the diagram tool on', () => {
+    expect(
+      handwrittenSvgRoute({ ...base, content: svg, request: 'draw me a heart icon' }),
+    ).toBeNull();
   });
 
-  it('a diagram inline in a page routes to diagram too; a logo inline stays svg', () => {
+  it("a diagram inline in a page routes to diagram; a logo inline is the page's", () => {
     const page = `<!doctype html><main><h1>How it works</h1>${REAL_4B_FLOW}</main>`;
     const on = { svgCommandAvailable: true, diagramAvailable: true };
     expect(inlineSvgRoute({ path: 'index.html', content: page, ...on })).toBe('diagram');
-    expect(inlineSvgRoute({ path: 'index.html', content: `<header>${svg}</header>`, ...on })).toBe(
-      'svg',
-    );
+    expect(
+      inlineSvgRoute({ path: 'index.html', content: `<header>${svg}</header>`, ...on }),
+    ).toBeNull();
     expect(
       inlineSvgRoute({
         path: 'index.html',

@@ -62,15 +62,29 @@ describe('what the turn made is the work; what it presented is the answer', () =
     expect(place.get(`p:${DIR}`)).toBe('beneath');
   });
 
-  it('a chart the chart tool drew is part of the work until it is presented', () => {
+  it('a chart or diagram tool presents what it draws — its result says the card is shown', () => {
     const chart = '/w/units.svg';
-    const drawn = placeTurnCards([call('c', 0, 'chart')], [card('c', chart, 'record')]);
-    expect(drawn.get(`c:${chart}`)).toBe('inside');
-    const shown = placeTurnCards(
-      [call('c', 0, 'chart'), call('p', 0, 'present', { path: 'units.svg' })],
-      [card('p', chart, 'record')],
+    const flow = '/w/flow.svg';
+    const place = placeTurnCards(
+      [call('c', 0, 'chart'), call('d', 0, 'diagram')],
+      [card('c', chart, 'record'), card('d', flow, 'record')],
     );
-    expect(shown.get(`p:${chart}`)).toBe('beneath');
+    expect(place.get(`c:${chart}`)).toBe('beneath');
+    expect(place.get(`d:${flow}`)).toBe('beneath');
+  });
+
+  it('…but while its chain works on, it files in with the work and comes out when done', () => {
+    const chart = '/w/units.svg';
+    const calls2 = [call('c', 0, 'chart'), call('w', 0, 'write', { path: 'summary.md' })];
+    const cards2 = [card('c', chart, 'record')];
+    expect(placeTurnCards(calls2, cards2, 0).get(`c:${chart}`)).toBe('inside');
+    expect(placeTurnCards(calls2, cards2, null).get(`c:${chart}`)).toBe('beneath');
+  });
+
+  it('a drawing OmniSVG made is work until presented', () => {
+    const svg = '/w/lighthouse.svg';
+    const place = placeTurnCards([call('s', 0, 'generate_svg')], [card('s', svg, 'record')]);
+    expect(place.get(`s:${svg}`)).toBe('inside');
   });
 
   it('a card no call in the turn accounts for stays where it was drawn', () => {
@@ -86,7 +100,7 @@ describe('one file, one card', () => {
       [card('c', chart, 'record'), card('e', chart, 'record')],
     );
     expect(place.get(`c:${chart}`)).toBe('none');
-    expect(place.get(`e:${chart}`)).toBe('inside');
+    expect(place.get(`e:${chart}`)).toBe('beneath');
   });
 });
 

@@ -222,11 +222,14 @@ try {
   mkdirSync(conv, { recursive: true });
   const file = path.join(conv, 'fox.png');
   writeFileSync(file, Buffer.from(png, 'base64'));
+  /* The first picture was PRESENTED — the full card a finished result is shown
+     as (turn-cards.ts: only what the model presents comes out of its chain). */
   const done0 = {
     kind: 'assistant',
     id: 'a0',
     blocks: [
       { type: 'toolCall', id: 'g0', name: 'generate_image', arguments: { prompt: 'a fox' } },
+      { type: 'toolCall', id: 'p0', name: 'present', arguments: { path: 'fox.png' } },
     ],
     timestamp: 2,
   };
@@ -240,9 +243,23 @@ try {
     isError: false,
     timestamp: 3,
   };
+  const present0 = {
+    kind: 'toolResult',
+    id: 'tr-a0-p0',
+    toolCallId: 'p0',
+    assistantId: 'a0',
+    toolName: 'present',
+    text: `Presented ${file} to the user.`,
+    isError: false,
+    timestamp: 3,
+  };
+  await page.evaluate(
+    (p) => window.__present_store().getState().add({ path: p, chat: '', afterMessageId: 'a0' }),
+    file,
+  );
   const user2 = { kind: 'user', id: 'u2', text: 'now a deeper red', timestamp: 4 };
   await set({
-    messages: [user, done0, result0, user2, { ...running, timestamp: 5 }],
+    messages: [user, done0, result0, present0, user2, { ...running, timestamp: 5 }],
     runningToolCalls: ['g1'],
     agent: { isStreaming: true },
   });
@@ -273,11 +290,13 @@ try {
     sizes.finished !== null &&
       sizes.waiting !== null &&
       Math.abs(sizes.finished - sizes.waiting) <= 2,
-    `the waiting card is the finished card's size (${sizes.waiting} vs ${sizes.finished})`,
+    `the waiting card is the presented card's size (${sizes.waiting} vs ${sizes.finished})`,
   );
 
   // HANDOVER: finish the waiting job with a real 4:3 result and watch it land —
-  // the number reaches 100, the halo goes, and the box does not change size.
+  // the number reaches 100, the halo goes, and — since this one is not
+  // presented — the box travels into its chain row under ONE View Transition
+  // name (AssistantGroup): the same name on the card before and its row after.
   await page.evaluate(() =>
     window.__gen_live().getState().update('pi:gen-probe', { step: 24, total: 24 }),
   );
@@ -304,11 +323,23 @@ try {
           const frame =
             document.querySelector('[data-testid="pending-media-card"] .pd-media-frame') ??
             document.querySelectorAll('[data-testid="media-card"] .pd-media-frame')[1];
+          const named = (el) => {
+            for (let e = el; e; e = e.parentElement) {
+              if (e.style?.viewTransitionName) return e.style.viewTransitionName;
+            }
+            return null;
+          };
+          const landed = [...document.querySelectorAll('[data-testid="media-card"]')].find((c) =>
+            c.querySelector('img')?.getAttribute('src')?.includes('fox-red'),
+          );
           seen.push({
             t: Math.round(performance.now() - t0),
             pill: pill ? pill.textContent : null,
             w: frame ? Math.round(frame.getBoundingClientRect().width) : null,
             pending: document.querySelector('[data-testid="pending-media-card"]') !== null,
+            name: named(
+              document.querySelector('[data-testid="pending-media-card"]') ?? landed ?? null,
+            ),
           });
           if (performance.now() - t0 < 3200) requestAnimationFrame(tick);
           else resolve(seen);
@@ -332,9 +363,13 @@ try {
   const widths = [...new Set(seen.map((x) => x.w).filter((x) => x !== null))];
   console.log('handover pills', [...new Set(pills)].join(','), 'widths', widths.join(','));
   check(pills.includes('100%'), 'the number reaches 100 when the result lands');
+  const names = [...new Set(seen.map((x) => x.name).filter((x) => x !== null))];
+  const before = seen.filter((x) => x.pending).map((x) => x.name);
+  const after = seen.filter((x) => !x.pending).map((x) => x.name);
+  console.log('handover names', names.join(','), 'widths', widths.join(','));
   check(
-    widths.every((w) => Math.abs(w - 482) <= 2),
-    `the box does not jump at the handover (${widths.join(',')})`,
+    names.length === 1 && before.includes(names[0]) && after.includes(names[0]),
+    `the handover is one box travelling into its row — one transition name before and after (${JSON.stringify({ names, before: before.at(-1), after: after.at(-1) })})`,
   );
 } finally {
   await finish();

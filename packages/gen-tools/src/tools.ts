@@ -648,21 +648,24 @@ function registerSvgTool(pi: ExtensionAPI, bridge: GenBridge | null): void {
     name: GENERATE_SVG_TOOL,
     label: 'Generate: SVG',
     description:
-      'Draw an icon, logo, symbol or simple flat illustration as an SVG file, on-device with ' +
-      'OmniSVG — from a short description, a reference image, or both. Every graphic goes ' +
-      'through this: a website\'s logo and icons, a "simple illustration", a pictogram — ' +
-      'whether or not the word SVG was used. Never write SVG markup by hand. One call per ' +
-      'graphic; describe the shape and colour plainly ("a coffee cup, flat, two colours"). ' +
-      'With an image it traces that image into vector paths. `out` puts the file where a ' +
-      'page references it (assets/logo.svg); otherwise it lands in Generated and opens on ' +
-      'the canvas. Photos and realistic pictures are not vectors — those are generation. ' +
+      /* the user (2026-09-24): "I feel like there's something wrong with omnisvg or
+         maybe just how it's used" — every graphic was routed here, including
+         icon sets and logos with names, which OmniSVG cannot make; the model
+         now writes those itself and checks them with present. */
+      'Draw an organic, illustrative SVG on-device with OmniSVG — from a short description, ' +
+      'a reference image to trace into vector paths, or both. It cannot keep a set consistent: ' +
+      'icons, a logo with its name, patterns and exact shapes are better written as SVG ' +
+      'yourself and checked with present. One call per drawing; describe the subject, shape ' +
+      'and colour plainly ("a lighthouse on a cliff at sunset, flat, warm"). `out` puts the ' +
+      'file where a page references it (assets/hero.svg); otherwise it lands in Generated. ' +
+      'Photos and realistic pictures are not vectors — those are generation. ' +
       // VQ-10: OmniSVG draws shapes, not words — REAL, asked for a graph "with
       // equations displayed" it drew an abstract shape and a car, and a flow
       // diagram came back as 52 wordless paths. Anything that must carry text
       // has a tool that writes the text.
       'Not for diagrams, charts or anything with words in it — OmniSVG cannot write text: a ' +
       'flowchart, process or org chart is the diagram tool, numbers are the chart tool.',
-    promptSnippet: 'Draw an icon, logo or simple illustration as an SVG (on-device)',
+    promptSnippet: 'Draw an organic illustration, or trace a picture, as an SVG (on-device)',
     parameters: Type.Object({
       prompt: Type.Optional(
         Type.String({
@@ -754,9 +757,11 @@ function registerSvgTool(pi: ExtensionAPI, bridge: GenBridge | null): void {
           rel === undefined
             ? 'Reference it by its path, or `cp` it into a project; never retype its markup.'
             : `In a page: <img src="${rel}" alt="…">. Never retype its markup.`;
-        /* The user watched it drawn and has it as a card in the chat already
-           (gen:svg-live) — a `present` call after this would show it twice. */
-        const shown = 'The user already sees it as a card in the chat; do not present it again.';
+        /* What a call makes stays in the work until it is presented (the user,
+           2026-09-24, turn-cards.ts) — and present renders the drawing back, the
+           one look the model gets at what OmniSVG made. */
+        const shown =
+          'It is in your work; present it when it is what they asked for — present also shows you the drawing.';
         const text =
           `Made ${result.outputs.length} SVG${result.outputs.length === 1 ? '' : 's'}` +
           `${outPath === undefined ? ' on the canvas' : ''}:\n` +

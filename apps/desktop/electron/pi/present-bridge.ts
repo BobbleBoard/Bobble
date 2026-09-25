@@ -59,6 +59,7 @@ let socketPath = '';
 let token = '';
 let getWindow: (() => WebContents | null) | null = null;
 let renderPage: ((filePath: string) => Promise<string | null>) | null = null;
+let renderSvg: ((filePath: string) => Promise<string | null>) | null = null;
 let renderDiagram: ((req: DiagramRenderRequest) => Promise<DiagramRenderReply>) | null = null;
 
 interface Request {
@@ -212,11 +213,16 @@ async function captureGodotFrame(dir: string): Promise<string | null> {
 }
 
 /** Produce the preview for one artefact. Pure-ish; the renderer is injected. */
+/** How much of an SVG's source rides beside its picture. */
+const SVG_SOURCE_HEAD = 900;
+
 export async function buildPreview(
   target: string,
   kind: string,
   deps: {
     renderPage?: ((p: string) => Promise<string | null>) | null;
+    /** Draw an SVG file to a PNG (base64) — how the model sees what it drew. */
+    renderSvg?: ((p: string) => Promise<string | null>) | null;
     /** Injected for tests; default is the live office-manager capture. */
     captureOffice?: (p: string) => Promise<string | null>;
   } = {},
@@ -232,8 +238,26 @@ export async function buildPreview(
             : ext === '.svg'
               ? 'image/svg+xml'
               : 'image/png';
-        // An SVG is text to a vision model; send it as source instead.
-        if (ext === '.svg') return { text: buf.toString('utf8').slice(0, TEXT_HEAD_CHARS) };
+        /*
+         * AN SVG IS SHOWN AS WHAT IT DRAWS. It used to go back as its source
+         * text ("an SVG is text to a vision model") — so a model that presented
+         * its icon set, or OmniSVG's lighthouse, never saw a single drawing and
+         * could not tell a lens from a heart. the user (2026-09-24): "I feel like
+         * there's something wrong with omnisvg or maybe just how it's used".
+         * Rendered on a neutral ground, with the head of the source beside it so
+         * a fix can name the element it means.
+         */
+        if (ext === '.svg') {
+          const source = buf.toString('utf8').slice(0, SVG_SOURCE_HEAD);
+          const drawn = await deps.renderSvg?.(target);
+          return drawn === null || drawn === undefined
+            ? { text: buf.toString('utf8').slice(0, TEXT_HEAD_CHARS) }
+            : {
+                imageBase64: drawn,
+                mimeType: 'image/png',
+                text: `The drawing above, on a light grey ground. Its source begins:\n${source}`,
+              };
+        }
         return { imageBase64: buf.toString('base64'), mimeType: mime };
       }
       case 'render': {
@@ -370,7 +394,10 @@ async function handle(req: Request): Promise<Record<string, unknown>> {
     return await decodePixels(target, req.params?.width);
   }
   if (req.method === 'preview') {
-    const preview = await buildPreview(target, req.params?.kind ?? 'describe', { renderPage });
+    const preview = await buildPreview(target, req.params?.kind ?? 'describe', {
+      renderPage,
+      renderSvg,
+    });
     /*
      * A PREVIEW THE MODEL CANNOT SEE IS WORSE THAN NO PREVIEW.
      *
@@ -430,10 +457,13 @@ function onConnection(socket: net.Socket): void {
 export function registerPresentBridge(deps: {
   getWindow: () => WebContents | null;
   renderPage?: (filePath: string) => Promise<string | null>;
+  /** Draw an SVG file to a base64 PNG, for the model's look at a drawing. */
+  renderSvg?: (filePath: string) => Promise<string | null>;
   renderDiagram?: (req: DiagramRenderRequest) => Promise<DiagramRenderReply>;
 }): void {
   getWindow = deps.getWindow;
   renderPage = deps.renderPage ?? null;
+  renderSvg = deps.renderSvg ?? null;
   renderDiagram = deps.renderDiagram ?? null;
   token = randomBytes(16).toString('hex');
   socketPath = path.join(

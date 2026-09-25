@@ -22,18 +22,24 @@ export const svg: Capability = {
      simple illustrations even without 'svg' mentioned". So the line names
      the cases where the word never comes up — a site's graphics, "a simple
      illustration" — and says where a site's file goes. */
+  /* the user (2026-09-24): "svg is a big and versatile thing" — and OmniSVG cannot
+     write a word or keep a set consistent (the visual suite's landing page lost
+     fifteen minutes to it). The line now splits the work: OmniSVG for organic
+     art and tracing; exact graphics are the model's own SVG, checked by
+     presenting it (present renders it back). Same length as before. */
   summary:
-    'Draw any icon, logo, symbol or simple flat illustration as an SVG file — a ' +
-    'website\'s graphics too, and whether or not "SVG" was said. One call per graphic; ' +
-    '--out puts it in the project (assets/logo.svg). Never write SVG markup yourself.',
+    'Draw an organic illustration, or trace a picture into vectors, as an SVG with OmniSVG ' +
+    '(--out puts it in the project). Icons, logos with a name, patterns and page glyphs you ' +
+    'write as SVG yourself, then present the file to see it.',
   guidance:
-    'Every graphic goes through this: icons, logos, symbols, pictograms, simple flat ' +
-    'illustrations, and the logo and icons of a site or app you are building — whether ' +
-    'or not anyone said "SVG". Draw first, then reference the file (<img src>); never ' +
-    'write SVG markup by hand. One call per graphic; describe subject, shape and colour ' +
-    'plainly, or hand it a reference image to trace. Photos and realistic pictures are ' +
-    'not vectors — those are generation. Nothing with words in it: OmniSVG cannot write text, ' +
-    'so a diagram (steps, arrows, labels) is diagram and a chart of numbers is chart.',
+    'OmniSVG draws organic, illustrative vector art from a description, or traces a ' +
+    'reference image into paths. It cannot write words or keep several drawings ' +
+    'consistent. So an icon set, a logo with its name, a badge, a pattern, the glyphs of a ' +
+    'page you are building: write those as SVG yourself — icons on a 24-unit viewBox, one ' +
+    'stroke width, round caps and joins, currentColor so they take the page colour — and ' +
+    'present the file: present shows you the drawing, so fix what looks wrong and present ' +
+    'again. A diagram (steps, arrows, labels) is diagram; a chart of numbers is chart; ' +
+    'photos and realistic pictures are generation.',
   /* VQ-10: the guidance (read only when the capability is looked up, so it
      costs no prompt) sends anything with words to the tools that write them —
      the summary above is left as it was, because it rides every prompt. */

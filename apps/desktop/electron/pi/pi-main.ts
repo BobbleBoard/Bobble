@@ -548,6 +548,28 @@ export function registerPiIpc(
       getWindow: opts.getWindow,
       // The `diagram` tool's drawing: bundled Mermaid in a hidden window (VQ-10).
       renderDiagram,
+      /* An SVG as a picture, framed on a neutral ground at a size a vision
+         model reads well. Inlined as a data: URI because the still window is a
+         data: page, which cannot load a file:// image. */
+      renderSvg: async (filePath) => {
+        const side = 768;
+        const inner = Math.round(side * 0.86);
+        const win = await openStillWindow(side, side);
+        try {
+          const svg = readFileSync(filePath);
+          const src = `data:image/svg+xml;base64,${svg.toString('base64')}`;
+          await win.load(
+            `<!doctype html><html><body style="margin:0;width:${side}px;height:${side}px;display:grid;place-items:center;background:#f2f2f4"><img src="${src}" style="width:${inner}px;height:${inner}px;object-fit:contain"></body></html>`,
+            side,
+            side,
+          );
+          return (await win.capture()).toString('base64');
+        } catch {
+          return null;
+        } finally {
+          await win.dispose().catch(() => {});
+        }
+      },
       renderPage: async (filePath) => {
         const win = await openStillWindow(1280, 900);
         try {
