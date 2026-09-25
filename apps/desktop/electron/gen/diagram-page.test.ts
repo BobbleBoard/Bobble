@@ -1,18 +1,23 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
-import { diagramTheme, isPurple, kitOrDefault } from '@pi-desktop/design-kit';
+import { diagramTheme, isPurple, KITS, kitOrDefault } from '@pi-desktop/design-kit';
 import { describe, expect, it } from 'vitest';
 import {
   asStatement,
+  DIAGRAM_TYPE,
   type DiagramPage,
   diagramId,
+  diagramLook,
+  diagramLookCss,
   diagramTypeOf,
   flowRoles,
   hintFor,
   MERMAID_SHA256,
   MERMAID_VERSION,
   mermaidConfig,
+  PAGE_SCRIPT,
+  PATH_TOOLS_JS,
   type ParseFailed,
   type ParseOk,
   pageCall,
@@ -22,6 +27,8 @@ import {
   ROUND_GEOMETRY_JS,
   roleStyling,
   runDiagram,
+  runDiagramLive,
+  SEQUENCE_FONT_SIZE,
   stylesItself,
 } from './diagram-page';
 
@@ -282,6 +289,189 @@ describe('mermaidConfig — the kit, in Mermaid’s words', () => {
       expect(vars.edgeLabelBackground).toBe(themes[mode].paper);
     }
   });
+
+  it('lays out with the Bobble look, and sizes a sequence diagram’s words itself', () => {
+    const c = mermaidConfig(themes.light);
+    expect(c.themeCSS).toBe(diagramLookCss(themes.light));
+    const seq = c.sequence as Record<string, number | boolean>;
+    // A sequence diagram's words come from the top-level size (Mermaid's
+    // sequence setConf lets it override the per-part ones): set for that kind
+    // only, a step down from the 16 px of a step's label.
+    expect(mermaidConfig(themes.light, 'sequence diagram').fontSize).toBe(SEQUENCE_FONT_SIZE);
+    expect(SEQUENCE_FONT_SIZE).toBeLessThan(themes.light.fontSize);
+    expect(c.fontSize).toBeUndefined();
+    expect(seq.actorFontWeight).toBe(500);
+    expect(seq.width).toBeLessThan(150);
+    expect((c.class as { hideEmptyMembersBox: boolean }).hideEmptyMembersBox).toBe(true);
+    const vars = c.themeVariables as Record<string, unknown>;
+    // A step's border is the hairline, not the ink.
+    expect(vars.nodeBorder).toBe(diagramLook(themes.light).nodeEdge);
+    expect(vars.nodeBorder).not.toBe(themes.light.ink);
+  });
+});
+
+/** WCAG contrast of two #RRGGBB colours. */
+function contrast(a: string, b: string): number {
+  const lum = (h: string) => {
+    const ch = [1, 3, 5].map((i) => {
+      const v = Number.parseInt(h.slice(i, i + 2), 16) / 255;
+      return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * (ch[0] ?? 0) + 0.7152 * (ch[1] ?? 0) + 0.0722 * (ch[2] ?? 0);
+  };
+  const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
+  return ((x ?? 0) + 0.05) / ((y ?? 0) + 0.05);
+}
+
+describe('diagramLook / diagramLookCss — the Bobble look', () => {
+  it('holds in every kit, both modes: hairlines lighter than ink, a group’s name readable, no purple', () => {
+    for (const k of KITS) {
+      for (const mode of ['light', 'dark'] as const) {
+        const t = diagramTheme(k, mode, 'mac');
+        const look = diagramLook(t);
+        for (const [role, hex] of Object.entries(look)) {
+          expect(hex, `${k.id} ${mode} ${role}`).toMatch(/^#[0-9A-F]{6}$/i);
+          expect(isPurple(hex), `${k.id} ${mode} ${role} ${hex}`).toBe(false);
+        }
+        // A hairline: it shows on the paper, and it is quieter than the ink.
+        expect(contrast(look.nodeEdge, t.paper)).toBeGreaterThan(1.3);
+        expect(contrast(look.nodeEdge, t.paper)).toBeLessThan(contrast(t.ink, t.paper));
+        // A group's name and an edge's words are read on their grounds.
+        expect(contrast(look.groupLabel, look.group), `${k.id} ${mode}`).toBeGreaterThanOrEqual(
+          4.5,
+        );
+        expect(contrast(t.ink, look.pill)).toBeGreaterThanOrEqual(4.5);
+        expect(contrast(t.fail.text, look.pill)).toBeGreaterThanOrEqual(4.5);
+        const css = diagramLookCss(t);
+        for (const hex of css.match(/#[0-9A-F]{6}/gi) ?? []) expect(isPurple(hex)).toBe(false);
+      }
+    }
+  });
+
+  it('draws edges at 1.5 px with round ends, labels a step down, groups’ names small', () => {
+    const css = diagramLookCss(themes.light);
+    expect(css).toMatch(
+      /\.edgePaths path[^{]*\{[^}]*stroke-width: 1\.5px; stroke-linecap: round; stroke-linejoin: round;/,
+    );
+    expect(css).toContain(`.edgeLabel text, .edgeLabel tspan { font-size: ${DIAGRAM_TYPE.edge}px;`);
+    expect(css).toContain(`font-size: ${DIAGRAM_TYPE.group}px`);
+    expect(DIAGRAM_TYPE.edge).toBeLessThan(themes.light.fontSize);
+    // A step: the kit's surface and a hairline, never the ink.
+    expect(css).toContain(
+      `.node path { fill: ${themes.light.surface}; stroke: ${diagramLook(themes.light).nodeEdge}; stroke-width: 1px;`,
+    );
+  });
+
+  it('leaves the sketch look’s boxes to rough.js (their hatching widths are the look)', () => {
+    const sketch = diagramLookCss({ ...themes.light, look: 'sketch' });
+    expect(sketch).not.toContain('.node rect');
+    expect(sketch).not.toContain('.row-rect-odd');
+    // …but its edges, labels and groups are Bobble's.
+    expect(sketch).toContain('.edgeLabel text');
+    expect(sketch).toContain('.cluster rect');
+  });
+
+  it('is part of the page script, with its geometry', () => {
+    expect(PAGE_SCRIPT).toContain('const P = (() => {');
+    expect(PAGE_SCRIPT).toContain('data-k');
+    expect(PAGE_SCRIPT).not.toContain('${');
+  });
+});
+
+describe('PATH_TOOLS_JS — the look’s geometry, run as the page runs it', () => {
+  const P = vm.runInNewContext(PATH_TOOLS_JS) as {
+    parse: (d: string) => Array<{ c: string; p: number[][] }> | null;
+    trimEnd: (d: string, px: number) => string;
+    trimStart: (d: string, px: number) => string;
+    roundCorners: (d: string, r: number) => string;
+    arrowTip: (d: string, refY: number) => { dir: number; tip: number } | null;
+    chevron: (dir: number, tip: number, len: number, half: number, notch: number) => string;
+    arrowhead: (width: number) => { len: number; half: number; notch: number; soft: number };
+    roundedRect: (x: number, y: number, w: number, h: number, r: number) => string;
+  };
+  const pts = (d: string) => (P.parse(d) ?? []).flatMap((s) => s.p);
+
+  it('reads absolute and relative path data, H and V as lines, and refuses arcs', () => {
+    expect(pts('M10,20L30,20H50V60')).toEqual([
+      [10, 20],
+      [30, 20],
+      [50, 20],
+      [50, 60],
+    ]);
+    expect(pts('m10 20 l5 0 c1 1 2 2 3 3')).toEqual([
+      [10, 20],
+      [15, 20],
+      [16, 21],
+      [17, 22],
+      [18, 23],
+    ]);
+    expect(P.parse('M0 0 A5 5 0 0 1 10 10')).toBeNull();
+    expect(P.parse('L0 0')).toBeNull();
+  });
+
+  it('pulls a line back along its own direction, never past half of a short one', () => {
+    expect(pts(P.trimEnd('M0,0L0,100', 3))).toEqual([
+      [0, 0],
+      [0, 97],
+    ]);
+    expect(pts(P.trimStart('M0,0L100,0', 4))).toEqual([
+      [4, 0],
+      [100, 0],
+    ]);
+    expect(pts(P.trimEnd('M0,0L0,4', 3))).toEqual([
+      [0, 0],
+      [0, 2],
+    ]);
+  });
+
+  it('pulls a curve’s end back with its last control point, so its tangent holds', () => {
+    // A cubic arriving straight down: end and handle both move up 3.
+    expect(pts(P.trimEnd('M0,0C0,50,0,80,0,100', 3))).toEqual([
+      [0, 0],
+      [0, 50],
+      [0, 77],
+      [0, 97],
+    ]);
+  });
+
+  it('rounds a polyline’s elbows, clamped to half of each run, and leaves straight runs and curves', () => {
+    const d = P.roundCorners('M0,0L0,50L40,50L40,100', 7);
+    expect(d).toBe('M0,0L0,43Q0,50 7,50L33,50Q40,50 40,57L40,100');
+    // Two short runs: the radius is half the shorter.
+    expect(P.roundCorners('M0,0L0,6L10,6', 7)).toBe('M0,0L0,3Q0,6 3,6L10,6');
+    // Straight on: no curve at all.
+    expect(P.roundCorners('M0,0L0,50L0,100', 7)).toBe('M0,0L0,50L0,100');
+    // A curve is already smooth.
+    expect(P.roundCorners('M0,0C1,1,2,2,3,3', 7)).toBe('M0,0C1,1,2,2,3,3');
+  });
+
+  it('finds which way Mermaid’s arrowheads point and where their tips are', () => {
+    // flowchart pointEnd / pointStart, the state barb, a class dependency's start,
+    // the sequence arrowhead (its back at -1)
+    expect(P.arrowTip('M 0 0 L 10 5 L 0 10 z', 5)).toEqual({ dir: 1, tip: 10 });
+    expect(P.arrowTip('M 0 5 L 10 10 L 10 0 z', 5)).toEqual({ dir: -1, tip: 0 });
+    expect(P.arrowTip('M 19,7 L9,13 L14,7 L9,1 Z', 7)).toEqual({ dir: 1, tip: 19 });
+    expect(P.arrowTip('M 5,7 L9,13 L1,7 L9,1 Z', 7)).toEqual({ dir: -1, tip: 1 });
+    expect(P.arrowTip('M -1 0 L 10 5 L 0 10 z', 5)).toEqual({ dir: 1, tip: 10 });
+    // A diamond (UML composition) has a vertex on the axis at both ends: that is
+    // not an arrowhead's shape, but it is refused by name before it gets here.
+    expect(P.arrowTip('M 0 0 L 10 0', 5)).toBeNull();
+  });
+
+  it('draws a notched chevron with its tip where it is asked, mirrored for the other way', () => {
+    expect(P.chevron(1, 4, 7, 3, 2)).toBe('M4,0L-3,3L-1,0L-3,-3Z');
+    expect(P.chevron(-1, -4, 7, 3, 2)).toBe('M-4,0L3,3L1,0L3,-3Z');
+    // Sized to the stroke: the same head up to 1.5 px, bigger past it.
+    expect(P.arrowhead(1)).toEqual(P.arrowhead(1.5));
+    expect(P.arrowhead(3).len).toBeCloseTo(P.arrowhead(1.5).len * 2);
+  });
+
+  it('rounds a box’s corners, never past half its side', () => {
+    const d = P.roundedRect(0, 0, 100, 40, 8);
+    expect(d.startsWith('M8,0H92A8,8 0 0 1 100,8V32')).toBe(true);
+    expect(d.match(/A/g)).toHaveLength(4);
+    expect(P.roundedRect(0, 0, 10, 10, 8)).toContain('A5,5');
+  });
 });
 
 describe('runDiagram — the whole job against a page', () => {
@@ -353,6 +543,38 @@ describe('runDiagram — the whole job against a page', () => {
     const r = await runDiagram(p, { source: '  \n ', themes });
     expect(r.ok).toBe(false);
     expect(renders).toHaveLength(0);
+  });
+
+  it('a live frame is the same job in one mode, under the id it is given', async () => {
+    const { p, renders } = page(() => null);
+    const r = await runDiagramLive(p, {
+      id: 'dglive1d',
+      source: 'flowchart LR\n  A --> B',
+      title: 'T',
+      theme: themes.dark,
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(renders).toHaveLength(1);
+    expect(renders[0]?.id).toBe('dglive1d');
+    expect(renders[0]?.theme.mode).toBe('dark');
+    // The same roles the finished drawing gets, so the last frame IS it.
+    expect(renders[0]?.source).toContain('class A pdStart');
+    expect(r.kind).toBe('flowchart');
+    expect(r.svg).toBe('<svg>dark</svg>');
+  });
+
+  it('a live frame Mermaid cannot read yet is a miss, not an error to anyone', async () => {
+    const { p, renders } = page(() => bad(2, 'PS'));
+    const r = await runDiagramLive(p, {
+      id: 'x',
+      source: 'flowchart TD\n  A[',
+      theme: themes.light,
+    });
+    expect(r).toMatchObject({ ok: false, line: 2 });
+    expect(renders).toHaveLength(0);
+    const empty = await runDiagramLive(p, { id: 'x', source: ' ', theme: themes.light });
+    expect(empty.ok).toBe(false);
   });
 
   it('ids are stable for the same diagram and differ between two', () => {
