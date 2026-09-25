@@ -275,11 +275,23 @@ async function seedChat() {
     },
     { pdUrl, picture: PICTURE },
   );
+  // Filed under THIS chat — a saved chat keys its cards by its session file.
   await page.evaluate(
-    (p) => window.__present_store().getState().add({ path: p, chat: '', afterMessageId: 'a1' }),
+    (p) =>
+      window
+        .__present_store()
+        .getState()
+        .add({
+          path: p,
+          chat: window.__pi_store().getState().session?.sessionFile ?? '',
+          afterMessageId: 'a1',
+        }),
     PICTURE,
   );
-  const card = await waitFor('[data-testid="media-card"] [data-testid="media-image"]', 15_000);
+  const card = await waitFor(
+    '[data-testid="presented"] [data-testid="media-card"] [data-testid="media-image"]',
+    15_000,
+  );
   check(card, 'the finished picture never mounted as a card in the chat');
   await page.waitForFunction(
     () => (document.querySelector('[data-testid="media-image"]')?.naturalWidth ?? 0) > 0,
