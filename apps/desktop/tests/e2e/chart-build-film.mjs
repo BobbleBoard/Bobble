@@ -172,6 +172,7 @@ try {
   const frameLog = await readFrameLog(page);
   await film.stop();
 
+  const bars = samples.filter((s) => s.pending).map((s) => s.bars);
   if (ARGS.type === 'line') {
     const shapes = [
       ...new Set(samples.filter((s) => s.pending && s.lineCmds > 0).map((s) => s.lineCmds)),
@@ -181,7 +182,6 @@ try {
       `the line keeps its shape while the values land (path commands: ${shapes.join(', ')})`,
     );
   } else {
-    const bars = samples.filter((s) => s.pending).map((s) => s.bars);
     check(
       bars.length > 2 && bars.at(-1) > bars[0],
       `the bars grow as the values land: ${bars.join(' → ')}`,
