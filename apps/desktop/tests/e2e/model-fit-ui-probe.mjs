@@ -32,6 +32,14 @@
  * nothing to start, and nothing is ever sent, so nothing starts for them — the
  * last check proves it.
  *
+ * WHICH FILE EACH DOWNLOAD ASKS FOR, WITHOUT A DOWNLOAD. The channels that start
+ * one are refused in main (harness.mjs `refuseIpc` — a wrapper around
+ * `window.piDesktop.invoke` in the page cannot work, the bridge is frozen), so a
+ * click ends at a refused `hf:register` whose request names the file it would
+ * have fetched. Every Download that takes no quant must name the file the
+ * picker pins; a label picked in the picker must name that model, not the speed
+ * head that shares its label; a quant split across files is not offered.
+ *
  *   node scripts/with-lock.mjs probe -- node apps/desktop/tests/e2e/model-fit-ui-probe.mjs
  *
  * Build first. MODEL_ID picks another catalog model (default: the 27B).
@@ -47,7 +55,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import path from 'node:path';
-import { launchApp, REPO_ROOT } from './harness.mjs';
+import { launchApp, REPO_ROOT, refuseIpc } from './harness.mjs';
 
 const SRC = path.join(REPO_ROOT, 'packages/inference/src');
 const { CATALOG } = await import(`${SRC}/catalog.ts`);
@@ -66,6 +74,7 @@ if (process.env.REAL_HOME === '1') {
 }
 
 const {
+  app,
   page,
   check: record,
   finish,
@@ -101,6 +110,57 @@ function need(ok, message) {
 
 const shot = (name, target = page) =>
   target.screenshot({ path: path.join(shotDir, `${name}.png`) });
+
+/*
+ * NOTHING DOWNLOADS, AND EVERY DOWNLOAD IS HEARD. These are the channels that
+ * start one; `refuseIpc` records each request in main and refuses it, so the
+ * app unwinds as from any failed start and nothing moves.
+ */
+const STARTS_A_DOWNLOAD = ['hf:register', 'llm:download-model', 'store:download'];
+let refused = { calls: async () => [] };
+/** `…-00001-of-00002.gguf`: one part of a model published across several files. */
+const SPLIT_PART = /-\d{5}-of-\d{5}\.gguf$/i;
+
+/**
+ * Click, then wait for the `hf:register` that click sends — or say why none
+ * came. A Download here ends in a refused registration within a few hundred
+ * milliseconds; eight seconds of nothing means the click never got that far,
+ * and the page's own message says why (a refusal for space, "no weights", …).
+ */
+async function registerAfter(click, what) {
+  const before = (await refused.calls()).length;
+  await click();
+  const until = Date.now() + 8000;
+  let heard = [];
+  while (Date.now() < until) {
+    heard = (await refused.calls()).slice(before);
+    if (heard.some((c) => c.channel === 'hf:register')) break;
+    await page.waitForTimeout(100);
+  }
+  // Let download() unwind (catalog refresh, busy cleared) before the next click.
+  await page
+    .waitForFunction(
+      () =>
+        document.querySelector('[data-testid="quant-download"]')?.textContent?.trim() !==
+        'Downloading…',
+      undefined,
+      { timeout: 5000 },
+    )
+    .catch(() => undefined);
+  const register = heard.find((c) => c.channel === 'hf:register');
+  const banner =
+    (await page
+      .locator('[data-testid="models-error"]')
+      .textContent({ timeout: 500 })
+      .catch(() => null)) ?? null;
+  const file = register?.request?.file;
+  console.log(
+    file === undefined
+      ? `  --   ${what}: no hf:register (${heard.map((c) => c.channel).join(', ') || 'nothing refused'}); the page says: ${banner}`
+      : `       ${what} → ${file.path} (${(file.sizeBytes / 1e9).toFixed(2)} GB)`,
+  );
+  return { what, file, repo: register?.request?.hit?.id, banner };
+}
 
 /** The three words the tone stands for; the user keeps them off the card itself. */
 const LABEL = { success: 'Fits', warning: 'Tight, will swap', danger: "Won't fit" };
@@ -231,6 +291,22 @@ try {
       if (window.__phases.at(-1) !== s.status.phase) window.__phases.push(s.status.phase);
     });
   });
+  /*
+   * The refusal goes in before anything on the page can be clicked, and proves
+   * itself: a page-side invoke must come back refused, and be heard in main.
+   */
+  refused = await refuseIpc(app, STARTS_A_DOWNLOAD);
+  const selfTest = await page.evaluate(() =>
+    window.piDesktop.invoke('llm:download-model', { modelId: '__probe_self_test__' }).then(
+      () => 'it went through',
+      (e) => String(e?.message ?? e),
+    ),
+  );
+  need(
+    /refused by the probe/.test(selfTest) &&
+      (await refused.calls()).some((c) => c.request?.modelId === '__probe_self_test__'),
+    `downloads are refused in main, and a page-side invoke is heard there ("${selfTest}")`,
+  );
 
   // ── The hub, from the sidebar ────────────────────────────────────────────
   await page.click('[data-testid="nav-model-management"]');
@@ -265,6 +341,28 @@ try {
   // Recommended waits out the hub's first Hugging Face search before it shows.
   await page.waitForSelector('[data-testid="curated-families"]', { timeout: 30_000 });
   await shot('1-hub');
+  /*
+   * TOP RECOMMENDED ON A FRESH HUB, before any card is open. Its Download
+   * selects the repo and downloads it in the same click, and it used to read
+   * the PREVIOUS selection's ladder — none yet, so the 27B came back as
+   * "publishes no GGUF weights". Heard here; judged once the picker has said
+   * what it pins.
+   */
+  const bestText = page.locator('[data-testid="best-text"]');
+  const topRepo = (await bestText.count()) > 0 ? await bestText.getAttribute('data-repo') : null;
+  const asked = [];
+  if (topRepo === model.hfRepo) {
+    asked.push(
+      await registerAfter(
+        () => page.click('[data-testid="best-download-text"]', { timeout: 5000 }),
+        'Top Recommended, on a fresh hub',
+      ),
+    );
+  } else {
+    console.log(
+      `  --   Top Recommended's text pick is ${topRepo ?? 'not on screen'}, not ${model.hfRepo}`,
+    );
+  }
   const variant = page.locator(`[data-testid^="family-variant-${model.hfRepo}:"]`).first();
   need((await variant.count()) > 0, `Recommended offers ${model.hfRepo}`);
   const family = await variant.evaluate(
@@ -321,6 +419,57 @@ try {
     `the verdict shows its arithmetic ("${detail}")`,
   );
   await shot('2b-verdict-tooltip');
+
+  // ── Download without opening the picker asks for the recommended file ────
+  /*
+   * The picker is loaded, closed, and nothing is picked — so the row it names
+   * is its recommendation. Every Download that takes no quant must ask for
+   * exactly that file: the headline, the picker's own button, and Quick
+   * Download and Top Recommended, which select this repo and download it in one
+   * click. They asked for the listing's FIRST file — on the 27B one 50 GB shard
+   * of a BF16 that cannot load on a 24 GB Mac — or, on a fresh hub, for none.
+   * The refusal is re-installed first: the clicks that matter get a fresh one.
+   */
+  refused = await refuseIpc(app, STARTS_A_DOWNLOAD);
+  asked.push(
+    await registerAfter(
+      () => page.click('[data-testid="detail-download"]', { timeout: 5000 }),
+      'the headline Download',
+    ),
+  );
+  asked.push(
+    await registerAfter(
+      () => page.click('[data-testid="quant-download"]', { timeout: 5000 }),
+      "the picker's Download, never opened",
+    ),
+  );
+  const quick = page.locator(`[data-testid="family-quick-${family}"]`);
+  if ((await quick.count()) > 0 && (await quick.getAttribute('data-repo')) === model.hfRepo) {
+    asked.push(await registerAfter(() => quick.click({ timeout: 5000 }), 'Quick Download'));
+  } else {
+    console.log(`  --   ${family}'s Quick Download is not ${model.hfRepo} on this machine`);
+  }
+  if (topRepo === model.hfRepo) {
+    asked.push(
+      await registerAfter(
+        () => page.click('[data-testid="best-download-text"]', { timeout: 5000 }),
+        'Top Recommended, with the card open',
+      ),
+    );
+  }
+  for (const a of asked) {
+    const f = a.file;
+    check(
+      f !== undefined &&
+        a.repo === model.hfRepo &&
+        f.quant === preselected &&
+        f.mtp !== true &&
+        f.mmproj !== true &&
+        !SPLIT_PART.test(f.path),
+      `${a.what} asks for the file the picker pins, ${preselected}: ${f === undefined ? `no registration (${a.banner ?? 'no message'})` : f.path}`,
+    );
+  }
+  await shot('2c-downloads-asked');
 
   // ── The dropdown: the pinned pick, then every file largest → smallest ────
   await page.mouse.move(1, 1);
@@ -391,6 +540,21 @@ try {
     pick.selected && preselected === pick.quant && detail === pick.tip,
     `the closed picker was already showing the pick, verdict and all — it is the preselection (${preselected})`,
   );
+  // The Downloads above named that label; these are its bytes too, to the byte.
+  check(
+    asked.length > 0 && asked.every((a) => a.file?.sizeBytes === pick.bytes),
+    `every Download asked for the pinned row's ${pick.size} (${asked.map((a) => a.file?.sizeBytes ?? 'nothing').join(', ')} bytes; the row holds ${pick.bytes})`,
+  );
+  if (topRepo === model.hfRepo) {
+    // Top Recommended names a file too, and it has to be this one.
+    const line = ((await page.locator('[data-testid="best-size-text"]').textContent()) ?? '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    check(
+      line === `${pick.size} · ${pick.quant}`,
+      `Top Recommended names the file the picker pins: "${line}" (pinned: ${pick.quant}, ${pick.size})`,
+    );
+  }
   check(
     rows.every((r) => r.dot),
     `every row carries a fit dot (${rows.filter((r) => r.dot).length} of ${rows.length})`,
@@ -419,6 +583,58 @@ try {
   );
   await shot('4-card-other-quant');
   await page.mouse.move(1, 1);
+
+  // ── A label is its model's file — not a speed head, not a shard ──────────
+  /*
+   * Read from the raw listing, not from the app's own rules: a quant published
+   * as parts is not offered at all (only its first part could download, and the
+   * server would refuse the rest), and a label that a speed head shares — the
+   * 27B's Q4_0 beside MTP/mtp-Qwen3.8-27B-Q4_0.gguf, which sorts first — must
+   * fetch the model when picked.
+   */
+  const { files: repoFiles = [] } = await page.evaluate(
+    (repoId) => window.piDesktop.invoke('hf:list-files', { repoId }),
+    model.hfRepo,
+  );
+  const byLabel = new Map();
+  for (const f of repoFiles) {
+    if (f.mmproj === true || f.mtp === true || f.quant === undefined) continue;
+    byLabel.set(f.quant, [...(byLabel.get(f.quant) ?? []), f]);
+  }
+  const split = [...byLabel]
+    .filter(([, parts]) => parts.length > 1 || parts.some((f) => SPLIT_PART.test(f.path)))
+    .map(([q]) => q);
+  check(
+    split.every((q) => !rows.some((r) => r.quant === q)),
+    `a quant published in parts is not offered (${split.length > 0 ? split.join(', ') : 'none in this repo'}; the menu has ${rows.length - 1} rows)`,
+  );
+  const head = repoFiles.find(
+    (f) =>
+      f.mtp === true &&
+      byLabel.get(f.quant)?.length === 1 &&
+      rows.some((r) => r.from === 'list' && r.quant === f.quant),
+  );
+  if (head !== undefined) {
+    const weights = byLabel.get(head.quant)[0];
+    await current.click();
+    await page.waitForSelector('[data-testid="quant-menu"]', { timeout: 3000 });
+    await page.locator(`[data-testid="quant-opt-list-${head.quant}"]`).first().click();
+    const twin = await registerAfter(
+      () => page.click('[data-testid="quant-download"]', { timeout: 5000 }),
+      `the picker's Download on ${head.quant}`,
+    );
+    check(
+      twin.file?.path === weights.path && twin.file?.sizeBytes === weights.sizeBytes,
+      `picking ${head.quant} asks for the model, ${weights.path}, not the speed head ${head.path}: ${twin.file?.path ?? `no registration (${twin.banner ?? 'no message'})`}`,
+    );
+    check(
+      (await currentQuant()) === head.quant,
+      `the picker still names ${head.quant} after that — the choice survives the catalog refresh every download attempt ends with (it names ${await currentQuant()})`,
+    );
+    await shot('4b-label-download');
+  } else {
+    console.log(`  --   no label in ${model.hfRepo} is shared by a speed head`);
+  }
 
   // ── A staged library: the on-disk half, without a download ───────────────
   const until = Date.now() + 20_000;

@@ -314,6 +314,46 @@ export async function openWorkMode(page) {
   return true;
 }
 
+/**
+ * REFUSE — AND RECORD — invoke calls on these channels, in MAIN.
+ *
+ * The obvious spy, wrapping `window.piDesktop.invoke` from the page, cannot
+ * work: contextBridge hands the page a FROZEN copy of the bridge, and
+ * `window.piDesktop` itself is non-writable and non-configurable. MEASURED
+ * 2026-09-25: the assignment is silently dropped, replacing the object is
+ * dropped, and redefining the property throws. Such a spy records nothing while
+ * every real call goes through — which is how a probe once "saw no
+ * hf:register" within 4 s of a Download click while the picker sat on
+ * "Downloading…": the registration had gone through in 3 ms, and the click was
+ * awaiting the real 50 GB transfer behind it.
+ *
+ * So the spy sits where every invoke lands. Each channel's `ipcMain` handler is
+ * replaced by one that records the request and throws: the renderer sees an
+ * ordinary rejected invoke, and nothing behind the channel runs. Calling this
+ * again re-installs it (idempotent), which is how a probe re-asserts it right
+ * before the clicks that matter. The app is thrown away at `finish()`, so there
+ * is nothing to restore.
+ *
+ * Returns `calls()`: every refused request so far, in order, `{ channel,
+ * request, at }`.
+ */
+export async function refuseIpc(app, channels) {
+  await app.evaluate(({ ipcMain }, list) => {
+    const g = /** @type {any} */ (globalThis);
+    g.__pdRefusedIpc ??= [];
+    for (const channel of list) {
+      ipcMain.removeHandler(channel);
+      ipcMain.handle(channel, (_event, request) => {
+        g.__pdRefusedIpc.push({ channel, request, at: Date.now() });
+        throw new Error(`refused by the probe: ${channel}`);
+      });
+    }
+  }, channels);
+  return {
+    calls: () => app.evaluate(() => /** @type {any} */ (globalThis).__pdRefusedIpc ?? []),
+  };
+}
+
 export async function launchApp(name, options = {}) {
   const {
     fixture = TOOL_USE_FIXTURE,

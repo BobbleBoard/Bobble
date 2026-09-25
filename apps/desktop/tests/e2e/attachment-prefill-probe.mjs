@@ -15,9 +15,11 @@
  * measured directly against llama-server (5416 tokens = 4.0s). That is the proof.
  *
  * The `pi:prefill` IPC spy below reports ZERO even when the feature demonstrably
- * works — the hook binds `invoke` at module load, before a wrapper installed
- * from here — so it is kept only as a hint and asserted on by NOTHING. A probe
- * that failed the build on that would have condemned a working feature.
+ * works, because it is never installed: contextBridge hands the page a FROZEN
+ * bridge, so the assignment to `window.piDesktop.invoke` is silently dropped
+ * (measured 2026-09-25). It is kept only as a hint and asserted on by NOTHING; a
+ * probe that must hear an IPC call listens in main, as harness.mjs `refuseIpc`
+ * does (it records the call there, and refuses it).
  *
  *   node tests/e2e/attachment-prefill-probe.mjs          # dev tree
  *   APP=/Applications/Bobble.app node …                  # the shipped bundle
@@ -65,9 +67,11 @@ try {
   console.log('model warm');
 
   /*
-   * SPY ON THE IPC. Wrapping `invoke` in the page is the only way to see a call
-   * that is supposed to happen and silently doesn't — reading the source would
-   * have "proved" the warm-up worked too.
+   * SPY ON THE IPC — or try to. Hearing a call that is supposed to happen and
+   * silently doesn't beats reading the source, which would have "proved" the
+   * warm-up worked too. But this page-side wrapper never takes (the bridge is
+   * frozen; see the header), so it stays a hint. Hearing a call takes main —
+   * see `refuseIpc` in harness.mjs.
    */
   await win.evaluate(() => {
     window.__prefillCalls = [];
@@ -99,9 +103,9 @@ try {
 
   /*
    * IDLE_MS=0 sends IMMEDIATELY, before the prefill can have primed anything.
-   * That contrast is the real proof: the IPC spy below can be blind (the hook
-   * binds `invoke` at module load, before a wrapper installed here), but the
-   * SEND LATENCY cannot lie — a ~5k-token attachment costs ~4s cold, measured.
+   * That contrast is the real proof: the IPC spy below is blind (the page's
+   * bridge is frozen, so the wrapper never takes), but the SEND LATENCY cannot
+   * lie — a ~5k-token attachment costs ~4s cold, measured.
    */
   const idleMs = Number(process.env.IDLE_MS ?? 12_000);
   await win.waitForTimeout(idleMs);
