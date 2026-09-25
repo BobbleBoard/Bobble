@@ -22,6 +22,12 @@ directories:
 files:
   - dist/**/*
   - dist-electron/**/*
+  # The UI package's component browser (Ladle): its config, its 3 MB static
+  # build and the stories. The renderer bundles the components themselves
+  # (dist/); none of this is read at run time.
+  - '!**/node_modules/@pi-desktop/ui/.ladle{,/**}'
+  - '!**/node_modules/@pi-desktop/ui/build{,/**}'
+  - '!**/node_modules/@pi-desktop/ui/**/*.stories.*'
 # Bundled skills (SKILL.md playbooks + their LICENSE/attribution) ship OUTSIDE
 # the asar at <Resources>/skills so the main process can cpSync a chosen folder
 # into ~/.pi/agent/skills/<id> (skills-main.ts resolves process.resourcesPath).
