@@ -36,9 +36,81 @@ export const OMNISVG_SAMPLING: Record<'icon' | 'illustration' | 'image', OmniSvg
   image: { temperature: 0.3, top_p: 0.9, top_k: 50, repeat_penalty: 1.05 },
 };
 
-/** Their `detect_text_subtype`: the word "icon" (or a few cousins) makes it one. */
+/*
+ * Their `detect_text_subtype` (OmniSVG inference.py), word for word: plain
+ * substring tests, the icon words first. This read only "icon, logo, symbol,
+ * emoji, glyph, badge" as whole words and called everything else an
+ * illustration — so "A red heart shape …", "A yellow star …", "A blue arrow
+ * …" (their own icon prompts) were sampled warmer and wider than the authors
+ * sample them.
+ */
+const ICON_WORDS = [
+  'icon',
+  'logo',
+  'symbol',
+  'badge',
+  'button',
+  'emoji',
+  'glyph',
+  'simple',
+  'arrow',
+  'triangle',
+  'circle',
+  'square',
+  'heart',
+  'star',
+  'checkmark',
+];
+const ILLUSTRATION_WORDS = [
+  'illustration',
+  'scene',
+  'person',
+  'people',
+  'character',
+  'man',
+  'woman',
+  'boy',
+  'girl',
+  'avatar',
+  'portrait',
+  'face',
+  'head',
+  'body',
+  'cat',
+  'dog',
+  'bird',
+  'animal',
+  'pet',
+  'fox',
+  'rabbit',
+  'sitting',
+  'standing',
+  'walking',
+  'running',
+  'sleeping',
+  'holding',
+  'playing',
+  'house',
+  'building',
+  'tree',
+  'garden',
+  'landscape',
+  'mountain',
+  'forest',
+  'city',
+  'ocean',
+  'beach',
+  'sunset',
+  'sunrise',
+  'sky',
+];
 export function textSubtype(prompt: string): 'icon' | 'illustration' {
-  return /\b(icon|logo|symbol|emoji|glyph|badge)\b/i.test(prompt) ? 'icon' : 'illustration';
+  const text = prompt.toLowerCase();
+  if (ICON_WORDS.some((w) => text.includes(w))) return 'icon';
+  if (ILLUSTRATION_WORDS.some((w) => text.includes(w)) || prompt.length > 50) {
+    return 'illustration';
+  }
+  return 'icon';
 }
 
 function chatml(user: string): string {

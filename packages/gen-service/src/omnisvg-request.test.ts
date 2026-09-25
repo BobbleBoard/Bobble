@@ -35,6 +35,28 @@ describe('the prompt OmniSVG is sent', () => {
     expect(buildOmniSvgRequest({ prompt: 'a fox icon' }).temperature).toBe(0.5);
     expect(buildOmniSvgRequest({ prompt: 'a fox in a forest' }).temperature).toBe(0.6);
   });
+
+  /* detect_text_subtype, as their inference.py has it: substrings, icon words
+     first, then an illustration word or more than 50 characters, else an icon. */
+  it('is their detect_text_subtype word for word', () => {
+    // Their own icon prompts, with no "icon" in them.
+    expect(textSubtype('A red heart shape with smooth curved edges, centered.')).toBe('icon');
+    expect(
+      textSubtype('A yellow star with five sharp points, simple geometric design, flat color.'),
+    ).toBe('icon');
+    expect(textSubtype('A black triangle pointing downward, centrally positioned.')).toBe('icon');
+    // Substrings, as theirs: "narrow" holds "arrow".
+    expect(textSubtype('a narrow road')).toBe('icon');
+    // An icon word wins over an illustration word.
+    expect(textSubtype('a person inside a circle')).toBe('icon');
+    // An illustration word, or length, makes an illustration…
+    expect(textSubtype('a cartoon character with a mustache')).toBe('illustration');
+    expect(
+      textSubtype('An orange thermometer with a circular base represents temperature measurement'),
+    ).toBe('illustration');
+    // …and a short prompt with neither is an icon.
+    expect(textSubtype('a green leaf')).toBe('icon');
+  });
 });
 
 describe('reading the reply', () => {
