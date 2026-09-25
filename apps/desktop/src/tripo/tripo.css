@@ -4491,6 +4491,11 @@
   align-items: center;
   justify-content: center;
   padding: 32px;
+  /* Centred in the CLEAR part: the Generate card floats over the viewport's
+     left and the view controls over its right (viewport-cover.ts); the
+     stage's row ran under the card's Finish row, then under the controls. */
+  padding-left: calc(32px + var(--tp-covered-left, 0px));
+  padding-right: calc(32px + var(--tp-covered-right, 0px));
   z-index: 45;
   pointer-events: none;
 }
@@ -4547,7 +4552,8 @@
   position: absolute;
   right: 0;
   bottom: 0;
-  left: 0;
+  /* Starts where the floating card ends (viewport-cover.ts). */
+  left: var(--tp-covered-left, 0px);
   display: flex;
   flex-direction: column;
   gap: 8px;

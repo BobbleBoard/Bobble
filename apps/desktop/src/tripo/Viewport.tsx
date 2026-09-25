@@ -32,6 +32,7 @@ import { Hint, MenuAnchor, SliderRow, Toggle } from './primitives';
 import { type TripoRenderMode, useTripoStore } from './store';
 import { LogoMark } from './thumbs';
 import { requestExport } from './viewer-io';
+import { useCoveredLeft } from './viewport-cover';
 
 /* Its own boundary + its own "Preparing viewer…" wait: three.js is the biggest
  * chunk in the app, and a WebGL viewer that will not load must cost the 3D
@@ -549,9 +550,14 @@ export function Viewport(): JSX.Element {
 
   // The animation state machine editor takes over the whole viewport.
   const showGraph = tool === 'animate' && graphOpen;
+  // What the floating card covers, for the overlays drawn over the canvas
+  // (the generating stage centres in the clear part — viewport-cover.ts).
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  useCoveredLeft(viewportRef);
 
   return (
     <div
+      ref={viewportRef}
       className="tp-viewport"
       data-testid="tp-viewport"
       // The bottom progress bar occupies the strip the floating controls sit in.

@@ -52,6 +52,7 @@ import {
   setViewerExportHandler,
   type ViewerExportRequest,
 } from './viewer-io';
+import { coveredLeft, floatingPanel } from './viewport-cover';
 
 /** Resolve an arbitrary CSS color expression (var()/color-mix()) to an sRGB
  * string three can parse, using a detached probe span's computed style. */
@@ -207,25 +208,6 @@ function buildGeneratedTexture(): InstanceType<typeof THREE.CanvasTexture> {
  * ~/Bobble/generated/3d and opens it in the chosen app. Either way the person
  * is told where it went, in the studio's own status line.
  */
-/** How much of the viewport's left the floating panel covers, in px (0 when
- * it is not there — the studio gated, or a window too narrow for it). */
-/** The floating card, wherever the studio's layout puts it. It is a SIBLING
- * of the viewport (.tp-body > Rail, GenPanel, Viewport), not a child of the
- * canvas host's parent — looking for it under the parent found nothing, and
- * the offset silently never applied (see the note in resize()). */
-function floatingPanel(host: HTMLElement): HTMLElement | null {
-  const root = host.closest<HTMLElement>('.tp-body') ?? host.parentElement;
-  return root?.querySelector<HTMLElement>('.tp-genpanel') ?? null;
-}
-
-function coveredLeft(host: HTMLElement): number {
-  const panel = floatingPanel(host);
-  if (panel === null) return 0;
-  const a = host.getBoundingClientRect();
-  const b = panel.getBoundingClientRect();
-  return Math.max(0, Math.min(b.right, a.right) - a.left);
-}
-
 async function deliverBytes(
   data: BlobPart,
   fileName: string,
