@@ -16,11 +16,25 @@
  * relative to the session's folder becomes the app's `pd-file://` URL, which
  * main serves fenced to the app's own roots, so the picture shows in the reply
  * and a click opens it on the canvas like any other file.
+ *
+ * A PICTURE OPENS IN THE IMAGE VIEWER, like a picture anywhere else in the app
+ * (the user, 2026-09-24: "images clicked on/fullscreened should have the new studio
+ * like ui") — by its path or by its `pd-file://` URL alike. An SVG still opens
+ * on the canvas, whose source/rendered toggle is the right room for a drawing
+ * made of text; so does anything the viewer cannot open. A remote http(s)
+ * picture never gets this far: the renderer's CSP (vite.config.ts `img-src`)
+ * refuses it, so there is nothing drawn to open.
  */
 import { Markdown as UiMarkdown, widenUrlTransform } from '@pi-desktop/ui';
 import type { ComponentPropsWithoutRef } from 'react';
+import { usePictureViewer } from '../media/picture-viewer';
 import { usePiStore } from '../state/pi-slice';
+import { baseName } from './attached-files';
 import { pdFileUrl } from './canvas/file-preview';
+import { pdFilePath } from './thread-media';
+
+/** What the image viewer opens (the pictures pd-file:// serves as pictures). */
+const RASTER = /\.(png|jpe?g|gif|webp|bmp|tiff?|heic|heif)$/i;
 
 /** Kept by the sanitiser so the image component below can see them. */
 const URL_TRANSFORM = widenUrlTransform(/^(?:pd-file:|file:)/i);
@@ -50,28 +64,47 @@ function LocalImage({
   ...rest
 }: ComponentPropsWithoutRef<'img'> & { node?: unknown }) {
   const cwd = usePiStore((s) => s.session?.cwd ?? undefined);
+  const { open: openPicture, viewer } = usePictureViewer();
+  const served = typeof src === 'string' && src.startsWith('pd-file:');
   const local =
-    typeof src === 'string' && !src.startsWith('pd-file:') ? localImagePath(src, cwd) : null;
-  const resolved = local === null ? src : pdFileUrl(local);
+    typeof src === 'string'
+      ? served
+        ? (pdFilePath(src) ?? null)
+        : localImagePath(src, cwd)
+      : null;
+  const resolved = local === null || served ? src : pdFileUrl(local);
   const img = <img {...rest} src={resolved} alt={alt ?? ''} className="pd-md-image" />;
   if (local === null) return img;
-  const open = () => {
+  const onCanvas = () => {
     void Promise.all([import('../state/canvas-store'), import('./canvas/file-tabs')]).then(
       ([canvas, tabs]) => tabs.openFileInCanvas(canvas.getCanvasController() as never, local, cwd),
     );
   };
-  /* A button, not an onClick on the img: it is an action (open on the canvas),
+  const inViewer = RASTER.test(local);
+  const open = () => {
+    if (!inViewer) {
+      onCanvas();
+      return;
+    }
+    void openPicture({ path: local }, baseName(local)).then((opened) => {
+      if (!opened) onCanvas();
+    });
+  };
+  /* A button, not an onClick on the img: it is an action (open the picture),
      so it is reachable from the keyboard and announced as one. */
   return (
-    <button
-      type="button"
-      className="pd-md-image-open"
-      onClick={open}
-      title="Open on the canvas"
-      data-local-path={local}
-    >
-      {img}
-    </button>
+    <>
+      <button
+        type="button"
+        className="pd-md-image-open"
+        onClick={open}
+        title={inViewer ? 'Open' : 'Open on the canvas'}
+        data-local-path={local}
+      >
+        {img}
+      </button>
+      {viewer}
+    </>
   );
 }
 

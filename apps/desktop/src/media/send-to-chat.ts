@@ -13,15 +13,15 @@
  * chips up in the composer and feeds attachment prefill exactly as a dropped
  * PNG would.
  *
- * A clip, a sound or a mesh cannot be seen by any local chat model we ship, and
- * attaching one would either be silently dropped by `addFiles` or, worse, look
- * like it worked. What the model CAN do with those is operate on them with
- * tools — so the path goes into the composer instead, ready for "trim this to
- * ten seconds" or "what's the poly count here". Naming the file honestly beats
- * pretending it was understood.
+ * A clip, a sound or a mesh cannot be seen by any local chat model we ship.
+ * What the model CAN do with those is operate on them with tools — so the path
+ * goes into the composer instead, ready for "trim this to ten seconds" or
+ * "what's the poly count here". Naming the file honestly beats pretending it
+ * was understood.
  */
 import { pdFileUrl } from '../chat/canvas/file-preview';
 import { useDropStore } from '../chat/composer/drop-store';
+import { withPath } from '../chat/composer/file-paths';
 import type { MediaKind } from '../chat/thread-media';
 import { exitModality } from '../state/modality-store';
 import { usePiStore } from '../state/pi-slice';
@@ -61,7 +61,9 @@ export async function sendToChat(item: SendToChatItem): Promise<'attached' | 'pa
       const res = await fetch(pdFileUrl(item.path));
       if (res.ok) {
         const blob = await res.blob();
-        const file = new File([blob], item.name, { type: mimeOf(item.name) });
+        /* The picture IS a file already: the composer attaches it by that path
+           (file-paths.ts) rather than saving its pixels a second time. */
+        const file = withPath(new File([blob], item.name, { type: mimeOf(item.name) }), item.path);
         useDropStore.getState().push([file]);
         exitModality();
         return 'attached';

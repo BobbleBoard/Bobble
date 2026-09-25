@@ -23,6 +23,8 @@ import {
 } from 'electron';
 import { registerAfmIpc } from './afm/afm-main';
 import { resolveBundledPackageAsset } from './app-paths';
+import type { AttachmentsInvokeMap } from './attachments/attachments-contract';
+import { attachmentsHandlers } from './attachments/attachments-main';
 import { isBackgroundMode, isHiddenMode } from './background-mode';
 import { registerBrowserAgentIpc } from './canvas/browser-agent';
 import { registerBrowserIpc } from './canvas/browser-manager';
@@ -733,6 +735,10 @@ function registerAppIpc(): void {
 
   // Read-only fs channels (composer @-mention picker + session sidebar).
   registerIpcHandlers<FsInvokeMap>(ipcMain, fsHandlers, { allowSender });
+
+  // The composer's attachments: what a pasted/dropped path is, a file for
+  // pasted pixels, and the viewer's picture (attachments/attachments-main.ts).
+  registerIpcHandlers<AttachmentsInvokeMap>(ipcMain, attachmentsHandlers, { allowSender });
 
   // Importer + onboarding channels (Claude/Codex config → pi; first-run gate).
   registerImportIpc(ipcMain, allowSender);

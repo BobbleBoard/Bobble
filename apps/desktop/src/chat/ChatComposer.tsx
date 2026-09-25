@@ -14,6 +14,8 @@ import type { Model } from '@pi-desktop/engine';
 import { CAPABILITIES } from '@pi-desktop/harness/presets/capabilities';
 import {
   ComposerAddMenu,
+  FileGlyph,
+  FolderGlyph,
   type GenActionKey,
   Glyph,
   IconArrowUp,
@@ -24,6 +26,7 @@ import {
 import type { SerializedEditorState } from 'lexical';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ExpandedScrim } from '../media/ExpandedScrim';
+import { usePictureViewer } from '../media/picture-viewer';
 import { IconMic, IconPause, IconPlay, IconStop } from '../settings/icons';
 import { useConnectorsStore } from '../state/connectors-store';
 import { abortCorpTask } from '../state/corp-connect';
@@ -35,6 +38,7 @@ import {
   getCommands,
   newSession,
   pausePi,
+  pendingInstructionsPreamble,
   resumePausedChat,
   runBash,
   sendPrompt,
@@ -65,6 +69,8 @@ import {
 } from './composer/ComposerEditor';
 import { clipboardEpoch } from './composer/clipboard-epoch';
 import { useDropStore } from './composer/drop-store';
+import { pathOfFile } from './composer/file-paths';
+import { attachPlan, TEXT_MAX_BYTES } from './composer/incoming-files';
 import type { PillData } from './composer/pill-node';
 import { type AcToken, EMPTY_TOKEN } from './composer/tokens';
 import {
@@ -128,10 +134,20 @@ interface Attachment {
    * a pasted block, which never was a file. */
   bytes?: number;
   /** Image attachments carry a data URI (sent to pi as ImageContent); text
-   * attachments carry their decoded contents (folded into the prompt text). */
-  kind: 'image' | 'text';
+   * attachments carry their decoded contents (folded into the prompt text); a
+   * file or folder is only its path, which the model's own tools open
+   * (composer/incoming-files.ts). */
+  kind: 'image' | 'text' | 'file' | 'folder';
   dataUri?: string;
   text?: string;
+  /**
+   * Where it is on disk. Every kind carries one when it exists — a picture of
+   * pasted pixels gets the file main saved them to — and the message names it
+   * to the model (agent-message.ts). Absent for a paste of text.
+   */
+  path?: string;
+  /** A folder's item count, for its chip. */
+  entries?: number;
   /** True for a large paste captured as an attachment — rendered as a text
    * preview card with a "PASTED" badge rather than a filename chip. */
   pasted?: boolean;
@@ -150,64 +166,6 @@ interface Attachment {
   mention?: string;
 }
 
-/** Text files we accept + read into the prompt (by MIME or extension). */
-const TEXT_EXTENSIONS = new Set([
-  'txt',
-  'text',
-  'md',
-  'markdown',
-  'rst',
-  'json',
-  'jsonc',
-  'csv',
-  'tsv',
-  'yaml',
-  'yml',
-  'toml',
-  'ini',
-  'cfg',
-  'conf',
-  'env',
-  'xml',
-  'html',
-  'htm',
-  'css',
-  'scss',
-  'less',
-  'js',
-  'jsx',
-  'ts',
-  'tsx',
-  'mjs',
-  'cjs',
-  'py',
-  'rb',
-  'go',
-  'rs',
-  'java',
-  'kt',
-  'swift',
-  'c',
-  'h',
-  'cc',
-  'cpp',
-  'hpp',
-  'cs',
-  'php',
-  'sh',
-  'bash',
-  'zsh',
-  'fish',
-  'sql',
-  'log',
-  'gitignore',
-  'dockerfile',
-  'makefile',
-  'gradle',
-  'properties',
-]);
-/** Cap the per-file size we inline into a prompt (256 KB). */
-const TEXT_MAX_BYTES = 256 * 1024;
 /**
  * A pasted plain-text block at/above this many characters becomes a "pasted
  * content" attachment instead of flooding the editor (the user) — and, being an
@@ -225,14 +183,6 @@ function typingElsewhere(): boolean {
   const el = document.activeElement;
   if (!(el instanceof HTMLElement) || el.closest('.pd-composer-root') !== null) return false;
   return el.isContentEditable || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA';
-}
-
-function isTextFile(file: File): boolean {
-  if (file.type.startsWith('text/')) return true;
-  if (file.type === 'application/json' || file.type === 'application/xml') return true;
-  const dot = file.name.lastIndexOf('.');
-  const ext = dot >= 0 ? file.name.slice(dot + 1).toLowerCase() : file.name.toLowerCase();
-  return TEXT_EXTENSIONS.has(ext);
 }
 
 /** Built-in commands shown unconditionally — so `/` always offers something,
@@ -280,7 +230,10 @@ function AttachmentPreview({
   bytes,
   text,
   kind,
+  path,
+  entries,
   onRemove,
+  onOpen,
   blind = false,
   selected = false,
   prefilling = false,
@@ -290,8 +243,16 @@ function AttachmentPreview({
   dataUri?: string;
   bytes?: number;
   text?: string;
-  kind: 'image' | 'text';
+  kind: Attachment['kind'];
+  /** Where it is on disk — a probe reads it off the chip as `data-path`. */
+  path?: string;
+  entries?: number;
   onRemove: () => void;
+  /**
+   * Open a picture in the image viewer. Resolves false when there was no file
+   * to open it from, and the chip falls back to the plain overlay.
+   */
+  onOpen?: () => Promise<boolean>;
   /** The selected model cannot read images — badge this one. */
   blind?: boolean;
   /** Clicked: blue fill, blue border, and part of a copy/cut selection. */
@@ -308,6 +269,7 @@ function AttachmentPreview({
     kind,
     ...(bytes !== undefined ? { bytes } : {}),
     ...(text !== undefined ? { text } : {}),
+    ...(entries !== undefined ? { entries } : {}),
   });
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: the chip's own buttons are focusable; this is a mouse affordance over them
@@ -315,6 +277,8 @@ function AttachmentPreview({
     <div
       className="pd-attach"
       data-selected={selected || undefined}
+      data-kind={kind}
+      data-path={path}
       data-testid="attach-chip"
       onClick={(e) => {
         // A click on the remove button or the thumbnail is that control's, not
@@ -332,14 +296,23 @@ function AttachmentPreview({
             The thumbnail used to be a button whose click opened the expanded
             view, which made it the one part of the chip you could not select by
             clicking — and it is the biggest part. The file-list idiom is the
-            right one here: click picks, double-click opens.
+            right one here: click picks, double-click opens — in the image
+            viewer, the room a picture opens into everywhere else.
           */}
           {/* biome-ignore lint/a11y/useAltText: the chip's label describes it */}
           <img
             className="pd-attach-thumb"
             src={dataUri}
             title={`${name} — double-click to open`}
-            onDoubleClick={() => setOpen(true)}
+            onDoubleClick={() => {
+              if (onOpen === undefined) {
+                setOpen(true);
+                return;
+              }
+              void onOpen().then((opened) => {
+                if (!opened) setOpen(true);
+              });
+            }}
           />
           {/* The fact travels WITH the picture, so it is still there when the
               pill has gone. the user: "a yellow circle + ! on images both in chat
@@ -354,6 +327,17 @@ function AttachmentPreview({
             </span>
           ) : null}
         </span>
+      ) : kind === 'file' ? (
+        /* A file the prompt cannot carry, named by its path: the page with its
+           extension written on it (the app's own file glyph). */
+        <span className="pd-attach-ext pd-attach-glyph" aria-hidden="true">
+          <FileGlyph ext={meta.ext} size={22} />
+        </span>
+      ) : kind === 'folder' ? (
+        /* It opens with the chip — the projects sidebar's folder, same morph. */
+        <span className="pd-attach-ext pd-attach-glyph" aria-hidden="true">
+          <FolderGlyph open={selected} size={22} />
+        </span>
       ) : (
         <span className="pd-attach-ext">{extLabel(name)}</span>
       )}
@@ -367,14 +351,18 @@ function AttachmentPreview({
           row of boxes is the resting state and the detail is on demand. */}
       <div className="pd-attach-detail" aria-hidden={!open ? undefined : undefined}>
         <div className="pd-attach-detail-inner">
-          <div className="pd-attach-name" title={name}>
+          <div className="pd-attach-name" title={path ?? name}>
             {/* The NAME truncates; the dot and the extension never do. They were
                 in the same clipping box at first, so a long filename pushed the
                 extension off the end — which is the one part of that row that is
                 the same width every time and therefore always has room. */}
             <span className="pd-attach-name-text">{name}</span>
-            <span className="pd-attach-dot">·</span>
-            <span className="pd-attach-ext-label">{meta.ext}</span>
+            {meta.ext !== '' ? (
+              <>
+                <span className="pd-attach-dot">·</span>
+                <span className="pd-attach-ext-label">{meta.ext}</span>
+              </>
+            ) : null}
           </div>
           <div className="pd-attach-meta">
             {meta.size !== '' ? <span>{meta.size}</span> : null}
@@ -428,6 +416,8 @@ export function ChatComposer({
    */
   const blindness = useImageBlindness();
   const blindToImages = blindness !== null;
+  /* A picture chip double-clicked opens in the image viewer (media/picture-viewer.tsx). */
+  const picture = usePictureViewer();
   /*
    * SELECTION, UNDO AND THE CLIPBOARD for attachments — the user: "cmd/ctrl Z needs
    * to be able to undo accidental file removals, clicking a file needs to
@@ -795,15 +785,17 @@ export function ChatComposer({
   const canSend = text.trim().length > 0 || attachments.length > 0;
   const bashMode = text.trim().startsWith('!');
 
-  // ATTACHMENT PREFILL: the fixed START of the next message is its text
-  // attachments (folded exactly as submit() will fold them — no typed text). Prime
-  // that as soon as it's attached so the real turn reuses it and only prefills the
-  // short typed tail. `abortPrefill` is called in submit() so the dispatched turn
-  // never queues behind an in-flight prefill on the single slot.
-  const attachmentPrefix = buildAgentMessage(
-    '',
-    attachments.filter((a) => a.kind === 'text'),
-  );
+  // ATTACHMENT PREFILL: the fixed START of the next message is its attachments —
+  // the path lines and the folded text files, exactly as submit() will build them
+  // with no typed text. Prime that as soon as it's attached so the real turn
+  // reuses it and only prefills the short typed tail. EVERY attachment, in the
+  // order submit() passes them: a path line left out of this prefix would be the
+  // first byte the turn and the prime disagree on. `abortPrefill` is called in
+  // submit() so the dispatched turn never queues behind a prime it does not begin
+  // with. And behind the saved custom instructions, when this is the message that
+  // will carry them (pi-connect pendingInstructionsPreamble): pi's copy opens
+  // with that block, so the prime has to as well.
+  const attachmentPrefix = `${pendingInstructionsPreamble()}${buildAgentMessage('', attachments)}`;
   /** The shape `buildAgentMessage` needs — slug + name, nothing about the UI. */
   const activatable: ActivatableConnector[] = useMemo(
     () => installedConnectors.map((c) => ({ slug: c.slug, name: c.name })),
@@ -832,31 +824,82 @@ export function ChatComposer({
         .map((a) => a.id)
     : [];
 
-  // Accept images (sent to pi as ImageContent) AND text files (read + folded
-  // into the prompt text on send). Anything else — binary the prompt can't carry
-  // (pdf, zip, …) — is NOT silently dropped: its name shows in an inline note.
+  /*
+   * EVERYTHING PASTED, DROPPED OR PICKED COMES THROUGH HERE.
+   *
+   * the user (2026-09-24): "why not handle this natively so that any image(s)/files/
+   * folders... can be pasted into the input box". What each thing becomes is
+   * composer/incoming-files.ts; this does the reading. Every File the OS handed
+   * over knows its path (webUtils), and main says in one round trip which of
+   * those paths are folders and how big the files are — a folder is never read,
+   * and neither is a file the model will open itself. Pixels with no file behind
+   * them are saved once, so they have a path too. Only what is not on this Mac
+   * at all is named in the note under the chips.
+   */
   const addFiles = async (files: File[]) => {
+    const incoming = files.map((file) => ({ file, path: pathOfFile(file) }));
+    const paths = incoming.map((i) => i.path).filter((p) => p !== '');
+    const found =
+      paths.length === 0
+        ? []
+        : await window.piDesktop
+            .invoke('attachments:inspect', { paths })
+            .then((r) => r.items)
+            .catch(() => []);
+    const onDisk = new Map(found.map((item) => [item.path, item]));
     const added: Attachment[] = [];
     const rejected: string[] = [];
-    for (const f of files) {
-      if (f.type.startsWith('image/')) {
-        added.push({
-          bytes: f.size,
-          id: crypto.randomUUID(),
-          name: f.name,
-          kind: 'image',
-          dataUri: await fileToDataUri(f),
-        });
-      } else if (isTextFile(f) && f.size <= TEXT_MAX_BYTES) {
-        added.push({
-          bytes: f.size,
-          id: crypto.randomUUID(),
-          name: f.name,
-          kind: 'text',
-          text: await f.text(),
-        });
-      } else {
-        rejected.push(f.name);
+    for (const { file, path } of incoming) {
+      const disk = path === '' ? null : (onDisk.get(path) ?? null);
+      const plan = attachPlan(file, path, disk);
+      const id = crypto.randomUUID();
+      const bytes = disk?.bytes ?? file.size;
+      try {
+        if (plan.as === 'image') {
+          const dataUri = await fileToDataUri(file);
+          let at = plan.save ? undefined : path;
+          if (plan.save) {
+            const saved = await window.piDesktop
+              .invoke('attachments:save-image', { dataUrl: dataUri })
+              .catch(() => null);
+            // A picture whose pixels could not be saved still goes to the model
+            // as pixels; it only has no path to name.
+            if (saved?.ok === true && saved.path !== undefined) at = saved.path;
+          }
+          added.push({
+            id,
+            name: file.name,
+            kind: 'image',
+            bytes,
+            dataUri,
+            ...(at !== undefined ? { path: at } : {}),
+          });
+        } else if (plan.as === 'text') {
+          const text = await file.text();
+          added.push({
+            id,
+            name: file.name,
+            kind: 'text',
+            bytes,
+            text,
+            ...(path !== '' ? { path } : {}),
+          });
+        } else if (plan.as === 'file') {
+          added.push({ id, name: file.name, kind: 'file', bytes, path });
+        } else if (plan.as === 'folder') {
+          added.push({
+            id,
+            name: file.name,
+            kind: 'folder',
+            path,
+            ...(disk?.entries !== undefined ? { entries: disk.entries } : {}),
+          });
+        } else {
+          rejected.push(file.name);
+        }
+      } catch {
+        // Unreadable after all (permissions, a file removed mid-read).
+        rejected.push(file.name);
       }
     }
     if (added.length > 0) setAttachments((prev) => [...prev, ...added]);
@@ -884,7 +927,14 @@ export function ChatComposer({
     if (res === null || res.binary || res.tooLarge || typeof res.text !== 'string') return;
     setAttachments((prev) => [
       ...prev,
-      { id: crypto.randomUUID(), name, kind: 'text', text: res.text as string, mention: token },
+      {
+        id: crypto.randomUUID(),
+        name,
+        kind: 'text',
+        text: res.text as string,
+        path: absPath,
+        mention: token,
+      },
     ]);
   };
 
@@ -929,8 +979,9 @@ export function ChatComposer({
    * A PASTED PICTURE IS A DROPPED PICTURE. the user: "copy and then attempting
    * pasting into our own apps input bar doesn't work." Same `addFiles` a drop
    * goes through, so a picture copied from a card chips up with its thumbnail,
-   * a screenshot does too, and a pasted file this composer cannot carry is
-   * named in the same "skipped" note rather than vanishing.
+   * a screenshot does too, and files and folders copied in Finder attach by
+   * their paths exactly as they would dropped (paste-files.ts says why the
+   * paste itself is enough to know them).
    */
   const handlePasteFiles = (files: File[]): boolean => {
     void addFiles(files);
@@ -1275,14 +1326,15 @@ export function ChatComposer({
       .filter((a) => a.kind === 'image')
       .map((a) => a.dataUri)
       .filter((uri): uri is string => uri !== undefined);
-    const textFiles = attachments.filter((a) => a.kind === 'text');
     /*
      * Hand the prefill the body we are about to send. A prime this turn BEGINS
      * WITH is left running — the tokens it is reading are the turn's own — and
      * only a prime for something else (a removed attachment, another chat) is
      * cancelled so it stops competing for the single slot. See abortPrefill.
      */
-    abortPrefill({ body: buildAgentMessage(raw, textFiles, activatable) });
+    abortPrefill({
+      body: `${pendingInstructionsPreamble()}${buildAgentMessage(raw, attachments, activatable)}`,
+    });
     apiRef.current?.clear();
     setAttachments([]);
     setToken(EMPTY_TOKEN);
@@ -1351,13 +1403,15 @@ export function ChatComposer({
     setPendingStop(false);
     setPendingStart(true);
     window.setTimeout(() => setPendingStart(false), 5000);
-    // Fold attached text-file contents into pi's copy of the message (the send
-    // path is otherwise images-only); the visible bubble echoes only the typed
-    // text (or the filenames when nothing was typed). Shared with predictive
-    // prefill so the prefilled draft byte-matches this exact body.
-    const agentMessage = buildAgentMessage(raw, textFiles, activatable);
+    // Name every attachment's path and fold the text files' contents into pi's
+    // copy of the message (the send path is otherwise images-only); the visible
+    // bubble echoes only the typed text (or the names when nothing was typed).
+    // Shared with predictive prefill so the prefilled draft byte-matches this
+    // exact body.
+    const agentMessage = buildAgentMessage(raw, attachments, activatable);
+    const named = attachments.filter((a) => a.kind !== 'image');
     const echo =
-      raw.length > 0 ? raw : textFiles.length > 0 ? textFiles.map((a) => a.name).join(', ') : raw;
+      raw.length > 0 ? raw : named.length > 0 ? named.map((a) => a.name).join(', ') : raw;
 
     /*
      * THE CORP IS SOMETHING THE MODEL ASKS FOR — NOT WHERE EVERY MESSAGE GOES.
@@ -1605,6 +1659,7 @@ export function ChatComposer({
         <ComposerPill
           imageOnBlindModel={blindness !== null && hasImageAttached ? blindness : false}
         />
+        {picture.viewer}
         <Autocomplete
           items={token.mode !== null ? items : []}
           selectedIndex={selectedIndex}
@@ -1641,6 +1696,20 @@ export function ChatComposer({
                     kind={a.kind}
                     {...(a.bytes !== undefined ? { bytes: a.bytes } : {})}
                     {...(a.text !== undefined ? { text: a.text } : {})}
+                    {...(a.path !== undefined ? { path: a.path } : {})}
+                    {...(a.entries !== undefined ? { entries: a.entries } : {})}
+                    {...(a.kind === 'image'
+                      ? {
+                          onOpen: () =>
+                            picture.open(
+                              {
+                                ...(a.path !== undefined ? { path: a.path } : {}),
+                                ...(a.dataUri !== undefined ? { dataUrl: a.dataUri } : {}),
+                              },
+                              a.name,
+                            ),
+                        }
+                      : {})}
                     blind={blindToImages && (a.dataUri ?? '').startsWith('data:image/')}
                     selected={selection.ids.includes(a.id)}
                     prefilling={prefillingIds.includes(a.id)}
@@ -1666,7 +1735,7 @@ export function ChatComposer({
               className="px-3 pt-2 text-footnote text-text-muted"
               data-testid="composer-skipped-note"
             >
-              Images and text files only. Skipped {skipped.join(', ')}.
+              Couldn't attach {skipped.join(', ')}.
             </div>
           ) : null}
 
@@ -1718,10 +1787,11 @@ export function ChatComposer({
             </div>
           ) : null}
           <div className="pd-composer-footer" hidden={dictating}>
+            {/* Any file: what the composer cannot read into the prompt it
+                attaches by path (composer/incoming-files.ts). */}
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*,text/*"
               multiple
               hidden
               data-testid="composer-file-input"

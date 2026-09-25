@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 /**
@@ -70,7 +70,17 @@ export function ExpandedScrim({
     return () => document.body.removeAttribute('data-media-expanded');
   }, []);
 
-  useEffect(() => holdPageBehind(), []);
+  /*
+   * WHERE FOCUS CAME FROM, read while this first renders — before any child's
+   * effect runs. Effects run children first, and the image viewer's edit bar
+   * focuses itself in one, so by the time an effect of ours looked, "where it
+   * came from" was that bar: gone on close, and focus fell to <body> instead of
+   * going back to the composer (SEEN, attach-anything-probe, a picture chip
+   * double-clicked and closed).
+   */
+  const [cameFrom] = useState(() => document.activeElement);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: held once for the scrim's life; cameFrom never changes
+  useEffect(() => holdPageBehind(cameFrom), []);
 
   return createPortal(
     <div
@@ -113,9 +123,8 @@ let holds = 0;
  * Returns the release. Released FIRST, restored second: an inert element cannot
  * take focus, so restoring before lifting it would land on <body>.
  */
-function holdPageBehind(): () => void {
+function holdPageBehind(cameFrom: Element | null): () => void {
   const root = document.getElementById('root');
-  const cameFrom = document.activeElement;
   if (root === null) return () => undefined;
   holds += 1;
   root.inert = true;

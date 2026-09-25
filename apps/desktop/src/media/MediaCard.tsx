@@ -28,7 +28,6 @@ import { type JSX, type MouseEvent, useEffect, useMemo, useState } from 'react';
 import { pdFileUrl } from '../chat/canvas/file-preview';
 import { ThreadAudio } from '../chat/ThreadAudio';
 import { humanSize, type ThreadMediaItem } from '../chat/thread-media';
-import { lazyRoute } from '../RouteBoundary';
 import { useModalityStore } from '../state/modality-store';
 import { studioFor, useStudioHandoff } from '../state/studio-handoff';
 import { ExpandedScrim } from './ExpandedScrim';
@@ -37,18 +36,14 @@ import { ModelSurface } from './ModelSurface';
 import { copyFile, exportFile, revealFile, startFileDrag } from './media-actions';
 import { shapeOf } from './media-shapes';
 import { createModelView, type ModelView } from './model-view';
+import { ImageViewer } from './picture-viewer';
 import { VideoSurface } from './VideoSurface';
 
 /*
  * A PICTURE OPENS INTO THE IMAGE VIEWER — the studio-shaped room around one
- * image (ImageViewer.tsx). Lazy, because it brings the 3D studio's stylesheet
- * for the rail and the History card, and a transcript of six pictures should
- * not pay for that until one is opened.
+ * image (ImageViewer.tsx), lazily, through the one entry every surface that
+ * shows a picture shares (picture-viewer.tsx).
  */
-const ImageViewer = lazyRoute('Image viewer', () => import('./ImageViewer'), {
-  pick: (m) => m.ImageViewer,
-  variant: 'inline',
-});
 
 /** The media itself, at whatever size the frame around it gives. */
 function Surface({

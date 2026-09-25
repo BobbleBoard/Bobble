@@ -43,6 +43,27 @@ describe('pastedFiles', () => {
     const html = '<p>Look at this <img src="x.png"> fox</p>';
     expect(pastedFiles([png], 'Look at this fox', html)).toEqual([]);
   });
+
+  /*
+   * A FINDER COPY OF FOLDERS AND FILES TOGETHER (2026-09-24): a folder is a
+   * File like the rest (paste-files.ts header), and Finder's text is the names
+   * as it SHOWS them — without an extension it has been told to hide.
+   */
+  it('attaches folders and files copied together in Finder', () => {
+    const folder = { name: 'garden-project' };
+    const pdf = { name: 'Q3 report.pdf' };
+    expect(pastedFiles([folder, pdf], 'garden-project\rQ3 report.pdf', '')).toEqual([folder, pdf]);
+  });
+
+  it('knows a file by the name Finder shows when its extension is hidden', () => {
+    const pdf = { name: 'Q3 report.pdf' };
+    expect(pastedFiles([pdf], 'Q3 report', '')).toEqual([pdf]);
+  });
+
+  it('never reads the word "image" beside pasted pixels as their name', () => {
+    // The trap again: words, with a rendering of them — the words win.
+    expect(pastedFiles([png], 'image', '<p>image</p>')).toEqual([]);
+  });
 });
 
 describe('clipboard epoch', () => {

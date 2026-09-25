@@ -1,7 +1,8 @@
-import { IconClose, Spinner } from '@pi-desktop/ui';
+import { FileGlyph, FolderGlyph, IconClose, Spinner } from '@pi-desktop/ui';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { ExpandedScrim } from '../media/ExpandedScrim';
+import { revealFile } from '../media/media-actions';
 
 /**
  * A text attachment, as a card you can open.
@@ -96,5 +97,71 @@ export function AttachedFileCard({
         </ExpandedScrim>
       ) : null}
     </>
+  );
+}
+
+/**
+ * A file or folder the message named by its PATH — a PDF, a zip, a project
+ * folder: nothing the prompt can carry, everything the model's tools can open.
+ *
+ * the user: "why not handle this natively so that any image(s)/files/folders...
+ * can be pasted into the input box". The card says what it is the way Finder
+ * would — the page with its extension on it, or the folder — its name, and
+ * what it is. The whole face is a button that shows it in Finder: a reference
+ * is a place on disk, and that is where it takes you.
+ *
+ * Same family as the paste card above (border, surface, radius), shorter,
+ * because there is no text to preview.
+ */
+export function AttachedPathCard({
+  kind,
+  name,
+  path,
+  detail,
+  onRemove,
+}: {
+  readonly kind: 'file' | 'folder' | 'image';
+  readonly name: string;
+  readonly path: string;
+  /** What it is — `PDF, 2.3 MB`; a folder says "Folder". */
+  readonly detail?: string;
+  readonly onRemove?: () => void;
+}): ReactNode {
+  const dot = name.lastIndexOf('.');
+  const ext = dot > 0 ? name.slice(dot + 1) : '';
+  return (
+    <div className="pd-pathcard" data-kind={kind} data-path={path} data-testid="attached-path">
+      {onRemove !== undefined ? (
+        <button
+          type="button"
+          className="pd-pasted-remove pd-focusable"
+          aria-label={`Remove ${name}`}
+          onClick={onRemove}
+        >
+          <IconClose size={12} />
+        </button>
+      ) : null}
+      <button
+        type="button"
+        className="pd-pathcard-open pd-focusable"
+        aria-label={`Show ${name} in Finder`}
+        title={`Show in Finder · ${path}`}
+        onClick={() => revealFile(path)}
+      >
+        <span className="pd-pathcard-tile" aria-hidden="true">
+          {kind === 'folder' ? (
+            <FolderGlyph open={false} size={22} />
+          ) : (
+            <FileGlyph ext={ext} size={22} />
+          )}
+        </span>
+        <span className="pd-pathcard-text">
+          <span className="pd-pathcard-name">{name}</span>
+          <span className="pd-pathcard-meta">
+            {kind === 'folder' ? 'Folder' : (detail ?? '').replace(/, /g, ' · ')}
+          </span>
+        </span>
+      </button>
+    </div>
   );
 }

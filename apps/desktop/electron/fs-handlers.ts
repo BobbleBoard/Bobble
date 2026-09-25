@@ -13,6 +13,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { dialog } from 'electron';
+import { messageSummary } from '../src/chat/attached-files';
 import type { FsInvokeMap, FsTreeNode, SessionSummary } from './ipc-contract';
 import { activeProjectFullAccess } from './project/project-main';
 import { sandboxBaseDir } from './sandbox';
@@ -148,32 +149,6 @@ export function excerptAround(haystack: string, original: string, needle: string
   return `${start > 0 ? '…' : ''}${body}${end < original.length ? '…' : ''}`;
 }
 
-/** The header + fenced body the composer writes for each text attachment. */
-const ATTACHED_FILE_BLOCK = /^Attached file `([^`\n]*)`:\n```\n([\s\S]*?)\n```(?:\n\n|\n?$)/;
-
-/** A user message with its folded attachments removed, or their names when that
- * is all it was. Mirrors `src/chat/attached-files.ts` — see the note at the
- * title, above. */
-function summarizeUserMessage(body: string): string {
-  const blocks: Array<{ name: string; text: string }> = [];
-  let rest = body;
-  for (;;) {
-    const m = ATTACHED_FILE_BLOCK.exec(rest);
-    if (m === null) break;
-    blocks.push({ name: m[1] ?? '', text: m[2] ?? '' });
-    rest = rest.slice(m[0].length);
-  }
-  const typed = rest.trim();
-  if (typed.length > 0) return typed;
-  const first = blocks[0];
-  if (first === undefined) return body.trim();
-  // A NAMED file names the chat; "pasted content" names nothing, so a paste is
-  // summarised by its own first line — which is what the chat is actually about.
-  if (first.name !== 'pasted content') return blocks.map((b) => b.name).join(', ');
-  const line = first.text.split('\n').find((l) => l.trim().length > 0);
-  return line?.trim() ?? first.name;
-}
-
 function readSessionSummary(file: string): SessionSummary | null {
   const st = statSafe(file);
   if (st === null) return null;
@@ -248,13 +223,13 @@ function readSessionSummary(file: string): SessionSummary | null {
    *
    *     Attached file `pasted content`: ``` we're going to work on the chat…
    *
-   * The unfold is deliberately duplicated rather than imported: this runs in the
-   * main process, and `src/chat/attached-files.ts` is renderer code (its test
-   * covers the same shape). Keep the two in step if the fold ever changes.
+   * The unfold was a copy of the renderer's until the fold grew path lines
+   * (`Attached folder: /Users/…`, 2026-09-24): three shapes kept in step by
+   * hand is how a title drifts from its bubble, so this runs the renderer's own
+   * parser — attached-files.ts is plain TypeScript, no DOM, no React.
    */
   const title = firstUserText
-    ? summarizeUserMessage(firstUserText).slice(0, 80).replace(/\s+/g, ' ').trim() ||
-      'Untitled session'
+    ? messageSummary(firstUserText).slice(0, 80).replace(/\s+/g, ' ').trim() || 'Untitled session'
     : 'Untitled session';
 
   const summary: SessionSummary = {

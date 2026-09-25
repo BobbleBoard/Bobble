@@ -8,6 +8,10 @@ import type { CanvasState } from '@pi-desktop/browser-use/protocol';
 import type { IpcClient, IpcEventMap, IpcInvokeMap } from '@pi-desktop/shared';
 import { AFM_INVOKE_CHANNELS, type AfmInvokeMap } from './afm/afm-contract';
 import {
+  ATTACHMENTS_INVOKE_CHANNELS,
+  type AttachmentsInvokeMap,
+} from './attachments/attachments-contract';
+import {
   BROWSER_AGENT_INVOKE_CHANNELS,
   type BrowserAgentEventMap,
   type BrowserAgentInvokeMap,
@@ -1182,6 +1186,7 @@ export const MAC_INVOKE_CHANNELS = [
 
 export type AppInvokeMap = CoreInvokeMap &
   FsInvokeMap &
+  AttachmentsInvokeMap &
   LlmInvokeMap &
   EngineInvokeMap &
   HarnessInvokeMap &
@@ -1231,6 +1236,7 @@ export const APP_INVOKE_CHANNELS = [
   'app:set-badge',
   'app:reload-window',
   ...FS_INVOKE_CHANNELS,
+  ...ATTACHMENTS_INVOKE_CHANNELS,
   ...LLM_INVOKE_CHANNELS,
   ...HF_INVOKE_CHANNELS,
   ...AFM_INVOKE_CHANNELS,

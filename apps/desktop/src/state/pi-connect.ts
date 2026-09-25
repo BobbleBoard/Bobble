@@ -13,6 +13,7 @@ import {
 } from '@pi-desktop/engine';
 import { createResumeSplitter, type ResumeEvent } from '@pi-desktop/provider-llamacpp/resume';
 import { conversationNameFrom } from '../../electron/workspace/project-dir';
+import { instructionsPreamble } from '../chat/attached-files';
 import { ensureChatServerReady, maybeRouteAuto } from '../chat/auto-router';
 import { ADVANCED_GROUNDTRUTH_KEY } from './advanced-store';
 import { resetCanvasForNewSession, restoreCanvas, snapshotCanvas } from './canvas-store';
@@ -145,14 +146,31 @@ function armSessionInstructions(): void {
   instructionsArmed = true;
 }
 
+/**
+ * The custom-instructions preamble the NEXT send will open with, read without
+ * consuming it — '' when none is pending.
+ *
+ * The composer's prime has to open with the same bytes (attachment-prefill.ts
+ * primes the start of the message being written). It did not: the first
+ * message of every chat of someone with saved instructions began with this
+ * block while the prime began with the attachment, so the two parted company
+ * at the first character of the message and Enter re-read the whole paste.
+ * MEASURED (attachment-prefill-probe INSTRUCTIONS=1, llama.cpp): 5,050 of
+ * 7,782 prompt tokens computed on Enter, 4.1 s to the first token, where the
+ * same paste without instructions computes 133.
+ */
+export function pendingInstructionsPreamble(): string {
+  if (!instructionsArmed) return '';
+  const instructions = useSettingsStore.getState().settings.customInstructions.trim();
+  return instructions.length === 0 ? '' : instructionsPreamble(instructions);
+}
+
 /** Consume the armed flag, returning `message` with the custom-instructions
  * preamble prepended when one is pending and configured. */
 function withPendingInstructions(message: string): string {
-  if (!instructionsArmed) return message;
+  const preamble = pendingInstructionsPreamble();
   instructionsArmed = false;
-  const instructions = useSettingsStore.getState().settings.customInstructions.trim();
-  if (instructions.length === 0) return message;
-  return `<user-instructions>\n${instructions}\n</user-instructions>\n\n${message}`;
+  return `${preamble}${message}`;
 }
 
 export function connectPi(): () => void {

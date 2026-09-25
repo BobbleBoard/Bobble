@@ -41,6 +41,29 @@ describe('extensionOf', () => {
   });
 });
 
+describe('attachmentMeta — named by path', () => {
+  it('gives a folder its item count and no extension', () => {
+    expect(attachmentMeta({ name: 'garden', kind: 'folder', entries: 12 })).toEqual({
+      size: '12 items',
+      ext: '',
+      tokens: null,
+    });
+    expect(attachmentMeta({ name: 'one', kind: 'folder', entries: 1 }).size).toBe('1 item');
+    expect(attachmentMeta({ name: 'huge', kind: 'folder', entries: 1000 }).size).toBe(
+      '1,000+ items',
+    );
+    expect(attachmentMeta({ name: 'unread', kind: 'folder' }).size).toBe('Folder');
+  });
+
+  it('gives a file its size and extension, and no token count — it costs one line', () => {
+    expect(attachmentMeta({ name: 'Q3 report.pdf', kind: 'file', bytes: 2_411_724 })).toEqual({
+      size: '2.3 MB',
+      ext: 'PDF',
+      tokens: null,
+    });
+  });
+});
+
 describe('attachmentMeta', () => {
   it('gives a text file a size, an extension and a token count', () => {
     const m = attachmentMeta({
