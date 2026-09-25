@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { HfGgufFileDTO } from '../../electron/ipc-contract';
 import { recommendedQuant } from '../settings/model-manager-logic';
-import { hfLadder, pickHfDownload, pickRefusal, quantLabel } from './hf-download';
+import {
+  hfLadder,
+  type OnDiskEntry,
+  pickHfDownload,
+  pickRefusal,
+  quantLabel,
+  quantsOnDisk,
+} from './hf-download';
 
 /**
  * unsloth/Qwen3.8-27B-GGUF as `hf:list-files` returned it on 2026-09-25, in the
@@ -87,6 +94,67 @@ describe('pickHfDownload — Download without opening the picker', () => {
     expect(pick.kind === 'file' ? pick.mmproj?.path : undefined).toBe('mmproj-BF16.gguf');
     expect(pick.kind === 'file' ? pick.mtpFile?.path : undefined).toBe(
       'MTP/mtp-Qwen3.8-27B-Q4_0.gguf',
+    );
+  });
+});
+
+describe('quantsOnDisk — a repo card counts every entry holding its files', () => {
+  const REPO = 'unsloth/Qwen3.8-27B-GGUF';
+  /** The curated 27B as llm:list-catalog lists it, holding `have`. */
+  const curated = (...have: string[]): OnDiskEntry => ({
+    hfRepo: REPO,
+    source: 'curated',
+    quants: [
+      { quant: 'UD-Q3_K_XL', bytes: 13_146_393_504 },
+      { quant: 'UD-Q2_K_XL', bytes: 9_828_981_664 },
+    ],
+    downloaded: have.length > 0,
+    downloadedQuants: have,
+  });
+  /** An entry hf:register made: one file. */
+  const registered = (quant: string, downloaded: boolean): OnDiskEntry => ({
+    hfRepo: REPO,
+    source: 'hf',
+    quants: [{ quant, bytes: 6_192_222_208 }],
+    downloaded,
+    downloadedQuants: downloaded ? [quant] : [],
+  });
+  const held = (...catalog: OnDiskEntry[]) => [...quantsOnDisk(catalog, REPO)].sort();
+
+  it('finds the file the curated entry holds, and only that one', () => {
+    expect(held(curated('UD-Q3_K_XL'))).toEqual(['UD-Q3_K_XL']);
+  });
+
+  it('finds the file an entry hf:register made holds', () => {
+    expect(held(curated(), registered('UD-IQ1_S', true))).toEqual(['UD-IQ1_S']);
+  });
+
+  it('counts every entry of the repo together', () => {
+    expect(held(curated('UD-Q2_K_XL'), registered('UD-IQ1_S', true))).toEqual([
+      'UD-IQ1_S',
+      'UD-Q2_K_XL',
+    ]);
+  });
+
+  it('reads a registered entry without downloadedQuants as its one file', () => {
+    const { downloadedQuants: _, ...bare } = registered('UD-IQ1_S', true);
+    expect(held(bare)).toEqual(['UD-IQ1_S']);
+  });
+
+  it('counts only entries that are downloaded, and only this repo', () => {
+    const elsewhere = { ...curated('UD-Q3_K_XL'), hfRepo: 'unsloth/Other-GGUF' };
+    expect(held(curated(), registered('Q4_0', false), elsewhere)).toEqual([]);
+  });
+
+  it('makes the file you have the pick, for the picker and a Download alike', () => {
+    // Only the registered UD-IQ1_S is here; a fresh 24 GB Mac is recommended UD-Q3_K_XL.
+    const onDisk = quantsOnDisk([curated(), registered('UD-IQ1_S', true)], REPO);
+    const isDownloaded = (q: string) => onDisk.has(q);
+    const options = hfLadder(QWEN38_27B).options;
+    expect(recommendedQuant(options, MAC_24GB)?.quant).toBe('UD-Q3_K_XL');
+    expect(recommendedQuant(options, MAC_24GB, isDownloaded)?.quant).toBe('UD-IQ1_S');
+    expect(pathOf(pickHfDownload(QWEN38_27B, MAC_24GB, { isDownloaded }))).toBe(
+      'Qwen3.8-27B-UD-IQ1_S.gguf',
     );
   });
 });

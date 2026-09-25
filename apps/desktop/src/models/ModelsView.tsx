@@ -66,7 +66,7 @@ import { hasRepo, useStoreModels } from '../state/store-models';
 import { BestForYourMachine } from './BestForYourMachine';
 import { DownloadAction } from './DownloadAction';
 import { FamilyCard } from './FamilyCard';
-import { type HfLadder, hfLadder, pickHfDownload, pickRefusal } from './hf-download';
+import { type HfLadder, hfLadder, pickHfDownload, pickRefusal, quantsOnDisk } from './hf-download';
 import { ModelCard } from './ModelCard';
 import { CapabilityPills } from './model-pills';
 import { hostFor, type ModelRecommendation, recommendFor } from './model-recommender';
@@ -955,12 +955,53 @@ export function ModelsView() {
   }, [refreshCatalog]);
 
   const all = useMemo(() => catalog.map((e) => toHubModel(e, hw?.ramGiB ?? 0)), [catalog, hw]);
+  /* What is on disk, by REPO — the curated list names repos, while the local
+     catalog is keyed by its own ids and carries the repo alongside. */
+  const downloadedRepos = useMemo(() => {
+    const set = new Set<string>();
+    for (const e of catalog) {
+      if (e.downloaded !== true) continue;
+      if (e.hfRepo !== undefined) set.add(e.hfRepo);
+      set.add(e.id);
+    }
+    // …and everything the store holds, which is where every non-GGUF model now
+    // lands. Without this half the curated list would report "not downloaded"
+    // about weights sitting on the disk.
+    for (const m of storeModels) {
+      if (m.incomplete === true) continue;
+      set.add(m.repo);
+    }
+    return set;
+  }, [catalog, storeModels]);
+  /*
+   * WHICH QUANTS OF A REPO ARE ON DISK, for every card keyed on a repo (a
+   * Recommended pick, a Hub search hit) and every Download that fetches from
+   * one: the picker's `isDownloaded` and `pickHfDownload`'s. One answer per
+   * repo, derived from the catalog (quantsOnDisk), so both read the same one.
+   * Its identity holds until the catalog changes, because the picker's
+   * recommendation is memoised on it.
+   */
+  const onDiskFor = useMemo(() => {
+    const byRepo = new Map<string, (quant: string) => boolean>();
+    return (repo: string) => {
+      let isDownloaded = byRepo.get(repo);
+      if (isDownloaded === undefined) {
+        const held = quantsOnDisk(catalog, repo);
+        isDownloaded = (quant: string) => held.has(quant);
+        byRepo.set(repo, isDownloaded);
+      }
+      return isDownloaded;
+    };
+  }, [catalog]);
   /* Discover = Hugging Face; On Device = what is actually on this disk. They
-     are different SOURCES, not two filters over one list. */
-  const discovered = useMemo(() => {
-    const local = new Set(all.filter((m) => m.downloaded === true).map((m) => m.id));
-    return hits.map((h) => ({ ...hfToHubModel(h), downloaded: local.has(h.id) }));
-  }, [hits, all]);
+     are different SOURCES, not two filters over one list. A hit is on disk
+     when its REPO is — the catalog ids it was compared with never equal a repo
+     id, so no hit ever was, and a hit's card offered its headline Download for
+     a model already here, as the curated card (downloadedRepos) does not. */
+  const discovered = useMemo(
+    () => hits.map((h) => ({ ...hfToHubModel(h), downloaded: downloadedRepos.has(h.id) })),
+    [hits, downloadedRepos],
+  );
   const datasetRows = useMemo<HubModel[]>(
     () =>
       datasets.map((d) => ({
@@ -1020,24 +1061,6 @@ export function ModelsView() {
     }
     return map;
   }, []);
-  /* What is on disk, by REPO — the curated list names repos, while the local
-     catalog is keyed by its own ids and carries the repo alongside. */
-  const downloadedRepos = useMemo(() => {
-    const set = new Set<string>();
-    for (const e of catalog) {
-      if (e.downloaded !== true) continue;
-      if (e.hfRepo !== undefined) set.add(e.hfRepo);
-      set.add(e.id);
-    }
-    // …and everything the store holds, which is where every non-GGUF model now
-    // lands. Without this half the curated list would report "not downloaded"
-    // about weights sitting on the disk.
-    for (const m of storeModels) {
-      if (m.incomplete === true) continue;
-      set.add(m.repo);
-    }
-    return set;
-  }, [catalog, storeModels]);
   /* From the FILTERED rows, not the whole source: showing four trending cards
      above an "Nothing matches these filters" table made the page argue with
      itself. */
@@ -1171,21 +1194,24 @@ export function ModelsView() {
    * used to name the quant as well: "17.2 GB · Q3_K_M" on the 27B, a quant that
    * repo does not publish, above a picker pinning UD-Q3_K_XL. Which FILE is the
    * listing's answer, by the same call a Download makes, so wherever a repo's
-   * listing is here the card, the picker and the button name one file.
+   * listing is here the card, the picker and the button name one file. With a
+   * file of the repo on disk, that is the file you have: it tops the pick as it
+   * tops the picker, so the card names what is here rather than something else.
    */
   const picks = useMemo(() => {
     const out: Record<string, { quant: string; bytes: number }> = {};
     const totalRamGB = hw?.ramGiB ?? 0;
     if (totalRamGB <= 0) return out;
     for (const [repo, read] of Object.entries(listings)) {
-      const pick = pickHfDownload(read.files, {
-        totalRamGB,
-        mmprojBytes: read.ladder.mmproj?.sizeBytes,
-      });
+      const pick = pickHfDownload(
+        read.files,
+        { totalRamGB, mmprojBytes: read.ladder.mmproj?.sizeBytes },
+        { isDownloaded: onDiskFor(repo) },
+      );
       if (pick.kind === 'file') out[repo] = { quant: pick.quant, bytes: pick.file.sizeBytes ?? 0 };
     }
     return out;
-  }, [listings, hw]);
+  }, [listings, hw, onDiskFor]);
   /* Top Recommended's text pick names its file, so that one listing is read up
      front: the request its card's picker would make, made once. */
   const textPickRepo = useMemo(() => {
@@ -1269,15 +1295,26 @@ export function ModelsView() {
     };
   }, [detailRepo, cardRepo, kind]);
   /*
-   * Which quants of the model on screen are actually on disk. Recreated per
-   * detail so the picker's `isDownloaded` identity is stable across renders —
-   * it feeds a `useMemo` in there, and a fresh closure every render would
-   * recompute the recommendation on every keystroke elsewhere on the page.
+   * Which quants of the model on screen are actually on disk: the picker's
+   * `isDownloaded`.
+   *
+   * A LOCAL entry's card (On Device) answers for that entry's own files, since
+   * its Download fetches into that entry and its files are what that entry
+   * launches. Any other card is a REPO's (a Recommended pick, a Hub search
+   * hit), which carries no `downloadedQuants` of its own. It answers for every
+   * entry holding a file of that repo, with the same `onDiskFor` its Downloads
+   * rank with. Recreated per detail and per catalog, so the identity is stable
+   * across renders: it feeds a `useMemo` in the picker, and a fresh closure
+   * every render would recompute the recommendation on every keystroke
+   * elsewhere on the page.
    */
   const quantOnDisk = useMemo(() => {
-    const set = new Set(detail?.downloadedQuants ?? []);
-    return (q: string) => set.has(q);
-  }, [detail?.downloadedQuants]);
+    if (localEntry === undefined) {
+      return detailRepo === undefined ? () => false : onDiskFor(detailRepo);
+    }
+    const own = new Set(localEntry.downloadedQuants ?? []);
+    return (q: string) => own.has(q);
+  }, [localEntry, detailRepo, onDiskFor]);
 
   const localCount = all.filter((m) => m.downloaded === true).length;
 
@@ -1399,6 +1436,8 @@ export function ModelsView() {
            * The listing is the one for `id`, read now if it has not been: this
            * click may also have just selected `id` (Top Recommended, Quick
            * Download), and the picker's state still belongs to the last card.
+           * So is what is on disk: `onDiskFor(id)` is the repo's own answer,
+           * the one its card's picker ranks with.
            */
           const read = await listingFor(id);
           const totalRamGB =
@@ -1407,18 +1446,21 @@ export function ModelsView() {
               .invoke('app:get-info', undefined)
               .then((i) => Math.round(i.totalMemoryBytes / 1024 ** 3))
               .catch(() => 0));
+          const onDisk = onDiskFor(id);
           const pick = pickHfDownload(
             read.files,
             { totalRamGB, mmprojBytes: read.ladder.mmproj?.sizeBytes },
-            {
-              ...(quant === undefined ? {} : { quant }),
-              ...(detail?.id === id ? { isDownloaded: quantOnDisk } : {}),
-            },
+            { ...(quant === undefined ? {} : { quant }), isDownloaded: onDisk },
           );
           if (pick.kind !== 'file') {
             // Gated: the token row says so and takes the token; one message is enough.
             if (read.error !== undefined && /401|403|gated/i.test(read.error)) setNeedsToken(true);
             else setError(pickRefusal(id, pick, read.error));
+          } else if (onDisk(pick.quant)) {
+            /* Already here, held by another entry of this repo. The picker says
+               "On disk" for it and offers no Download, and no other path may
+               fetch it a second time into a new entry either. */
+            setError(`${pick.quant} of ${id} is already on disk.`);
           } else if (await roomFor((pick.file.sizeBytes ?? 0) + (pick.mmproj?.sizeBytes ?? 0))) {
             await useHfStore.getState().addAndDownload(hit, pick.file, {
               ...(pick.mmproj === undefined ? {} : { mmproj: pick.mmproj }),

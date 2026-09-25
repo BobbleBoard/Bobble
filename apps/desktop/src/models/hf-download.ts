@@ -25,7 +25,7 @@
  * options, so a Download pressed without opening the picker fetches the row the
  * picker pins — by construction, not by two pieces of code agreeing.
  */
-import type { HfGgufFileDTO } from '../../electron/ipc-contract';
+import type { HfGgufFileDTO, LlmCatalogEntry } from '../../electron/ipc-contract';
 import {
   mergeQuantLadder,
   type QuantFitInput,
@@ -125,6 +125,40 @@ export function hfLadder(files: readonly HfGgufFileDTO[]): HfLadder {
   return mmproj === undefined ? { options, split } : { options, mmproj, split };
 }
 
+/** What {@link quantsOnDisk} reads from a catalog entry. */
+export type OnDiskEntry = Pick<
+  LlmCatalogEntry,
+  'hfRepo' | 'downloaded' | 'downloadedQuants' | 'quants' | 'source'
+>;
+
+/**
+ * Which quants of a REPO are on disk, under any catalog entry.
+ *
+ * A Recommended pick and a Hub search hit are cards for a repo. The files are
+ * held by catalog ENTRIES, with ids of their own: the curated one
+ * (`qwen3.8-27b-mtp`), or one `hf:register` made for a single file
+ * (`unsloth-qwen3-8-27b-gguf-ud-q3-k-xl`). Those cards read
+ * `downloadedQuants` off themselves, and neither kind of card carries it. So a
+ * file already here was offered as a Download (which registered a second entry
+ * to fetch it again) and never became the pick.
+ *
+ * So the answer comes from every entry with that `hfRepo` that is downloaded:
+ * its `downloadedQuants` or, for an entry `hf:register` made (one file), that
+ * file's quant. Either label is the listing's own (`parseQuant`), which is the
+ * label the picker shows. The picker and {@link pickHfDownload} both take their
+ * `isDownloaded` from this one answer, so they rank alike.
+ */
+export function quantsOnDisk(catalog: readonly OnDiskEntry[], repo: string): ReadonlySet<string> {
+  const held = new Set<string>();
+  for (const e of catalog) {
+    if (e.hfRepo !== repo || e.downloaded !== true) continue;
+    const only = e.quants.length === 1 ? e.quants[0]?.quant : undefined;
+    const quants = e.downloadedQuants ?? (e.source === 'hf' && only !== undefined ? [only] : []);
+    for (const quant of quants) held.add(quant);
+  }
+  return held;
+}
+
 /** What a Download press resolves to. */
 export type HfPick =
   | {
@@ -146,7 +180,10 @@ export type HfPick =
 export interface HfPickOptions {
   /** The label the picker showed. Omitted: the recommendation, as the picker pins it. */
   readonly quant?: string;
-  /** Which labels are on disk — the picker's `isDownloaded`, so the two rank alike. */
+  /**
+   * Which labels are on disk: the repo's {@link quantsOnDisk}, which is also the
+   * picker's `isDownloaded`, so the two rank alike and a file you have is the pick.
+   */
   readonly isDownloaded?: (quant: string) => boolean;
 }
 
