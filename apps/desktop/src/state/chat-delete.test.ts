@@ -157,4 +157,35 @@ describe('deleteChatNow', () => {
     expect(useDeletedChats.getState().files.has(A)).toBe(false);
     expect(useDeletedChats.getState().files.has(A0)).toBe(false);
   });
+
+  /*
+   * …AND SAYS WHY (review of the 2026-09-23 wave). The sidebar drops what
+   * deleteChatNow returns, so a delete the disk refused just put the row back —
+   * a chat the person deleted, reappearing without a word.
+   */
+  it('says which chat could not be deleted, and why, on the error toast', async () => {
+    usePiStore.setState({ notifications: [] });
+    diskResult = {
+      ok: false,
+      error: "EACCES: permission denied, unlink '/Users/me/.pi/agent/sessions/--me--/a.jsonl'",
+    };
+    const done = deleteChatNow({ file: A, supersedes: [], title: 'Trip plans' });
+    releaseDisk();
+    await done;
+    const shown = usePiStore.getState().notifications;
+    expect(shown).toHaveLength(1);
+    expect(shown[0]?.level).toBe('error');
+    expect(shown[0]?.message).toContain('Trip plans');
+    expect(shown[0]?.message).toMatch(/permission/i);
+    // The reason, not the path it failed on.
+    expect(shown[0]?.message).not.toContain('/Users/me');
+  });
+
+  it('a delete that works raises nothing', async () => {
+    usePiStore.setState({ notifications: [] });
+    const done = deleteChatNow({ file: A, supersedes: [], title: 'Trip plans' });
+    releaseDisk();
+    await done;
+    expect(usePiStore.getState().notifications).toEqual([]);
+  });
 });

@@ -928,7 +928,7 @@ export function SessionSidebar({
   // dialog was skipped.
   const requestDeleteChat = (s: SessionSummary) => {
     if (hideDeleteConfirm) {
-      void deleteChatNow(s).then(refresh);
+      void deleteChatNow({ ...s, title: displayTitle(s, org) }).then(refresh);
       if (deleteOptionDefs.length > 0) void runDeleteOptions(menuContext(s), undefined);
       return;
     }
@@ -946,7 +946,7 @@ export function SessionSidebar({
     const target = deleteTarget;
     setDeleteTarget(null);
     if (dontAskDelete) void useSettingsStore.getState().update({ hideDeleteChatConfirm: true });
-    void deleteChatNow(target).then(refresh);
+    void deleteChatNow({ ...target, title: displayTitle(target, org) }).then(refresh);
     if (deleteOptionDefs.length > 0) void runDeleteOptions(menuContext(target), deleteChoices);
   };
   const createProjectAndAssign = async (file?: string) => {
