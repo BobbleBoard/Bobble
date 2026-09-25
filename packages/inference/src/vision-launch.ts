@@ -88,8 +88,17 @@ export function planVisionEngine(
   }
 
   /* RAPID-MLX SEES on its vision lane — without a speculative decoder, which
-     that lane does not honour, and only from its own runtime. */
-  if (profile.engine === 'rapid-mlx' && input.mlxTwinHasVision && input.rapidVisionReady) {
+     that lane does not honour, and only from its own runtime. A row that names
+     a decoder (a calibration step, a row the user clicked) is not moved onto
+     the lane: rewritten to `none`, calibration's MTP and DFlash rows re-measured
+     the lane already running, and a clicked MTP row ran without MTP. It keeps
+     its method and is blind, below. */
+  if (
+    profile.engine === 'rapid-mlx' &&
+    input.mlxTwinHasVision &&
+    input.rapidVisionReady &&
+    (profile.spec === 'none' || !input.explicit)
+  ) {
     return { profile: { engine: 'rapid-mlx', spec: 'none' }, vision: 'lane' };
   }
 

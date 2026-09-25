@@ -2292,7 +2292,18 @@ async function calibrate(modelId?: string, quant?: string): Promise<LlmCalibrate
     writeRecord(record);
     const target = record.chosen ?? previous ?? defaultProfile(model);
     postCalibration({ stage: 'switching', chosen: target });
-    const up = await startServer(model.id, file.quant, 'fast-text', 1, target);
+    /* The winner is the VERDICT, not a row anyone clicked: it comes up the way
+       every later start of this model will (vision may hand a text-only winner
+       to llama.cpp with the projector), not blind until the next launch. */
+    const up = await startServer(
+      model.id,
+      file.quant,
+      'fast-text',
+      1,
+      target,
+      false,
+      record.chosen === null,
+    );
     if (!up.success) {
       const error = `calibrated, but the winner failed to start: ${up.error ?? 'unknown'}`;
       postCalibration({ stage: 'failed', error });
@@ -2462,9 +2473,11 @@ function startServer(
   parallel?: number,
   profile?: LaunchProfile,
   force = false,
+  /** `profile` is honoured as asked (planVisionEngine `explicit`); false = a verdict vision may move. */
+  explicit = profile !== undefined,
 ): Promise<{ success: boolean; baseUrl?: string; error?: string }> {
   const run = (startInFlight ?? Promise.resolve()).then(() =>
-    startServerExclusive(modelId, quant, launchMode, parallel, profile, force),
+    startServerExclusive(modelId, quant, launchMode, parallel, profile, force, explicit),
   );
   // Keep the chain alive even when a start fails, so one failure cannot wedge
   // every later start behind a rejected promise.
@@ -2479,6 +2492,7 @@ async function startServerExclusive(
   parallel?: number,
   requestedProfile?: LaunchProfile,
   force = false,
+  explicit = requestedProfile !== undefined,
 ): Promise<{ success: boolean; baseUrl?: string; error?: string }> {
   const model = getModel(modelId);
   if (model === undefined) return { success: false, error: `unknown model: ${modelId}` };
@@ -2526,7 +2540,7 @@ async function startServerExclusive(
           {
             profile: wished,
             visionWanted,
-            explicit: requestedProfile !== undefined,
+            explicit,
             modelHasProjector: model.mmproj !== undefined,
             ggufOnDisk: existsSync(modelPathFor(model, file)),
             mlxTwinHasVision: twinDir !== undefined && mlxTwinHasVision(twinDir),

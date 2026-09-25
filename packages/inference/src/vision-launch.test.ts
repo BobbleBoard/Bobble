@@ -65,6 +65,33 @@ describe('planVisionEngine — vision on unless the user says otherwise (the use
     });
   });
 
+  /*
+   * A CALIBRATION STEP OR A CLICKED rapid-mlx ROW KEEPS ITS METHOD. Rewriting
+   * rapid-mlx/mtp and rapid-mlx/dflash to the vision lane (spec none) made
+   * calibration's MTP and DFlash rows re-measure the already-running lane — the
+   * reuse gate returned it in ~0 ms — and a clicked "rapid-mlx · MTP" row ran
+   * without MTP.
+   */
+  it('a CLICKED rapid-mlx row with a speculative method keeps it, and is reported blind', () => {
+    for (const spec of ['mtp', 'dflash'] as const) {
+      expect(
+        planVisionEngine({ ...base, profile: { engine: 'rapid-mlx', spec }, explicit: true }),
+      ).toEqual({
+        profile: { engine: 'rapid-mlx', spec },
+        vision: 'none',
+        blindReason: 'engine',
+      });
+    }
+    // The plain row IS the vision lane's launch, so it still sees.
+    expect(
+      planVisionEngine({
+        ...base,
+        profile: { engine: 'rapid-mlx', spec: 'none' },
+        explicit: true,
+      }),
+    ).toEqual({ profile: { engine: 'rapid-mlx', spec: 'none' }, vision: 'lane' });
+  });
+
   it('with no GGUF to fall back on, the chosen engine runs blind and says so', () => {
     const plan = planVisionEngine({
       ...base,
