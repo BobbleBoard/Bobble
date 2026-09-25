@@ -87,14 +87,19 @@ try {
   });
   await page.waitForSelector('[data-testid="pending-media-card"]', { timeout: 8000 });
   await sleep(500);
+  /* The soft edge is no longer an element of its own (`.pd-pending-falloff` went
+     in 2026-09-23): it is the frame's halo into the chat and the loader's edge
+     fading into the card's ground (global.css, the raised card of 2026-09-24). */
   const pendingPic = await page.evaluate(() => {
     const card = document.querySelector('[data-testid="pending-media-card"]');
     const frame = card?.querySelector('.pd-media-frame');
-    const fall = card?.querySelector('.pd-pending-falloff');
+    const loader = card?.querySelector('.pd-bobble-loader-host');
+    const mask = loader ? getComputedStyle(loader) : null;
     return {
       kind: card?.getAttribute('data-kind'),
       border: frame ? getComputedStyle(frame).borderTopColor : null,
-      falloff: fall ? getComputedStyle(fall).opacity : null,
+      halo: frame ? getComputedStyle(frame).boxShadow : null,
+      edgeMask: mask ? mask.maskImage || mask.webkitMaskImage : null,
       phase: card?.querySelector('[data-testid="pending-phase"]')?.textContent ?? null,
     };
   });
@@ -103,7 +108,10 @@ try {
     pendingPic.kind === 'image' && /rgba\(0, 0, 0, 0\)|transparent/.test(pendingPic.border ?? ''),
     `a waiting picture has no border: ${JSON.stringify(pendingPic)}`,
   );
-  check(pendingPic.falloff === '1', `…and its soft edge (falloff ${pendingPic.falloff})`);
+  check(
+    /0px 0px 14px/.test(pendingPic.halo ?? '') && /linear-gradient/.test(pendingPic.edgeMask ?? ''),
+    `…and its soft edge (halo ${pendingPic.halo}; loader edge ${pendingPic.edgeMask})`,
+  );
   // The cascade act: puzzle 12×340ms = 4080ms, split 1500ms → cascade from ~5.6 s.
   await sleep(6200);
   await clip('2-pending-image-cascade', '[data-testid="pending-media-card"]');

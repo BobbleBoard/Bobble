@@ -22,19 +22,17 @@
  * A preview carries a jobId; the chat's tool row carries a toolCallId; nothing
  * connects the two, and plumbing a shared id would mean threading a new field
  * through the tool → app bridge → sidecar → worker → event stream, five layers
- * deep, to identify something there is only ever one of.
+ * deep.
  *
- * Because there IS only ever one. The engine refuses to start a second job while
- * one is running — a hard 24 GB invariant enforced in gen3d-main's `runImageJob`
- * (`jobPlans.size > 0` → "only one runs at a time on this machine") and mirrored
- * by the sidecar's single worker and by gen-service's JobQueue. So "the
- * in-flight image job" and "the in-flight generate tool call" are the same event
- * by construction, and matching them by liveness is exact rather than a guess.
- *
- * The guard that keeps it exact: only a MOUNTED placeholder subscribes, and the
- * chat mounts one only while a generate tool row is actually running. A
- * generation started in a studio therefore animates nothing in the chat — there
- * is no chat row waiting on it — even though it publishes the same events.
+ * It used to be matched by liveness, on the premise that only one job ever
+ * runs. That stopped being true: a HyperFrames render is a LIGHT job the
+ * JobQueue runs beside others, gen3d's image jobs are outside that queue
+ * altogether, and a studio, a subagent or a chat in the background can each be
+ * generating while a chat's card waits (review of the 2026-09-23 wave). So every
+ * frame now says which job it is (the engine's id) and what that job is making,
+ * and the card keeps only frames of its own kind, from a job the chat on screen
+ * started (state/chat-jobs — a studio's job is never announced), from the one
+ * job it is following (PendingMediaCard).
  *
  * ## Why this is a plain function and not a hook
  * It used to be `useDenoisePreview`, holding the frames in React state. That put
@@ -47,10 +45,16 @@
 
 import type { GenSurfacePayload } from '../../electron/gen/gen-ipc-contract';
 import type { PreviewFrameInput } from './denoise-preview';
-import { latestPreview } from './gen-stream';
+import { jobIdFromTab, latestPreview } from './gen-stream';
 
 export interface DenoiseListener {
-  readonly onFrame: (jobId: string, preview: PreviewFrameInput) => void;
+  /** `jobId` is the engine's (a gen-service stream's tab id reduced to it);
+   * `modality` is what the job is making — gen3d's frames are always pictures. */
+  readonly onFrame: (
+    jobId: string,
+    preview: PreviewFrameInput,
+    modality: 'image' | 'video',
+  ) => void;
   readonly onDone: (jobId: string) => void;
 }
 
@@ -88,7 +92,7 @@ export function subscribeToDenoise(listener: DenoiseListener): (() => void) | nu
 
   const unsubGen3d = bridge.onEvent('gen3d:job', (update) => {
     if (update.preview !== undefined) {
-      listener.onFrame(update.jobId, update.preview);
+      listener.onFrame(update.jobId, update.preview, 'image');
       return;
     }
     // Keep the last frame on screen and let the card settle at fully resolved
@@ -103,11 +107,15 @@ export function subscribeToDenoise(listener: DenoiseListener): (() => void) | nu
     const frame = genFrameFrom(payload);
     if (frame !== undefined && frame.step > (seenStep.get(tabId) ?? -1)) {
       seenStep.set(tabId, frame.step);
-      listener.onFrame(tabId, frame);
+      listener.onFrame(
+        jobIdFromTab(tabId),
+        frame,
+        payload.modality === 'video' ? 'video' : 'image',
+      );
     }
     if (payload.status !== 'generating') {
       seenStep.delete(tabId);
-      listener.onDone(tabId);
+      listener.onDone(jobIdFromTab(tabId));
     }
   });
 
