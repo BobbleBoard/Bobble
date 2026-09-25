@@ -17,14 +17,15 @@
  *
  * {@link buildVideoJob} resolves a catalog {@link ModalityModel} + normalised
  * params into the right {@link GenJob} arm (`comfy` for ComfyUI, `video` for
- * HyperFrames). {@link defaultExtractPosterFrame} pulls a still first frame out
- * of the produced clip (an animated PNG in plain TypeScript, an MP4 with ffmpeg;
- * best-effort) so a chat model can critique output it cannot watch.
+ * HyperFrames). {@link defaultExtractPosterFrame} pulls one still out of the
+ * produced clip — for a HyperFrames animation the frame it settles to (its
+ * last), in plain TypeScript; for an MP4 the first, with ffmpeg; best-effort —
+ * so a chat model can critique output it cannot watch.
  * Everything real-runtime is injectable so the routing/builder
  * logic unit-tests against fakes — no ComfyUI, ffmpeg, or Chrome is required.
  */
 import { spawn } from 'node:child_process';
-import { writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type {
   ComfyJobSpec,
@@ -36,7 +37,8 @@ import type {
   ModalityModel,
   VideoJobSpec,
 } from '@pi-desktop/gen-service';
-import { readPngHead, stillOfApng } from './apng.js';
+import { readPngChunks, readPngHead, stillOfApng } from './apng.js';
+import { FRAMES_DIR, frameFileName } from './hyperframes-still.js';
 
 /** Options a runner accepts (the {@link JobRunner} tail). */
 export interface VideoRunOptions {
@@ -211,30 +213,55 @@ export function buildVideoJob(
 export type FrameExtractor = (videoPath: string, outDir: string) => Promise<string | undefined>;
 
 /**
- * Default poster-frame extractor: the FIRST frame of the clip, as
- * `<outDir>/poster.png`. Best-effort — resolves `undefined` when it cannot, so a
- * failed extraction never fails the generation itself (the output is still on
- * disk); the `generate_video` tool simply omits the self-critique image.
+ * Default poster-frame extractor: a still of the clip as `<outDir>/poster.png`
+ * — for a HyperFrames animation, the frame it SETTLES to. Best-effort —
+ * resolves `undefined` when it cannot, so a failed extraction never fails the
+ * generation itself (the output is still on disk); the `generate_video` tool
+ * simply omits the self-critique image.
  *
- * A PNG needs no decoder: HyperFrames' animated PNG carries frame 0 as its
- * default image, lifted out in plain TypeScript (and a lone frame is already a
- * still). Only a real video goes to ffmpeg — which is not bundled, so on a Mac
- * without it a clip gets no poster.
+ * A PNG needs no decoder (a lone frame is already a still). Only a real video
+ * goes to ffmpeg — which is not bundled, so on a Mac without it a clip gets no
+ * poster.
  */
 export const defaultExtractPosterFrame: FrameExtractor = (videoPath, outDir) =>
   /\.png$/i.test(videoPath) ? pngPoster(videoPath, outDir) : ffmpegPoster(videoPath, outDir);
 
 /**
- * An animated PNG's poster is frame 0 as a plain still: a vision model's decoder
- * is not an APNG player, and the whole animation is far over the size a tool
- * result may attach. Only the file's head is read — frame 0 and nothing after
- * it. A PNG that is not animated is its own poster.
+ * An animated PNG's poster is ONE plain still: a vision model's decoder is not
+ * an APNG player, and the whole animation is far over the size a tool result
+ * may attach.
+ *
+ * WHICH still. It used to be frame 0 — for a title card, the words at a third
+ * of their opacity halfway into their entrance; for an authored scene often an
+ * empty plate — and that is the picture the model was shown to judge its own
+ * work by. The poster is the frame the animation settles to: the LAST one the
+ * renderer wrote into `frames/` beside it (counted from the animation's own
+ * header, so a stale frame from an earlier render cannot stand in). Only the
+ * animation's head is read. Without that folder (an animation from elsewhere)
+ * it falls back to the default image, frame 0; a PNG that is not animated is
+ * its own poster.
  */
 async function pngPoster(pngPath: string, outDir: string): Promise<string | undefined> {
   try {
-    const still = stillOfApng(await readPngHead(pngPath));
-    if (still === undefined) return pngPath;
+    const head = await readPngHead(pngPath);
+    const actl = readPngChunks(head).find((c) => c.type === 'acTL');
+    if (actl === undefined) return pngPath;
     const outPath = path.join(outDir, 'poster.png');
+    const count = Buffer.from(actl.data).readUInt32BE(0);
+    if (count > 0) {
+      const settled = path.join(path.dirname(pngPath), FRAMES_DIR, frameFileName(count - 1, count));
+      try {
+        const bytes = await readFile(settled);
+        if (stillOfApng(bytes) === undefined && readPngChunks(bytes).length > 0) {
+          await writeFile(outPath, bytes);
+          return outPath;
+        }
+      } catch {
+        /* no frames beside it: the animation's own default image below */
+      }
+    }
+    const still = stillOfApng(head);
+    if (still === undefined) return pngPath;
     await writeFile(outPath, still);
     return outPath;
   } catch {

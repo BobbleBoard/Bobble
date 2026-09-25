@@ -19,6 +19,12 @@
  *     it reads. Rewriting it is not enhancement, it is putting words in
  *     someone's mouth, so speech has no guidance here at all and the enhancer
  *     refuses to run on it.
+ *   - HYPERFRAMES is not a video model at all: it sets words on a card (or
+ *     plays an HTML scene). Its prompt is closer to speech — the quoted words
+ *     are printed as written — so it gets its own dialect: keep the words,
+ *     name the colours, the length, one motion. Told the VIDEO rules ("say what
+ *     moves, the camera, the light") the enhancer made the prompt longer, and
+ *     the renderer printed all of it as the title (VQ-11 lite).
  *
  * These notes are the enhancer's whole knowledge of the target. They are data,
  * kept apart from the model that applies them, so adding a generator is one
@@ -26,7 +32,13 @@
  */
 
 /** The dialects. One per way of being written to, not one per model. */
-export type PromptDialect = 'image-natural' | 'video' | 'music' | 'sfx' | 'none';
+export type PromptDialect =
+  | 'image-natural'
+  | 'video'
+  | 'motion-graphics'
+  | 'music'
+  | 'sfx'
+  | 'none';
 
 export interface PromptGuideline {
   readonly dialect: PromptDialect;
@@ -70,6 +82,27 @@ const VIDEO: PromptGuideline = {
     to: 'A folded paper boat drifts along a rain gutter, spinning slowly as the current carries it over a grate and bumps it against the kerb. The camera tracks alongside it at water level. Grey afternoon light, wet asphalt, raindrops pocking the surface.',
   },
   maxWords: 80,
+};
+
+/**
+ * HyperFrames: a title card reads its words from the quotes, its colours by
+ * name, its length in seconds (./hyperframes-templates.ts). The rewrite may
+ * give a vague ask that shape; it may never change or invent the words.
+ */
+const MOTION_GRAPHICS: PromptGuideline = {
+  dialect: 'motion-graphics',
+  rules: [
+    'This is a title card: words set on a plain ground, animated in. The words that appear on screen go in double quotes, exactly as the user wrote them — the title first, then a tagline if they gave one.',
+    'Never invent words to show. If the user named what the card is for but gave no exact words, use that name, in their spelling, as the title in quotes.',
+    'Then the colour of the words and of the background, by name; the length in seconds; at most one motion word (rise, fade, wipe, pulse).',
+    'No camera, no scene, no story, no second shot — it is typography on a plate.',
+    'One line.',
+  ],
+  example: {
+    from: 'launch title card for tidewell in teal, 6 seconds',
+    to: 'A 6-second title card "Tidewell" in teal letters on a dark background, rising in and settling.',
+  },
+  maxWords: 40,
 };
 
 const MUSIC: PromptGuideline = {
@@ -130,7 +163,7 @@ const BY_MODEL: Readonly<Record<string, PromptGuideline>> = {
   'flux1-dev-gguf': IMAGE_NATURAL,
   'z-image-turbo': IMAGE_NATURAL,
   'qwen-image-2512': IMAGE_NATURAL,
-  hyperframes: VIDEO,
+  hyperframes: MOTION_GRAPHICS,
   'wan2.1-t2v-1.3b': VIDEO,
   'ltx-video-2b-distilled': VIDEO,
   'ltx-2': VIDEO,

@@ -33,6 +33,7 @@ import {
   resolveStyle,
   roundedBarPath,
   seriesColour,
+  sliceColour,
 } from '@pi-desktop/charts';
 import {
   type CSSProperties,
@@ -202,9 +203,14 @@ export function ChartView({ spec, fill = false, corner, className }: ChartViewPr
         title: s.label,
         rows: [
           {
-            colour: s.highlighted
-              ? style.accent
-              : (style.palette[s.point % style.palette.length] ?? ''),
+            colour: sliceColour(
+              style,
+              s.point,
+              layout.slices.length,
+              s.highlighted,
+              spec.highlight !== undefined,
+              '',
+            ),
             value: `${formatValue(s.value, spec.unit)}${spec.unit === '%' ? '' : ` · ${Math.round(s.fraction * 100)}%`}`,
             name: spec.series[0]?.name ?? '',
           },
@@ -488,12 +494,16 @@ function ChartShapes({
   }
 
   if (L.donut !== undefined) {
-    const shades =
-      spec.highlight !== undefined
-        ? style.palette.filter((c) => c !== style.accent)
-        : style.palette;
+    // The one slice rule the SVG and the sidecar share (charts style.ts).
     const sliceFill = (s: { highlighted: boolean; point: number }): string =>
-      s.highlighted ? style.accent : (shades[s.point % shades.length] ?? 'currentColor');
+      sliceColour(
+        style,
+        s.point,
+        L.slices.length,
+        s.highlighted,
+        spec.highlight !== undefined,
+        'currentColor',
+      );
     for (const s of L.slices) {
       const dim = hover.point !== null && hover.point !== s.point;
       shapes.push(

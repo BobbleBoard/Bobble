@@ -69,7 +69,7 @@ describe('ChartView', () => {
     const fills = [...container.querySelectorAll('.pd-chart-bar')].map((b) =>
       b.getAttribute('fill'),
     );
-    expect(fills[3]).toBe('#E8863A');
+    expect(fills[3]).toBe('#DD6A1A'); // clean's accent, re-stepped by VQ-03 (was #E8863A)
     expect(fills[0]).toBe('#2F6FE4');
     expect(container.querySelector('.pd-chart-bar')?.tagName.toLowerCase()).toBe('path');
     expect(container.querySelector('.pd-chart-bar')?.getAttribute('d')).toContain('a8 8');

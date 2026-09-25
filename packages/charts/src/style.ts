@@ -24,7 +24,21 @@
  * phosphor-green "terminal" look: there was one, and the first thing a model
  * picked it for was a market-share donut — the user (2026-09-17): "remove the green
  * styling preset at all, it shouldn't be there."
+ *
+ * EVERY LOOK PASSES THE PALETTE CHECKS (VQ-03, ./palette-check.ts). The
+ * visual-quality research ran the looks through the data-viz validator and all
+ * eleven failed something; seven could not be told apart by a colour-blind
+ * reader (editorial's olive beside its brick: a deutan ΔE of 3.8 where 8 is the
+ * target), and candy's highlight WAS its first colour, so a highlighted bar was
+ * invisible. The palettes were re-stepped — the same families, moved in
+ * lightness and re-ordered so neighbours alternate light/dark and warm/cool —
+ * until every neighbour clears ΔE 15 (normal vision) and 8 (protan/deutan; 6–8
+ * only on the looks that write their values on the marks), and every mark is
+ * 3:1 against its ground. A theme-following look carries its own DARK steps,
+ * the same hues lifted for a dark ground, rather than a formula's guess.
  */
+
+import { deltaE } from './palette-check.ts';
 
 export type LookName =
   | 'clean'
@@ -91,6 +105,13 @@ export interface Look {
   readonly ring: number;
   /** A ground of its own (fixed-ground looks); absent = follows the theme. */
   readonly ground?: Ground;
+  /**
+   * The same colours stepped for a dark ground — a theme-following look in a
+   * dark chat (or on a dark background of its own) wears these, not the light
+   * steps lifted by formula. Same order, same families; validated like the
+   * light ones (style.test.ts).
+   */
+  readonly dark?: { readonly palette: readonly string[]; readonly accent: string };
 }
 
 export interface Ground {
@@ -128,8 +149,12 @@ export const LOOKS: readonly Look[] = [
   look({
     name: 'clean',
     about: 'the everyday one — the app blue, a thin grid, gently rounded bars',
-    palette: ['#2F6FE4', '#E8863A', '#3FB3AC', '#D9B44A', '#9AC05F', '#97A3AD'],
-    accent: '#E8863A',
+    palette: ['#2F6FE4', '#DD6A1A', '#007A6C', '#0095D0', '#A8325C', '#7B8598'],
+    accent: '#DD6A1A',
+    dark: {
+      palette: ['#6598F0', '#FF985A', '#4BA994', '#4CC3FF', '#E66B95', '#B0BCCE'],
+      accent: '#FF985A',
+    },
     radius: 8,
     barWidth: 0.56,
     grid: 'lines',
@@ -144,9 +169,13 @@ export const LOOKS: readonly Look[] = [
   }),
   look({
     name: 'soft',
-    about: 'pastel pills, a dotted grid, smooth lines — friendly, low contrast',
-    palette: ['#7FB3F5', '#F5B48A', '#8FD3C9', '#F2D98A', '#B9D98A', '#C9B8A8'],
-    accent: '#F08C5A',
+    about: 'muted, dusty colours, pill bars, a dotted grid, smooth lines — friendly and quiet',
+    palette: ['#5C8CDA', '#6E9475', '#99506E', '#008AA5', '#CA7037', '#655D53'],
+    accent: '#CA7037',
+    dark: {
+      palette: ['#84B2FD', '#99C09E', '#D07EA4', '#28C3DD', '#FA9C5C', '#9F958A'],
+      accent: '#FA9C5C',
+    },
     radius: 'pill',
     barWidth: 0.34,
     grid: 'dots',
@@ -162,8 +191,12 @@ export const LOOKS: readonly Look[] = [
   look({
     name: 'bold',
     about: 'saturated colours, no grid, values on every bar, a heavy title — for a headline number',
-    palette: ['#1F5EFF', '#FF6A3D', '#00B894', '#FFC400', '#FF3D7F', '#00A8E8'],
-    accent: '#FF6A3D',
+    palette: ['#1F5EFF', '#009D90', '#C2187A', '#0894D9', '#F2541B', '#007C5C'],
+    accent: '#F2541B',
+    dark: {
+      palette: ['#5F97F7', '#2AC7C0', '#F652A0', '#57BDFF', '#FF9575', '#8BE0B1'],
+      accent: '#FF9575',
+    },
     radius: 10,
     barWidth: 0.6,
     grid: 'none',
@@ -171,6 +204,8 @@ export const LOOKS: readonly Look[] = [
     markers: 'dot',
     area: 'flat',
     font: 'system',
+    // ON, and it has to be: two neighbours sit in the 6–8 colour-blind band,
+    // which is legal only with the values written on the marks.
     labels: 'on',
     titleWeight: 800,
     strokeWidth: 3.5,
@@ -179,8 +214,12 @@ export const LOOKS: readonly Look[] = [
   look({
     name: 'mono',
     about: 'one hue in tints with a single warm accent — for rankings and one-series bars',
-    palette: ['#1D4ED8', '#3B82F6', '#60A5FA', '#93C5FD', '#BFDBFE', '#DBEAFE'],
-    accent: '#F59E0B',
+    palette: ['#1D4ED8', '#528CE5', '#606C83', '#003D88', '#026FBD', '#808DA3'],
+    accent: '#D57200',
+    dark: {
+      palette: ['#5A93F0', '#9ECCFF', '#8F99B2', '#2875C1', '#42B5FF', '#6E798B'],
+      accent: '#FF9841',
+    },
     radius: 3,
     barWidth: 0.6,
     grid: 'lines',
@@ -197,8 +236,12 @@ export const LOOKS: readonly Look[] = [
     name: 'editorial',
     about:
       'serif titles, a muted navy/terracotta/olive palette, hairline grid — reports, the press',
-    palette: ['#1F3A5F', '#C0504D', '#6B8E23', '#D4A017', '#4E7D96', '#8C8C8C'],
-    accent: '#C0504D',
+    palette: ['#1F3A5F', '#BA4A51', '#B78200', '#487992', '#6B9800', '#8D8B88'],
+    accent: '#BA4A51',
+    dark: {
+      palette: ['#6584AE', '#EF7983', '#E0A943', '#76ABC3', '#96C342', '#BFBCB9'],
+      accent: '#EF7983',
+    },
     radius: 2,
     barWidth: 0.56,
     grid: 'lines',
@@ -214,8 +257,12 @@ export const LOOKS: readonly Look[] = [
   look({
     name: 'ocean',
     about: 'deep blues to teal with a sand accent, smooth lines and a gradient under them',
-    palette: ['#0B6E99', '#1BA3C6', '#5CC8D7', '#9EDCE0', '#F2B134', '#2C4A63'],
-    accent: '#F2B134',
+    palette: ['#0B6E99', '#359C83', '#005069', '#0097C8', '#6B6E70', '#132E4A'],
+    accent: '#B88210',
+    dark: {
+      palette: ['#3CAFFC', '#6AC9AC', '#4B97B5', '#52D6FF', '#A0A2A5', '#5C7295'],
+      accent: '#E6AB43',
+    },
     radius: 10,
     barWidth: 0.56,
     grid: 'dots',
@@ -231,8 +278,12 @@ export const LOOKS: readonly Look[] = [
   look({
     name: 'forest',
     about: 'greens and bark with a copper accent — nature, sustainability, growth',
-    palette: ['#2F6B3A', '#5FA05C', '#9BC97A', '#D6C98A', '#B8722C', '#6F7F6A'],
+    palette: ['#2F6B3A', '#5B3721', '#00996A', '#325D71', '#B8722C', '#6E9296'],
     accent: '#B8722C',
+    dark: {
+      palette: ['#5A9C6B', '#B16200', '#4CC898', '#6D95AE', '#E6A358', '#A3C6CE'],
+      accent: '#E6A358',
+    },
     radius: 8,
     barWidth: 0.56,
     grid: 'lines',
@@ -248,8 +299,12 @@ export const LOOKS: readonly Look[] = [
   look({
     name: 'sunset',
     about: 'coral to amber to rose, pill bars, no grid — warm and loud',
-    palette: ['#F0563C', '#F5883D', '#F7B547', '#E56C8A', '#C25C6E', '#3B3A57'],
-    accent: '#F7B547',
+    palette: ['#CC382E', '#BF7F00', '#3C3B52', '#964500', '#D06C8D', '#7A2350'],
+    accent: '#BF7F00',
+    dark: {
+      palette: ['#FF725C', '#ECB349', '#82829C', '#C87A35', '#F991B3', '#BD6496'],
+      accent: '#ECB349',
+    },
     radius: 'pill',
     barWidth: 0.34,
     grid: 'none',
@@ -265,8 +320,14 @@ export const LOOKS: readonly Look[] = [
   look({
     name: 'candy',
     about: 'pink, tangerine, mint, sky — pill bars, rounded type, values on — playful',
-    palette: ['#FF5C8A', '#FFB84C', '#4CD4B0', '#5CB8FF', '#C8E45C', '#FF8F5C'],
-    accent: '#FF5C8A',
+    // The highlight is the sky blue, never the pink the bars are drawn in: it
+    // used to be the first colour, so a highlighted bar looked like the rest.
+    palette: ['#EC4C82', '#D77100', '#2B8FE3', '#029E86', '#B73E79', '#639B0A'],
+    accent: '#2B8FE3',
+    dark: {
+      palette: ['#FC8EB9', '#FF9B40', '#6EB8FF', '#4DCAA7', '#DE64A2', '#8BC546'],
+      accent: '#6EB8FF',
+    },
     radius: 'pill',
     barWidth: 0.34,
     grid: 'dots',
@@ -282,7 +343,7 @@ export const LOOKS: readonly Look[] = [
   look({
     name: 'slate',
     about: 'its own charcoal ground with bright cyan/lime/amber — a dashboard tile, in any theme',
-    palette: ['#4CC9F0', '#B5E48C', '#FFB703', '#F4978E', '#8ECAE6', '#A8DADC'],
+    palette: ['#4CC9F0', '#FFB703', '#F39692', '#AADCDD', '#6BA2C0', '#ACE997'],
     accent: '#FFB703',
     radius: 6,
     barWidth: 0.56,
@@ -300,8 +361,8 @@ export const LOOKS: readonly Look[] = [
   look({
     name: 'paper',
     about: 'cream ground, ink lines, serif — a chart from a book',
-    palette: ['#2B4C7E', '#C0504D', '#5B8C5A', '#D9A441', '#7A6C5D', '#4E8FA6'],
-    accent: '#C0504D',
+    palette: ['#2B4C7E', '#BF801E', '#4E8FA6', '#4E4133', '#A4464D', '#65915C'],
+    accent: '#A4464D',
     radius: 2,
     barWidth: 0.52,
     grid: 'lines',
@@ -566,16 +627,35 @@ export function resolveStyle(
       : style?.ink !== undefined && base.ground !== undefined
         ? { ...base.ground, ink: style.ink }
         : (base.ground ?? null);
-  const rawPalette =
-    style?.palette !== undefined && style.palette.length > 0 ? style.palette : base.palette;
-  // A theme-following look on a dark ground: its darkest inks (editorial's
-  // navy) would sink into the charcoal — lifted just enough to read.
+  const ownPalette = style?.palette !== undefined && style.palette.length > 0;
   const onDark = ground === null ? opts.theme === 'dark' : lightness(ground.paper) < 0.45;
-  const palette = onDark ? rawPalette.map(liftForDark) : rawPalette;
+  // A look on a dark ground wears its own dark steps (validated, same hues);
+  // colours the chart brought itself — a palette, an accent — are lifted just
+  // enough to read instead, since nobody stepped them for the dark.
+  const steps = onDark && base.dark !== undefined ? base.dark : null;
+  const palette = ownPalette
+    ? onDark
+      ? (style?.palette ?? []).map(liftForDark)
+      : (style?.palette ?? [])
+    : steps !== null
+      ? steps.palette
+      : onDark
+        ? base.palette.map(liftForDark)
+        : base.palette;
+  const accent =
+    style?.accent !== undefined
+      ? onDark
+        ? liftForDark(style.accent)
+        : style.accent
+      : steps !== null
+        ? steps.accent
+        : onDark
+          ? liftForDark(base.accent)
+          : base.accent;
   return {
     look: base.name,
     palette,
-    accent: onDark ? liftForDark(style?.accent ?? base.accent) : (style?.accent ?? base.accent),
+    accent,
     radius: style?.radius ?? base.radius,
     barWidth: style?.barWidth ?? base.barWidth,
     maxBarPx:
@@ -609,6 +689,57 @@ export function liftForDark(colour: string): string {
       .toString(16)
       .padStart(2, '0');
   return `#${mix(c(1))}${mix(c(3))}${mix(c(5))}`.toUpperCase();
+}
+
+/**
+ * The colour of donut/pie slice `point` of `count` — the one rule the static
+ * SVG, the elements sidecar and the interactive card share.
+ *
+ * With a highlight the accent is the highlighted slice's alone: the others
+ * cycle through the palette WITHOUT the accent (a second accent-coloured slice
+ * read as two highlights). A ring closes, so the last slice meets the first —
+ * and once there are more slices than colours the cycle can put the SAME
+ * colour on both sides of that seam (7 slices on a 6-colour palette, or 6 on
+ * the 5 left beside an accent: seen, a blue slice touching a blue slice). So
+ * the last slice of a wrapped ring takes, of the colours that differ from both
+ * its neighbours, the one a colour-blind reader tells apart from them best.
+ */
+export function sliceColour(
+  style: Pick<ResolvedStyle, 'palette' | 'accent'>,
+  point: number,
+  count: number,
+  highlighted: boolean,
+  hasHighlight: boolean,
+  fallback = '#888888',
+): string {
+  if (highlighted) return style.accent;
+  const shades = hasHighlight ? style.palette.filter((c) => c !== style.accent) : style.palette;
+  const k = shades.length;
+  if (k === 0) return fallback;
+  const natural = shades[point % k] ?? fallback;
+  if (count <= k || point !== count - 1 || k < 3) return natural;
+  // The seam of a wrapped ring: the previous slice and the first slice.
+  const prev = shades[(point - 1) % k] ?? fallback;
+  const first = shades[0] ?? fallback;
+  const separation = (c: string): number =>
+    Math.min(
+      deltaE(c, prev, 'protan'),
+      deltaE(c, prev, 'deutan'),
+      deltaE(c, first, 'protan'),
+      deltaE(c, first, 'deutan'),
+    );
+  let best = natural;
+  let bestScore = natural === prev || natural === first ? -1 : separation(natural);
+  if (bestScore >= 8) return natural; // the cycle's own colour already reads apart
+  for (const c of shades) {
+    if (c === prev || c === first) continue;
+    const s = separation(c);
+    if (s > bestScore) {
+      best = c;
+      bestScore = s;
+    }
+  }
+  return best;
 }
 
 /** The corner radius for a bar of this size: 'pill' is as round as the bar allows. */
