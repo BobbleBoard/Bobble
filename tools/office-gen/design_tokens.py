@@ -30,8 +30,8 @@ TOKENS = HERE / "design_tokens.json"
 
 #: The colour roles every kit mode carries, in the TypeScript schema's order.
 ROLES = (
-    "paper", "surface", "ink", "mute", "line", "accent", "onAccent", "deep",
-    "onDeep", "tint", "good", "bad", "warn", "highlight",
+    "paper", "surface", "ink", "mute", "line", "accent", "onAccent", "accentInk",
+    "deep", "onDeep", "tint", "good", "bad", "warn", "highlight",
 )
 
 
@@ -82,11 +82,31 @@ def font_stack(name: str | None = None, role: str = "text", platform: str | None
     return kit(name)["type"][role][platform or _platform()]
 
 
+# What a CSS stack may name that a document cannot: the keywords a browser
+# resolves to the system face, the generic families, and Apple's system-private
+# faces. SF Pro / SF Pro Rounded / New York ship inside macOS as hidden
+# ".SF NS…" fonts a browser reaches through `-apple-system` / `ui-rounded`, but
+# a deck that names them gets a substitute: sage & moss's slide came out of
+# QuickLook in Times while its page, in Chromium, fell through to Avenir Next
+# (visual-eval kits/sage-moss). A document names the first family it can carry.
+_KEYWORDS = frozenset({
+    "-apple-system", "blinkmacsystemfont", "system-ui", "new york",
+    "serif", "sans-serif", "monospace", "cursive", "fantasy",
+})
+_PREFIXES = ("ui-", "sf pro", "sf compact")
+
+
 def first_family(stack: str) -> str:
-    """The first family of a CSS stack, unquoted — what python-pptx/docx take as a font name."""
-    head = stack.split(",")[0].strip().strip("'\"")
-    # A CSS keyword is not a font a document can name.
-    return "Helvetica Neue" if head.startswith("-apple-system") or head == "system-ui" else head
+    """The first family of a CSS stack a document can name, unquoted — what
+    python-pptx/docx take as a font name. Keywords, generics and Apple's
+    system-private faces are passed over; a stack of nothing else gives
+    Helvetica Neue."""
+    for part in stack.split(","):
+        name = part.strip().strip("'\"")
+        low = name.lower()
+        if name and low not in _KEYWORDS and not low.startswith(_PREFIXES):
+            return name
+    return "Helvetica Neue"
 
 
 def contrast(a: str, b: str) -> float:
@@ -103,13 +123,19 @@ def contrast(a: str, b: str) -> float:
 
 
 def kit_palette(name: str | None = None, mode: str = "light"):
-    """The kit as the renderers' own `palette.Palette` — primary = the kit's accent,
-    accent = its highlight, and the rest from its roles, not derived by formula."""
+    """The kit as the renderers' own `palette.Palette` — primary = the kit's accent
+    AS WORDS (accentInk), accent = its highlight, and the rest from its roles,
+    not derived by formula.
+
+    primary, not accent: the renderers set headings and labels in `primary`, and
+    palette.build() holds it to 4.5:1 on the paper for exactly that reason. A kit
+    whose accent is only a fill (graphite & amber's amber, 3.2:1 on its paper)
+    names a deeper twin for words, and that twin is what a heading must use."""
     import palette  # the office pipeline's own module, beside this one
 
     c = colours(name, mode)
     return palette.Palette(
-        primary=c["accent"],
+        primary=c["accentInk"],
         accent=c["highlight"],
         deep=c["deep"],
         support=c["tint"],

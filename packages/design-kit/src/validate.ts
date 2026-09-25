@@ -10,7 +10,8 @@
  * disagree about what "readable" means:
  *
  *   - ink on its paper, surface and tint at 7:1 (body text, WCAG AAA);
- *   - secondary text (mute) and text on the accent at 4.5:1 (AA);
+ *   - secondary text (mute), text on the accent and the accent as words
+ *     (accentInk, on paper, surface and tint) at 4.5:1 (AA);
  *   - text on the deep ground at 7:1 (a hero is read across a room);
  *   - the semantic colours at 4.5:1, because they are also TEXT — a "no"
  *     on a diagram's failure edge, a "+9%" in a KPI row;
@@ -41,7 +42,7 @@ import { COLOUR_ROLES, type Hex, type Kit, type KitColours, type KitMode } from 
 export const KIT_GATES = {
   /** Body text: ink on paper, surface and tint. */
   text: 7,
-  /** Secondary text, and text on the accent. */
+  /** Secondary text, text on the accent, the accent as words. */
   secondary: 4.5,
   /** Text on the deep ground. */
   onDeep: 7,
@@ -119,9 +120,12 @@ export function checkColours(c: KitColours, mode: KitMode): KitIssue[] {
   for (const ground of ['paper', 'surface'] as const) {
     on('ink', ground, KIT_GATES.text);
     on('mute', ground, KIT_GATES.secondary);
+    on('accentInk', ground, KIT_GATES.secondary);
     for (const role of ['good', 'bad', 'warn'] as const) on(role, ground, KIT_GATES.semantic);
   }
   on('ink', 'tint', KIT_GATES.text);
+  // A callout on the tint names itself in the accent ("LEAK RESPONSE").
+  on('accentInk', 'tint', KIT_GATES.secondary);
   on('onAccent', 'accent', KIT_GATES.secondary);
   on('onDeep', 'deep', KIT_GATES.onDeep);
 

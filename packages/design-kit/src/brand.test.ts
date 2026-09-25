@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { dePurple, fitContrast, kitFromBrand, kitFromPixels, parseBrandMd } from './brand.ts';
 import { kitOrDefault } from './kits.ts';
 import { loadProjectKit } from './project.ts';
-import { describeIssues, isPurple } from './validate.ts';
+import { describeIssues, isLavender, isPurple } from './validate.ts';
 
 const TIDEWELL = `---
 name: Tidewell
@@ -85,6 +85,10 @@ describe('kitFromBrand', () => {
     const r = kitFromBrand({ name: 'Violet', accent: '#7B3FF2' });
     expect(isPurple(r.kit.light.accent)).toBe(false);
     expect(isPurple(r.kit.dark.accent)).toBe(false);
+    // Its words too: the blue it was turned to, deepened for text, walked
+    // back into violet (#6D40F2) until fitContrast learned to step around it.
+    expect(isPurple(r.kit.light.accentInk)).toBe(false);
+    expect(isLavender(r.kit.dark.accentInk)).toBe(false);
     expect(r.notes.join(' ')).toMatch(/purple — turned to/);
     expect(r.report.ok, describeIssues(r.report)).toBe(true);
   });
@@ -93,6 +97,8 @@ describe('kitFromBrand', () => {
     const r = kitFromBrand({ name: 'Mint', accent: '#9FE3DD' });
     expect(contrastRatio(r.kit.light.accent, r.kit.light.paper)).toBeGreaterThanOrEqual(3);
     expect(contrastRatio(r.kit.light.onAccent, r.kit.light.accent)).toBeGreaterThanOrEqual(4.5);
+    // A mint that is a mark at 3:1 is not yet words: its accentInk is deeper.
+    expect(contrastRatio(r.kit.light.accentInk, r.kit.light.tint)).toBeGreaterThanOrEqual(4.5);
     expect(r.notes.join(' ')).toMatch(/too pale to read as a mark/);
     expect(r.report.ok, describeIssues(r.report)).toBe(true);
   });

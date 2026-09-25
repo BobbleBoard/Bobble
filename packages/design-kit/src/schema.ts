@@ -45,6 +45,16 @@ export interface KitColours {
   readonly accent: Hex;
   /** Text set on the accent. */
   readonly onAccent: Hex;
+  /**
+   * The accent as WORDS: an eyebrow label, a link, a KPI row's one accented
+   * number. It is the accent itself whenever the accent reads as text; an
+   * accent that only works as a fill needs a deeper twin here. Graphite &
+   * amber's amber is a button under dark text, and as words on its paper it
+   * was 3.2:1 — the kit sheet's slide failed its own label (visual-eval,
+   * kits/graphite-amber). The office pipeline's `primary` is read as text
+   * too (palette.py holds it to 4.5:1), so Python maps THIS role onto it.
+   */
+  readonly accentInk: Hex;
   /** A deep ground for hero slides, title cards and a flow's first step. */
   readonly deep: Hex;
   /** Text set on deep. */
@@ -192,6 +202,7 @@ export const COLOUR_ROLES = [
   'line',
   'accent',
   'onAccent',
+  'accentInk',
   'deep',
   'onDeep',
   'tint',

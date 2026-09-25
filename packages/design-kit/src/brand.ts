@@ -260,7 +260,7 @@ export function dePurple(colour: Hex): Hex | undefined {
 /**
  * The colour moved in lightness only — darker on light grounds, lighter on
  * dark ones — until it reaches `min` against every ground. Hue kept; chroma
- * only where the gamut runs out.
+ * only where the gamut runs out; and never into the violet band.
  */
 export function fitContrast(colour: Hex, grounds: readonly Hex[], min: number): Hex {
   const ok = (c: Hex): boolean => grounds.every((g) => contrastRatio(c, g) >= min);
@@ -269,7 +269,12 @@ export function fitContrast(colour: Hex, grounds: readonly Hex[], min: number): 
   const groundL = grounds.reduce((s, g) => s + oklch(g).l, 0) / Math.max(1, grounds.length);
   const dir = groundL > 0.5 ? -1 : 1;
   for (let step = 1; step <= 100; step += 1) {
-    const next = fromOklch(Math.max(0, Math.min(1, l + dir * step * 0.01)), c, h);
+    const shade = fromOklch(Math.max(0, Math.min(1, l + dir * step * 0.01)), c, h);
+    // A blue's shades walk toward violet at the same OKLCH hue: a violet
+    // brand's accent, already turned to blue, came back #6D40F2 as words
+    // (brand.test.ts). A shade in the band is turned out of it before it is
+    // judged — the user: no purple, not even on the way to a contrast.
+    const next = dePurple(shade) ?? shade;
     if (ok(next)) return next;
   }
   return dir < 0 ? '#000000' : '#FFFFFF';
@@ -322,15 +327,13 @@ function brandColours(plan: ModePlan, notes: string[]): KitColours {
   const { mode, base } = plan;
   const paper = plan.paper ?? base.paper;
   const grounds = [paper, base.surface, ...APP_GROUNDS[mode]];
-  const ink =
-    plan.ink !== undefined && contrastRatio(plan.ink, paper) >= KIT_GATES.text
-      ? plan.ink
-      : plan.ink !== undefined
-        ? (notes.push(
-            `${mode}: the brand ink ${plan.ink} is too faint on ${paper}; the kit's ink is used`,
-          ),
-          base.ink)
-        : base.ink;
+  let ink = base.ink;
+  if (plan.ink !== undefined && contrastRatio(plan.ink, paper) >= KIT_GATES.text) ink = plan.ink;
+  else if (plan.ink !== undefined) {
+    notes.push(
+      `${mode}: the brand ink ${plan.ink} is too faint on ${paper}; the kit's ink is used`,
+    );
+  }
   const mark = (c: Hex, what: string): Hex => {
     let out = c;
     const turned = dePurple(out);
@@ -370,12 +373,20 @@ function brandColours(plan: ModePlan, notes: string[]): KitColours {
   const onDeep = textOn(deep, [base.onDeep, paper, ink], KIT_GATES.onDeep) ?? base.onDeep;
   const tint =
     plan.accent !== undefined ? mixHex(accent, paper, mode === 'light' ? 0.88 : 0.82) : base.tint;
+  // The accent as words: itself when it reads at 4.5:1 on every ground a label
+  // sits on, else its nearest deeper (lighter, on dark) shade that does — with
+  // a hair of headroom, so a reader rounding sRGB differently still clears it.
+  const wordGrounds = [paper, base.surface, tint];
+  const accentInk = wordGrounds.every((g) => contrastRatio(accent, g) >= KIT_GATES.secondary)
+    ? accent
+    : fitContrast(accent, wordGrounds, KIT_GATES.secondary + 0.1);
   const colours: KitColours = {
     ...base,
     paper,
     ink,
     accent,
     onAccent: onAccent ?? base.onAccent,
+    accentInk,
     deep,
     onDeep,
     tint,

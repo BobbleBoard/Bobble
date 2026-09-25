@@ -52,6 +52,8 @@ def test_the_gates_hold_in_python_arithmetic_too(path):
             for s in c["series"]:
                 assert dt.contrast(s, c[ground]) >= 3, (kit["id"], mode, s, ground)
         assert dt.contrast(c["onAccent"], c["accent"]) >= 4.5, (kit["id"], mode)
+        for ground in ("paper", "surface", "tint"):
+            assert dt.contrast(c["accentInk"], c[ground]) >= 4.5, (kit["id"], mode, "accentInk", ground)
 
 
 def test_lookup_is_forgiving_and_falls_back_to_the_default():
@@ -63,9 +65,27 @@ def test_lookup_is_forgiving_and_falls_back_to_the_default():
         dt.colours("fog", "sepia")
 
 
+def test_a_document_names_a_family_it_can_carry():
+    # sage & moss: SF Pro Rounded is macOS-private — a deck naming it got Times.
+    assert dt.first_family("'SF Pro Rounded', ui-rounded, 'Avenir Next', 'Helvetica Neue', sans-serif") == "Avenir Next"
+    assert dt.first_family("-apple-system, 'SF Pro Display', 'Helvetica Neue', Helvetica") == "Helvetica Neue"
+    assert dt.first_family("'New York', 'Iowan Old Style', serif") == "Iowan Old Style"
+    assert dt.first_family("system-ui, sans-serif") == "Helvetica Neue"
+    assert dt.first_family("Charter, Georgia, serif") == "Charter"
+    for kit_id in dt.kit_ids():
+        for role in ("display", "text"):
+            name = dt.first_family(dt.font_stack(kit_id, role, "mac")).lower()
+            assert not name.startswith(("sf ", "ui-", "-apple")) and name not in ("serif", "sans-serif"), (kit_id, role, name)
+
+
 def test_fonts_and_the_renderers_own_palette():
     assert dt.first_family(dt.font_stack("bone-oxblood", "display", "mac")) == "Iowan Old Style"
     assert dt.first_family(dt.font_stack("fog", "text", "mac")) == "Helvetica Neue"
     p = dt.kit_palette("paper-teal")
-    assert (p.primary, p.accent, p.paper) == ("#0F7B74", "#D0661C", "#FBFAF7")
+    assert (p.primary, p.accent, p.paper) == ("#00756E", "#D0661C", "#FBFAF7")
     assert p.on(p.deep) == p.paper
+    # Every kit's primary reads as a heading — palette.build()'s own 4.5:1 rule.
+    for kit_id in dt.kit_ids():
+        k = dt.kit_palette(kit_id)
+        assert dt.contrast(k.primary, k.paper) >= 4.5, kit_id
+    assert dt.kit_palette("graphite-amber").primary == "#935D00"

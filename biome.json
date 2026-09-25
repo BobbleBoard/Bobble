@@ -7,7 +7,11 @@
   },
   "files": {
     "ignoreUnknown": true,
-    "includes": ["**", "!**/resources/mermaid/mermaid.min.js"]
+    "includes": [
+      "**",
+      "!**/resources/mermaid/mermaid.min.js",
+      "!**/tools/office-gen/design_tokens.json"
+    ]
   },
   "formatter": {
     "enabled": true,

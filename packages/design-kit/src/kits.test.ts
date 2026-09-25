@@ -1,4 +1,5 @@
 import { readdirSync, readFileSync } from 'node:fs';
+import { contrastRatio } from '@pi-desktop/charts';
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_KIT_ID, KIT_IDS, KITS, kitById, kitOrDefault } from './kits.ts';
 import { COLOUR_ROLES, parseKit } from './schema.ts';
@@ -63,6 +64,26 @@ describe('the kits', () => {
         );
       }
     }
+  });
+
+  it('name the accent as words: the accent itself when it reads, a deeper twin only when it cannot', () => {
+    for (const kit of KITS) {
+      for (const mode of ['light', 'dark'] as const) {
+        const c = kit[mode];
+        const words = [c.paper, c.surface, c.tint];
+        const accentReads = words.every((g) => contrastRatio(c.accent, g) >= 4.5);
+        if (accentReads) expect(c.accentInk, `${kit.id} ${mode}`).toBe(c.accent);
+        else expect(c.accentInk, `${kit.id} ${mode}`).not.toBe(c.accent);
+        for (const g of words) {
+          expect(contrastRatio(c.accentInk, g), `${kit.id} ${mode} on ${g}`).toBeGreaterThanOrEqual(
+            4.5,
+          );
+        }
+      }
+    }
+    // The one it was made for: graphite & amber's amber is a fill under dark text.
+    const amber = KITS.find((k) => k.id === 'graphite-amber');
+    expect(amber?.light.accentInk).not.toBe(amber?.light.accent);
   });
 
   it('differ from one another: no two kits share an accent', () => {
