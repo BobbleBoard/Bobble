@@ -565,10 +565,11 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
   // ComfyUI for the rest. Not ready → the job waits for the Download button the
   // renderer is now showing, and continues when the install lands.
   const modules = opts.modules;
-  const ensureModule = async (backend: string): Promise<void> => {
+  // `stop` is the job's: a stopped job stops waiting, and the card stops counting it.
+  const ensureModule = async (backend: string, stop?: AbortSignal): Promise<void> => {
     const id = moduleForBackend(backend);
     if (id === undefined || modules === undefined) return;
-    await modules.ensure(id);
+    await modules.ensure(id, stop);
   };
   /**
    * AND THEN ITS WEIGHTS. A ComfyUI graph names its files; a catalog entry
@@ -577,10 +578,10 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
    * runtime's. An entry that lists nothing (its files arrive some other way)
    * passes through.
    */
-  const ensureWeights = async (model: ModalityModel): Promise<void> => {
+  const ensureWeights = async (model: ModalityModel, stop?: AbortSignal): Promise<void> => {
     const id = weightsModuleFor(model);
     if (id === undefined || modules === undefined) return;
-    await modules.ensure(id);
+    await modules.ensure(id, stop);
   };
   const moduleSucceeded = (backend: string): void => {
     const id = moduleForBackend(backend);
@@ -854,8 +855,8 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
     try {
       // Download-then-continue: an mflux image needs no up-front pack, so this is
       // a no-op here; the seam is uniform so a future comfyui-backed image gates too.
-      await unlessStopped(stop, ensureModule(job.backend));
-      await unlessStopped(stop, ensureWeights(model));
+      await unlessStopped(stop, ensureModule(job.backend, stop));
+      await unlessStopped(stop, ensureWeights(model, stop));
       const need = needForModel(model);
       if (need !== undefined && ensureAsset !== undefined) {
         await unlessStopped(stop, ensureAsset(need));
@@ -988,8 +989,8 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
     try {
       // Download-then-continue: a comfyui-backed video (LTX / Wan) whose weights
       // pack is missing PROMPTS the user, downloads on accept, then continues here.
-      await unlessStopped(stop, ensureModule(job.backend));
-      await unlessStopped(stop, ensureWeights(model));
+      await unlessStopped(stop, ensureModule(job.backend, stop));
+      await unlessStopped(stop, ensureWeights(model, stop));
       const need = needForModel(model);
       if (need !== undefined && ensureAsset !== undefined) {
         await unlessStopped(stop, ensureAsset(need));
@@ -1175,8 +1176,8 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
     try {
       // Same download-then-continue courtesy the video path gets: a ComfyUI music
       // or SFX model whose weights pack is missing prompts, downloads, continues.
-      await unlessStopped(stop, ensureModule(job.backend));
-      await unlessStopped(stop, ensureWeights(model));
+      await unlessStopped(stop, ensureModule(job.backend, stop));
+      await unlessStopped(stop, ensureWeights(model, stop));
       const need = needForModel(model);
       if (need !== undefined && ensureAsset !== undefined) {
         await unlessStopped(stop, ensureAsset(need));
@@ -1659,8 +1660,8 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
     if (params.onNote !== undefined) noteSinks.set(jobId, params.onNote);
     const stop = pendingJobs.open(jobId, params.signal);
     try {
-      await unlessStopped(stop, ensureModule(job.backend));
-      await unlessStopped(stop, ensureWeights(model));
+      await unlessStopped(stop, ensureModule(job.backend, stop));
+      await unlessStopped(stop, ensureWeights(model, stop));
       await unlessStopped(stop, opts.freshReading?.());
       pendingJobs.admit(jobId);
       const queued = jobQueue.enqueue(job, {

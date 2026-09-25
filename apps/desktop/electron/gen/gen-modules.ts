@@ -162,6 +162,9 @@ export interface GenModulePorts {
  */
 export const MODULE_WAIT_MS = 4 * 60 * 1000;
 
+/** Why a job stopped at the gate ended — the queue's own words for a cancel. */
+const JOB_STOPPED = 'generation canceled';
+
 /** Marker the renderer reads out of a tool result to show the button there. */
 export function moduleMarker(id: GenModuleId): string {
   return `[[bobble-module:${id}]]`;
@@ -360,12 +363,21 @@ export class GenModulesManager {
    * dismiss it or the wait runs out. A held job is what makes the button
    * appear in the chat (`wanted`).
    */
-  async ensure(id: GenModuleId): Promise<void> {
+  async ensure(id: GenModuleId, signal?: AbortSignal): Promise<void> {
+    /*
+     * `signal` is the job's: a job stopped while it waits (its turn stopped,
+     * its chat deleted) is no longer waiting. Its waiter stayed registered, so
+     * the card went on saying a generation was waiting on this module until
+     * the four-minute clock ran out.
+     */
+    const stopped = (): boolean => signal?.aborted === true;
+    if (stopped()) throw new Error(JOB_STOPPED);
     if (this.#ready.get(id) !== true) {
       const ready = await this.#ports.ready(id).catch(() => false);
       this.#ready.set(id, ready);
     }
     if (this.#ready.get(id) === true) return;
+    if (stopped()) throw new Error(JOB_STOPPED);
     const inFlight = this.#installing.get(id);
     if (inFlight !== undefined) {
       await inFlight;
@@ -373,12 +385,28 @@ export class GenModulesManager {
     }
     await new Promise<void>((resolve, reject) => {
       const list = this.#waiters.get(id) ?? [];
-      const waiter: Waiter = { resolve, reject, timer: null };
+      const onStop = (): void => {
+        if (waiter.timer !== null) this.#clear(waiter.timer);
+        this.#drop(id, waiter);
+        reject(new Error(JOB_STOPPED));
+      };
+      const waiter: Waiter = {
+        resolve: () => {
+          signal?.removeEventListener('abort', onStop);
+          resolve();
+        },
+        reject: (err) => {
+          signal?.removeEventListener('abort', onStop);
+          reject(err);
+        },
+        timer: null,
+      };
       const arm = this.#ports.setTimeout ?? ((fn, ms) => setTimeout(fn, ms));
       waiter.timer = arm(() => {
         this.#drop(id, waiter);
-        reject(new GenModuleMissingError(id, this.#meta(id)));
+        waiter.reject(new GenModuleMissingError(id, this.#meta(id)));
       }, MODULE_WAIT_MS);
+      signal?.addEventListener('abort', onStop, { once: true });
       list.push(waiter);
       this.#waiters.set(id, list);
       this.#broadcast();
