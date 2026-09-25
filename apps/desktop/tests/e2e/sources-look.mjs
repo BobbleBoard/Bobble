@@ -440,6 +440,7 @@ const scrollTo = (selector, block = 'start') =>
   );
 const setMode = (mode) =>
   page.evaluate((m) => document.documentElement.setAttribute('data-mode', m), mode);
+const cdp = await page.context().newCDPSession(page);
 
 try {
   await page.waitForFunction(() => typeof window.__pi_store === 'function', { timeout: 20000 });
@@ -610,7 +611,21 @@ try {
       await scrollTo(cardSel, 'start');
       await sleep(300);
       buf = await shot(`04-sources-expanded-${mode}`);
-      await crop(`04-sources-expanded-${mode}-crop`, buf, cardSel);
+      /* The whole open card — rows and "Show less" — needs a taller window
+         than the app's; the device-metrics override lays the same page out
+         taller for one frame (as turn-cards-look does). */
+      await cdp.send('Emulation.setDeviceMetricsOverride', {
+        width: 1440,
+        height: 1500,
+        deviceScaleFactor: 2,
+        mobile: false,
+      });
+      await sleep(500);
+      await scrollTo(cardSel, 'start');
+      await sleep(300);
+      await crop(`04-sources-expanded-${mode}-crop`, await page.screenshot(), cardSel);
+      await cdp.send('Emulation.clearDeviceMetricsOverride');
+      await sleep(400);
       const expanded = await page.evaluate((sel) => {
         const el = document.querySelector(sel);
         return {

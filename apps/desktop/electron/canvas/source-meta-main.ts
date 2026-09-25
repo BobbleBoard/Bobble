@@ -5,7 +5,7 @@
  */
 import path from 'node:path';
 import { cacheRoot } from '@pi-desktop/inference';
-import { nativeImage } from 'electron';
+import { app, nativeImage } from 'electron';
 import { setFaviconCacheDir } from './favicons';
 import type { SourceMetaDeps } from './source-meta';
 
@@ -48,10 +48,19 @@ function thumbnail(bytes: Buffer): { data: Buffer; type: string } | null {
 
 let deps: SourceMetaDeps | null = null;
 
-/** The wiring every `canvas:source-meta` call uses; sets up the icon cache once. */
+/**
+ * The wiring every `canvas:source-meta` call uses; sets up the icon cache once.
+ *
+ * Kept under the support root beside the app's other caches — except in a
+ * probe, which may point the support root at the REAL one for its model
+ * weights (`realCache`); its sources stay in its own throwaway profile.
+ */
 export function sourceMetaDeps(): SourceMetaDeps {
   if (deps !== null) return deps;
-  const root = path.join(cacheRoot(), 'sources');
+  const root =
+    process.env.PI_E2E === '1'
+      ? path.join(app.getPath('userData'), 'sources')
+      : path.join(cacheRoot(), 'sources');
   setFaviconCacheDir(path.join(root, 'icons'));
   deps = { cacheDir: path.join(root, 'pages'), thumbnail };
   return deps;
