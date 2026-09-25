@@ -1764,6 +1764,16 @@ function setViewPointer(sessionPath: string, isStreaming?: boolean): void {
 export async function switchSession(
   sessionPath: string,
 ): Promise<{ ok: boolean; truncated: boolean; cancelled?: boolean; error?: string }> {
+  /*
+   * A DELETED CHAT CANNOT BE OPENED. A notification about it outlives it in
+   * Notification Center, and clicking that lands here: pi would open its file
+   * — pi creates a fresh session at a missing path — and everything written
+   * there would be swept away by the tombstones, its row never appearing. A
+   * parked background run of it would come back on screen instead.
+   */
+  if (isChatDeleted(sessionPath)) {
+    return { ok: false, truncated: false, error: 'that chat was deleted' };
+  }
   const store = usePiStore.getState();
   const viewed = store.session?.sessionFile ?? null;
   if (sessionPath === viewed) return { ok: true, truncated: false };

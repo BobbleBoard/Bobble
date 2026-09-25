@@ -64,6 +64,8 @@ const invoke = vi.fn(async (channel: string, req: unknown) => {
       return { delivered: true };
     case 'pi:get-state':
       return { success: true, state: { sessionFile: '/s/fresh.jsonl', sessionId: 'fresh' } };
+    case 'fs:read-session':
+      return { text: null };
     default:
       return { success: true };
   }
@@ -204,5 +206,40 @@ describe('deleting a chat whose turn is waiting on the user', () => {
     // No dialog, no banner, no orange dot, no dock badge for a chat that is gone.
     expect(usePiStore.getState().uiRequests).toEqual([]);
     expect(usePiStore.getState().unread[A]).toBeUndefined();
+  });
+});
+
+/*
+ * A DELETED CHAT CANNOT BE OPENED AGAIN (review wave-0923, delete #7). A
+ * notification about it can outlive it in Notification Center, and clicking
+ * that opens its file: pi's SessionManager creates a fresh session at a missing
+ * path, and everything written there is swept by the tombstones.
+ */
+describe('opening a chat that was deleted', () => {
+  it('does not point pi at its file', async () => {
+    const { usePiStore } = mods.slice;
+    usePiStore.setState({ session: { sessionFile: B }, bgRun: null });
+    mods.deleted.useDeletedChats.getState().hide([A]);
+
+    const res = await mods.connect.switchSession(A);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(res.ok).toBe(false);
+    expect(usePiStore.getState().session?.sessionFile).toBe(B);
+    expect(channels()).not.toContain('pi:switch-session');
+  });
+
+  it('does not bring its parked thread back on screen', async () => {
+    const { usePiStore } = mods.slice;
+    usePiStore.setState({
+      session: { sessionFile: B },
+      bgRun: { sessionFile: A, messages: [], streaming: false, title: null },
+    });
+    mods.deleted.useDeletedChats.getState().hide([A]);
+
+    await mods.connect.switchSession(A);
+
+    expect(usePiStore.getState().session?.sessionFile).toBe(B);
+    expect(usePiStore.getState().bgRun?.sessionFile).toBe(A);
   });
 });
