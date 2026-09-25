@@ -59,9 +59,13 @@ import {
 import { macMonitorMockControl, startMacMonitorMock } from './monitor-mock';
 import { macOverlay } from './overlay-controller';
 import type { OverlayRect } from './overlay-geometry';
+import { aimAwayFromSelf, type FrontApp, refuseSelf } from './self-target';
 
 const log = createLogger('desktop:mac-agent');
 const execFileAsync = promisify(execFile);
+
+/** Bobble's own process — the one that owns its windows (a dev build's too). */
+const OWN_PIDS: readonly number[] = [process.pid];
 
 /** How long to let a freshly launched app settle before the model snapshots. */
 const LAUNCH_SETTLE_MS = 600;
@@ -383,6 +387,9 @@ async function launchApp(name: string, background = true): Promise<MacLaunchAck>
     // Still a successful open; the tool degrades to a by-name snapshot.
     return { ok: true, app: appName };
   }
+  // A name that resolved to Bobble itself (a dev build is "Electron"): never
+  // nudged, never taken as the target.
+  refuseSelf(bounds.pid, OWN_PIDS);
   // Let first-paint settle so the snapshot-after-open screenshot shows content.
   await sleep(LAUNCH_SETTLE_MS);
   bounds = (await nudgeOnScreen(bounds)) ?? bounds;
@@ -482,6 +489,9 @@ async function snapshotWithOverlay(params: Record<string, unknown>): Promise<Mac
   // that is the one thing a bubble saying "Thinking" was actively wrong about.
   await macOverlay.reading();
   const snap = await getHelper().request<MacSnapshot>('snapshot', params);
+  // A named look that resolved to Bobble: refused before it is cached, nudged,
+  // followed by the overlay, or read by the model (see self-target.ts).
+  refuseSelf(snap.pid, OWN_PIDS);
   cacheSnapshot(snap);
   if (typeof snap.pid === 'number') {
     /*
@@ -589,10 +599,20 @@ function brakeRefusal(): string | null {
   return `The user pressed Stop, so Mac control is off. Do not retry: say what you had done to ${named} and ask whether to carry on.`;
 }
 
-async function dispatch(method: MacAgentMethod, params: Record<string, unknown>): Promise<unknown> {
+async function dispatch(
+  method: MacAgentMethod,
+  requested: Record<string, unknown>,
+): Promise<unknown> {
   if (!isSupportedPlatform()) throw new Error('mac computer-use is macOS-only');
   const refusal = controlRefusal(method);
   if (refusal !== null) throw new Error(refusal);
+  // A request that names no app goes to the front app that is NOT Bobble —
+  // resolved and stamped here, before the helper can pick Bobble itself.
+  const params = await aimAwayFromSelf(method, requested, {
+    ownPids: OWN_PIDS,
+    frontmost: (excludePids) =>
+      getHelper().request<FrontApp>('frontmost', { excludePids: [...excludePids] }),
+  });
   switch (method) {
     case 'check':
       return getHelper().request('check');
