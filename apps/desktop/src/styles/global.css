@@ -2393,8 +2393,8 @@ h2.text-heading {
   animation: pd-chat-dot-pop 0.28s var(--pd-easing-standard) both;
 }
 .pd-chat-dot--finished {
-  background: var(--pd-status-info-fg);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pd-status-info-fg) 22%, transparent);
+  background: var(--pd-status-info-solid);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pd-status-info-solid) 26%, transparent);
 }
 .pd-chat-dot--needs-input {
   background: var(--pd-status-warning-fg);
@@ -3320,8 +3320,8 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
 }
 .pd-task-tray-dot[data-tone="done"],
 .pd-task-dot[data-tone="done"] {
-  background: var(--pd-status-info-fg);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pd-status-info-fg) 22%, transparent);
+  background: var(--pd-status-info-solid);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pd-status-info-solid) 26%, transparent);
 }
 .pd-task-tray-dot[data-tone="needs-input"],
 .pd-task-dot[data-tone="needs-input"] {
@@ -3545,8 +3545,9 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
 }
 /* Thin, and blue end to end — the user on the download bars: "the unfilled part of
    the bar isn't blue enough it seems grey it should read very blue still just
-   unfilled" — so the track is the hub bars' 45% blue (.pd-dl-track) and the
-   fill their solid one. */
+   unfilled" — and (2026-09-25) "why such a pale blue for the notifications?":
+   the bar is the SOLID status hue, not `fg` (a text colour, lifted toward
+   white on dark). The track is the same hue thinned, so it stays blue. */
 .pd-transfer-bar {
   position: relative;
   flex: 1;
@@ -3554,7 +3555,7 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   height: 3px;
   overflow: hidden;
   border-radius: 999px;
-  background: color-mix(in oklab, var(--pd-status-info-fg) 45%, transparent);
+  background: color-mix(in oklab, var(--pd-status-info-solid) 35%, transparent);
 }
 .pd-transfer-fill {
   position: absolute;
@@ -3562,7 +3563,7 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   bottom: 0;
   left: 0;
   border-radius: inherit;
-  background: var(--pd-status-info-fg);
+  background: var(--pd-status-info-solid);
   /* Updates land about once a second; the fill walks between them. */
   transition: width 1s linear;
 }
@@ -3661,8 +3662,8 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   overflow: hidden;
   /* the user: "the unfilled part of the bar isn't blue enough it seems grey it
      should read very blue still just unfilled." 22% against a dark surface
-     desaturates into grey; 45% keeps the hue and still reads as the empty half. */
-  background: color-mix(in oklab, var(--pd-status-info-fg) 45%, transparent);
+     desaturates into grey; the solid hue thinned keeps it blue (see .pd-transfer-bar). */
+  background: color-mix(in oklab, var(--pd-status-info-solid) 35%, transparent);
   cursor: default;
 }
 .pd-dl-fill {
@@ -3671,7 +3672,7 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   left: 0;
   display: block;
   border-radius: 999px;
-  background: var(--pd-status-info-fg);
+  background: var(--pd-status-info-solid);
   transition: width 200ms var(--pd-easing-standard, ease);
 }
 .pd-dl-fill--sweep {

@@ -36,6 +36,13 @@ export interface StatusTokens {
   fg: string;
   /** Border for outlined status surfaces. */
   border: string;
+  /**
+   * The status hue at full strength, for small solid marks — a progress fill,
+   * a notification dot. `fg` is tuned for TEXT, so on dark it is lifted toward
+   * white for contrast, which reads as a washed-out pastel on a 3px bar or a
+   * 5px dot (the user, 2026-09-25: "why such a pale blue for the notifications?").
+   */
+  solid: string;
 }
 
 export interface ThemeTokens {
@@ -583,10 +590,10 @@ const claudeLight: ThemeTokens = {
     subtle: '#d977571f', // derived: clay @ 12%
   },
   status: {
-    info: { bg: '#cde2fb', fg: '#184f95', border: '#86b6ef' }, // blue-100/600/250
-    success: { bg: '#caeac7', fg: '#006300', border: '#73cb6d' }, // green-100/600/250
-    warning: { bg: '#f9dca4', fg: '#734500', border: '#eda100' }, // yellow-100/600/250
-    danger: { bg: '#fad6d6', fg: '#8e2626', border: '#f09595' }, // red-100/600/250
+    info: { bg: '#cde2fb', fg: '#184f95', border: '#86b6ef', solid: '#2c84db' }, // blue-100/600/250
+    success: { bg: '#caeac7', fg: '#006300', border: '#73cb6d', solid: '#1a9e1a' }, // green-100/600/250
+    warning: { bg: '#f9dca4', fg: '#734500', border: '#eda100', solid: '#eda100' }, // yellow-100/600/250
+    danger: { bg: '#fad6d6', fg: '#8e2626', border: '#f09595', solid: '#d93a3a' }, // red-100/600/250
   },
   bubble: {
     // the user round-5 #10: the user bubble was clay/orange-tinted — swap to a
@@ -684,10 +691,10 @@ const claudeDark: ThemeTokens = {
     subtle: '#d9775726', // derived: clay @ 15%
   },
   status: {
-    info: { bg: '#032042', fg: '#6da7ec', border: '#0d366b' }, // blue-800/300/700
-    success: { bg: '#11260f', fg: '#0ca30c', border: '#074506' }, // green-800/400/700
-    warning: { bg: '#311a00', fg: '#db9300', border: '#512e00' }, // yellow-800/300/700
-    danger: { bg: '#3c0e0e', fg: '#ec7e7e', border: '#641919' }, // red-800/300/700
+    info: { bg: '#032042', fg: '#6da7ec', border: '#0d366b', solid: '#3d8fe6' }, // blue-800/300/700
+    success: { bg: '#11260f', fg: '#0ca30c', border: '#074506', solid: '#0ca30c' }, // green-800/400/700
+    warning: { bg: '#311a00', fg: '#db9300', border: '#512e00', solid: '#db9300' }, // yellow-800/300/700
+    danger: { bg: '#3c0e0e', fg: '#ec7e7e', border: '#641919', solid: '#e45c5c' }, // red-800/300/700
   },
   bubble: {
     // the user round-5 #10: neutral (warm-white @ ~10%), no clay tint.
@@ -781,10 +788,10 @@ const codexLight: ThemeTokens = {
     subtle: '#e5f3ff', // --color-background-accent (blue-50)
   },
   status: {
-    info: { bg: '#e5f3ff', fg: '#0285ff', border: '#339cff26' }, // blue-50/400; border derived @ 15%
-    success: { bg: '#00a24012', fg: '#00a240', border: '#00a24026' }, // green @ 7%; green-500; derived @ 15%
-    warning: { bg: '#ffe7d9', fg: '#e25507', border: '#e2550726' }, // orange-50/500; orange @ 15%
-    danger: { bg: '#ffd9d9', fg: '#e02e2a', border: '#e02e2a26' }, // red-50/500; red @ 15%
+    info: { bg: '#e5f3ff', fg: '#0285ff', border: '#339cff26', solid: '#0285ff' }, // blue-50/400; border derived @ 15%
+    success: { bg: '#00a24012', fg: '#00a240', border: '#00a24026', solid: '#00a240' }, // green @ 7%; green-500; derived @ 15%
+    warning: { bg: '#ffe7d9', fg: '#e25507', border: '#e2550726', solid: '#e25507' }, // orange-50/500; orange @ 15%
+    danger: { bg: '#ffd9d9', fg: '#e02e2a', border: '#e02e2a26', solid: '#e02e2a' }, // red-50/500; red @ 15%
   },
   bubble: {
     bg: '#1a1c1f0d', // bg-token-foreground/5 (computed oklab ~5%)
@@ -873,10 +880,10 @@ const codexDark: ThemeTokens = {
     subtle: '#00284d', // --color-background-accent dark (blue-900)
   },
   status: {
-    info: { bg: '#00284d', fg: '#99ceff', border: '#339cff66' }, // blue-900/100; border derived @ 40%
-    success: { bg: '#04b84c29', fg: '#40c977', border: '#40c97766' }, // green @ 16%; green-300; derived @ 40%
-    warning: { bg: '#4a2206', fg: '#ff8549', border: '#ff854966' }, // orange-900/300; orange @ 40%
-    danger: { bg: '#4d100e', fg: '#ff6764', border: '#fa423e66' }, // red-900/300; red-400 @ 40%
+    info: { bg: '#00284d', fg: '#99ceff', border: '#339cff66', solid: '#339cff' }, // blue-900/100; border derived @ 40%
+    success: { bg: '#04b84c29', fg: '#40c977', border: '#40c97766', solid: '#04b84c' }, // green @ 16%; green-300; derived @ 40%
+    warning: { bg: '#4a2206', fg: '#ff8549', border: '#ff854966', solid: '#ff8549' }, // orange-900/300; orange @ 40%
+    danger: { bg: '#4d100e', fg: '#ff6764', border: '#fa423e66', solid: '#fa423e' }, // red-900/300; red-400 @ 40%
   },
   bubble: {
     bg: '#ffffff0d', // white @ 5% (derived)
@@ -1139,10 +1146,10 @@ const bobbleLight: ThemeTokens = {
     subtle: '#0071e31a',
   },
   status: {
-    info: { bg: '#e8f2fd', fg: '#0058b0', border: '#a7cdf7' },
-    success: { bg: '#e4f7e9', fg: '#1d7a3b', border: '#93dcae' },
-    warning: { bg: '#fdf0dd', fg: '#9a5b00', border: '#f5c26b' },
-    danger: { bg: '#fde8e7', fg: '#c0271f', border: '#f5a49f' },
+    info: { bg: '#e8f2fd', fg: '#0058b0', border: '#a7cdf7', solid: '#007aff' },
+    success: { bg: '#e4f7e9', fg: '#1d7a3b', border: '#93dcae', solid: '#34c759' },
+    warning: { bg: '#fdf0dd', fg: '#9a5b00', border: '#f5c26b', solid: '#ff9500' },
+    danger: { bg: '#fde8e7', fg: '#c0271f', border: '#f5a49f', solid: '#ff3b30' },
   },
   bubble: {
     bg: '#7878801f', // neutral fill, no accent tint
@@ -1243,10 +1250,10 @@ const bobbleDark: ThemeTokens = {
     subtle: '#0a84ff29',
   },
   status: {
-    info: { bg: '#0a84ff24', fg: '#6cb2ff', border: '#0a84ff66' },
-    success: { bg: '#30d15824', fg: '#30d158', border: '#30d15866' },
-    warning: { bg: '#ff9f0a24', fg: '#ffb340', border: '#ff9f0a66' },
-    danger: { bg: '#ff453a24', fg: '#ff6961', border: '#ff453a66' },
+    info: { bg: '#0a84ff24', fg: '#6cb2ff', border: '#0a84ff66', solid: '#0a84ff' },
+    success: { bg: '#30d15824', fg: '#30d158', border: '#30d15866', solid: '#30d158' },
+    warning: { bg: '#ff9f0a24', fg: '#ffb340', border: '#ff9f0a66', solid: '#ff9f0a' },
+    danger: { bg: '#ff453a24', fg: '#ff6961', border: '#ff453a66', solid: '#ff453a' },
   },
   bubble: {
     bg: '#7878802e',

@@ -55,6 +55,7 @@ export function flattenTheme(t: ThemeTokens): Array<[name: string, value: string
     push(`status-${kind}-bg`, t.status[kind].bg);
     push(`status-${kind}-fg`, t.status[kind].fg);
     push(`status-${kind}-border`, t.status[kind].border);
+    push(`status-${kind}-solid`, t.status[kind].solid);
   }
 
   push('user-bubble-bg', t.bubble.bg);

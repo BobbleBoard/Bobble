@@ -230,7 +230,8 @@ try {
       probe.style.color = 'var(--pd-status-danger-fg)';
       document.body.append(probe);
       const danger = getComputedStyle(probe).color;
-      probe.style.color = 'var(--pd-status-info-fg)';
+      // The bar is the SOLID status blue, not the text blue (the user: "why such a pale blue").
+      probe.style.color = 'var(--pd-status-info-solid)';
       const info = getComputedStyle(probe).color;
       probe.style.color = 'var(--pd-text-primary)';
       const primary = getComputedStyle(probe).color;
