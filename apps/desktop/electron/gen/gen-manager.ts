@@ -1382,6 +1382,9 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
               ...(req.fps !== undefined ? { fps: req.fps } : {}),
               ...(req.seed !== undefined ? { seed: req.seed } : {}),
               ...(req.negativePrompt !== undefined ? { negativePrompt: req.negativePrompt } : {}),
+              // The studio's Steps knob — dropped here the same way, so it
+              // changed nothing (handleGenerateVideo clamps and uses it).
+              ...(req.steps !== undefined ? { steps: req.steps } : {}),
             },
             undefined,
             req.requestId,
@@ -1395,6 +1398,15 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
             })),
           };
         }
+        /*
+         * THE EDIT HALF WAS NEVER FORWARDED. The contract has carried
+         * `inputImage` / `strength` / `guidance` since the studios learned to
+         * edit, and `handleGenerate` has honoured them since the same day — but
+         * this call dropped all three, so every "Edit" the Image Studio ever ran
+         * was a plain text-to-image run of the instruction, and the round-2 edit
+         * probe passed anyway (a fresh picture of the same subject is "different
+         * from the input" too). Found wiring the image viewer's Edit bar to it.
+         */
         const r = await handleGenerate(
           {
             prompt: req.prompt,
@@ -1404,6 +1416,11 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
             ...(req.steps !== undefined ? { steps: req.steps } : {}),
             ...(req.seed !== undefined ? { seed: req.seed } : {}),
             ...(req.negativePrompt !== undefined ? { negativePrompt: req.negativePrompt } : {}),
+            ...(req.guidance !== undefined ? { guidance: req.guidance } : {}),
+            ...(req.inputImage !== undefined && req.inputImage.length > 0
+              ? { inputImage: req.inputImage }
+              : {}),
+            ...(req.strength !== undefined ? { strength: req.strength } : {}),
           },
           undefined,
           req.requestId,
