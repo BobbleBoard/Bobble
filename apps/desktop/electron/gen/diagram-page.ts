@@ -528,6 +528,9 @@ export function mermaidConfig(theme: DiagramTheme): Record<string, unknown> {
   const scale: Record<string, string> = {};
   for (let i = 0; i < 12; i += 1) {
     scale[`cScale${i}`] = series(i);
+    // A timeline underlines each event in cScaleInv — Mermaid's derived one
+    // was a pale blue under an orange box.
+    scale[`cScaleInv${i}`] = series(i);
     scale[`cScaleLabel${i}`] = theme.mode === 'light' ? '#FFFFFF' : theme.paper;
     scale[`pie${i + 1}`] = series(i);
   }
@@ -560,7 +563,22 @@ export function mermaidConfig(theme: DiagramTheme): Record<string, unknown> {
     state: noSize,
     er: noSize,
     journey: noSize,
-    gantt: noSize,
+    // Mermaid's gantt sized itself to the page (1,656 px) in 11 px type with
+    // full ISO dates on every tick: in a 700 px chat card that was 5 px words.
+    // A chat-card width, the kit's type size, short tick dates.
+    gantt: {
+      ...noSize,
+      useWidth: 880,
+      fontSize: theme.fontSize,
+      sectionFontSize: theme.fontSize,
+      barHeight: 26,
+      barGap: 6,
+      topPadding: 40,
+      leftPadding: 88,
+      rightPadding: 24,
+      gridLineStartPadding: 32,
+      axisFormat: '%b %d',
+    },
     pie: noSize,
     timeline: noSize,
     mindmap: noSize,
@@ -623,6 +641,9 @@ export function mermaidConfig(theme: DiagramTheme): Record<string, unknown> {
       pieLegendTextColor: theme.ink,
       pieStrokeColor: theme.paper,
       pieOuterStrokeColor: theme.line,
+      // Mermaid draws slices at 0.7: washed out beside their own legend.
+      pieOpacity: '1',
+      pieOuterStrokeWidth: '1px',
       // gantt
       taskBkgColor: series(0),
       taskBorderColor: series(0),
@@ -781,6 +802,23 @@ export const PAGE_SCRIPT = String.raw`(() => {
     }
     for (const r of root.querySelectorAll('g.edgeLabel rect, .labelBkg')) r.style.opacity = '1';
 
+    // 1b. Two of Mermaid's own slips, where they showed (a render of each
+    // kind the tool offers, 2026-09-25): a timeline paints its axis and its
+    // connectors in the last section's LABEL colour — white on the paper, so
+    // the line was gone; a mind map's round root sets its words from its
+    // centre rather than about it, so "Launch" ran out of its circle.
+    for (const l of root.querySelectorAll('.lineWrapper line')) l.style.setProperty('stroke', t.line, 'important');
+    for (const node of root.querySelectorAll('g.mindmap-node')) {
+      const label = node.querySelector(':scope > g.label');
+      if (!node.querySelector(':scope > circle') || !label) continue;
+      const bb = label.getBBox();
+      const at = /translate\(\s*([-\d.e]+)[ ,]+([-\d.e]+)\s*\)/.exec(label.getAttribute('transform') || '');
+      const dx = -(bb.x + bb.width / 2);
+      if (Math.abs(dx - (at ? Number(at[1]) : 0)) > 1) {
+        label.setAttribute('transform', 'translate(' + dx + ', ' + (at ? Number(at[2]) : 0) + ')');
+      }
+    }
+
     // 2. The contrast guard: every label against the painted shape under it.
     const shapes = [...root.querySelectorAll('rect, polygon, path, circle, ellipse')].filter((s) => {
       if (s.closest('marker, defs')) return false;
@@ -821,6 +859,10 @@ export const PAGE_SCRIPT = String.raw`(() => {
         const m = root.querySelector('marker#' + CSS.escape(ref[1]));
         const tip = m && m.querySelector('path, circle, polygon');
         if (!tip) continue;
+        // An arrowhead is ONE solid shape. A marker of several — an ER
+        // diagram's circle-and-crow's-foot — is drawn open, and painting all
+        // of it in the line's colour made each one a grey blob.
+        if (m.querySelectorAll('path, circle, polygon, line').length > 1) continue;
         const fill = toHex(getComputedStyle(tip).fill);
         if (!fill || fill.hex === stroke.hex) continue;
         const key = ref[1] + '-' + stroke.hex.slice(1);
