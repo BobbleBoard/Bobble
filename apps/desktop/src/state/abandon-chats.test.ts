@@ -210,6 +210,38 @@ describe('deleting a chat whose turn is waiting on the user', () => {
 });
 
 /*
+ * A SUBAGENT BELONGS TO THE CHAT WHOSE TURN SPAWNED IT (review wave-0923,
+ * delete #6). Main nests a spawn_subagent child under the session the renderer
+ * last reported; that was the chat on SCREEN, so a background chat's subagent
+ * landed under whichever chat the user was reading — deleting that chat killed
+ * it, and deleting its real owner left it running.
+ */
+describe('which chat main is told pi is working for', () => {
+  const reported = (): unknown =>
+    calls.filter((c) => c.channel === 'pi:report-active-session').at(-1)?.req;
+
+  it('is the chat running in the background while one runs, and the viewed chat otherwise', () => {
+    const { usePiStore } = mods.slice;
+    mods.connect.connectPi();
+    usePiStore.setState({ session: { sessionFile: A }, bgRun: null });
+    expect(reported()).toEqual({ sessionFile: A });
+
+    // The user opens B while A's turn keeps running behind it.
+    usePiStore.setState({
+      session: { sessionFile: B },
+      bgRun: { sessionFile: A, messages: [], streaming: true, title: null },
+    });
+    expect(reported()).toEqual({ sessionFile: A });
+
+    // A finishes; the next turn pi runs is B's.
+    usePiStore.setState({
+      bgRun: { sessionFile: A, messages: [], streaming: false, title: null },
+    });
+    expect(reported()).toEqual({ sessionFile: B });
+  });
+});
+
+/*
  * A DELETED CHAT CANNOT BE OPENED AGAIN (review wave-0923, delete #7). A
  * notification about it can outlive it in Notification Center, and clicking
  * that opens its file: pi's SessionManager creates a fresh session at a missing

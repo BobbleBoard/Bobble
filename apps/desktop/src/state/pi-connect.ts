@@ -17,6 +17,7 @@ import { instructionsPreamble } from '../chat/attached-files';
 import { ensureChatServerReady, maybeRouteAuto } from '../chat/auto-router';
 import { ADVANCED_GROUNDTRUTH_KEY } from './advanced-store';
 import { resetCanvasForNewSession, restoreCanvas, snapshotCanvas } from './canvas-store';
+import { ownerOfJob } from './chat-jobs';
 import { deleteChat, renameChat } from './chat-org';
 import { isChatDeleted, useDeletedChats } from './deleted-chats';
 import { ensureVisionMode } from './local-model';
@@ -190,11 +191,20 @@ export function connectPi(): () => void {
     createQueueDrain((head) => sendPrompt(head.text, head.images, head.agentMessage)),
   );
 
-  // Report the viewed chat's session to main so a model-spawned subagent
-  // (spawn_subagent → app bridge) nests under it in the sidebar dropdown.
+  // Report the chat pi is working for to main so a model-spawned subagent
+  // (spawn_subagent → app bridge) nests under it in the sidebar dropdown. That
+  // is the chat running in the background while one runs, not the one on
+  // screen: nested under the viewed chat, a background chat's subagent was
+  // killed with the wrong chat and outlived its own (chat-jobs has the rule).
   let lastReportedSession = '';
   const unsubscribeSession = usePiStore.subscribe((state) => {
-    const file = state.session?.sessionFile ?? '';
+    const file =
+      ownerOfJob({
+        agent: undefined,
+        childParent: undefined,
+        bgRun: state.bgRun,
+        viewed: state.session?.sessionFile ?? null,
+      }) ?? '';
     if (file === lastReportedSession) return;
     lastReportedSession = file;
     void window.piDesktop.invoke('pi:report-active-session', { sessionFile: file });
