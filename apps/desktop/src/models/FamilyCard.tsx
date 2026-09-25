@@ -30,7 +30,7 @@ import { type JSX, useEffect, useRef, useState } from 'react';
 import { cx } from '../onboarding/cx';
 import { OrgAvatar } from '../settings/brand-icons';
 import { DownloadBar } from './DownloadBar';
-import { quickPickFor } from './model-recommender';
+import { quickPickFor, type RecommenderHost } from './model-recommender';
 import { compactBytes } from './models-layout';
 import { Pill } from './Pill';
 import {
@@ -50,6 +50,12 @@ export interface FamilyCardProps {
   readonly selectedRepo: string | null;
   /** This machine's unified memory, for the fit verdict. 0 = not yet known. */
   readonly memoryGB: number;
+  /**
+   * The machine Top Recommended recommends for (`hostFor`), which Quick
+   * Download decides against too — the same budget, handed down from the hub.
+   * null = not yet known.
+   */
+  readonly host: RecommenderHost | null;
   /** 0..1 while a variant is downloading, keyed by its repo. */
   readonly progress?: Readonly<Record<string, number>>;
   readonly onSelect: (repo: string) => void;
@@ -91,6 +97,7 @@ export function FamilyCard({
   downloaded,
   selectedRepo,
   memoryGB,
+  host,
   progress = {},
   bytes,
   picks = {},
@@ -268,11 +275,18 @@ export function FamilyCard({
    * same judgement the top-of-page picks make, scoped to this family — the best
    * variant this machine can hold — so the fast path and the considered path
    * agree rather than being two different opinions with one button each.
+   *
+   * AGAINST THE SAME BUDGET, or they do not agree. This used to pass total RAM
+   * as the budget while Top Recommended took `hostFor(hardware)` — 24 GB against
+   * 18 on a 24 GB Mac — so the same judgement ran on two machines. MEASURED over
+   * the catalog on 8–32 GB Macs: 18 family × machine pairs where it fetched a
+   * bigger variant than that judgement picks, or one where it picks none. On
+   * the 24 GB Mac, Quick Download fetched Mage Flow Turbo · bf16, marked Tight
+   * on its own row, beside Top Recommended's Turbo · int8, and the 22B LTX-2.5
+   * beside its 2B; Krea 2 offered a 24 GB model the top of the page would never
+   * pick. The hub computes the host once and hands it to both.
    */
-  const quick =
-    memoryGB > 0
-      ? quickPickFor(family, { usableMemoryGB: memoryGB, totalRamGB: memoryGB })
-      : undefined;
+  const quick = host === null ? undefined : quickPickFor(family, host);
   const quickHave = quick !== undefined && downloaded.has(quick.variant.repo);
   const quickProgress = quick === undefined ? undefined : bytes?.[quick.variant.repo];
   /* The quant it names is the file the click fetches — the repo listing's pick,
@@ -401,6 +415,9 @@ export function FamilyCard({
                 quickHave ? `family-quick-use-${family.id}` : `family-quick-${family.id}`
               }
               data-repo={quick.variant.repo}
+              /* The repo is not the variant: Mage Flow's three recipes are one
+                 repo, int8 at 13 GB and bf16 at 17. */
+              data-variant={quick.variant.label}
               onClick={() => (quickHave ? onSelect(quick.variant.repo) : onDownload(quick.variant))}
               title={`${quick.variant.label}${quickQuant === undefined ? '' : ` · ${quickQuant}`}`}
               className="pd-focusable shrink-0 rounded-full bg-accent-primary px-4 py-1.5 text-body font-medium text-text-on-accent transition-opacity hover:opacity-90"

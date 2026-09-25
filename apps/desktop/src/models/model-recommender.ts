@@ -60,8 +60,12 @@ export interface RecommenderHost {
 
 /**
  * The host the hub recommends for, from the detected hardware — one place, so
- * Top Recommended and the page that fetches its pick's file ask about the same
- * machine. Without a detected budget, three quarters of RAM.
+ * Top Recommended, every family's Quick Download and the page that fetches the
+ * text pick's file ask about the same machine. Without a detected budget, three
+ * quarters of RAM.
+ *
+ * Not total RAM: that is 24 GB on a 24 GB Mac, where a model gets 18, and on a
+ * discrete card it is not the model's memory at all.
  */
 export function hostFor(hardware: {
   readonly totalRamGB: number;
@@ -209,7 +213,8 @@ function reasonFor(
  * the user asked for a Quick Download beside every collection, and the word quick is
  * the specification: it must not open the family, it must not ask which quant,
  * and it must not fetch the biggest thing in there. It is the same judgement the
- * per-modality pick already makes, scoped to one family.
+ * per-modality pick already makes, scoped to one family — so it must be handed
+ * the same host (`hostFor`), or the two judge different machines.
  */
 export function quickPickFor(
   family: RecommendedFamily,

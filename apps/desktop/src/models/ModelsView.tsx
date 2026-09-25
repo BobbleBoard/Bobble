@@ -702,6 +702,14 @@ export function ModelsView() {
    * app cannot fetch it.
    */
   const hardware = useLlmStore((s) => s.hardware);
+  /*
+   * THE MACHINE THE HUB RECOMMENDS FOR — one value, handed to Top Recommended,
+   * to every family's Quick Download and to the text pick whose listing is read
+   * up front, so no two of them judge against different budgets. Quick
+   * Download used to take total RAM (24 GB where Top Recommended took 18) and
+   * fetched bigger variants than the top of the page picks.
+   */
+  const host = useMemo(() => (hardware === null ? null : hostFor(hardware)), [hardware]);
   const storeModels = useStoreModels((s) => s.models);
   const storeProgress = useStoreModels((s) => s.progress);
   const storeDownload = useStoreModels((s) => s.download);
@@ -1181,10 +1189,10 @@ export function ModelsView() {
   /* Top Recommended's text pick names its file, so that one listing is read up
      front: the request its card's picker would make, made once. */
   const textPickRepo = useMemo(() => {
-    if (!curated || hardware === null) return undefined;
-    const rec = recommendFor('text', hostFor(hardware));
+    if (!curated || host === null) return undefined;
+    const rec = recommendFor('text', host);
     return rec !== undefined && installKindOf(rec.family) === 'gguf' ? rec.variant.repo : undefined;
-  }, [curated, hardware]);
+  }, [curated, host]);
   useEffect(() => {
     if (textPickRepo !== undefined) void listingFor(textPickRepo);
   }, [textPickRepo, listingFor]);
@@ -2181,7 +2189,7 @@ export function ModelsView() {
 
                     {curated ? (
                       <BestForYourMachine
-                        hardware={hardware}
+                        host={host}
                         downloaded={downloadedRepos}
                         picks={picks}
                         onSelect={setSelected}
@@ -2215,6 +2223,7 @@ export function ModelsView() {
                             downloaded={downloadedRepos}
                             selectedRepo={selected}
                             memoryGB={hw?.ramGiB ?? 0}
+                            host={host}
                             progress={storeFractions}
                             bytes={storeProgressByRepo}
                             picks={picks}

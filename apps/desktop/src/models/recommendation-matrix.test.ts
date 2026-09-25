@@ -1,5 +1,6 @@
 import { describe, it } from 'vitest';
-import { recommendAll } from './model-recommender';
+import { hostFor, quickPickFor, recommendAll } from './model-recommender';
+import { fitFor, RECOMMENDED_FAMILIES } from './recommended-catalog';
 
 /**
  * THE MATRIX, PRINTED — every machine class against every modality.
@@ -35,6 +36,54 @@ describe('the recommendation matrix', () => {
           : '— nothing fits';
         console.log(`   ${m.padEnd(6)} ${line}`);
       }
+    }
+  });
+
+  /*
+   * AND EVERY FAMILY'S QUICK DOWNLOAD — the same judgement scoped to one
+   * family, so it runs on the same host (★ = a family Top Recommended picks
+   * from). `≠` marks where total RAM, which FamilyCard used to pass as the
+   * budget, fetches something else, with the verdict that variant's own row
+   * shows. Printing this is how that mismatch was found: 18 family × machine
+   * pairs on 8–32 GB Macs, none at 64, and a 32 GB budget on a 12 GB card.
+   */
+  it('prints what every family’s Quick Download fetches, and where total RAM would not', () => {
+    const machines: Array<[string, number, number | undefined]> = [
+      ['8 GB Mac', 8, undefined],
+      ['16 GB Mac', 16, undefined],
+      ['24 GB Mac (this Mac)', 24, undefined],
+      ['32 GB Mac', 32, undefined],
+      ['64 GB Mac', 64, undefined],
+      ['RTX 3060 12 GB, 32 GB RAM', 32, 12],
+    ];
+    const said = (p: ReturnType<typeof quickPickFor>): string =>
+      p === undefined
+        ? '—'
+        : `${p.variant.label}${p.quant === undefined ? '' : ` ${p.quant.rung.quant}`} · ${p.needsGB} GB`;
+    for (const [name, total, vram] of machines) {
+      const host = hostFor({
+        totalRamGB: total,
+        ...(vram === undefined ? {} : { usableMemoryGB: vram }),
+      });
+      const top = new Set(Object.values(recommendAll(host)).map((r) => r.family.id));
+      const lines: string[] = [];
+      let differ = 0;
+      for (const f of RECOMMENDED_FAMILIES) {
+        const pick = quickPickFor(f, host);
+        const asTotal = quickPickFor(f, { usableMemoryGB: total, totalRamGB: total });
+        const same = asTotal?.variant === pick?.variant;
+        if (!same) differ += 1;
+        const was = same
+          ? ''
+          : `≠ ${total} GB: ${said(asTotal)}${asTotal === undefined ? '' : ` (${fitFor(asTotal.variant, total)})`}`;
+        lines.push(
+          `   ${top.has(f.id) ? '★' : ' '} ${f.name.padEnd(22)} ${said(pick).padEnd(34)} ${was}`,
+        );
+      }
+      console.log(
+        `\n── ${name}: Quick Download at ${host.usableMemoryGB} GB — ${differ} famil${differ === 1 ? 'y differs' : 'ies differ'} at ${total} GB`,
+      );
+      console.log(lines.join('\n'));
     }
   });
 });

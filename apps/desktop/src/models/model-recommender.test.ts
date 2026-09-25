@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { hostFor, recommendAll, recommendFor } from './model-recommender';
+import { hostFor, quickPickFor, recommendAll, recommendFor } from './model-recommender';
 import { DIFFUSION_LADDER, floorApplies, quantForBudget, TEXT_LADDER } from './quant-ladder';
+import { fitFor, RECOMMENDED_FAMILIES, type RecommendedFamily } from './recommended-catalog';
 
 /**
  * These encode the user's rules directly, because they are judgements rather than
@@ -151,5 +152,79 @@ describe('hostFor — the machine the hub recommends for', () => {
     expect(
       recommendFor('text', hostFor({ totalRamGB: 24, usableMemoryGB: 18 }))?.variant.repo,
     ).toBe('unsloth/Qwen3.8-27B-GGUF');
+  });
+});
+
+/**
+ * QUICK DOWNLOAD IS TOP RECOMMENDED'S JUDGEMENT, SCOPED TO ONE FAMILY — and
+ * only that if both are asked about the same machine. FamilyCard used to hand
+ * `quickPickFor` total RAM ({ usableMemoryGB: 24, totalRamGB: 24 } on a 24 GB
+ * Mac) while Top Recommended handed it `hostFor(hardware)`, 18 GB. These pin
+ * what the hub now relies on: one host, one pick.
+ */
+describe('Quick Download — the same machine as Top Recommended', () => {
+  /** The Macs the hub is asked about most; a model gets three quarters of each. */
+  const MACS_GB = [8, 16, 24, 32, 64] as const;
+  const family = (id: string): RecommendedFamily => {
+    const found = RECOMMENDED_FAMILIES.find((f) => f.id === id);
+    if (found === undefined) throw new Error(`no family ${id}`);
+    return found;
+  };
+
+  it('on every Mac, a family Top Recommended picks from Quick-Downloads the variant it picked', () => {
+    for (const ram of MACS_GB) {
+      const host = hostFor({ totalRamGB: ram });
+      for (const rec of Object.values(recommendAll(host))) {
+        expect(quickPickFor(rec.family, host)?.variant, `${ram} GB · ${rec.family.name}`).toBe(
+          rec.variant,
+        );
+      }
+    }
+  });
+
+  it('never fetches more than a model gets on that machine', () => {
+    for (const ram of MACS_GB) {
+      const host = hostFor({ totalRamGB: ram });
+      for (const f of RECOMMENDED_FAMILIES) {
+        const pick = quickPickFor(f, host);
+        if (pick === undefined) continue;
+        expect(pick.needsGB, `${ram} GB · ${f.name} ${pick.variant.label}`).toBeLessThanOrEqual(
+          host.usableMemoryGB,
+        );
+      }
+    }
+  });
+
+  it('on the 24 GB Mac, total RAM fetched bigger than Top Recommended’s own image and video picks', () => {
+    const host = hostFor({ totalRamGB: 24, usableMemoryGB: 18 });
+    const totalRam = { usableMemoryGB: 24, totalRamGB: 24 };
+    const top = recommendAll(host);
+
+    expect(top.image?.variant.label).toBe('Turbo · int8');
+    expect(quickPickFor(family('mage-flow'), host)?.variant).toBe(top.image?.variant);
+    const bf16 = quickPickFor(family('mage-flow'), totalRam)?.variant;
+    expect(bf16?.label).toBe('Turbo · bf16');
+    // …a recipe its own row marks Tight.
+    expect(bf16 === undefined ? undefined : fitFor(bf16, 24)).toBe('tight');
+
+    expect(top.video?.variant.label).toBe('2B distilled · Q4');
+    expect(quickPickFor(family('ltx'), host)?.variant).toBe(top.video?.variant);
+    expect(quickPickFor(family('ltx'), totalRam)?.variant.label).toBe('2.5 22B · Q3');
+
+    // Krea 2's smallest needs all 24 GB: no Quick Download here, as no pick.
+    expect(quickPickFor(family('krea2'), host)).toBeUndefined();
+    expect(quickPickFor(family('krea2'), totalRam)?.variant.label).toBe('Turbo');
+  });
+
+  it('on a discrete card the budget is its VRAM, not the RAM beside it', () => {
+    // An RTX 3060 in a 32 GB box. Total RAM would have been a 32 GB budget.
+    const host = hostFor({ totalRamGB: 32, usableMemoryGB: 12 });
+    expect(quickPickFor(family('mage-flow'), host)?.variant.label).toBe('Turbo · int8');
+    expect(quickPickFor(family('ltx'), host)?.variant.label).toBe('2B distilled · Q4');
+    expect(quickPickFor(family('qwen-image'), host)).toBeUndefined();
+    for (const f of RECOMMENDED_FAMILIES) {
+      const pick = quickPickFor(f, host);
+      if (pick !== undefined) expect(pick.needsGB, f.name).toBeLessThanOrEqual(12);
+    }
   });
 });

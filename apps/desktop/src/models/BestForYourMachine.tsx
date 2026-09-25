@@ -30,17 +30,20 @@
  * family rows below, where someone comparing options is actually looking.
  */
 import type { JSX } from 'react';
-import type { LlmHardware } from '../../electron/ipc-contract';
 import { OrgAvatar } from '../settings/brand-icons';
 import { Carousel } from './Carousel';
 import { DownloadBar } from './DownloadBar';
-import { hostFor, type ModelRecommendation, recommendAll } from './model-recommender';
+import { type ModelRecommendation, type RecommenderHost, recommendAll } from './model-recommender';
 import { compactBytes } from './models-layout';
 import { Pill } from './Pill';
 import { installKindOf, type ModelTask, type OutputModality } from './recommended-catalog';
 
 export interface BestForYourMachineProps {
-  readonly hardware: LlmHardware | null;
+  /**
+   * The machine to recommend for — the hub's `hostFor(hardware)`, the same one
+   * every family's Quick Download decides against. null = not yet detected.
+   */
+  readonly host: RecommenderHost | null;
   /** Repos already on disk — decides whether the button offers or activates. */
   readonly downloaded: ReadonlySet<string>;
   readonly onSelect: (repo: string) => void;
@@ -134,6 +137,7 @@ function Card({
       className="pd-hub-card flex w-[300px] shrink-0 flex-col gap-3 p-4"
       data-testid={`best-${rec.modality}`}
       data-repo={rec.variant.repo}
+      data-variant={rec.variant.label}
     >
       <button
         type="button"
@@ -197,7 +201,7 @@ function Card({
 }
 
 export function BestForYourMachine({
-  hardware,
+  host,
   downloaded,
   progress = {},
   picks = {},
@@ -206,8 +210,8 @@ export function BestForYourMachine({
   onUse,
   onCancel,
 }: BestForYourMachineProps): JSX.Element | null {
-  if (hardware === null) return null;
-  const all = recommendAll(hostFor(hardware));
+  if (host === null) return null;
+  const all = recommendAll(host);
   const order: OutputModality[] = ['text', 'image', 'video', 'audio', '3d'];
   const cards = order.map((m) => all[m]).filter((r): r is ModelRecommendation => r !== undefined);
   if (cards.length === 0) return null;
