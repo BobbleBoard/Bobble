@@ -11,12 +11,16 @@
   "scripts": {
     "lint": "biome check .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "export-tokens": "vitest run src/export.test.ts -u"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.2",
     "@types/node": "^24.13.2",
     "typescript": "^6.0.3",
     "vitest": "^4.1.10"
+  },
+  "dependencies": {
+    "@pi-desktop/charts": "workspace:*"
   }
 }

@@ -25,6 +25,12 @@ export {
   type Tick,
 } from './layout.ts';
 export {
+  dressInKit,
+  type KitChartColours,
+  type KitForChart,
+  lookFromKit,
+} from './look-from-kit.ts';
+export {
   ACCEPTED_NUMBER_FORMS,
   ChartDataError,
   type ParsedList,

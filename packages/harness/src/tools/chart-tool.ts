@@ -60,11 +60,14 @@ import {
   chartToElements,
   chartToSvg,
   coerceChartForm,
+  dressInKit,
   formatValue,
+  type KitForChart,
   LOOK_NAMES,
   LOOKS,
   type LookName,
   lookByName,
+  lookFromKit,
   normalizeChartSpec,
   normalizeStyle,
   paletteFromPixels,
@@ -75,6 +78,7 @@ import {
   rgbaFromBase64,
   titleFromData,
 } from '@pi-desktop/charts';
+import { loadProjectKit } from '@pi-desktop/design-kit';
 import { Type } from '@sinclair/typebox';
 import type { PresentBridge } from './present.js';
 import { pathForModel } from './workspace-relative.js';
@@ -95,9 +99,40 @@ export interface ChartToolDeps {
   readonly bridge: PresentBridge | null;
   /** The workspace root a relative path is resolved against. */
   readonly root: (ctxCwd: string | undefined) => string;
+  /**
+   * The design kit in force for this project, or null for none (VQ-04). A
+   * chart that names no look wears it; with none, charts keep their per-chat
+   * looks. See `projectChartKit`.
+   */
+  readonly kit?: (root: string) => Promise<KitForChart | null>;
   /** Injected for tests. */
   readonly writeFileImpl?: (p: string, text: string) => Promise<void>;
   readonly readFileImpl?: (p: string) => Promise<string>;
+}
+
+/**
+ * THE KIT A CHART WEARS, WHEN ONE IS IN FORCE (VQ-04): the project's own
+ * `.bobble/brand.md`, or the kit the Design setting names while that setting
+ * is on (`PI_DESKTOP_DESIGN_KIT`). With neither — every install today, until
+ * the Design panel ships (VQ-14) — there is none, and a chart keeps its
+ * per-chat look: the user, "we CANNOT have 'all charts from bobble look the same
+ * generic'", and the house default kit for every chart would be exactly that.
+ * One kit per PROJECT is the other half of the same rule — variety across
+ * projects, a deck and its charts belonging together inside one.
+ */
+export async function projectChartKit(
+  root: string,
+  opts: {
+    readonly kitName?: string;
+    readonly readFile?: (p: string) => Promise<string>;
+  } = {},
+): Promise<KitForChart | null> {
+  const project = await loadProjectKit({
+    root,
+    kitName: opts.kitName ?? process.env.PI_DESKTOP_DESIGN_KIT,
+    readFile: opts.readFile ?? ((p) => readFile(p, 'utf8')),
+  });
+  return project.source === 'default' ? null : project.kit;
 }
 
 const TYPE_WORD = new Set<string>([
@@ -365,8 +400,12 @@ export function withTitle(spec: ChartSpec): ChartSpec {
  * — variety comes across conversations, and a chart that names a look gets it.
  * `sticky` is that conversation's look, when it has one.
  */
-export function withLook(spec: ChartSpec, sticky?: LookName): ChartSpec {
+export function withLook(spec: ChartSpec, sticky?: LookName, kit?: KitForChart | null): ChartSpec {
   if (spec.style?.look !== undefined) return spec;
+  // A kit in force dresses every chart that named no look — its colours, its
+  // knobs, its dark steps — under whatever the chart set itself (dressInKit).
+  if (kit !== undefined && kit !== null)
+    return { ...spec, style: dressInKit(lookFromKit(kit), spec.style) };
   const look = sticky ?? pickLook(spec.title !== '' ? spec.title : describeData(spec));
   return { ...spec, style: { ...spec.style, look } };
 }
@@ -526,6 +565,7 @@ export function describeLook(spec: ChartSpec): string {
   const st = spec.style;
   if (st === undefined) return '';
   const parts: string[] = [];
+  if (st.kit !== undefined) parts.push(`kit ${st.kit}`);
   if (st.look !== undefined) parts.push(`look ${st.look}`);
   if (st.palette !== undefined) parts.push(`palette ${st.palette.join(' ')}`);
   if (st.accent !== undefined) parts.push(`accent ${st.accent}`);
@@ -872,8 +912,9 @@ export function registerChartTool(pi: ExtensionAPI, deps: ChartToolDeps): void {
       // is not a look is said, with the ones that are).
       const key = conversationKey(ctx, path.dirname(target));
       const asked = lookAskedFor(p);
+      const kit = asked === undefined && deps.kit !== undefined ? await deps.kit(root) : null;
       const sticky = conversationLooks.get(key) ?? (await lookOfNewestChart(path.dirname(target)));
-      spec = withLook(spec, sticky);
+      spec = withLook(spec, sticky, kit);
       if (asked !== undefined && lookByName(asked) === undefined) {
         notes.push(
           `There is no look called "${asked}" (the looks: ${LOOK_NAMES.join(', ')}); it wears ${spec.style?.look ?? 'clean'}.`,
