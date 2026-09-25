@@ -310,6 +310,18 @@ try {
   const onPresent = await read();
   both ||= onPresent.pending && onPresent.done;
   await sleep(30);
+  /* Every frame's position of the finished card while the answer lands and the
+     chain's rows above it change: the card may GLIDE, never jump. */
+  await page.evaluate(() => {
+    const tops = [];
+    window.__cardTops = tops;
+    const tick = () => {
+      const svg = document.querySelector('[data-testid="presented-diagram"] .pd-inline-widget-box svg');
+      if (svg) tops.push({ t: performance.now(), y: svg.getBoundingClientRect().y });
+      if (tops.length < 400 && window.__cardTops === tops) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
   await set({
     messages: [
       user,
@@ -331,6 +343,14 @@ try {
   both ||= justAfter.pending && justAfter.done;
   await sleep(1200);
   const settled = await read();
+  const tops = await page.evaluate(() => {
+    const t = window.__cardTops ?? [];
+    window.__cardTops = null;
+    return t;
+  });
+  const steps = tops.slice(1).map((f, i) => Math.abs(f.y - tops[i].y));
+  const biggestStep = steps.length > 0 ? Math.max(...steps) : null;
+  const travel = tops.length > 1 ? tops.at(-1).y - tops[0].y : 0;
   const doneShot = await page.screenshot();
   const frameLog = await readFrameLog(page);
   await film.stop();
@@ -364,6 +384,12 @@ try {
     `the drawing did not move at the handover: ${JSON.stringify(moved)}`,
   );
   check(!both, 'never two cards at once');
+  // The answer adds the chain's wait row above the card: it grows in, so the
+  // card glides — no single frame moves it more than a few pixels.
+  check(
+    biggestStep !== null && biggestStep <= 8,
+    `the card glides when the answer lands (travel ${Math.round(travel)}px, largest single frame ${biggestStep?.toFixed(1)}px over ${tops.length} frames)`,
+  );
   // What the answer then does to the thread above the card (the chain's own
   // rows), reported, not judged here.
   const answerShift = delta(onPresent.doneSvg, settled.doneSvg);
@@ -435,6 +461,7 @@ try {
     nodes: nodeCounts,
     moved,
     answerShift,
+    answerGlide: { travel, biggestStep, frames: tops.length },
   };
   writeFileSync(
     path.join(SHOT_DIR, 'frames.json'),
