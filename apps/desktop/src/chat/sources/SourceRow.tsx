@@ -26,7 +26,7 @@ import {
   writeClipboardText,
 } from '@pi-desktop/ui';
 import { SourceFavicon } from './SourceFavicon';
-import { cleanTitle, siteLabel, type TurnSource } from './source-model';
+import { bestTitle, cleanTitle, siteLabel, type TurnSource } from './source-model';
 import { useSourceMeta } from './use-source-meta';
 
 /** The page opened in the system browser — the one way out of the app. */
@@ -82,7 +82,11 @@ export function SourceRow({
   const openUrl = useOpenUrl();
   const meta = useSourceMeta(source.url, active);
   const name = siteLabel(meta?.siteName, source.host);
-  const title = cleanTitle(source.title ?? meta?.title ?? source.url, meta?.siteName, source.host);
+  const title = cleanTitle(
+    bestTitle(source.title, meta?.title) ?? source.url,
+    meta?.siteName,
+    source.host,
+  );
   const snippet = source.snippet ?? meta?.description;
   const thumb = meta?.image;
   const open = (): void => {

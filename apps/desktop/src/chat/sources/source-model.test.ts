@@ -4,6 +4,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  bestTitle,
   cleanTitle,
   collectTurnSources,
   linkedKeys,
@@ -242,6 +243,21 @@ describe('orderForCard', () => {
       'medschool.example', // rank 1 of search 1
       'z.example', // rank 2 of search 1
     ]);
+  });
+});
+
+describe('bestTitle', () => {
+  it('keeps what the search showed, unless the search cut it short', () => {
+    const page = 'Whole-brain annotation and multi-connectome cell typing of Drosophila';
+    expect(bestTitle('Whole-brain annotation and multi-connectome cell typing of ...', page)).toBe(
+      page,
+    );
+    expect(bestTitle('Whole-brain annotation and multi-connectome cell typing of', page)).toBe(
+      page,
+    );
+    expect(bestTitle('Fly brain map', 'Home | Some Site')).toBe('Fly brain map');
+    expect(bestTitle(undefined, page)).toBe(page);
+    expect(bestTitle('Only the search', undefined)).toBe('Only the search');
   });
 });
 

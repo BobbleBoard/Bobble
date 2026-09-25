@@ -364,6 +364,25 @@ export function cleanTitle(title: string, siteName: string | undefined, host: st
 }
 
 /**
+ * The title to show: what the search showed the model — unless the search had
+ * cut it short. Search engines trim long titles ("Whole-brain annotation and
+ * multi-connectome cell typing of ..."; SEEN on the first real research turn,
+ * a Nature paper), and the page's own `og:title` is the whole of it.
+ */
+export function bestTitle(
+  fromSearch: string | undefined,
+  fromPage: string | undefined,
+): string | undefined {
+  if (fromSearch === undefined || fromSearch.trim() === '') return fromPage;
+  if (fromPage === undefined || fromPage.trim() === '') return fromSearch;
+  const bare = fromSearch.replace(/\s*(?:\.{3}|…)\s*$/, '').trim();
+  const trimmed = bare !== fromSearch.trim();
+  const longer = fromPage.trim().length > bare.length + 3;
+  const extends_ = fromPage.trim().toLowerCase().startsWith(bare.toLowerCase());
+  return longer && (trimmed || extends_) ? fromPage.trim() : fromSearch;
+}
+
+/**
  * What a chip calls a site: its own name when the page declares one
  * (`og:site_name`), otherwise its host. Never guessed from the title.
  */
