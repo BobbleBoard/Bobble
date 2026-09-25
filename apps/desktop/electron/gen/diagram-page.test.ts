@@ -233,6 +233,22 @@ describe('flowRoles / roleStyling — the kit’s semantic colours', () => {
     );
   });
 
+  it('a sketch marks its first and last steps by outline, on the pale tint, in ink', () => {
+    // Hatched in a deep fill, white words sat on dark stripes and paper gaps.
+    const sketch = { ...themes.light, look: 'sketch' as const };
+    const lines = roleStyling(flowRoles(FLOW), sketch);
+    expect(lines).toContain(
+      `classDef pdStart fill:${sketch.group},stroke:${sketch.start.fill},color:${sketch.ink}`,
+    );
+    expect(lines).toContain(
+      `classDef pdEnd fill:${sketch.group},stroke:${sketch.end.fill},color:${sketch.ink}`,
+    );
+    // the failure step is pale already, and stays as it is
+    expect(lines).toContain(
+      `classDef pdFail fill:${sketch.fail.fill},stroke:${sketch.fail.stroke},color:${sketch.fail.text}`,
+    );
+  });
+
   it('a web of many starts or ends is not coloured, and a source that styles itself is left alone', () => {
     const web: ParseOk = {
       ...FLOW,

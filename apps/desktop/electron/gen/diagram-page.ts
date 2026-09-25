@@ -483,8 +483,17 @@ export function roleStyling(roles: FlowRoles, theme: DiagramTheme): string[] {
     lines.push(`classDef ${name} fill:${fill},stroke:${stroke},color:${color}`);
     lines.push(`class ${ids.join(',')} ${name}`);
   };
-  cls('pdStart', theme.start.fill, theme.start.fill, theme.start.text, roles.start);
-  cls('pdEnd', theme.end.fill, theme.end.fill, theme.end.text, roles.end);
+  if (theme.look === 'sketch') {
+    // The sketch look FILLS by hatching (rough.js, 4 px strokes in the fill
+    // colour, paper between them): a deep or accent fill became dark stripes
+    // under white words, readable on neither. So a sketch marks its first and
+    // last steps by their OUTLINE, on the kit's pale tint, in ink.
+    cls('pdStart', theme.group, theme.start.fill, theme.ink, roles.start);
+    cls('pdEnd', theme.group, theme.end.fill, theme.ink, roles.end);
+  } else {
+    cls('pdStart', theme.start.fill, theme.start.fill, theme.start.text, roles.start);
+    cls('pdEnd', theme.end.fill, theme.end.fill, theme.end.text, roles.end);
+  }
   cls('pdFail', theme.fail.fill, theme.fail.stroke, theme.fail.text, roles.failNodes);
   if (roles.failEdges.length > 0) {
     lines.push(
@@ -746,6 +755,23 @@ export const PAGE_SCRIPT = String.raw`(() => {
     const root = host.querySelector('svg');
     if (!root) throw new Error('Mermaid drew nothing');
     const t = req.theme;
+
+    // 0. The sketch look's hatching is a path of 4 px strokes whose stroke
+    // ATTRIBUTE is the node's fill colour — but a class's colours are a CSS
+    // rule with !important that reaches every path of the node, and it
+    // repainted the hatching in the BORDER colour: a failure step came out a
+    // solid block of dark orange over its own words (a bare-Electron render,
+    // 2026-09-25). The hatching is put back in its own colour. (A sketched
+    // node is a g.rough-node, not a g.node.)
+    if (req.config && req.config.look === 'handDrawn') {
+      for (const p of root.querySelectorAll('g.rough-node path[stroke-width="4"], g.node path[stroke-width="4"]')) {
+        const own = p.getAttribute('stroke');
+        if (own && own !== 'none') {
+          p.style.setProperty('stroke', own, 'important');
+          p.style.setProperty('fill', 'none', 'important');
+        }
+      }
+    }
 
     // 1. The kit's corners on plain boxes (a rounded or a stadium node keeps its
     // own), and edge labels on a SOLID patch of paper: Mermaid draws that patch
