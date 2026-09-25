@@ -66,6 +66,23 @@ sign --deep "$APP_SRC"
 echo "ship-local: $(codesign -d -r- "$APP_SRC" 2>&1 | grep designated || true)"
 
 DEST="/Applications/Bobble.app"
+# Never replace the bundle under a running Bobble: its lazily loaded chunks would
+# then resolve against the NEW asar (other hashes) and fail. Ask it to quit the
+# way a person would (it saves and stops its own model servers), wait, and stop
+# here rather than force it — the user may be mid-task. (2026-09-24: a ship ran with
+# the user's Bobble open because the running-check and the ship shared one command.)
+if pgrep -f "$DEST/Contents/MacOS/Bobble" >/dev/null; then
+  echo "ship-local: Bobble is running — asking it to quit"
+  osascript -e 'tell application "Bobble" to quit' >/dev/null 2>&1 || true
+  for _ in $(seq 1 60); do
+    pgrep -f "$DEST/Contents/MacOS/Bobble" >/dev/null || break
+    sleep 0.5
+  done
+  if pgrep -f "$DEST/Contents/MacOS/Bobble" >/dev/null; then
+    echo "ship-local: Bobble is still running after 30s — not replacing it; quit it and ship again" >&2
+    exit 1
+  fi
+fi
 rm -rf "$DEST"
 ditto "$APP_SRC" "$DEST"
 
