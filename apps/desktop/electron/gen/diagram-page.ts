@@ -1597,6 +1597,31 @@ export const PAGE_SCRIPT = String.raw`(() => {
       }
     }
 
+    // 2b'. A class with fields and no methods (or methods and no fields): no
+    // divider fencing off the empty part. Mermaid hides a compartment only when
+    // BOTH are empty, so LineItem wore a line over a blank strip. The box keeps
+    // its size (an edge may end on its border); only the line goes.
+    for (const node of root.querySelectorAll('g.node')) {
+      const members = node.querySelector(':scope > g.members-group');
+      const methods = node.querySelector(':scope > g.methods-group');
+      if (!members || !methods) continue;
+      const noMembers = (members.textContent || '').trim() === '';
+      const noMethods = (methods.textContent || '').trim() === '';
+      if (noMembers === noMethods) continue;
+      const lines = [...node.querySelectorAll(':scope > g.divider')].sort((a, b) => a.getBBox().y - b.getBBox().y);
+      if (lines.length < 2) continue;
+      // The rows that remain sit in the middle of the room they now have.
+      const box = node.querySelector(':scope > g.outer-path');
+      const top = lines[0].getBBox().y;
+      const mid = lines[lines.length - 1].getBBox().y;
+      const bottom = box ? box.getBBox().y + box.getBBox().height : mid;
+      const rows = noMethods ? members : methods;
+      const shift = noMethods ? (bottom - mid) / 2 : -(mid - top) / 2;
+      const at = /translate\(\s*([-\d.e]+)[ ,]+([-\d.e]+)\s*\)/.exec(rows.getAttribute('transform') || '');
+      if (at && Number.isFinite(shift)) rows.setAttribute('transform', 'translate(' + at[1] + ', ' + (Number(at[2]) + shift) + ')');
+      (noMethods ? lines[lines.length - 1] : lines[0]).remove();
+    }
+
     // 2c. Each edge label on a pill of paper, a hairline round it; the words
     // are a step down from a step's (diagramLookCss) — Mermaid drew a hard
     // rectangle at half opacity, so the line showed straight through "yes".
