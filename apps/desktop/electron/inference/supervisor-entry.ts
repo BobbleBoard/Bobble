@@ -2370,7 +2370,12 @@ function listLocalGgufs(): Array<{
 async function relaunch(): Promise<{ success: boolean; error?: string }> {
   if (current === null) return { success: false, error: 'no model is running' };
   const c = current;
-  const res = await startServer(c.model.id, c.file.quant, c.launchMode, 1, undefined, true);
+  /* A MULTIMODAL launch exists to see (ensureVisionMode's relaunch). Vision
+     switched off since: relaunched multimodal it would force llama.cpp and
+     re-attach the projector behind the switch — and keep reading images with
+     the switch saying Off. It comes back as the text launch instead. */
+  const mode = c.launchMode === 'multimodal' && !loadVision ? 'fast-text' : c.launchMode;
+  const res = await startServer(c.model.id, c.file.quant, mode, 1, undefined, true);
   return { success: res.success, ...(res.error !== undefined ? { error: res.error } : {}) };
 }
 

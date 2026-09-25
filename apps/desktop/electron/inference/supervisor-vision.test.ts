@@ -275,6 +275,20 @@ describe('the reuse gate (ALREADY RESIDENT)', () => {
   });
 });
 
+describe('Vision off, then Apply (relaunch)', () => {
+  it('a server launched multimodal to see comes back without its projector', async () => {
+    gguf('qwen3.5-0.8b-mtp', 'Qwen3.5-0.8B-Q8_0.gguf', true);
+    await ask({ type: 'start-server', modelId: 'qwen3.5-0.8b-mtp', launchMode: 'multimodal' });
+    expect(lastLaunch()?.mmprojPath).toBeDefined();
+    await vision(false);
+    expect((await ask<{ success: boolean }>({ type: 'relaunch' })).success).toBe(true);
+    expect(lastLaunch()?.mmprojPath).toBeUndefined();
+    const s = await status();
+    expect(s.visionReady).toBe(false);
+    expect(s.blindReason).toBe('off');
+  });
+});
+
 describe('rapid-mlx rows keep the method they name', () => {
   const twin = 'mlx-community/Qwen3.5-4B-MLX-8bit';
   const setUp = async () => {
