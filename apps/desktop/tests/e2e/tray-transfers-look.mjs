@@ -139,14 +139,19 @@ try {
         kind: 'failed',
         detail: 'Not enough space — 9.4 GB needed, 3.1 GB free.',
       });
+      /* PINNED, not set once: the app's own main process reports the (idle)
+         server's status a beat after launch and that report has no load in it
+         — MEASURED, the Loading section was gone by the time the tray opened
+         on 1 run in 2. The cancel check below needs only the IPC call. */
       const llm = window.__llm_store();
-      llm.setState({
-        status: {
-          ...llm.getState().status,
-          phase: 'starting',
-          loading: { modelId: 'gemma-4-e4b', displayName: 'Gemma 4 E4B', since: Date.now() - 4000 },
-        },
-      });
+      const load = { modelId: 'gemma-4-e4b', displayName: 'Gemma 4 E4B', since: Date.now() - 4000 };
+      const pin = () => {
+        const status = llm.getState().status;
+        if (status.loading?.modelId === load.modelId && status.phase === 'starting') return;
+        llm.setState({ status: { ...status, phase: 'starting', loading: load } });
+      };
+      pin();
+      llm.subscribe(pin);
     },
     { GIB },
   );
