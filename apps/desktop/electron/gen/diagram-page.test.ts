@@ -356,10 +356,12 @@ describe('diagramLook / diagramLookCss — the Bobble look', () => {
     expect(css).toContain(`.edgeLabel text, .edgeLabel tspan { font-size: ${DIAGRAM_TYPE.edge}px;`);
     expect(css).toContain(`font-size: ${DIAGRAM_TYPE.group}px`);
     expect(DIAGRAM_TYPE.edge).toBeLessThan(themes.light.fontSize);
-    // A step: the kit's surface and a hairline, never the ink.
+    // A step: the kit's flat surface and a solid border at the edges' weight
+    // (the user, 2026-09-25: "clean solid borders") — never the full ink.
     expect(css).toContain(
-      `.node path { fill: ${themes.light.surface}; stroke: ${diagramLook(themes.light).nodeEdge}; stroke-width: 1px;`,
+      `.node path { fill: ${themes.light.surface}; stroke: ${diagramLook(themes.light).nodeEdge}; stroke-width: 1.5px;`,
     );
+    expect(diagramLook(themes.light).nodeEdge).not.toBe(themes.light.ink);
   });
 
   it('leaves the sketch look’s boxes to rough.js (their hatching widths are the look)', () => {
@@ -378,6 +380,15 @@ describe('diagramLook / diagramLookCss — the Bobble look', () => {
   });
 });
 
+type Box = { x: number; y: number; w: number; h: number; kind?: string };
+const box = (x: number, y: number, w: number, h: number, kind = 'box'): Box => ({
+  x,
+  y,
+  w,
+  h,
+  kind,
+});
+
 describe('PATH_TOOLS_JS — the look’s geometry, run as the page runs it', () => {
   const P = vm.runInNewContext(PATH_TOOLS_JS) as {
     parse: (d: string) => Array<{ c: string; p: number[][] }> | null;
@@ -385,8 +396,23 @@ describe('PATH_TOOLS_JS — the look’s geometry, run as the page runs it', () 
     trimStart: (d: string, px: number) => string;
     roundCorners: (d: string, r: number) => string;
     arrowTip: (d: string, refY: number) => { dir: number; tip: number } | null;
-    chevron: (dir: number, tip: number, len: number, half: number, notch: number) => string;
-    arrowhead: (width: number) => { len: number; half: number; notch: number; soft: number };
+    openChevron: (
+      dir: number,
+      apex: number,
+      len: number,
+      half: number,
+      shaftFrom?: number,
+    ) => string;
+    arrowhead: (width: number) => { len: number; half: number };
+    elbow: (spec: {
+      pts: number[][];
+      from: Box;
+      to: Box;
+      label?: Box | null;
+      obstacles?: Box[];
+      axis?: string;
+      r?: number;
+    }) => { pts: number[][]; label: number[] | null } | null;
     roundedRect: (x: number, y: number, w: number, h: number, r: number) => string;
   };
   const pts = (d: string) => (P.parse(d) ?? []).flatMap((s) => s.p);
@@ -458,12 +484,154 @@ describe('PATH_TOOLS_JS — the look’s geometry, run as the page runs it', () 
     expect(P.arrowTip('M 0 0 L 10 0', 5)).toBeNull();
   });
 
-  it('draws a notched chevron with its tip where it is asked, mirrored for the other way', () => {
-    expect(P.chevron(1, 4, 7, 3, 2)).toBe('M4,0L-3,3L-1,0L-3,-3Z');
-    expect(P.chevron(-1, -4, 7, 3, 2)).toBe('M-4,0L3,3L1,0L3,-3Z');
+  it('draws an open ">" with its point where it is asked — never a closed triangle', () => {
+    // the user (2026-09-25): "arrows should not be triangles".
+    expect(P.openChevron(1, 0, 6, 4)).toBe('M-6,4L0,0L-6,-4');
+    expect(P.openChevron(-1, 0, 6, 4)).toBe('M6,4L0,0L6,-4');
+    expect(P.openChevron(1, 0, 6, 4)).not.toMatch(/Z/i);
+    // A point ahead of where the line stops carries the rest of the line to it.
+    expect(P.openChevron(1, 3, 6, 4, 0)).toBe('M0,0L3,0M-3,4L3,0L-3,-4');
+    // …and a point behind it does not (the page pulls the line back instead).
+    expect(P.openChevron(1, -1, 6, 4, 0)).toBe('M-7,4L-1,0L-7,-4');
     // Sized to the stroke: the same head up to 1.5 px, bigger past it.
     expect(P.arrowhead(1)).toEqual(P.arrowhead(1.5));
     expect(P.arrowhead(3).len).toBeCloseTo(P.arrowhead(1.5).len * 2);
+  });
+
+  describe('elbow — an edge re-drawn square, through its label', () => {
+    // Every run is level or plumb: an elbow, not a slant.
+    const square = (q: number[][]) =>
+      q
+        .slice(1)
+        .every(
+          (p, i) =>
+            Math.abs((p[0] ?? 0) - (q[i]?.[0] ?? 0)) < 0.01 ||
+            Math.abs((p[1] ?? 0) - (q[i]?.[1] ?? 0)) < 0.01,
+        );
+
+    it('runs straight down between two boxes that share room', () => {
+      const out = P.elbow({
+        pts: [
+          [100, 40],
+          [100, 80],
+        ],
+        from: box(50, 0, 100, 40),
+        to: box(60, 80, 80, 40),
+        axis: 'TB',
+        r: 8,
+      });
+      expect(out?.pts).toEqual([
+        [100, 40],
+        [100, 80],
+      ]);
+    });
+
+    it('takes a decision’s branch from the corner it turns toward, across and down through its label', () => {
+      const out = P.elbow({
+        pts: [
+          [130, 70],
+          [200, 130],
+          [200, 160],
+        ],
+        from: box(60, 0, 100, 100, 'diamond'),
+        to: box(160, 160, 80, 40),
+        label: box(186, 120, 28, 20),
+        axis: 'TB',
+        r: 8,
+      });
+      expect(out?.pts).toEqual([
+        [160, 50],
+        [200, 50],
+        [200, 160],
+      ]);
+      expect(out?.label).toEqual([200, 130]);
+    });
+
+    it('takes a loop back round the side, clear of the edge that runs down, its label on the upright', () => {
+      const out = P.elbow({
+        pts: [
+          [120, 170],
+          [140, 130],
+          [120, 100],
+        ],
+        from: box(50, 150, 100, 100, 'diamond'),
+        to: box(40, 60, 120, 40),
+        label: box(120, 120, 40, 20),
+        obstacles: [box(97, 100, 6, 50)],
+        axis: 'TB',
+        r: 8,
+      });
+      expect(out).not.toBeNull();
+      expect(square(out?.pts ?? [])).toBe(true);
+      // Out of the decision's right point, back into the box's right side.
+      expect(out?.pts[0]).toEqual([150, 200]);
+      expect(out?.pts.at(-1)).toEqual([160, 80]);
+      const x = out?.pts[1]?.[0] ?? 0;
+      expect(x).toBeGreaterThan(160);
+      expect(out?.label?.[0]).toBe(x);
+    });
+
+    it('meets a decision at its point, not a hair off it', () => {
+      const out = P.elbow({
+        pts: [
+          [100.5, 40],
+          [100, 80],
+        ],
+        from: box(50, 0, 101, 40),
+        to: box(50, 80, 100, 100, 'diamond'),
+        axis: 'TB',
+        r: 8,
+      });
+      expect(out?.pts).toEqual([
+        [100, 40],
+        [100, 80],
+      ]);
+    });
+
+    it('turns with the flow: left to right leaves the side facing the next box', () => {
+      const out = P.elbow({
+        pts: [
+          [100, 20],
+          [160, 20],
+        ],
+        from: box(0, 0, 100, 40),
+        to: box(160, 0, 100, 40),
+        axis: 'LR',
+        r: 8,
+      });
+      expect(out?.pts).toEqual([
+        [100, 20],
+        [160, 20],
+      ]);
+      const up = P.elbow({
+        pts: [
+          [100, 60],
+          [160, 20],
+        ],
+        from: box(0, 40, 100, 40),
+        to: box(160, 0, 100, 40),
+        axis: 'LR',
+        r: 8,
+      });
+      expect(square(up?.pts ?? [])).toBe(true);
+      expect(up?.pts[0]?.[0]).toBe(100);
+      expect(up?.pts.at(-1)?.[0]).toBe(160);
+    });
+
+    it('gives up (null) rather than draw through a box', () => {
+      const out = P.elbow({
+        pts: [
+          [100, 40],
+          [100, 200],
+        ],
+        from: box(50, 0, 100, 40),
+        to: box(50, 200, 100, 40),
+        obstacles: [box(0, 100, 400, 40)],
+        axis: 'TB',
+        r: 8,
+      });
+      expect(out).toBeNull();
+    });
   });
 
   it('rounds a box’s corners, never past half its side', () => {

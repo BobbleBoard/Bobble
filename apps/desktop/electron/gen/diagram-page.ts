@@ -526,7 +526,9 @@ export function roleStyling(roles: FlowRoles, theme: DiagramTheme): string[] {
 export interface DiagramLook {
   /** A step's fill. */
   readonly node: string;
-  /** A step's hairline — a third of the way from the surface to the ink. */
+  /** A step's border: solid, most of the way from the surface to the ink
+   * (the user, 2026-09-25: "clean solid borders no shininess" — a third of the
+   * way, as a hairline, read as a soft white card, not an outlined box). */
   readonly nodeEdge: string;
   /** An edge label's pill, and the hairline round it. */
   readonly pill: string;
@@ -545,7 +547,7 @@ export function diagramLook(t: DiagramTheme): DiagramLook {
   const light = t.mode === 'light';
   return {
     node: t.surface,
-    nodeEdge: over(t.ink, t.surface, light ? 0.3 : 0.34),
+    nodeEdge: over(t.ink, t.surface, light ? 0.58 : 0.52),
     pill: t.paper,
     pillEdge: over(t.ink, t.paper, light ? 0.14 : 0.2),
     group: over(t.group, t.paper, light ? 0.55 : 0.6),
@@ -578,8 +580,8 @@ export function diagramLookCss(t: DiagramTheme): string {
     t.look === 'sketch'
       ? []
       : [
-          // Steps: the surface, a hairline, round joins (a decision's points soften too).
-          `.node rect, .node circle, .node ellipse, .node polygon, .node path { fill: ${k.node}; stroke: ${k.nodeEdge}; stroke-width: 1px; stroke-linejoin: round; }`,
+          // Steps: the flat surface, a solid 1.5 px border (the edges' weight), round joins.
+          `.node rect, .node circle, .node ellipse, .node polygon, .node path { fill: ${k.node}; stroke: ${k.nodeEdge}; stroke-width: 1.5px; stroke-linejoin: round; }`,
           `.row-rect-odd path { fill: ${k.node}; stroke: none; }`,
           `.row-rect-even path { fill: ${k.zebra}; stroke: none; }`,
           `.divider path { stroke: ${k.nodeEdge}; stroke-width: 1px; }`,
@@ -602,8 +604,8 @@ export function diagramLookCss(t: DiagramTheme): string {
     // Class and entity boxes: the name set bolder than the lines under it.
     '.label-group text, .label-group tspan, .label.name text, .label.name tspan { font-weight: 600; }',
     `.members-group text, .methods-group text, .label.attribute-type text, .label.attribute-name text, .label.attribute-keys text, .label.attribute-comment text { font-size: ${DIAGRAM_TYPE.member}px; }`,
-    // Sequence: hairline participants, soft lifelines, messages drawn like edges.
-    `.actor { fill: ${k.node}; stroke: ${k.nodeEdge}; stroke-width: 1px; }`,
+    // Sequence: participants boxed like steps, soft lifelines, messages drawn like edges.
+    `.actor { fill: ${k.node}; stroke: ${k.nodeEdge}; stroke-width: 1.5px; }`,
     `text.actor, text.actor > tspan { fill: ${t.ink}; stroke: none; }`,
     `.actor-line { stroke: ${k.lifeline}; stroke-width: 1px; }`,
     `.messageLine0, .messageLine1 { stroke: ${t.line}; stroke-width: 1.5px; stroke-linecap: round; }`,
@@ -620,12 +622,6 @@ export function diagramLookCss(t: DiagramTheme): string {
 }
 
 // ── the kit's theme, in Mermaid's words ──────────────────────────────────────
-
-const CURVES: Readonly<Record<DiagramTheme['curve'], string>> = {
-  basis: 'basis',
-  linear: 'linear',
-  step: 'stepAfter',
-};
 
 /** Six-digit hex, for Mermaid's colour maths (it cannot read the kit's other spellings). */
 function hex6(c: string): string {
@@ -675,7 +671,10 @@ export function mermaidConfig(theme: DiagramTheme, kind = ''): Record<string, un
     flowchart: {
       ...noSize,
       htmlLabels: false,
-      curve: CURVES[theme.curve],
+      // Laid out straight: every edge is re-drawn as an elbow in the page
+      // (2a'), and a label then sits on dagre's own point. The kit's curve
+      // is the elbows' corner radius.
+      curve: 'linear',
       // A little more room between ranks than Mermaid's own: an edge's pill
       // and its arrowhead both sit in that gap.
       nodeSpacing: 36,
@@ -857,8 +856,17 @@ export const ROUND_GEOMETRY_JS = String.raw`(v) => v.replace(/-?(?:\d+\.?\d*|\.\
  *                      `step` kit keeps its straight runs, not its sharp turns
  *   arrowTip           which way a Mermaid arrowhead points, and where its tip
  *                      is (the vertex on the marker's axis at the far end)
- *   chevron            Bobble's arrowhead: a small filled chevron, its back
- *                      notched, drawn round-joined so the tip is soft
+ *   openChevron        Bobble's arrowhead: an open ">" stroked like its edge,
+ *                      round-capped and round-joined — never a filled triangle
+ *                      (the user, 2026-09-25: "arrows should not be triangles,
+ *                      beveled tip/tail clean"); with the short run of line
+ *                      from the edge's end to the point when the point is ahead
+ *   elbow              an edge re-routed as an elbow ("curved path eg. elbow
+ *                      arrows"): out of its box square to the side it leaves
+ *                      (a decision from the corner it turns toward), into the
+ *                      next square to the side it enters, through its label,
+ *                      small jogs pulled straight — the corners are rounded by
+ *                      roundCorners afterwards
  *   roundedRect        a box with its corners rounded (class and entity boxes)
  */
 export const PATH_TOOLS_JS = String.raw`(() => {
@@ -994,16 +1002,183 @@ export const PATH_TOOLS_JS = String.raw`(() => {
     if (onAxis.some((p) => Math.abs(p[0] - min) < 0.01)) return { dir: -1, tip: min };
     return null;
   };
-  const chevron = (dir, tip, len, half, notch) => {
-    const back = tip - dir * len;
-    const nock = tip - dir * (len - notch);
-    return 'M' + fmt(tip) + ',0L' + fmt(back) + ',' + fmt(half) + 'L' + fmt(nock) + ',0L' + fmt(back) + ',' + fmt(-half) + 'Z';
+  const openChevron = (dir, apex, len, half, shaftFrom) => {
+    const back = apex - dir * len;
+    const arms = 'M' + fmt(back) + ',' + fmt(half) + 'L' + fmt(apex) + ',0L' + fmt(back) + ',' + fmt(-half);
+    // The point is ahead of where the line stops: the head carries the rest of the line.
+    const shaft = shaftFrom !== undefined && dir * (apex - shaftFrom) > 0.01
+      ? 'M' + fmt(shaftFrom) + ',0L' + fmt(apex) + ',0'
+      : '';
+    return shaft + arms;
   };
-  // The head for an edge this many px wide: a thick edge gets a bigger one;
-  // the tip is softened by a 1 px round-joined stroke in the same colour.
+  // The head for an edge this many px wide: a thick edge gets a bigger one.
   const arrowhead = (width) => {
     const k = Math.max(1, width / 1.5);
-    return { len: 7.2 * k, half: 3.5 * k, notch: 2.1 * k, soft: 1 };
+    return { len: 5.6 * k, half: 4.4 * k };
+  };
+  const elbow = (spec) => {
+    // Work in a frame where the flow runs down the page (+y): TB as drawn, BT
+    // flipped, LR/RL turned. Every box and point goes in; the route comes out.
+    const dir = spec.axis === 'BT' || spec.axis === 'LR' || spec.axis === 'RL' ? spec.axis : 'TB';
+    const fw = (p) => dir === 'TB' ? [p[0], p[1]] : dir === 'BT' ? [p[0], -p[1]] : dir === 'LR' ? [p[1], p[0]] : [p[1], -p[0]];
+    const bw = (p) => dir === 'TB' ? [p[0], p[1]] : dir === 'BT' ? [p[0], -p[1]] : dir === 'LR' ? [p[1], p[0]] : [-p[1], p[0]];
+    const fbox = (b) => {
+      const a = fw([b.x, b.y]);
+      const c = fw([b.x + b.w, b.y + b.h]);
+      return { x: Math.min(a[0], c[0]), y: Math.min(a[1], c[1]), w: Math.abs(c[0] - a[0]), h: Math.abs(c[1] - a[1]), kind: b.kind };
+    };
+    if (!spec.pts || spec.pts.length < 2) return null;
+    const pts = spec.pts.map(fw);
+    const S = fbox(spec.from);
+    const T = fbox(spec.to);
+    const others = (spec.obstacles || []).map(fbox);
+    const L = spec.label ? (() => { const b = fbox(spec.label); return { x: b.x + b.w / 2, y: b.y + b.h / 2, w: b.w, h: b.h }; })() : null;
+    const r = spec.r || 0;
+    const GAP = 18;
+    const cx = (b) => b.x + b.w / 2;
+    const cy = (b) => b.y + b.h / 2;
+    const bottom = (b) => b.y + b.h;
+    const right = (b) => b.x + b.w;
+    const inset = (b) => Math.min(b.w / 2, r + 4);
+    // The run of a side a line may meet: a box's side less its corners; a
+    // decision's point, or near it (a quarter of the way along either edge).
+    const span = (b, loose) => b.kind === 'diamond'
+      ? (loose ? [cx(b) - b.w / 8, cx(b) + b.w / 8] : [cx(b), cx(b)])
+      : [b.x + inset(b), right(b) - inset(b)];
+    const pref = (b) => b.kind === 'diamond' ? cx(b) : null;
+    // Where a vertical line at x meets the box's top or bottom.
+    const topAt = (b, x) => b.kind === 'diamond' ? b.y + Math.abs(x - cx(b)) * (b.h / b.w) : b.y;
+    const botAt = (b, x) => b.kind === 'diamond' ? bottom(b) - Math.abs(x - cx(b)) * (b.h / b.w) : bottom(b);
+    const sidePort = (b, s) => b.kind === 'diamond'
+      ? [s > 0 ? right(b) : b.x, cy(b)]
+      : [s > 0 ? right(b) : b.x, cy(b)];
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    // Does a run cut a box? Its own ends' boxes count past the point it leaves
+    // or enters them; so do the other labels and the edges drawn before it.
+    // A run and a box: a decision is its diamond, not the square round it (a
+    // line meeting a decision's edge off its point starts inside that square).
+    const cut = (x1, y1, x2, y2, b) => {
+      if (!(Math.max(x1, x2) > b.x + 1 && Math.min(x1, x2) < right(b) - 1 && Math.max(y1, y2) > b.y + 1 && Math.min(y1, y2) < bottom(b) - 1)) return false;
+      if (b.kind !== 'diamond') return true;
+      const a = b.w / 2 - 1;
+      const e = b.h / 2 - 1;
+      if (Math.abs(x1 - x2) < 0.01) {
+        const reach = e * (1 - Math.abs(x1 - cx(b)) / a);
+        return reach > 0 && Math.max(y1, y2) > cy(b) - reach && Math.min(y1, y2) < cy(b) + reach;
+      }
+      const reach = a * (1 - Math.abs(y1 - cy(b)) / e);
+      return reach > 0 && Math.max(x1, x2) > cx(b) - reach && Math.min(x1, x2) < cx(b) + reach;
+    };
+    const hits = (q, lab) => {
+      const boxes = [S, T, ...others];
+      for (let i = 1; i < q.length; i += 1) {
+        const [x1, y1] = q[i - 1];
+        const [x2, y2] = q[i];
+        for (const b of boxes) if (cut(x1, y1, x2, y2, b)) return true;
+      }
+      if (lab) {
+        const lb = { x: lab.x - L.w / 2, y: lab.y - L.h / 2, w: L.w, h: L.h };
+        for (const b of [S, T, ...others]) {
+          if (lb.x < right(b) && right(lb) > b.x && lb.y < bottom(b) && bottom(lb) > b.y) return true;
+        }
+      }
+      return false;
+    };
+    const cands = [];
+    const forward = T.y >= bottom(S) - 1;
+    const backward = bottom(T) <= S.y + 1;
+    const room = (a, b) => [Math.max(a[0], b[0]), Math.min(a[1], b[1])];
+    const labOn = (x, y0, y1) => L ? { x, y: clamp(L.y, Math.min(y0, y1) + L.h / 2 + 4, Math.max(y0, y1) - L.h / 2 - 4) } : null;
+    const straight = (loose) => {
+      const [lo, hi] = room(span(S, loose), span(T, loose));
+      if (lo > hi + 0.01) return;
+      const xs = [pref(S), pref(T), L ? L.x : null, pts[0][0], pts[pts.length - 1][0], (lo + hi) / 2, lo, hi]
+        .filter((v) => v !== null && v >= lo - 0.01 && v <= hi + 0.01);
+      for (const x of xs) {
+        const q = forward ? [[x, botAt(S, x)], [x, topAt(T, x)]] : [[x, topAt(S, x)], [x, botAt(T, x)]];
+        cands.push({ q, lab: labOn(x, q[0][1], q[1][1]) });
+      }
+    };
+    if (forward) {
+      // 1. Straight down, when the two sides share room — a decision at its point.
+      straight(false);
+      // 2. A decision's branch: out of the corner it turns toward, across, then down.
+      if (S.kind === 'diamond') {
+        for (const s of [Math.sign((L ? L.x : cx(T)) - cx(S)) || 1, -(Math.sign((L ? L.x : cx(T)) - cx(S)) || 1)]) {
+          const [tl, th] = span(T);
+          const xs = [pref(T), L ? L.x : null, pts[pts.length - 1][0], cx(T), tl, th].filter((v) => v !== null && v >= tl - 0.01 && v <= th + 0.01);
+          for (const x of xs) {
+            const v = sidePort(S, s);
+            if (s * (x - v[0]) < GAP / 2) continue;
+            const q = [v, [x, v[1]], [x, topAt(T, x)]];
+            cands.push({ q, lab: labOn(x, v[1], q[2][1]) });
+          }
+        }
+      }
+      // 3. Down, across, down (the across at the label, or halfway).
+      {
+        const [sl, sh] = span(S);
+        const [tl, th] = span(T);
+        const xa = pref(S) ?? clamp(L ? L.x : pts[0][0], sl, sh);
+        const xb = pref(T) ?? clamp(L ? L.x : pts[pts.length - 1][0], tl, th);
+        const y0 = botAt(S, xa);
+        const y1 = topAt(T, xb);
+        const ym = L ? clamp(L.y, y0 + 8, y1 - 8) : (y0 + y1) / 2;
+        const q = [[xa, y0], [xa, ym], [xb, ym], [xb, y1]];
+        cands.push({ q, lab: L ? { x: clamp(L.x, Math.min(xa, xb), Math.max(xa, xb)), y: ym } : null });
+      }
+      // 4. Straight, meeting a decision off its point (two edges that share one).
+      straight(true);
+    } else if (backward) {
+      // 1. Straight up, beside whatever runs down (dagre put the label there).
+      const [lo, hi] = room(span(S, true), span(T, true));
+      if (lo <= hi + 0.01 && L) {
+        const x = clamp(L.x, lo, hi);
+        const q = [[x, topAt(S, x)], [x, botAt(T, x)]];
+        cands.push({ q, lab: labOn(x, q[0][1], q[1][1]) });
+      }
+      // 2. Round the side the label is on: out of the side, up past both, back in.
+      const mids = pts.slice(1, -1);
+      const lean = L ? L.x : mids.length > 0 ? mids.reduce((u, v) => u + v[0], 0) / mids.length : cx(S) + 1;
+      for (const s of [Math.sign(lean - (cx(S) + cx(T)) / 2) || 1, -(Math.sign(lean - (cx(S) + cx(T)) / 2) || 1)]) {
+        const edge = s > 0 ? Math.max(right(S), right(T)) : Math.min(S.x, T.x);
+        // Far enough out for the line, then for its label to clear both boxes.
+        const half = L ? L.w / 2 + 6 : 0;
+        const xs = [0, 1, 2, 3].map((k) => edge + s * (GAP + k * GAP)).concat([0, 1, 2].map((k) => edge + s * (half + GAP / 2 + k * GAP)));
+        if (L && s * (L.x - edge) >= GAP - 0.01) xs.unshift(L.x);
+        for (const X of xs) {
+          const a = sidePort(S, s);
+          const z = sidePort(T, s);
+          const q = [a, [X, a[1]], [X, z[1]], z];
+          cands.push({ q, lab: labOn(X, a[1], z[1]) });
+        }
+      }
+    } else {
+      // Side by side: out of the facing sides, across (a jog at halfway).
+      const s = Math.sign(cx(T) - cx(S)) || 1;
+      const a = sidePort(S, s);
+      const z = sidePort(T, -s);
+      const xm = L ? L.x : (a[0] + z[0]) / 2;
+      const q = Math.abs(a[1] - z[1]) < 0.01 ? [a, z] : [a, [xm, a[1]], [xm, z[1]], z];
+      cands.push({ q, lab: L ? { x: xm, y: Math.abs(a[1] - z[1]) < 0.01 ? a[1] : clamp(L.y, Math.min(a[1], z[1]), Math.max(a[1], z[1])) } : null });
+    }
+    const chosen = cands.find((c) => !hits(c.q, c.lab));
+    if (!chosen) return null;
+    // Duplicates and straight-through points out.
+    const out = [];
+    for (const q of chosen.q) {
+      const prev = out[out.length - 1];
+      if (prev && Math.hypot(q[0] - prev[0], q[1] - prev[1]) < 0.01) continue;
+      out.push(q);
+      while (out.length >= 3) {
+        const [u, v, w] = out.slice(-3);
+        const cross = (v[0] - u[0]) * (w[1] - v[1]) - (v[1] - u[1]) * (w[0] - v[0]);
+        const dot = (v[0] - u[0]) * (w[0] - v[0]) + (v[1] - u[1]) * (w[1] - v[1]);
+        if (Math.abs(cross) < 0.01 && dot >= 0) out.splice(out.length - 2, 1);
+        else break;
+      }
+    }
+    return { pts: out.map(bw), label: chosen.lab ? bw([chosen.lab.x, chosen.lab.y]) : null };
   };
   const roundedRect = (x, y, w, h, r) => {
     const q = Math.max(0, Math.min(r, w / 2, h / 2));
@@ -1014,7 +1189,7 @@ export const PATH_TOOLS_JS = String.raw`(() => {
       'V' + fmt(y + q) + a(x + q, y) + 'Z'
     );
   };
-  return { parse, write, trimEnd, trimStart, roundCorners, arrowTip, chevron, arrowhead, roundedRect };
+  return { parse, write, trimEnd, trimStart, roundCorners, arrowTip, openChevron, arrowhead, elbow, roundedRect };
 })()`;
 
 /**
@@ -1154,6 +1329,198 @@ export const PAGE_SCRIPT = String.raw`(() => {
       if ((g.textContent || '').trim() === '') g.remove();
     }
 
+    // 2a'. ELBOWS (the user, 2026-09-25: "curved path eg. elbow arrows"). A
+    // flowchart's edges are laid out by dagre as points; Mermaid joined them
+    // with the kit's curve — soft S-bends that wandered through their own
+    // labels, or steps that jogged a few pixels at every rank. Each edge is
+    // re-drawn from the same points (P.elbow): square out of its box, a
+    // decision's branches from the corner they turn toward, through its label,
+    // square into the next box, corners rounded. The drawing's layout is
+    // untouched, so nothing else moves.
+    const routed = new Set();
+    // Flowcharts, and state diagrams (the same flow, with states for steps).
+    if (role.startsWith('flowchart') || /^statediagram/i.test(role)) {
+      const dirM = /^\s*(?:(?:flowchart|graph)\s+|direction\s+)(TB|TD|BT|RL|LR)\b/im.exec(req.source || '');
+      const axis = dirM ? (dirM[1].toUpperCase() === 'TD' ? 'TB' : dirM[1].toUpperCase()) : 'TB';
+      const radius = t.curve === 'step' ? 7 : t.curve === 'linear' ? 9 : 12;
+      const prefix = svgId + '-';
+      const nodes = new Map();
+      const allNodes = [...root.querySelectorAll('g.node')];
+      for (const g of allNodes) {
+        const own = (g.id || '').startsWith(prefix) ? g.id.slice(prefix.length) : g.id || '';
+        const m = /^flowchart-(.+)-\d+$/.exec(own);
+        if (m) nodes.set(m[1], g);
+      }
+      // A box in the edges' coordinates — a node's SHAPE's, not its group's
+      // (the words can overhang a decision by half a pixel, which put a kink
+      // over every corner it was entered by); a label's words with the room
+      // its pill will take round them (2c).
+      const frame = root.querySelector('g.edgePaths');
+      const boxOf = (els, pad) => {
+        let x0 = Infinity;
+        let y0 = Infinity;
+        let x1 = -Infinity;
+        let y1 = -Infinity;
+        for (const el of els) {
+          const b = el.getBBox();
+          if (!(b.width > 0 || b.height > 0)) continue;
+          const m = frame.getCTM().inverse().multiply(el.getCTM());
+          for (const [px, py] of [[b.x, b.y], [b.x + b.width, b.y], [b.x, b.y + b.height], [b.x + b.width, b.y + b.height]]) {
+            const q = new DOMPoint(px, py).matrixTransform(m);
+            x0 = Math.min(x0, q.x);
+            y0 = Math.min(y0, q.y);
+            x1 = Math.max(x1, q.x);
+            y1 = Math.max(y1, q.y);
+          }
+        }
+        if (!Number.isFinite(x0)) return null;
+        return { x: x0 - pad[0], y: y0 - pad[1], w: x1 - x0 + 2 * pad[0], h: y1 - y0 + 2 * pad[1] };
+      };
+      const nodeBox = (g) => {
+        const shapes = [...g.querySelectorAll('rect, polygon, path, circle, ellipse')].filter(
+          (el) => !el.closest('g.label, text, marker, defs, clipPath'),
+        );
+        const b = boxOf(shapes.length > 0 ? shapes : [g], [0, 0]);
+        if (!b) return null;
+        const poly = g.querySelector(':scope > polygon, :scope > g > polygon');
+        const diamond = !!poly && (poly.getAttribute('points') || '').trim().split(/\s+/).length === 4;
+        return { ...b, kind: diamond ? 'diamond' : 'box' };
+      };
+      const boxes = new Map(allNodes.map((g) => [g, nodeBox(g)]));
+      // A label knows its edge (its inner group carries the edge's id).
+      const labels = new Map();
+      for (const g of root.querySelectorAll('g.edgeLabel')) {
+        const inner = g.querySelector('[data-id]');
+        const id = inner && inner.getAttribute('data-id');
+        const at = /translate\(\s*([-\d.e]+)[ ,]+([-\d.e]+)\s*\)/.exec(g.getAttribute('transform') || '');
+        const b = boxOf([g], [8, 5]);
+        if (id && at && b) labels.set(id, { g, x: Number(at[1]), y: Number(at[2]), box: b });
+      }
+      // An edge's two ends: named in a flowchart edge's id (L_<from>_<to>_<n>);
+      // otherwise (a state diagram's edge0, edge1…) the boxes its first and
+      // last points sit on.
+      const nearest = (q) => {
+        let best = null;
+        let dist = 4;
+        for (const [g, b] of boxes) {
+          if (!b) continue;
+          const dx = Math.max(b.x - q[0], 0, q[0] - (b.x + b.w));
+          const dy = Math.max(b.y - q[1], 0, q[1] - (b.y + b.h));
+          const d = Math.hypot(dx, dy);
+          if (d < dist) {
+            dist = d;
+            best = g;
+          }
+        }
+        return best;
+      };
+      const ends = (id, pts) => {
+        const m = /^L_(.+)_\d+$/.exec(id || '');
+        if (m) {
+          const rest = m[1];
+          for (let i = rest.indexOf('_'); i > 0; i = rest.indexOf('_', i + 1)) {
+            const a = rest.slice(0, i);
+            const b = rest.slice(i + 1);
+            if (nodes.has(a) && nodes.has(b)) return [nodes.get(a), nodes.get(b)];
+          }
+        }
+        const a = nearest(pts[0]);
+        const b = nearest(pts[pts.length - 1]);
+        return a && b ? [a, b] : null;
+      };
+      const along = (b) => (axis === 'LR' ? b.x + b.w / 2 : axis === 'RL' ? -(b.x + b.w / 2) : axis === 'BT' ? -(b.y + b.h / 2) : b.y + b.h / 2);
+      const edges = [];
+      for (const path of root.querySelectorAll('g.edgePaths > path')) {
+        const id = path.getAttribute('data-id');
+        let pts;
+        try {
+          pts = JSON.parse(atob(path.getAttribute('data-points') || '')).map((q) => [q.x, q.y]);
+        } catch (e) { continue; }
+        if (!Array.isArray(pts) || pts.length < 2 || pts.some((q) => !Number.isFinite(q[0]) || !Number.isFinite(q[1]))) continue;
+        const pair = ends(id, pts);
+        if (!pair || pair[0] === pair[1]) continue;
+        const from = boxes.get(pair[0]);
+        const to = boxes.get(pair[1]);
+        if (!from || !to) continue;
+        edges.push({ path, id, pair, from, to, pts, back: along(to) < along(from) });
+      }
+      // The edges that run with the flow first: a loop back finds its way round them.
+      edges.sort((u, v) => Number(u.back) - Number(v.back));
+      const drawn = [];
+      // Twice: an edge with no clear way on the first pass tries again once the
+      // others are down (a loop that went round the side took its label with it).
+      const pending = [...edges, ...edges];
+      const done = new Set();
+      for (const e of pending) {
+        if (done.has(e)) continue;
+        const lab = labels.get(e.id) || null;
+        // Only the labels already set down are in the way: one not yet routed
+        // moves with its own edge (and keeps off the lines drawn before it).
+        const obstacles = [
+          ...[...boxes.entries()].filter(([g]) => g !== e.pair[0] && g !== e.pair[1]).map(([, b]) => b).filter(Boolean),
+          ...[...done].map((d) => labels.get(d.id)).filter(Boolean).map((l) => l.box),
+          ...drawn,
+        ];
+        const route = P.elbow({ pts: e.pts, from: e.from, to: e.to, label: lab ? lab.box : null, obstacles, axis, r: radius });
+        if (!route || route.pts.length < 2) continue;
+        done.add(e);
+        e.path.setAttribute('d', P.roundCorners('M' + route.pts.map((q) => q[0] + ',' + q[1]).join('L'), radius));
+        e.path.setAttribute('data-pd-routed', '1');
+        routed.add(e.path);
+        // Later edges keep off this one (a few pixels either side of each run).
+        for (let i = 1; i < route.pts.length; i += 1) {
+          const [x1, y1] = route.pts[i - 1];
+          const [x2, y2] = route.pts[i];
+          drawn.push({ x: Math.min(x1, x2) - 3, y: Math.min(y1, y2) - 3, w: Math.abs(x2 - x1) + 6, h: Math.abs(y2 - y1) + 6, kind: 'box' });
+        }
+        if (lab && route.label) {
+          const [lx, ly] = route.label;
+          if (Math.hypot(lx - lab.x, ly - lab.y) > 0.01) {
+            lab.box = { ...lab.box, x: lab.box.x + lx - lab.x, y: lab.box.y + ly - lab.y };
+            lab.x = lx;
+            lab.y = ly;
+            lab.g.setAttribute('transform', 'translate(' + lx + ', ' + ly + ')');
+          }
+        }
+      }
+      // Anything the router left (no route stayed clear) keeps Mermaid's straight runs, corners rounded.
+      for (const path of root.querySelectorAll('g.edgePaths > path')) {
+        if (routed.has(path)) continue;
+        const d = path.getAttribute('d');
+        if (d) path.setAttribute('d', P.roundCorners(d, radius));
+        routed.add(path);
+        path.setAttribute('data-pd-routed', 'mermaid');
+      }
+      // A loop round the side, or a label moved onto it, can leave the frame
+      // Mermaid measured before any of this: the frame grows to hold them (a
+      // "retry" pill was cut in half at the drawing's edge).
+      const vbox = root.viewBox && root.viewBox.baseVal;
+      if (vbox && vbox.width > 0 && vbox.height > 0) {
+        const at = root.getBoundingClientRect();
+        const kx = vbox.width / (at.width || vbox.width);
+        const ky = vbox.height / (at.height || vbox.height);
+        let x0 = vbox.x;
+        let y0 = vbox.y;
+        let x1 = vbox.x + vbox.width;
+        let y1 = vbox.y + vbox.height;
+        for (const el of [...routed, ...[...labels.values()].map((l) => l.g)]) {
+          if (!el.isConnected) continue;
+          const b = el.getBoundingClientRect();
+          if (!(b.width > 0 || b.height > 0)) continue;
+          x0 = Math.min(x0, vbox.x + (b.left - at.left) * kx - 8);
+          y0 = Math.min(y0, vbox.y + (b.top - at.top) * ky - 8);
+          x1 = Math.max(x1, vbox.x + (b.right - at.left) * kx + 8);
+          y1 = Math.max(y1, vbox.y + (b.bottom - at.top) * ky + 8);
+        }
+        if (x0 < vbox.x - 0.5 || y0 < vbox.y - 0.5 || x1 > vbox.x + vbox.width + 0.5 || y1 > vbox.y + vbox.height + 0.5) {
+          root.setAttribute('viewBox', [x0, y0, x1 - x0, y1 - y0].map((v) => Math.round(v * 100) / 100).join(' '));
+          root.setAttribute('width', String(Math.ceil(x1 - x0)));
+          root.setAttribute('height', String(Math.ceil(y1 - y0)));
+          root.style.maxWidth = '';
+        }
+      }
+    }
+
     // 2b. Boxes: the kit's corners on a plain one (a rounded or a stadium
     // node keeps its own; a state takes the kit's over Mermaid's 5 px), and
     // a class or entity box redrawn as ONE rounded shape — Mermaid draws it
@@ -1206,7 +1573,7 @@ export const PAGE_SCRIPT = String.raw`(() => {
         edge.setAttribute('class', 'pd-box-edge');
         edge.style.fill = 'none';
         edge.style.stroke = k.nodeEdge;
-        edge.style.strokeWidth = '1px';
+        edge.style.strokeWidth = '1.5px';
         const rows = node.querySelectorAll(':scope > g.row-rect-odd, :scope > g.row-rect-even');
         if (rows.length > 0) {
           const clip = document.createElementNS(NS, 'clipPath');
@@ -1307,6 +1674,7 @@ export const PAGE_SCRIPT = String.raw`(() => {
     if (t.curve !== 'basis') {
       const r = t.curve === 'step' ? 7 : 9;
       for (const p of root.querySelectorAll('g.edgePaths > path')) {
+        if (routed.has(p)) continue;
         const d = p.getAttribute('d');
         if (d) p.setAttribute('d', P.roundCorners(d, r));
       }
@@ -1360,16 +1728,31 @@ export const PAGE_SCRIPT = String.raw`(() => {
           // Which way is "out" along the marker's own x: forward at the end;
           // at the start, back — unless the marker turns itself round there.
           const outward = which === 'marker-end' || orient === 'auto-start-reverse' ? 1 : -1;
-          let off = (tip.tip - refX) * s;
-          if (tip.dir === outward && Math.abs(off) < 3) {
-            // A tip that sits on the line's own end: the line is pulled back
-            // into the head, so its round cap never shows past the point.
-            const pullBy = 3 - Math.abs(off);
-            pull(el, which, pullBy);
-            off += outward * pullBy;
+          // Where the point goes, in the marker's own units: Mermaid's tip,
+          // less half the stroke (the round join reaches that far past it).
+          // A routed edge (2a') already ends on its box, so it stops half a
+          // stroke short and the point sits on its end.
+          let apex;
+          let shaftFrom;
+          if (el.getAttribute('data-pd-routed') === '1') {
+            pull(el, which, width / 2);
+            apex = 0;
+          } else {
+            apex = (tip.tip - refX) * s - tip.dir * (width / 2);
+            if (tip.dir === outward && apex * outward < -0.01) {
+              // The line runs past the point: pulled back to it, so its round
+              // cap never shows beyond.
+              const by = -apex * outward;
+              pull(el, which, by);
+              apex += outward * by;
+            } else if (tip.dir === outward && apex * outward > 0.01) {
+              // The point is ahead of where the line stops: the head carries
+              // the last of the line to it.
+              shaftFrom = 0;
+            }
           }
           const size = P.arrowhead(width);
-          const key = ['a', colour.hex.slice(1), Math.round(width * 10), Math.round(off * 10), tip.dir, orient].join('_');
+          const key = ['a', colour.hex.slice(1), Math.round(width * 10), Math.round(apex * 10), shaftFrom === undefined ? 0 : 1, tip.dir, orient].join('_');
           id = made.get(key);
           if (!id) {
             id = svgId + '_pd' + key.replace(/[^\w-]/g, '');
@@ -1382,11 +1765,13 @@ export const PAGE_SCRIPT = String.raw`(() => {
             mk.setAttribute('refY', '0');
             mk.setAttribute('markerUnits', 'userSpaceOnUse');
             mk.setAttribute('orient', orient);
+            // An open ">" in the edge's own stroke — never a filled triangle.
             const head = document.createElementNS(NS, 'path');
-            head.setAttribute('d', P.chevron(tip.dir, off - (tip.dir * size.soft) / 2, size.len, size.half, size.notch));
-            head.style.fill = colour.hex;
+            head.setAttribute('d', P.openChevron(tip.dir, apex, size.len, size.half, shaftFrom));
+            head.style.fill = 'none';
             head.style.stroke = colour.hex;
-            head.style.strokeWidth = size.soft + 'px';
+            head.style.strokeWidth = width + 'px';
+            head.style.strokeLinecap = 'round';
             head.style.strokeLinejoin = 'round';
             mk.appendChild(head);
             defs.appendChild(mk);
