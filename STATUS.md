@@ -1,13 +1,40 @@
 # Bobble — status
 
-Updated: 2026-09-25 (late morning) · main `89466859` **installed** in /Applications (packaged probe + smoke green, codesign verified) · OmniSVG comparison queued behind the AC-power gate (on battery)
+Updated: 2026-09-25 (midday) · main `33752a35` (built; installed is `89466859`) · OmniSVG comparison queued for AC power + an idle machine · the list of everything NOT finished is the next section
 
 ## Morning 2026-09-25 (the user back)
 | Item | State |
 |---|---|
 | "why such a pale blue for the notifications?" | **Done** `23d21af6`: progress bars + unread dots use a new per-theme `--pd-status-*-solid` (the hue at full strength, #0a84ff on Bobble dark) instead of `fg`, a text colour lifted toward white on dark. tray-transfers-look + notif-redesign-probe green, looked at. |
-| "omnisvg should be really good … figure this out" | **In progress.** Ruled out, measured: the GGUF conversion (embedding rows identical to OmniSVG's own checkpoint, cos 1.0000; the matrix is tied, as their config says), prompt tokenization (llama-server parses `<\|im_start\|>` as specials). Our "fox" fixture decodes to a red abstract shape; the authors' demos are clean flat icons and characters. Suspects: our prompts (terse/abstract, with text) vs their caption style, candidate choice (eos-first favours short drawings; 1,536-token cap vs their 4,096 table), sampler order. A side-by-side (our Q8 pipeline ×2 samplers vs their bf16 PyTorch pipeline, same prompts) is queued behind the AC-power gate. |
+| "omnisvg should be really good … figure this out" | **In progress — the decisive run has not happened.** The side-by-side waited for AC all morning (battery) and died with the session at ~11:40; re-queued behind AC + an idle machine. Everything below still stands. **Earlier:** Ruled out, measured: the GGUF conversion (embedding rows identical to OmniSVG's own checkpoint, cos 1.0000; the matrix is tied, as their config says), prompt tokenization (llama-server parses `<\|im_start\|>` as specials). Our "fox" fixture decodes to a red abstract shape; the authors' demos are clean flat icons and characters. Suspects: our prompts (terse/abstract, with text) vs their caption style, candidate choice (eos-first favours short drawings; 1,536-token cap vs their 4,096 table), sampler order. A side-by-side (our Q8 pipeline ×2 samplers vs their bf16 PyTorch pipeline, same prompts) is queued behind the AC-power gate. |
+| "arrows should not be triangles, beveled tip/tail clean and curved path eg. elbow arrows … clean solid borders no shininess" | **Done, on main `33752a35` (built, not installed):** every arrowhead an open ">" stroked like its edge (round caps/joins, point on the border); flowchart + state-diagram edges re-drawn as elbows from dagre's own points — straight when boxes share room, a decision's branch from its corner, a loop round the side its label is on, labels riding on the route (matched by id), each route checked against boxes, placed labels and earlier edges; solid 1.5 px borders, flat fills. diagram-page tests 50/50 (7 new), inline-diagram-probe OK. **Not re-verified:** the hand-over glide (a game held the GPU at 10 fps during both runs). Class/ER keep Mermaid's routing (their UML marks are placed for it). |
 | "custom mermaid arrows and box styling … animate/build in real time" | **Done, on main `729d0845`, installed:** Bobble's own diagram look over Mermaid's (chevron arrowheads, hairline rounded boxes, edge-label pills; six kits × light/dark × flowchart/sequence/state/class/ER, contrast guard green); the card builds live from the streaming `source` (parts matched across frames: new ones pop in, edges draw, moved ones glide; longest frame 16.5 ms) and hands over in place (0 px); charts ease to each new height; small SVGs draw in (<0.7 s); file and Sources cards rise in; nothing replays on a chat switch; reduced motion honoured. Plus `66c1c092`: the chain's wait row grows in / folds away, so a card beneath it glides when a tool answers (largest single-frame move 34 px → 3.2 px). Tests: ui 427, desktop 3,365, canvas 384; probes diagram-build-look, chart-build-film, arrival-film, turn-cards-look, pending-card-look, image-viewer, inline-diagram green on main. Not fixed (reported by the lane): a class with only fields or only methods keeps a thin empty compartment; step-routed class arrows enter side-on in two kits; line/area charts redraw rather than glide when a point is added. |
+
+## Everything NOT finished (2026-09-25 midday) — the user: "I don't believe it's totally all finished"
+**The visual push (the user, 09-24 night) — per kind:**
+| Kind | State |
+|---|---|
+| Website (images as backgrounds, scroll features, SVG, UI) | ❌ not worked on beyond the SVG unblock; not verified |
+| UI (app-like screens) | ❌ not started |
+| pptx / docx / xlsx | 🟡 renderer-from-spec fixed (fonts, citations, Sources slide/sheet, multi-sheet); no model-driven run; docs open with a "Missing document fonts" warning (cause known, not fixed) |
+| Charts / dataviz | 🟡 VQ-02/03 fixes + live growth; no model-driven run tonight |
+| Diagrams | ✅ tool, look, live build, today's elbow/arrow/border restyle |
+| Math explanations, math animations, NN inner workings | ❌ not started |
+| Animations (HyperFrames) | 🟡 title-card fix only |
+| Interactive widgets inline + canvas | ❌ not built (the path is known: a presented .html → PresentedInline → InlineWidget 'html') |
+| SVG icons / artwork | 🟡 policy + render-back done, no model run since; OmniSVG quality open (above) |
+| Images: observe + improve loop | 🟡 generate_image returns pixels; edit_image does not; no loop work |
+| 3D for games (generate, rig, retopo) | ❌ not touched in the push |
+| Sources UI | ✅ chips, hover card, Sources card — but the 4B puts research into notes.md 3 of 4 times (unfixed) |
+| Mixes (deck with diagrams + data + images + animation; site with images + SVG + UI) and improve-loops inside a big task | ❌ not started |
+| Ming 0.1 (models + pptx skill) | ❌ not started (only the earlier engine spike, 18d42c0a) |
+| One generation per kind "you're proud of", + the quick-email control | ❌ not done (the suite stopped at the time cap) |
+
+**The 09-23 tracks:** Hindsight memory, bobble help, workflows — prototypes only · training/Unsloth parity — brief + parity study, 3 prototypes not built · Linux/Windows GPUs — uv installer only · Tailscale Devices — backend merged, no UI · studios as editors — prototypes + the image viewer's Edit bar · harness LoRA — plan only · the 10 design prototypes — waiting on the user's critique.
+
+**Side sessions (finished, NOT merged to main):** `claude/nice-hertz-e0f8aa` (a CLI command held to its tool's own tool_call rules), `claude/elated-chatelet-abe541` (Download asks for the pinned file; the model-fit probe drives the hub; includes `claude/vigorous-ellis-7c0351`'s one-row-per-model quants), `claude/gallant-burnell-c0f392` (every `uv run --with` starts offline). The gen3d-on-Python-3.9 test task left no branch.
+
+**Open bugs:** the 6 confirmed vision-wave bugs (deliverables/review/wave-0923-findings.md; worst: clicked rapid-mlx rows silently switch to the vision lane) + 33 unverified · the office chip flicker (1/15) · rapid-mlx never lands the paste prime (~4.5k tokens re-read) · a finished card remounts into the chain when the next tool starts; a picture embedded in the reply shows twice; ⌘Z into a streaming turn keeps the partial; an image-only message can't be rewound · img2img edits are subtle (the real instruction editor needs the 3D engine) · a class with only fields/methods keeps an empty compartment; class arrows enter side-on in two kits; line/area charts redraw instead of glide · the OmniSVG catalog repo (Lavanuke/OmniSVG1.1_4B-GGUF) does not exist on the Hub, so a fresh install cannot download it (needs a write token) · stale Ladle build in the bundle.
 
 ## Overnight 2026-09-24/25 — the visual-output push (the user: "start working on the visuals (high priority) the model can produce …")
 Merged on main (`bacdca5f` … `2c794eae`), unit suites 8,234 pass (the 2 gen3d Python tests on system Python 3.9 still fail — a separate task is fixing that):
