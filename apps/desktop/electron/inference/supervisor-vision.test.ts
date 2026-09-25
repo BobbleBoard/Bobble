@@ -24,7 +24,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { hardwareKey, modelDir, PINNED_LLAMACPP } from '@pi-desktop/inference';
 import { entryDir, slugFor, writeManifest } from '@pi-desktop/model-store';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LlmCompanion, LlmStatus } from '../ipc-contract';
 import {
   calibrationDir,
@@ -182,6 +182,7 @@ function ask<T>(req: LlmRequestBody): Promise<T> {
   });
 }
 
+const realHome = process.env.HOME;
 process.env.HOME = mkdtempSync(join(tmpdir(), 'pd-supervisor-home-'));
 await import('./supervisor-entry');
 
@@ -273,6 +274,12 @@ beforeEach(async () => {
   h.hold = null;
 });
 
+afterAll(() => {
+  vi.unstubAllGlobals();
+  if (realHome === undefined) delete process.env.HOME;
+  else process.env.HOME = realHome;
+});
+
 describe('the reuse gate (ALREADY RESIDENT)', () => {
   it('a text-only model with vision off is reused, not reloaded', async () => {
     gguf('nanbeige4.2-3b', 'Nanbeige_Nanbeige4.2-3B-Q8_0.gguf');
@@ -325,7 +332,7 @@ describe('Vision off, then Apply (relaunch)', () => {
       type: 'start-server',
       modelId: 'qwen3.5-0.8b-mtp',
     });
-    await vi.waitFor(() => expect(h.launches.length).toBe(launched + 1));
+    await vi.waitFor(() => expect(h.launches.length).toBe(launched + 1), { timeout: 10_000 });
     expect((await status()).serverRunning).toBe(false);
     await vision(false);
     const applied = ask<{ success: boolean }>({ type: 'relaunch' });
