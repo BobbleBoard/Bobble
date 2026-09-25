@@ -252,16 +252,16 @@ try {
     { timeout: 8000 },
   );
   assert(
-    (await page.locator('[data-testid="media-expanded"]').count()) === 0,
+    (await page.locator('[data-testid="image-viewer"]').count()) === 0,
     'the expanded view should be closed until the card is opened',
   );
   // The controls only exist on hover, which is the gesture as well as the style.
   await card.hover();
   await page.locator('[data-testid="media-expand"]').first().click();
-  await page.locator('[data-testid="media-expanded"]').waitFor({ state: 'visible', timeout: 4000 });
+  await page.locator('[data-testid="image-viewer"]').waitFor({ state: 'visible', timeout: 4000 });
   await page.keyboard.press('Escape');
   await page.waitForFunction(
-    () => document.querySelector('[data-testid="media-expanded"]') === null,
+    () => document.querySelector('[data-testid="image-viewer"]') === null,
     null,
     { timeout: 4000 },
   );

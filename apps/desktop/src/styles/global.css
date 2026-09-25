@@ -4500,6 +4500,11 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   inset: 0;
   cursor: zoom-out;
 }
+/* …and the picture that opens it says so. A card click opens the image
+   viewer (MediaCard `data-opens`); the corner controls keep their pointer. */
+.pd-media-frame[data-opens="true"] {
+  cursor: zoom-in;
+}
 .pd-media-stage {
   position: relative;
   z-index: 1;
