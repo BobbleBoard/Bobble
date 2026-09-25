@@ -735,6 +735,36 @@ try {
     }
   }
 
+  /* 07 — a narrow window (the app's minimum width): chips wrap with the text,
+     the card's rows keep their picture and nothing spills sideways. */
+  await setMode('dark');
+  await cdp.send('Emulation.setDeviceMetricsOverride', {
+    width: 780,
+    height: 940,
+    deviceScaleFactor: 2,
+    mobile: false,
+  });
+  await sleep(600);
+  await scrollTo('[data-testid="sources-card"]', 'center');
+  await sleep(400);
+  await shot('07-narrow-dark');
+  const spill = await page.evaluate(() => {
+    const scroller = document.querySelector('[data-testid="chat-scroll"]');
+    const card = document.querySelector('[data-testid="sources-card"]');
+    return {
+      sideways: scroller === null ? 0 : scroller.scrollWidth - scroller.clientWidth,
+      cardRight: Math.round(card?.getBoundingClientRect().right ?? 0),
+      viewport: window.innerWidth,
+    };
+  });
+  console.log('narrow:', JSON.stringify(spill));
+  check(
+    spill.sideways <= 0,
+    `nothing scrolls sideways in a narrow window (${JSON.stringify(spill)})`,
+  );
+  await cdp.send('Emulation.clearDeviceMetricsOverride');
+  await sleep(400);
+
   /* Keyboard: Tab onto a chip, Enter opens its card with focus inside, Escape closes. */
   await setMode('dark');
   const kb = await page.evaluate(async () => {
