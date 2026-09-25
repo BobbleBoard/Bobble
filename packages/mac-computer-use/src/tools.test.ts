@@ -1474,6 +1474,7 @@ describe('only a session that drove the Mac this turn ends the driving', () => {
     });
     registerChromeTools(s.pi, bridge, {
       session,
+      consent: preConsented(),
       isChromeRunning: async () => true,
       chromePid: async () => 4321,
       ...NO_APPLE_EVENTS,
@@ -1703,6 +1704,7 @@ describe('Chrome work leaves Chrome under control whichever route did it — and
     const { pi, tools } = piStub();
     registerChromeTools(pi, bridge, {
       session,
+      consent: preConsented(),
       isChromeRunning: async () => true,
       chromePid: async () => 4321,
       ...NO_APPLE_EVENTS,
@@ -1764,5 +1766,122 @@ describe('a --visual click maps the picture the helper actually sent', () => {
     await run(tools, 'mac_click', { x: 1000, y: 800 });
     // The middle of the picture is the middle of the rect.
     expect(bridge.lastParams('click')).toMatchObject({ x: 600, y: 500 });
+  });
+});
+
+/*
+ * The chrome_* commands against the person's standing answer: computer use
+ * switched off, or Chrome not among the apps allowed without asking.
+ */
+describe('chrome_* pass the same consent and policy gate as the mac acts', () => {
+  const OFF = () =>
+    createMacConsentGate({
+      preConsented: true,
+      policy: async () => ({ enabled: false, apps: [] }),
+    });
+  const ONLY = (id: string, name: string) =>
+    createMacConsentGate({ policy: async () => ({ enabled: true, apps: [{ id, name }] }) });
+
+  function chrome(consent: MacConsentGate, jsAllowed = true) {
+    const evals: string[] = [];
+    const bridge = new FakeBridge()
+      .on('brake', () => ({ refusal: null }))
+      .on('snapshot', () => ({
+        ...SNAP([{ index: 1, role: 'AXLink', name: 'Docs' }], 4321),
+        app: 'Google Chrome',
+      }))
+      .on('click', () => ({ found: true }))
+      .on('type', () => ({ ok: true }));
+    const { pi, tools } = piStub();
+    registerChromeTools(pi, bridge, {
+      consent,
+      isChromeRunning: async () => true,
+      chromePid: async () => 4321,
+      ...NO_APPLE_EVENTS,
+      chromeJsAllowed: async () => jsAllowed,
+      chromeEval: async (js: string) => {
+        evals.push(js);
+        return { ok: true, value: 'done' };
+      },
+    });
+    /** Everything that reached Chrome: page scripts and helper acts. */
+    const reached = () =>
+      evals.length + bridge.countOf('click') + bridge.countOf('type') + bridge.countOf('snapshot');
+    return { tools, reached };
+  }
+
+  const EVERY: readonly [string, Record<string, unknown>][] = [
+    ['chrome_snapshot', {}],
+    ['chrome_click', { index: 1 }],
+    ['chrome_type', { index: 1, text: 'hello' }],
+    ['chrome_go', { url: 'https://example.com' }],
+  ];
+
+  it.each(EVERY)('%s does nothing while computer use is switched off', async (tool, params) => {
+    const { tools, reached } = chrome(OFF());
+    const r = await run(tools, tool, params);
+    expect(textOf(r)).toContain(COMPUTER_USE_OFF_REASON);
+    expect(reached()).toBe(0);
+  });
+
+  it('nor through the Accessibility fallback of a default Chrome', async () => {
+    const { tools, reached } = chrome(OFF(), false);
+    const r = await run(tools, 'chrome_click', { index: 1 }, ctxStub(false));
+    expect(textOf(r)).toContain(COMPUTER_USE_OFF_REASON);
+    expect(reached()).toBe(0);
+  });
+
+  it.each(
+    EVERY,
+  )('%s does nothing where Chrome is not allowed and nobody can be asked', async (tool, params) => {
+    const { tools, reached } = chrome(ONLY('com.apple.TextEdit', 'TextEdit'));
+    const r = await run(tools, tool, params, ctxStub(false));
+    expect(textOf(r)).toMatch(/consent/i);
+    expect(reached()).toBe(0);
+  });
+
+  it('asks about Chrome by name where it can, and acts only on a yes', async () => {
+    const consent = ONLY('com.apple.TextEdit', 'TextEdit');
+    const no = ctxStub(true, false);
+    const declined = chrome(consent);
+    await run(declined.tools, 'chrome_click', { index: 1 }, no);
+    expect(no.ui.confirm).toHaveBeenCalledWith('Let Bobble use Google Chrome?', expect.any(String));
+    expect(declined.reached()).toBe(0);
+    const yes = chrome(ONLY('com.apple.TextEdit', 'TextEdit'));
+    await run(yes.tools, 'chrome_click', { index: 1 }, ctxStub(true, true));
+    expect(yes.reached()).toBe(1);
+  });
+
+  it('acts without a question where Chrome is on the list', async () => {
+    const { tools, reached } = chrome(ONLY('com.google.Chrome', 'Google Chrome'));
+    await run(tools, 'chrome_click', { index: 1 }, ctxStub(false));
+    expect(reached()).toBe(1);
+  });
+
+  it('chrome tabs does not read Chrome on another app’s grant', async () => {
+    let reads = 0;
+    const bridge = new FakeBridge().on('snapshot', () => SNAP([OK_BUTTON]));
+    const { pi, tools } = piStub();
+    registerMacComputerUseTools(pi, {
+      bridge,
+      consent: ONLY('com.apple.TextEdit', 'TextEdit'),
+      readChromeTabs: async () => {
+        reads += 1;
+        return [{ window: 1, index: 1, title: 'Bank', url: 'https://bank.example', active: true }];
+      },
+    });
+    await run(tools, 'mac_snapshot', { app: 'TextEdit' }, ctxStub(false)); // TextEdit: allowed
+    const r = await run(tools, 'chrome_tabs', {}, ctxStub(false));
+    expect(reads).toBe(0);
+    expect(textOf(r)).toMatch(/consent/i);
+  });
+
+  it('chrome tab was already refused while computer use is off', async () => {
+    const bridge = new FakeBridge().on('tabSelect', () => ({ ok: true, tabs: [] }));
+    const { pi, tools } = piStub();
+    registerMacComputerUseTools(pi, { bridge, consent: OFF(), readChromeTabs: async () => null });
+    const r = await run(tools, 'chrome_tab', { action: 'select', index: 2 });
+    expect(textOf(r)).toContain(COMPUTER_USE_OFF_REASON);
+    expect(bridge.countOf('tabSelect')).toBe(0);
   });
 });

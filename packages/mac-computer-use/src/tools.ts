@@ -1479,7 +1479,10 @@ export function registerMacComputerUseTools(
     }),
     async execute(_id, params, _signal, _upd, ctx): Promise<AgentToolResult<MacDetails>> {
       if (bridge === null) return unavailable('chrome_tabs');
-      const blocked = await gate('chrome_tabs', ctx);
+      /* Asked about the browser it READS — Chrome, unless another is named. A
+         gate that named nothing let any earlier grant (TextEdit's, say) cover
+         reading every Chrome tab's title and URL over Apple Events. */
+      const blocked = await gate('chrome_tabs', ctx, params.app ?? CHROME_APP);
       if (blocked !== null) return blocked;
       try {
         /*
@@ -1877,6 +1880,24 @@ export function registerChromeTools(
     }
   }
 
+  /**
+   * THE GATE EVERY MAC ACT PASSES, NAMING CHROME — before either route.
+   *
+   * These commands had none: with computer use switched off in Settings, or
+   * Chrome not among the apps allowed without asking (and no one to ask — a
+   * subagent, a scheduled run), a click, a typed value or a navigation still
+   * went into the user's logged-in Chrome, over Apple Events or through the
+   * Accessibility fallback alike. Returns what to tell the model, or null.
+   */
+  async function chromeGate(tool: string, ctx: ExtensionContext): Promise<string | null> {
+    const decision = await consent.ensure(ctx, CHROME_APP);
+    return decision.ok ? null : `${tool} failed: ${decision.reason}`;
+  }
+  const said = (text: string) => ({
+    content: [{ type: 'text' as const, text }],
+    details: undefined,
+  });
+
   /** Make sure Chrome will run our JavaScript, asking the user once if not. */
   async function ensureChromeJs(ctx: ExtensionContext): Promise<string | null> {
     if (await jsAllowed()) return null;
@@ -1977,19 +1998,16 @@ export function registerChromeTools(
        * window through Accessibility's capture, which needs no Chrome setting —
        * and only once Chrome is up, so looking never launches it in front.
        */
+      const refused = await chromeGate('chrome_snapshot', ctx);
+      if (refused !== null) return said(refused);
       if (params.visual === true) {
         /*
-         * THE GATE AND THE BRAKE mac_snapshot --visual answers to — it is the
-         * same capture of the user's logged-in window. It had neither: it took
+         * THE GATE (above) AND THE BRAKE mac_snapshot --visual answers to — it is
+         * the same capture of the user's logged-in window. It had neither: it took
          * the picture with computer use switched off in Settings or Chrome never
          * allowed, and it swallowed the brake's refusal into "take a plain chrome
          * snapshot instead" — the one route the brake could not see.
          */
-        const decision = await consent.ensure(ctx, CHROME_APP);
-        if (!decision.ok) {
-          const text = `chrome_snapshot failed: ${decision.reason}`;
-          return { content: [{ type: 'text', text }], details: undefined };
-        }
         const braked = await brakeRefusal(bridge);
         if (braked !== null) {
           const text = `chrome_snapshot failed: ${braked}`;
@@ -2061,6 +2079,8 @@ export function registerChromeTools(
       index: Type.Number({ description: 'The [index] from chrome_snapshot.' }),
     }),
     async execute(_id, params, _signal, _upd, ctx) {
+      const refused = await chromeGate('chrome_click', ctx);
+      if (refused !== null) return said(refused);
       const out = await evalInChrome(ctx, chromeActionJs(params.index, 'click'));
       if (out.ok) return { content: [{ type: 'text', text: out.text }], details: undefined };
       const ack = await ax<{ found?: boolean; mode?: string }>('click', { index: params.index });
@@ -2096,6 +2116,8 @@ export function registerChromeTools(
       ),
     }),
     async execute(_id, params, _signal, _upd, ctx) {
+      const refused = await chromeGate('chrome_type', ctx);
+      if (refused !== null) return said(refused);
       const out = await evalInChrome(ctx, chromeActionJs(params.index, 'focus', params.text));
       if (out.ok) return { content: [{ type: 'text', text: out.text }], details: undefined };
       const ack = await ax<{ ok?: boolean }>('type', {
@@ -2128,6 +2150,8 @@ export function registerChromeTools(
           details: undefined,
         };
       }
+      const refused = await chromeGate('chrome_go', ctx);
+      if (refused !== null) return said(refused);
       const out = await evalInChrome(ctx, `location.href = ${JSON.stringify(url)}; location.href`);
       return { content: [{ type: 'text', text: out.text }], details: undefined };
     },
