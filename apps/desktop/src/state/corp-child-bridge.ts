@@ -38,7 +38,7 @@ export const corpChildId = (nodeId: string): string => `${CORP_CHILD_PREFIX}${no
  * chat renders. The corp store's block list is already settled/merged (text and
  * thinking carry their own `streaming` flag), so this is a straight projection.
  */
-function blocksToMessages(childId: string, blocks: readonly CorpBlock[]): ChatMsg[] {
+function blocksToMessages(childId: string, run: string, blocks: readonly CorpBlock[]): ChatMsg[] {
   const content: ContentBlock[] = [];
   const results: ChatMsg[] = [];
   /*
@@ -53,7 +53,16 @@ function blocksToMessages(childId: string, blocks: readonly CorpBlock[]): ChatMs
    * turn and becomes a user message, so the transcript reads as a conversation.
    */
   const out: ChatMsg[] = [];
-  const assistantId = `${childId}:turn`;
+  /*
+   * THE RUN IS PART OF THE ID. A running step's clock is remembered by its id
+   * for the life of the renderer (activity-chain's STEP_FIRST_SEEN), and every
+   * production starts a role's transcript over (setTask clears workerBlocks) —
+   * so with ids built from the role alone, the manager's first thought in the
+   * second run WAS its first thought in the first run, and opened reading
+   * "Thinking for 30m" (review of the 2026-09-23 wave). Tool-call ids derive
+   * from this one, so a running command's clock is covered too.
+   */
+  const assistantId = `${childId}:${run}:turn`;
   let turn = 0;
   const flush = (streaming: boolean): void => {
     if (content.length === 0) return;
@@ -161,7 +170,9 @@ export function syncCorpChildren(parentId: string): void {
     const blocks = corp.workerBlocks[node.id];
     if (blocks !== undefined && blocks !== lastBlocks.get(node.id)) {
       lastBlocks.set(node.id, blocks);
-      useChildAgentStore.getState().replaceMessages(id, blocksToMessages(id, blocks));
+      useChildAgentStore
+        .getState()
+        .replaceMessages(id, blocksToMessages(id, corp.taskId ?? '', blocks));
     }
     /*
      * A ROLE CANNOT BE RUNNING AFTER THE RUN HAS ENDED.
