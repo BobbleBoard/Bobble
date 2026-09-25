@@ -506,6 +506,9 @@ export interface QuantOption {
   bytes: number;
 }
 
+/** An importance-matrix file: calibration data a quantizer used, not a model. */
+const IMATRIX_RE = /imatrix/i;
+
 /** Rough Q2…Q8 ordering key (UD-/IQ- prefixes keep their base digit). Only a
  * tie-break now, for ladders whose sizes we never learned. */
 function quantRank(quant: string): number {
@@ -533,7 +536,12 @@ function quantRank(quant: string): number {
  */
 export function mergeQuantLadder(
   base: readonly QuantOption[],
-  fetched?: ReadonlyArray<{ quant?: string; sizeBytes?: number; mmproj?: boolean }>,
+  fetched?: ReadonlyArray<{
+    quant?: string;
+    sizeBytes?: number;
+    mmproj?: boolean;
+    mtp?: boolean;
+  }>,
 ): QuantOption[] {
   const map = new Map<string, QuantOption>();
   for (const q of base) map.set(q.quant, { quant: q.quant, bytes: q.bytes });
@@ -563,6 +571,14 @@ export function mergeQuantLadder(
      * every caller remembering to.
      */
     if (f.mmproj === true) continue;
+    /*
+     * NOR IS A SPEED HEAD, NOR AN IMATRIX. The same 27B repo ships
+     * `MTP/mtp-Qwen3.8-27B-Q4_0.gguf` (a 1.4 GB draft head that loads beside
+     * the weights) and `imatrix_unsloth.gguf` (calibration data). Listed row for
+     * row they became a second "Q4_0" at 1.3 GB and a 13 MB "imatrix_unsloth",
+     * both green and neither a model you can run.
+     */
+    if (f.mtp === true || IMATRIX_RE.test(f.quant)) continue;
     const bytes = f.sizeBytes ?? 0;
     const prior = fromFetch.has(f.quant) ? (map.get(f.quant)?.bytes ?? 0) : 0;
     fromFetch.add(f.quant);

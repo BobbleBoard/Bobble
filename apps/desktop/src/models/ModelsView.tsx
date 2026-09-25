@@ -52,7 +52,7 @@ import type {
 } from '../../electron/ipc-contract';
 import { cx } from '../onboarding/cx';
 import { OrgAvatar } from '../settings/brand-icons';
-import { type QuantOption, ramVerdict } from '../settings/model-manager-logic';
+import { mergeQuantLadder, type QuantOption, ramVerdict } from '../settings/model-manager-logic';
 import { useHfStore } from '../state/hf-store';
 import { downloadEtaSeconds, downloadFraction, formatEta, useLlmStore } from '../state/llm-store';
 import { activateLocalModel } from '../state/local-model';
@@ -1126,12 +1126,25 @@ export function ModelsView() {
           repo: detailRepo,
           files,
           mmproj,
-          options: files
-            .filter((f) => f.mmproj !== true && (f.sizeBytes ?? 0) > 0)
-            .map((f) => ({
+          /*
+           * ONE ROW PER MODEL, NOT PER FILE. A quant split into shards is one
+           * model whose size is their SUM, and a projector, a speed head or an
+           * imatrix is no model at all; mergeQuantLadder owns those rules (the
+           * old manager's, caught on this very card as "BF16 · 4.7 GB · Fits").
+           * Mapping the listing row for row brought it straight back: the
+           * 27B's two BF16 shards shared one label, the 4.7 GB tail ranked the
+           * label green, and the pinned "Recommended" row became the 47 GB
+           * BF16 that cannot load on the 24 GB Mac it was recommended to.
+           */
+          options: mergeQuantLadder(
+            [],
+            files.map((f) => ({
               quant: quantLabel(f.quant, f.path),
-              bytes: f.sizeBytes ?? 0,
+              sizeBytes: f.sizeBytes,
+              mmproj: f.mmproj,
+              mtp: f.mtp,
             })),
+          ).filter((q) => q.bytes > 0),
           mmprojBytes: mmproj?.sizeBytes,
           loading: false,
         });

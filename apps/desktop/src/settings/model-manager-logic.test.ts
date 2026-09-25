@@ -516,6 +516,64 @@ describe('mergeQuantLadder — shards are one model', () => {
     expect(out[0]?.bytes).toBeCloseTo(17.11 * GB, -6);
   });
 
+  it('drops a speed head instead of listing it as a second Q4_0', () => {
+    const out = mergeQuantLadder(
+      [],
+      [
+        { quant: 'Q4_0', sizeBytes: 16.06 * GB },
+        { quant: 'Q4_0', sizeBytes: 1.37 * GB, mtp: true },
+      ],
+    );
+    expect(out).toEqual([{ quant: 'Q4_0', bytes: 16.06 * GB }]);
+  });
+
+  it('drops an imatrix file — calibration data, not a model', () => {
+    const out = mergeQuantLadder(
+      [],
+      [
+        { quant: 'UD-Q3_K_XL', sizeBytes: 13.15 * GB },
+        { quant: 'imatrix_unsloth', sizeBytes: 0.0136 * GB },
+      ],
+    );
+    expect(out.map((q) => q.quant)).toEqual(['UD-Q3_K_XL']);
+  });
+
+  /*
+   * THE WHOLE LISTING, as `hf:list-files` returns it for unsloth/Qwen3.8-27B-GGUF
+   * (sizes from the Hub, 2026-09-24). The hub mapped it row for row, and on a
+   * 24 GB Mac its pinned "Recommended" row was the 47 GB BF16: the 4.7 GB second
+   * shard shared the label and ranked it green.
+   */
+  it('the real 27B listing: one row per model, and the pick is UD-Q3_K_XL', () => {
+    const listing = [
+      { quant: 'BF16', sizeBytes: 49.99 * GB },
+      { quant: 'BF16', sizeBytes: 4.67 * GB },
+      { quant: 'Q4_0', sizeBytes: 1.37 * GB, mtp: true },
+      { quant: 'Q4_0', sizeBytes: 16.06 * GB },
+      { quant: 'Q8_0', sizeBytes: 29.05 * GB },
+      { quant: 'UD-IQ1_S', sizeBytes: 6.19 * GB },
+      { quant: 'UD-IQ3_S', sizeBytes: 12.04 * GB },
+      { quant: 'UD-Q2_K_XL', sizeBytes: 9.83 * GB },
+      { quant: 'UD-Q3_K_XL', sizeBytes: 13.15 * GB },
+      { quant: 'UD-Q4_K_XL', sizeBytes: 17.56 * GB },
+      { quant: 'imatrix_unsloth', sizeBytes: 0.0136 * GB },
+      { quant: 'BF16', sizeBytes: 0.93 * GB, mmproj: true },
+    ];
+    const ladder = mergeQuantLadder([], listing);
+    expect(ladder.map((q) => q.quant)).toEqual([
+      'UD-IQ1_S',
+      'UD-Q2_K_XL',
+      'UD-IQ3_S',
+      'UD-Q3_K_XL',
+      'Q4_0',
+      'UD-Q4_K_XL',
+      'Q8_0',
+      'BF16',
+    ]);
+    expect(ladder.find((q) => q.quant === 'BF16')?.bytes).toBeCloseTo(54.66 * GB, -8);
+    expect(recommendedQuant(ladder, M5_PRO_24GB)?.quant).toBe('UD-Q3_K_XL');
+  });
+
   it('a summed shard family sorts and judges by its REAL size', () => {
     const ladder = mergeQuantLadder(
       [],
