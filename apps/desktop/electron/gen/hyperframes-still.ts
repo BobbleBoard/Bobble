@@ -40,7 +40,7 @@
 import { createHash } from 'node:crypto';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
-import type { GenOutput } from '@pi-desktop/gen-service';
+import { GenAbortError, type GenOutput } from '@pi-desktop/gen-service';
 import { createLogger } from '@pi-desktop/shared';
 import { writeApngFile } from './apng.js';
 import {
@@ -205,11 +205,12 @@ const defaultAssemble = (framePaths: readonly string[], outPath: string, fps: nu
 /**
  * Build the renderer that replaces {@link hyperFramesRenderUnavailable}.
  *
- * Emits progress per frame, honours an abort between frames (a capture itself is
- * short, so mid-capture cancellation would buy nothing and risks a half-written
- * file), writes each frame into `<outputDir>/frames/`, and returns ONE
- * {@link GenOutput}: the frames joined into `<outputDir>/animation.png`, an
- * animated PNG — modality `image`, because that is what an `<img>` shows it as.
+ * Emits progress per frame, honours an abort between frames by rejecting (a
+ * capture itself is short, so mid-capture cancellation would buy nothing and
+ * risks a half-written file), writes each frame into `<outputDir>/frames/`,
+ * and returns ONE {@link GenOutput}: the frames joined into
+ * `<outputDir>/animation.png`, an animated PNG — modality `image`, because
+ * that is what an `<img>` shows it as.
  * If the join fails, the one output is the last frame on its own; never one
  * output per frame, which is what put 120 cards in the thread.
  */
@@ -288,6 +289,13 @@ export function createStillRenderer(deps: StillRendererDeps): HyperFramesRender 
     if (frames.length === 0) {
       throw new Error('hyperframes rendered no frames');
     }
+    /*
+     * STOPPED IS NOT DONE. Stop, a chat's delete and the guardian's shed all
+     * abort, and all of them expect the runner to REJECT — the queue records
+     * a resolve after an abort as 'done'. The frames already written stay on
+     * disk; nothing is joined from them and nothing is reported finished.
+     */
+    if (signal?.aborted === true) throw new GenAbortError();
     if (frames.length > 1 && digests.size === 1) {
       throw new Error(
         `hyperframes rendered ${frames.length} IDENTICAL frames — the scene did not animate. ` +

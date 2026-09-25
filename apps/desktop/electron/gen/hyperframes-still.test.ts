@@ -3,6 +3,7 @@ import { writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
+import { JobQueue } from '@pi-desktop/gen-service';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { isApng, readPngChunks, readPngFrame } from './apng.js';
 import {
@@ -20,6 +21,7 @@ import {
   type StillWindow,
   seekScript,
 } from './hyperframes-still.js';
+import { HyperFramesRunner } from './video-dispatch.js';
 
 /**
  * The file side of the renderer, in memory: what was written, which folders were
@@ -306,7 +308,14 @@ describe('createStillRenderer', () => {
     expect(files.joins).toEqual([]);
   });
 
-  it('stops between frames when aborted, and still returns one output', async () => {
+  /*
+   * STOPPED IS NOT DONE. The queue, the guardian (shedRunning) and a chat's
+   * delete all abort and expect the runner to REJECT — the queue calls a
+   * resolve after an abort 'done'. This used to join the frames it had into
+   * an animation and return it: a job the user or the guardian stopped was
+   * reported as a finished render, and a deleted chat's job wrote new files.
+   */
+  it('stops between frames when aborted, and rejects without joining anything', async () => {
     const win = makeWin();
     const ac = new AbortController();
     let n = 0;
@@ -318,10 +327,45 @@ describe('createStillRenderer', () => {
         if (++n === 1) ac.abort();
       },
     });
-    const out = await render(spec, '/out', () => {}, ac.signal);
-    expect(out).toHaveLength(1);
-    expect(out[0]?.frames?.count).toBe(1);
+    await expect(render(spec, '/out', () => {}, ac.signal)).rejects.toThrow('aborted');
+    expect(n).toBe(1);
+    expect(files.joins).toEqual([]);
     expect(win.disposed).toBe(true);
+  });
+
+  it('a render the queue cancels ends canceled, with the reason — not done', async () => {
+    const win = makeWin();
+    const files = fakeFiles();
+    const queue = new JobQueue({
+      runner: (job, opts) =>
+        new HyperFramesRunner(
+          createStillRenderer({ openWindow: async () => win, ...files.deps }),
+        ).run(job, opts),
+    });
+    const statuses: string[] = [];
+    queue.on((e) => {
+      if (e.type === 'status') statuses.push(e.status);
+    });
+    const handle = queue.enqueue(
+      {
+        id: 'hf-1',
+        modality: 'video',
+        backend: 'hyperframes',
+        outputDir: '/out',
+        video: spec,
+      },
+      {
+        onEvent: (e) => {
+          // The guardian sheds it after the first frame lands.
+          if (e.event === 'progress' && e.step === 1) {
+            queue.cancel('hf-1', 'stopped: only 7% of memory was free');
+          }
+        },
+      },
+    );
+    await expect(handle.result).rejects.toThrow('stopped: only 7% of memory was free');
+    expect(statuses).toEqual(['queued', 'running', 'canceled']);
+    expect(files.joins).toEqual([]);
   });
 
   it('fails loudly rather than reporting an empty success', async () => {
