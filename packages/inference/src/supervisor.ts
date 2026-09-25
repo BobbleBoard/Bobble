@@ -399,6 +399,14 @@ export interface SupervisorOptions {
    * (e.g. the `uv` binary) and this builds its arguments. Unset → llama.cpp args.
    */
   readonly buildArgsFn?: (port: number) => string[];
+  /**
+   * Awaited before EVERY spawn — the first start, each restart, a resume — and
+   * handed a way to run this supervisor's own command (same binary, same spawn,
+   * same env) with other arguments. MLX probes uv's cache with it and launches
+   * `--offline` when the environment is already on disk (mlx-manager,
+   * uv-run.ts). A hook that throws is logged and the spawn goes ahead.
+   */
+  readonly beforeSpawn?: (run: (args: string[]) => LlamaChildProcess) => Promise<void>;
 
   // -- lifecycle tuning ---------------------------------------------------
   readonly healthTimeoutMs?: number;
@@ -650,10 +658,17 @@ export class LlamaServerSupervisor {
   private async spawnOnce(): Promise<boolean> {
     if (this.disposed) return false;
     this.emit({ type: 'starting', attempt: this.restartCount });
+    const env = { ...(this.opts.env ?? process.env) };
+    if (this.opts.beforeSpawn !== undefined) {
+      try {
+        await this.opts.beforeSpawn((args) => this.spawnFn(this.opts.serverPath, args, { env }));
+      } catch (err) {
+        this.emit({ type: 'log', stream: 'stderr', text: `before spawn: ${String(err)}` });
+      }
+      if (this.disposed) return false;
+    }
     const args = this.buildArgs();
-    const child = this.spawnFn(this.opts.serverPath, args, {
-      env: { ...(this.opts.env ?? process.env) },
-    });
+    const child = this.spawnFn(this.opts.serverPath, args, { env });
     this.child = child;
     this.wireChild(child);
     // Arm the parent-death watchdog immediately (before health) so even a

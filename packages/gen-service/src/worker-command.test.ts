@@ -8,6 +8,7 @@ import {
   backendUvFlags,
   baseWorkerWith,
   buildEnvWarmArgs,
+  buildMfluxSaveArgs,
   buildWorkerUvArgs,
   bundledMlxVlmWheel,
   bundledWheelPath,
@@ -18,7 +19,10 @@ import {
   MLX_VLM_COMMIT,
   MLX_VLM_RESOLVED_BEFORE,
   MLX_VLM_WHEEL,
+  mfluxSaveUvEnv,
   resolveWorkerScript,
+  warmUvEnv,
+  workerUvEnv,
 } from './worker-command.ts';
 
 /** packages/gen-service/python — worker.py, wheels/, mlx-vlm-ming/. */
@@ -160,6 +164,107 @@ describe('buildWorkerUvArgs', () => {
         '/w/worker.py',
       ]);
     }
+  });
+});
+
+describe('offline launches (the probe decides — uv-run.ts)', () => {
+  const QWEN = bundledWheelPath('/w/worker.py', 'mflux-0.19.2+bobble.qwen21.te8-py3-none-any.whl');
+  const JOBS = [
+    { workerScript: '/w/worker.py' },
+    { workerScript: '/w/worker.py', mfluxWith: QWEN },
+    { workerScript: '/w/worker.py', backend: 'mlx-audio' as const, extraWith: ['misaki[en]'] },
+    { workerScript: '/w/worker.py', backend: 'mlx-vlm' as const },
+    { workerScript: '/w/worker.py', backend: 'trellis' as const, serveMode: true },
+  ];
+
+  it('a job launches offline as the same argv with --offline straight after `run`', () => {
+    for (const job of JOBS) {
+      const online = buildWorkerUvArgs(job);
+      expect(online).not.toContain('--offline');
+      expect(buildWorkerUvArgs({ ...job, offline: false })).toEqual(online);
+      expect(buildWorkerUvArgs({ ...job, offline: true })).toEqual([
+        'run',
+        '--offline',
+        ...online.slice(1),
+      ]);
+    }
+  });
+
+  it('workerUvEnv is exactly what the job launches in (between `run` and python)', () => {
+    for (const job of JOBS) {
+      const args = buildWorkerUvArgs(job);
+      expect(workerUvEnv(job)).toEqual(args.slice(1, args.indexOf('python')));
+    }
+  });
+
+  it('the warm launches offline the same way, and warms the env the job runs in', () => {
+    const warms = [
+      { backend: 'mflux' as const },
+      { backend: 'mflux' as const, mfluxWith: QWEN },
+      { backend: 'mlx-audio' as const },
+      { backend: 'mlx-vlm' as const, workerScript: '/w/worker.py' },
+    ];
+    for (const warm of warms) {
+      const online = buildEnvWarmArgs(warm);
+      expect(buildEnvWarmArgs({ ...warm, offline: true })).toEqual([
+        'run',
+        '--offline',
+        ...online.slice(1),
+      ]);
+      expect(warmUvEnv(warm)).toEqual(online.slice(1, online.indexOf('python')));
+      expect(warmUvEnv(warm)).toEqual(workerUvEnv({ workerScript: '/w/worker.py', ...warm }));
+    }
+  });
+});
+
+describe('buildMfluxSaveArgs (a model converted on this Mac)', () => {
+  const QWEN = bundledWheelPath('/w/worker.py', 'mflux-0.19.2+bobble.qwen21.te8-py3-none-any.whl');
+
+  it('runs mflux-save from the model’s own wheel — the argv gen-modules always built', () => {
+    expect(
+      buildMfluxSaveArgs({ mfluxWith: QWEN, model: '/store/release', bits: 4, dest: '/shelf/q4' }),
+    ).toEqual([
+      'run',
+      '--no-project',
+      '--python',
+      DEFAULT_PYTHON_VERSION,
+      '--with',
+      QWEN,
+      'mflux-save',
+      '--model',
+      '/store/release',
+      '-q',
+      '4',
+      '--path',
+      '/shelf/q4',
+    ]);
+  });
+
+  it('names a base model only when given, and falls back to PyPI mflux without a wheel', () => {
+    const args = buildMfluxSaveArgs({
+      model: '/r',
+      baseModel: 'qwen-image',
+      bits: 8,
+      dest: '/d',
+    });
+    expect(args.slice(4, 6)).toEqual(['--with', 'mflux']);
+    expect(args.slice(args.indexOf('--base-model'), args.indexOf('--base-model') + 2)).toEqual([
+      '--base-model',
+      'qwen-image',
+    ]);
+    expect(buildMfluxSaveArgs({ model: '/r', bits: 8, dest: '/d' })).not.toContain('--base-model');
+    expect(mfluxSaveUvEnv({ mfluxWith: '' })).toEqual(mfluxSaveUvEnv({}));
+  });
+
+  it('launches offline as the same argv with --offline, in the env its probe asks about', () => {
+    const opts = { mfluxWith: QWEN, model: '/r', bits: 4, dest: '/d' };
+    const online = buildMfluxSaveArgs(opts);
+    expect(buildMfluxSaveArgs({ ...opts, offline: true })).toEqual([
+      'run',
+      '--offline',
+      ...online.slice(1),
+    ]);
+    expect(mfluxSaveUvEnv(opts)).toEqual(online.slice(1, online.indexOf('mflux-save')));
   });
 });
 

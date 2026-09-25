@@ -6,6 +6,8 @@
  *   image  uv (the app's own pinned copy when none is on PATH) + the mflux
  *          environment, warmed by running one line of python through the SAME
  *          `uv run --with …` the worker uses — uv downloads every package first.
+ *          Offline first, like every `uv run --with` here (inference uv-run.ts):
+ *          an env already in uv's cache warms `--offline`, with no network.
  *   audio  the same, for mlx-audio.
  *   comfy  the ComfyUI engine (inference/engines-main), the thing Settings ›
  *          Engines installs; video, music and sound effects run on it.
@@ -30,15 +32,19 @@ import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import {
   buildEnvWarmArgs,
+  buildMfluxSaveArgs,
   bundledWheelPath,
-  DEFAULT_PYTHON_VERSION,
+  type EnvWarmOptions,
   getModel,
+  type MfluxSaveOptions,
   MODALITY_CATALOG,
   type ModalityModel,
+  mfluxSaveUvEnv,
   resolveWorkerScript,
   type WeightFile,
+  warmUvEnv,
 } from '@pi-desktop/gen-service';
-import { cacheRoot } from '@pi-desktop/inference';
+import { cacheRoot, uvEnvCached } from '@pi-desktop/inference';
 import {
   downloadRepo,
   readManifest,
@@ -147,15 +153,17 @@ async function installPrepared(
   if (existsSync(dest) && !preparedPresent(model)) rmSync(dest, { recursive: true, force: true });
   mkdirSync(path.dirname(dest), { recursive: true });
   report(`Converting to ${prepared.bits}-bit for MLX — a minute or two, once…`, 0.95);
-  const args = ['run', '--no-project', '--python', DEFAULT_PYTHON_VERSION];
-  args.push(
-    '--with',
-    mflux.wheel !== undefined ? bundledWheelPath(workerScript, mflux.wheel) : 'mflux',
-  );
-  args.push('mflux-save', '--model', release.dir);
-  if (mflux.baseModel !== undefined) args.push('--base-model', mflux.baseModel);
-  args.push('-q', String(prepared.bits), '--path', dest);
-  await runUv(uv.uvPath, args, (line) => report(line, 0.97));
+  const save: MfluxSaveOptions = {
+    ...(mflux.wheel !== undefined
+      ? { mfluxWith: bundledWheelPath(workerScript, mflux.wheel) }
+      : {}),
+    model: release.dir,
+    ...(mflux.baseModel !== undefined ? { baseModel: mflux.baseModel } : {}),
+    bits: prepared.bits,
+    dest,
+  };
+  const offline = await uvCached(uv.uvPath, mfluxSaveUvEnv(save));
+  await runUv(uv.uvPath, buildMfluxSaveArgs({ ...save, offline }), (line) => report(line, 0.97));
   if (!preparedPresent(model)) {
     throw new Error(`mflux-save finished but ${dest} is not a complete model`);
   }
@@ -278,13 +286,13 @@ async function installWeights(
 }
 
 /**
- * The env-warm argv for a uv-worker module — for `image`, one per mflux build
- * the catalog's image models run on: the pinned release, and the bundled
- * wheel of any model that ships its own (Qwen-Image 2.1's port). Same
- * packages for the most part; uv hardlinks them, so the second is quick.
+ * The envs a uv-worker module warms — for `image`, one per mflux build the
+ * catalog's image models run on: the pinned release, and the bundled wheel of
+ * any model that ships its own (Qwen-Image 2.1's port). Same packages for the
+ * most part; uv hardlinks them, so the second is quick.
  */
-function warmArgs(id: 'image' | 'audio', deps: GenModulePortsDeps): string[][] {
-  if (id === 'audio') return [buildEnvWarmArgs({ backend: 'mlx-audio' })];
+function warmSpecs(id: 'image' | 'audio', deps: GenModulePortsDeps): EnvWarmOptions[] {
+  if (id === 'audio') return [{ backend: 'mlx-audio' }];
   const workerScript = resolveWorkerScript(deps.workerScript);
   const wheels = new Set<string>();
   for (const m of MODALITY_CATALOG) {
@@ -292,9 +300,23 @@ function warmArgs(id: 'image' | 'audio', deps: GenModulePortsDeps): string[][] {
       wheels.add(bundledWheelPath(workerScript, m.mflux.wheel));
   }
   return [
-    buildEnvWarmArgs({ backend: 'mflux' }),
-    ...[...wheels].map((mfluxWith) => buildEnvWarmArgs({ backend: 'mflux', mfluxWith })),
+    { backend: 'mflux' },
+    ...[...wheels].map((mfluxWith): EnvWarmOptions => ({ backend: 'mflux', mfluxWith })),
   ];
+}
+
+/** The env every `uv` here runs with — the probe's and the launch's alike. */
+function uvSpawnEnv(): NodeJS.ProcessEnv {
+  return { ...process.env, UV_PYTHON_DOWNLOADS: 'automatic' };
+}
+
+/**
+ * Is this env already all in uv's cache? A silent `uv run --offline` probe
+ * (inference uv-run.ts): yes → the launch runs `--offline` and needs no
+ * network; no → online, as before, and uv downloads.
+ */
+function uvCached(uvPath: string, env: readonly string[]): Promise<boolean> {
+  return uvEnvCached((args) => spawn(uvPath, args, { env: uvSpawnEnv(), stdio: 'ignore' }), env);
 }
 
 /**
@@ -308,7 +330,7 @@ function runUv(
 ): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     const child = spawn(uvPath, args, {
-      env: { ...process.env, UV_PYTHON_DOWNLOADS: 'automatic' },
+      env: uvSpawnEnv(),
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let tail = '';
@@ -375,7 +397,10 @@ export function createGenModulePorts(
           });
           log.info('module install: uv ready', { id, source: uv.source, uvPath: uv.uvPath });
           report('Resolving packages…');
-          for (const args of warmArgs(id, deps)) await runUv(uv.uvPath, args, report);
+          for (const warm of warmSpecs(id, deps)) {
+            const offline = await uvCached(uv.uvPath, warmUvEnv(warm));
+            await runUv(uv.uvPath, buildEnvWarmArgs({ ...warm, offline }), report);
+          }
           writeMarker(id, 'installed');
           return;
         }

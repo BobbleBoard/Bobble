@@ -12,8 +12,14 @@
 import { spawn as nodeSpawn } from 'node:child_process';
 import { stat } from 'node:fs/promises';
 import { delimiter, join } from 'node:path';
+import { uvEnvCached } from '@pi-desktop/inference/uv-run';
 import { type GenEvent, type GenJob, type GenOutput, NdjsonParser } from './protocol.js';
-import { buildWorkerUvArgs, resolveWorkerScript } from './worker-command.js';
+import {
+  buildWorkerUvArgs,
+  resolveWorkerScript,
+  type WorkerUvArgsOptions,
+  workerUvEnv,
+} from './worker-command.js';
 
 /** Minimal stdin surface (write the job, then close). */
 export interface GenWritable {
@@ -57,6 +63,9 @@ export class GenAbortError extends Error {
     this.name = 'GenAbortError';
   }
 }
+
+/** Read fresh at each call (TypeScript keeps a property's narrowing across an await). */
+const isAborted = (signal: AbortSignal | undefined): boolean => signal?.aborted === true;
 
 /** Resolve an executable by scanning PATH (absolute path). Mirrors mlx-manager. */
 async function resolveOnPath(
@@ -145,10 +154,10 @@ export class GenServiceClient {
    * terminal `done`; rejects on `error`, an unexpected exit, or abort.
    */
   async run(job: GenJob, options: RunJobOptions = {}): Promise<GenOutput[]> {
-    if (options.signal?.aborted === true) throw new GenAbortError();
+    if (isAborted(options.signal)) throw new GenAbortError();
     const uvPath = await this.#resolveUvPath();
     const workerScript = resolveWorkerScript(this.#opts.workerScript);
-    const args = buildWorkerUvArgs({
+    const argOpts: WorkerUvArgsOptions = {
       workerScript,
       /*
        * THE JOB'S OWN BACKEND, which this had never passed.
@@ -165,15 +174,30 @@ export class GenServiceClient {
       ...(options.mfluxWith !== undefined ? { mfluxWith: options.mfluxWith } : {}),
       python: this.#opts.python,
       extraWith: options.extraWith,
-    });
+    };
     const spawnFn = this.#opts.spawnFn ?? defaultGenSpawn;
+    const env = { ...process.env, UV_PYTHON_DOWNLOADS: 'automatic' };
+    /*
+     * OFFLINE FIRST. uv re-resolves the `--with` packages against PyPI on every
+     * run once its index cache is ten minutes old, so with no network a job
+     * failed before worker.py started — mflux, the wheel and the env all on
+     * disk. A silent `uv run --offline` probe of the job's own env comes first;
+     * everything cached → the worker launches `--offline`, else online as it
+     * always did (uv-run.ts). The probe goes through `spawnFn`, the transport,
+     * so it asks the uv that will run the job.
+     */
+    const offline = await uvEnvCached(
+      (args) => spawnFn(uvPath, args, { env }),
+      workerUvEnv(argOpts),
+    );
+    // The probe took a moment; an abort inside it must still stop the job.
+    if (isAborted(options.signal)) throw new GenAbortError();
+    const args = buildWorkerUvArgs({ ...argOpts, offline });
 
     return await new Promise<GenOutput[]>((resolve, reject) => {
       let child: GenChildProcess;
       try {
-        child = spawnFn(uvPath, args, {
-          env: { ...process.env, UV_PYTHON_DOWNLOADS: 'automatic' },
-        });
+        child = spawnFn(uvPath, args, { env });
       } catch (err) {
         reject(err instanceof Error ? err : new Error(String(err)));
         return;
