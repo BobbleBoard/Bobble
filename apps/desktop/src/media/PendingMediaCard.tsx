@@ -56,6 +56,7 @@ import { pdFileUrl } from '../chat/canvas/file-preview';
 import { ThreadAudio } from '../chat/ThreadAudio';
 import type { ThreadMediaItem } from '../chat/thread-media';
 import { subscribeToDenoise } from '../chat/useDenoisePreview';
+import { showsInViewedChat } from '../state/chat-jobs';
 import { ModelSurface } from './ModelSurface';
 import { rememberShape } from './media-shapes';
 import {
@@ -444,17 +445,31 @@ export function PendingMediaCard({
   const [preview, setPreview] = useState<string | undefined>(undefined);
   useEffect(() => {
     if (live !== true) return;
+    /*
+     * THIS CARD'S JOB'S FRAMES, AND NO ONE ELSE'S. The stream carries every
+     * job's frames, and more than one job runs: a picture's card swept away
+     * onto a HyperFrames frame and then dropped its own steps (all numbered
+     * below the clip's), and a clip's card showed another job's denoising
+     * (review of the 2026-09-23 wave). So a frame is taken only when it is of
+     * this card's kind, from a job the chat on screen started, and from the one
+     * job the card is already following — whose step count is the only one
+     * the high-water mark is measured against.
+     */
+    let following: string | null = null;
     let latest = -1;
     const off = subscribeToDenoise({
-      onFrame: (_jobId, frame) => {
+      onFrame: (jobId, frame, modality) => {
+        if (modality !== kind || !showsInViewedChat(jobId)) return;
+        if (following !== null && jobId !== following) return;
         if (frame.step <= latest) return;
+        following = jobId;
         latest = frame.step;
         setPreview(frame.dataUri);
       },
       onDone: () => undefined,
     });
     return () => off?.();
-  }, [live]);
+  }, [live, kind]);
 
   // The first thing that can be shown — the result, or a decoded step — is
   // what starts the sweep. After it the card is content, not a loader.

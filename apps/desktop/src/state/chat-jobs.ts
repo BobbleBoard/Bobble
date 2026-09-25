@@ -69,6 +69,21 @@ export function forgetJob(jobId: string): void {
   jobs.delete(jobId);
 }
 
+/**
+ * Do this job's live frames belong on the chat on screen?
+ *
+ * Only a job an agent started (a studio's is never announced), and not one a
+ * DIFFERENT chat owns — a chat running in the background keeps its own frames.
+ * A job no chat could be named for (asked before the chat had a file) gets the
+ * benefit of the doubt. PendingMediaCard asks this of every decoded frame,
+ * because the stream carries every job's frames at once.
+ */
+export function showsInViewedChat(jobId: string): boolean {
+  const job = jobs.get(jobId);
+  if (job === undefined) return false;
+  return job.owner === null || job.owner === (usePiStore.getState().session?.sessionFile ?? null);
+}
+
 /** Every tracked job owned by one of these chat files. */
 export function jobsOwnedBy(files: readonly string[]): ChatJob[] {
   return [...jobs.values()].filter((j) => j.owner !== null && files.includes(j.owner));
