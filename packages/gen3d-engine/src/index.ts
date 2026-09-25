@@ -42,6 +42,9 @@ export {
   pickFreePort,
   resolveUv,
   SIDECAR_HF_HUB_PIN,
+  SIDECAR_PROBE_TIMEOUT_MS,
   SIDECAR_PYTHON,
   type SidecarArgsConfig,
+  sidecarProbeArgs,
+  sidecarUvEnv,
 } from './sidecar';

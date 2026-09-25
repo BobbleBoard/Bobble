@@ -30,17 +30,43 @@ export interface SidecarArgsConfig {
   readonly registryPath: string;
   readonly hfHubPin?: string;
   readonly python?: string;
+  /** `uv run --offline`: the probe found the env already in uv's cache. */
+  readonly offline?: boolean;
+}
+
+/**
+ * The `uv run` options that make the sidecar's environment — everything
+ * between `run` and server.py. The launch and its offline probe both take it
+ * from here, so they resolve one env. Pure.
+ */
+export function sidecarUvEnv(cfg: Pick<SidecarArgsConfig, 'hfHubPin' | 'python'> = {}): string[] {
+  return [
+    '--no-project',
+    '--python',
+    cfg.python ?? SIDECAR_PYTHON,
+    '--with',
+    `huggingface_hub==${cfg.hfHubPin ?? SIDECAR_HF_HUB_PIN}`,
+  ];
+}
+
+/**
+ * The offline probe: `uv run --offline <env> python -c ''` exits 0 only when
+ * the sidecar's env resolves and installs from uv's cache alone. Pure. (The
+ * same probe as @pi-desktop/inference's uv-run.ts, kept here because this
+ * package is self-contained.)
+ */
+export function sidecarProbeArgs(
+  cfg: Pick<SidecarArgsConfig, 'hfHubPin' | 'python'> = {},
+): string[] {
+  return ['run', '--offline', ...sidecarUvEnv(cfg), 'python', '-c', ''];
 }
 
 /** Build the uv argv for the sidecar. Pure. */
 export function assembleSidecarArgs(cfg: SidecarArgsConfig): string[] {
   return [
     'run',
-    '--no-project',
-    '--python',
-    cfg.python ?? SIDECAR_PYTHON,
-    '--with',
-    `huggingface_hub==${cfg.hfHubPin ?? SIDECAR_HF_HUB_PIN}`,
+    ...(cfg.offline === true ? ['--offline'] : []),
+    ...sidecarUvEnv(cfg),
     cfg.serverScript,
     '--port',
     String(cfg.port),
@@ -51,6 +77,42 @@ export function assembleSidecarArgs(cfg: SidecarArgsConfig): string[] {
     '--registry',
     cfg.registryPath,
   ];
+}
+
+/** A probe answers in well under a second; one that has not by this is abandoned (→ online). */
+export const SIDECAR_PROBE_TIMEOUT_MS = 120_000;
+
+/**
+ * Run the offline probe through the sidecar's own spawn and env; true on exit 0
+ * alone. Not cached, no uv, a spawn error, the timeout: false — launch online,
+ * as before. Never rejects.
+ */
+function envCached(
+  spawnFn: typeof spawn,
+  uvPath: string,
+  probeArgs: string[],
+  env: NodeJS.ProcessEnv,
+  timeoutMs = SIDECAR_PROBE_TIMEOUT_MS,
+): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    let child: ChildProcess;
+    try {
+      child = spawnFn(uvPath, probeArgs, { stdio: 'ignore', env });
+    } catch {
+      resolve(false);
+      return;
+    }
+    const timer = setTimeout(() => {
+      child.kill('SIGKILL');
+      resolve(false);
+    }, timeoutMs);
+    const settle = (cached: boolean): void => {
+      clearTimeout(timer);
+      resolve(cached);
+    };
+    child.on('error', () => settle(false));
+    child.on('exit', (code) => settle(code === 0));
+  });
 }
 
 /**
@@ -147,20 +209,32 @@ export class Gen3dSidecar {
   private async startOnce(): Promise<void> {
     const spawnFn = this.opts.spawnFn ?? spawn;
     const log = this.opts.log ?? (() => {});
-    const args = assembleSidecarArgs({
+    const env = {
+      ...process.env,
+      HF_HOME: join(this.opts.cacheDir, 'hf'),
+      ...this.opts.env,
+    };
+    const cfg: SidecarArgsConfig = {
       serverScript: this.opts.serverScript,
       port: this.opts.port,
       cacheDir: this.opts.cacheDir,
       sandboxDir: this.opts.sandboxDir,
       registryPath: this.opts.registryPath,
-    });
-    const child = spawnFn(this.opts.uvPath, args, {
+    };
+    /*
+     * OFFLINE FIRST, before every start and every restart. uv re-resolves
+     * `--with huggingface_hub==<pin>` against PyPI on each run once its index
+     * cache is ten minutes old, so with no network the sidecar died inside uv —
+     * "Failed to fetch: https://pypi.org/simple/huggingface-hub/" — and each
+     * backoff restart failed the same way, with Python and the package on disk
+     * (MEASURED 2026-09-25). A silent `--offline` probe decides: all cached →
+     * launch `--offline`; not (a fresh machine, a pin bump) → online, as before.
+     */
+    const offline = await envCached(spawnFn, this.opts.uvPath, sidecarProbeArgs(cfg), env);
+    if (this.disposed) throw new Error('gen3d sidecar disposed');
+    const child = spawnFn(this.opts.uvPath, assembleSidecarArgs({ ...cfg, offline }), {
       stdio: ['ignore', 'pipe', 'pipe'],
-      env: {
-        ...process.env,
-        HF_HOME: join(this.opts.cacheDir, 'hf'),
-        ...this.opts.env,
-      },
+      env,
     });
     this.child = child;
     child.stdout?.on('data', (d: Buffer) => log('sidecar', { out: d.toString().trimEnd() }));

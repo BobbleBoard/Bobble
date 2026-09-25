@@ -112,11 +112,16 @@ export type {
 } from './protocol.js';
 export { isGenEvent, NdjsonParser, parseGenEventLine } from './protocol.js';
 export * from './stitch.js';
-export type { WorkerUvArgsOptions } from './worker-command.js';
+export type {
+  EnvWarmOptions,
+  MfluxSaveOptions,
+  WorkerUvArgsOptions,
+} from './worker-command.js';
 export {
   backendUvFlags,
   baseWorkerWith,
   buildEnvWarmArgs,
+  buildMfluxSaveArgs,
   buildWorkerUvArgs,
   bundledMlxVlmWheel,
   bundledWheelPath,
@@ -127,5 +132,8 @@ export {
   MLX_VLM_COMMIT,
   MLX_VLM_RESOLVED_BEFORE,
   MLX_VLM_WHEEL,
+  mfluxSaveUvEnv,
   resolveWorkerScript,
+  warmUvEnv,
+  workerUvEnv,
 } from './worker-command.js';

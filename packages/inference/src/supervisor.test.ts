@@ -437,6 +437,124 @@ describe('LlamaServerSupervisor lifecycle', () => {
     await expect(sup.resume()).rejects.toThrow(/disposed/);
   });
 
+  it('runs beforeSpawn before EVERY spawn — start, crash-restart, resume — on the same command and env', async () => {
+    // What MLX's offline probe rides on (mlx-manager): the hook runs the
+    // server's own binary, through the same spawn, with the same env.
+    const log: string[] = [];
+    const spawned: { cmd: string; args: string[]; env: Record<string, string | undefined> }[] = [];
+    let last: FakeChild | undefined;
+    const sup = new LlamaServerSupervisor({
+      serverPath: '/bin/uv',
+      modelPath: 'repo',
+      launchMode: 'fast-text',
+      port: 9104,
+      healthIntervalMs: 1,
+      restartBaseDelayMs: 5,
+      env: { MARK: 'env-for-both' },
+      beforeSpawn: async (run) => {
+        log.push('before');
+        const probe = run(['--probe']);
+        await new Promise<void>((resolve) => probe.on('exit', () => resolve()));
+      },
+      buildArgsFn: () => ['--serve'],
+      spawnFn: (cmd, args, o) => {
+        spawned.push({ cmd, args, env: o.env });
+        const child = new FakeChild();
+        if (args[0] === '--probe') queueMicrotask(() => child.emit('exit', 0, null));
+        else {
+          log.push('spawn');
+          last = child;
+        }
+        return asChild(child);
+      },
+      fetchImpl: okFetch(() => true),
+    });
+    await sup.start();
+    expect(log).toEqual(['before', 'spawn']);
+
+    const restarted = new Promise<void>((resolve) => {
+      const off = sup.on((e) => {
+        if (e.type === 'ready') {
+          off();
+          resolve();
+        }
+      });
+    });
+    last?.emit('exit', 1, null);
+    await restarted;
+    expect(log).toEqual(['before', 'spawn', 'before', 'spawn']);
+
+    await sup.park();
+    await sup.resume();
+    expect(log).toEqual(['before', 'spawn', 'before', 'spawn', 'before', 'spawn']);
+
+    expect(spawned.map((s) => s.args[0])).toEqual([
+      '--probe',
+      '--serve',
+      '--probe',
+      '--serve',
+      '--probe',
+      '--serve',
+    ]);
+    for (const s of spawned) {
+      expect(s.cmd).toBe('/bin/uv');
+      expect(s.env.MARK).toBe('env-for-both');
+    }
+    await sup.dispose();
+  });
+
+  it('a beforeSpawn that throws is logged, and the server still starts', async () => {
+    let spawns = 0;
+    const sup = new LlamaServerSupervisor({
+      serverPath: '/bin/uv',
+      modelPath: 'repo',
+      launchMode: 'fast-text',
+      port: 9105,
+      healthIntervalMs: 1,
+      beforeSpawn: async () => {
+        throw new Error('probe exploded');
+      },
+      buildArgsFn: () => ['--serve'],
+      spawnFn: () => {
+        spawns += 1;
+        return asChild(new FakeChild());
+      },
+      fetchImpl: okFetch(() => true),
+    });
+    const events = collect(sup);
+    await sup.start();
+    expect(spawns).toBe(1);
+    expect(
+      events.some((e) => e.type === 'log' && /before spawn: .*probe exploded/.test(e.text)),
+    ).toBe(true);
+    await sup.dispose();
+  });
+
+  it('spawns nothing when disposed while beforeSpawn is still running', async () => {
+    let spawns = 0;
+    let release: () => void = () => {};
+    const sup = new LlamaServerSupervisor({
+      serverPath: '/bin/uv',
+      modelPath: 'repo',
+      launchMode: 'fast-text',
+      port: 9106,
+      healthIntervalMs: 1,
+      beforeSpawn: () => new Promise<void>((resolve) => (release = resolve)),
+      buildArgsFn: () => ['--serve'],
+      spawnFn: () => {
+        spawns += 1;
+        return asChild(new FakeChild());
+      },
+      fetchImpl: okFetch(() => true),
+    });
+    const starting = sup.start();
+    await new Promise((r) => setTimeout(r, 5));
+    await sup.dispose();
+    release();
+    await expect(starting).rejects.toThrow(/disposed/);
+    expect(spawns).toBe(0);
+  });
+
   /**
    * A child that ignores BOTH signals. Real llama-server does not, but a process
    * stuck in uninterruptible I/O while unmapping tens of gigabytes behaves

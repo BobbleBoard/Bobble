@@ -10,6 +10,7 @@
  */
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { uvRunArgs } from '@pi-desktop/inference/uv-run';
 import type { Backend } from './protocol.js';
 
 /**
@@ -142,6 +143,61 @@ export function baseWorkerWith(
 }
 
 /**
+ * The `uv run` options that make a backend's environment — everything between
+ * `run` and the command: the Python, the backend's flags, its `--with`
+ * packages. A job, its env warm and their offline probes all take it from here,
+ * so they resolve one env. Pure.
+ */
+function backendUvEnv(
+  backend: Backend,
+  opts: {
+    readonly python?: string;
+    readonly mfluxPin?: string;
+    readonly mfluxWith?: string;
+    readonly extraWith?: readonly string[];
+  },
+  mlxVlmWith: string | undefined,
+): string[] {
+  const env = [
+    '--no-project',
+    '--python',
+    opts.python ?? DEFAULT_PYTHON_VERSION,
+    ...backendUvFlags(backend),
+  ];
+  for (const dep of baseWorkerWith(backend, opts.mfluxPin, opts.mfluxWith, mlxVlmWith))
+    env.push('--with', dep);
+  for (const dep of opts.extraWith ?? []) env.push('--with', dep);
+  return env;
+}
+
+export interface EnvWarmOptions {
+  readonly backend: Backend;
+  readonly mfluxPin?: string;
+  /** The mflux requirement in place of the pin (a bundled wheel's path). */
+  readonly mfluxWith?: string;
+  /** The mlx-vlm wheel's absolute path; defaults to the one beside `workerScript`. */
+  readonly mlxVlmWith?: string;
+  /**
+   * The worker.py the jobs will launch. The design env's wheel sits beside it,
+   * so pass the same path the jobs get; then warm and job resolve one env.
+   */
+  readonly workerScript?: string;
+  readonly python?: string;
+  readonly extraWith?: readonly string[];
+  /** `uv run --offline`: the env is already in uv's cache (uv-run.ts). */
+  readonly offline?: boolean;
+}
+
+/** The env {@link buildEnvWarmArgs} warms — what its offline probe asks about. Pure. */
+export function warmUvEnv(opts: EnvWarmOptions): string[] {
+  const workerScript = given(opts.workerScript);
+  const mlxVlmWith =
+    given(opts.mlxVlmWith) ??
+    (workerScript !== undefined ? bundledMlxVlmWheel(workerScript) : undefined);
+  return backendUvEnv(opts.backend, opts, mlxVlmWith);
+}
+
+/**
  * The argv that WARMS a backend's environment and nothing else: the same
  * `uv run --with …` prefix the worker gets, running a one-line python instead
  * of worker.py. uv resolves and downloads every package before that line runs,
@@ -149,37 +205,53 @@ export function baseWorkerWith(
  * progress on screen (see the app's gen-modules) instead of inside somebody's
  * first picture. Pure.
  */
-export function buildEnvWarmArgs(opts: {
-  backend: Backend;
-  mfluxPin?: string;
-  /** The mflux requirement in place of the pin (a bundled wheel's path). */
-  mfluxWith?: string;
-  /** The mlx-vlm wheel's absolute path; defaults to the one beside `workerScript`. */
-  mlxVlmWith?: string;
+export function buildEnvWarmArgs(opts: EnvWarmOptions): string[] {
+  return uvRunArgs(warmUvEnv(opts), ['python', '-c', "print('module ready')"], {
+    offline: opts.offline,
+  });
+}
+
+export interface MfluxSaveOptions {
   /**
-   * The worker.py the jobs will launch. The design env's wheel sits beside it,
-   * so pass the same path the jobs get; then warm and job resolve one env.
+   * The mflux build that converts: the model's bundled wheel (absolute path,
+   * {@link bundledWheelPath}). Unset or empty → PyPI's `mflux`, unpinned — the
+   * requirement the conversion has always used for a model with no wheel.
    */
-  workerScript?: string;
-  python?: string;
-  extraWith?: readonly string[];
-}): string[] {
-  const args = [
-    'run',
+  readonly mfluxWith?: string;
+  /** The downloaded release to convert (`mflux-save --model`). */
+  readonly model: string;
+  /** `--base-model`, for a release mflux cannot name by itself. */
+  readonly baseModel?: string;
+  /** Quantization bits (`-q`). */
+  readonly bits: number;
+  /** Where the converted model is saved (`--path`). */
+  readonly dest: string;
+  readonly python?: string;
+  /** `uv run --offline`: the env is already in uv's cache (uv-run.ts). */
+  readonly offline?: boolean;
+}
+
+/** The env {@link buildMfluxSaveArgs} converts in — what its offline probe asks about. Pure. */
+export function mfluxSaveUvEnv(opts: Pick<MfluxSaveOptions, 'mfluxWith' | 'python'>): string[] {
+  return [
     '--no-project',
     '--python',
     opts.python ?? DEFAULT_PYTHON_VERSION,
-    ...backendUvFlags(opts.backend),
+    '--with',
+    given(opts.mfluxWith) ?? 'mflux',
   ];
-  const workerScript = given(opts.workerScript);
-  const mlxVlmWith =
-    given(opts.mlxVlmWith) ??
-    (workerScript !== undefined ? bundledMlxVlmWheel(workerScript) : undefined);
-  for (const dep of baseWorkerWith(opts.backend, opts.mfluxPin, opts.mfluxWith, mlxVlmWith))
-    args.push('--with', dep);
-  for (const dep of opts.extraWith ?? []) args.push('--with', dep);
-  args.push('python', '-c', "print('module ready')");
-  return args;
+}
+
+/**
+ * The argv that CONVERTS a model on this Mac (catalog `mflux.prepared`, the
+ * app's gen-modules): `mflux-save` from the model's own mflux build, quantized
+ * to `bits`. Pure.
+ */
+export function buildMfluxSaveArgs(opts: MfluxSaveOptions): string[] {
+  const command = ['mflux-save', '--model', opts.model];
+  if (opts.baseModel !== undefined) command.push('--base-model', opts.baseModel);
+  command.push('-q', String(opts.bits), '--path', opts.dest);
+  return uvRunArgs(mfluxSaveUvEnv(opts), command, { offline: opts.offline });
 }
 
 /** Env var an embedder can set to point at an explicit worker.py (packaged app). */
@@ -252,12 +324,23 @@ export interface WorkerUvArgsOptions {
    * process-per-job behaviour (image/TTS), byte-for-byte unchanged.
    */
   readonly serveMode?: boolean;
+  /**
+   * `uv run --offline`: the client's probe found the env already in uv's cache
+   * (uv-run.ts), so the job starts with no network. Default online, as before.
+   */
+  readonly offline?: boolean;
+}
+
+/** The env {@link buildWorkerUvArgs} launches in — what its offline probe asks about. Pure. */
+export function workerUvEnv(opts: WorkerUvArgsOptions): string[] {
+  const mlxVlmWith = given(opts.mlxVlmWith) ?? bundledMlxVlmWheel(opts.workerScript);
+  return backendUvEnv(opts.backend ?? 'mflux', opts, mlxVlmWith);
 }
 
 /**
  * Build the argv for the `uv` binary that launches the worker:
  *
- *   run --no-project --python <v> [<backend flags>] --with <base…> [--with <extra> …] python <worker.py>
+ *   run [--offline] --no-project --python <v> [<backend flags>] --with <base…> [--with <extra> …] python <worker.py>
  *
  * The base `--with` package(s) come from the job's `backend` via
  * {@link baseWorkerWith} (mflux for image, mlx-audio for TTS, the 3D deps for
@@ -268,26 +351,11 @@ export interface WorkerUvArgsOptions {
  * {@link ../protocol!GenEvent}s back on stdout. Pure.
  */
 export function buildWorkerUvArgs(opts: WorkerUvArgsOptions): string[] {
-  const backend = opts.backend ?? 'mflux';
-  const args = [
-    'run',
-    '--no-project',
-    '--python',
-    opts.python ?? DEFAULT_PYTHON_VERSION,
-    ...backendUvFlags(backend),
-  ];
-  const mlxVlmWith = given(opts.mlxVlmWith) ?? bundledMlxVlmWheel(opts.workerScript);
-  for (const dep of baseWorkerWith(backend, opts.mfluxPin, opts.mfluxWith, mlxVlmWith)) {
-    args.push('--with', dep);
-  }
-  for (const dep of opts.extraWith ?? []) {
-    args.push('--with', dep);
-  }
-  args.push('python', opts.workerScript);
+  const command = ['python', opts.workerScript];
   // Persistent 3D (TRELLIS.2) serve mode: worker.py loads the pipeline once and
   // reads one job envelope per stdin line until EOF / a `{"type":"shutdown"}`.
   if (opts.serveMode === true) {
-    args.push('--serve');
+    command.push('--serve');
   }
-  return args;
+  return uvRunArgs(workerUvEnv(opts), command, { offline: opts.offline });
 }

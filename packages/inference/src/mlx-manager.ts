@@ -22,6 +22,7 @@
 import { stat } from 'node:fs/promises';
 import { delimiter, join } from 'node:path';
 import { LlamaServerSupervisor } from './supervisor.js';
+import { uvEnvCached, uvRunArgs } from './uv-run.js';
 
 /**
  * Pinned `mlx-lm` version passed to uv `--with`. Bump deliberately; the ephemeral
@@ -75,19 +76,22 @@ export interface MlxServerArgsConfig {
   readonly transformersPin?: string;
   /** Python version uv provisions for the run (default 3.12). */
   readonly python?: string;
+  /**
+   * Launch with `uv run --offline`: a probe found the environment already in
+   * uv's cache (see uv-run.ts), so the start needs no network.
+   */
+  readonly offline?: boolean;
 }
 
 /**
- * Build the argv passed to the `uv` binary to launch `mlx_lm.server`. Pure.
- *
- * `uv run --no-project --python <v> --with mlx-lm==<pin> --with
- * transformers==<pin> mlx_lm.server --model <repo> --host <h> --port <p>
- * [--draft-model <r> --num-draft-tokens <n>]`. Both pins are load-bearing (see
- * {@link MLX_LM_PIN} / {@link TRANSFORMERS_PIN}).
+ * The `uv run` options that make `mlx_lm.server`'s environment — the Python and
+ * both pins, everything between `run` and the command. The launch and its
+ * offline probe both take it from here. Pure.
  */
-export function assembleMlxServerArgs(cfg: MlxServerArgsConfig): string[] {
-  const args = [
-    'run',
+export function mlxServerUvEnv(
+  cfg: Pick<MlxServerArgsConfig, 'mlxLmPin' | 'transformersPin' | 'python'> = {},
+): string[] {
+  return [
     '--no-project',
     '--python',
     cfg.python ?? '3.12',
@@ -95,6 +99,19 @@ export function assembleMlxServerArgs(cfg: MlxServerArgsConfig): string[] {
     `mlx-lm==${cfg.mlxLmPin ?? MLX_LM_PIN}`,
     '--with',
     `transformers==${cfg.transformersPin ?? TRANSFORMERS_PIN}`,
+  ];
+}
+
+/**
+ * Build the argv passed to the `uv` binary to launch `mlx_lm.server`. Pure.
+ *
+ * `uv run [--offline] --no-project --python <v> --with mlx-lm==<pin> --with
+ * transformers==<pin> mlx_lm.server --model <repo> --host <h> --port <p>
+ * [--draft-model <r> --num-draft-tokens <n>]`. Both pins are load-bearing (see
+ * {@link MLX_LM_PIN} / {@link TRANSFORMERS_PIN}).
+ */
+export function assembleMlxServerArgs(cfg: MlxServerArgsConfig): string[] {
+  const command = [
     'mlx_lm.server',
     '--model',
     cfg.repo,
@@ -104,14 +121,14 @@ export function assembleMlxServerArgs(cfg: MlxServerArgsConfig): string[] {
     String(cfg.port),
   ];
   if (cfg.draftRepo !== undefined && cfg.draftRepo.length > 0) {
-    args.push(
+    command.push(
       '--draft-model',
       cfg.draftRepo,
       '--num-draft-tokens',
       String(cfg.numDraftTokens ?? 3),
     );
   }
-  return args;
+  return uvRunArgs(mlxServerUvEnv(cfg), command, { offline: cfg.offline });
 }
 
 /** How `mlx_lm.server` is reached (its command + provenance). */
@@ -187,6 +204,13 @@ export interface CreateMlxSupervisorOptions {
  * crash-restart/backoff/dispose skeleton via its `buildArgsFn` + `healthPath`
  * seams: the command is `uv`, the args launch `mlx_lm.server`, and readiness is
  * probed on `/v1/models` (no `/health`).
+ *
+ * OFFLINE FIRST, via `beforeSpawn`: before every spawn — the first, each
+ * restart, a resume — a silent `uv run --offline` probe asks whether the pinned
+ * environment is all on disk, and when it is the server launches `--offline`.
+ * Without it uv re-resolves both pins against PyPI once its index cache is ten
+ * minutes old, and a Mac with no network could not load an MLX model it had
+ * run an hour before. Not cached → online, exactly as before (uv-run.ts).
  */
 export function createMlxSupervisor(
   opts: CreateMlxSupervisorOptions & {
@@ -196,6 +220,8 @@ export function createMlxSupervisor(
   },
 ): LlamaServerSupervisor {
   const host = opts.host ?? '127.0.0.1';
+  const uvEnv = mlxServerUvEnv({ mlxLmPin: opts.mlxLmPin });
+  let offline = false;
   return new LlamaServerSupervisor({
     serverPath: opts.uvPath,
     modelPath: opts.repo, // unused by buildArgsFn; kept for logging/parity
@@ -204,6 +230,9 @@ export function createMlxSupervisor(
     port: opts.port,
     healthPath: '/v1/models',
     healthTimeoutMs: opts.healthTimeoutMs ?? 180_000,
+    beforeSpawn: async (run) => {
+      offline = await uvEnvCached(run, uvEnv);
+    },
     buildArgsFn: (port) =>
       assembleMlxServerArgs({
         repo: opts.repo,
@@ -211,6 +240,7 @@ export function createMlxSupervisor(
         port,
         draftRepo: opts.draftRepo,
         mlxLmPin: opts.mlxLmPin,
+        offline,
       }),
     spawnFn: opts.spawnFn,
     fetchImpl: opts.fetchImpl,
