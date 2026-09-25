@@ -372,11 +372,31 @@ def test_xlsx_cite_cells_link_to_their_source_rows(workbook):
     ws = wb["Findings"]
     cites = {c.value: c.hyperlink.location for row in ws.iter_rows() for c in row
              if c.hyperlink is not None and c.hyperlink.location}
-    assert cites == {"2, 4": "'Sources'!A6", "3": "'Sources'!A7", "5": "'Sources'!A9", "1": "'Sources'!A5"}
+    # One source is its number (3, not "3": text that looks like a number is
+    # flagged as an error by a spreadsheet); two are "2, 4".
+    assert cites == {"2, 4": "'Sources'!A6", 3: "'Sources'!A7", 5: "'Sources'!A9", 1: "'Sources'!A5"}
     src = wb["Sources"]
     for loc in cites.values():
         row = int(loc.rsplit("A", 1)[1])
         assert isinstance(src.cell(row=row, column=1).value, int)
+    # A citation's number is not data: no data bar over it (SEEN in the canvas
+    # before this), no thousands format, set left like the text around it.
+    assert [str(cf.sqref) for cf in ws.conditional_formatting] == []
+    assert ws["C6"].number_format == "General" and ws["C6"].alignment.horizontal == "left"
+    assert [str(cf.sqref) for cf in wb["Data"].conditional_formatting] == ["B5:B8"]
+
+
+def test_xlsx_sentences_wrap_and_their_rows_grow(workbook):
+    """A claim is a sentence: clipped at the next cell it was not readable
+    (SEEN in the canvas). It wraps, left-aligned, in a row tall enough."""
+    spec, out, wb, _path = workbook
+    ws = wb["Findings"]
+    claim = ws["A5"]
+    assert claim.alignment.wrap_text and claim.alignment.horizontal == "left"
+    assert ws.row_dimensions[5].height and ws.row_dimensions[5].height > 20
+    assert ws["B5"].alignment.horizontal == "left"            # text, not a number
+    src = wb["Sources"]
+    assert [c.value for c in src[4]][:3] == ["#", "Title", "URL"]
 
 
 def test_xlsx_notes_and_no_leftover_markers(workbook):

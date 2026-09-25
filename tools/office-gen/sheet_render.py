@@ -87,6 +87,10 @@ class _Plain:
     def text(v):
         return v
 
+    @staticmethod
+    def numeric(cell, v) -> bool:
+        return isinstance(v, (int, float))
+
     def style(self, cell, t):
         pass
 
@@ -158,7 +162,7 @@ def _sheet(ws, spec: dict, t, cells=_Plain()) -> dict:
             cell.border = Border(bottom=thin)
             cell.alignment = Alignment(vertical="center", indent=1 if c == 1 else 0,
                                        horizontal="left" if c == 1 else "right")
-            if isinstance(cell.value, (int, float)):
+            if cells.numeric(cell, v):
                 numeric_cols.add(c)
                 cell.number_format = spec.get("number_format", "#,##0")
             if (r - head_row) % 2 == 0:
@@ -220,7 +224,7 @@ def _sheet(ws, spec: dict, t, cells=_Plain()) -> dict:
         ws.auto_filter.ref = f"A{head_row}:{get_column_letter(len(headers))}{head_row + len(rows)}"
     return {"sheet": ws.title, "kind": "table", "title": cells.shown(spec.get("title", "")),
             "headers": [cells.shown(h) for h in headers], "rows": len(rows),
-            "chart": chart_kind or None}
+            "chart": chart_kind or None, "_data_rows": (head_row + 1, head_row + len(rows))}
 
 
 def build(spec: dict, out: Path, *, drawn: list | None = None, warnings: list | None = None,
@@ -268,6 +272,12 @@ class _Rich:
         self.sources_sheet = sources_sheet
         self.links = 0
         self.notes = 0
+        self._cites: set[str] = set()     # cells that hold a citation, not data
+
+    def numeric(self, cell, v) -> bool:
+        """Data, for the column's number format, data bar and total — a
+        citation's number ("3") is none of those."""
+        return isinstance(cell.value, (int, float)) and cell.coordinate not in self._cites
 
     @staticmethod
     def head(h):
@@ -298,8 +308,13 @@ class _Rich:
         if v.get("cite") is not None:
             nums = self.cite.resolve_ids(v.get("cite"))
             from citations import numbers_text
-            cell.value = self.text(v) if (v.get("text") is not None or v.get("value") is not None) \
-                else numbers_text(nums)
+            if v.get("text") is not None or v.get("value") is not None:
+                cell.value = self.text(v)
+            else:
+                # One source is its NUMBER: "3" stored as text is flagged as a
+                # number-stored-as-text error (Univer's green corner, SEEN).
+                cell.value = nums[0] if len(nums) == 1 else numbers_text(nums)
+                self._cites.add(cell.coordinate)
             if nums and self.sources_sheet:
                 link = ("internal", f"'{self.sources_sheet}'!A{SOURCES_HEAD_ROW + min(nums)}")
         else:
@@ -327,24 +342,48 @@ class _Rich:
         return cell
 
     def style(self, cell, t):
-        """A linked cell reads as a link: the theme's primary, underlined."""
+        """Text reads left to right and wraps when it is a sentence (a research
+        workbook's claims are; clipped at the next cell they were not read); a
+        linked cell reads as a link: the theme's primary, underlined."""
+        v = cell.value
+        if (isinstance(v, str) and not v.startswith("=")) or cell.coordinate in self._cites:
+            cell.alignment = Alignment(vertical="center", horizontal="left", indent=1,
+                                       wrap_text=isinstance(v, str) and len(v) > WRAP_AT)
         if cell.hyperlink is not None:
             f = cell.font
             cell.font = Font(name=f.name, size=f.sz, bold=f.b, italic=f.i, underline="single",
                              color=_hx(t.primary))
 
 
+WRAP_AT = 40          # characters: past this a text cell wraps in its column
+
+
+def _fit_rows(ws, first: int, last: int) -> None:
+    """Row heights for wrapped cells. Excel keeps a row at its stored height on
+    open, so a wrapped sentence in a default-height row shows one line of
+    itself; the lines are estimated from the column's width in characters."""
+    for r in range(first, last + 1):
+        lines = 1
+        for cell in ws[r]:
+            if cell.alignment is None or not cell.alignment.wrap_text or not isinstance(cell.value, str):
+                continue
+            width = ws.column_dimensions[cell.column_letter].width or 10
+            lines = max(lines, -(-len(cell.value) // max(1, int(width) - 3)))
+        if lines > 1:
+            ws.row_dimensions[r].height = 13.5 * lines + 4
+
+
 def _sources_sheet(ws, spec: dict, t, cite, cells: _Rich) -> dict:
     """Every source, one row each, in the citations' numbering; the URL a live
-    link. Columns nobody filled are left out rather than shown empty."""
+    link, next to its title — in a narrow viewer (the canvas) a URL after the
+    site and date was off the side (SEEN). Columns nobody filled are left out
+    rather than shown empty."""
     ws.sheet_view.showGridLines = False
-    cols = [("#", lambda s: s.n), ("Title", lambda s: s.title)]
-    for head, get in (("Site", lambda s: s.site), ("Date", lambda s: s.date)):
+    cols = [("#", lambda s: s.n), ("Title", lambda s: s.title), ("URL", lambda s: s.url)]
+    for head, get in (("Site", lambda s: s.site), ("Date", lambda s: s.date),
+                      ("Accessed", lambda s: s.accessed)):
         if any(get(s) for s in cite.sources):
             cols.append((head, get))
-    cols.append(("URL", lambda s: s.url))
-    if any(s.accessed for s in cite.sources):
-        cols.append(("Accessed", lambda s: s.accessed))
     last_col = max(len(cols), 4)
     _band(ws, 1, 1, last_col, t, t.deep, height=34)
     title = ws.cell(row=1, column=1, value=cells.text(spec.get("title")) or "Sources")
@@ -370,8 +409,8 @@ def _sources_sheet(ws, spec: dict, t, cite, cells: _Rich) -> dict:
             cell = ws.cell(row=r, column=c, value=v if v != "" else None)
             cell.font = _font(t, size=10, bold=(head == "Title"))
             cell.border = Border(bottom=thin)
-            cell.alignment = Alignment(vertical="center", indent=1 if c == 1 else 0,
-                                       horizontal="left", wrap_text=head == "Title")
+            cell.alignment = Alignment(vertical="center", indent=1, horizontal="left",
+                                       wrap_text=head == "Title" and len(str(v)) > WRAP_AT)
             if head == "URL" and v:
                 cell.hyperlink = v
                 cell.font = Font(name=FONT, size=10, underline="single", color=_hx(t.primary))
@@ -380,11 +419,12 @@ def _sources_sheet(ws, spec: dict, t, cite, cells: _Rich) -> dict:
                 cell.fill = _fill(t.faint)
             widths[c - 1] = max(widths[c - 1], len(str(v)))
     for c, w in enumerate(widths, start=1):
-        cap = 6 if c == 1 else 48 if cols[c - 1][0] == "Title" else 70
+        cap = 6 if c == 1 else 44 if cols[c - 1][0] == "Title" else 70
         ws.column_dimensions[get_column_letter(c)].width = min(cap, max(6 if c == 1 else 12, w + 4))
     ws.freeze_panes = ws.cell(row=SOURCES_HEAD_ROW + 1, column=1)
     return {"sheet": ws.title, "kind": "sources", "title": title.value, "headers": [h for h, _g in cols],
-            "rows": len(cite.sources), "links": sum(1 for s in cite.sources if s.url)}
+            "rows": len(cite.sources), "links": sum(1 for s in cite.sources if s.url),
+            "_data_rows": (SOURCES_HEAD_ROW + 1, SOURCES_HEAD_ROW + len(cite.sources))}
 
 
 def _workbook(wb, spec: dict, t, cite, drawn: list, warnings: list) -> None:
@@ -409,6 +449,7 @@ def _workbook(wb, spec: dict, t, cite, drawn: list, warnings: list) -> None:
         else:
             rec = _sheet(ws, part, t, cells)
             rec["links"] = cells.links
+        _fit_rows(ws, *rec.pop("_data_rows"))
         rec["notes"] = cells.notes
         drawn.append(rec)
 
