@@ -129,7 +129,7 @@ describe('registerWebTools wiring', () => {
     });
     const tool = getTool(tools, WEB_SEARCH_TOOL);
     const res = await tool.execute('t1', { query: 'example' });
-    expect(res.content[0]?.text.endsWith(CITE_HINT)).toBe(true);
+    expect((res.content[0]?.text ?? '').endsWith(CITE_HINT)).toBe(true);
     expect(JSON.stringify(tools.get(WEB_SEARCH_TOOL))).not.toContain('cite each page');
 
     const empty = createFakePi();
