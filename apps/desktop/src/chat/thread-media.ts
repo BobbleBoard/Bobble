@@ -120,6 +120,18 @@ const EXT: Readonly<Record<string, MediaKind>> = {
   stl: 'model',
 };
 
+/**
+ * The media card for a file, by its extension — or null when it is not a picture,
+ * clip, sound or model. What a PRESENTED picture is drawn as (ChatThread): the
+ * full card, not a file row pointing at the canvas.
+ */
+export function mediaItemForPath(absPath: string): ThreadMediaItem | null {
+  const ext = absPath.split('.').pop()?.toLowerCase() ?? '';
+  const kind = EXT[ext];
+  if (kind === undefined) return null;
+  return { path: absPath, kind, name: absPath.split('/').pop() ?? absPath };
+}
+
 /*
  * An absolute POSIX path ending in a media extension.
  *

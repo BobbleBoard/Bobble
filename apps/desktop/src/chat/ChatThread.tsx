@@ -62,8 +62,10 @@ import { effectiveToolName } from './long-job';
 import { MessageErrorBoundary } from './MessageErrorBoundary';
 import { PresentedInline } from './PresentedInline';
 import { awaitingReplyAfterLatestTurn, sentAttachmentsPrefilling } from './sent-prefill';
-import { useThreadSlots } from './thread-slots';
+import { ThreadMedia } from './ThreadMedia';
 import { followToLatest, useThreadFollow } from './thread-follow';
+import { mediaItemForPath } from './thread-media';
+import { useThreadSlots } from './thread-slots';
 import { attributeRecords, type CallResultFacts } from './turn-cards';
 import { BlindImageNote, UserImage } from './UserImage';
 
@@ -320,9 +322,15 @@ export function ChatThread() {
     </div>
   );
   /* A chart, or a small SVG, IS shown here — the card is the thing, not a
-   * row pointing at the canvas (PresentedInline). */
-  const renderRecord = (item: PresentedRecord): ReactNode =>
-    isInlinePresented(item) ? (
+   * row pointing at the canvas (PresentedInline). So is a picture, a clip, a
+   * sound or a model the model presented: the user (2026-09-24) wants what is
+   * handed over "shown in the full big card" — the media card with its
+   * controls — while the same thing un-presented sits small in the work
+   * (turn-cards.ts). */
+  const renderRecord = (item: PresentedRecord): ReactNode => {
+    const media = isInlinePresented(item) ? null : mediaItemForPath(item.path);
+    if (media !== null) return <ThreadMedia key={item.path} items={[media]} />;
+    return isInlinePresented(item) ? (
       <PresentedInline key={item.path} item={item} />
     ) : (
       <PresentCard
@@ -350,6 +358,7 @@ export function ChatThread() {
         }}
       />
     );
+  };
 
   const copyText = (text: string) => {
     void writeClipboardText(text);

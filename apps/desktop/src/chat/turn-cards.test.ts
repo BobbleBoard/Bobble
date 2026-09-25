@@ -27,9 +27,8 @@ const card = (callId: string, path: string, kind: CardKind = 'image'): TurnCard 
   kind,
 });
 
-describe('the user's iteration — edit, look, edit again', () => {
-  /* The shape he described: one chain (Qwen's "\n\n" between thought and call is
-     not a boundary), each edit taking the previous result as its input. */
+describe('what the turn made is the work; what it presented is the answer', () => {
+  /* the user's iteration: one chain, each edit taking the previous result as input. */
   const calls = [
     call('e1', 0, 'edit_image', { image_path: '/Users/j/Desktop/photo.png', instruction: 'x' }),
     call('e2', 0, 'edit_image', { image_path: V1, instruction: 'warmer' }),
@@ -37,111 +36,45 @@ describe('the user's iteration — edit, look, edit again', () => {
   ];
   const cards = [card('e1', V1), card('e2', V2), card('e3', V3)];
 
-  it('while the chain is working, every earlier result is filed INTO it', () => {
-    const place = placeTurnCards(calls, cards, 0);
+  it('every result files into the chain — none of them was handed over', () => {
+    const place = placeTurnCards(calls, cards);
+    expect([...place.values()]).toEqual(['inside', 'inside', 'inside']);
+  });
+
+  it('presenting the last version brings it out, full size, once', () => {
+    const presented = [...calls, call('p', 1, 'present', { path: V3 })];
+    const place = placeTurnCards(presented, [...cards, card('p', V3, 'record')]);
     expect(place.get(`e1:${V1}`)).toBe('inside');
     expect(place.get(`e2:${V2}`)).toBe('inside');
+    // The edit's own card of V3 gives way to the presented one: one file, one card.
+    expect(place.get(`e3:${V3}`)).toBe('none');
+    expect(place.get(`p:${V3}`)).toBe('beneath');
   });
 
-  it('…and the newest sits beneath it, where its generating card stood', () => {
-    expect(placeTurnCards(calls, cards, 0).get(`e3:${V3}`)).toBe('beneath');
-  });
-
-  it('when the turn ends only the final version comes out — the drafts stay folded', () => {
-    const place = placeTurnCards(calls, cards, null);
-    expect(place.get(`e1:${V1}`)).toBe('inside');
-    expect(place.get(`e2:${V2}`)).toBe('inside');
-    expect(place.get(`e3:${V3}`)).toBe('beneath');
-  });
-
-  it('a draft is a draft only because a later edit took it as INPUT', () => {
-    // Same three results, but each edit started from the ORIGINAL photo: they
-    // are three alternatives, none of them revised, so all three are answers.
-    const siblings = calls.map((c) => ({ ...c, args: { image_path: '/Users/j/Desktop/p.png' } }));
-    const place = placeTurnCards(siblings, cards, null);
-    expect([...place.values()]).toEqual(['beneath', 'beneath', 'beneath']);
-  });
-});
-
-describe('a result the model is about to talk about does not jump', () => {
-  it('thinking after the call is not moving on: the picture stays beneath', () => {
-    // One call in the live chain and nothing after it (the model is thinking
-    // about what to say) — beneath, so the reply's start does not move it twice.
-    const place = placeTurnCards([call('g', 0, 'generate_image')], [card('g', V1)], 0);
-    expect(place.get(`g:${V1}`)).toBe('beneath');
-  });
-
-  it('a later call in ANOTHER chain does not file it (that chain is not this one)', () => {
-    const place = placeTurnCards(
-      [call('g', 0, 'generate_image'), call('w', 2, 'write')],
-      [card('g', V1)],
-      2,
+  it('eight pages of a children’s book come out only as the model presents them', () => {
+    const pages = Array.from({ length: 8 }, (_, i) =>
+      call(`g${i}`, 0, 'generate_image', { prompt: `page ${i}` }),
     );
-    expect(place.get(`g:${V1}`)).toBe('beneath');
+    const made = pages.map((c, i) => card(c.id, `${DIR}/page_${i}.png`));
+    expect([...placeTurnCards(pages, made).values()].every((p) => p === 'inside')).toBe(true);
+    const shown = [...pages, call('p', 1, 'present', { path: `${DIR}` })];
+    const place = placeTurnCards(shown, [...made, card('p', DIR, 'record')]);
+    expect(place.get(`p:${DIR}`)).toBe('beneath');
   });
 
-  it('any later call in the SAME live chain files it — even a read of the picture', () => {
-    const place = placeTurnCards(
-      [call('g', 0, 'generate_image'), call('r', 0, 'read', { path: V1 })],
-      [card('g', V1)],
-      0,
+  it('a chart the chart tool drew is part of the work until it is presented', () => {
+    const chart = '/w/units.svg';
+    const drawn = placeTurnCards([call('c', 0, 'chart')], [card('c', chart, 'record')]);
+    expect(drawn.get(`c:${chart}`)).toBe('inside');
+    const shown = placeTurnCards(
+      [call('c', 0, 'chart'), call('p', 0, 'present', { path: 'units.svg' })],
+      [card('p', chart, 'record')],
     );
-    expect(place.get(`g:${V1}`)).toBe('inside');
-  });
-});
-
-describe('a turn that made several things makes several answers', () => {
-  it('eight pages of a children’s book: none revised, all eight come out', () => {
-    const calls = Array.from({ length: 8 }, (_, i) =>
-      call(`p${i}`, 0, 'generate_image', { prompt: `page ${i}` }),
-    );
-    const cards = calls.map((c, i) => card(c.id, `${DIR}/page_${i}.png`));
-    const done = placeTurnCards(calls, cards, null);
-    expect([...done.values()].every((p) => p === 'beneath')).toBe(true);
-    // …while mid-turn only the newest is out and the rest are in the chain.
-    const mid = placeTurnCards(calls, cards, 0);
-    expect(cards.map((c) => mid.get(c.key))).toEqual([...Array(7).fill('inside'), 'beneath']);
+    expect(shown.get(`p:${chart}`)).toBe('beneath');
   });
 
-  it('reading a picture is not revising it', () => {
-    const place = placeTurnCards(
-      [call('g', 0, 'generate_image'), call('r', 0, 'read', { path: V1 })],
-      [card('g', V1)],
-      null,
-    );
-    expect(place.get(`g:${V1}`)).toBe('beneath');
-  });
-
-  it('a video made FROM a picture does not make the picture a draft', () => {
-    const clip = `${DIR}/clip.mp4`;
-    const place = placeTurnCards(
-      [call('g', 0, 'generate_image'), call('v', 0, 'generate_video', { image: V1 })],
-      [card('g', V1), card('v', clip, 'video')],
-      null,
-    );
-    expect(place.get(`g:${V1}`)).toBe('beneath');
-    expect(place.get(`v:${clip}`)).toBe('beneath');
-  });
-
-  it('a refined mesh supersedes the build it refined', () => {
-    const a = `${DIR}/out/fox.glb`;
-    const b = `${DIR}/out/fox-refined.glb`;
-    // `out/fox.glb` — the way the 3D tools tell the model to name it, relative
-    // to the working folder — is the same file.
-    const place = placeTurnCards(
-      [call('m', 0, 'generate_3d'), call('r', 0, 'refine_3d', { model_path: 'out/fox.glb' })],
-      [card('m', a, 'model'), card('r', b, 'model')],
-      null,
-    );
-    expect(place.get(`m:${a}`)).toBe('inside');
-    expect(place.get(`r:${b}`)).toBe('beneath');
-    // Refining some OTHER mesh leaves this one an answer.
-    const other = placeTurnCards(
-      [call('m', 0, 'generate_3d'), call('r', 0, 'refine_3d', { model_path: 'out/owl.glb' })],
-      [card('m', a, 'model'), card('r', b, 'model')],
-      null,
-    );
-    expect(other.get(`m:${a}`)).toBe('beneath');
+  it('a card no call in the turn accounts for stays where it was drawn', () => {
+    expect(placeTurnCards([], [card('x', V1)]).get(`x:${V1}`)).toBe('beneath');
   });
 });
 
@@ -151,10 +84,9 @@ describe('one file, one card', () => {
     const place = placeTurnCards(
       [call('c', 0, 'chart'), call('e', 0, 'chart_edit', { file: 'units.svg' })],
       [card('c', chart, 'record'), card('e', chart, 'record')],
-      null,
     );
     expect(place.get(`c:${chart}`)).toBe('none');
-    expect(place.get(`e:${chart}`)).toBe('beneath');
+    expect(place.get(`e:${chart}`)).toBe('inside');
   });
 });
 

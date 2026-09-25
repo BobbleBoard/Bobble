@@ -307,7 +307,7 @@ export function AssistantGroup({
       });
     }
   }
-  const placed = placeTurnCards(turnCalls, turnCards, liveChain);
+  const placed = placeTurnCards(turnCalls, turnCards);
   const placeOf = (kind: 'm' | 'r', callId: string, path: string): CardPlace =>
     placed.get(`${kind}:${callId}:${path}`) ?? 'beneath';
   // The picture still coming out from under the sweep is the pending card's

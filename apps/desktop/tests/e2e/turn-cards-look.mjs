@@ -308,13 +308,13 @@ try {
   const b = await where();
   console.log('result landed:', JSON.stringify(b));
   await shot('b-result-landed');
+  /* the user (2026-09-24, later): "have generated stuff go inside a thought process
+     at first and only show outside the thought process if present is called on
+     it" — the newest result plays its reveal where its card stood, then files
+     in with the others. */
   check(
-    b.outside.length === 1 && b.outside[0] === 'edit_003.png',
-    `the newest result sits beneath the chain, where its card stood (${JSON.stringify(b)})`,
-  );
-  check(
-    b.inside.length === 3,
-    `…and the earlier three stay filed in the chain (${b.inside.length})`,
+    b.outside.length === 0 && b.inside.length === 4,
+    `every result, the newest too, is filed in the chain — none presented yet (${JSON.stringify(b)})`,
   );
 
   /* ── c. the turn ends with its reply ── */
@@ -332,15 +332,37 @@ try {
         'a5',
         [
           thought('That is the look they asked for.'),
+          { type: 'toolCall', id: 'p1', name: 'present', arguments: { path: V[3] } },
+        ],
+        90,
+      ),
+      {
+        kind: 'toolResult',
+        id: 'tr-a5-p1',
+        toolCallId: 'p1',
+        assistantId: 'a5',
+        toolName: 'present',
+        text: `Presented ${V[3]} to the user. Preview: an image.`,
+        isError: false,
+        timestamp: 95,
+      },
+      assistant(
+        'a6',
+        [
           {
             type: 'text',
             text: 'Here it is in golden-hour light — warmer fur, a glowing background.',
           },
         ],
-        90,
+        100,
       ),
     ],
   });
+  // The model handed the final version over: present-store's record of it.
+  await page.evaluate(
+    ({ p }) => window.__present_store().getState().add({ path: p, chat: '', afterMessageId: 'a5' }),
+    { p: V[3] },
+  );
   await sleep(1500);
   await decoded();
   await toBottom();
@@ -352,7 +374,7 @@ try {
   check(c.chainExpanded === 'false', 'the chain folds when the turn is done');
   check(
     c.outside.length === 1 && c.outside[0] === 'edit_003.png',
-    `only the FINAL picture is shown beneath the chain (${JSON.stringify(c.outside)})`,
+    `only the picture the model PRESENTED is shown beneath the chain (${JSON.stringify(c.outside)})`,
   );
 
   /* ── d. the iterations are still there when the chain is opened ── */
@@ -524,8 +546,24 @@ try {
         isError: false,
         timestamp: 240,
       },
+      // The model hands the chart over: presenting it is what brings it out.
       assistant(
         'b3',
+        [{ type: 'toolCall', id: 'p2', name: 'present', arguments: { path: 'units.svg' } }],
+        245,
+      ),
+      {
+        kind: 'toolResult',
+        id: 'tr-b3-p2',
+        toolCallId: 'p2',
+        assistantId: 'b3',
+        toolName: 'present',
+        text: 'Presented units.svg to the user. Preview: rendered.',
+        isError: false,
+        timestamp: 248,
+      },
+      assistant(
+        'b4',
         [{ type: 'text', text: 'Sales rose every year — 27 thousand units in 2023.' }],
         250,
       ),
@@ -540,7 +578,7 @@ try {
   await shot('h-chart-answer');
   check(
     h.chartInChain === false && h.chainExpanded === 'false',
-    `when the turn is done the chart is its answer, beneath the folded chain (${JSON.stringify(h)})`,
+    `the chart the model PRESENTED is its answer, beneath the folded chain (${JSON.stringify(h)})`,
   );
 } finally {
   await finish();

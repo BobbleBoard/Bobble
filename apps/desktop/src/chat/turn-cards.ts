@@ -2,40 +2,36 @@
  * WHERE A FINISHED CARD SITS — inside the activity chain that made it, or
  * beneath it.
  *
- * the user (2026-09-24): "generations/inline cards of any kind always seem to get
- * pinned to the bottom of the chat for quite some time, including during
- * working/iteration, eg. … I gave an image and asked for it edited in a certain
- * way, and the 4b qwen model has gone on and iterated visually over the
- * generated images improving each time toward the goal. however on each of it's
- * iterations the full image cards are presented at the very bottom of the chat
- * as if totally finished, these should be embedded in thinking blocks, not the
- * generating card, that stays out".
+ * the user (2026-09-24, first): "generations/inline cards of any kind always seem to
+ * get pinned to the bottom of the chat for quite some time, including during
+ * working/iteration … on each of it's iterations the full image cards are
+ * presented at the very bottom of the chat as if totally finished, these should
+ * be embedded in thinking blocks, not the generating card, that stays out".
  *
- * Every card a turn made used to hang under the chain that made it (ThreadMedia)
- * or after the whole reply (present-store), so a turn that kept working stacked
- * each intermediate result at the foot of the conversation — a column of
- * finished-looking pictures while the model was three edits away from done.
+ * the user (2026-09-24, later): "have generated stuff go inside a thought process at
+ * first and only show outside the thought process if present is called on it,
+ * still clickable within the thought process embed it smaller than full inside
+ * the work/think block where it was generated, just no hover buttons and such
+ * when it's not presented and shown in the full big card."
  *
- * ONE QUESTION DECIDES EACH CARD: HAS THE WORK MOVED ON FROM IT?
+ * ONE QUESTION DECIDES EACH CARD: DID THE MODEL HAND IT OVER?
  *
- *  - The newest thing a LIVE chain made sits beneath it, in the slot its
- *    generating card stood in. The reveal finishes where it started, and a
- *    result the model is about to talk about does not jump into the chain only
- *    to jump back out a second later when the reply begins (the chain folds the
- *    moment text starts — the user's rule — and a card that went in with it would
- *    have to come straight back).
- *  - The moment the chain calls ANYTHING after it, the work has moved on: the
- *    card files into the chain, under the row of the call that made it, and
- *    folds away with the chain. Thinking alone does not file it — a model that
- *    looks at its picture and then answers has not moved on from it.
- *  - Once a chain is no longer live (its reply began, a later chain took over,
- *    the turn ended) its DELIVERABLES come back out beneath it: everything it
- *    made that no later call went on to revise. A picture that a later
- *    `edit_image` took as its input was a draft of that later picture, so it
- *    stays in the chain and only the last version is outside — the answer
- *    shows its result without repeating every step of the iteration. A turn
- *    that made eight separate pictures (a children's book: one call per page)
- *    revised none of them, so all eight come out.
+ *  - Whatever a call MAKES — a picture, a chart, a drawing, a mesh, a clip — is
+ *    part of the work, and files into the chain under the row of the call that
+ *    made it, small, clickable, without the card's controls (global.css
+ *    `.pd-chain-step-attachment`). It folds away with the chain.
+ *  - Whatever the model PRESENTS is the answer: the `present` call's card stands
+ *    beneath the chain, full size, with its controls. Presenting is the model's
+ *    one deliberate act of showing — the tool that also hands it a look at what
+ *    the user will see — so the answer is exactly what it chose to show, and an
+ *    iteration's drafts never pose as results.
+ *  - The generating card is neither: it stands beneath the live chain while the
+ *    job runs (the wait is the one thing a folding chain must never hide), plays
+ *    its reveal there, and the result then files in.
+ *
+ * (The earlier rule brought a chain's "deliverables" back out when it went quiet
+ * — everything no later call had revised. It guessed at what the answer was; the
+ * model knows, and says so by presenting.)
  *
  * Pure: no React, no store. AssistantGroup gathers the facts and renders what
  * this decides.
@@ -71,17 +67,6 @@ export interface TurnCard {
  * the very same file (one card per file, at the newest call that made it).
  */
 export type CardPlace = 'inside' | 'beneath' | 'none';
-
-/**
- * The tools that make a NEW VERSION of a card of this kind out of an old one.
- * Only these can turn a card into a draft: a call that merely READS a picture
- * (the model looking at its own output) has not replaced it, and a video made
- * from a picture is a different thing the user may want both of.
- */
-const REVISED_BY: Partial<Record<CardKind, ReadonlySet<string>>> = {
-  image: new Set(['edit_image']),
-  model: new Set(['refine_3d']),
-};
 
 /** The words of a command line, unquoted: `--image_path="/a b.png"` → `/a b.png`. */
 function wordsOf(text: string): string[] {
@@ -123,19 +108,19 @@ export function argsNamePath(args: unknown, absPath: string): boolean {
   return false;
 }
 
-/**
- * Where each card goes. `liveChain` is the chain the turn is working in right
- * now (the last segment of a streaming turn), or null when no chain is live.
- */
+/** The tool whose card is the answer — see the header. */
+const PRESENT = 'present';
+
+/** Where each card goes: beneath the chain if the model presented it, else in it. */
 export function placeTurnCards(
   calls: readonly TurnCall[],
   cards: readonly TurnCard[],
-  liveChain: number | null,
 ): Map<string, CardPlace> {
   const order = new Map(calls.map((c, i) => [c.id, i]));
   /* The same file from two calls — a picture saved over itself, a chart the
-     model redrew in place — is ONE card, and it belongs to the newest call:
-     that is the version on disk, which is what either card would show. */
+     model redrew in place, a picture it then presented — is ONE card, and it
+     belongs to the newest call: that is the version on disk, and a present of
+     it is the model saying this one is the answer. */
   const newestCall = new Map<string, number>();
   for (const card of cards) {
     const at = order.get(card.callId) ?? -1;
@@ -155,19 +140,7 @@ export function placeTurnCards(
       out.set(card.key, 'none');
       continue;
     }
-    const later = calls.slice(at + 1);
-    if (call.chain === liveChain) {
-      const movedOn = later.some((c) => c.chain === call.chain);
-      out.set(card.key, movedOn ? 'inside' : 'beneath');
-      continue;
-    }
-    const revisers = REVISED_BY[card.kind];
-    const revised =
-      revisers !== undefined &&
-      later.some(
-        (c) => c.tool !== undefined && revisers.has(c.tool) && argsNamePath(c.args, card.path),
-      );
-    out.set(card.key, revised ? 'inside' : 'beneath');
+    out.set(card.key, call.tool === PRESENT ? 'beneath' : 'inside');
   }
   return out;
 }

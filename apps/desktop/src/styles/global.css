@@ -4619,6 +4619,20 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
 .pd-chain-step-attachment {
   --pd-media-max-h: 240px;
 }
+/*
+ * …AND NOT YET HANDED OVER. the user (2026-09-24): "still clickable within the
+ * thought process embed it smaller than full inside the work/think block where
+ * it was generated, just no hover buttons and such when it's not presented and
+ * shown in the full big card." A click still opens it (the picture → the
+ * viewer, a chart → the canvas); copy, export, open-in-studio and the like
+ * belong to the card the model presents (turn-cards.ts).
+ */
+.pd-chain-step-attachment .pd-media-btn,
+.pd-chain-step-attachment .pd-media-beside,
+.pd-chain-step-attachment .pd-inline-chart-move,
+.pd-chain-step-attachment .pd-inline-widget-actions {
+  display: none;
+}
 /* The row above already spaces it; the thread's own top margin would double it. */
 .pd-chain-step-attachment .pd-thread-media {
   margin-top: 0;
