@@ -601,6 +601,7 @@ try {
         { timeout: 5000 },
       )
       .catch(() => undefined);
+    await sleep(600); // past the room's fade-in
     await shot('09c-pasted-picture-in-viewer');
     await page.keyboard.press('Escape');
     await sleep(400);
