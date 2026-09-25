@@ -141,14 +141,23 @@ async function handleLine(socket: net.Socket, line: string): Promise<void> {
    * the app owns its lifetime (see corp/bridge-client.ts).
    */
   if (req.method === 'corp') {
+    /* The CEO's call holds this connection open for the whole production and
+       hangs up when its turn is stopped (corp/bridge-client.ts). A close before
+       the answer is the CEO gone: the production stops with it. */
+    const ceo = new AbortController();
+    const gone = (): void => ceo.abort();
+    socket.once('close', gone);
     try {
       const message = typeof req.params?.message === 'string' ? req.params.message : '';
       if (message === '') {
         respond({ ok: false, error: 'talk_to_manager needs a message for the manager' });
         return;
       }
-      respond(await runCorpForBridge(getWindow(), message));
+      const result = await runCorpForBridge(getWindow(), message, ceo.signal);
+      socket.off('close', gone);
+      respond(result);
     } catch (err) {
+      socket.off('close', gone);
       respond({ ok: false, error: err instanceof Error ? err.message : String(err) });
     }
     return;
