@@ -13,7 +13,7 @@
  * swaps type when it settles), and real tool/file activity rows.
  */
 import { type AssistantMsg, cleanErrorText, type ToolResultMsg } from '@pi-desktop/engine';
-import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { type PendingKind, PendingMediaCard } from '../media/PendingMediaCard';
 import { abortPi } from '../state/pi-connect';
@@ -28,7 +28,7 @@ import { LiveSvgCard } from './LiveSvgCard';
 import { LongJobCard } from './LongJobCard';
 import { PresentedCallContext } from './live-handover';
 import { effectiveToolName, estimateFor, type JobKind, jobKindForTool, jobView } from './long-job';
-import { Markdown } from './markdown';
+import { Markdown, TurnCardsContext } from './markdown';
 import { PendingChartCard, pendingChartArgs } from './PendingChartCard';
 import { PendingDiagramCard } from './PendingDiagramCard';
 import { SourcesCard } from './sources/SourcesCard';
@@ -418,6 +418,18 @@ export function AssistantGroup({
     const keep = new Set(shownKeys.split('\n'));
     for (const key of [...homes.current.keys()]) if (!keep.has(key)) homes.current.delete(key);
   }, [shownKeys]);
+  /* The files this turn shows as a card OUTSIDE its chain — its reply's own copy
+     of one is not drawn again (markdown.tsx TurnCardsContext). */
+  const outsideKey = turnCards
+    .filter(
+      (c) => placed.get(c.key) === 'beneath' && (c.kind !== 'record' || renderRecord !== undefined),
+    )
+    .map((c) => c.path)
+    .join('\n');
+  const outside = useMemo(
+    () => new Set(outsideKey === '' ? [] : outsideKey.split('\n')),
+    [outsideKey],
+  );
   // The picture still coming out from under the sweep is the pending card's
   // until it is out — see `handing`.
   const heldBack = (path: string): boolean => handingLive && handingItem?.path === path;
@@ -755,7 +767,7 @@ export function AssistantGroup({
   );
   return (
     <TurnSourcesProvider group={group} resultFor={resultForBlock}>
-      {body}
+      <TurnCardsContext.Provider value={outside}>{body}</TurnCardsContext.Provider>
     </TurnSourcesProvider>
   );
 }
