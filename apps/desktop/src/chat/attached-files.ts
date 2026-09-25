@@ -31,6 +31,19 @@
 /** The name the composer gives a large paste (it names nothing on its own). */
 export const PASTED_NAME = 'pasted content';
 
+/**
+ * The saved custom instructions, the way the first message of a chat carries
+ * them — ahead of everything else in pi's copy (pi-connect
+ * withPendingInstructions builds it with this). The person did not write them
+ * in that message and the live bubble never shows them, so a bubble rebuilt
+ * from the session file and a chat's title skip them too: SEEN in the sidebar,
+ * a chat titled "<user-instructions> Answer in …".
+ */
+export function instructionsPreamble(instructions: string): string {
+  return `<user-instructions>\n${instructions}\n</user-instructions>\n\n`;
+}
+const PREAMBLE = /^<user-instructions>\n[\s\S]*?\n<\/user-instructions>\n\n/;
+
 export interface AttachedFile {
   /**
    * A stable render key. A folded block carries no id, and the body of a sent
@@ -105,7 +118,7 @@ function readLine(kind: string, rest: string): { path: string; detail?: string }
 export function splitAttachedFiles(body: string): SplitMessage {
   const refs: AttachedRef[] = [];
   const images: AttachedRef[] = [];
-  let rest = body;
+  let rest = body.replace(PREAMBLE, '');
   for (;;) {
     const m = LINE.exec(rest);
     if (m === null) break;
@@ -182,7 +195,8 @@ export function messageSummary(body: string): string {
     if (named.length > 0) return named.join(', ');
     return images.length === 1 ? 'Image' : `${images.length} images`;
   }
-  return body.trim();
+  // Nothing typed and nothing attached: nothing to name it by.
+  return typed;
 }
 
 /** The first non-empty line of a block of text. */

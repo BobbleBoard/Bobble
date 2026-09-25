@@ -37,6 +37,7 @@ import {
   getCommands,
   newSession,
   pausePi,
+  pendingInstructionsPreamble,
   resumePausedChat,
   runBash,
   sendPrompt,
@@ -783,8 +784,10 @@ export function ChatComposer({
   // order submit() passes them: a path line left out of this prefix would be the
   // first byte the turn and the prime disagree on. `abortPrefill` is called in
   // submit() so the dispatched turn never queues behind a prime it does not begin
-  // with.
-  const attachmentPrefix = buildAgentMessage('', attachments);
+  // with. And behind the saved custom instructions, when this is the message that
+  // will carry them (pi-connect pendingInstructionsPreamble): pi's copy opens
+  // with that block, so the prime has to as well.
+  const attachmentPrefix = `${pendingInstructionsPreamble()}${buildAgentMessage('', attachments)}`;
   /** The shape `buildAgentMessage` needs — slug + name, nothing about the UI. */
   const activatable: ActivatableConnector[] = useMemo(
     () => installedConnectors.map((c) => ({ slug: c.slug, name: c.name })),
@@ -1315,7 +1318,9 @@ export function ChatComposer({
      * only a prime for something else (a removed attachment, another chat) is
      * cancelled so it stops competing for the single slot. See abortPrefill.
      */
-    abortPrefill({ body: buildAgentMessage(raw, attachments, activatable) });
+    abortPrefill({
+      body: `${pendingInstructionsPreamble()}${buildAgentMessage(raw, attachments, activatable)}`,
+    });
     apiRef.current?.clear();
     setAttachments([]);
     setToken(EMPTY_TOKEN);

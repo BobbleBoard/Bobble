@@ -559,6 +559,35 @@ try {
   await clip('07-drop-pdf-folder', '.pd-composer-root', 16);
   await clearComposer();
 
+  /* ── 07b. a big paste of text beside files: each keeps its own height ─── */
+  await page.click('[data-testid="composer-input"]');
+  await page.evaluate(
+    (t) => {
+      const data = new DataTransfer();
+      data.setData('text/plain', t);
+      document
+        .querySelector('[data-testid="composer-input"]')
+        .dispatchEvent(
+          new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }),
+        );
+    },
+    `Survey notes.\n${'The north wall is twelve metres wide with a slight overhang. '.repeat(40)}`,
+  );
+  await sleep(300);
+  await pasteFinder([PDF, FOLDER]);
+  const heights = await page.evaluate(() =>
+    [...document.querySelectorAll('[data-testid="composer-attachments"] > *')].map((el) =>
+      Math.round(el.getBoundingClientRect().height),
+    ),
+  );
+  log('07b paste card + chips, heights →', JSON.stringify(heights));
+  check(
+    heights.length === 3 && heights[1] < 60 && heights[2] < 60,
+    `the chips beside a paste card are stretched to its height: ${JSON.stringify(heights)}`,
+  );
+  await clip('07b-paste-text-and-files', '.pd-composer-root', 16);
+  await clearComposer();
+
   /* ── 08. an old message: its picture is only a data URL ───────────────── */
   const oldUrl = await drawPicture(800, 520, '#9cc3e6', '#2a9d8f', 'old message');
   await page.evaluate((url) => {
@@ -599,6 +628,50 @@ try {
     `the same picture must be ONE file (before ${before8}, first open ${after8.length}, second ${again8})`,
   );
   await closeOverlay();
+
+  /* ── 08b. a chat reopened from its session file ───────────────────────── */
+  // What rehydrate builds: pi's copy IS the text, custom instructions and all.
+  const foxUrl = await page.evaluate(async () => {
+    const src = document.querySelector('.pd-user-image img')?.getAttribute('src') ?? '';
+    return src;
+  });
+  await page.evaluate(
+    ({ fox, folder, url }) => {
+      const s = window.__pi_store().getState();
+      window.__pi_store().setState({
+        messages: [
+          ...s.messages,
+          {
+            kind: 'user',
+            id: 'reopened-u',
+            text: `<user-instructions>\nPrefer metric units.\n</user-instructions>\n\nAttached image: ${fox} (PNG, 127 KB)\nAttached folder: ${folder}\n\nwhich bed gets the sun?`,
+            images: [url],
+            timestamp: 13,
+          },
+        ],
+      });
+    },
+    { fox: FOX, folder: FOLDER, url: foxUrl },
+  );
+  await sleep(700);
+  const reopened = await page.evaluate(() => {
+    const turn = document.querySelector('[data-user-turn="reopened-u"]');
+    return {
+      bubble: (turn?.querySelector('.pd-msg-bubble')?.textContent ?? '').trim(),
+      folders: [...(turn?.querySelectorAll('[data-testid="attached-path"]') ?? [])].map((c) =>
+        c.getAttribute('data-path'),
+      ),
+      picture: turn?.querySelector('.pd-user-image')?.getAttribute('data-path') ?? null,
+    };
+  });
+  log('08b reopened →', JSON.stringify(reopened));
+  check(
+    reopened.bubble === 'which bed gets the sun?' &&
+      JSON.stringify(reopened.folders) === JSON.stringify([FOLDER]) &&
+      reopened.picture === FOX,
+    `a reopened message did not unfold its lines into cards: ${JSON.stringify(reopened)}`,
+  );
+  await clip('08b-reopened-message', '[data-user-turn="reopened-u"]', 24);
 
   /* ── 09. pictures in a reply's markdown ───────────────────────────────── */
   const pdUrl = `pd-file://f${SUNSET.split('/').map(encodeURIComponent).join('/')}`;

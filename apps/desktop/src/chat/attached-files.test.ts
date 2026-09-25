@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { messageSummary, splitAttachedFiles } from './attached-files';
+import { instructionsPreamble, messageSummary, splitAttachedFiles } from './attached-files';
 import { buildAgentMessage } from './composer/agent-message';
 
 describe('splitAttachedFiles', () => {
@@ -61,7 +61,12 @@ describe('splitAttachedFiles — everything named by path', () => {
     path: '/Users/j/Bobble/attachments/image-3f9a0c1b2d4e.png',
     bytes: 36_000,
   };
-  const NOTES = { kind: 'text' as const, name: 'notes.md', path: '/Users/j/notes.md', text: '# hi' };
+  const NOTES = {
+    kind: 'text' as const,
+    name: 'notes.md',
+    path: '/Users/j/notes.md',
+    text: '# hi',
+  };
 
   it('round-trips every kind, in order, with what was typed', () => {
     const body = buildAgentMessage('what first?', [FOX, NOTES, PDF, FOLDER, SHOT]);
@@ -105,6 +110,22 @@ describe('splitAttachedFiles — everything named by path', () => {
     }
   });
 
+  /*
+   * The first message of a chat carries the saved custom instructions ahead of
+   * everything (pi-connect). The live bubble never showed them; a rebuilt one
+   * must not either, and they must not hide the attachments behind them.
+   */
+  it('reads past the custom-instructions preamble the first message carries', () => {
+    const body = `${instructionsPreamble('Prefer metric units.\nBe brief.')}${buildAgentMessage(
+      'how wide?',
+      [PDF],
+    )}`;
+    const out = splitAttachedFiles(body);
+    expect(out.refs.map((r) => r.path)).toEqual([PDF.path]);
+    expect(out.text).toBe('how wide?');
+    expect(messageSummary(body)).toBe('how wide?');
+  });
+
   it('still reads a message from before paths', () => {
     const body = 'Attached file `notes.md`:\n```\n# hi\n```\n\nsummarise';
     expect(splitAttachedFiles(body)).toEqual({
@@ -143,6 +164,13 @@ describe('messageSummary', () => {
     expect(messageSummary('how does spoofdpi work')).toBe('how does spoofdpi work');
   });
 
+  /* SEEN in the sidebar: a chat titled "<user-instructions> Answer in …". */
+  it('never titles a chat with the saved custom instructions', () => {
+    expect(messageSummary(`${instructionsPreamble('Answer in plain sentences.')}hi there`)).toBe(
+      'hi there',
+    );
+  });
+
   /* A title that is a path line would be the whole path, twice as long as the row. */
   it('titles by what was typed, never by a path line', () => {
     const body = buildAgentMessage('summarise this project', [
@@ -163,7 +191,9 @@ describe('messageSummary', () => {
   it('names a picture by its file, or just "Image" when its name is a hash', () => {
     expect(
       messageSummary(
-        buildAgentMessage('', [{ kind: 'image', name: 'fox.png', path: '/Users/j/fox.png', bytes: 9 }]),
+        buildAgentMessage('', [
+          { kind: 'image', name: 'fox.png', path: '/Users/j/fox.png', bytes: 9 },
+        ]),
       ),
     ).toBe('fox.png');
     const saved = (h: string) => ({

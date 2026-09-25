@@ -43,8 +43,12 @@
  *                       primes over /apply-template + /completion); unset, the
  *                       model runs on whatever calibration chose on this Mac
  *                       (rapid-mlx for qwen3.5-4b-mtp, where no prime lands)
+ *   INSTRUCTIONS=1      the person has saved custom instructions: the first
+ *                       message of every chat carries them ahead of everything
+ *                       else (pi-connect withPendingInstructions), so the prime
+ *                       has to begin with them too
  */
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { launchApp, probeHome } from './harness.mjs';
@@ -68,6 +72,12 @@ writeFileSync(
     // The user's own speculative choice outranks the calibrated engine, and
     // every choice but `auto` is a llama.cpp launch (supervisor userProfileFor).
     ...(process.env.ENGINE === 'llamacpp' ? { modelSpec: { [MODEL]: { method: 'mtp' } } } : {}),
+    ...(process.env.INSTRUCTIONS === '1'
+      ? {
+          customInstructions:
+            'Answer in plain sentences. Prefer metric units. When a document is attached, quote the line you rely on.',
+        }
+      : {}),
   }),
 );
 /* The files a person would paste from Finder: outside every served folder. */
@@ -78,7 +88,7 @@ mkdirSync(FOLDER, { recursive: true });
 writeFileSync(path.join(FOLDER, 'README.md'), '# Wall\n\nTwelve metres, slight overhang.\n');
 writeFileSync(PDF, `%PDF-1.4\n% ${'survey '.repeat(20000)}\n%%EOF\n`);
 
-const { page, check, finish } = await launchApp('attachment-prefill', {
+const { app, page, check, finish } = await launchApp('attachment-prefill', {
   realCache: true,
   env: {
     HOME: home,
@@ -91,6 +101,12 @@ const { page, check, finish } = await launchApp('attachment-prefill', {
   timeout: 120_000,
 });
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
+// The app's own log, for a run that ends somewhere unexpected (OUT/app.log).
+const APP_LOG = path.join(OUT, 'app.log');
+writeFileSync(APP_LOG, '');
+for (const s of [app.process().stderr, app.process().stdout]) {
+  s?.on('data', (c) => appendFileSync(APP_LOG, c));
+}
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const usageLines = () =>

@@ -487,6 +487,9 @@ body {
 .pd-composer-attachments {
   display: flex;
   flex-wrap: wrap;
+  /* Each at its own height: beside a paste card the chips were stretched to its
+     height, two tall empty boxes (SEEN with a paste + a PDF + a folder). */
+  align-items: flex-start;
   gap: 8px;
   padding: 10px 12px 0;
 }
