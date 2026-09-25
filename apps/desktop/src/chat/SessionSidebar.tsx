@@ -67,6 +67,7 @@ import { publishSessionList } from '../state/visible-projects';
 import { useThemeStore } from '../store/theme';
 import { formatModuleSize } from '../tripo/module-state';
 import { BobbleMark } from './BobbleMark';
+import { BG_RUN_IDLE, type BgRunWatch, watchBgRun } from './bg-run-watch';
 import { PROFILE_MENU_ACTIONS } from './profile-menu';
 import {
   type DeleteChatOption,
@@ -447,7 +448,6 @@ export function SessionSidebar({
   // chat you're looking at needs no marker.
   const unread = usePiStore((s) => s.unread);
   const markUnread = usePiStore((s) => s.markUnread);
-  const prevBgStreaming = useRef(false);
 
   // Child agents (subagents / roles running as their own pi instances) grouped by
   // their parent chat, for the nested dropdown. Expanded by default so a running
@@ -587,18 +587,15 @@ export function SessionSidebar({
 
   // A background chat finished (bgRun.streaming true→false) → mark ITS row unread so
   // a dot sits there until the user opens it. needs-input is marked when the request
-  // arrives (see UiRequestHost), so it isn't downgraded here.
-  const bgStartedAt = useRef<number | null>(null);
+  // arrives (see UiRequestHost), so it isn't downgraded here. The rule is
+  // bg-run-watch.ts; a deleted chat's finish is neither.
+  const bgWatch = useRef<BgRunWatch>(BG_RUN_IDLE);
   useEffect(() => {
-    const streaming = bgRun?.streaming === true;
-    if (streaming && bgStartedAt.current === null) bgStartedAt.current = Date.now();
-    if (
-      prevBgStreaming.current &&
-      !streaming &&
-      bgRun !== null &&
-      !isChatDeleted(bgRun.sessionFile)
-    ) {
-      markUnread(bgRun.sessionFile, 'finished');
+    const look = watchBgRun(bgWatch.current, bgRun, Date.now(), isChatDeleted);
+    bgWatch.current = look.watch;
+    const finished = look.finished;
+    if (finished !== null) {
+      markUnread(finished.sessionFile, 'finished');
       /*
        * AND TELL THEM IF THEY ARE NOT HERE.
        *
@@ -611,20 +608,17 @@ export function SessionSidebar({
        * two seconds is not something to interrupt someone for — they either
        * saw it or will in a moment.
        */
-      const ranFor = Date.now() - (bgStartedAt.current ?? Date.now());
-      if (ranFor >= NOTIFY_MIN_RUN_MS) {
+      if (finished.ranFor >= NOTIFY_MIN_RUN_MS) {
         void window.piDesktop
           .invoke('app:notify', {
-            title: bgRun.title ?? 'A background chat finished',
-            body: bgRun.title !== null ? 'It finished while you were away.' : 'It has a reply.',
-            sessionFile: bgRun.sessionFile,
+            title: finished.title ?? 'A background chat finished',
+            body: finished.title !== null ? 'It finished while you were away.' : 'It has a reply.',
+            sessionFile: finished.sessionFile,
             kind: 'finished',
           })
           .catch(() => undefined);
       }
-      bgStartedAt.current = null;
     }
-    prevBgStreaming.current = streaming;
   }, [bgRun, markUnread]);
 
   /*
