@@ -31,12 +31,15 @@
  *             generator is stubbed IN MAIN (a renderer-side stub cannot hold —
  *             contextBridge objects are frozen), and the stub says so.
  *
- * THE CLIPBOARD IS THE SYSTEM ONE. The round trip is only real through it, so
- * this writes it twice (the card's Copy, then a PNG from main). It never READS
- * what someone else put there — macOS asks the person before an app reads
- * another app's pasteboard, and that dialog would be the screen taken — so the
- * previous contents cannot be restored; the probe clears its own picture off
- * at the end when nothing newer has been copied (the change count says so).
+ * THE CLIPBOARD IS THE PERSON'S, SO BY DEFAULT THIS NEVER TOUCHES IT. A run
+ * used to write the system pasteboard three times and clear it after — whatever
+ * the user had copied was gone, and it cannot be put back: macOS asks the person
+ * before an app reads another app's pasteboard, and that dialog would be the
+ * screen taken. So main's clipboard WRITES are caught in the app (the card's
+ * Copy is `clipboard.writeImage` in main) and a ⌘V is the paste event a real one
+ * dispatches, carrying what was caught — the composer's handler cannot tell the
+ * two apart. `REAL_CLIPBOARD=1` runs the true round trip through the system
+ * pasteboard (the change count says whether it may clear its picture after).
  */
 import { execFileSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -46,6 +49,7 @@ import { launchApp, probeHome } from './harness.mjs';
 
 const PHASE = process.env.PHASE ?? 'after';
 const REAL = process.env.REAL === '1';
+const REAL_CLIPBOARD = process.env.REAL_CLIPBOARD === '1';
 const CAP_MS = Number(process.env.MAX_MIN ?? 12) * 60_000;
 const SHOT_DIR = process.env.SHOT_DIR ?? path.join(tmpdir(), 'pd-shots', 'image-viewer');
 mkdirSync(SHOT_DIR, { recursive: true });
@@ -121,8 +125,52 @@ const setTheme = async (mode) => {
   await sleep(300);
 };
 
+/*
+ * THE PRIVATE CLIPBOARD (the default): main's writes land here instead of on the
+ * system pasteboard. Only what the app itself writes is caught; nothing is read.
+ */
+if (!REAL_CLIPBOARD) {
+  await app.evaluate(({ clipboard }) => {
+    const held = { image: null, text: null, count: 0 };
+    globalThis.__probeClipboard = held;
+    clipboard.writeImage = (image) => {
+      held.image = image.toDataURL();
+      held.text = null;
+      held.count += 1;
+    };
+    clipboard.writeText = (text) => {
+      held.text = String(text);
+      held.image = null;
+      held.count += 1;
+    };
+    clipboard.writeBuffer = () => {
+      held.image = null;
+      held.text = null;
+      held.count += 1;
+    };
+    clipboard.clear = () => {
+      held.image = null;
+      held.text = null;
+      held.count += 1;
+    };
+  });
+  // Proven BEFORE anything is copied: a patch that did not take would put the
+  // first Copy on the person's pasteboard.
+  const caught = await app.evaluate(({ clipboard }) =>
+    [clipboard.writeImage, clipboard.writeText, clipboard.writeBuffer, clipboard.clear].every((f) =>
+      String(f).includes('held.count'),
+    ),
+  );
+  if (!caught) {
+    await app.close().catch(() => undefined);
+    throw new Error('the private clipboard did not take — refusing to touch the real one');
+  }
+}
+const heldClipboard = () => app.evaluate(() => globalThis.__probeClipboard);
+
 /** The pasteboard's change count: counts writes, reads nobody's data. */
-function pasteboardCount() {
+async function pasteboardCount() {
+  if (!REAL_CLIPBOARD) return (await heldClipboard()).count;
   if (process.platform !== 'darwin') return null;
   try {
     const out = execFileSync(
@@ -291,11 +339,33 @@ async function clearAttachments() {
   }
 }
 
-/** Paste into the composer the way a person does: focus it, ⌘V. */
+/**
+ * Paste into the composer the way a person does: focus it, ⌘V. On the private
+ * clipboard the ⌘V is the paste event itself, carrying what main caught — a
+ * picture as a PNG file, the way Chromium hands over a copied image.
+ */
 async function pasteIntoComposer() {
   await page.click('[data-testid="composer-input"]');
   await sleep(150);
-  await page.keyboard.press('Meta+V');
+  if (REAL_CLIPBOARD) {
+    await page.keyboard.press('Meta+V');
+    await sleep(900);
+    return;
+  }
+  const held = await heldClipboard();
+  await page.evaluate(async ({ image, text }) => {
+    const data = new DataTransfer();
+    if (image !== null) {
+      const blob = await (await fetch(image)).blob();
+      data.items.add(new File([blob], 'image.png', { type: 'image/png' }));
+    }
+    if (text !== null) data.setData('text/plain', text);
+    const target =
+      document.activeElement ?? document.querySelector('[data-testid="composer-input"]');
+    target.dispatchEvent(
+      new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }),
+    );
+  }, held);
   await sleep(900);
 }
 
@@ -488,7 +558,7 @@ try {
   await setTheme('light');
 
   /* ── 4. copy → paste, through the system clipboard ──────────────────── */
-  const count0 = pasteboardCount();
+  const count0 = await pasteboardCount();
   await clearAttachments();
   const before = await attachments();
   check(before.count === 0, `the composer already holds ${before.count} attachment(s)`);
@@ -496,7 +566,7 @@ try {
   await sleep(400);
   await page.click('[data-testid="media-copy"]');
   await sleep(600);
-  const count1 = pasteboardCount();
+  const count1 = await pasteboardCount();
   log('pasteboard change count', count0, '→', count1, '(the card wrote it)');
   await pasteIntoComposer();
   const fromCard = await attachments();
@@ -549,10 +619,11 @@ try {
     g.fillText('pasted', 180, 110);
     return c.toDataURL('image/png');
   });
+  // (On the private clipboard this is caught like any other write of main's.)
   await app.evaluate(({ clipboard, nativeImage }, url) => {
     clipboard.writeImage(nativeImage.createFromDataURL(url));
   }, outside);
-  const count2 = pasteboardCount();
+  const count2 = await pasteboardCount();
   await pasteIntoComposer();
   const fromOutside = await attachments();
   log('paste from outside →', JSON.stringify(fromOutside));
@@ -578,7 +649,7 @@ try {
   await sleep(400);
   await page.click('[data-testid="media-copy"]');
   await sleep(600);
-  const lastWrite = pasteboardCount();
+  const lastWrite = await pasteboardCount();
   await pasteIntoComposer();
   const newest = await page.evaluate(async () => {
     const chips = [...document.querySelectorAll('[data-testid="attach-chip"] img.pd-attach-thumb')];
@@ -594,9 +665,11 @@ try {
     `⌘V after a newer card copy did not paste the card's picture: ${JSON.stringify(newest)}`,
   );
 
-  // Our picture off the clipboard, if nothing newer landed there meanwhile.
-  const count3 = pasteboardCount();
-  if (lastWrite !== null && count3 === lastWrite) {
+  // Our picture off the SYSTEM clipboard, if nothing newer landed there meanwhile.
+  const count3 = await pasteboardCount();
+  if (!REAL_CLIPBOARD) {
+    log('private clipboard: the system pasteboard was never touched');
+  } else if (lastWrite !== null && count3 === lastWrite) {
     await app.evaluate(({ clipboard }) => clipboard.clear());
     log('cleared the probe picture off the clipboard');
   } else {
