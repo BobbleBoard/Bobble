@@ -1,6 +1,88 @@
 # Bobble — status
 
-Updated: 2026-09-25 (evening) · main `0a41a80d` (built; installed is `89466859`) · bugs first (the user: "keep going on the list, bugs can go first, verify"): the review's 39 findings, the four thread bugs and every follow-up the fixes surfaced are merged and verified; OmniSVG measured and two causes fixed, the bf16 reference running
+Updated: 2026-09-25 (evening, on AC) · main `389b4e0c` · installed `c034085d` (16:15, packaged checks green) · the user: "keep going on the list, bugs can go first, verify" — every bug on the list is fixed and verified or refuted; the OmniSVG reference (their bf16 pipeline) is running; the per-kind visual verification is next in the heavy queue
+
+## Report — 2026-09-25 evening (the user: "a table documenting the bugfixes/suggested worktree runs")
+
+Every row below was reproduced first (a failing test, or a probe/filmstrip on the old build), fixed, and re-checked; images were looked at for anything visible. Suites on main now: desktop 3,536 · harness 1,803 · ui 429 · mac-computer-use 263 · gen-service 194 · gen-tools 52 · gen3d-engine 43 + 104 Python · canvas 384. Typechecks clean.
+
+### A. Worktree runs (agents, each in its own git worktree, merged by me after its suites + images)
+| Run (branch) | Scope | Result | Merged | Verified by | Left open (and what happened to it) |
+|---|---|---|---|---|---|
+| Mermaid lane (`worktree-agent-adc1dccca7ef8a3e7`) | Bobble's own diagram look, live build, card build-in | done | `729d0845` | diagram-build-look, chart-build-film, arrival-film, turn-cards/pending-card looks | class empty compartment → `7d15b07b`; class arrows side-on → `0bfbbbac`; line/area glide → `407386de` (all fixed by me) |
+| Vision wave review (`worktree-agent-aa22dc2e86494f458`) | the 6 confirmed vision bugs + the 33 candidates in its area | 12 real, fixed | `ac453f51` | failing test first for each | — |
+| Chat delete, run 1 (`worktree-agent-af6b22f6899fa940b`) | 10 review findings | 10/10 confirmed, fixed | `e7bf6741` | 25 new tests; wave-0923-look + chat-projects-probe on main; real pi: abort not acked in 6 s with a question open, 10 ms after "no answer" | 4 follow-ups → run 2 |
+| Chat delete, run 2 | Stop waited for generations; talk_to_manager ignored Stop; silent failed delete; lingering Download wait; production nesting | 4/4 confirmed, fixed | `b846a019` | stop-generation-probe (schemas 68 ms, CLI 153 ms, job released), delete-refused-look, pi-level checks | 300 s bash clock would cancel long renders → `363613e3`; "1 image failed" after Stop → `389b4e0c` (both mine) |
+| Computer use, run 1 (`worktree-agent-a26ea1a27f3a5ebd1`) | 9 review findings (2 high) | 9/9 confirmed, fixed | `8849f3c9` | 26 new tests, Swift compiled | 3 pre-existing → run 2 |
+| Computer use, run 2 | Chrome page commands had no consent gate; a bare look could land on Bobble; one chat's turn end cleared another's overlay | 3/3 confirmed, fixed | `4aea7524` | 13 new tests, helper rebuilt (15:06) | named-app routing + wording → run 3 |
+| Computer use, run 3 | a named app lost to the controlled one; header wording; `mac_type` description | 3/3 fixed | `08dd2d06` | 8 new tests | the description change needs a live prefill check (queued) |
+| Renderer, run 1 (`worktree-agent-a78959c4c199e1470`) | 8 review findings | 8/8 (R3 partly fixed already) | `dcff54e4` | live-frames / loader-loop / audio-handover / studio-cards looks, re-run and looked at on main | thread bugs → run 2 |
+| Renderer, run 2 | the 4 thread bugs | 3 fixed, 1 refuted (⌘Z keeps partial: not on today's code, real pi, both provider paths) | `140d6309` | turn-card-move-look (1 element, 0 regrow frames; was 3 and 133), reply-embed-look, unsend-real-pi-probe; widget-inline-look after the portal change | the model lost its folder after ⌘Z → suggested task `task_ec6092f8` → fixed by me `336771cc`, chip withdrawn |
+| Side sessions (suggested runs from 09-24) | `claude/nice-hertz-e0f8aa`, `claude/elated-chatelet-abe541`, `claude/gallant-burnell-c0f392` | finished on branches | `1e85a6af`, `8f4182a2`, `c4864a80` | harness 1,796, inference 396, model-fit-ui-probe (hub looked at) | — |
+
+### B. Harness fixes today
+| Bug | Fix | Verified by |
+|---|---|---|
+| A CLI command escaped its tool's own tool_call rules | `1e85a6af` | harness suite |
+| `uv run --with` launches died offline 10 min after resolving | `c4864a80` | inference suite, dead-proxy recipe |
+| After ⌘Z or an edit past the turn that told the model its working folder, the model lost it for good | `336771cc` the branch's own notes decide what was told | fork-session 6/6, new case fails on the old rule |
+| Stop waited for a running generation (gen tools ignored pi's abort); a killed CLI command orphaned its job | `b846a019` (2cdc2bd7, ca87aba9) — Stop cancels, as delete does | stop-generation-probe in the real app |
+| talk_to_manager ignored Stop | `b846a019` (3bec4684) | pi acks in 3 ms, the app sees the hang-up 1 ms later |
+| …which would have cancelled any render over bash's 300 s clock (a video took 521 s) | `363613e3` media/svg/3d commands get 30 min in CLI mode | index.test (media gets it, a build and `echo media` do not) |
+| Computer use: 15 findings across three runs (Chrome took control from the chosen app; carried-over control ended other chats' driving; no consent gate on Chrome's page commands; looks landing on Bobble; …) | `8849f3c9`, `4aea7524`, `08dd2d06` | mac-computer-use 263 (47 new) |
+| A heavy job that began on AC ran on into the battery (an agent saw 2%) | `4e88ea6f` with-lock pauses the job's process tree on battery, resumes at AC | _locks.test, live S→T→S |
+| gen3d-engine Python tests failed 2/104 on macOS's Python 3.9 | `16e519e3` they run on the engine's uv 3.12 | 104/104 |
+| Flaky under load: abandon-chats' module re-import hook (10 s) | `6b085cad` | full suite green under a model run |
+
+**Prefill:** no always-on prompt text changed today. `mac_type`'s description changed (schemas mode with computer use on only, −7 characters; CLI mode lists just its unchanged first line) — the live prefill check is queued behind the OmniSVG reference. The re-sent folder note after a rewind is ~30 tokens, once.
+
+### C. UI/UX fixes today
+| Bug | Fix | Verified by (looked at) |
+|---|---|---|
+| "why such a pale blue for the notifications?" | `23d21af6` `--pd-status-*-solid` | tray-transfers-look, notif-redesign-probe |
+| Diagrams: triangle arrowheads, wandering curves, shiny borders | `33752a35` open chevrons, elbows through labels, solid 1.5 px borders | diagram-page tests, inline-diagram-probe |
+| Class/ER lines met their boxes aslant (every kit) | `0bfbbbac` | new "every line meets its boxes square": fails on the old page, passes 6 kits × 2 modes |
+| A class with no methods kept a divider over nothing | `7d15b07b` | renders |
+| Line/area charts redrew instead of gliding | `407386de` | chart-build-film CHART_TYPE=line filmstrip |
+| A light app's report wore a black status bar; docs warned "Missing document fonts" | `420ea136` | office-render-probe (both directions) |
+| A finished card remounted into the chain (bars regrew 133 frames) | `140d6309` | turn-card-move-look filmstrip |
+| A picture presented and embedded showed twice | `140d6309` | reply-embed-look |
+| A chat's generating card showed a studio's clip; the loader blanked on resize, ignored Reduce Motion, ran rAF forever; the sound card popped; a corp thought's clock started at 30m | `dcff54e4` | the four renderer looks |
+| Delete: not instant/final in 10 ways; a refused delete said nothing | `e7bf6741`, `b846a019` | wave-0923-look, delete-refused-look ("Couldn't delete “trip plans for march”… permission denied") |
+| After Stop the chain said "1 image failed" in red | `389b4e0c` orange "Stopped", "1 image stopped" | activity-mapping + chain tests (fail on the old code) — not in the installed build yet |
+| The Ladle component browser (3 MB) shipped in the app | `68cf0219` | installed asar: 0 `.ladle`, 0 stories entries |
+
+### D. Visuals status (the 09-24 request)
+| Kind | State today |
+|---|---|
+| Diagrams | ✅ look, live build, elbows, square class/ER lines |
+| Charts | 🟡 live growth for bars AND lines; no model-driven run yet |
+| Interactive widgets | 🟡 built (`14a91cc6`), live in the chat, survive the card move; no model-driven run yet |
+| Images: look back | 🟡 generate_image and edit_image hand the model a small look (`ee33de15`) |
+| SVG (OmniSVG) | 🟡 measured, two causes fixed (below); characters still weak — the bf16 reference is running |
+| Office (pptx/docx/xlsx) | 🟡 renderer fixed (fonts, theme sheets); no model-driven run |
+| Website, UI screens, math/NN, animations, mixes, 3D for games, Ming 0.1 | ❌ not verified — the 16-task visual suite (one real turn per kind, screenshots, prefill per request) is next in the heavy queue |
+
+**OmniSVG, measured today** (the authors' 19 prompts + our 4 + 4 caption rewrites, 3 samples each, the app's own Q8 pipeline):
+| Finding | Number | Fix |
+|---|---|---|
+| Icons from their prompts | clean (heart, star, arrow, checkmark, thermometer, database, monitor, bookmark) | — |
+| A sample loops on one zero-length command to the token limit | 25% of their prompts, 50% of ours/captions | `00b88aed` loop guard: cut at the loop, draw again (3 more tries) |
+| llama-server's sampler chain ≠ theirs (min_p 0.05, temperature last, 64-token penalty window) | 25% → 17% looping with theirs | `b13ec0ec` |
+| The icon/illustration rule was not theirs | their icon prompts sampled as illustrations | `dd9284bf` |
+| Terse prompts ("a fox", "a coffee cup icon") | junk; the same as captions draw clean marks (kiln, cup) | the tool's prompt guidance → caption style (queued with a prefill check) |
+| Characters/scenes | weak at 1,536; some recognisable at 2,048 (a bust silhouette, two avatars), 46% still loop | pending: their bf16 PyTorch pipeline on the same prompts (running) |
+
+### E. The overall request, by request
+| the user asked | State |
+|---|---|
+| "omnisvg should be really good … figure this out" | 🟡 two causes found and fixed; the decisive reference run is going |
+| "why such a pale blue" | ✅ |
+| "custom mermaid arrows and box styling … animate/build in real time" | ✅ |
+| "arrows should not be triangles … elbow arrows … clean solid borders" | ✅ (and class/ER) |
+| "status for everything else … I don't believe it's totally all finished" | ✅ recalled (the list below), kept current |
+| "keep going on the list, bugs can go first, verify" | ✅ bugs: 39 review findings + 4 thread bugs + 11 follow-ups + 14 of mine, all verified; the open ones are listed under Open bugs. Next: the visual list |
+| "add to the harness + ui/ux report + visuals status + overall … a table documenting the bugfixes/suggested worktree runs" | ✅ this section |
 
 ## Morning 2026-09-25 (the user back)
 | Item | State |
