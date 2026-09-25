@@ -70,11 +70,22 @@ function collectTools(
      failed when it had one. Returning null here puts the fake bridge back in
      charge, which is the only thing these tests are supposed to be measuring. */
   registerMacComputerUseTools(pi, { bridge, consent, readChromeTabs: async () => null });
-  registerChromeTools(pi, bridge, { isChromeRunning: async () => chromeUp });
+  registerChromeTools(pi, bridge, { isChromeRunning: async () => chromeUp, ...NO_APPLE_EVENTS });
   return tools;
 }
 /** What the fake "is Chrome running?" answers; tests flip it. */
 let chromeUp = true;
+/*
+ * NEVER THE REAL CHROME. The Apple-Events route reads Chrome's setting, can
+ * WRITE it (after a confirm the ctx stub answers yes to), and runs osascript
+ * against whatever Chrome the machine running the suite has open. Every test
+ * gets this instead: scripting allowed, and a page that never answers.
+ */
+const NO_APPLE_EVENTS = {
+  chromeJsAllowed: async () => true,
+  enableChromeJs: async () => ({ ok: false, stderr: 'not in a unit test' }),
+  chromeEval: async () => ({ ok: false, value: '', error: 'no Chrome in a unit test' }),
+};
 
 async function run(
   tools: Map<string, ToolDefinition>,

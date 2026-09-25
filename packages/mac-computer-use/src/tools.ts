@@ -1692,11 +1692,22 @@ export function registerChromeTools(
     readonly session?: MacSessionState;
     /** Chrome's pid (test seam; default pgrep). */
     readonly chromePid?: () => Promise<number | null>;
+    /*
+     * The Apple-Events route (test seams; defaults read Chrome's setting, write
+     * it, and run osascript). A unit test must never script — or change the
+     * preferences of — the Chrome of the machine running it.
+     */
+    readonly chromeJsAllowed?: () => Promise<boolean>;
+    readonly enableChromeJs?: () => Promise<{ ok: boolean; stderr: string }>;
+    readonly chromeEval?: (js: string) => Promise<{ ok: boolean; value: string; error?: string }>;
   } = {},
 ): void {
   let askedThisSession = false;
   const isChromeRunning = options.isChromeRunning ?? chromeRunning;
   const pidOfChrome = options.chromePid ?? chromePid;
+  const jsAllowed = options.chromeJsAllowed ?? chromeJsAllowed;
+  const enableJs = options.enableChromeJs ?? enableChromeJs;
+  const evalJs = options.chromeEval ?? chromeEval;
   /**
    * WORK IN CHROME LEAVES CHROME UNDER CONTROL. The chrome_* commands used to
    * touch no state at all, so after a run of them a bare `mac snapshot` found
@@ -1736,7 +1747,7 @@ export function registerChromeTools(
 
   /** Make sure Chrome will run our JavaScript, asking the user once if not. */
   async function ensureChromeJs(ctx: ExtensionContext): Promise<string | null> {
-    if (await chromeJsAllowed()) return null;
+    if (await jsAllowed()) return null;
     if (ctx.hasUI !== true) {
       return (
         'Chrome will not run JavaScript from Apple Events yet, and there is no UI here to ' +
@@ -1755,7 +1766,7 @@ export function registerChromeTools(
         'for it to take effect. Nothing else about Chrome is changed.',
     );
     if (!ok) return 'The user declined to enable Chrome scripting.';
-    const res = await enableChromeJs();
+    const res = await enableJs();
     if (!res.ok) return `Could not change the Chrome setting: ${res.stderr}`;
     return (
       'ENABLED — but Chrome must be RESTARTED before it takes effect. Tell the user to quit ' +
@@ -1796,7 +1807,7 @@ export function registerChromeTools(
     const notUp = await ensureChromeRunning();
     if (notUp !== null) return { text: notUp, ok: false };
     await noteChrome();
-    const res = await chromeEval(js);
+    const res = await evalJs(js);
     if (!res.ok) return { text: res.error ?? 'Chrome did not respond.', ok: false };
     return { text: res.value, ok: true };
   }
