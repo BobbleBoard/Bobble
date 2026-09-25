@@ -1292,14 +1292,16 @@ export function SessionSidebar({
         <span className="pd-wordmark text-text-primary">Bobble</span>
       </div>
 
-      <div className="px-2 pb-2">
+      <div className="pd-sidebar-search-wrap px-2 pb-2">
         <div className="min-w-0 flex-1" data-testid="sidebar-search">
           <CollapsibleSearch placeholder="Search chats" value={query} onChange={setQuery} />
         </div>
       </div>
 
       <SidebarScroll>
+        {/* The rail's one lead action: it carries the accent (sidebar.css). */}
         <SidebarRow
+          className="pd-sidebar-row--lead"
           icon={<Glyph name="newChat" />}
           label="New chat"
           meta={<Kbd keys="⌘N" />}
@@ -1319,31 +1321,37 @@ export function SessionSidebar({
           ))}
         </SidebarSection>
 
-        {/* Modalities — full-window studios (3D now; image/video/audio later). A
-            fold-down dropdown so more can be added without crowding the rail. */}
+        {/*
+          Modalities — full-window studios (3D, image, video, audio). A section
+          like Workspace, whose header also folds it, so more can be added without
+          crowding the rail.
+
+          It was a ROW with a chevron over an indented tree of 13px rows — the
+          grammar the project folders use for their chats — so the studios read
+          as the contents of a folder called Modalities, and the header read as
+          one more item (14px, the rows' own ink) between two real section labels
+          (the user 2026-09-24: "do you see the lack of hierarchy"). The header is now
+          the section label every other group wears, and the studios are the same
+          rows as Workspace: places, side by side.
+
+          NO ICON on the header. Three attempts — the 3D cube (which named one of
+          the four things below it), three loose primitives, then a wand — and
+          the user rejected each: this is a disclosure for rows that each carry their
+          own icon, so any glyph here is a fifth medium or a decoration.
+        */}
         <div className="pd-sidebar-section" data-testid="modalities">
           <button
             type="button"
-            className="pd-sidebar-row pd-focusable"
+            className="pd-sidebar-section-header pd-sidebar-section-toggle pd-focusable"
             data-testid="modalities-toggle"
             aria-expanded={modalitiesOpen}
             onClick={() => setModalitiesOpen((o) => !o)}
           >
-            {/*
-              NO ICON. Three attempts to find one — the 3D cube (which named one
-              of the four things below it), three loose primitives, then a wand —
-              and the user rejected each. The reason they all failed is the same: this
-              row is a DISCLOSURE for four rows that each carry their own icon,
-              so any glyph here is either a fifth medium or a decoration. The
-              chevron already says what the row does.
-            */}
-            <span className="pd-sidebar-row-label">Modalities</span>
-            <span className="pd-sidebar-row-meta">
-              <IconChevronDown size={14} className={modalitiesOpen ? '' : '-rotate-90'} />
-            </span>
+            <span>Modalities</span>
+            <IconChevronDown size={12} className={modalitiesOpen ? '' : '-rotate-90'} />
           </button>
           {modalitiesOpen ? (
-            <div className="pd-child-rows" data-testid="modality-rows">
+            <div data-testid="modality-rows">
               {/*
                * THE CAPABILITIES SETTING DECIDES WHICH ROOMS EXIST.
                *
@@ -1358,9 +1366,14 @@ export function SessionSidebar({
                * nothing anywhere in the app. See the default in settings-store.
                */}
               {caps.threeD ? (
-                <button
-                  type="button"
-                  className="pd-child-row pd-focusable"
+                <SidebarRow
+                  icon={<Glyph name="studio3d" />}
+                  label="3D Studio"
+                  meta={
+                    !module3d.installed && moduleSize !== '' ? (
+                      <span data-testid="modality-3d-size">{moduleSize}</span>
+                    ) : undefined
+                  }
                   data-testid="modality-3d"
                   data-installed={module3d.installed}
                   title={
@@ -1371,17 +1384,7 @@ export function SessionSidebar({
                         }`
                   }
                   onClick={() => setModalityView('3d')}
-                >
-                  <span className="pd-child-row-icon">
-                    <Glyph name="studio3d" />
-                  </span>
-                  <span className="pd-child-row-label">3D Studio</span>
-                  {!module3d.installed && moduleSize !== '' ? (
-                    <span className="pd-child-row-meta" data-testid="modality-3d-size">
-                      {moduleSize}
-                    </span>
-                  ) : null}
-                </button>
+                />
               ) : null}
               {/*
                * THE THREE STUDIOS. Openable whether or not their engine is
@@ -1393,46 +1396,31 @@ export function SessionSidebar({
                * read as one thing and its 3D variant rather than separate rooms.
                */}
               {caps.image ? (
-                <button
-                  type="button"
-                  className="pd-child-row pd-focusable"
+                <SidebarRow
+                  icon={<Glyph name="image" />}
+                  label="Image"
                   data-testid="modality-image"
                   title="Image Studio"
                   onClick={() => setModalityView('image')}
-                >
-                  <span className="pd-child-row-icon">
-                    <Glyph name="image" />
-                  </span>
-                  <span className="pd-child-row-label">Image</span>
-                </button>
+                />
               ) : null}
               {caps.video ? (
-                <button
-                  type="button"
-                  className="pd-child-row pd-focusable"
+                <SidebarRow
+                  icon={<Glyph name="video" />}
+                  label="Video"
                   data-testid="modality-video"
                   title="Video Studio"
                   onClick={() => setModalityView('video')}
-                >
-                  <span className="pd-child-row-icon">
-                    <Glyph name="video" />
-                  </span>
-                  <span className="pd-child-row-label">Video</span>
-                </button>
+                />
               ) : null}
               {caps.audio ? (
-                <button
-                  type="button"
-                  className="pd-child-row pd-focusable"
+                <SidebarRow
+                  icon={<Glyph name="audio" />}
+                  label="Audio"
                   data-testid="modality-audio"
                   title="Audio Studio"
                   onClick={() => setModalityView('audio')}
-                >
-                  <span className="pd-child-row-icon">
-                    <Glyph name="audio" />
-                  </span>
-                  <span className="pd-child-row-label">Audio</span>
-                </button>
+                />
               ) : null}
             </div>
           ) : null}

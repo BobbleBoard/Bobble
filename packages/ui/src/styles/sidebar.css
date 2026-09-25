@@ -108,6 +108,27 @@
   text-transform: uppercase;
 }
 
+/* A section header that also folds its section (Modalities): the same label,
+ * as a button. */
+.pd-sidebar-section-toggle {
+  width: 100%;
+  margin: 0;
+  border: 0;
+  border-radius: var(--pd-radius-row);
+  background: transparent;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: color var(--pd-duration-base) var(--pd-easing-standard);
+}
+.pd-sidebar-section-toggle:hover {
+  color: var(--pd-text-secondary);
+}
+.pd-sidebar-section-toggle svg {
+  flex: none;
+  transition: transform var(--pd-duration-base) var(--pd-easing-standard);
+}
+
 .pd-sidebar-section-actions {
   display: inline-flex;
   gap: 2px;
@@ -208,6 +229,55 @@
 .pd-sidebar-row:focus-within .pd-sidebar-row-controls,
 .pd-sidebar-row[data-selected="true"] .pd-sidebar-row-controls {
   display: inline-flex;
+}
+
+/*
+ * THE RAIL'S LADDER (Bobble). the user 2026-09-24: "do you see the lack of
+ * hierarchy". Measured before: every navigation row, every studio and every chat
+ * title at 14px/400 in the same secondary ink (6.6:1) — the pages you go to and
+ * the list of things you made read as one list — with the icons in primary ink,
+ * louder than their own words.
+ *
+ * Now a row's role decides its ink. A row with an icon is a PLACE (Workspace
+ * pages, studios, project folders): primary ink, level with its icon. A row
+ * without one is CONTENT (a chat title): it stays secondary, so the long list is
+ * the quiet part of the rail and the chat you are in (pill + primary) stands out
+ * of it. "New chat" is the one lead action: medium weight, and the rail's only
+ * accent, on its icon.
+ */
+:root[data-flavor="bobble"] .pd-sidebar-row:has(> .pd-sidebar-row-icon) {
+  color: var(--pd-text-primary);
+}
+:root[data-flavor="bobble"] .pd-sidebar-row--lead {
+  font-weight: var(--pd-font-weight-medium);
+}
+:root[data-flavor="bobble"] .pd-sidebar-row--lead .pd-sidebar-row-icon {
+  color: var(--pd-accent-primary);
+}
+:root[data-flavor="bobble"] .pd-sidebar-row--lead .pd-sidebar-row-meta {
+  font-weight: var(--pd-font-weight-regular);
+}
+/* Search and New chat are the rail's two actions: one row apart, as rows are,
+ * rather than New chat floating halfway (48px each way) between Search and the
+ * Workspace label. The scroll's own top fade only appears once it scrolls. */
+:root[data-flavor="bobble"] .pd-sidebar-search-wrap {
+  padding-bottom: 0;
+}
+:root[data-flavor="bobble"] .pd-sidebar-scroll {
+  padding-top: 0;
+}
+/* The compact search (click to type) was the faintest thing on the rail —
+ * placeholder grey, 2.4:1, below even the section labels — so it read as
+ * disabled. It is an action: the glass in the rows' icon ink, the words one
+ * step under the places. */
+:root[data-flavor="bobble"] .pd-sidebar .pd-collapsible-search--collapsed {
+  color: var(--pd-text-secondary);
+}
+:root[data-flavor="bobble"]
+  .pd-sidebar
+  .pd-collapsible-search--collapsed
+  .pd-collapsible-search-icon {
+  color: var(--pd-text-icon, var(--pd-text-primary));
 }
 
 .pd-sidebar-footer {
