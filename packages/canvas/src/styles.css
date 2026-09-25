@@ -5816,6 +5816,48 @@
   padding: 0;
 }
 
+/*
+ * A DIAGRAM CARD (VQ-10): the code block's frame, head and corner controls,
+ * on the drawing's own paper (--pd-diagram-paper, set per card from the kit)
+ * so the card and the diagram read as one surface. The drawing scales DOWN to
+ * the card, never up past its own size (a three-step flow stays at its type
+ * size, centred), and never scrolls: a tall one fades into "Open in canvas".
+ */
+.pd-inline-diagram .pd-inline-widget {
+  background: var(--pd-diagram-paper, var(--pd-bg-raised));
+  max-width: min(100%, var(--pd-thread-prose-width, 44rem));
+}
+
+.pd-inline-diagram .pd-inline-widget-box {
+  padding: 0 0 6px;
+}
+
+.pd-inline-diagram .pd-inline-widget-box > .pd-canvas-svg {
+  display: block;
+  height: auto;
+  overflow: visible;
+  padding: 0 6px;
+}
+
+.pd-inline-diagram .pd-canvas-svg svg {
+  display: block;
+  margin: 0 auto;
+  max-width: 100%;
+  height: auto;
+}
+
+.pd-inline-diagram .pd-inline-widget-raw {
+  padding: 0 14px 8px;
+}
+
+.pd-inline-diagram .pd-inline-widget-overflow {
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    var(--pd-diagram-paper, var(--pd-bg-raised)) 70%
+  );
+}
+
 /* ─────────────────────────────────────────────────────────────────────────
  * Presented inline (a chart card, a small SVG) and the stub it leaves behind
  * while its tab is open in the canvas

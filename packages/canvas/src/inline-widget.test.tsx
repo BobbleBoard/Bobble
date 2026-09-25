@@ -38,10 +38,39 @@ describe('InlineWidget', () => {
     const toggle = container.querySelectorAll('.pd-inline-widget-toggle-btn');
     expect(toggle.length).toBe(2);
     expect(container.querySelector('[aria-label="Copy"]')).not.toBeNull();
-    expect(container.querySelector('.pd-inline-widget')?.getAttribute('data-view')).toBe('rendered');
+    expect(container.querySelector('.pd-inline-widget')?.getAttribute('data-view')).toBe(
+      'rendered',
+    );
     await click(toggle[1] ?? null);
     expect(container.querySelector('.pd-inline-widget')?.getAttribute('data-view')).toBe('raw');
     expect(container.querySelector('.pd-inline-widget-raw')).not.toBeNull();
+  });
+
+  it('names the thing and shows its own source as raw when given one (a diagram: "Flowchart", its Mermaid)', async () => {
+    const { container } = await render(
+      <InlineWidget
+        artifact={svg}
+        label="Flowchart"
+        source={{ text: 'flowchart TD\n  A --> B' }}
+      />,
+    );
+    expect(container.querySelector('.pd-inline-widget-kind')?.textContent).toBe('Flowchart');
+    await click(container.querySelector('[aria-label="Raw"]'));
+    expect(container.querySelector('.pd-inline-widget-raw')?.textContent).toBe(
+      'flowchart TD\n  A --> B',
+    );
+  });
+
+  it('raw wins over a custom body when the toggle asks for it', async () => {
+    const { container } = await render(
+      <InlineWidget artifact={svg} source={{ text: 'the source' }}>
+        <div className="custom">drawing</div>
+      </InlineWidget>,
+    );
+    expect(container.querySelector('.custom')).not.toBeNull();
+    await click(container.querySelector('[aria-label="Raw"]'));
+    expect(container.querySelector('.custom')).toBeNull();
+    expect(container.querySelector('.pd-inline-widget-raw')?.textContent).toBe('the source');
   });
 
   it('is size-capped and never scrollable', async () => {

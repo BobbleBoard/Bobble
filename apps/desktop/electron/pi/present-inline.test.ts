@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   INLINE_SVG_MAX_BYTES,
   presentInlinePayload,
+  readDiagramCard,
   svgIsInlineSized,
   svgSize,
 } from './present-inline';
@@ -74,5 +75,72 @@ describe('presentInlinePayload', () => {
   it('anything else is the plain card', async () => {
     expect(await presentInlinePayload('/ws/deck.pptx', reader({}))).toEqual({});
     expect(await presentInlinePayload('/ws/missing.svg', reader({}))).toEqual({});
+  });
+});
+
+/** The `diagram` tool's three files (VQ-10): the light drawing, the source, the card's sidecar. */
+const DIAGRAM_LIGHT =
+  '<svg xmlns="http://www.w3.org/2000/svg" width="1332" height="322"><rect fill="#FBFAF7"/></svg>';
+const DIAGRAM_SIDE = JSON.stringify({
+  schema: 1,
+  title: 'Order fulfilment',
+  kind: 'flowchart',
+  kit: 'paper-teal',
+  look: 'clean',
+  source: 'flowchart LR\n  A --> B',
+  nodes: ['A', 'B'],
+  edges: 1,
+  light: { width: 1332, height: 322, paper: '#FBFAF7' },
+  dark: {
+    width: 1332,
+    height: 322,
+    paper: '#191816',
+    svg: '<svg xmlns="http://www.w3.org/2000/svg" width="1332" height="322"><rect fill="#191816"/></svg>',
+  },
+});
+
+describe('a presented diagram', () => {
+  it('carries both drawings, the source and the papers, never the plain-svg payload', async () => {
+    const payload = await presentInlinePayload(
+      '/ws/order-fulfilment.svg',
+      reader({
+        '/ws/order-fulfilment.svg': DIAGRAM_LIGHT,
+        '/ws/order-fulfilment.diagram.json': DIAGRAM_SIDE,
+      }),
+    );
+    expect(payload.svg).toBeUndefined();
+    expect(payload.diagram).toMatchObject({
+      title: 'Order fulfilment',
+      kind: 'flowchart',
+      kit: 'paper-teal',
+      source: 'flowchart LR\n  A --> B',
+      light: { svg: DIAGRAM_LIGHT, width: 1332, height: 322, paper: '#FBFAF7' },
+      dark: { width: 1332, height: 322, paper: '#191816' },
+    });
+    expect(payload.diagram?.dark.svg).toContain('#191816');
+  });
+
+  it('a sidecar it cannot trust is ignored: the drawing is then a plain (poster-sized) SVG', async () => {
+    const broken = JSON.stringify({
+      title: 'x',
+      light: { width: 10 },
+      dark: { width: 10, height: 10 },
+    });
+    const payload = await presentInlinePayload(
+      '/ws/x.svg',
+      reader({ '/ws/x.svg': DIAGRAM_LIGHT, '/ws/x.diagram.json': broken }),
+    );
+    expect(payload.diagram).toBeUndefined();
+    expect(payload.svg).toMatchObject({ width: 1332, height: 322 });
+  });
+
+  it('readDiagramCard reads the same files for a chat reopened later (the renderer’s path)', async () => {
+    const card = await readDiagramCard(
+      '/ws/order-fulfilment.svg',
+      DIAGRAM_LIGHT,
+      reader({ '/ws/order-fulfilment.diagram.json': DIAGRAM_SIDE }),
+    );
+    expect(card?.title).toBe('Order fulfilment');
+    expect(await readDiagramCard('/ws/order-fulfilment.svg', 'not svg', reader({}))).toBeNull();
   });
 });

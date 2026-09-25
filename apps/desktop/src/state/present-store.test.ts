@@ -323,6 +323,47 @@ describe('a chart, or a small SVG, is shown IN the thread', () => {
     expect(tabs[0]).toMatchObject({ kind: 'svg', inline: true, filePath: '/ws/icon.svg' });
     expect((tabs[0]?.artifact as { content: { text: string } }).content.text).toBe('<svg/>');
   });
+
+  /* VQ-10: a diagram shows IN the thread (both drawings travel with it) and
+     opens full size in the canvas, as the drawing for the app's theme. */
+  const DIAGRAM = {
+    title: 'Order fulfilment',
+    kind: 'flowchart',
+    kit: 'paper-teal',
+    source: 'flowchart LR\n  A --> B',
+    light: { svg: '<svg>light</svg>', width: 1332, height: 322, paper: '#FBFAF7' },
+    dark: { svg: '<svg>dark</svg>', width: 1332, height: 322, paper: '#191816' },
+  };
+
+  it('a presented diagram is an inline card, and opens as its drawing for the theme', () => {
+    usePresentStore.getState().add({ path: '/ws/flow.svg', diagram: DIAGRAM });
+    const [item] = items();
+    expect(item?.diagram?.title).toBe('Order fulfilment');
+    expect(isInlinePresented(item as never)).toBe(true);
+    const tabs: Array<Record<string, unknown>> = [];
+    const c = {
+      upsertTab: vi.fn((key: string, spec: Record<string, unknown>) => {
+        tabs.push({ key, ...spec });
+        return 't1';
+      }),
+      updateTab: vi.fn(),
+      focusTab: vi.fn(),
+      getState: () => ({ tabs }),
+    };
+    document.documentElement.setAttribute('data-mode', 'dark');
+    void openPresented(c as never, item as never);
+    document.documentElement.removeAttribute('data-mode');
+    expect(tabs[0]).toMatchObject({
+      key: presentTabKey('/ws/flow.svg'),
+      kind: 'svg',
+      title: 'Order fulfilment',
+      filePath: '/ws/flow.svg',
+      inline: true,
+    });
+    expect((tabs[0]?.artifact as { content: { text: string } }).content.text).toBe(
+      '<svg>dark</svg>',
+    );
+  });
 });
 
 /*

@@ -134,6 +134,9 @@ const COMMAND_PATH_OVERRIDES: Readonly<Record<string, readonly string[]>> = {
   /* The same shape: the `chart` group's one tool IS the command —
      `chart bar "Units Sold by Year" --labels … --values …`. */
   chart: [],
+  /* …and `diagram "Order fulfilment" --source '<mermaid>'`; its sibling
+     derives to `diagram edit`. */
+  diagram: [],
   /* `3d generate` / `3d refine` — derived, `generate_3d` under `3d` would
      read "3d generate 3d" (the group name is a suffix here, not a prefix). */
   generate_3d: ['generate'],
@@ -254,6 +257,12 @@ const FLAG_ALIASES: Readonly<Record<string, readonly string[]>> = {
    * model did not read). `--kind` is the other spelling a model reaches for.
    */
   type: ['chart-type', 'chart_type', 'charttype', 'chart-kind', 'kind'],
+  /*
+   * `diagram --mermaid "flowchart TD …"`: the diagram's text is `--source`,
+   * and a model that knows the text is Mermaid names the flag after it. Only
+   * where the tool has `source` and no property of the alias's own name.
+   */
+  source: ['mermaid', 'mmd', 'definition', 'diagram'],
 };
 
 /** Resolve one flag name onto a schema property, or return it unchanged. */

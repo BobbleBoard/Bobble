@@ -30,6 +30,7 @@
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join } from 'node:path';
 import type { ExtensionAPI } from '@mariozechner/pi-coding-agent';
+import type { DiagramTheme } from '@pi-desktop/design-kit';
 import { Type } from '@sinclair/typebox';
 import { pathForModel } from './workspace-relative.js';
 
@@ -154,6 +155,53 @@ export function reviewInstruction(): string {
   );
 }
 
+/**
+ * The `diagram` call over the bridge (diagram-tool.ts → the app's Mermaid
+ * window, apps/desktop/electron/gen/diagram-page.ts): the model's Mermaid and
+ * the kit's two themes in; both drawings, or the line Mermaid could not read,
+ * out. Defined here, beside the bridge it travels on, so both sides read one
+ * contract.
+ */
+export interface DiagramRenderRequest {
+  readonly source: string;
+  readonly title?: string;
+  readonly subtitle?: string;
+  readonly themes: { readonly light: DiagramTheme; readonly dark: DiagramTheme };
+}
+
+export interface DiagramDrawing {
+  readonly svg: string;
+  readonly width: number;
+  readonly height: number;
+}
+
+export type DiagramRenderReply =
+  | {
+      readonly ok: true;
+      /** The source as drawn — after any correction the notes describe. */
+      readonly source: string;
+      readonly notes: readonly string[];
+      /** What it is, in words: "flowchart", "sequence diagram". */
+      readonly kind: string;
+      /** A flowchart's step labels, in the order declared (empty for other kinds). */
+      readonly nodes: readonly string[];
+      readonly edges: number;
+      readonly labelledEdges: readonly string[];
+      readonly failEdges: number;
+      readonly decisions: number;
+      readonly light: DiagramDrawing;
+      readonly dark: DiagramDrawing;
+    }
+  | {
+      readonly ok: false;
+      readonly error: string;
+      /** 1-based, in the source as the model sent it. */
+      readonly line: number | null;
+      readonly lineText: string | null;
+      /** The likely fix, in one line. */
+      readonly hint: string;
+    };
+
 export interface PresentBridge {
   /** Show the card + open the artefact in the canvas. */
   show(req: { path: string; note?: string }): Promise<{ ok: boolean; error?: string }>;
@@ -171,6 +219,11 @@ export interface PresentBridge {
     path: string;
     width?: number;
   }): Promise<{ width?: number; height?: number; rgba?: string; error?: string }>;
+  /**
+   * Draw a diagram with the app's bundled Mermaid. Optional: a bridge without
+   * it (an older app) means the diagram tool is not available here.
+   */
+  diagram?(req: DiagramRenderRequest): Promise<DiagramRenderReply>;
 }
 
 export interface PresentToolDeps {

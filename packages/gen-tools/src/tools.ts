@@ -655,7 +655,13 @@ function registerSvgTool(pi: ExtensionAPI, bridge: GenBridge | null): void {
       'graphic; describe the shape and colour plainly ("a coffee cup, flat, two colours"). ' +
       'With an image it traces that image into vector paths. `out` puts the file where a ' +
       'page references it (assets/logo.svg); otherwise it lands in Generated and opens on ' +
-      'the canvas. Photos and realistic pictures are not vectors — those are generation.',
+      'the canvas. Photos and realistic pictures are not vectors — those are generation. ' +
+      // VQ-10: OmniSVG draws shapes, not words — REAL, asked for a graph "with
+      // equations displayed" it drew an abstract shape and a car, and a flow
+      // diagram came back as 52 wordless paths. Anything that must carry text
+      // has a tool that writes the text.
+      'Not for diagrams, charts or anything with words in it — OmniSVG cannot write text: a ' +
+      'flowchart, process or org chart is the diagram tool, numbers are the chart tool.',
     promptSnippet: 'Draw an icon, logo or simple illustration as an SVG (on-device)',
     parameters: Type.Object({
       prompt: Type.Optional(

@@ -20,6 +20,7 @@ import { MESSAGES_SEND_TOOL } from '@pi-desktop/mac-connectors/tool-names';
 import { createIpcEventSender, createLogger } from '@pi-desktop/shared';
 import { app, type IpcMainInvokeEvent, ipcMain, type WebContents } from 'electron';
 import { resolveBundledPackageAsset } from '../app-paths';
+import { renderDiagram } from '../gen/diagram-render';
 import { guardRun } from '../gen/guardian-main';
 import { openStillWindow } from '../gen/hyperframes-window';
 import { omniSvgFiles } from '../gen/omnisvg';
@@ -41,6 +42,7 @@ import {
   currentWorkspaceDir,
 } from '../project/project-main';
 import { resolveSessionCwd } from '../sandbox';
+import { designKitEnv } from '../settings/features/design-settings';
 import {
   advancedSamplingFilePath,
   generationExperimentEnabled,
@@ -50,7 +52,7 @@ import { isTrustedIpcEvent } from '../trusted-senders';
 import { type ChildAgents, createChildAgents } from './child-agents';
 import type { PiInvokeMap } from './contract';
 import { extensionPackageDirs, toolExtensionPackageDirs } from './extension-dirs';
-import { piEnvContributions } from './pi-env';
+import { piEnvContributions, registerPiEnvContributor } from './pi-env';
 import { createPiSessions, type PiSessionHandlers } from './pi-sessions';
 import { registerPrefillIpc } from './prefill-main';
 import { registerPresentBridge } from './present-bridge';
@@ -536,9 +538,16 @@ export function registerPiIpc(
      never awaited: the first pi spawn may see only the `python3` default, which
      is what the harness falls back to anyway. */
   void primeOfficeGen();
+  /* The design kit a chat's diagrams (and, once the Design panel ships, its
+     charts) wear — from the Design setting, while that setting is on; off, the
+     harness falls back to the project's brand.md or the house default. Read at
+     every spawn (settings/features/design-settings.ts). */
+  registerPiEnvContributor(() => ({ PI_DESKTOP_DESIGN_KIT: designKitEnv(readSettings().design) }));
   if (opts.getWindow !== undefined) {
     registerPresentBridge({
       getWindow: opts.getWindow,
+      // The `diagram` tool's drawing: bundled Mermaid in a hidden window (VQ-10).
+      renderDiagram,
       renderPage: async (filePath) => {
         const win = await openStillWindow(1280, 900);
         try {

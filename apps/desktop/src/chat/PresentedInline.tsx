@@ -32,7 +32,7 @@ import {
   useCanvasTabs,
 } from '@pi-desktop/canvas';
 import { IconButton } from '@pi-desktop/ui';
-import type { CSSProperties } from 'react';
+import { type CSSProperties, useEffect, useState } from 'react';
 import { useCanvasStore } from '../state/canvas-store';
 import { openPresented, type PresentedRecord, presentTabKey } from '../state/present-store';
 import { withViewTransition } from './canvas/view-transition';
@@ -41,14 +41,44 @@ function baseName(p: string): string {
   return p.split(/[\\/]/).pop() ?? p;
 }
 
+/**
+ * The app's mode as the theme sheet keys it (`data-mode` on the root), watched
+ * — a diagram has a light and a dark drawing, and a theme switch swaps them
+ * without a remount (the chart card reads the same attribute).
+ */
+function readDataMode(): 'light' | 'dark' {
+  return typeof document !== 'undefined' &&
+    document.documentElement.getAttribute('data-mode') === 'dark'
+    ? 'dark'
+    : 'light';
+}
+
+function useDataMode(): 'light' | 'dark' {
+  const [mode, setMode] = useState(readDataMode);
+  useEffect(() => {
+    const mo = new MutationObserver(() => setMode(readDataMode()));
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-mode'] });
+    return () => mo.disconnect();
+  }, []);
+  return mode;
+}
+
+/** A diagram's head label: "Flowchart", "Sequence diagram". */
+function kindLabel(kind: string): string {
+  return kind === '' ? 'Diagram' : `${kind.charAt(0).toUpperCase()}${kind.slice(1)}`;
+}
+
 export function PresentedInline({ item }: { item: PresentedRecord }) {
   const { tabs, controller } = useCanvasTabs();
+  const mode = useDataMode();
   const key = presentTabKey(item.path);
   const open = tabs.find((t) => t.key === key);
   const name =
     item.chart?.title !== undefined && item.chart.title !== ''
       ? item.chart.title
-      : baseName(item.path);
+      : item.diagram?.title !== undefined && item.diagram.title !== ''
+        ? item.diagram.title
+        : baseName(item.path);
 
   const moveToCanvas = (): void => {
     withViewTransition(() => {
@@ -80,6 +110,42 @@ export function PresentedInline({ item }: { item: PresentedRecord }) {
             }
           />
         </div>
+      </div>
+    );
+  }
+
+  /*
+   * A DIAGRAM (VQ-10): its drawing for the chat's theme, in the card every
+   * other visual wears (the code block's frame, head and corner controls), on
+   * the drawing's own paper so the card and the diagram are one surface. The
+   * raw view is the Mermaid it was drawn from, and Copy copies that. Wide
+   * drawings scale to the card; the canvas is where a big one is read.
+   */
+  if (item.diagram !== undefined) {
+    const drawing = mode === 'dark' ? item.diagram.dark : item.diagram.light;
+    const style = {
+      ...transition,
+      ...(drawing.paper !== undefined ? { '--pd-diagram-paper': drawing.paper } : {}),
+    } as CSSProperties;
+    return (
+      <div
+        className="flex flex-col gap-1 pd-inline-diagram"
+        data-testid="presented-diagram"
+        data-mode={mode}
+        style={style}
+      >
+        <InlineWidget
+          artifact={{
+            id: key,
+            title: name,
+            filename: baseName(item.path),
+            content: { kind: 'svg', text: drawing.svg },
+          }}
+          label={kindLabel(item.diagram.kind)}
+          source={{ text: item.diagram.source }}
+          maxHeight={560}
+          onMoveToCanvas={moveToCanvas}
+        />
       </div>
     );
   }

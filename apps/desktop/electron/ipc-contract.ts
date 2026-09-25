@@ -1333,6 +1333,20 @@ export type AppEventMap = {
      * canvas only on request. See electron/pi/present-inline.ts.
      */
     chart?: Record<string, unknown>;
+    /**
+     * A diagram's card (the `diagram` tool's `<stem>.diagram.json` beside a
+     * presented .svg): both drawings — the thread shows the one for its theme —
+     * and the Mermaid behind them. See electron/pi/present-inline.ts.
+     */
+    diagram?: {
+      title: string;
+      subtitle?: string;
+      kind: string;
+      kit: string;
+      source: string;
+      light: { svg: string; width: number; height: number; paper?: string };
+      dark: { svg: string; width: number; height: number; paper?: string };
+    };
     /** A presented SVG's size and, when icon-sized and light, its markup. */
     svg?: { width: number; height: number; bytes: number; text?: string };
   };

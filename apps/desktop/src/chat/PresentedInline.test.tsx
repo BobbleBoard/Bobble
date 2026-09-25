@@ -147,4 +147,73 @@ describe('PresentedInline', () => {
     expect(container.querySelector('[data-testid="inline-stub"]')).toBeNull();
     expect(container.textContent).toBe('');
   });
+
+  /*
+   * VQ-10: a diagram card — the drawing for the chat's theme, on its own
+   * paper, named for what it is, with its Mermaid as the raw view — and the
+   * same move to the canvas as every other card.
+   */
+  it('a diagram renders its drawing for the theme, its kind, its source, and moves to the canvas', async () => {
+    usePresentStore.getState().add({
+      path: '/ws/flow.svg',
+      diagram: {
+        title: 'Order fulfilment',
+        kind: 'flowchart',
+        kit: 'paper-teal',
+        source: 'flowchart LR\n  A([Order placed]) --> B{Payment ok?}',
+        light: {
+          svg: '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="20"><text>light</text></svg>',
+          width: 40,
+          height: 20,
+          paper: '#FBFAF7',
+        },
+        dark: {
+          svg: '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="20"><text>dark</text></svg>',
+          width: 40,
+          height: 20,
+          paper: '#191816',
+        },
+      },
+    });
+    const [item] = presentedFor(usePresentStore.getState(), UNSAVED_CHAT);
+    if (item === undefined) throw new Error('no record');
+    const controller = createCanvasController();
+    const { container } = await render(
+      <CanvasProvider controller={controller}>
+        <PresentedInline item={item} />
+      </CanvasProvider>,
+    );
+    const card = container.querySelector('[data-testid="presented-diagram"]') as HTMLElement;
+    expect(card).not.toBeNull();
+    expect(card.style.getPropertyValue('--pd-diagram-paper')).toBe('#FBFAF7');
+    expect(card.style.getPropertyValue('view-transition-name')).toMatch(/^pd-inline-/);
+    expect(container.querySelector('.pd-inline-widget-kind')?.textContent).toBe('Flowchart');
+    expect(container.querySelector('.pd-inline-widget-box svg text')?.textContent).toBe('light');
+    // The theme flips: the other drawing, the other paper.
+    await act(async () => {
+      document.documentElement.setAttribute('data-mode', 'dark');
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(container.querySelector('.pd-inline-widget-box svg text')?.textContent).toBe('dark');
+    expect(
+      (
+        container.querySelector('[data-testid="presented-diagram"]') as HTMLElement
+      ).style.getPropertyValue('--pd-diagram-paper'),
+    ).toBe('#191816');
+    document.documentElement.removeAttribute('data-mode');
+    // Raw is the Mermaid it was drawn from.
+    await click(container.querySelector('[aria-label="Raw"]'));
+    expect(container.querySelector('.pd-inline-widget-raw')?.textContent).toContain(
+      'A([Order placed])',
+    );
+    // …and the corner lifts it into the canvas as its drawing.
+    await click(container.querySelector('.pd-inline-widget-move'));
+    expect(controller.getState().tabs[0]).toMatchObject({
+      kind: 'svg',
+      inline: true,
+      title: 'Order fulfilment',
+      filePath: '/ws/flow.svg',
+    });
+    expect(container.textContent).toBe('');
+  });
 });

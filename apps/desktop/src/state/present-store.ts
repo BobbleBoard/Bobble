@@ -15,6 +15,7 @@ import type { CanvasController, CanvasTab, CanvasTabKind } from '@pi-desktop/can
 import { type ChartSpec, normalizeChartSpec } from '@pi-desktop/charts';
 import type { PresentKind } from '@pi-desktop/ui';
 import { create } from 'zustand';
+import { type DiagramCardPayload, readDiagramCard } from '../../electron/pi/diagram-card';
 import { previewKindForExt } from '../chat/canvas/file-preview';
 import { fileTabKey, openFileInCanvas } from '../chat/canvas/file-tabs';
 import { svgCardPayload } from '../chat/svg-size';
@@ -51,15 +52,23 @@ export interface PresentedRecord {
    */
   chart?: ChartSpec;
   /**
+   * A diagram's card, when the presented .svg is the `diagram` tool's: both
+   * drawings (the thread shows the one for its theme) and the Mermaid behind
+   * them. The diagram shows IN the thread, like a chart (VQ-10).
+   */
+  diagram?: DiagramCardPayload;
+  /**
    * A presented SVG's size and, when it is icon-sized and light, its markup —
    * the drawing itself goes inline; a poster stays a canvas tab.
    */
   svg?: { width: number; height: number; bytes: number; text?: string };
 }
 
-/** Does this record show the thing itself in the thread (a chart card, a small SVG)? */
-export function isInlinePresented(item: Pick<PresentedRecord, 'chart' | 'svg'>): boolean {
-  return item.chart !== undefined || item.svg?.text !== undefined;
+/** Does this record show the thing itself in the thread (a chart or diagram card, a small SVG)? */
+export function isInlinePresented(
+  item: Pick<PresentedRecord, 'chart' | 'diagram' | 'svg'>,
+): boolean {
+  return item.chart !== undefined || item.diagram !== undefined || item.svg?.text !== undefined;
 }
 
 /** The canvas tab key a presented path opens under — the inline card's twin. */
@@ -131,6 +140,7 @@ interface PresentState {
     chat?: string;
     /** The chart spec beside a presented .svg, as main read it (unvalidated). */
     chart?: Record<string, unknown>;
+    diagram?: DiagramCardPayload;
     svg?: { width: number; height: number; bytes: number; text?: string };
   }) => PresentedRecord;
   /** Attach the apps that can open a presented artefact (async, best-effort). */
@@ -165,7 +175,7 @@ export function presentedFor(state: PresentState, chat: string): PresentedRecord
 
 export const usePresentStore = create<PresentState>((set, get) => ({
   byChat: {},
-  add: ({ path, note, afterMessageId = null, chat = UNSAVED_CHAT, chart, svg }) => {
+  add: ({ path, note, afterMessageId = null, chat = UNSAVED_CHAT, chart, diagram, svg }) => {
     const { kind } = classifyPresented(path);
     const have = presentedFor(get(), chat);
     // A spec main could read but the chart model cannot make sense of is a
@@ -185,6 +195,7 @@ export const usePresentStore = create<PresentState>((set, get) => ({
       afterMessageId,
       ...(note !== undefined ? { note } : {}),
       ...(spec !== undefined ? { chart: spec } : {}),
+      ...(spec === undefined && diagram !== undefined ? { diagram } : {}),
       ...(svg !== undefined ? { svg } : {}),
     };
     /*
@@ -354,20 +365,29 @@ export async function rehydratePresented(
       chart = undefined;
     }
     /*
-     * NO SIDECAR: a plain drawing (the svg tool's, or a presented icon). Its
-     * card is its markup, read back off disk when it is small enough to sit
-     * in the thread — the same rule present-inline applies on the way in.
+     * NO CHART SIDECAR: a diagram (the diagram tool's own sidecar beside it —
+     * both drawings back, the same reader main uses on the way in), or a
+     * plain drawing (the svg tool's, a presented icon), whose card is its
+     * markup when it is small enough to sit in the thread.
      */
     let svg: { width: number; height: number; bytes: number; text?: string } | undefined;
+    let diagram: DiagramCardPayload | undefined;
     if (chart === undefined) {
+      const readText = async (p: string): Promise<string> => {
+        const read = (await bridge.invoke('fs:read-file', { path: p })) as { text?: string | null };
+        if (typeof read?.text !== 'string') throw new Error(`cannot read ${p}`);
+        return read.text;
+      };
+      let markup = '';
       try {
-        const read = (await bridge.invoke('fs:read-file', { path })) as { text?: string | null };
-        const markup = typeof read?.text === 'string' ? read.text : '';
-        svg = markup === '' ? undefined : svgCardPayload(markup);
+        markup = await readText(path);
       } catch {
-        svg = undefined;
+        markup = '';
       }
-      if (svg?.text === undefined) continue;
+      diagram =
+        markup === '' ? undefined : ((await readDiagramCard(path, markup, readText)) ?? undefined);
+      svg = markup === '' || diagram !== undefined ? undefined : svgCardPayload(markup);
+      if (diagram === undefined && svg?.text === undefined) continue;
     }
     // The chat may have been opened elsewhere while the sidecars were read.
     const have = presentedFor(usePresentStore.getState(), chat);
@@ -377,6 +397,7 @@ export async function rehydratePresented(
       chat,
       afterMessageId,
       ...(chart === undefined ? {} : { chart }),
+      ...(diagram === undefined ? {} : { diagram }),
       ...(svg === undefined ? {} : { svg }),
     });
     added += 1;
@@ -398,7 +419,13 @@ export async function rehydratePresented(
  * wiring and the card's Open button, so both land on the same tab. */
 export async function openPresented(
   controller: { upsertTab: (key: string, spec: never) => string } | null,
-  item: { path: string; note?: string; chart?: ChartSpec; svg?: PresentedRecord['svg'] },
+  item: {
+    path: string;
+    note?: string;
+    chart?: ChartSpec;
+    diagram?: DiagramCardPayload;
+    svg?: PresentedRecord['svg'];
+  },
 ): Promise<void> {
   if (controller === null) return;
   const { tab } = classifyPresented(item.path);
@@ -426,6 +453,33 @@ export async function openPresented(
         content: { kind: 'chart', text: JSON.stringify(item.chart) },
       },
       // No subtitle: the tool's note repeats the title ("a bar chart 'Units…'").
+    } as never);
+    return;
+  }
+  /*
+   * A DIAGRAM OPENS AS ITS DRAWING, full size — the canvas is where a wide one
+   * is read — and synchronously, inside the card's view transition, like a
+   * chart. The drawing for the app's theme at the moment it opens.
+   */
+  if (item.diagram !== undefined) {
+    const key = presentTabKey(item.path);
+    const dark =
+      typeof document !== 'undefined' &&
+      document.documentElement.getAttribute('data-mode') === 'dark';
+    const drawing = dark ? item.diagram.dark : item.diagram.light;
+    const name = item.diagram.title !== '' ? item.diagram.title : title;
+    controller.upsertTab(key, {
+      kind: 'svg',
+      key,
+      title: name,
+      filePath: item.path,
+      inline: true,
+      artifact: {
+        id: key,
+        title: name,
+        filename: title,
+        content: { kind: 'svg', text: drawing.svg },
+      },
     } as never);
     return;
   }
@@ -632,11 +686,13 @@ export function presentFromMain({
   path,
   note,
   chart,
+  diagram,
   svg,
 }: {
   path: string;
   note?: string;
   chart?: Record<string, unknown>;
+  diagram?: DiagramCardPayload;
   svg?: { width: number; height: number; bytes: number; text?: string };
 }): void {
   // Anchor it to the turn that produced it — see `afterMessageId` — in the
@@ -654,6 +710,7 @@ export function presentFromMain({
     afterMessageId: anchor,
     ...(note !== undefined ? { note } : {}),
     ...(chart !== undefined ? { chart } : {}),
+    ...(diagram !== undefined ? { diagram } : {}),
     ...(svg !== undefined ? { svg } : {}),
   });
   // The canvas belongs to the chat on screen; a background chat's artefact

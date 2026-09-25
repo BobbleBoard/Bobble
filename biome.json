@@ -6,7 +6,8 @@
     "useIgnoreFile": true
   },
   "files": {
-    "ignoreUnknown": true
+    "ignoreUnknown": true,
+    "includes": ["**", "!**/resources/mermaid/mermaid.min.js"]
   },
   "formatter": {
     "enabled": true,
@@ -46,9 +47,7 @@
   },
   "overrides": [
     {
-      "includes": [
-        "**/build/**"
-      ],
+      "includes": ["**/build/**"],
       "linter": {
         "rules": {
           "a11y": {

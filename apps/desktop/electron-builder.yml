@@ -41,7 +41,16 @@ extraResources:
   # office-gen-env.ts resolve <Resources>/office-gen when packaged.
   - from: ../../tools/office-gen
     to: office-gen
-    filter: ['*.py', 'README.md']
+    # design_tokens.json: the design kits, exported for Python (VQ-04,
+    # tools/office-gen/design_tokens.py) — the same tokens the chart and
+    # diagram tools read.
+    filter: ['*.py', 'README.md', 'design_tokens.json']
+  # The bundled Mermaid the `diagram` tool draws with (VQ-10), outside the asar
+  # because the main process reads it as a file (gen/diagram-render.ts) — MIT,
+  # pinned by sha256 (resources/mermaid/README.md).
+  - from: resources/mermaid
+    to: mermaid
+    filter: ['mermaid.min.js', 'LICENSE', 'README.md']
   # The vendored GenOffice EDITORS — the live docx/xlsx/pptx/pdf tabs in the
   # canvas. office-manager.ts resolves <Resources>/genoffice when packaged
   # (vendorRoot), and until this entry existed nothing put anything there: an
