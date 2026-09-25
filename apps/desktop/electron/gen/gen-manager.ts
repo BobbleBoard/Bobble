@@ -644,6 +644,8 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
     raw: GenerateImageParams,
     from?: AgentSource,
     requestId?: string,
+    /** The asking tool gave up (its turn was stopped) — see `abandon`. */
+    signal?: AbortSignal,
   ): Promise<GenerateImageResult> {
     const model = getModel(raw.model ?? defaultImageModel().id);
     // An image model runs one of two ways: the mflux worker (its `mflux`
@@ -847,7 +849,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
       }
     };
 
-    const stop = pendingJobs.open(jobId);
+    const stop = pendingJobs.open(jobId, signal);
     announceAgentJob(jobId, from);
     try {
       // Download-then-continue: an mflux image needs no up-front pack, so this is
@@ -864,7 +866,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
       });
       await unlessStopped(stop, opts.freshReading?.());
       pendingJobs.admit(jobId);
-      const outputs = await jobQueue.enqueue(job, {
+      const queued = jobQueue.enqueue(job, {
         heavy: model.heavy,
         footprintGB,
         onEvent,
@@ -878,7 +880,10 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
               ),
             }
           : {}),
-      }).result;
+      });
+      // Stopped while queued or running: the queue's own cancel.
+      stop.addEventListener('abort', () => jobQueue.cancel(jobId), { once: true });
+      const outputs = await queued.result;
       moduleSucceeded(job.backend);
       progress = undefined;
       send('gen:update', { tabId, payload: payload('done') });
@@ -898,6 +903,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
     raw: GenerateVideoParams,
     from?: AgentSource,
     requestId?: string,
+    signal?: AbortSignal,
   ): Promise<GenerateVideoResult> {
     const model = getModel(raw.model ?? defaultVideoModel().id);
     if (model === undefined || model.modality !== 'video') {
@@ -977,7 +983,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
       }
     };
 
-    const stop = pendingJobs.open(jobId);
+    const stop = pendingJobs.open(jobId, signal);
     announceAgentJob(jobId, from);
     try {
       // Download-then-continue: a comfyui-backed video (LTX / Wan) whose weights
@@ -994,7 +1000,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
       });
       await unlessStopped(stop, opts.freshReading?.());
       pendingJobs.admit(jobId);
-      const outputs = await jobQueue.enqueue(job, {
+      const queued = jobQueue.enqueue(job, {
         heavy: model.heavy,
         footprintGB: jobFootprintGB(model, width * height),
         onEvent,
@@ -1010,7 +1016,10 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
         ...(model.auxDeps !== undefined && model.auxDeps.length > 0
           ? { extraWith: model.auxDeps }
           : {}),
-      }).result;
+      });
+      // Stopped while queued or running: the queue's own cancel.
+      stop.addEventListener('abort', () => jobQueue.cancel(jobId), { once: true });
+      const outputs = await queued.result;
       moduleSucceeded(job.backend);
       progress = undefined;
       send('gen:update', { tabId, payload: payload('done') });
@@ -1049,6 +1058,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
     raw: GenerateAudioParams,
     from?: AgentSource,
     requestId?: string,
+    signal?: AbortSignal,
   ): Promise<GenerateAudioResult> {
     const kind = raw.kind ?? 'speech';
     const fallback = defaultAudioModel(kind, activeModels());
@@ -1160,7 +1170,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
       }
     };
 
-    const stop = pendingJobs.open(jobId);
+    const stop = pendingJobs.open(jobId, signal);
     announceAgentJob(jobId, from);
     try {
       // Same download-then-continue courtesy the video path gets: a ComfyUI music
@@ -1177,7 +1187,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
       });
       await unlessStopped(stop, opts.freshReading?.());
       pendingJobs.admit(jobId);
-      const outputs = await jobQueue.enqueue(job, {
+      const queued = jobQueue.enqueue(job, {
         heavy: model.heavy,
         footprintGB: jobFootprintGB(model),
         onEvent,
@@ -1193,7 +1203,10 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
         ...(model.auxDeps !== undefined && model.auxDeps.length > 0
           ? { extraWith: model.auxDeps }
           : {}),
-      }).result;
+      });
+      // Stopped while queued or running: the queue's own cancel.
+      stop.addEventListener('abort', () => jobQueue.cancel(jobId), { once: true });
+      const outputs = await queued.result;
       moduleSucceeded(job.backend);
       progress = undefined;
       canvasPush('gen:update', payload('done'));
@@ -1220,14 +1233,26 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
     method: string,
     params: Record<string, unknown>,
     from: AgentSource = {},
+    /** Fires when the tool that asked stopped waiting (`abandon`, or its pi went away). */
+    signal?: AbortSignal,
   ): Promise<unknown> {
     switch (method) {
       case 'generate':
-        return handleGenerate(params as unknown as GenerateImageParams, from);
+        return handleGenerate(params as unknown as GenerateImageParams, from, undefined, signal);
       case 'generateVideo':
-        return handleGenerateVideo(params as unknown as GenerateVideoParams, from);
+        return handleGenerateVideo(
+          params as unknown as GenerateVideoParams,
+          from,
+          undefined,
+          signal,
+        );
       case 'generateAudio':
-        return handleGenerateAudio(params as unknown as GenerateAudioParams, from);
+        return handleGenerateAudio(
+          params as unknown as GenerateAudioParams,
+          from,
+          undefined,
+          signal,
+        );
       case 'generateSvg': {
         /* OmniSVG: its own short-lived llama-server, not the worker queue —
            see omnisvg.ts. The folder is named after the ask like every other
@@ -1246,6 +1271,9 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
         const svgId = `svg-${++svgSeq}`;
         const stop = new AbortController();
         svgRuns.set(svgId, stop);
+        // The turn that asked was stopped: so is the drawing.
+        if (signal?.aborted === true) stop.abort();
+        else signal?.addEventListener('abort', () => stop.abort(), { once: true });
         announceAgentJob(svgId, from);
         let result: Awaited<ReturnType<typeof generateSvg>>;
         try {
@@ -1254,7 +1282,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
           );
         } catch (err) {
           const message = stop.signal.aborted
-            ? 'stopped — the chat that asked for this drawing was deleted'
+            ? 'stopped — the chat that asked for this drawing stopped it, or was deleted'
             : err instanceof Error
               ? err.message
               : String(err);
@@ -1297,7 +1325,18 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
   }
 
   // ── socket server (mirrors browser-agent.ts) ────────────────────────────────
-  async function handleLine(socket: net.Socket, line: string): Promise<void> {
+  /*
+   * WHO IS STILL WAITING. A pi child keeps one connection for all its requests,
+   * so each request gets a signal of its own: `abandon` fires it (the tool's
+   * turn was stopped — gen-bridge-client), and so does the connection closing
+   * (that pi is gone). Either way nobody will receive the job's result, and the
+   * job is cancelled rather than left holding the machine for minutes.
+   */
+  async function handleLine(
+    socket: net.Socket,
+    line: string,
+    waiting: Map<number, AbortController>,
+  ): Promise<void> {
     let req: GenBridgeRequest;
     try {
       req = JSON.parse(line) as GenBridgeRequest;
@@ -1316,26 +1355,40 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
       respond({ ok: false, error: 'unauthorized' });
       return;
     }
+    if (req.method === 'abandon') {
+      waiting.get(Number(req.params?.requestId))?.abort();
+      return;
+    }
+    const asker = new AbortController();
+    waiting.set(req.id, asker);
     try {
       const from: AgentSource =
         typeof req.agent === 'string' && req.agent !== '' ? { agent: req.agent } : {};
-      respond({ ok: true, result: await dispatch(req.method, req.params ?? {}, from) });
+      const result = await dispatch(req.method, req.params ?? {}, from, asker.signal);
+      waiting.delete(req.id);
+      respond({ ok: true, result });
     } catch (err) {
+      waiting.delete(req.id);
       respond({ ok: false, error: err instanceof Error ? err.message : String(err) });
     }
   }
 
   function handleConnection(socket: net.Socket): void {
     let buffer = '';
+    const waiting = new Map<number, AbortController>();
     socket.setEncoding('utf8');
     socket.on('error', () => {});
+    socket.on('close', () => {
+      for (const asker of waiting.values()) asker.abort();
+      waiting.clear();
+    });
     socket.on('data', (chunk: string) => {
       buffer += chunk;
       let nl = buffer.indexOf('\n');
       while (nl !== -1) {
         const l = buffer.slice(0, nl);
         buffer = buffer.slice(nl + 1);
-        if (l.trim() !== '') void handleLine(socket, l);
+        if (l.trim() !== '') void handleLine(socket, l, waiting);
         nl = buffer.indexOf('\n');
       }
     });
@@ -1616,7 +1669,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
         onEvent,
       });
       // The caller knows this job by its own id; its signal is how it stops it.
-      params.signal?.addEventListener('abort', () => jobQueue.cancel(jobId), { once: true });
+      stop.addEventListener('abort', () => jobQueue.cancel(jobId), { once: true });
       const outputs = await queued.result;
       moduleSucceeded(job.backend);
       return { jobId, outputs };

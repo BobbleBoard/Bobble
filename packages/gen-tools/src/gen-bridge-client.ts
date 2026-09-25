@@ -26,7 +26,15 @@ interface Pending {
   resolve: (value: unknown) => void;
   reject: (err: Error) => void;
   timer: ReturnType<typeof setTimeout>;
+  /** Stops listening to the caller's signal once the request is over. */
+  off?: () => void;
 }
+
+/**
+ * Why a request ended when its turn was stopped. The tools put it in front of
+ * the model as the result, so it says what happened to the job as well.
+ */
+export const GEN_REQUEST_STOPPED = 'stopped — the turn was stopped, and the job with it';
 
 export interface GenBridgeClientOptions {
   readonly socketPath: string;
@@ -44,7 +52,15 @@ const DEFAULT_CONNECT_TIMEOUT = 5_000;
 
 /** The narrow surface the tools depend on — lets tests inject a fake bridge. */
 export interface GenBridge {
-  request<T = unknown>(method: GenBridgeMethod, params?: Record<string, unknown>): Promise<T>;
+  /**
+   * `signal` is the tool call's: when it fires the request rejects AT ONCE with
+   * {@link GEN_REQUEST_STOPPED}, and the app is told to let the job go.
+   */
+  request<T = unknown>(
+    method: GenBridgeMethod,
+    params?: Record<string, unknown>,
+    signal?: AbortSignal,
+  ): Promise<T>;
 }
 
 export class GenBridgeClient implements GenBridge {
@@ -117,6 +133,7 @@ export class GenBridgeClient implements GenBridge {
     this.#buffer = '';
     for (const [, p] of this.#pending) {
       clearTimeout(p.timer);
+      p.off?.();
       p.reject(reason);
     }
     this.#pending.clear();
@@ -145,16 +162,22 @@ export class GenBridgeClient implements GenBridge {
     if (pending === undefined) return;
     this.#pending.delete(msg.id);
     clearTimeout(pending.timer);
+    pending.off?.();
     if (msg.ok) pending.resolve(msg.result);
     else pending.reject(new Error(msg.error ?? 'gen bridge error'));
   }
 
-  /** Issue one RPC. Rejects on transport/timeout/app error. */
+  /** Issue one RPC. Rejects on transport/timeout/app error, or at once on `signal`. */
   async request<T = unknown>(
     method: GenBridgeMethod,
     params?: Record<string, unknown>,
+    signal?: AbortSignal,
   ): Promise<T> {
+    // A function, so the check after the await is not narrowed away.
+    const stopped = (): boolean => signal?.aborted === true;
+    if (stopped()) throw new Error(GEN_REQUEST_STOPPED);
     const socket = await this.#connect();
+    if (stopped()) throw new Error(GEN_REQUEST_STOPPED);
     const id = this.#nextId++;
     const payload: GenBridgeRequest = {
       id,
@@ -165,11 +188,40 @@ export class GenBridgeClient implements GenBridge {
     };
     return new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => {
+        this.#pending.get(id)?.off?.();
         this.#pending.delete(id);
         reject(new Error(`gen bridge "${method}" timed out (${this.#requestTimeoutMs}ms)`));
       }, this.#requestTimeoutMs);
       timer.unref?.();
-      this.#pending.set(id, { resolve: resolve as (v: unknown) => void, reject, timer });
+      /*
+       * THE TURN WAS STOPPED. pi ends a turn only once its tool call returns, so
+       * waiting here for the job held the Stop for as long as the job took. Give
+       * up now — and tell the app, which cancels the job: nobody is left to
+       * receive it. A fire-and-forget line with no reply expected; an app that
+       * does not know the method answers an id nobody is waiting for.
+       */
+      const onAbort = (): void => {
+        const p = this.#pending.get(id);
+        if (p === undefined) return;
+        this.#pending.delete(id);
+        clearTimeout(p.timer);
+        reject(new Error(GEN_REQUEST_STOPPED));
+        this.#send({
+          id: this.#nextId++,
+          token: this.#token,
+          method: 'abandon',
+          params: { requestId: id },
+        });
+      };
+      signal?.addEventListener('abort', onAbort, { once: true });
+      this.#pending.set(id, {
+        resolve: resolve as (v: unknown) => void,
+        reject,
+        timer,
+        ...(signal !== undefined
+          ? { off: () => signal.removeEventListener('abort', onAbort) }
+          : {}),
+      });
       try {
         socket.write(`${JSON.stringify(payload)}\n`, (err) => {
           if (err != null) {
@@ -177,6 +229,7 @@ export class GenBridgeClient implements GenBridge {
             if (p !== undefined) {
               this.#pending.delete(id);
               clearTimeout(p.timer);
+              p.off?.();
               reject(err);
             }
           }
@@ -184,9 +237,20 @@ export class GenBridgeClient implements GenBridge {
       } catch (err) {
         this.#pending.delete(id);
         clearTimeout(timer);
+        signal?.removeEventListener('abort', onAbort);
         reject(err instanceof Error ? err : new Error(String(err)));
       }
     });
+  }
+
+  /** Write one line with no reply expected. Best effort: a dead socket loses it,
+   * and a dead socket is one the app has already let go of. */
+  #send(payload: GenBridgeRequest): void {
+    try {
+      this.#socket?.write(`${JSON.stringify(payload)}\n`);
+    } catch {
+      /* the connection is gone; so is the app's side of the request */
+    }
   }
 
   /** Enqueue an image generation and await its outputs. */

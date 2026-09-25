@@ -49,6 +49,11 @@ export type GenBridgeMethod =
   /** Whether OmniSVG's files are on disk — the connector card's install state. */
   | 'omnisvgStatus'
   | 'cancel'
+  /**
+   * The tool that sent request `params.requestId` stopped waiting for it (its
+   * turn was stopped): the app cancels that request's job. No reply.
+   */
+  | 'abandon'
   | 'listModels';
 
 /** One request on the wire. */

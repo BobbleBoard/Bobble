@@ -207,7 +207,7 @@ export function registerGenTools(pi: ExtensionAPI, options: GenToolsOptions): vo
       seed: Type.Optional(Type.Number({ description: 'Base RNG seed for reproducibility.' })),
       negative_prompt: Type.Optional(Type.String({ description: 'What to avoid in the image.' })),
     }),
-    async execute(_id, params): Promise<AgentToolResult<GenerateDetails>> {
+    async execute(_id, params, signal): Promise<AgentToolResult<GenerateDetails>> {
       if (bridge === null) {
         return errResult(
           'generation bridge unavailable (the gen-tools extension must run inside Bobble)',
@@ -225,15 +225,25 @@ export function registerGenTools(pi: ExtensionAPI, options: GenToolsOptions): vo
       }
 
       try {
-        const result = await bridge.request<GenerateImageResult>('generate', {
-          prompt: params.prompt,
-          model: modelId,
-          size: params.size,
-          n: params.n,
-          steps: params.steps,
-          seed: params.seed,
-          negativePrompt: params.negative_prompt,
-        });
+        /*
+         * THE TURN'S SIGNAL GOES WITH THE JOB. pi ends a turn only once this call
+         * returns, so a Stop that did not reach the bridge waited for the picture
+         * — or for the module gate's four minutes. The bridge gives up at once
+         * and the app cancels the job (gen-bridge-client.ts).
+         */
+        const result = await bridge.request<GenerateImageResult>(
+          'generate',
+          {
+            prompt: params.prompt,
+            model: modelId,
+            size: params.size,
+            n: params.n,
+            steps: params.steps,
+            seed: params.seed,
+            negativePrompt: params.negative_prompt,
+          },
+          signal,
+        );
 
         const outputs = result.outputs;
         if (outputs.length === 0) return errResult('the generator produced no images');
@@ -327,7 +337,7 @@ export function registerGenTools(pi: ExtensionAPI, options: GenToolsOptions): vo
       seed: Type.Optional(Type.Number({ description: 'Base RNG seed for reproducibility.' })),
       negative_prompt: Type.Optional(Type.String({ description: 'What to avoid in the video.' })),
     }),
-    async execute(_id, params): Promise<AgentToolResult<GenerateDetails>> {
+    async execute(_id, params, signal): Promise<AgentToolResult<GenerateDetails>> {
       if (bridge === null) {
         return videoErrResult(
           'generation bridge unavailable (the gen-tools extension must run inside Bobble)',
@@ -343,15 +353,19 @@ export function registerGenTools(pi: ExtensionAPI, options: GenToolsOptions): vo
       }
 
       try {
-        const result = await bridge.request<GenerateVideoResult>('generateVideo', {
-          prompt: params.prompt,
-          model: modelId,
-          seconds: params.seconds,
-          size: params.size,
-          fps: params.fps,
-          seed: params.seed,
-          negativePrompt: params.negative_prompt,
-        });
+        const result = await bridge.request<GenerateVideoResult>(
+          'generateVideo',
+          {
+            prompt: params.prompt,
+            model: modelId,
+            seconds: params.seconds,
+            size: params.size,
+            fps: params.fps,
+            seed: params.seed,
+            negativePrompt: params.negative_prompt,
+          },
+          signal,
+        );
 
         const outputs = result.outputs;
         if (outputs.length === 0) return videoErrResult('the generator produced no video');
@@ -481,7 +495,7 @@ export function registerAudioTools(pi: ExtensionAPI, options: GenToolsOptions): 
         seed: Type.Optional(Type.Number({ description: 'Base RNG seed.' })),
         ...extra,
       }),
-      async execute(_id, params): Promise<AgentToolResult<GenerateDetails>> {
+      async execute(_id, params, signal): Promise<AgentToolResult<GenerateDetails>> {
         if (bridge === null) {
           return audioErrResult(
             name,
@@ -497,20 +511,24 @@ export function registerAudioTools(pi: ExtensionAPI, options: GenToolsOptions): 
           );
         }
         try {
-          const result = await bridge.request<GenerateAudioResult>('generateAudio', {
-            prompt: p.prompt,
-            kind,
-            model: modelId,
-            seconds: p.seconds,
-            steps: p.steps,
-            voice: p.voice,
-            speed: p.speed,
-            lang: p.lang,
-            refAudio: p.reference_audio,
-            refText: p.reference_text,
-            seed: p.seed,
-            count: p.n,
-          });
+          const result = await bridge.request<GenerateAudioResult>(
+            'generateAudio',
+            {
+              prompt: p.prompt,
+              kind,
+              model: modelId,
+              seconds: p.seconds,
+              steps: p.steps,
+              voice: p.voice,
+              speed: p.speed,
+              lang: p.lang,
+              refAudio: p.reference_audio,
+              refText: p.reference_text,
+              seed: p.seed,
+              count: p.n,
+            },
+            signal,
+          );
           const outputs = result.outputs;
           if (outputs.length === 0) return audioErrResult(name, 'no audio was produced');
           const lines = outputs.map(
@@ -692,7 +710,7 @@ function registerSvgTool(pi: ExtensionAPI, bridge: GenBridge | null): void {
         }),
       ),
     }),
-    async execute(_id, params): Promise<AgentToolResult<GenerateDetails>> {
+    async execute(_id, params, signal): Promise<AgentToolResult<GenerateDetails>> {
       if (bridge === null) {
         return errResult(
           'generation bridge unavailable (the gen-tools extension must run inside Bobble)',
@@ -734,12 +752,16 @@ function registerSvgTool(pi: ExtensionAPI, bridge: GenBridge | null): void {
             tokPerSec: number | null;
             tokens: number;
           }[];
-        }>('generateSvg', {
-          prompt: params.prompt,
-          images,
-          candidates: params.candidates,
-          ...(outPath === undefined ? {} : { outPath }),
-        });
+        }>(
+          'generateSvg',
+          {
+            prompt: params.prompt,
+            images,
+            candidates: params.candidates,
+            ...(outPath === undefined ? {} : { outPath }),
+          },
+          signal,
+        );
         const lines = result.outputs.map(
           (o, i) =>
             `  ${i + 1}. ${o.outputPath} — ${o.paths} path${o.paths === 1 ? '' : 's'}` +
