@@ -58,6 +58,21 @@ export interface RecommenderHost {
   readonly totalRamGB: number;
 }
 
+/**
+ * The host the hub recommends for, from the detected hardware — one place, so
+ * Top Recommended and the page that fetches its pick's file ask about the same
+ * machine. Without a detected budget, three quarters of RAM.
+ */
+export function hostFor(hardware: {
+  readonly totalRamGB: number;
+  readonly usableMemoryGB?: number;
+}): RecommenderHost {
+  return {
+    usableMemoryGB: hardware.usableMemoryGB ?? Math.max(1, Math.round(hardware.totalRamGB * 0.75)),
+    totalRamGB: hardware.totalRamGB,
+  };
+}
+
 export interface ModelRecommendation {
   readonly modality: OutputModality;
   readonly family: RecommendedFamily;
