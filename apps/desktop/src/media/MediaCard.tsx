@@ -34,6 +34,7 @@ import { ExpandedScrim } from './ExpandedScrim';
 import { ModelControls } from './ModelControls';
 import { ModelSurface } from './ModelSurface';
 import { copyFile, exportFile, revealFile, startFileDrag } from './media-actions';
+import { shapeOf } from './media-shapes';
 import { createModelView, type ModelView } from './model-view';
 import { VideoSurface } from './VideoSurface';
 
@@ -49,6 +50,11 @@ function Surface({
   view?: ModelView;
 }): JSX.Element {
   const src = pdFileUrl(item.path);
+  /* A picture the waiting card just swept in has a known shape: hold its box
+     until this copy decodes, so the handover has no frame at the empty size
+     (see media-shapes). */
+  const known = item.kind === 'image' ? shapeOf(item.path) : undefined;
+  const [decoded, setDecoded] = useState(known === undefined);
   if (item.kind === 'image') {
     return (
       <img
@@ -57,6 +63,15 @@ function Surface({
         src={src}
         alt={item.name}
         draggable={false}
+        onLoad={() => setDecoded(true)}
+        style={
+          decoded || known === undefined
+            ? undefined
+            : {
+                aspectRatio: String(known),
+                width: `min(calc(var(--pd-media-max-h) * ${known}), 100%)`,
+              }
+        }
       />
     );
   }

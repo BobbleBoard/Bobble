@@ -14,9 +14,23 @@
  *
  * So this is not a loading card that gets replaced by a result card. It IS the
  * result card, mounted early and empty: same `pd-media-card` / `pd-media-frame`
- * as {@link MediaCard}, same radius, same ground. The mark plays at card scale
- * inside the frame, and the only other thing on screen is a bare white bar
- * floating under it.
+ * as {@link MediaCard}, same radius. The mark plays at card scale inside the
+ * frame.
+ *
+ * ## The ground and the number (2026-09-24)
+ * the user, with ChatGPT's image card beside ours: "I don't actually think there is
+ * a difference between the background color of the generation card and the chat
+ * area, what I want here is for there to be a distinct black background card
+ * that makes it feel raised, not lowered, but without a border, just quick but
+ * noticeable falloff around the edge into the background color" — and "that
+ * terminal logging style text below it needs to go, maybe just drop the entirety
+ * of the bar and such, show a little bordered pill at the bottom right of the
+ * image card that says n%". So the frame has a ground again (global.css), the
+ * bar and the engine's line under it are gone, and the number is the pill in the
+ * corner ({@link ProgressPill}). The frame is also exactly the box the finished
+ * picture will take — it used to fall back to 330px when the job named no size,
+ * which is why the waiting card was "significantly smaller than the images
+ * generated".
  *
  * ## The handover
  * When the result arrives it is mounted UNDERNEATH the still-running canvas and
@@ -43,6 +57,15 @@ import { ThreadAudio } from '../chat/ThreadAudio';
 import type { ThreadMediaItem } from '../chat/thread-media';
 import { subscribeToDenoise } from '../chat/useDenoisePreview';
 import { ModelSurface } from './ModelSurface';
+import { rememberShape } from './media-shapes';
+import {
+  finish,
+  type ProgressEstimate,
+  percentLabel,
+  report,
+  shownAt,
+  startEstimate,
+} from './progress-estimate';
 import { VideoSurface } from './VideoSurface';
 
 /** What the finished thing will be — the same kinds {@link MediaCard} takes. */
@@ -183,7 +206,14 @@ const VARIANT: Record<PendingKind, LoaderVariant> = {
  * Muted and autoplaying for video: the card is mid-reveal, and a play button
  * appearing from under the sweep is chrome arriving before the content has.
  */
-function RevealSurface({ item }: { item: ThreadMediaItem }): JSX.Element {
+function RevealSurface({
+  item,
+  onAspect,
+}: {
+  item: ThreadMediaItem;
+  /** The picture's real width / height, once it has decoded. */
+  onAspect?: (aspect: number) => void;
+}): JSX.Element {
   const src = pdFileUrl(item.path);
   if (item.kind === 'video') return <VideoSurface src={src} large={false} testid="pending-video" />;
   if (item.kind === 'model') return <ModelSurface src={src} testid="pending-model" />;
@@ -197,7 +227,137 @@ function RevealSurface({ item }: { item: ThreadMediaItem }): JSX.Element {
       src={src}
       alt={item.name}
       draggable={false}
+      onLoad={(ev) => {
+        const img = ev.currentTarget;
+        if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+          const a = img.naturalWidth / img.naturalHeight;
+          rememberShape(item.path, a);
+          onAspect?.(a);
+        }
+      }}
     />
+  );
+}
+
+/*
+ * ONE NUMBER PER JOB, WHICHEVER CARD IS SHOWING IT. When the result lands the
+ * thread swaps the waiting card for the one that sweeps the result in — a new
+ * instance, which started its pill at 0% and never reached 100 (MEASURED at the
+ * handover). The estimate lives here, keyed by the tool call, so the second card
+ * carries on from the number the first one was showing and finishes it.
+ */
+const ESTIMATES = new Map<string, ProgressEstimate>();
+/* …and its shape: by the time the result lands the running job is gone from the
+   thread, so the card that sweeps it in cannot be told the aspect — it opened
+   square and grew into the picture (MEASURED 362 → 482px at the handover). */
+const SHAPES = new Map<string, number>();
+
+/** A first guess at speed for the very start of a run — the last run's own. */
+const PRIOR_KEY = (kind: PendingKind): string => `pd-progress-prior:${kind}`;
+function priorFor(kind: PendingKind): number | undefined {
+  try {
+    const v = Number(localStorage.getItem(PRIOR_KEY(kind)));
+    return Number.isFinite(v) && v > 0 ? v : undefined;
+  } catch {
+    return undefined;
+  }
+}
+function rememberPrior(kind: PendingKind, msPerUnit: number | undefined): void {
+  if (msPerUnit === undefined || !Number.isFinite(msPerUnit) || msPerUnit <= 0) return;
+  try {
+    localStorage.setItem(PRIOR_KEY(kind), String(Math.round(msPerUnit)));
+  } catch {
+    /* private window or blocked storage: the next run just starts without a guess */
+  }
+}
+
+/**
+ * THE NUMBER, IN A PILL IN THE CARD'S CORNER.
+ *
+ * the user (2026-09-24): "that terminal logging style text below it needs to go,
+ * maybe just drop the entirety of the bar and such, show a little bordered pill
+ * at the bottom right of the image card that says n% and smoothly goes up". The
+ * engine's steps are a staircase; `progress-estimate` turns them into a slope at
+ * this run's measured speed without ever claiming a step before it is reported
+ * (its rules, and why, are there).
+ *
+ * The number moves at display rate, so it is written straight into the pill's
+ * text from its own frame loop: the card around it does not re-render sixty
+ * times a second for a digit. It appears with the first real report (the phase
+ * line says what the warm-up is doing; a 0% sitting through a 90-second cold
+ * load would be exactly the stuck number he does not want), runs to 100 when the
+ * result lands, and leaves with the reveal.
+ */
+function ProgressPill({
+  kind,
+  progress,
+  done,
+  label,
+  progressKey,
+}: {
+  kind: PendingKind;
+  progress: number | undefined;
+  done: boolean;
+  label: string;
+  /** The job this number belongs to — a later card for the same job continues it. */
+  progressKey?: string;
+}): JSX.Element {
+  const textRef = useRef<HTMLSpanElement | null>(null);
+  const est = useRef<ProgressEstimate | null>(
+    progressKey === undefined ? null : (ESTIMATES.get(progressKey) ?? null),
+  );
+  const [seen, setSeen] = useState(est.current !== null);
+  useEffect(() => {
+    if (progress === undefined) return;
+    const now = performance.now();
+    est.current = report(est.current ?? startEstimate(now, priorFor(kind)), progress, now);
+    setSeen(true);
+  }, [progress, kind]);
+  useEffect(() => {
+    if (!done || est.current === null) return;
+    est.current = finish(est.current, performance.now());
+    rememberPrior(kind, est.current.msPerUnit);
+  }, [done, kind]);
+  useEffect(() => {
+    let raf = 0;
+    let lastLabel = '';
+    const tick = (): void => {
+      const e = est.current;
+      const el = textRef.current;
+      if (e !== null && el !== null) {
+        const { value, next } = shownAt(e, performance.now());
+        est.current = next;
+        if (progressKey !== undefined) ESTIMATES.set(progressKey, next);
+        const text = percentLabel(value);
+        if (text !== lastLabel) {
+          lastLabel = text;
+          el.textContent = text;
+          el.parentElement?.setAttribute('aria-valuenow', String(Math.floor(value * 100)));
+        }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [progressKey]);
+  /* A finished job's number is not needed once its card has shown 100. */
+  useEffect(() => {
+    if (!done || progressKey === undefined) return;
+    const t = setTimeout(() => ESTIMATES.delete(progressKey), 4000);
+    return () => clearTimeout(t);
+  }, [done, progressKey]);
+  return (
+    <span
+      className="pd-pending-pill"
+      data-testid="pending-pct"
+      data-visible={seen || done ? 'true' : undefined}
+      role="progressbar"
+      aria-label={label}
+      aria-valuemin={0}
+      aria-valuemax={100}
+    >
+      <span ref={textRef}>{est.current === null ? '0%' : percentLabel(est.current.shown)}</span>
+    </span>
   );
 }
 
@@ -207,10 +367,10 @@ export function PendingMediaCard({
   width,
   live,
   progress,
-  note,
   label = 'Working',
   item,
   onRevealed,
+  progressKey,
 }: {
   kind: PendingKind;
   /** width / height, as soon as the job says — the box takes it immediately. */
@@ -220,7 +380,9 @@ export function PendingMediaCard({
   width?: number;
   /** 0..1 from the engine's own counter. Undefined → the bar sweeps instead. */
   progress?: number;
-  /** What the engine last said it was doing. Shown only if there is no number. */
+  /** What the engine last said it was doing. No longer printed — the user asked for
+   * the engine's lines to go ("that terminal logging style text below it needs
+   * to go"); kept so callers need not change, and for a future tooltip. */
   note?: string;
   label?: string;
   /** The finished media. Its arrival is what starts the closing sweep. */
@@ -234,9 +396,22 @@ export function PendingMediaCard({
   live?: boolean;
   /** Called once the sweep has cleared the board and the result is fully out. */
   onRevealed?: () => void;
+  /** The job (tool call) this card shows — so the card that sweeps the result in
+   * continues the waiting card's number rather than starting one of its own. */
+  progressKey?: string;
 }): JSX.Element {
   const frameRef = useRef<HTMLDivElement | null>(null);
   const [swept, setSwept] = useState(false);
+  /* The picture's own shape once it has decoded: a job that never said its size
+     (an edit keeps its input's) still eases into the right box during the sweep,
+     so the finished card that replaces this one lands on exactly this frame. */
+  const [realAspect, setRealAspect] = useState<number | undefined>(undefined);
+  const frameAspect =
+    realAspect ?? aspect ?? (progressKey === undefined ? undefined : SHAPES.get(progressKey));
+  useEffect(() => {
+    if (progressKey !== undefined && frameAspect !== undefined)
+      SHAPES.set(progressKey, frameAspect);
+  }, [progressKey, frameAspect]);
   /*
    * THE LATEST DECODED STEP, when the engine sends them. Local state on
    * purpose: only this card re-renders when a frame lands (~1.3 s apart),
@@ -273,9 +448,6 @@ export function PendingMediaCard({
     onRevealed?.();
   }, [swept, item, onRevealed]);
 
-  const pct =
-    progress === undefined ? undefined : Math.round(Math.max(0, Math.min(1, progress)) * 100);
-
   /* The phase line's clock, ticking only while there is no counter to read. */
   const startedAt = useRef(Date.now());
   const [elapsed, setElapsed] = useState(0);
@@ -297,6 +469,7 @@ export function PendingMediaCard({
       className="pd-media-card pd-media-card--pending"
       data-kind={kind}
       data-revealing={revealing ? 'true' : undefined}
+      data-done={item !== undefined ? 'true' : undefined}
       data-swept={swept ? 'true' : undefined}
       data-testid="pending-media-card"
       aria-busy={swept ? undefined : 'true'}
@@ -306,8 +479,8 @@ export function PendingMediaCard({
         className="pd-media-frame"
         style={
           {
-            ...(aspect !== undefined && aspect > 0
-              ? { '--pd-pending-aspect': String(aspect) }
+            ...(frameAspect !== undefined && frameAspect > 0
+              ? { '--pd-pending-aspect': String(frameAspect) }
               : {}),
             ...(width !== undefined && width > 0 ? { '--pd-pending-w': `${width}px` } : {}),
           } as CSSProperties
@@ -318,7 +491,7 @@ export function PendingMediaCard({
             element into the hole the blocks just left. */}
         {item !== undefined && (kind !== 'audio' || swept) ? (
           <div className="pd-pending-reveal">
-            <RevealSurface item={item} />
+            <RevealSurface item={item} onAspect={setRealAspect} />
           </div>
         ) : preview !== undefined ? (
           <div className="pd-pending-reveal">
@@ -360,35 +533,16 @@ export function PendingMediaCard({
               }}
               onExitDone={() => setSwept(true)}
             />
+            <ProgressPill
+              kind={kind}
+              progress={progress}
+              done={item !== undefined}
+              label={label}
+              {...(progressKey !== undefined ? { progressKey } : {})}
+            />
           </>
         )}
       </div>
-      {/*
-        THE BAR, AND NOTHING ELSE. No title (the prompt is already above), no
-        elapsed clock, no Stop — the user asked for "just floating, a white progress
-        bar". It leaves as soon as the sweep starts, because by then the card is
-        showing the answer rather than waiting for it.
-      */}
-      <div
-        className="pd-pending-bar"
-        role="progressbar"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-label={label}
-        {...(pct === undefined ? {} : { 'aria-valuenow': pct })}
-      >
-        <div
-          className="pd-pending-fill"
-          data-indeterminate={pct === undefined ? 'true' : undefined}
-          style={pct === undefined ? undefined : { width: `${pct}%` }}
-        />
-      </div>
-      {/* The number when there is an honest one — the user: "a progressbar at the
-          bottom with % otherwise loading is good". Kept to one short line so the
-          card stays the card and not a status panel. */}
-      <span className="pd-pending-pct" data-testid="pending-pct">
-        {pct === undefined ? (note ?? 'Loading') : `${pct}%`}
-      </span>
     </figure>
   );
 }

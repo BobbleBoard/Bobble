@@ -219,7 +219,19 @@ export function BobbleLoader({
       resize();
     }
 
-    const ink = getComputedStyle(host).getPropertyValue('--pd-bobble-ink').trim() || '#ffffff';
+    /* The ink follows the theme while the card waits: read once, a card that was
+       mounted on the dark theme kept drawing white blocks after a switch to the
+       light one — white on the light card, i.e. an empty card (SEEN 2026-09-24). */
+    const readInk = (): string =>
+      getComputedStyle(host).getPropertyValue('--pd-bobble-ink').trim() || '#ffffff';
+    let ink = readInk();
+    const themeWatch = new MutationObserver(() => {
+      ink = readInk();
+    });
+    themeWatch.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-mode', 'data-flavor'],
+    });
 
     let raf = 0;
     let running = true;
@@ -336,6 +348,7 @@ export function BobbleLoader({
       cancelAnimationFrame(raf);
       io.disconnect();
       ro?.disconnect();
+      themeWatch.disconnect();
     };
   }, [size, variant, fill]);
 

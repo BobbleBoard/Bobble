@@ -370,6 +370,7 @@ export function AssistantGroup({
                */
               <PendingMediaCard
                 kind={pendingKindFor(jobHere.kind) as PendingKind}
+                progressKey={jobHere.callId}
                 /* The engine's own frames as they land: a picture's denoise
                    steps, a clip's rendered frames (HyperFrames names each). */
                 live={jobHere.kind === 'image' || jobHere.kind === 'video'}
@@ -410,6 +411,9 @@ export function AssistantGroup({
                 kind={pendingKindFor(handing.kind) ?? 'image'}
                 live={handing.kind === 'image' || handing.kind === 'video'}
                 item={handingItem}
+                /* The same job's number and shape, so the handover neither
+                   restarts the pill nor reopens the frame square. */
+                progressKey={handing.callId}
                 onRevealed={() => setRevealed((cur) => new Set([...cur, handingItem.path]))}
               />
             ) : null}

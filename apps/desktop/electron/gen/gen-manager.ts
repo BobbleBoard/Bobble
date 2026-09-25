@@ -95,6 +95,7 @@ import { buildComfyImageJob, isComfyImageModel } from './image-dispatch';
 import { createRoomKeeper, type RoomKeeper } from './make-room';
 import { generateSvg, omniSvgFiles } from './omnisvg';
 import { canEnhance, type EnhancerEndpoint, enhancePrompt } from './prompt-enhancer';
+import { parseTqdm } from './tqdm';
 import {
   buildVideoJob,
   defaultExtractPosterFrame,
@@ -795,6 +796,27 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
          * being dropped, so the room said "Starting…" throughout and he reported
          * the studio as not working at all.
          */
+        const steps = event.event === 'log' ? parseTqdm(event.text) : undefined;
+        if (steps !== undefined) {
+          /*
+           * A worker that only PRINTS its steps (tqdm on stderr — the image-edit
+           * path) still has a counter: it becomes the same progress a structured
+           * event gives, and the line itself is never shown. the user (2026-09-24):
+           * "that terminal logging style text below it needs to go". tqdm does
+           * not say which candidate; the first one not yet done is being drawn.
+           */
+          const idx = Math.max(
+            0,
+            candidates.findIndex((c) => c.status !== 'done'),
+          );
+          const c = candidates[idx];
+          if (c !== undefined && c.status === 'pending') {
+            candidates[idx] = { ...c, status: 'generating' };
+          }
+          progress = { candidate: idx, step: steps.step, total: steps.total };
+          send('gen:update', { tabId, payload: payload('generating') });
+          return;
+        }
         const line =
           event.event === 'log' ? noteFrom(event.text) : downloadNote(event.detail, event.ratio);
         if (line !== undefined && line !== note) {
