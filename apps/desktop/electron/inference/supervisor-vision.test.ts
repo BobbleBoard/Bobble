@@ -247,6 +247,34 @@ beforeEach(async () => {
   h.hold = null;
 });
 
+describe('the reuse gate (ALREADY RESIDENT)', () => {
+  it('a text-only model with vision off is reused, not reloaded', async () => {
+    gguf('nanbeige4.2-3b', 'Nanbeige_Nanbeige4.2-3B-Q8_0.gguf');
+    await vision(false);
+    expect(
+      (await ask<{ success: boolean }>({ type: 'start-server', modelId: 'nanbeige4.2-3b' }))
+        .success,
+    ).toBe(true);
+    const launched = h.launches.length;
+    // Models → Use on the loaded model; or a second start racing the first.
+    expect(
+      (await ask<{ success: boolean }>({ type: 'start-server', modelId: 'nanbeige4.2-3b' }))
+        .success,
+    ).toBe(true);
+    expect(h.launches.length).toBe(launched);
+  });
+
+  it('still relaunches a model with a projector when the switch changed', async () => {
+    gguf('qwen3.5-0.8b-mtp', 'Qwen3.5-0.8B-Q8_0.gguf', true);
+    await ask({ type: 'start-server', modelId: 'qwen3.5-0.8b-mtp' });
+    expect(lastLaunch()?.mmprojPath).toBeDefined();
+    await vision(false);
+    await ask({ type: 'start-server', modelId: 'qwen3.5-0.8b-mtp' });
+    expect(lastLaunch()?.mmprojPath).toBeUndefined();
+    expect((await status()).blindReason).toBe('off');
+  });
+});
+
 describe('rapid-mlx rows keep the method they name', () => {
   const twin = 'mlx-community/Qwen3.5-4B-MLX-8bit';
   const setUp = async () => {

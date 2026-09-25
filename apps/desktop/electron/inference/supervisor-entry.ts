@@ -2632,8 +2632,10 @@ async function startServerExclusive(
     current.launchMode === launchMode &&
     sameProfile(current.profile, profile) &&
     current.launchConfigFingerprint === launchFingerprint('llamacpp', model.id) &&
-    // Vision switched on or off since: the projector is a launch argument.
-    (current.blindReason === 'off') === !visionWanted
+    // Vision switched on or off since: the projector is a launch argument —
+    // for a model that has one. A text-only model launches the same either way
+    // (its blindReason is 'model', never 'off'), so the switch changes nothing.
+    (model.mmproj === undefined || (current.blindReason === 'off') === !visionWanted)
   ) {
     return { success: true, baseUrl: current.baseUrl };
   }
