@@ -509,10 +509,13 @@ try {
   await clip('09b-paste-from-card-composer', '.pd-composer-root', 16);
 
   /* The composer's own look-closer view (the other user of the shared scrim):
-     double-click the pasted picture, Escape, and focus is back in the box. */
-  await page.dblclick('[data-testid="attach-chip"] img.pd-attach-thumb');
-  const preview = await waitFor('[data-testid="attachment-expanded"]', 3000);
-  check(preview, 'double-clicking the pasted picture did not open it');
+     double-click the pasted picture, Escape, and focus is back in the box.
+     (Only when the paste attached something — on a build where it does not,
+     that failure is already recorded above.) */
+  const pastedThumb = await exists('[data-testid="attach-chip"] img.pd-attach-thumb');
+  if (pastedThumb) await page.dblclick('[data-testid="attach-chip"] img.pd-attach-thumb');
+  const preview = pastedThumb && (await waitFor('[data-testid="attachment-expanded"]', 3000));
+  if (pastedThumb) check(preview, 'double-clicking the pasted picture did not open it');
   if (preview) {
     await sleep(400);
     await page.keyboard.press('Escape');
@@ -566,7 +569,8 @@ try {
    * chip clipboard used to claim every ⌘V once it held anything, so this pasted
    * the 320×200 chip again. Told apart by size.
    */
-  await page.locator('[data-testid="attach-chip"]').first().click();
+  const haveChip = await exists('[data-testid="attach-chip"]');
+  if (haveChip) await page.locator('[data-testid="attach-chip"]').first().click();
   await sleep(200);
   await page.keyboard.press('Meta+c');
   await sleep(200);
