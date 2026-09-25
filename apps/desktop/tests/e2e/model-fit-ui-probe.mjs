@@ -1,228 +1,599 @@
 /**
- * LOOK at the model manager's fit/sort/ordering work in the real app.
+ * LOOK at the model hub's fit, sort and ordering work in the real app.
  *
  * the user's standing rule on UI work: drive the real thing and look, because tests
- * pass while the screen is wrong. This asserts the things the unit tests cannot
- * — that the badge is on screen, that its tooltip carries the arithmetic, that
- * the dropdown really is ordered the way `orderQuantsForDisplay` says, and that
- * the verdict CHANGES when the quant does.
+ * pass while the screen is wrong. This asserts what the unit tests cannot — that
+ * the verdict is on screen, that it carries its arithmetic, that the dropdown
+ * really is in the order the user asked for, and that the verdict CHANGES when the
+ * quant does. It prints every row too, because printing the real data is what
+ * found the bugs this probe exists for.
  *
- * Isolated empty HOME by default: no model is cached there, so nothing can
- * auto-start and this is safe to run beside a live corp run on the one GPU.
- * The catalog, the hardware detect and every fit computation are real.
+ * WHERE THAT LIVES NOW. Model management left Settings for a page of its own —
+ * the sidebar's "Model management" row opens the hub in the chat area — so the
+ * `settings-nav-models` this used to click is gone, and so is the card's text
+ * badge. The quant picker sits in the hub's detail pane, and two things about it
+ * changed on the user's word (QuantPicker.tsx has the quotes):
+ *   · the verdict is the fit DOT's tooltip, not a word on the card;
+ *   · the list is plain size order, largest first, under ONE pinned
+ *     "Recommended" row — the fit-first ranking now only chooses that row.
+ * The checks follow those shapes and keep what they were for.
  *
- *   REAL_HOME=1  use the actual model cache, so the downloaded-card and the
- *                delete confirmation can be checked too. Reads only — the
- *                delete dialog is opened, read, screenshotted and CANCELLED.
+ * A Recommended pick is a Hugging Face repo, so its ladder is a live file
+ * listing: this needs the network. The catalog, the hardware detect and every
+ * fit computation are the app's own, and the numbers on screen are checked
+ * against the launcher's estimator (context-cap.ts), not against a copy of it.
  *
- * Run `pnpm build` first. Screenshots land in .corp-runs/model-fit-ui/.
+ * ON DISK, WITHOUT A DOWNLOAD. The on-disk half — the picker's action following
+ * the selected file, "Only show models that fit", the delete confirmation — used
+ * to need REAL_HOME=1 and the real cache. A probe never gets the real home now
+ * (harness.mjs), so this STAGES a library in its throwaway one: sparse files at
+ * the catalog's own paths, found by the app's ordinary disk-truth code and
+ * taking no disk. They appear only after the boot-time model check has found
+ * nothing to start, and nothing is ever sent, so nothing starts for them — the
+ * last check proves it.
+ *
+ *   node scripts/with-lock.mjs probe -- node apps/desktop/tests/e2e/model-fit-ui-probe.mjs
+ *
+ * Build first. MODEL_ID picks another catalog model (default: the 27B).
+ * Screenshots land in $SHOT_DIR, else $TMPDIR/pd-shots/model-fit-ui.
  */
-import { existsSync, mkdirSync, mkdtempSync } from 'node:fs';
-import { createRequire } from 'node:module';
-import { tmpdir } from 'node:os';
+import {
+  existsSync,
+  mkdirSync,
+  realpathSync,
+  rmSync,
+  statSync,
+  truncateSync,
+  writeFileSync,
+} from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { _electron as electron } from 'playwright-core';
+import { launchApp, REPO_ROOT } from './harness.mjs';
 
-const require = createRequire(import.meta.url);
-const electronBinary = require('electron');
-const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const repoRoot = path.resolve(appRoot, '../..');
-const mockPi = path.join(repoRoot, 'packages/engine/tools/mock-pi/mock-pi.mjs');
-const fixture = path.join(repoRoot, 'packages/engine/tools/mock-pi/fixtures/simple-chat.json');
-const OUT = path.join(repoRoot, '.corp-runs', 'model-fit-ui');
+const SRC = path.join(REPO_ROOT, 'packages/inference/src');
+const { CATALOG } = await import(`${SRC}/catalog.ts`);
+const { DEFAULT_MEMORY_FRACTION, estimateLaunchRamGB } = await import(`${SRC}/context-cap.ts`);
+
 const MODEL_ID = process.env.MODEL_ID ?? 'qwen3.8-27b-mtp';
-
-const failures = [];
-function check(ok, message) {
-  console.log(`${ok ? '  ok  ' : ' FAIL '} ${message}`);
-  if (!ok) failures.push(message);
-}
-
-if (!existsSync(path.join(appRoot, 'dist/index.html'))) {
-  console.error('model-fit-ui-probe: app not built — run `pnpm build` first');
+const model = CATALOG.find((m) => m.id === MODEL_ID);
+if (model?.hfRepo === undefined || model.files.length === 0) {
+  console.error(`model-fit-ui-probe: ${MODEL_ID} is not a catalog model with a Hugging Face repo`);
   process.exit(1);
 }
-mkdirSync(OUT, { recursive: true });
+if (process.env.REAL_HOME === '1') {
+  console.log(
+    '  --   REAL_HOME=1 is ignored: a probe never runs in the real home; a staged library stands in',
+  );
+}
 
-const userDataDir = mkdtempSync(path.join(tmpdir(), 'pi-e2e-udd-'));
-const env = { ...process.env, PI_BIN: mockPi, MOCK_PI_FIXTURE: fixture, PI_E2E: '1' };
-if (process.env.REAL_HOME !== '1') env.HOME = mkdtempSync(path.join(tmpdir(), 'pi-e2e-home-'));
-const app = await electron.launch({
-  executablePath: electronBinary,
-  args: [appRoot, `--user-data-dir=${userDataDir}`],
-  env,
+const {
+  page,
+  check: record,
+  finish,
+  home,
+  shotDir,
+} = await launchApp('model-fit-ui', {
+  waitFor: null,
 });
 
-try {
-  const page = await app.firstWindow();
-  page.on('console', (m) => {
-    if (m.type() === 'error') console.log('console.error:', m.text().slice(0, 200));
+/*
+ * THE BOOT-TIME MODEL CHECK, heard from the first frame. App.tsx starts the
+ * first downloaded model it finds (ensureChatServerReady), so the staged
+ * library below may only appear once that check has decided there is nothing
+ * to start. Listening before the page has even loaded is what makes its
+ * verdict impossible to miss.
+ */
+const bootCheck = [];
+page.on('console', (m) => {
+  const text = m.text();
+  if (m.type() === 'error') console.log('console.error:', text.slice(0, 200));
+  if (text.includes('[pi-diag] ensureChatServerReady:')) bootCheck.push(text);
+});
+
+function check(ok, message) {
+  if (ok) console.log(`  ok   ${message}`);
+  return record(ok, message);
+}
+/** A check the rest of the run stands on: recorded like any other, then stop. */
+class Stop extends Error {}
+function need(ok, message) {
+  if (!check(ok, message)) throw new Stop(message);
+}
+
+const shot = (name, target = page) =>
+  target.screenshot({ path: path.join(shotDir, `${name}.png`) });
+
+/** The three words the tone stands for; the user keeps them off the card itself. */
+const LABEL = { success: 'Fits', warning: 'Tight, will swap', danger: "Won't fit" };
+const SEVERITY = { success: 0, warning: 1, danger: 2 };
+
+/**
+ * Hover a fit dot and read ITS tooltip — the verdict lives there now.
+ *
+ * MEASURED, row by row: every other row's tooltip never opened. Leaving a dot
+ * gives the pointer a grace area to travel to its tooltip, and only a LATER
+ * move outside that area closes it and clears Radix's "pointer in transit" —
+ * so one jump away left the flag up, and the next dot's hover was swallowed.
+ * Hence two moves away, the old tooltip waited out, and the text read through
+ * the dot's own `aria-describedby` rather than whatever tooltip is on screen.
+ */
+async function tooltipOf(dot) {
+  await page.mouse.move(1, 1);
+  await page.waitForTimeout(50);
+  await page.mouse.move(2, 2);
+  await page.waitForFunction(() => document.querySelector('[role="tooltip"]') === null, undefined, {
+    timeout: 3000,
   });
-  await page.waitForSelector('[data-testid="composer-input"]', { timeout: 25000 });
+  await dot.hover();
+  await page.waitForFunction(
+    (el) => {
+      const id = el.getAttribute('aria-describedby');
+      return id !== null && document.getElementById(id) !== null;
+    },
+    await dot.elementHandle(),
+    { timeout: 3000 },
+  );
+  return dot.evaluate(
+    (el) =>
+      document.getElementById(el.getAttribute('aria-describedby') ?? '')?.textContent?.trim() ?? '',
+  );
+}
 
-  await page.click('[data-testid="profile-button"]');
-  await page.click('[data-testid="open-settings"]');
-  await page.waitForSelector('[data-testid="settings-view"]', { timeout: 10000 });
-  await page.click('[data-testid="settings-nav-models"]');
-  await page.waitForSelector('[data-testid="model-manager"]', { timeout: 10000 });
-  await page.waitForSelector('[data-testid^="model-card-"]', { timeout: 10000 });
-  await page.screenshot({ path: path.join(OUT, '1-manager.png'), fullPage: true });
+/*
+ * DOES A VERDICT ADD UP? Its terms must sum to its total, the total must be the
+ * launcher's own estimate for THIS file at the window it names, the RAM must be
+ * this machine's, and the colour must be the one those numbers earn. The last
+ * is the composition the old dropdown got wrong while every unit test passed:
+ * the sort and the labels were each right and fed different inputs.
+ */
+const WORKING =
+  /^([\d.]+) weights \+ ([\d.]+) context \+ ([\d.]+) runtime ≈ ([\d.]+) GB of (\d+) GB, at a (\d+)k window/;
+function judge(text, bytes, tone, ramGB) {
+  const m = WORKING.exec(text ?? '');
+  if (m === null) return `no arithmetic in "${text}"`;
+  const [weights, context, runtime, total, of, windowK] = m.slice(1).map(Number);
+  const estimate = estimateLaunchRamGB(bytes, windowK * 1024);
+  const earned =
+    estimate <= ramGB * DEFAULT_MEMORY_FRACTION
+      ? 'success'
+      : estimate <= ramGB
+        ? 'warning'
+        : 'danger';
+  if (Math.abs(weights - bytes / 1024 ** 3) > 0.051)
+    return `${weights} GB of weights is not this file`;
+  if (Math.abs(weights + context + runtime - total) > 0.151)
+    return `its terms do not sum to ${total}`;
+  if (Math.abs(total - estimate) > 0.051)
+    return `${total} is not the launcher's ${estimate.toFixed(2)}`;
+  if (of !== ramGB) return `"of ${of} GB" is not this machine's ${ramGB} GB`;
+  if (tone !== earned) return `coloured ${tone}, but its numbers earn ${earned}`;
+  return null;
+}
 
+/** Every row of the open quant menu, top to bottom, as the screen has it. */
+const MENU_ROW = '[data-testid="quant-menu"] [data-testid^="quant-opt-"]';
+const readMenu = () =>
+  page.$$eval(MENU_ROW, (els) =>
+    els.map((el) => {
+      const id = el.getAttribute('data-testid') ?? '';
+      const from = id.startsWith('quant-opt-pinned-') ? 'pinned' : 'list';
+      const dot = el.querySelector('span.rounded-full.h-2');
+      const box = dot?.getBoundingClientRect();
+      const tint = dot?.getAttribute('class') ?? '';
+      const size = el.querySelector('[data-testid="quant-size"]');
+      return {
+        from,
+        quant: id.slice(`quant-opt-${from}-`.length),
+        bytes: Number(size?.getAttribute('data-bytes')),
+        size: size?.textContent?.trim() ?? '',
+        tone: /status-success/.test(tint)
+          ? 'success'
+          : /status-warning/.test(tint)
+            ? 'warning'
+            : /status-danger/.test(tint)
+              ? 'danger'
+              : 'default',
+        dot:
+          dot !== null &&
+          box !== undefined &&
+          box.width >= 6 &&
+          box.height >= 6 &&
+          getComputedStyle(dot).backgroundColor !== 'rgba(0, 0, 0, 0)',
+        badge: /Recommended/.test(el.textContent ?? ''),
+        onDisk: /on disk/.test(el.textContent ?? ''),
+        selected: el.getAttribute('data-selected') === 'true',
+        dividedBelow: el.nextElementSibling?.classList.contains('pd-menu-separator') ?? false,
+      };
+    }),
+  );
+
+function printRows(rows) {
+  console.log('the menu, top to bottom:');
+  for (const r of rows) {
+    const marks = [r.badge ? 'Recommended' : '', r.onDisk ? 'on disk' : '', r.selected ? '✓' : '']
+      .filter(Boolean)
+      .join(' ');
+    console.log(
+      `  ${r.from === 'pinned' ? '★' : ' '} ${r.quant.padEnd(16)} ${r.size.padStart(7)}  ${(LABEL[r.tone] ?? r.tone).padEnd(16)} ${marks.padEnd(22)} ${r.tip ?? ''}`,
+    );
+  }
+}
+
+try {
+  await page.waitForSelector('[data-testid="composer-input"]', { timeout: 30_000 });
+  // Every phase the inference status passes through, for the last check.
+  await page.waitForFunction(() => window.__llm_store !== undefined, undefined, {
+    timeout: 10_000,
+  });
+  await page.evaluate(() => {
+    const store = window.__llm_store();
+    window.__phases = [store.getState().status.phase];
+    store.subscribe((s) => {
+      if (window.__phases.at(-1) !== s.status.phase) window.__phases.push(s.status.phase);
+    });
+  });
+
+  // ── The hub, from the sidebar ────────────────────────────────────────────
+  await page.click('[data-testid="nav-model-management"]');
+  await page.waitForSelector('[data-testid="models-view"]', { timeout: 10_000 });
+  await page.waitForFunction(
+    () =>
+      /\d+\s*GB RAM/.test(
+        document.querySelector('[data-testid="hardware-strip"]')?.textContent ?? '',
+      ) && window.__llm_store?.().getState().hardware != null,
+    undefined,
+    { timeout: 15_000 },
+  );
   const hardware = await page.evaluate(() => window.__llm_store?.().getState().hardware ?? null);
   console.log('hardware:', JSON.stringify(hardware));
   check(hardware !== null && hardware.totalRamGB > 0, 'hardware was detected (real RAM)');
+  const strip = (await page.textContent('[data-testid="hardware-strip"]')) ?? '';
+  const ramGB = Number(/(\d+)\s*GB RAM/.exec(strip)?.[1]);
+  need(ramGB > 0, `the hub states this machine's memory (${ramGB} GB)`);
 
-  // ── The 27B card exists and its verdict shows its working ────────────────
-  const card = page.locator(`[data-testid="model-card-${MODEL_ID}"]`);
-  check((await card.count()) > 0, `the ${MODEL_ID} card is in the catalog`);
-  await card.scrollIntoViewIfNeeded();
-
-  const badge = page.locator(`[data-testid="ram-badge-${MODEL_ID}"]`);
-  const label = (await badge.textContent())?.trim() ?? '';
-  const detail = (await badge.getAttribute('title')) ?? '';
-  console.log(`verdict: "${label}"  title: "${detail}"`);
+  // ── The model, where a person finds it: Recommended → its family ─────────
   check(
-    ['Fits', 'Tight — will swap', "Won't fit"].includes(label),
-    `verdict is a fit verdict ("${label}")`,
+    await page.evaluate(
+      (id) =>
+        window
+          .__llm_store?.()
+          .getState()
+          .catalog.some((e) => e.id === id) ?? false,
+      MODEL_ID,
+    ),
+    `${MODEL_ID} is in the app's catalog`,
   );
+  // Recommended waits out the hub's first Hugging Face search before it shows.
+  await page.waitForSelector('[data-testid="curated-families"]', { timeout: 30_000 });
+  await shot('1-hub');
+  const variant = page.locator(`[data-testid^="family-variant-${model.hfRepo}:"]`).first();
+  need((await variant.count()) > 0, `Recommended offers ${model.hfRepo}`);
+  const family = await variant.evaluate(
+    (el) =>
+      el
+        .closest('[data-testid^="family-card-"]')
+        ?.getAttribute('data-testid')
+        ?.slice('family-card-'.length) ?? '',
+  );
+  await page.click(`[data-testid="family-toggle-${family}"]`);
+  // A one-version family opens its card on that click; a larger one unfolds.
+  await page.waitForTimeout(400);
+  if ((await variant.getAttribute('data-selected')) !== 'true') {
+    await variant.locator('button').first().click();
+  }
+  await page.waitForSelector('[data-testid="model-detail"]', { timeout: 10_000 });
+  check(
+    (await variant.getAttribute('data-selected')) === 'true',
+    `its card is the one open (${family} → ${model.hfRepo})`,
+  );
+  // The ladder is a live Hugging Face listing; give the network its time.
+  const listed = await page
+    .waitForSelector('[data-testid="quant-picker"]', { timeout: 45_000 })
+    .then(
+      () => true,
+      () => false,
+    );
+  if (!listed) {
+    const why = await page.evaluate(() => ({
+      loading: document.querySelector('[data-testid="quant-picker-loading"]') !== null,
+      error: document.querySelector('[data-testid="models-hf-error"]')?.textContent ?? null,
+      gated: document.querySelector('[data-testid="hf-token-row"]') !== null,
+    }));
+    need(
+      false,
+      `${model.hfRepo}'s files came back from Hugging Face (needs the network): ${JSON.stringify(why)}`,
+    );
+  }
+  await shot('2-card', page.locator('[data-testid="model-detail"]'));
+
+  // ── The verdict: the dot's colour, with its working in the tooltip ───────
+  const dot = page.locator('[data-testid="quant-fit-dot"]');
+  const current = page.locator('[data-testid="quant-current"]');
+  /** The quant the closed picker names — its first span; the rest is size. */
+  const currentQuant = async () =>
+    ((await current.locator('span').first().textContent()) ?? '').trim();
+  const preselected = await currentQuant();
+  const tone = (await dot.getAttribute('data-tone')) ?? '';
+  const detail = await tooltipOf(dot);
+  console.log(`verdict on ${preselected}: ${LABEL[tone] ?? tone}  "${detail}"`);
+  check(tone in LABEL, `the dot carries a fit verdict (${tone})`);
   check(
     /GB of \d+ GB, at a \d+k window/.test(detail),
-    `verdict shows its arithmetic ("${detail}")`,
+    `the verdict shows its arithmetic ("${detail}")`,
   );
-  await card.screenshot({ path: path.join(OUT, '2-card.png') });
+  await shot('2b-verdict-tooltip');
 
-  // ── The dropdown: ordering + per-row fit dots ────────────────────────────
-  await page.click(`[data-testid="quant-${MODEL_ID}"]`);
-  await page.waitForTimeout(600);
-  await page.screenshot({ path: path.join(OUT, '3-quant-dropdown.png') });
-
-  const rows = await page.locator('[role="option"]').allTextContents();
-  console.log('rows:', JSON.stringify(rows));
-  check(rows.length >= 2, `the dropdown lists the quants (${rows.length})`);
+  // ── The dropdown: the pinned pick, then every file largest → smallest ────
+  await page.mouse.move(1, 1);
+  await current.click();
+  await page.waitForSelector('[data-testid="quant-menu"]', { timeout: 3000 });
+  await page.waitForTimeout(300);
+  await shot('3-quant-dropdown');
+  const rows = await readMenu();
+  // Each row's verdict is on its own dot, so read every one of them.
+  for (let i = 0; i < rows.length; i++) {
+    const rowDot = page.locator(MENU_ROW).nth(i).locator('span.rounded-full.h-2');
+    rows[i].tip = await tooltipOf(rowDot).catch(() => '');
+  }
+  await page.mouse.move(1, 1);
+  printRows(rows);
 
   /*
    * The invariants, not a hand-written expected list:
-   *   · fit classes are contiguous and in order (Fits → Tight → Won't fit)
-   *   · row 0 is in the best class present — it is the preselection
-   *   · inside the won't-fit tail, ascending (near-misses first)
-   * Size is NOT strictly descending inside a class: a dynamic quant outranks a
-   * marginally larger plain one (UD_QUALITY_BONUS), which is deliberate.
+   *   · one pinned "Recommended" row, a divider, then the list by size, largest
+   *     first — the user's spec for this menu;
+   *   · every file once, the pick's twin included (and without the badge);
+   *   · down the list the verdict only improves — size and colour agree;
+   *   · the pick is in the best fit class on offer, and it is the preselection;
+   *   · inside that class a dynamic quant beats a marginally larger plain one
+   *     (UD_QUALITY_BONUS), so where one fits, the pick is one.
    */
-  const sizes = rows.map((r) => {
-    const m = /([\d.]+)\s*GB/.exec(r);
-    return m ? Number(m[1]) : Number.NaN;
-  });
-  const classOf = (r) => (r.includes("Won't fit") ? 2 : r.includes('Tight') ? 1 : 0);
-  const classes = rows.map(classOf);
-  console.log('row sizes:', JSON.stringify(sizes));
-  console.log('row classes:', JSON.stringify(classes));
-  check(
-    classes.every((c, i) => i === 0 || c >= classes[i - 1]),
-    `fit classes are grouped and ordered: ${JSON.stringify(classes)}`,
+  const [pick, ...list] = rows;
+  need(
+    rows.length >= 3 && pick.from === 'pinned',
+    `the menu opens on a pinned pick (${rows.length} rows)`,
   );
-  check(classes[0] === Math.min(...classes), 'row 0 is in the best fit class on offer');
-  const tail = sizes.filter((_, i) => classes[i] === 2);
   check(
-    tail.every((s, i) => i === 0 || s >= tail[i - 1]),
-    `the won't-fit tail is ascending — near-misses first (${JSON.stringify(tail)})`,
+    rows.filter((r) => r.from === 'pinned').length === 1 && pick.badge,
+    `one pinned row, and it says "Recommended" (${pick.quant})`,
   );
-  // A dynamic quant should win the top slot over a marginally larger plain one.
-  check(/UD-/.test(rows[0]), `row 0 is a dynamic quant where one fits ("${rows[0]}")`);
-
-  // A dot per row, coloured by fit.
-  const dotCount = await page.locator('[role="option"] span.rounded-full').count();
+  check(pick.dividedBelow, 'a divider separates the pick from the list');
   check(
-    dotCount >= rows.length,
-    `every row carries a fit dot (${dotCount} for ${rows.length} rows)`,
+    list.every((r, i) => i === 0 || r.bytes <= list[i - 1].bytes),
+    `the list runs largest → smallest (${list.map((r) => r.size).join(', ')})`,
+  );
+  const names = list.map((r) => r.quant);
+  const twice = [...new Set(names.filter((q, i) => names.indexOf(q) !== i))];
+  check(
+    twice.length === 0,
+    `no quant is listed twice${twice.length > 0 ? ` (${twice.join(', ')})` : ''}`,
+  );
+  const twins = list.filter((r) => r.quant === pick.quant);
+  check(
+    twins.length === 1 && !twins[0].badge,
+    `the pick is in the list too, once, without the badge (${pick.quant})`,
+  );
+  const severity = list.map((r) => SEVERITY[r.tone] ?? 3);
+  check(
+    severity.every((s, i) => i === 0 || s <= severity[i - 1]),
+    `down the list the verdict only improves (${list.map((r) => r.tone).join(', ')})`,
+  );
+  const best = Math.min(...severity);
+  check(
+    (SEVERITY[pick.tone] ?? 3) === best,
+    `the pick is in the best fit class on offer (${pick.quant}: ${LABEL[pick.tone] ?? pick.tone})`,
+  );
+  const dynamic = (q) => /(^|[^A-Z])UD-/i.test(q);
+  check(
+    !list.some((r) => SEVERITY[r.tone] === best && dynamic(r.quant)) || dynamic(pick.quant),
+    `a dynamic quant wins the pick where one fits (${pick.quant})`,
+  );
+  check(
+    pick.selected && preselected === pick.quant && detail === pick.tip,
+    `the closed picker was already showing the pick, verdict and all — it is the preselection (${preselected})`,
+  );
+  check(
+    rows.every((r) => r.dot),
+    `every row carries a fit dot (${rows.filter((r) => r.dot).length} of ${rows.length})`,
+  );
+  const wrong = rows
+    .map((r) => ({ quant: r.quant, why: judge(r.tip, r.bytes, r.tone, ramGB) }))
+    .filter((w) => w.why !== null);
+  check(
+    wrong.length === 0,
+    `every row's verdict adds up and earns its colour${wrong.length > 0 ? `: ${wrong.map((w) => `${w.quant} — ${w.why}`).join('; ')}` : ` (${rows.length} rows)`}`,
   );
 
   // ── The verdict MOVES with the selection ─────────────────────────────────
-  const lastRow = page.locator('[role="option"]').nth(rows.length - 1);
-  const lastText = (await lastRow.textContent())?.trim() ?? '';
-  await lastRow.click();
+  const other = list[0].quant !== pick.quant ? list[0] : list[list.length - 1];
+  await page.locator(`[data-testid="quant-opt-list-${other.quant}"]`).first().click();
+  await page.waitForSelector('[data-testid="quant-menu"]', { state: 'detached', timeout: 3000 });
+  const tone2 = (await dot.getAttribute('data-tone')) ?? '';
+  const detail2 = await tooltipOf(dot);
+  console.log(`after picking ${other.quant}: ${LABEL[tone2] ?? tone2}  "${detail2}"`);
+  check((await currentQuant()) === other.quant, `the picker now names ${other.quant}`);
+  check(detail2 !== detail, `the verdict moved with the quant ("${detail}" → "${detail2}")`);
+  const moved = judge(detail2, other.bytes, tone2, ramGB);
+  check(
+    moved === null,
+    `and it is ${other.quant}'s own verdict${moved === null ? ` (${LABEL[tone2]})` : `: ${moved}`}`,
+  );
+  await shot('4-card-other-quant');
+  await page.mouse.move(1, 1);
+
+  // ── A staged library: the on-disk half, without a download ───────────────
+  const until = Date.now() + 20_000;
+  while (!bootCheck.some((l) => l.includes('NO model to start')) && Date.now() < until) {
+    await page.waitForTimeout(250);
+  }
+  need(
+    bootCheck.some((l) => l.includes('NO model to start')),
+    `the boot-time model check found nothing to start before anything was staged (${bootCheck.at(-1) ?? 'no verdict heard'})`,
+  );
+  const { libraryRoot } = await page.evaluate(() =>
+    window.piDesktop.invoke('storage:overview', { fresh: false }),
+  );
+  const inHome = (p) =>
+    [home, realpathSync(home)].some(
+      (h) => typeof p === 'string' && p.startsWith(`${h}${path.sep}`),
+    );
+  need(inHome(libraryRoot), `the library is inside the throwaway home (${libraryRoot})`);
+  // Sparse, or not at all: a disk that cannot make a hole would really write 13 GB.
+  const canary = path.join(home, 'sparse-canary');
+  writeFileSync(canary, '');
+  truncateSync(canary, 64 * 1024 ** 2);
+  const sparse = statSync(canary).blocks * 512 < 1024 ** 2;
+  rmSync(canary);
+  need(sparse, 'this disk makes sparse files, so a staged model costs nothing');
+  /** A model's first file at the catalog's own path and size — a hole, not data. */
+  const stage = (m) => {
+    const file = m.files[0];
+    const at = path.join(libraryRoot, 'LLM', m.id, file.name);
+    mkdirSync(path.dirname(at), { recursive: true });
+    writeFileSync(at, '');
+    truncateSync(at, file.bytes);
+    console.log(
+      `staged ${path.relative(libraryRoot, at)}: ${(file.bytes / 1e9).toFixed(2)} GB, ${statSync(at).blocks * 512} bytes on disk`,
+    );
+    return { at, bytes: file.bytes, quant: file.quant };
+  };
+  /* The near miss: the smallest catalog model this machine cannot hold, so the
+     fit filter has something real to hide. */
+  const tooBig = CATALOG.filter(
+    (m) =>
+      m.id !== MODEL_ID &&
+      m.minRamGB > ramGB &&
+      m.files.length > 0 &&
+      (m.engine ?? 'llamacpp') === 'llamacpp',
+  ).sort((a, b) => a.minRamGB - b.minRamGB)[0];
+  const staged = stage(model);
+  if (tooBig !== undefined) stage(tooBig);
+
+  // ── On Device, and "Only show models that fit" ──────────────────────────
+  await page.click('[data-testid="models-tab-device"]');
+  await page.click('[data-testid="models-refresh"]');
+  await page.waitForSelector(`[data-testid="model-row-${MODEL_ID}"]`, { timeout: 10_000 });
+  if (tooBig !== undefined) {
+    await page.waitForSelector(`[data-testid="model-row-${tooBig.id}"]`, { timeout: 10_000 });
+  }
+  const onDevice = () =>
+    page.$$eval('[data-testid^="model-row-"]', (els) =>
+      els.map((el) => el.getAttribute('data-testid')?.slice('model-row-'.length) ?? ''),
+    );
+  const before = await onDevice();
+  await page.click('[data-testid="filter-sort"]');
+  await page.click('[data-testid="filter-only-fits"]');
   await page.waitForTimeout(500);
-  const label2 = (await badge.textContent())?.trim() ?? '';
-  const detail2 = (await badge.getAttribute('title')) ?? '';
-  console.log(`after selecting "${lastText}": "${label2}"  title: "${detail2}"`);
-  check(detail2 !== detail, `the verdict moved when the quant did ("${detail}" → "${detail2}")`);
-  await card.screenshot({ path: path.join(OUT, '4-card-other-quant.png') });
-
-  // ── "Only what fits" ─────────────────────────────────────────────────────
-  const fitsToggle = page.locator('[data-testid="mm-fits-toggle"]');
-  if ((await fitsToggle.count()) > 0) {
-    const beforeCards = await page.locator('[data-testid^="model-card-"]').count();
-    await fitsToggle.click();
-    await page.waitForTimeout(500);
-    const afterCards = await page.locator('[data-testid^="model-card-"]').count();
-    console.log(`fits filter: ${beforeCards} cards → ${afterCards}`);
-    check(afterCards > 0, 'the fit filter leaves something on screen');
+  const after = await onDevice();
+  console.log(`fit filter: ${JSON.stringify(before)} → ${JSON.stringify(after)}`);
+  // The hub's own rule (ramVerdict): a model fits when the machine meets its minimum.
+  const fitsHere = (m) => ramGB >= m.minRamGB;
+  check(after.length > 0 || !fitsHere(model), 'the fit filter leaves something on screen');
+  check(
+    after.includes(MODEL_ID) === fitsHere(model),
+    `it keeps ${MODEL_ID} exactly when it fits (${model.minRamGB} GB minimum, ${ramGB} GB here)`,
+  );
+  if (tooBig !== undefined) {
     check(
-      afterCards <= beforeCards,
-      `the fit filter hid the models that cannot load (${beforeCards} → ${afterCards})`,
+      !after.includes(tooBig.id) && after.length < before.length,
+      `it hid the model that cannot load (${tooBig.id}, ${tooBig.minRamGB} GB minimum)`,
     );
-    await page.screenshot({ path: path.join(OUT, '5-fits-only.png'), fullPage: true });
-    await fitsToggle.click();
   } else {
-    console.log('  --   fit filter absent (every model fits this machine)');
+    console.log('  --   nothing in the catalog is too big for this machine; nothing to hide');
+  }
+  await shot('5-fits-only');
+  await page.click('[data-testid="filter-only-fits"]');
+  await page.keyboard.press('Escape');
+
+  /*
+   * ── The picker's action follows the SELECTED file ────────────────────────
+   * With one quant on disk, picking another used to keep offering Verify /
+   * Delete / Set active — and Set active would have loaded a file that is not
+   * there. The picker's own button is that action now: "On disk" for the file
+   * that is here, "Download" for one that is not.
+   */
+  await page.click(`[data-testid="model-row-${MODEL_ID}"]`);
+  await page.waitForSelector('[data-testid="quant-picker"]', { timeout: 10_000 });
+  const action = page.locator('[data-testid="quant-download"]');
+  const actionState = async () => ({
+    selected: await currentQuant(),
+    action: ((await action.textContent()) ?? '').trim(),
+    enabled: await action.isEnabled(),
+  });
+  let state = await actionState();
+  check(
+    state.selected === staged.quant && state.action === 'On disk' && !state.enabled,
+    `the file on disk is the preselection, and its action says so (${JSON.stringify(state)})`,
+  );
+  await current.click();
+  await page.waitForSelector('[data-testid="quant-menu"]', { timeout: 3000 });
+  const local = await readMenu();
+  printRows(local);
+  check(
+    local.every((r) => r.onDisk === (r.quant === staged.quant)),
+    `"on disk" marks the ${staged.quant} rows and nothing else`,
+  );
+  const elsewhere = local.find((r) => r.from === 'list' && r.quant !== staged.quant);
+  if (elsewhere !== undefined) {
+    await page.locator(`[data-testid="quant-opt-list-${elsewhere.quant}"]`).first().click();
+    state = await actionState();
+    check(
+      state.selected === elsewhere.quant && state.action === 'Download' && state.enabled,
+      `picking ${elsewhere.quant}, which is not on disk, offers Download (${JSON.stringify(state)})`,
+    );
+    await shot('6-on-device-card');
+    await current.click();
+    await page.locator(`[data-testid="quant-opt-list-${staged.quant}"]`).first().click();
+    state = await actionState();
+    check(
+      state.selected === staged.quant && state.action === 'On disk' && !state.enabled,
+      `picking ${staged.quant} again turns it back to On disk (${JSON.stringify(state)})`,
+    );
+  } else {
+    console.log(`  --   ${MODEL_ID} has one quant in the catalog; nothing to switch between`);
+    await page.keyboard.press('Escape');
   }
 
   /*
-   * ── The delete confirmation (REAL_HOME only) ─────────────────────────────
+   * ── The delete confirmation ──────────────────────────────────────────────
    * Deleting the 27B was one click on a ghost button: 14.4 GB and a 3m30s
-   * re-download, with no dialog and no undo. This opens it, reads it, and
-   * presses CANCEL — a probe must never destroy what it is inspecting.
+   * re-download, with no dialog and no undo. Delete lives in Manage Storage now.
+   * This opens it, reads it, and presses CANCEL — a probe must never destroy
+   * what it is inspecting, staged or not.
    */
-  /*
-   * The action row must describe the SELECTED quant. With one quant on disk,
-   * selecting a different one used to keep offering Verify/Delete/Set active —
-   * and Set active would have tried to load a file that is not there.
-   */
-  const onDiskQuants = await page.evaluate((id) => {
-    const e = window
-      .__llm_store?.()
-      .getState()
-      .catalog.find((c) => c.id === id);
-    return e?.downloadedQuants ?? [];
-  }, MODEL_ID);
-  console.log('on disk:', JSON.stringify(onDiskQuants));
-  if (onDiskQuants.length > 0) {
-    // Currently a NON-downloaded quant is selected (the probe picked the last row).
-    const selectedNow =
-      (await page.locator(`[data-testid="quant-${MODEL_ID}"]`).textContent()) ?? '';
-    const isOnDisk = onDiskQuants.some((q) => selectedNow.includes(q));
-    const showsDownload =
-      (await page.locator(`[data-testid="download-${MODEL_ID}-btn"]`).count()) > 0;
-    check(
-      isOnDisk !== showsDownload,
-      `the action row follows the selected quant (selected="${selectedNow.trim()}", onDisk=${isOnDisk}, showsDownload=${showsDownload})`,
-    );
-    // Now pick the downloaded one and confirm the row flips.
-    await page.click(`[data-testid="quant-${MODEL_ID}"]`);
-    await page.waitForTimeout(400);
-    await page.locator('[role="option"]', { hasText: onDiskQuants[0] }).first().click();
-    await page.waitForTimeout(500);
-    check(
-      (await page.locator(`[data-testid="delete-${MODEL_ID}"]`).count()) > 0,
-      `selecting the downloaded quant (${onDiskQuants[0]}) offers Delete / Set active`,
-    );
+  await page.click('[data-testid="models-tab-storage"]');
+  await page.waitForSelector('[data-testid="storage-library"]', { timeout: 15_000 });
+  // The library names a model the way the catalog does, so search for that.
+  await page.fill('[data-testid="storage-search"]', model.displayName);
+  const node = page.locator(`[data-testid^="storage-row-"][data-path$="/LLM/${MODEL_ID}"]`).first();
+  if ((await node.count()) === 0) {
+    // An overview measured before the staging: measure again, as a person would.
+    await page.click('[data-testid="storage-view"] button[aria-label="Measure again"]');
+    await node.waitFor({ timeout: 15_000 });
   }
+  await node.locator('[data-testid="storage-name"]').click();
+  await page.click('[data-testid="inspector-delete"]');
+  const dialog = page.locator('[data-testid="delete-model-dialog"]');
+  await dialog.waitFor({ timeout: 5000 });
+  // Photographed once it has faded in, not halfway.
+  await dialog.evaluate((el) =>
+    Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished)),
+  );
+  const said = ((await dialog.textContent()) ?? '').replace(/\s+/g, ' ').trim();
+  console.log(`delete dialog: "${said}"`);
+  const frees = /([\d.]+) (KB|MB|GB|TB) goes to the Trash/.exec(said);
+  check(frees !== null, `the delete dialog says what it frees ("${frees?.[0] ?? said}")`);
+  const statedGB =
+    Number(frees?.[1]) * ({ KB: 1e-6, MB: 1e-3, GB: 1, TB: 1e3 }[frees?.[2]] ?? Number.NaN);
+  const heldGB = staged.bytes / 1e9;
+  check(
+    Math.abs(statedGB - heldGB) <= (heldGB >= 10 ? 0.51 : 0.051),
+    `and that is what this model holds on disk (${frees?.[0]}, for ${heldGB.toFixed(2)} GB)`,
+  );
+  await shot('7-delete-confirm');
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await dialog.waitFor({ state: 'detached', timeout: 3000 });
+  check(existsSync(staged.at), 'Cancel closes the dialog without deleting');
 
-  const del = page.locator(`[data-testid="delete-${MODEL_ID}"]`);
-  if ((await del.count()) > 0) {
-    await del.click();
-    const dialog = page.locator(`[data-testid="delete-dialog-${MODEL_ID}"]`);
-    await dialog.waitFor({ timeout: 5000 });
-    const text = (await dialog.textContent())?.replace(/\s+/g, ' ').trim() ?? '';
-    console.log(`delete dialog: "${text}"`);
-    check(/Frees [\d.]+ GB/.test(text), `the delete dialog says what it frees ("${text}")`);
-    await page.screenshot({ path: path.join(OUT, '7-delete-confirm.png') });
-    await dialog.locator('text=Cancel').click();
-    await page.waitForTimeout(400);
-    check((await dialog.count()) === 0, 'Cancel closes the dialog without deleting');
-  } else {
-    console.log('  --   delete dialog not checked (model not downloaded in this HOME)');
-  }
   /*
    * ── The chat-screen download indicator, LOOKED AT ────────────────────────
    * The real 13 GB download proved the TEXT was right ("43%1m 48s left") but I
@@ -230,8 +601,8 @@ try {
    * checked without another multi-gigabyte transfer — the numbers below are the
    * real ones observed mid-download.
    */
-  await page.click('[data-testid="settings-back"]').catch(() => {});
-  await page.waitForSelector('[data-testid="composer-input"]', { timeout: 10000 });
+  await page.click('[data-testid="new-chat"]');
+  await page.waitForSelector('[data-testid="composer-input"]', { timeout: 10_000 });
   await page.evaluate(() => {
     window.__llm_store?.().getState().applyDownloadProgress({
       modelId: 'qwen3.8-27b-mtp',
@@ -271,7 +642,7 @@ try {
     const text = (await page.locator('[data-testid="tray-downloads"]').textContent())?.trim() ?? '';
     console.log(`tray panel: "${text}"`);
     check(/\d+(\.\d)? \/ \d+(\.\d)? GB|\d+%/.test(text), `the indicator says how far ("${text}")`);
-    await page.screenshot({ path: path.join(OUT, '8-footer-download.png') });
+    await shot('8-footer-download');
     const box = await footer.boundingBox();
     check(
       box !== null && box.width > 16 && box.height > 16,
@@ -279,14 +650,19 @@ try {
     );
     await page.keyboard.press('Escape');
   }
-} finally {
-  await app.close().catch(() => {});
-}
 
-console.log(`\nscreenshots: ${OUT}`);
-if (failures.length > 0) {
-  console.log(`FAILED (${failures.length}):`);
-  for (const f of failures) console.log(`  · ${f}`);
-  process.exit(1);
+  // ── Nothing was started for the staged files ─────────────────────────────
+  const phases = await page.evaluate(() => window.__phases ?? []);
+  check(
+    phases.length > 0 && !phases.some((p) => p === 'starting' || p === 'ready'),
+    `no model server started during the run (status: ${phases.join(' → ')})`,
+  );
+} catch (error) {
+  if (!(error instanceof Stop)) {
+    console.error(error);
+    record(false, `the probe threw: ${String(error?.message ?? error).split('\n')[0]}`);
+  }
+} finally {
+  await finish();
 }
-console.log('model-fit-ui-probe: all checks passed');
+console.log(`\nscreenshots: ${shotDir}`);
