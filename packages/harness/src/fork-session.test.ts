@@ -35,9 +35,10 @@ const BASE_PROMPT =
 // biome-ignore lint/suspicious/noExplicitAny: event handler shape varies per event.
 type AnyHandler = (event: any, ctx: any) => any;
 
-function wiring(options: { callModel?: CallModel } = {}) {
+function wiring(options: { callModel?: CallModel; entries?: StoredEntryLike[] } = {}) {
   const handlers = new Map<string, AnyHandler[]>();
-  const entries: StoredEntryLike[] = [];
+  // A branch starts with what its session file holds up to the fork point.
+  const entries: StoredEntryLike[] = [...(options.entries ?? [])];
   let command:
     | { handler: (args: string, ctx: ExtensionCommandContext) => Promise<void> }
     | undefined;
@@ -89,7 +90,10 @@ function wiring(options: { callModel?: CallModel } = {}) {
   });
   const fire = (event: string, e: unknown) =>
     Promise.all((handlers.get(event) ?? []).map((h) => h(e, ctx)));
-  type TurnResult = { systemPrompt?: string; message?: { customType?: string } };
+  type TurnResult = {
+    systemPrompt?: string;
+    message?: { customType?: string; content?: string; details?: unknown };
+  };
   const turn = async (): Promise<TurnResult> => {
     const [res] = (await fire('before_agent_start', {
       type: 'before_agent_start',
@@ -138,9 +142,15 @@ describe('a fork is the same session continued', () => {
     expect(frozen).not.toContain('`name-three-fruits`');
     // …which then arrived and was announced once, beside the next message.
     await before.workspace('/Users/j/Bobble/name-three-fruits');
-    expect((await before.turn()).message?.customType).toBe('harness-workspace');
+    const told = (await before.turn()).message;
+    expect(told?.customType).toBe('harness-workspace');
 
-    const after = wiring();
+    // The branch keeps the turn that carried the note (pi stores it as a custom_message).
+    const after = wiring({
+      entries: [
+        { type: 'custom_message', customType: 'harness-workspace', details: told?.details },
+      ],
+    });
     await after.fire('session_start', { type: 'session_start', reason: 'fork' });
     const branchTurn = await after.turn();
     // MEASURED before this: handed only the folder, the branch NAMED it — the
@@ -149,6 +159,27 @@ describe('a fork is the same session continued', () => {
     // …and the model is not told about the folder a second time.
     expect(branchTurn.message).toBeUndefined();
     expect(after.folder()).toBe('/Users/j/Bobble/name-three-fruits');
+  });
+
+  it('a fork from BEFORE the note (⌘Z, an edit) tells the model its folder again', async () => {
+    const before = wiring();
+    await before.fire('session_start', { type: 'session_start', reason: 'startup' });
+    const frozen = await before.turnPrompt();
+    await before.workspace('/Users/j/Bobble/name-three-fruits');
+    expect((await before.turn()).message?.customType).toBe('harness-workspace');
+
+    // Taken back: the branch ends before the message the note came with.
+    const after = wiring({ entries: [] });
+    await after.fire('session_start', { type: 'session_start', reason: 'fork' });
+    const branchTurn = await after.turn();
+    // MEASURED before this (the thread track's unsend probe, C4b): the note was
+    // gone from the model's context and never sent again.
+    expect(branchTurn.message?.customType).toBe('harness-workspace');
+    expect(branchTurn.message?.content).toContain('`name-three-fruits`');
+    // …beside the same frozen prompt: the prefix is untouched.
+    expect(branchTurn.systemPrompt).toBe(frozen);
+    // Once: the turn after that one says nothing more.
+    expect((await after.turn()).message).toBeUndefined();
   });
 
   it('any other session boundary is another chat: it starts from nothing', async () => {

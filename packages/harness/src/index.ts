@@ -322,6 +322,8 @@ interface HarnessRuntime {
    * `workspaceRoot` at every turn start; see the note in before_agent_start.
    */
   announcedWorkspace: string | null;
+  /** The working folder the frozen prompt itself names (null when it names none). */
+  promptWorkspace: string | null;
   /** The capability just switched on, named while its re-prefill runs. */
   loadingCapability: string | null;
   /** Conversation title, produced by the background titler (computed once). */
@@ -449,6 +451,25 @@ export interface HarnessHandle {
 function getEntries(ctx: ExtensionContext): StoredEntryLike[] {
   const sm = ctx.sessionManager as unknown as { getEntries?: () => StoredEntryLike[] };
   return sm.getEntries?.() ?? [];
+}
+
+/**
+ * The folder the model was last told about on this branch: the last workspace
+ * note's (its details say which), else the folder the frozen prompt names. A
+ * note from before notes said which folder is taken to be the one carried.
+ */
+export function announcedOnBranch(
+  entries: readonly StoredEntryLike[],
+  promptWorkspace: string | null,
+  carried: string | null,
+): string | null {
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const e = entries[i];
+    if (e?.type !== 'custom_message' || e.customType !== HARNESS_WORKSPACE_NOTE) continue;
+    const root = (e.details as { root?: unknown } | undefined)?.root;
+    return typeof root === 'string' ? root : carried;
+  }
+  return promptWorkspace;
 }
 
 /** Restore a persisted conversation title (last write wins), or null. */
@@ -916,13 +937,19 @@ interface ForkCarry {
   prompt: string | null;
   workspaceRoot: string | null;
   announcedWorkspace: string | null;
+  promptWorkspace: string | null;
 }
 const FORK_CARRY = Symbol.for('pi-desktop.harness.forkCarry');
 const carryGlobals = globalThis as unknown as Record<symbol, ForkCarry | undefined>;
 function processForkCarry(): ForkCarry {
   const existing = carryGlobals[FORK_CARRY];
   if (existing !== undefined) return existing;
-  const fresh: ForkCarry = { prompt: null, workspaceRoot: null, announcedWorkspace: null };
+  const fresh: ForkCarry = {
+    prompt: null,
+    workspaceRoot: null,
+    announcedWorkspace: null,
+    promptWorkspace: null,
+  };
   carryGlobals[FORK_CARRY] = fresh;
   return fresh;
 }
@@ -1091,6 +1118,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     config: DEFAULT_CONFIG,
     workspaceRoot: null,
     announcedWorkspace: null,
+    promptWorkspace: null,
     title: null,
     canonicalSystemPrompt: null,
     activeTools: [],
@@ -1257,6 +1285,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     forkCarry.prompt = runtime.canonicalSystemPrompt;
     forkCarry.workspaceRoot = runtime.workspaceRoot;
     forkCarry.announcedWorkspace = runtime.announcedWorkspace;
+    forkCarry.promptWorkspace = runtime.promptWorkspace;
   };
   const titler: ConversationTitler | undefined =
     callModel !== undefined ? createConversationTitler(callModel) : undefined;
@@ -1450,6 +1479,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     if (runtime.announcedWorkspace === null) {
       runtime.announcedWorkspace =
         /^Current working directory: (.*)$/m.exec(canonical)?.[1] ?? null;
+      runtime.promptWorkspace = runtime.announcedWorkspace;
     }
     rememberForFork();
     // Build the tool list in the SAME ORDER a real turn does (applyPreset unions
@@ -2891,6 +2921,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     // seeds below used to read the path back off the prompt line.
     if (runtime.workspaceRoot !== null && runtime.announcedWorkspace === null) {
       runtime.announcedWorkspace = runtime.workspaceRoot;
+      runtime.promptWorkspace = runtime.workspaceRoot;
     }
     const augmented = augmentSystemPrompt(base, {
       toolInterface: toolCliMode ? 'bash-cli' : 'schemas',
@@ -3335,6 +3366,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     pendingCanonicalPrompt = null;
     // …and what the model has been told about its folder starts over with it.
     runtime.announcedWorkspace = null;
+    runtime.promptWorkspace = null;
     /*
      * …EXCEPT ON A FORK, which is not a new session but the same one continued
      * on a branch: it keeps the prompt it froze, the folder its tools work in
@@ -3345,7 +3377,20 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     if (isFork) {
       runtime.canonicalSystemPrompt = forkCarry.prompt;
       runtime.workspaceRoot = forkCarry.workspaceRoot;
-      runtime.announcedWorkspace = forkCarry.announcedWorkspace;
+      runtime.promptWorkspace = forkCarry.promptWorkspace;
+      /*
+       * …but what the model was TOLD is what this branch still holds. A ⌘Z or
+       * an edit forks from before the message it takes back; when that was the
+       * turn that carried the workspace note, the note went with it, and the
+       * branch's model knows only the folder its prompt names. MEASURED (the
+       * thread track's unsend probe, C4b): the note gone from the context and
+       * never sent again. So: the last note on the branch, else the prompt's own.
+       */
+      runtime.announcedWorkspace = announcedOnBranch(
+        getEntries(ctx),
+        forkCarry.promptWorkspace,
+        forkCarry.announcedWorkspace,
+      );
     } else {
       rememberForFork();
     }
@@ -3494,6 +3539,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     if (runtime.announcedWorkspace === null) {
       runtime.announcedWorkspace =
         /^Current working directory: (.*)$/m.exec(augmentedSystemPrompt)?.[1] ?? null;
+      runtime.promptWorkspace = runtime.announcedWorkspace;
     }
     /*
      * THE FOLDER MOVED SINCE THE MODEL WAS LAST TOLD — say so, in the turn.
@@ -3550,6 +3596,8 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
               customType: HARNESS_WORKSPACE_NOTE,
               content: workspaceNote,
               display: false,
+              // Which folder it announced — read back off a branch (session_start, fork).
+              details: { root: runtime.announcedWorkspace },
             },
           }
         : {}),

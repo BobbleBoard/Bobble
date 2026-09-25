@@ -159,6 +159,8 @@ export interface StoredEntryLike {
   readonly type: string;
   readonly customType?: string;
   readonly data?: unknown;
+  /** A `custom_message` entry's details (what the harness said it about). */
+  readonly details?: unknown;
 }
 
 /**
