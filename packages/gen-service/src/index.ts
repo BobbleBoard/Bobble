@@ -56,6 +56,12 @@ export {
   imageTo3dTemplateFor,
   WORKFLOW_TEMPLATES,
 } from './comfy-workflow.js';
+/*
+ * Planned modules two lanes write to, pre-added by the W0-A pre-wire with
+ * placeholder files (deliverables/research/PLAN.md R5): the stitcher (ED-05) and
+ * Ming's design jobs (MING lane). Each lane fills its file; this line stays.
+ */
+export * from './design-job.js';
 export type { GenRunnerLike, MakeGenRunnerDeps } from './gen-runner.js';
 export { makeGenRunner } from './gen-runner.js';
 export type {
@@ -105,6 +111,7 @@ export type {
   VideoJobSpec,
 } from './protocol.js';
 export { isGenEvent, NdjsonParser, parseGenEventLine } from './protocol.js';
+export * from './stitch.js';
 export type { WorkerUvArgsOptions } from './worker-command.js';
 export {
   backendUvFlags,

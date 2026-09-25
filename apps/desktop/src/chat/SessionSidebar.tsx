@@ -38,8 +38,10 @@ import {
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { SessionSummary } from '../../electron/ipc-contract';
 import type { ChatProject } from '../../electron/settings/settings-contract';
+import { useRouteViewsVersion } from '../route-views';
 import { IconMoon, IconSun } from '../settings/icons';
 import type { SettingsSection } from '../settings/SettingsView';
+import { navigate } from '../state/app-nav-store';
 import { deleteChatNow } from '../state/chat-delete';
 import {
   assignChat,
@@ -66,6 +68,15 @@ import { useThemeStore } from '../store/theme';
 import { formatModuleSize } from '../tripo/module-state';
 import { BobbleMark } from './BobbleMark';
 import { PROFILE_MENU_ACTIONS } from './profile-menu';
+import {
+  type DeleteChatOption,
+  runDeleteOptions,
+  type ThreadMenuContext,
+  threadMenuEntriesFor,
+  useDeleteChatOptions,
+  useThreadMenuEntries,
+} from './thread-menu-entries';
+import { type WorkspaceNavContext, workspaceNavRows } from './workspace-nav';
 
 /**
  * How long typing has to settle before main searches session BODIES.
@@ -300,14 +311,6 @@ function relativeTime(iso: string): string {
   return `${Math.floor(secs / 86400)}d`;
 }
 
-interface WorkspaceNavItem {
-  id: string;
-  label: string;
-  icon: ReactNode;
-  onClick: () => void;
-  testid: string;
-}
-
 /**
  * The colour that goes with a child row's state word. Derived from the WORD so
  * this and the situation room cannot drift apart — one vocabulary, two surfaces.
@@ -471,6 +474,9 @@ export function SessionSidebar({
   /* Which rooms this person wants at all — the Capabilities setting, which the
      onboarding step also writes. See the rows below for why it is read here. */
   const caps = useSettingsStore((s) => s.settings.capabilities);
+  // A planned workspace row (Training, Workflows) appears when its screen is
+  // registered — follow the route registry (./workspace-nav.ts).
+  useRouteViewsVersion();
   /*
    * TURNING A ROOM OFF WHILE STANDING IN IT PUTS YOU BACK IN THE CHAT.
    *
@@ -523,6 +529,14 @@ export function SessionSidebar({
   // The chat pending a delete confirmation (null = dialog closed).
   const [deleteTarget, setDeleteTarget] = useState<SessionSummary | null>(null);
   const [dontAskDelete, setDontAskDelete] = useState(false);
+  /*
+   * What features add to a chat's ⋯ menu and to "Delete chat?" — memory's
+   * "Forget what Bobble learned here", workflows' "Save as workflow…"
+   * (./thread-menu-entries.ts). None until one registers.
+   */
+  const extraMenuEntries = useThreadMenuEntries();
+  const deleteOptionDefs = useDeleteChatOptions();
+  const [deleteChoices, setDeleteChoices] = useState<Record<string, boolean>>({});
 
   /*
    * The query main is currently searching bodies for.
@@ -901,14 +915,36 @@ export function SessionSidebar({
     }
   };
 
+  /** The chat a registered menu row or delete option is told about. */
+  const menuContext = (s: SessionSummary): ThreadMenuContext => ({
+    file: s.file,
+    title: displayTitle(s, org),
+    pinned: org.pinned.includes(s.file),
+    projectId: org.assignments[s.file],
+  });
+  const deleteOptionsFor = (s: SessionSummary): readonly DeleteChatOption[] => {
+    if (deleteOptionDefs.length === 0) return [];
+    const ctx = menuContext(s);
+    return deleteOptionDefs.filter((o) => o.visible?.(ctx) ?? true);
+  };
+
   // Delete: skip the dialog when the user chose "don't ask again". Either way the
   // row is gone at once and the chat's work stops; the disk catches up behind.
+  // A feature's delete options run either way — with their defaults when the
+  // dialog was skipped.
   const requestDeleteChat = (s: SessionSummary) => {
     if (hideDeleteConfirm) {
       void deleteChatNow(s).then(refresh);
+      if (deleteOptionDefs.length > 0) void runDeleteOptions(menuContext(s), undefined);
       return;
     }
     setDontAskDelete(false);
+    if (deleteOptionDefs.length > 0) {
+      const ctx = menuContext(s);
+      setDeleteChoices(
+        Object.fromEntries(deleteOptionsFor(s).map((o) => [o.id, o.defaultChecked(ctx)])),
+      );
+    }
     setDeleteTarget(s);
   };
   const confirmDeleteChat = () => {
@@ -917,6 +953,7 @@ export function SessionSidebar({
     setDeleteTarget(null);
     if (dontAskDelete) void useSettingsStore.getState().update({ hideDeleteChatConfirm: true });
     void deleteChatNow(target).then(refresh);
+    if (deleteOptionDefs.length > 0) void runDeleteOptions(menuContext(target), deleteChoices);
   };
   const createProjectAndAssign = async (file?: string) => {
     const id = await createProject('New project');
@@ -963,6 +1000,8 @@ export function SessionSidebar({
     const title = displayTitle(s, org);
     const pinned = org.pinned.includes(s.file);
     const assignedTo = org.assignments[s.file];
+    // What a registered ⋯ menu row is told about this chat (none registered: skip).
+    const menuCtx = extraMenuEntries.length === 0 ? null : menuContext(s);
 
     // Editing → the row becomes an inline rename input.
     if (renamingFile === s.file) {
@@ -1158,6 +1197,19 @@ export function SessionSidebar({
                     </DropdownMenuItem>
                   </DropdownMenuSubContent>
                 </DropdownMenuSub>
+                {menuCtx === null
+                  ? null
+                  : threadMenuEntriesFor(extraMenuEntries, menuCtx).map((entry) => (
+                      <DropdownMenuItem
+                        key={entry.id}
+                        icon={entry.icon}
+                        danger={entry.danger}
+                        data-testid={entry.testid?.(menuCtx)}
+                        onSelect={() => entry.onSelect(menuCtx)}
+                      >
+                        {typeof entry.label === 'function' ? entry.label(menuCtx) : entry.label}
+                      </DropdownMenuItem>
+                    ))}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   danger
@@ -1226,33 +1278,15 @@ export function SessionSidebar({
   // removed; "Model management" routes to the settings model-manager surface
   // (section id `models` is the seam the parallel model-manager rework owns);
   // the redundant Settings entry is gone (it lives in the profile footer).
-  // The glyphs are the set's (packages/ui glyph.tsx — the user's 2026-09-20 picks):
-  // the circuit board, the puzzle piece, the calendar. "Extensions" is what
-  // the connectors are called on screen now (the user); ids and test ids keep the
-  // old name, the way pi's internals keep theirs.
-  const workspaceNav: WorkspaceNavItem[] = [
-    {
-      id: 'models',
-      label: 'Model management',
-      icon: <Glyph name="models" />,
-      onClick: () => onOpenSettings('models'),
-      testid: 'nav-model-management',
-    },
-    {
-      id: 'connectors',
-      label: 'Extensions',
-      icon: <Glyph name="extensions" />,
-      onClick: onOpenConnectors,
-      testid: 'nav-connectors',
-    },
-    {
-      id: 'scheduled',
-      label: 'Scheduled',
-      icon: <Glyph name="scheduled" />,
-      onClick: onOpenScheduled,
-      testid: 'nav-scheduled',
-    },
-  ];
+  // The rows are the workspace-nav registry now (./workspace-nav.ts): the
+  // three that ship, and the planned ones that appear once their screen does.
+  const workspaceNavContext: WorkspaceNavContext = {
+    onOpenSettings,
+    onOpenConnectors,
+    onOpenScheduled,
+    navigate,
+  };
+  const workspaceNav = workspaceNavRows({ capabilities: caps });
 
   /*
    * COLLAPSED: NOTHING — eventually. the user: "when we close the left sidebar now
@@ -1313,9 +1347,9 @@ export function SessionSidebar({
           {workspaceNav.map((item) => (
             <SidebarRow
               key={item.id}
-              icon={item.icon}
+              icon={<Glyph name={item.glyph} />}
               label={item.label}
-              onClick={item.onClick}
+              onClick={() => item.onClick(workspaceNavContext)}
               data-testid={item.testid}
             />
           ))}
@@ -1606,6 +1640,25 @@ export function SessionSidebar({
               />
               Don’t ask again
             </label>
+            {deleteTarget === null
+              ? null
+              : deleteOptionsFor(deleteTarget).map((option) => (
+                  <label
+                    key={option.id}
+                    htmlFor={`delete-chat-option-${option.id}`}
+                    className="flex cursor-pointer items-center gap-2 text-footnote text-text-muted"
+                  >
+                    <Checkbox
+                      id={`delete-chat-option-${option.id}`}
+                      checked={deleteChoices[option.id] === true}
+                      onCheckedChange={(v) =>
+                        setDeleteChoices((c) => ({ ...c, [option.id]: v === true }))
+                      }
+                      data-testid={option.testid}
+                    />
+                    {option.label}
+                  </label>
+                ))}
           </DialogBody>
           <DialogFooter>
             <button

@@ -6,6 +6,7 @@
  */
 import { DEFAULT_CODE_THEME_IDS, isCodeThemeId } from '@pi-desktop/code-themes';
 import type { OnboardingChoices } from '../import/import-contract';
+import { clampFeatureSettings, DEFAULT_FEATURE_SETTINGS, mergeFeatureSettings } from './features';
 import {
   type AdvancedSettings,
   type ChatOrganization,
@@ -135,7 +136,9 @@ export const DEFAULT_SETTINGS: DesktopSettings = {
      box; a person who wants a run pushed picks 'full' for it. */
   powerMode: 'low',
   showComputerUseStatusPill: true,
-  capabilities: { image: true, video: true, audio: true, threeD: true },
+  // Training is the one capability off by default: nothing shows it until its
+  // view ships (TR-5), and then it is something a person turns on.
+  capabilities: { image: true, video: true, audio: true, threeD: true, training: false },
   customInstructions: '',
   iconStroke: ICON_STROKE_DEFAULT,
   iconScale: ICON_SCALE_DEFAULT,
@@ -164,6 +167,8 @@ export const DEFAULT_SETTINGS: DesktopSettings = {
   moduleConnectors: {},
   harnessId: 'pi-bundled',
   harnessConfigPath: '',
+  // memory, training, devices, design, workflows, editor — all off (./features).
+  ...DEFAULT_FEATURE_SETTINGS,
 };
 
 function oneOf<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
@@ -395,6 +400,7 @@ export function clampSettings(raw: unknown): DesktopSettings {
       video: bool(caps.video, d.capabilities.video),
       audio: bool(caps.audio, d.capabilities.audio),
       threeD: bool(caps.threeD, d.capabilities.threeD),
+      training: bool(caps.training, d.capabilities.training),
     },
     customInstructions: str(o.customInstructions, d.customInstructions),
     iconStroke: num(o.iconStroke, d.iconStroke, ICON_STROKE_MIN, ICON_STROKE_MAX),
@@ -428,6 +434,9 @@ export function clampSettings(raw: unknown): DesktopSettings {
     computerUse: clampComputerUse(o.computerUse, d.computerUse),
     memoryGuard: bool(o.memoryGuard, d.memoryGuard),
     moduleConnectors: clampModuleConnectors(o.moduleConnectors),
+    // Each feature group clamps itself (./features); an old file without one
+    // reads as that group's defaults.
+    ...clampFeatureSettings(o),
   };
 }
 
@@ -518,8 +527,40 @@ export function mergeSettingsPatch(
     ),
     modelSpec: { ...current.modelSpec, ...patch.modelSpec },
     moduleConnectors: { ...current.moduleConnectors, ...patch.moduleConnectors },
+    // The feature groups: one level deep, like the objects above.
+    ...mergeFeatureSettings(current, patch),
     ...(patch.modelsRoot === undefined ? {} : { modelsRoot: patch.modelsRoot }),
   });
+}
+
+/**
+ * The value at a dotted path of a settings document (`memory.enabled`,
+ * `capabilities.training`); `''` is the whole document. Undefined when the
+ * path runs off the document.
+ */
+export function settingValueAt(doc: DesktopSettings, path: string): unknown {
+  if (path === '') return doc;
+  let at: unknown = doc;
+  for (const part of path.split('.')) {
+    if (typeof at !== 'object' || at === null) return undefined;
+    at = (at as Record<string, unknown>)[part];
+  }
+  return at;
+}
+
+/**
+ * Did a write change anything at or under `prefix`? Compared by value (a
+ * re-sent identical object is not a change), which is what `subscribeSettings`
+ * listeners are promised.
+ */
+export function settingsChangedAt(
+  prefix: string,
+  before: DesktopSettings,
+  next: DesktopSettings,
+): boolean {
+  return (
+    JSON.stringify(settingValueAt(before, prefix)) !== JSON.stringify(settingValueAt(next, prefix))
+  );
 }
 
 /**

@@ -5,6 +5,7 @@ import { App } from './App';
 import { AppErrorBoundary } from './AppErrorBoundary';
 import { completeSoftReload, onSoftReload, reloadGeneration, softReload } from './app-reload';
 import { CrashSeam } from './crash-seam';
+import { registerFeatures } from './features';
 import { connectChatJobs } from './state/chat-jobs';
 import { connectChildAgents } from './state/child-agent-store';
 import { connectGen } from './state/gen-store';
@@ -49,6 +50,9 @@ if (!new URLSearchParams(window.location.search).has('canvasPopout')) {
   connectGen();
   connectStoreModels();
   connectSettings();
+  // What the push's features add to shared surfaces, before the first paint
+  // (src/features.ts). Nothing yet.
+  registerFeatures();
 }
 
 const rootElement = document.getElementById('root');

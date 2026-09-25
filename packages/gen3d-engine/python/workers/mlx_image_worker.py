@@ -190,6 +190,12 @@ def main() -> None:
     ap.add_argument("--edit-cli", default="")
     ap.add_argument("--edit-model", default="mage-flow-edit-turbo")
     ap.add_argument("--model", default=DEFAULT_MODEL)
+    # With --model/--edit-model naming a checkpoint DIRECTORY (jobs.py always
+    # passes one: the release's own repo ids answer 401 now), mflux needs the
+    # model config by name — steps, guidance and the edit/text-to-image check
+    # all hang off it.
+    ap.add_argument("--base-model", default="")
+    ap.add_argument("--edit-base-model", default="")
     ap.add_argument("--steps", type=int, default=4)
     ap.add_argument("--size", type=int, default=1024)
     ap.add_argument("--seed", type=int, default=42)
@@ -241,6 +247,7 @@ def main() -> None:
                     [
                         args.edit_cli,
                         "--model", args.edit_model,
+                        *(["--base-model", args.edit_base_model] if args.edit_base_model else []),
                         "-q", str(args.quantize),
                         "--steps", str(args.steps),
                         "--seed", str(args.seed),
@@ -256,6 +263,7 @@ def main() -> None:
             cmd = [
                 args.cli,
                 "--model", args.model,
+                *(["--base-model", args.base_model] if args.base_model else []),
                 "-q", str(args.quantize),
                 "--steps", str(args.steps),
                 "--seed", str(args.seed),
@@ -270,11 +278,15 @@ def main() -> None:
             if watcher is not None:
                 watcher.stop()
 
+    # The model's NAME, not the directory it loads from — this line is shown to
+    # the user, and a cache path means nothing to them.
+    edit_name = args.edit_base_model or args.edit_model
+    model_name = args.base_model or args.model
     progress(
         STAGE,
-        f"Editing the image with {args.edit_model} ({args.steps} steps)…"
+        f"Editing the image with {edit_name} ({args.steps} steps)…"
         if editing
-        else f"Generating image with {args.model} ({args.steps} steps)…",
+        else f"Generating image with {model_name} ({args.steps} steps)…",
         1,
         2,
     )

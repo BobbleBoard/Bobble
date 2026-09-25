@@ -23,6 +23,16 @@ import {
 } from './connectors/connectors-contract';
 import { CORP_INVOKE_CHANNELS, type CorpEventMap, type CorpInvokeMap } from './corp/corp-contract';
 import {
+  DEVICES_INVOKE_CHANNELS,
+  type DevicesEventMap,
+  type DevicesInvokeMap,
+} from './devices/devices-contract';
+import {
+  EDITOR_INVOKE_CHANNELS,
+  type EditorEventMap,
+  type EditorInvokeMap,
+} from './editor/editor-contract';
+import {
   GEN_CATALOG_INVOKE_CHANNELS,
   GEN_INVOKE_CHANNELS,
   type GenCatalogInvokeMap,
@@ -36,12 +46,18 @@ import {
   type Gen3dEventMap,
   type Gen3dInvokeMap,
 } from './gen3d/gen3d-contract';
+import { HELP_INVOKE_CHANNELS, type HelpEventMap, type HelpInvokeMap } from './help/help-contract';
 import { IMPORT_INVOKE_CHANNELS, type ImportInvokeMap } from './import/import-contract';
 import {
   MAC_MONITOR_INVOKE_CHANNELS,
   type MacMonitorEventMap,
   type MacMonitorInvokeMap,
 } from './mac/mac-monitor-contract';
+import {
+  MEMORY_INVOKE_CHANNELS,
+  type MemoryEventMap,
+  type MemoryInvokeMap,
+} from './memory/memory-contract';
 import {
   STORE_INVOKE_CHANNELS,
   type StoreEventMap,
@@ -72,6 +88,16 @@ import {
   type StudioInvokeMap,
 } from './studio/studio-contract';
 import { PTY_INVOKE_CHANNELS, type PtyEventMap, type PtyInvokeMap } from './terminal/pty-contract';
+import {
+  TRAINING_INVOKE_CHANNELS,
+  type TrainingEventMap,
+  type TrainingInvokeMap,
+} from './training/training-contract';
+import {
+  WORKFLOWS_INVOKE_CHANNELS,
+  type WorkflowsEventMap,
+  type WorkflowsInvokeMap,
+} from './workflows/workflows-contract';
 
 export interface AppInfo {
   appVersion: string;
@@ -1185,7 +1211,15 @@ export type AppInvokeMap = CoreInvokeMap &
   CorpInvokeMap &
   MacInvokeMap &
   MacMonitorInvokeMap &
-  PiInvokeMap;
+  PiInvokeMap &
+  /* The six feature contracts the W0-A pre-wire composed in ahead of their
+     lanes (PLAN.md §2.3): each lane grows its own file, never this one. */
+  MemoryInvokeMap &
+  HelpInvokeMap &
+  TrainingInvokeMap &
+  DevicesInvokeMap &
+  EditorInvokeMap &
+  WorkflowsInvokeMap;
 
 /** Runtime allowlist for the preload's invoke passthrough: only channels in
  * the contract ever reach ipcMain (see preload.ts). `satisfies` checks
@@ -1227,6 +1261,12 @@ export const APP_INVOKE_CHANNELS = [
   ...ORGAVATAR_INVOKE_CHANNELS,
   ...DATASET_INVOKE_CHANNELS,
   ...SCHEDULED_INVOKE_CHANNELS,
+  ...MEMORY_INVOKE_CHANNELS,
+  ...HELP_INVOKE_CHANNELS,
+  ...TRAINING_INVOKE_CHANNELS,
+  ...DEVICES_INVOKE_CHANNELS,
+  ...EDITOR_INVOKE_CHANNELS,
+  ...WORKFLOWS_INVOKE_CHANNELS,
 ] as const satisfies readonly (keyof AppInvokeMap)[];
 
 type MissingChannels = Exclude<keyof AppInvokeMap, (typeof APP_INVOKE_CHANNELS)[number]>;
@@ -1329,7 +1369,13 @@ export type AppEventMap = {
   StorageEventMap &
   StudioEventMap &
   ScheduledEventMap &
-  PiEventMap;
+  PiEventMap &
+  MemoryEventMap &
+  HelpEventMap &
+  TrainingEventMap &
+  DevicesEventMap &
+  EditorEventMap &
+  WorkflowsEventMap;
 
 /** Shape of `window.piDesktop` as exposed by the preload script. */
 export interface PiDesktopBridge {

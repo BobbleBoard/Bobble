@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import path from 'node:path';
@@ -34,6 +35,8 @@ import {
 } from './canvas/canvas-main';
 import { registerConnectorsIpc } from './connectors/connectors-main';
 import { registerCorpIpc } from './corp/corp-main';
+import { registerDevicesIpc } from './devices/devices-main';
+import { registerEditorIpc } from './editor/editor-main';
 import { fsHandlers } from './fs-handlers';
 import {
   disposeGen,
@@ -46,6 +49,7 @@ import { createGenModules } from './gen/gen-modules-main';
 import { startGuardian } from './gen/guardian-main';
 import { genWorkerCandidates, resolveGenWorkerScript } from './gen/worker-path';
 import { registerGen3dIpc, setComfy3dRunner, setGen3dAdmission } from './gen3d/gen3d-main';
+import { registerHelpIpc } from './help/help-main';
 import { registerImportIpc } from './import/import-main';
 import {
   getInferenceUtility,
@@ -60,7 +64,9 @@ import {
 } from './inference/llm-main';
 import { setVisionAllowed } from './inference/vision-want';
 import type { AppEventMap, CoreInvokeMap, FsInvokeMap } from './ipc-contract';
+import { reapRegisteredAtQuit, reapRegisteredOrphans } from './lifecycle';
 import { disposeMacAgent, registerMacAgentIpc } from './mac/mac-agent';
+import { registerMemoryIpc } from './memory/memory-main';
 import { registerStoreIpc } from './model-store/store-main';
 import { notifyDecision } from './notify-gate';
 import { registerOfficeIpc } from './office/office-ipc';
@@ -87,6 +93,7 @@ import {
   registerStudioIpc,
 } from './studio/studio-main';
 import { disposeAllPtys, registerPtyIpc } from './terminal/pty-manager';
+import { registerTrainingIpc } from './training/training-main';
 import {
   isTrustedIpcEvent,
   isTrustedWebContents,
@@ -95,6 +102,7 @@ import {
 } from './trusted-senders';
 import { TRAFFIC_LIGHTS } from './window-chrome';
 import { resolveRendererTarget, resolveSecondInstanceWindow } from './window-policy';
+import { registerWorkflowsIpc } from './workflows/workflows-main';
 
 // dist-electron is bundled to CJS (sandboxed preloads must be CommonJS), so
 // __dirname is available at runtime.
@@ -597,7 +605,10 @@ function installAppMenu(): void {
  *   - the inference utilityProcess + its llama-server grandchild (shutdownInference),
  *   - the long-lived pi-mac computer-use helper (disposeMacAgent), and
  *   - any terminal PTY/shell sessions (disposeAllPtys), and
- *   - the ComfyUI server, when the studio started one (disposeStudio).
+ *   - the ComfyUI server, when the studio started one (disposeStudio), and
+ *   - every long-lived process a feature registered with lifecycle.ts
+ *     (`registerQuitReaper`) — the memory service, the help pi, a training
+ *     worker — so a new one never has to edit this list (PLAN.md R10).
  * The pi children (and, via their process group, their subagent grandchildren)
  * are reaped by the quit-hold's own `disposeAll`. `allSettled` so one slow/failed
  * teardown never blocks the others; the quit-hold's grace cap bounds the whole
@@ -605,6 +616,7 @@ function installAppMenu(): void {
  */
 async function reapChildProcesses(): Promise<void> {
   await Promise.allSettled([
+    reapRegisteredAtQuit((message, meta) => log.warn(message, meta)),
     shutdownInference(),
     (async () => disposeMacAgent())(),
     (async () => disposeAllPtys())(),
@@ -1009,6 +1021,20 @@ function registerAppIpc(): void {
   // window. Channels are always registered but only reached when the
   // experimental flag / `PI_DESKTOP_CORP=1` gate is on (sender-gated internally).
   registerCorpIpc();
+
+  /*
+   * THE PUSH'S SIX FEATURES, wired before any of them exists (W0-A pre-wire,
+   * deliverables/research/PLAN.md §2.3). Each contract is already composed
+   * into ipc-contract.ts and each registration is a no-op until its lane gives
+   * the contract channels — so memory, help, training, devices, the editor
+   * and workflows land without another edit to this file.
+   */
+  registerMemoryIpc(ipcMain, allowSender);
+  registerHelpIpc(ipcMain, allowSender);
+  registerTrainingIpc(ipcMain, allowSender);
+  registerDevicesIpc(ipcMain, allowSender);
+  registerEditorIpc(ipcMain, allowSender);
+  registerWorkflowsIpc(ipcMain, allowSender);
 }
 
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
@@ -1118,6 +1144,18 @@ if (!hasSingleInstanceLock) {
       return kind === 'audio' || kind === undefined;
     });
     registerAppIpc();
+    /*
+     * Ghosts of a previous run's long-lived processes (a memory service, a
+     * training worker…) that a crash or force-quit left reparented to init.
+     * Only for signatures a feature registered with lifecycle.ts; with none
+     * registered this reads nothing and kills nothing. The model servers keep
+     * their own sweep in llm-main (reapOrphanedServers).
+     */
+    reapRegisteredOrphans({
+      ps: () => execFileSync('ps', ['-axo', 'pid=,ppid=,command='], { encoding: 'utf8' }),
+      kill: (pid) => process.kill(pid),
+      log: (message, meta) => log.info(message, meta),
+    });
     registerPiIpc({
       extraTeardown: reapChildProcesses,
       // The window subagents run under: spawn_subagent routes to the app bridge,

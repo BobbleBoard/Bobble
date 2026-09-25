@@ -44,6 +44,9 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from './dropdown-menu.tsx';
 import {
@@ -136,6 +139,66 @@ const GEN_ACTION_ICON: Record<GenActionKey, ReactElement> = {
   perception: <IconSearch size={16} />,
 };
 
+/**
+ * A row the APP adds to the menu — a mode or a feature the composer does not
+ * know about (Bobble help, Research, Workflows ›, Temporary chat: the W0-A
+ * pre-wire's composer entries). They render as the menu's last group, in the
+ * order given, and only when there are any — so a menu with none is exactly
+ * the menu without the prop.
+ */
+export interface AddMenuEntry {
+  /** Stable React key. */
+  readonly key: string;
+  readonly label: string;
+  readonly icon?: ReactNode;
+  readonly testid?: string;
+  readonly hint?: string;
+  /** A mode that is on or off: the row is a checkbox (the Web search idiom). */
+  readonly checked?: boolean;
+  /** A row that opens a submenu (`Workflows ›`). */
+  readonly children?: readonly AddMenuEntry[];
+  /** The row was picked (a checkbox row flips its mode here). */
+  readonly onSelect?: () => void;
+}
+
+function renderEntry(entry: AddMenuEntry): ReactNode {
+  if (entry.children !== undefined) {
+    return (
+      <DropdownMenuSub key={entry.key}>
+        <DropdownMenuSubTrigger icon={entry.icon} data-testid={entry.testid}>
+          {entry.label}
+        </DropdownMenuSubTrigger>
+        <DropdownMenuSubContent>{entry.children.map(renderEntry)}</DropdownMenuSubContent>
+      </DropdownMenuSub>
+    );
+  }
+  if (entry.checked !== undefined) {
+    return (
+      <DropdownMenuCheckboxItem
+        key={entry.key}
+        checked={entry.checked}
+        hint={entry.hint}
+        data-testid={entry.testid}
+        onCheckedChange={() => entry.onSelect?.()}
+      >
+        {entry.icon !== undefined ? <span className="pd-menu-icon">{entry.icon}</span> : null}
+        {entry.label}
+      </DropdownMenuCheckboxItem>
+    );
+  }
+  return (
+    <DropdownMenuItem
+      key={entry.key}
+      icon={entry.icon}
+      hint={entry.hint}
+      data-testid={entry.testid}
+      onSelect={() => entry.onSelect?.()}
+    >
+      {entry.label}
+    </DropdownMenuItem>
+  );
+}
+
 export interface ComposerAddMenuProps {
   /** Trigger element; defaults to a "+" IconButton. */
   trigger?: ReactNode;
@@ -157,6 +220,8 @@ export interface ComposerAddMenuProps {
   onGenerateVideo?: () => void;
   onGenerateMotion?: () => void;
   onPerception?: () => void;
+  /** Rows the app adds, drawn as the last group (`variant="full"` only). */
+  entries?: readonly AddMenuEntry[];
   /** Force-open for galleries/screenshots. */
   open?: boolean;
   defaultOpen?: boolean;
@@ -181,6 +246,7 @@ export function ComposerAddMenu({
   onGenerateVideo,
   onGenerateMotion,
   onPerception,
+  entries,
   open,
   defaultOpen,
 }: ComposerAddMenuProps) {
@@ -331,6 +397,7 @@ export function ComposerAddMenu({
                   </DropdownMenuCheckboxItem>
                 ) : null,
               ],
+          variant !== 'full' || entries === undefined ? [] : entries.map(renderEntry),
         ])}
       </DropdownMenuContent>
     </DropdownMenu>

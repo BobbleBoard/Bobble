@@ -3,8 +3,9 @@
  *
  * Boot: put the library root on the environment (every engine child inherits
  * it), move whatever is still in `~/.cache` onto the shelves (library-migration
- * — renames, engine views kept), and keep Spotlight out of the library the
- * way it is kept out of the cache.
+ * — renames, engine views kept), put back the hub links a reset 3D cache lost
+ * (hub-relink), and keep Spotlight out of the library the way it is kept out
+ * of the cache.
  *
  * Page: a tree with sizes for the library and the support root, Reveal in
  * Finder, Trash (never rm), and a move of the whole library to another folder
@@ -26,7 +27,7 @@ import {
 import { cp, readdir, readFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { GEN3D_MODEL_SPECS } from '@pi-desktop/gen3d-engine';
+import { repoAttribution } from '@pi-desktop/gen3d-engine';
 import { cacheRoot, getCatalogModel, legacyCacheRoot, libraryRoot } from '@pi-desktop/inference';
 import {
   defaultLibraryRoot,
@@ -38,6 +39,7 @@ import { createLogger, registerIpcHandlers } from '@pi-desktop/shared';
 import { dialog, type IpcMain, shell } from 'electron';
 import { getLoadedModel } from '../inference/llm-main';
 import { readSettings, writeSettingsPatch } from '../settings/settings-main';
+import { relinkAtBoot } from './hub-relink';
 import {
   applyLibraryMigration,
   type MigrationResult,
@@ -51,6 +53,7 @@ import type {
   StorageNode,
   StorageOverview,
 } from './storage-contract';
+import { featureStorageRoots, featureStorageRows, supportNoteFor } from './storage-rows';
 
 const log = createLogger('desktop:storage');
 
@@ -167,6 +170,8 @@ export function runLibraryMigration(opts: { readonly skipRepos?: readonly string
           }),
         };
   const plan = planLibraryMigration(snap);
+  // The inverse: a 3D cache that lost its links gets them back (hub-relink.ts).
+  relinkAtBoot(cache, lib, skip, log);
   if (plan.moves.length === 0) return;
   const result = applyLibraryMigration(plan);
   lastMigration = { ...result, ranAt: new Date().toISOString(), unsorted: plan.unsorted };
@@ -396,14 +401,20 @@ async function modelNode(
   const catalog = repo === null ? getCatalogModel(base) : undefined;
   const name = repo ?? catalog?.displayName ?? base;
   const shelf = shelfOf(p);
-  // What a catalog says about it: the 3D engine's spec for a hub repo, the
-  // store's manifest for a repo it downloaded.
-  const spec =
-    repo === null ? undefined : GEN3D_MODEL_SPECS.find((m) => m.repos.some((r) => r.repo === repo));
+  // What a catalog says about it: the 3D engine's spec for a hub repo (or, for
+  // one several engine models share, that it is shared), the store's manifest
+  // for a repo it downloaded.
+  const spec = repo === null ? undefined : repoAttribution(repo);
   const manifest = await readManifestLite(p);
   const meta = {
     ...(repo !== null ? { org: repo.split('/')[0] ?? '', repo } : {}),
-    ...(spec !== undefined ? { blurb: spec.note, tasks: [spec.role], label: spec.label } : {}),
+    ...(spec !== undefined
+      ? {
+          blurb: spec.blurb,
+          tasks: [...spec.roles],
+          ...(spec.label !== undefined ? { label: spec.label } : {}),
+        }
+      : {}),
     ...(manifest !== null
       ? {
           ...(manifest.notes !== undefined ? { blurb: manifest.notes } : {}),
@@ -593,12 +604,14 @@ async function supportTree(): Promise<StorageNode[]> {
   for (const n of names) {
     const p = path.join(root, n);
     const { bytes, files, mtime } = await sizeOf(p);
+    // A feature's own folder carries the note it registered (storage-rows.ts).
+    const note = SUPPORT_NOTES[n] ?? supportNoteFor(n);
     out.push({
       name: n,
       path: p,
       bytes,
       kind: 'tool',
-      ...(SUPPORT_NOTES[n] === undefined ? {} : { note: SUPPORT_NOTES[n] }),
+      ...(note === undefined ? {} : { note }),
       fileCount: files,
       mtime,
     });
@@ -612,7 +625,13 @@ let cached: { at: number; overview: StorageOverview } | null = null;
 async function overview(fresh: boolean): Promise<StorageOverview> {
   if (!fresh && cached !== null && Date.now() - cached.at < 30_000) return cached.overview;
   const t0 = Date.now();
-  const [library, support] = await Promise.all([libraryTree(), supportTree()]);
+  const [library, support, features] = await Promise.all([
+    libraryTree(),
+    supportTree(),
+    featureStorageRows((id, error) =>
+      log.warn('storage rows failed', { provider: id, error: String(error) }),
+    ),
+  ]);
   const { free, total } = await diskSpace();
   const disk = { free, total };
   const out: StorageOverview = {
@@ -622,6 +641,7 @@ async function overview(fresh: boolean): Promise<StorageOverview> {
     disk,
     library,
     support,
+    features,
     migration:
       lastMigration === null
         ? null
@@ -639,9 +659,10 @@ async function overview(fresh: boolean): Promise<StorageOverview> {
   return out;
 }
 
-/** Only the library and the support root are ours to touch. */
+/** Only the library, the support root and the folders a feature registered
+ * (storage-rows.ts) are ours to touch. */
 function underOurRoots(p: string): boolean {
-  const roots = [libraryRoot(), cacheRoot()].map((r) => {
+  const roots = [libraryRoot(), cacheRoot(), ...featureStorageRoots()].map((r) => {
     try {
       return realpathSync(r);
     } catch {

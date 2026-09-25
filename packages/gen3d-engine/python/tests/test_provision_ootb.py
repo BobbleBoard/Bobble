@@ -245,19 +245,105 @@ def test_cubepart_gets_mlx_for_the_denoiser_swap() -> None:
         assert "mlx" in install, install
 
 
+def _mflux_registry(tmp: str) -> reg.Registry:
+    r = reg.Registry.__new__(reg.Registry)
+    r.uv_path = "uv"
+    r.src_dir = Path(tmp)
+    r.prebuilt_dir = ENGINE.parent / "prebuilt"
+    r.tool_dir = lambda name: Path(tmp) / name
+    r.venv_python = lambda name: Path(tmp) / name / ".venv" / "bin" / "python"
+    bin_dir = Path(tmp) / "mflux" / ".venv" / "bin"
+    r.mflux_cli = lambda: bin_dir / "mflux-generate-mage-flow"
+    r.mflux_edit_cli = lambda: bin_dir / "mflux-generate-mage-flow-edit"
+    return r
+
+
+def _fake_install(r: reg.Registry, runs: list[list[str]], *, gives_commands: bool):
+    """A stand-in for `_run` that records argv and, like the real wheel, drops
+    the two console scripts into the venv (or, like PyPI 0.18.0, does not)."""
+
+    def run(cmd, *a, **k):
+        runs.append(cmd)
+        if gives_commands and "install" in cmd:
+            for cli in (r.mflux_cli(), r.mflux_edit_cli()):
+                cli.parent.mkdir(parents=True, exist_ok=True)
+                cli.write_text("#!/bin/sh\n")
+
+    return run
+
+
 def test_mflux_is_provisioned_before_the_pytorch_image_tree() -> None:
     with tempfile.TemporaryDirectory() as tmp:
-        r = reg.Registry.__new__(reg.Registry)
-        r.uv_path = "uv"
-        r.src_dir = Path(tmp)
-        r.tool_dir = lambda name: Path(tmp) / name
-        r.venv_python = lambda name: Path(tmp) / name / ".venv" / "bin" / "python"
-        r.mflux_cli = lambda: Path(tmp) / "mflux" / ".venv" / "bin" / "mflux-generate-mage-flow"
+        r = _mflux_registry(tmp)
         runs: list[list[str]] = []
         with (
-            patch.object(envs, "_run", side_effect=lambda cmd, *a, **k: runs.append(cmd)),
+            patch.object(envs, "_run", side_effect=_fake_install(r, runs, gives_commands=True)),
             patch.object(r, "ensure_tool_clone", side_effect=lambda name, log: (Path(tmp) / name)),
+            patch.object(envs, "_prebuilt_manifest", return_value=None),
         ):
             (Path(tmp) / "Mage" / "mage_flow").mkdir(parents=True)
             envs._provision_mageflow(r, lambda m: None)
-        assert any(f"mflux=={envs.MFLUX_PIN}" in c for c in runs), runs
+        first_install = next(i for i, c in enumerate(runs) if "install" in c)
+        assert envs.MFLUX_MAGE_FLOW_SOURCE in runs[first_install], runs
+        mage_venv = next(i for i, c in enumerate(runs) if "3.11" in c)
+        assert first_install < mage_venv, runs
+
+
+def test_mflux_comes_from_the_shipped_mage_flow_wheel_never_the_pypi_pin() -> None:
+    """PyPI's mflux 0.18.0 (the old pin) has no `mflux-generate-mage-flow`, so
+    installing it gave a fresh Mac no fast path and no edits. The shipped wheel
+    is what goes in, and nothing pins a PyPI version."""
+    manifest = json.loads((ENGINE.parent / "prebuilt" / "darwin-arm64" / "manifest.json").read_text())
+    with tempfile.TemporaryDirectory() as tmp:
+        r = _mflux_registry(tmp)
+        runs: list[list[str]] = []
+        with (
+            patch.object(envs, "_run", side_effect=_fake_install(r, runs, gives_commands=True)),
+            # The real manifest, on any platform this suite runs on.
+            patch.object(envs, "_prebuilt_manifest", return_value=manifest),
+        ):
+            envs._provision_mflux(r, lambda m: None)
+        install = next(c for c in runs if "install" in c)
+        wheel = [a for a in install if a.endswith(".whl")]
+        assert len(wheel) == 1 and "+bobble.mageflow" in wheel[0], install
+        assert Path(wheel[0]).exists(), wheel
+        assert "--reinstall-package" in install, install
+        assert not any(a.startswith("mflux==") for c in runs for a in c), runs
+
+
+def test_a_venv_whose_mflux_lacks_mage_flow_is_repaired_or_refused() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        r = _mflux_registry(tmp)
+        # The broken state the old pin left: a venv, mflux, no Mage-Flow commands.
+        r.venv_python("mflux").parent.mkdir(parents=True)
+        r.venv_python("mflux").write_text("")
+        runs: list[list[str]] = []
+        with patch.object(envs, "_run", side_effect=_fake_install(r, runs, gives_commands=False)):
+            try:
+                envs._provision_mflux(r, lambda m: None)
+            except RuntimeError as err:
+                assert "Mage-Flow" in str(err)
+            else:
+                raise AssertionError("an install without the commands must not pass")
+        assert any("install" in c for c in runs), "the broken venv was left alone"
+        # And once both commands exist, nothing is reinstalled.
+        for cli in (r.mflux_cli(), r.mflux_edit_cli()):
+            cli.write_text("#!/bin/sh\n")
+        runs.clear()
+        with patch.object(envs, "_run", side_effect=_fake_install(r, runs, gives_commands=True)):
+            envs._provision_mflux(r, lambda m: None)
+        assert runs == [], runs
+
+
+def test_the_shipped_mflux_wheel_carries_both_mage_flow_commands() -> None:
+    import zipfile
+
+    root = ENGINE.parent / "prebuilt" / "darwin-arm64"
+    manifest = json.loads((root / "manifest.json").read_text())
+    wheel = root / manifest["mflux"]
+    assert wheel.exists(), wheel
+    with zipfile.ZipFile(wheel) as z:
+        eps = next(n for n in z.namelist() if n.endswith(".dist-info/entry_points.txt"))
+        text = z.read(eps).decode()
+    assert "mflux-generate-mage-flow = " in text, text
+    assert "mflux-generate-mage-flow-edit = " in text, text

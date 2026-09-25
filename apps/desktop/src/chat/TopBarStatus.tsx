@@ -16,16 +16,40 @@
  * going up are the part that reassures.
  */
 import { Spinner } from '@pi-desktop/ui';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { useLlmStore } from '../state/llm-store';
 import { usePiStore } from '../state/pi-slice';
 import { typicalBootSeconds } from './boot-history';
 import { composerPill } from './composer-pill';
 import { modelReadyStage, PREFIX_WARM_STATUS } from './harness-status';
 import { TopBarModelCard } from './TopBarModelCard';
+import { type TopBarNotice, useTopBarNotices } from './topbar-notices';
 import { useWaitClock } from './use-wait-clock';
 
+/**
+ * The bar's status with every notice a feature registered around it
+ * (./topbar-notices.ts): the urgent ones (priority > 0) ahead of the model
+ * status, the quiet ones behind it, where they show only when it has nothing
+ * to say. With none registered this is the model status alone, as it was.
+ */
 export function TopBarStatus() {
+  const notices = useTopBarNotices();
+  if (notices.length === 0) return <ModelStatus fallback={null} />;
+  const chain = (list: readonly TopBarNotice[], end: ReactNode): ReactNode =>
+    list.reduceRight<ReactNode>((inner, n) => <n.Component key={n.id} fallback={inner} />, end);
+  return chain(
+    notices.filter((n) => n.priority > 0),
+    <ModelStatus
+      fallback={chain(
+        notices.filter((n) => n.priority <= 0),
+        null,
+      )}
+    />,
+  );
+}
+
+/** The model's own state — starting up, getting ready — with its details card. */
+function ModelStatus({ fallback }: { fallback: ReactNode }) {
   const [open, setOpen] = useState(false);
   const prefixWarm = usePiStore((s) => s.extensionStatus[PREFIX_WARM_STATUS]);
   const readyStage = useLlmStore((s) => modelReadyStage(s.status.phase, prefixWarm));
@@ -38,7 +62,7 @@ export function TopBarStatus() {
   /* The same state machine the pill used, asked only for the two waits that are
      about the app rather than about the message. */
   const view = composerPill({ readyStage, imageOnBlindModel: false, elapsedMs, typicalSec });
-  if (view === null || view.kind === 'no-vision') return null;
+  if (view === null || view.kind === 'no-vision') return fallback;
 
   return (
     /*

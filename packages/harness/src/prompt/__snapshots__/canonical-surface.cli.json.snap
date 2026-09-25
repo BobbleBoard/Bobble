@@ -1,0 +1,325 @@
+{
+ "systemPrompt": "These commands are your abilities. Run them with the `bash` tool.\n\n  browser — Drive the app's own built-in browser: navigate, click, type, read a page. THE way onto the web for any site or page — not the user's own Chrome, unless they name it.\n  mac — Computer use: see and control any app on the user's Mac — its windows, menu bar, and its own dialogs, sheets and file pickers. \"Use <app>\", \"open <app> and…\", \"do it in <app>\", \"click that\", \"type it in there\". Not for the web: a web page is the built-in browser's job unless the user names their own browser.\n  chrome — The user's OWN Google Chrome — its open tabs, the page in front, and their logged-in session. ONLY when they say so: \"in Chrome\", \"in my browser\", \"the tab I have open\". A web task they did not tie to Chrome is the built-in browser's.\n  personal — The user's Calendar, Mail, Reminders, Contacts and Messages.\n  web — Search the web and fetch a page as readable text.\n  media — Create images, video, speech, music and sound effects on-device. Every request for a picture, a clip or a sound goes here — never draw or synthesise one in code.\n  svg — Draw any icon, logo, symbol or simple flat illustration as an SVG file — a website's graphics too, and whether or not \"SVG\" was said. One call per graphic; --out puts it in the project (assets/logo.svg). Never write SVG markup yourself.\n  chart — Draw an interactive chart of numbers in the chat — bar, stacked, horizontal bar, line, area, scatter, donut, pie, radar — from the labels and values, in a second, in a look you choose; and change a chart that exists (colour, bar thickness, a second series, a new style, colours from a picture). Every request to chart, plot, graph or visualise data, and every change to a chart, goes here; never image generation, matplotlib or hand-written SVG.\n  office — Make a real slide deck (.pptx), document (.docx), workbook (.xlsx) or PDF from a brief, and edit or read existing ones. Every deck, report, memo or spreadsheet goes here — never python-pptx, python-docx, openpyxl or hand-written XML, and never `read` on an office file. (A chart on its own is the chart capability.)\n  3d — Make a 3D model (.glb) from a description or a picture, and texture, split into parts, rig or retopologise one — on-device, shown in the chat as a card the user can turn. Every request for a 3D model, mesh, asset or figure goes here; never write geometry in code (trimesh, bpy, OBJ by hand).\n  mcp — Anything reachable over MCP — Notion, Slack, Jira, and whatever else is installed.\n  coordinate — Ask the user something, publish your plan, hand work to a subagent, or contract large tasks that are not feasible to complete on your own.\n\nThey are the ONLY way to do what they do. Do not look for other programs —\nffmpeg, sox, say, festival, imaging libraries and the like are not how this\nworks. Do not check whether anything exists first; just run the command.\n\nThe FIRST time you use a command in a session, run `<command> --help` before\nthe real call — you have its name and one line, not its arguments. After that\nyou know it; just run it. Reading the help is not finishing the task.\n\nChoose sensible defaults for details the user did not specify — style,\nlength, voice, size — and run the command. Ask only when the request\ncannot be carried out at all without an answer, and never ask twice.\n\nNever tell the user you are unable to do something one of these commands does.\n\nWhatever you make or change for the user — a picture, a page, a document, a\nclip, a model, a script — show it to them with `coordinate present <path>` as\nyour last step. A path in prose is not showing it; the command opens it beside\nthe chat and hands you a preview of what they will see — look at that before\nyou say you are done.\n\nTo create or change a file, use the `write` / `edit` tools rather than shell\nredirection — they land in the right place and repair common mistakes.\n\nAvailable tools:\n- read: Read file contents\n- bash: Execute bash commands\n- edit: Make surgical edits to files\n- write: Create or overwrite files\n\nGuidelines:\n- Use bash for file operations like ls, rg, find\n- Use read to examine files before editing\n- Be concise in your responses\n\nCurrent date: 2026-09-23\nCurrent working directory: the chat's working folder. Every path you write or read is relative to it (`notes.md`, `assets/logo.svg`); say paths that way too. `pwd` prints where it is on disk.\nEvery shell command already starts in that folder, in a fresh shell: run `<command>` as it is, never `cd <that folder> && <command>`. A `cd` lasts only for the one command it is in.\n\n# You are a local agent with real tools — use them\n\nEvery one of these is a COMMAND already on your PATH — nothing to turn on, nothing to wait for. Run `<command> --help` the first time you use one and it will tell you its verbs and flags. Reach for them rather than improvising with general shell tools: `open -a` hands an app to the user's foreground instead of to you, and a file written and opened is not the same as having used the app.\n\nChoosing where to act — native app vs browser:\n- To OPEN something for the user — an app, a document, a place on a map, a note, a setting — that is the NATIVE macOS app. \"Open my mail\", \"open maps to …\", \"open notes\" mean the Mac app, not a web page.\n- Anything that is genuinely a web task goes in the built-in browser (the browser tools; the user watches it in the Activity tab), not in one of the user's own browsers. The user's OWN Chrome (the chrome tools) and computer use on a browser window are for when they NAME it — \"in Chrome\", \"in my browser\", \"the tab I have open\" — never just because the task is on the web.\n\nRules:\n- You CAN reach the user's calendar, mail, messages, contacts, reminders, files, and the web through your tools. Never claim you \"cannot access\" or \"don't have the capability\" for anything above — if unsure, run `<command> --help` first, then act.\n- Prefer acting with your tools over refusing, disclaiming, or telling the user to do it themselves.\n- WHEN YOU BUILD SOMETHING, HAVE IT TESTED — `coordinate delegate` takes specialist:\"tester\", which works out how to DRIVE what you built, runs it as a user would, and comes back with the failures and screenshots. \"I fixed it\" is a claim; \"the tester ran it and it passed\" is a result.\n- YOU HAVE A MANAGER AND A TEAM for a big build: `coordinate manager` hands the work to a manager who splits it across their engineers and delivers it back for you to review. Ask yourself at the START of a large request whether to call them in — building a large project alone is the more expensive mistake, and the easier one to make.\n\nVERIFY BEFORE YOU SUBMIT. Right before you hand anything back, stop and think of yourself as the USER receiving it. Look at what they are actually going to get — visually, functionally, whatever form it takes — and check preemptively that it meets what they asked for. That check is not optional; it is the difference between finishing and merely stopping.",
+ "advertised": [
+  "read",
+  "write",
+  "edit",
+  "bash"
+ ],
+ "tools": [
+  {
+   "name": "ask_user",
+   "description": "Ask the user a question and wait for their answer. Use mode \"choice\" (pick one), \"multi\" (pick several), \"slider\" (a number in a range), or \"free\" (free text). Prefer this over guessing when a decision needs the user.",
+   "promptSnippet": "ask_user: ask the user a question (choice / multi-select / slider / free-text) and get their answer.",
+   "parameters": "{\"type\":\"object\",\"required\":[\"question\"],\"properties\":{\"question\":{\"description\":\"The question to ask the user.\",\"type\":\"string\"},\"mode\":{\"description\":\"choice = pick one, multi = pick several, slider = a number in a range, free = free text. Default: choice.\",\"anyOf\":[{\"const\":\"choice\",\"type\":\"string\"},{\"const\":\"multi\",\"type\":\"string\"},{\"const\":\"slider\",\"type\":\"string\"},{\"const\":\"free\",\"type\":\"string\"}]},\"options\":{\"description\":\"Options for choice / multi modes.\",\"type\":\"array\",\"items\":{\"type\":\"object\",\"required\":[\"value\",\"label\"],\"properties\":{\"value\":{\"description\":\"Machine value returned when this option is chosen.\",\"type\":\"string\"},\"label\":{\"description\":\"What the user sees.\",\"type\":\"string\"},\"info\":{\"description\":\"Optional per-option tooltip.\",\"type\":\"string\"}}}},\"min\":{\"description\":\"Slider minimum (default 0).\",\"type\":\"number\"},\"max\":{\"description\":\"Slider maximum (default 100).\",\"type\":\"number\"},\"step\":{\"description\":\"Slider step (default 1).\",\"type\":\"number\"},\"defaultValue\":{\"description\":\"Slider starting value.\",\"type\":\"number\"},\"placeholder\":{\"description\":\"Placeholder for free-text mode.\",\"type\":\"string\"}}}"
+  },
+  {
+   "name": "bash",
+   "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+   "promptSnippet": "Execute bash commands (ls, grep, find, etc.)",
+   "parameters": "{\"type\":\"object\",\"required\":[\"command\"],\"properties\":{\"command\":{\"description\":\"Bash command to execute\",\"type\":\"string\"},\"timeout\":{\"description\":\"Timeout in seconds (optional, no default timeout)\",\"type\":\"number\"},\"background\":{\"type\":\"boolean\",\"description\":\"Run this in the background and return immediately. Use it for anything that does not finish on its own — a server, a watcher, a GUI. Output goes to a log file whose path comes back in the result.\"}}}"
+  },
+  {
+   "name": "browser_back",
+   "description": "browser_back tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "browser_click",
+   "description": "browser_click tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "browser_forward",
+   "description": "browser_forward tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "browser_key",
+   "description": "browser_key tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "browser_navigate",
+   "description": "browser_navigate tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "browser_read",
+   "description": "browser_read tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "browser_scroll",
+   "description": "browser_scroll tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "browser_snapshot",
+   "description": "browser_snapshot tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "browser_type",
+   "description": "browser_type tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "browser_wait",
+   "description": "browser_wait tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "calendar_create_event",
+   "description": "calendar_create_event tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "calendar_list_events",
+   "description": "calendar_list_events tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "capability",
+   "description": "Look up what a group of commands can do. Call it with no argument to see the groups, or with a name for that group's guidance: browser, computer-use, chrome, personal, web-research, generation, svg, chart, office, 3d, connectors. Everything is already on your PATH — this tells you about it, it does not switch anything on.",
+   "promptSnippet": "Turn on a group of tools (browser, computer-use, personal, …)",
+   "parameters": "{\"type\":\"object\",\"properties\":{\"name\":{\"description\":\"The capability to turn on: browser, computer-use, chrome, personal, web-research, generation, svg, chart, office, 3d, connectors. Omit to list them.\",\"type\":\"string\"}}}"
+  },
+  {
+   "name": "chart",
+   "description": "Draw a data visual — bar, stacked, horizontal bar, line, area, scatter, donut, pie or radar — from the numbers, straight into the chat as an interactive card (hover reads the values, a chart/table toggle, Open in canvas). Every request to chart, plot, graph or visualise data goes here: sales by year, shares of a total, a trend, a comparison of two series. It draws in under a second from the labels and values you pass; put the real numbers in, never a summary of them. Every chart has a LOOK: name one that fits the subject (--look), set the knobs (--palette, --accent, --radius, --bars, --grid, --line, --font), or --from_image a picture to take its colours; left alone, it wears the conversation's look. Never image generation for a chart (a painting cannot put a value on an axis), never matplotlib, never hand-written SVG, never a whole deck for one chart. It writes a .svg (and the spec beside it) into the project, so the same chart can go into a page or document. To change a chart afterwards, use chart_edit.",
+   "promptSnippet": "chart: an interactive chart of data in the chat (bar, line, donut, …), with a look",
+   "parameters": "{\"type\":\"object\",\"required\":[\"type\",\"title\"],\"properties\":{\"type\":{\"description\":\"Which chart: bar (values by category), stacked (parts of each category), hbar (ranked names, long labels), line (a trend), area, scatter (x/y points), donut (shares of a whole), pie (the same, no hole), radar (several measures on spokes — a profile, ratings). Left out: bar (line for many points).\",\"cliOptional\":true,\"anyOf\":[{\"const\":\"bar\",\"type\":\"string\"},{\"const\":\"stacked\",\"type\":\"string\"},{\"const\":\"hbar\",\"type\":\"string\"},{\"const\":\"line\",\"type\":\"string\"},{\"const\":\"area\",\"type\":\"string\"},{\"const\":\"scatter\",\"type\":\"string\"},{\"const\":\"donut\",\"type\":\"string\"},{\"const\":\"pie\",\"type\":\"string\"},{\"const\":\"radar\",\"type\":\"string\"}]},\"title\":{\"description\":\"The chart title, e.g. \\\"Units Sold by Year\\\".\",\"cliOptional\":true,\"type\":\"string\"},\"labels\":{\"description\":\"The categories (x axis), comma-separated: \\\"2021, 2022, 2023, 2024\\\". For scatter, the x values.\",\"type\":\"string\"},\"values\":{\"description\":\"The values in the same order: \\\"12, 19, 15, 22\\\". Several series: \\\"Revenue: 4.2, 5.1, 6.4; Cost: 3.1, 3.4, 3.9\\\".\",\"type\":\"string\"},\"unit\":{\"description\":\"The unit of the values: \\\"$\\\", \\\"%\\\", \\\"GW\\\", \\\"units\\\".\",\"type\":\"string\"},\"subtitle\":{\"description\":\"A line under the title: the population, the period.\",\"type\":\"string\"},\"x_label\":{\"description\":\"Axis title for the categories.\",\"type\":\"string\"},\"y_label\":{\"description\":\"Axis title for the values.\",\"type\":\"string\"},\"highlight\":{\"description\":\"One label to single out (its bar or slice takes the accent).\",\"type\":\"string\"},\"note\":{\"description\":\"A source line under the chart: \\\"Source: Q3 report\\\".\",\"type\":\"string\"},\"data\":{\"description\":\"Instead of labels/values: the whole spec as JSON — {\\\"series\\\":[{\\\"name\\\":\\\"…\\\",\\\"points\\\":[{\\\"label\\\":\\\"…\\\",\\\"value\\\":1}]}]}, or [{\\\"label\\\":\\\"…\\\",\\\"value\\\":1}, …].\",\"type\":\"string\"},\"look\":{\"description\":\"A named look. Pick one that fits the subject: clean — the everyday one — the app blue, a thin grid, gently rounded bars; soft — muted, dusty colours, pill bars, a dotted grid, smooth lines — friendly and quiet; bold — saturated colours, no grid, values on every bar, a heavy title — for a headline number; mono — one hue in tints with a single warm accent — for rankings and one-series bars; editorial — serif titles, a muted navy/terracotta/olive palette, hairline grid — reports, the press; ocean — deep blues to teal with a sand accent, smooth lines and a gradient under them; forest — greens and bark with a copper accent — nature, sustainability, growth; sunset — coral to amber to rose, pill bars, no grid — warm and loud; candy — pink, tangerine, mint, sky — pill bars, rounded type, values on — playful; slate — its own charcoal ground with bright cyan/lime/amber — a dashboard tile, in any theme; paper — cream ground, ink lines, serif — a chart from a book. Left out, the chart wears the conversation's look.\",\"anyOf\":[{\"const\":\"clean\",\"type\":\"string\"},{\"const\":\"soft\",\"type\":\"string\"},{\"const\":\"bold\",\"type\":\"string\"},{\"const\":\"mono\",\"type\":\"string\"},{\"const\":\"editorial\",\"type\":\"string\"},{\"const\":\"ocean\",\"type\":\"string\"},{\"const\":\"forest\",\"type\":\"string\"},{\"const\":\"sunset\",\"type\":\"string\"},{\"const\":\"candy\",\"type\":\"string\"},{\"const\":\"slate\",\"type\":\"string\"},{\"const\":\"paper\",\"type\":\"string\"}]},\"palette\":{\"description\":\"Series colours, comma-separated hex or names: \\\"#264653, #2a9d8f, #e9c46a\\\" or \\\"navy, coral, teal\\\". Overrides the look's.\",\"type\":\"string\"},\"accent\":{\"description\":\"The highlight colour (hex or a name like coral, amber).\",\"type\":\"string\"},\"radius\":{\"description\":\"Bar corners: a number of px (0 = square), or \\\"pill\\\" (fully rounded).\",\"type\":\"string\"},\"bars\":{\"description\":\"Bar thickness: \\\"thin\\\", \\\"wide\\\", or a fraction of the band like 0.4.\",\"type\":\"string\"},\"grid\":{\"description\":\"Gridlines: lines, dots, or none.\",\"anyOf\":[{\"const\":\"lines\",\"type\":\"string\"},{\"const\":\"dots\",\"type\":\"string\"},{\"const\":\"none\",\"type\":\"string\"}]},\"line\":{\"description\":\"Line/area charts: straight, smooth (curved), or step.\",\"anyOf\":[{\"const\":\"straight\",\"type\":\"string\"},{\"const\":\"smooth\",\"type\":\"string\"},{\"const\":\"step\",\"type\":\"string\"}]},\"font\":{\"description\":\"The typeface: system, serif, mono, rounded.\",\"anyOf\":[{\"const\":\"system\",\"type\":\"string\"},{\"const\":\"serif\",\"type\":\"string\"},{\"const\":\"mono\",\"type\":\"string\"},{\"const\":\"rounded\",\"type\":\"string\"}]},\"value_labels\":{\"description\":\"Values written on the bars/points: on, off, or auto (only in the larger view).\",\"anyOf\":[{\"const\":\"on\",\"type\":\"string\"},{\"const\":\"off\",\"type\":\"string\"},{\"const\":\"auto\",\"type\":\"string\"}]},\"background\":{\"description\":\"A ground of the chart's own (hex): the card paints it in any theme; the ink is chosen for contrast.\",\"type\":\"string\"},\"style\":{\"description\":\"Every knob at once as JSON: {\\\"look\\\":\\\"soft\\\",\\\"radius\\\":\\\"pill\\\",\\\"grid\\\":\\\"dots\\\",\\\"markers\\\":\\\"dot\\\",\\\"area\\\":\\\"gradient\\\",\\\"ring\\\":0.4}.\",\"type\":\"string\"},\"from_image\":{\"description\":\"Style it like this picture: a path to an image whose colours (and ground) become the palette — a screenshot, a poster, a brand page.\",\"type\":\"string\"},\"size\":{\"description\":\"Where the .svg is going: card — the chat and web pages, 960×560; doc — a document column, 640×400; slide — a 16:9 slide, 1280×720, type 1.5×; square — a square tile, 800×800. Default card.\",\"anyOf\":[{\"const\":\"card\",\"type\":\"string\"},{\"const\":\"doc\",\"type\":\"string\"},{\"const\":\"slide\",\"type\":\"string\"},{\"const\":\"square\",\"type\":\"string\"}]},\"out\":{\"description\":\"Where to write the .svg, e.g. charts/units.svg. Relative paths land in the project. Default: named from the title, in the project.\",\"type\":\"string\"}}}"
+  },
+  {
+   "name": "chart_edit",
+   "description": "Change a chart that exists (its .svg or .chart.json): its data — add a series for comparison (--add \"Cost: 8, 12, 10, 14\"), change one value (--set \"2023: 17\"), remove a series (--remove Cost), replace the labels or values — its words (title, subtitle, unit, note, highlight, axis titles), its type, or its look (--look, --palette, --accent, --radius, --bars thin, --grid none, --line smooth, --font serif, --value_labels on, --background, --from_image). Every request to change a chart in any way — a colour, thinner bars, a second bar per year, a different style, \"make it look like this picture\" — is one call here; the chart is redrawn in place and shown again. Nothing else about it changes.",
+   "promptSnippet": "chart_edit: change an existing chart — data, words, or look",
+   "parameters": "{\"type\":\"object\",\"required\":[\"file\"],\"properties\":{\"file\":{\"description\":\"The chart to change: its .svg (or .chart.json) path, as the chart tool reported it.\",\"type\":\"string\"},\"add\":{\"description\":\"A series to add, in the labels' order: \\\"Cost: 8, 12, 10, 14\\\" (several: \\\"A: 1, 2; B: 3, 4\\\"). Turns a bar chart into grouped bars.\",\"type\":\"string\"},\"set\":{\"description\":\"Change values by label: \\\"2023: 17\\\" or \\\"2023: 17, 2024: 25\\\". For several series: \\\"Cost/2023: 9\\\".\",\"type\":\"string\"},\"remove\":{\"description\":\"A series to remove by name (or a label to drop from every series).\",\"type\":\"string\"},\"rename\":{\"description\":\"Rename a series or a label: \\\"old: new\\\" (several: \\\"a: b; c: d\\\").\",\"type\":\"string\"},\"sort\":{\"description\":\"Order the categories by value (a ranking), or leave them as given.\",\"anyOf\":[{\"const\":\"asc\",\"type\":\"string\"},{\"const\":\"desc\",\"type\":\"string\"},{\"const\":\"none\",\"type\":\"string\"}]},\"type\":{\"description\":\"A different kind of chart: bar (values by category), stacked (parts of each category), hbar (ranked names, long labels), line (a trend), area, scatter (x/y points), donut (shares of a whole), pie (the same, no hole), radar (several measures on spokes — a profile, ratings).\",\"anyOf\":[{\"const\":\"bar\",\"type\":\"string\"},{\"const\":\"stacked\",\"type\":\"string\"},{\"const\":\"hbar\",\"type\":\"string\"},{\"const\":\"line\",\"type\":\"string\"},{\"const\":\"area\",\"type\":\"string\"},{\"const\":\"scatter\",\"type\":\"string\"},{\"const\":\"donut\",\"type\":\"string\"},{\"const\":\"pie\",\"type\":\"string\"},{\"const\":\"radar\",\"type\":\"string\"}]},\"title\":{\"type\":\"string\"},\"subtitle\":{\"type\":\"string\"},\"labels\":{\"description\":\"Replace the categories: \\\"Q1, Q2, Q3, Q4\\\".\",\"type\":\"string\"},\"values\":{\"description\":\"Replace ALL the data: \\\"1, 2, 3\\\" or \\\"A: 1, 2; B: 3, 4\\\".\",\"type\":\"string\"},\"unit\":{\"type\":\"string\"},\"x_label\":{\"type\":\"string\"},\"y_label\":{\"type\":\"string\"},\"highlight\":{\"description\":\"The label to single out, or \\\"none\\\".\",\"type\":\"string\"},\"note\":{\"type\":\"string\"},\"look\":{\"description\":\"A named look. Pick one that fits the subject: clean — the everyday one — the app blue, a thin grid, gently rounded bars; soft — muted, dusty colours, pill bars, a dotted grid, smooth lines — friendly and quiet; bold — saturated colours, no grid, values on every bar, a heavy title — for a headline number; mono — one hue in tints with a single warm accent — for rankings and one-series bars; editorial — serif titles, a muted navy/terracotta/olive palette, hairline grid — reports, the press; ocean — deep blues to teal with a sand accent, smooth lines and a gradient under them; forest — greens and bark with a copper accent — nature, sustainability, growth; sunset — coral to amber to rose, pill bars, no grid — warm and loud; candy — pink, tangerine, mint, sky — pill bars, rounded type, values on — playful; slate — its own charcoal ground with bright cyan/lime/amber — a dashboard tile, in any theme; paper — cream ground, ink lines, serif — a chart from a book. Left out, the chart wears the conversation's look.\",\"anyOf\":[{\"const\":\"clean\",\"type\":\"string\"},{\"const\":\"soft\",\"type\":\"string\"},{\"const\":\"bold\",\"type\":\"string\"},{\"const\":\"mono\",\"type\":\"string\"},{\"const\":\"editorial\",\"type\":\"string\"},{\"const\":\"ocean\",\"type\":\"string\"},{\"const\":\"forest\",\"type\":\"string\"},{\"const\":\"sunset\",\"type\":\"string\"},{\"const\":\"candy\",\"type\":\"string\"},{\"const\":\"slate\",\"type\":\"string\"},{\"const\":\"paper\",\"type\":\"string\"}]},\"palette\":{\"description\":\"Series colours, comma-separated hex or names: \\\"#264653, #2a9d8f, #e9c46a\\\" or \\\"navy, coral, teal\\\". Overrides the look's.\",\"type\":\"string\"},\"accent\":{\"description\":\"The highlight colour (hex or a name like coral, amber).\",\"type\":\"string\"},\"radius\":{\"description\":\"Bar corners: a number of px (0 = square), or \\\"pill\\\" (fully rounded).\",\"type\":\"string\"},\"bars\":{\"description\":\"Bar thickness: \\\"thin\\\", \\\"wide\\\", or a fraction of the band like 0.4.\",\"type\":\"string\"},\"grid\":{\"description\":\"Gridlines: lines, dots, or none.\",\"anyOf\":[{\"const\":\"lines\",\"type\":\"string\"},{\"const\":\"dots\",\"type\":\"string\"},{\"const\":\"none\",\"type\":\"string\"}]},\"line\":{\"description\":\"Line/area charts: straight, smooth (curved), or step.\",\"anyOf\":[{\"const\":\"straight\",\"type\":\"string\"},{\"const\":\"smooth\",\"type\":\"string\"},{\"const\":\"step\",\"type\":\"string\"}]},\"font\":{\"description\":\"The typeface: system, serif, mono, rounded.\",\"anyOf\":[{\"const\":\"system\",\"type\":\"string\"},{\"const\":\"serif\",\"type\":\"string\"},{\"const\":\"mono\",\"type\":\"string\"},{\"const\":\"rounded\",\"type\":\"string\"}]},\"value_labels\":{\"description\":\"Values written on the bars/points: on, off, or auto (only in the larger view).\",\"anyOf\":[{\"const\":\"on\",\"type\":\"string\"},{\"const\":\"off\",\"type\":\"string\"},{\"const\":\"auto\",\"type\":\"string\"}]},\"background\":{\"description\":\"A ground of the chart's own (hex): the card paints it in any theme; the ink is chosen for contrast.\",\"type\":\"string\"},\"style\":{\"description\":\"Every knob at once as JSON: {\\\"look\\\":\\\"soft\\\",\\\"radius\\\":\\\"pill\\\",\\\"grid\\\":\\\"dots\\\",\\\"markers\\\":\\\"dot\\\",\\\"area\\\":\\\"gradient\\\",\\\"ring\\\":0.4}.\",\"type\":\"string\"},\"from_image\":{\"description\":\"Style it like this picture: a path to an image whose colours (and ground) become the palette — a screenshot, a poster, a brand page.\",\"type\":\"string\"},\"size\":{\"description\":\"Where the .svg is going: card — the chat and web pages, 960×560; doc — a document column, 640×400; slide — a 16:9 slide, 1280×720, type 1.5×; square — a square tile, 800×800. Default card.\",\"anyOf\":[{\"const\":\"card\",\"type\":\"string\"},{\"const\":\"doc\",\"type\":\"string\"},{\"const\":\"slide\",\"type\":\"string\"},{\"const\":\"square\",\"type\":\"string\"}]}}}"
+  },
+  {
+   "name": "chrome_click",
+   "description": "chrome_click tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "chrome_go",
+   "description": "chrome_go tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "chrome_snapshot",
+   "description": "chrome_snapshot tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "chrome_tab",
+   "description": "chrome_tab tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "chrome_tabs",
+   "description": "chrome_tabs tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "chrome_type",
+   "description": "chrome_type tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "contacts_search",
+   "description": "contacts_search tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "create_scheduled_task",
+   "description": "Save a recurring task that runs on its own in a fresh chat — daily, on weekdays, weekly, hourly, or only when the user runs it by hand. Use this when the user asks for something to happen regularly or later (\"every morning…\", \"each Friday…\"), rather than agreeing to do it and forgetting. The task appears in Scheduled tasks where they can edit, pause or delete it.",
+   "promptSnippet": "create_scheduled_task: save recurring work that runs by itself on a schedule.",
+   "parameters": "{\"type\":\"object\",\"required\":[\"name\",\"prompt\",\"frequency\"],\"properties\":{\"name\":{\"description\":\"Short name for the task, as it will appear in the list (e.g. \\\"Morning test run\\\").\",\"type\":\"string\"},\"prompt\":{\"description\":\"What to do when it runs, written as an instruction to yourself in a fresh chat. It must stand alone: the run cannot see this conversation.\",\"type\":\"string\"},\"frequency\":{\"description\":\"How often. \\\"manual\\\" creates it without a schedule, for the user to run by hand.\",\"anyOf\":[{\"const\":\"manual\",\"type\":\"string\"},{\"const\":\"hourly\",\"type\":\"string\"},{\"const\":\"daily\",\"type\":\"string\"},{\"const\":\"weekdays\",\"type\":\"string\"},{\"const\":\"weekly\",\"type\":\"string\"}]},\"hour\":{\"minimum\":0,\"maximum\":23,\"description\":\"Local hour, 0-23 (default 9).\",\"type\":\"number\"},\"minute\":{\"minimum\":0,\"maximum\":59,\"description\":\"Local minute (default 0).\",\"type\":\"number\"},\"weekday\":{\"minimum\":0,\"maximum\":6,\"description\":\"For \\\"weekly\\\": 0=Sunday … 6=Saturday (default Monday).\",\"type\":\"number\"},\"cwd\":{\"description\":\"Working folder for the run. Defaults to the app default.\",\"type\":\"string\"}}}"
+  },
+  {
+   "name": "edit_image",
+   "description": "edit_image tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "generate_3d",
+   "description": "generate_3d tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "generate_image",
+   "description": "generate_image tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "generate_music",
+   "description": "generate_music tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "generate_sfx",
+   "description": "generate_sfx tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "generate_speech",
+   "description": "generate_speech tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "generate_svg",
+   "description": "generate_svg tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "generate_video",
+   "description": "generate_video tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "mac_click",
+   "description": "mac_click tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "mac_key",
+   "description": "mac_key tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "mac_launch",
+   "description": "mac_launch tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "mac_scroll",
+   "description": "mac_scroll tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "mac_snapshot",
+   "description": "mac_snapshot tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "mac_type",
+   "description": "mac_type tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "mail_read",
+   "description": "mail_read tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "mail_recent",
+   "description": "mail_recent tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "mail_search",
+   "description": "mail_search tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "mcp_call",
+   "description": "mcp_call tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "mcp_list",
+   "description": "mcp_list tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "mcp_schema",
+   "description": "mcp_schema tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "messages_recent",
+   "description": "messages_recent tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "messages_send",
+   "description": "messages_send tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "office_edit",
+   "description": "Change an existing .pptx, .docx, .xlsx or .pdf (or a chart .svg made here) in place through the document pipeline: reword text, restyle it (size, bold, colour), move or resize a shape, delete one, delete, duplicate or reorder slides, set cells and formats — and PUT A CHART IN: `chart` names a chart the chart tool made (its .svg) and it lands as native shapes on a slide (`slide`, optional `box` in inches), as a picture after a paragraph (`after` a paragraph id), at a cell (`anchor`), or drawn onto a PDF page in its free space or on a new page after it (`page`). Say WHICH slide, paragraph or cell and WHAT it should become — office_inspect shows the ids. It cannot add new slides or paragraphs of new content; for that, make the file again with a fuller brief. Never edit these files with python-pptx/docx/openpyxl or by touching the XML.",
+   "promptSnippet": "office_edit: change wording, style, layout or slide order in an existing office file, or put a chart into it",
+   "parameters": "{\"type\":\"object\",\"required\":[\"file\"],\"properties\":{\"file\":{\"description\":\"The .pptx/.docx/.xlsx/.pdf (or chart .svg) to change.\",\"type\":\"string\"},\"instruction\":{\"description\":\"The change, precisely: which slide/paragraph/cell, and the new text or style. Optional when `chart` is given.\",\"type\":\"string\"},\"chart\":{\"description\":\"A chart to put in: the .svg the chart tool wrote (the spec and elements beside it are read). Give WHERE with slide / after / anchor / page.\",\"type\":\"string\"},\"slide\":{\"description\":\"pptx: the slide number (1-based) for the chart.\",\"type\":\"number\"},\"after\":{\"description\":\"docx: the paragraph id (from office_inspect, e.g. p5) the chart goes after; \\\"end\\\" for the end.\",\"type\":\"string\"},\"anchor\":{\"description\":\"xlsx: the top-left cell for the chart, e.g. E2.\",\"type\":\"string\"},\"page\":{\"description\":\"pdf: the page number (1-based) the chart belongs with.\",\"type\":\"number\"},\"box\":{\"description\":\"pptx/pdf: where exactly, in inches from the top-left: \\\"x, y, w, h\\\" (e.g. \\\"6.8, 1.4, 6, 4.4\\\"). Default: pptx the right half under the title; pdf the free space at the foot of the page, else a new page after it.\",\"type\":\"string\"},\"width\":{\"description\":\"docx/xlsx: the chart's width in inches (default: the text width / 5).\",\"type\":\"number\"},\"place\":{\"description\":\"pdf: auto (free space on the page, else a new page), below, or new-page.\",\"anyOf\":[{\"const\":\"auto\",\"type\":\"string\"},{\"const\":\"below\",\"type\":\"string\"},{\"const\":\"new-page\",\"type\":\"string\"}]},\"out\":{\"description\":\"Write the changed copy here instead of editing in place.\",\"type\":\"string\"}}}"
+  },
+  {
+   "name": "office_inspect",
+   "description": "Outline an existing .pptx, .docx, .xlsx, .pdf or chart .svg made here: every slide, shape, paragraph or cell with its id, text, size and colour; a PDF as its pages' text, numbered. This is how to READ an office file — never `read` it (that returns zip bytes) and never unzip it. The ids are what office_edit takes; the page numbers are what --page takes.",
+   "promptSnippet": "office_inspect: read an office file (or a PDF) as an outline with ids",
+   "parameters": "{\"type\":\"object\",\"required\":[\"file\"],\"properties\":{\"file\":{\"description\":\"The .pptx/.docx/.xlsx/.pdf to outline.\",\"type\":\"string\"}}}"
+  },
+  {
+   "name": "office_make",
+   "description": "Make a real .pptx slide deck, .docx document, .xlsx workbook, .pdf — or a standalone chart (.svg) of DATA — from a brief: designed layouts, fitted type, charts drawn from their numbers, through the on-device document pipeline. Every request for a deck, a presentation, a report, a memo, a spreadsheet or a PDF goes here; never write these with python-pptx, python-docx, openpyxl, reportlab or by assembling the XML. (A chart on its own is quicker with the chart tool, which draws it in the chat; kind chart here is for a chart made in a document flow.) The brief is the whole content: put in it every fact, number, name and section the file should contain, in order — the pipeline writes only what the brief gives it and invents nothing. It returns a slide-by-slide (or block-by-block) summary and opens the file in the canvas. For changes to a file that exists, use office_edit.",
+   "promptSnippet": "office_make: a deck, document, workbook, PDF or data chart from a brief (on-device)",
+   "parameters": "{\"type\":\"object\",\"required\":[\"kind\",\"brief\"],\"properties\":{\"kind\":{\"description\":\"pptx (slides), docx (document), xlsx (workbook), pdf, or chart (one bar/hbar/line/donut chart of data, as .svg). Left out, it is read from the brief or the out path.\",\"cliOptional\":true,\"anyOf\":[{\"const\":\"pptx\",\"type\":\"string\"},{\"const\":\"docx\",\"type\":\"string\"},{\"const\":\"xlsx\",\"type\":\"string\"},{\"const\":\"pdf\",\"type\":\"string\"},{\"const\":\"chart\",\"type\":\"string\"}]},\"brief\":{\"description\":\"What the file is and EVERYTHING it should say: audience, purpose, every fact and number, the sections or slides in order. Long is good.\",\"type\":\"string\"},\"out\":{\"description\":\"Where to write it, e.g. docs/q3-review.pptx. Relative paths land in the project. Default: named from the brief, in the project.\",\"type\":\"string\"},\"slides\":{\"description\":\"pptx only: how many slides (3–24). Default 8.\",\"type\":\"number\"}}}"
+  },
+  {
+   "name": "present",
+   "description": "Show the user a finished file, folder or project — it appears as a card and opens (or runs) in the canvas beside the chat. Use this as your LAST action when you have made something: a page, an image, a script, a game, a document. It hands you back a preview of what the user will actually see, so you can check it before you say you are done. Present the finished artefact, not an intermediate file.",
+   "promptSnippet": "present: show the user the finished artefact and see it yourself first",
+   "parameters": "{\"type\":\"object\",\"required\":[\"path\"],\"properties\":{\"path\":{\"description\":\"Path to the finished file, folder or project to show the user — absolute, or relative to the working folder.\",\"type\":\"string\"},\"note\":{\"description\":\"One line for the card — what this is. Optional.\",\"type\":\"string\"}}}"
+  },
+  {
+   "name": "refine_3d",
+   "description": "refine_3d tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "reminders_create",
+   "description": "reminders_create tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "reminders_list",
+   "description": "reminders_list tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "spawn_subagent",
+   "description": "Outsource a self-contained sub-task to an isolated child agent. The child runs its own agent loop in a separate process; its intermediate steps never enter your context — you receive ONLY its final summary. Use it to parallelize independent work or to keep a large sub-investigation out of your own context. Spawns are memory-scheduled: over-budget requests queue or are declined with a reason.",
+   "promptSnippet": "spawn_subagent: run an isolated sub-task in a child agent and get back only its summary.",
+   "parameters": "{\"type\":\"object\",\"required\":[\"goal\"],\"properties\":{\"goal\":{\"description\":\"The self-contained task for the subagent, in plain English. It runs in isolation and only its final summary returns — include everything it needs.\",\"type\":\"string\"},\"name\":{\"description\":\"Short label shown in the live subagent list (e.g. \\\"Research docs\\\").\",\"type\":\"string\"},\"model\":{\"description\":\"Optional model id override for the subagent (else inherits yours).\",\"type\":\"string\"},\"provider\":{\"description\":\"Optional provider override for the subagent.\",\"type\":\"string\"},\"est_ram_gb\":{\"exclusiveMinimum\":0,\"description\":\"Optional RAM estimate (GiB) for scheduling. Must be > 0. Raise it when the subagent uses a bigger/different model.\",\"type\":\"number\"},\"timeout_seconds\":{\"description\":\"Timeout in seconds (default 300, max 1800).\",\"type\":\"number\"},\"specialist\":{\"description\":\"Run the subagent as a named specialist, with that role's charter and tools. PICK BY THE ARTIFACT YOU WANT BACK, not by topic — the kinds carry different tools, so the wrong neighbour comes back empty-handed. `image` makes and improves still pictures. `motion` makes ANIMATION — motion graphics, titles, anything that moves over time; it is the only kind that can render frames. `ui-critic` judges an interface that already exists. `research` goes and finds out, and delivers the exact deliverable you name. The rest answer a question through one lens: auditor, integration, tester, correctness, security, performance, visual, accessibility, image, motion, ui-critic, research, document.\",\"type\":\"string\"},\"iterations\":{\"description\":\"For specialist=\\\"image\\\": how many improvement passes to run after the first image (default 3). Ignored by other specialists.\",\"type\":\"number\"}}}"
+  },
+  {
+   "name": "talk_to_manager",
+   "description": "BEFORE YOU USE THIS: we strongly recommend a workflow of decomposing the user's request, identifying any unknowns, then one by one addressing those unknowns — leveraging the available tools and specialists to make your life easier wherever possible. Look things up. Get the real thing in front of you. THEN write the brief, with what you found attached. A brief written before the unknowns are closed is a list of your own assumptions. now that you're in max effort mode you are now connected to a manager, the manager is a powerful coordinator that has a team of workers at their disposal to help you achieve large projects/goals, if you have something large, that could benefit from handing off and allow you to handle the user requests at a higher level of abstraction, please utilize this tool, this should be for anything large, it's really simple to use, you just tell the manager what you want, a spec maybe, or simply the vision you want fufilled, and you'll get back a fully made product, you should then focus on testing this product and iterating with the manager until you have fufilled the user's large request. anything *genuinely* quick you are still free to do without this tool though. start by asking yourself at each turn, 'genuinely quick or should I call in the manager?'. WHAT THE MANAGER TAKES: a planned, fully thought out vision that you lay out conceptually and designed, but with no need for technical instruction. You provide in detail exactly the deliverable you want, and the manager will have it built, so long as you articulate exactly what you want. Be specific about all details. No technical or implementation details are needed however — simply describe what you want done. Decide what the thing IS, what it contains, how it should look and feel, and what would make it good; leave how to build it to the team. From the user prompt, think of all the unknowns you have, and don't guess, get concrete. The user asks for something to look a certain way, function a certain way, maybe even feel a certain way, or maybe like something else. Do you know what they mean? Do you have a visual? They ask for something to perform or function like something else — do you know what they're referencing? All the unknowns: they say a name you don't recognize, something you don't quite understand — don't ask the user, research it, commission specialists, get informed, and then brief the manager so they can focus on building exactly what you asked for, concretely. Attach any relevant files to the brief that will be useful: assets, references, pieces, rough drafts, block-outs, concepts. The more comprehensive and better you make your brief, the better the result you get will be.",
+   "promptSnippet": "talk_to_manager: hand a large build to your manager and their team of engineers, who deliver it back for your review.",
+   "parameters": "{\"type\":\"object\",\"required\":[\"message\"],\"properties\":{\"message\":{\"description\":\"What you want built, in your own words — the full vision, in as much detail as you have. The manager has not spoken to the user and only knows what you tell them.\",\"type\":\"string\"},\"reason\":{\"description\":\"Optional: why this needs a team rather than a single pass.\",\"type\":\"string\"},\"divisions\":{\"description\":\"OPTIONAL. Only if you already have a shape in mind. Leave it out and the manager splits the work itself.\",\"type\":\"array\",\"items\":{\"type\":\"object\",\"required\":[\"name\",\"purpose\"],\"properties\":{\"name\":{\"description\":\"Short division name, e.g. \\\"Frontend\\\", \\\"Storyline\\\", \\\"3D Assets\\\".\",\"type\":\"string\"},\"purpose\":{\"description\":\"What this division is responsible for producing.\",\"type\":\"string\"}}}}}}"
+  },
+  {
+   "name": "update_plan",
+   "description": "Publish or update a task checklist the user sees live. Pass the FULL ordered list of steps each call; mark exactly one step \"in_progress\" while you work it and \"done\" when finished. Use it for any multi-step task so the user can watch progress.",
+   "promptSnippet": "update_plan: maintain a visible task checklist (pending/in_progress/done) for multi-step work.",
+   "parameters": "{\"type\":\"object\",\"required\":[\"plan\"],\"properties\":{\"title\":{\"description\":\"Optional heading for the checklist panel.\",\"type\":\"string\"},\"plan\":{\"description\":\"The FULL ordered list of steps (replaces the previous plan). Re-send it with updated statuses to advance the checklist. Send an empty array to clear the plan.\",\"type\":\"array\",\"items\":{\"type\":\"object\",\"required\":[\"text\"],\"properties\":{\"text\":{\"description\":\"Short imperative step label, e.g. \\\"Add the RPC type\\\".\",\"type\":\"string\"},\"status\":{\"description\":\"Step state. Defaults to \\\"pending\\\".\",\"anyOf\":[{\"const\":\"pending\",\"type\":\"string\"},{\"const\":\"in_progress\",\"type\":\"string\"},{\"const\":\"done\",\"type\":\"string\"}]},\"id\":{\"description\":\"Stable id for this step (kept across updates). Optional.\",\"type\":\"string\"},\"group\":{\"description\":\"Optional section/group heading.\",\"type\":\"string\"},\"roadmap\":{\"description\":\"Mark as a future/roadmap step (rendered dimmer).\",\"type\":\"boolean\"}}}}}}"
+  },
+  {
+   "name": "use",
+   "description": "Fallback: call a tool by name when it is not in your tool list. Prefer calling a tool directly when you can see it — after `capability` turns a group on, those tools appear in your list and should be called normally. Use this only if one you were told about is still not callable.",
+   "promptSnippet": "Call a tool a capability made available",
+   "parameters": "{\"type\":\"object\",\"required\":[\"tool\"],\"properties\":{\"tool\":{\"description\":\"The tool name, exactly as the capability named it.\",\"type\":\"string\"},\"args\":{\"additionalProperties\":true,\"description\":\"That tool's arguments.\",\"type\":\"object\",\"properties\":{}}}}"
+  },
+  {
+   "name": "web_fetch",
+   "description": "web_fetch tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "web_search",
+   "description": "web_search tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  }
+ ]
+}

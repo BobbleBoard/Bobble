@@ -33,13 +33,28 @@ import { createLogger } from '@pi-desktop/shared';
 
 const log = createLogger('desktop:pausables');
 
+/**
+ * Which kind of work a pausable is.
+ *
+ *   'gen'     a generation job (a uv worker, ComfyUI while a job is in it)
+ *   'gen3d'   a 3D sidecar stage
+ *   'agent'   a pi child while a turn is in flight (paused, never terminated)
+ *   'service' a long-lived helper a feature runs beside the chat — the memory
+ *             service, the editing-tools worker (PLAN.md R10)
+ *   'train'   a training or export run
+ *
+ * The last two were added by the W0-A pre-wire ahead of their lanes, so a
+ * service or a training worker registers with `guardRun` without an edit here.
+ */
+export type PausableKind = 'gen' | 'gen3d' | 'agent' | 'service' | 'train';
+
 export interface Pausable {
   /** Stable per run, e.g. `gen:<jobId>`, `gen3d:<jobId>`, `pi:<pid>`. */
   readonly id: string;
   /** What the person will read: "the picture", "the 3D texture", "the chat". */
   readonly label: string;
   /** Which kind of work, for the order of termination and the log. */
-  readonly kind: 'gen' | 'gen3d' | 'agent';
+  readonly kind: PausableKind;
   /** The root of the process tree to signal, when there is one right now. */
   readonly pid: () => number | undefined;
   /**

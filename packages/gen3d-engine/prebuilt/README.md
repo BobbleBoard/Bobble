@@ -13,6 +13,12 @@ engine used to need them:
   provide, which a fresh Mac does not have either.
 - `quadriflow` — the quad remesher. Was a hand-built binary nothing provisioned.
 
+One more piece is here because it cannot be installed from PyPI at all:
+
+- `mflux-…+bobble.mageflow…whl` — the mflux build with Mage-Flow (an
+  unmerged port; no release has it). Pure Python; see
+  `python/mflux-mageflow/README.md` for why and how it is built.
+
 `darwin-arm64/manifest.json` names the set; `engine/envs.py` reads it and
 installs the wheels instead of building from source, falling back to the
 source build (which needs Xcode) on a platform with no manifest.

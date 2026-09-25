@@ -6,14 +6,21 @@
  * ~22MB, so this skips the resume/`.part` machinery inference needs for
  * multi-GB GGUFs and just streams to a temp file, hashes, verifies, and renames.
  *
+ * The `.part` file is closed — its handle released, not just its data flushed —
+ * before it is renamed into place or removed, so neither races the close (on
+ * Windows a file removed while still open can linger as "delete pending"), and
+ * both ride out a virus scanner holding the fresh file (win-fs.ts).
+ *
  * `fetchImpl` is injectable so unit tests drive a fixture without the network.
  * Never imports electron; runs in plain Node.
  */
 import { createHash } from 'node:crypto';
 import { once } from 'node:events';
 import { createWriteStream } from 'node:fs';
-import { mkdir, rename, rm, stat } from 'node:fs/promises';
+import { mkdir, stat } from 'node:fs/promises';
 import { dirname } from 'node:path';
+import { finished } from 'node:stream/promises';
+import { removeRetrying, renameRetrying } from './win-fs.js';
 
 export interface DownloadProgress {
   readonly received: number;
@@ -93,6 +100,11 @@ export async function downloadFile(opts: DownloadOptions): Promise<DownloadResul
   let received = 0;
 
   const out = createWriteStream(partPath, { flags: 'w' });
+  // Settles when the handle is closed: a file stream emits 'close' after 'finish'
+  // (or after an error). Watched from the start, so a failed open or write is
+  // caught here rather than left as an unhandled 'error' event.
+  const closed = finished(out);
+  closed.catch(() => {});
   try {
     for await (const chunk of res.body as unknown as AsyncIterable<Uint8Array>) {
       if (signal?.aborted === true) throw new DownloadError('aborted');
@@ -104,25 +116,26 @@ export async function downloadFile(opts: DownloadOptions): Promise<DownloadResul
         total,
         fraction: total !== undefined && total > 0 ? received / total : undefined,
       });
+      // A stream that already failed never drains: stop instead of waiting forever.
+      if (out.destroyed) throw out.errored ?? new DownloadError(`cannot write ${partPath}`);
       if (!out.write(buf)) await once(out, 'drain');
     }
-    await new Promise<void>((resolve, reject) => {
-      out.on('error', reject);
-      out.end(() => resolve());
-    });
+    out.end();
+    await closed;
   } catch (err) {
     out.destroy();
-    await rm(partPath, { force: true }).catch(() => {});
+    await closed.catch(() => {});
+    await removeRetrying(partPath).catch(() => {});
     throw err;
   }
 
   const sha256 = hash.digest('hex');
   if (expectedSha256 !== undefined && sha256 !== expectedSha256) {
-    await rm(partPath, { force: true }).catch(() => {});
+    await removeRetrying(partPath).catch(() => {});
     throw new ChecksumMismatchError(expectedSha256, sha256);
   }
 
-  await rename(partPath, dest);
+  await renameRetrying(partPath, dest);
   return { dest, sha256, bytes: received, cached: false };
 }
 

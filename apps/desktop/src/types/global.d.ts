@@ -27,6 +27,8 @@ declare global {
     /** E2E hook: accessor for the canvas controller (open browser/terminal
      * tabs). Present only when loaded with ?piE2E=1 (see CanvasTabsPanel.tsx). */
     __pi_canvas?: () => CanvasController;
+    /** E2E only: the in-app navigation store (deep links, `navigate`). */
+    __app_nav?: () => typeof import('../state/app-nav-store').useAppNavStore;
     /** E2E only: the theme store, so probes can flip dark/light. */
     // biome-ignore lint/suspicious/noExplicitAny: probe-only escape hatch
     __pi_theme?: () => any;

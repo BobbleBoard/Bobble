@@ -1,0 +1,3 @@
+# bench-run.sh writes each run here (trace, output, summary). The results that
+# matter are copied into queue.md; the raw runs stay on the machine.
+runs/
