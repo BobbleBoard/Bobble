@@ -71,9 +71,14 @@ export * from './uv-platform.js';
  * conversation after the cached prefix: the prompt the model is warmed on does
  * not change by a byte. Both tool modes read it — the CLI's `web search`
  * prints this same text.
+ *
+ * "IN YOUR REPLY" because of what the first real research turn did (the 4B,
+ * 2026-09-24): it wrote the summary into notes.md with its citations and told
+ * the chat "the document includes full citations" — the reply, where the
+ * chips are, had none.
  */
 export const CITE_HINT =
-  'Cite a page you use as [site name](url) right after the sentence it supports.';
+  'In your reply, cite each page you use as [site name](url) right after the sentence it supports.';
 
 /** Stable tool names — also the identifiers W5 gates on via pi's `tool_call` event. */
 export const WEB_SEARCH_TOOL = 'web_search';

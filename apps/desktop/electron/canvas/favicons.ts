@@ -28,7 +28,8 @@
  */
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { isPublicHost, routeSourceUrl } from './source-fetch';
+import { fetchCapped, isPublicHost, isPublicUrl, routeSourceUrl } from './source-fetch';
+import { parsePageMeta } from './source-meta-parse';
 
 /** Icon paths to try, in order. Nearly every site answers one of these. */
 const CANDIDATE_PATHS = ['/favicon.ico', '/favicon.png', '/apple-touch-icon.png'] as const;
@@ -102,10 +103,15 @@ export function faviconHost(input: string): string | undefined {
 }
 
 async function tryPath(host: string, path: string): Promise<string | null> {
+  return await tryUrl(`https://${host}${path}`);
+}
+
+async function tryUrl(url: string): Promise<string | null> {
+  if (!isPublicUrl(url)) return null;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const res = await fetch(routeSourceUrl(`https://${host}${path}`), {
+    const res = await fetch(routeSourceUrl(url), {
       signal: controller.signal,
       redirect: 'follow',
       // No cookies, no referrer: this is a decoration, not a visit.
@@ -122,6 +128,30 @@ async function tryPath(host: string, path: string): Promise<string | null> {
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * THE HOME PAGE'S OWN WORD, when none of the usual places has an icon: plenty
+ * of sites declare theirs somewhere else (`<link rel="icon" href="/static/…">`).
+ * SEEN on the first real research turn (2026-09-24): research.google,
+ * flyconnecto.me and nimh.nih.gov drew letter tiles in the search row while
+ * the Sources card, which reads a page's head, had their icons. One more small
+ * request, to the same site, only for a site that answered none of the three.
+ */
+async function declaredIcon(host: string): Promise<string | null> {
+  const page = await fetchCapped(`https://${host}/`, {
+    maxBytes: 256 * 1024,
+    timeoutMs: TIMEOUT_MS,
+    accept: 'text/html,application/xhtml+xml',
+    stopAt: /<\/head\s*>|<body[\s>]/i,
+    types: /html|xml/,
+  });
+  if (!page.ok || page.body.byteLength === 0) return null;
+  for (const href of parsePageMeta(page.body.toString('utf8'), page.finalUrl).icons.slice(0, 2)) {
+    const found = await tryUrl(href);
+    if (found !== null) return found;
+  }
+  return null;
 }
 
 /**
@@ -149,7 +179,7 @@ export async function siteFavicon(input: string): Promise<string | null> {
       const found = await tryPath(host, path);
       if (found !== null) return found;
     }
-    return null;
+    return await declaredIcon(host);
   })();
   inFlight.set(host, lookup);
   try {

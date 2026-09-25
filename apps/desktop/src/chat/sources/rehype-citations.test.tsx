@@ -147,7 +147,7 @@ const SEARCH = [
   '    https://c.example/3',
   '    About C.',
   '',
-  'Cite a page you use as [site name](url) right after the sentence it supports.',
+  'In your reply, cite each page you use as [site name](url) right after the sentence it supports.',
 ].join('\n');
 
 function answer(text: string): string {

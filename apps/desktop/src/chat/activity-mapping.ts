@@ -1050,6 +1050,18 @@ export function mapToolStep(
     typeof measured === 'number' && measured > 0
       ? { ...step, data: { ...step.data, durationMs: measured } }
       : step;
+  /*
+   * A PAGE THAT DID NOT LOAD WAS NOT READ. web_fetch answers a 403 with the
+   * text "Fetch failed: …" rather than as an error (SEEN on the first real
+   * research turn: science.org refused it), so the row said "Read a page" over
+   * a page nobody read.
+   */
+  if (withDuration.data.kind === 'page' && /^Fetch failed:/m.test(result?.text ?? '')) {
+    return {
+      ...withDuration,
+      data: { ...withDuration.data, failed: true, label: 'Could not read the page' },
+    };
+  }
   if (result?.isError !== true) return withDuration;
   return {
     ...withDuration,

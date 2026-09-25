@@ -132,6 +132,23 @@ export function webCallsOf(name: string, args: unknown): WebCall[] {
   return [];
 }
 
+/**
+ * The URLs a fetch call asked for — `web_fetch {url}`, or `web fetch <url>` /
+ * `--url=<url>` in a shell line. The fallback for a fetch whose printed header
+ * did not survive: bash keeps the LAST 2000 lines of a long page, and the
+ * `URL:` line is the first.
+ */
+export function fetchUrlsOf(name: string, args: unknown): string[] {
+  const a = args as Record<string, unknown> | undefined;
+  if (name.toLowerCase() !== 'bash') {
+    const url = str(a?.url);
+    return url !== undefined && /^https?:\/\//i.test(url) ? [url] : [];
+  }
+  const command = str(a?.command) ?? '';
+  const re = /web\s+fetch\s+(?:--url[=\s]\s*)?["']?(https?:\/\/[^\s"']+)/g;
+  return [...command.matchAll(re)].map((m) => m[1] as string);
+}
+
 /** A page a fetch printed: `# Title`, `URL: …`, then the article. */
 export interface FetchedPage {
   readonly url: string;
@@ -264,8 +281,13 @@ export function collectTurnSources(calls: readonly TurnCall[]): TurnSource[] {
           add({ url: r.url, title: r.title, snippet: r.snippet, read: false, rank: i + 1, search });
         }
       } else {
-        for (const p of fetchedPagesOf(result, result.text)) {
+        const pages = fetchedPagesOf(result, result.text);
+        for (const p of pages) {
           add({ url: p.url, title: p.title, snippet: p.snippet, read: true });
+        }
+        // The header lost to truncation: the call itself says which page it was.
+        if (pages.length === 0 && !/^Fetch failed:/m.test(result.text)) {
+          for (const url of fetchUrlsOf(call.name, call.args)) add({ url, read: true });
         }
       }
     }

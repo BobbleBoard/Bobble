@@ -707,7 +707,7 @@ describe('mapToolStep — web_search result parsing', () => {
       call('c1', 'web_search', { query: 'example domain' }),
       result(
         'c1',
-        `${toolText}\n\nCite a page you use as [site name](url) right after the sentence it supports.`,
+        `${toolText}\n\nIn your reply, cite each page you use as [site name](url) right after the sentence it supports.`,
       ),
       false,
     ).data;
@@ -742,6 +742,17 @@ describe('mapToolStep — web_search result parsing', () => {
     if (step.kind !== 'search') throw new Error(step.kind);
     expect(step.results).toBeUndefined();
     expect(step.label).toBe('Searching the web');
+  });
+
+  it('a page that did not load says so — it was not read', () => {
+    const step = mapToolStep(
+      call('f3', 'web_fetch', { url: 'https://down.example/' }),
+      result('f3', 'Fetch failed: HTTP 403 Forbidden'),
+      false,
+    ).data;
+    expect(step.kind).toBe('page');
+    expect(step.failed).toBe(true);
+    expect(step.label).toBe('Could not read the page');
   });
 
   it('a fetched page is a "Read a page" row with its text — not a browser step', () => {

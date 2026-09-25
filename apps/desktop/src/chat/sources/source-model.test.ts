@@ -19,7 +19,7 @@ import {
 function searchText(rows: { title: string; url: string; snippet: string }[], hint = true): string {
   const lines = rows.map((r, i) => `[${i + 1}] ${r.title}\n    ${r.url}\n    ${r.snippet}`);
   const cite = hint
-    ? '\n\nCite a page you use as [site name](url) right after the sentence it supports.'
+    ? '\n\nIn your reply, cite each page you use as [site name](url) right after the sentence it supports.'
     : '';
   return `${rows.length} result(s) via duckduckgo\n\n${lines.join('\n\n')}${cite}`;
 }
@@ -167,6 +167,31 @@ describe('collectTurnSources', () => {
     expect(c?.search).toBe(1);
     // The citation hint the tools print is not the last result's snippet.
     expect(sources[1]?.snippet).toBe('8,453 types.');
+  });
+
+  it('a page whose printed header was cut off is still the page the call asked for', () => {
+    const tail = 'the last lines of a long article\n'.repeat(3);
+    const sources = collectTurnSources([
+      {
+        name: 'bash',
+        args: { command: 'web fetch "https://long.example/a"' },
+        result: { text: tail, isError: false },
+      },
+      {
+        name: 'web_fetch',
+        args: { url: 'https://long.example/b' },
+        result: { text: tail, isError: false },
+      },
+      {
+        name: 'web_fetch',
+        args: { url: 'https://down.example/' },
+        result: { text: 'Fetch failed: HTTP 403 Forbidden', isError: false },
+      },
+    ]);
+    expect(sources.map((s) => [s.url, s.read])).toEqual([
+      ['https://long.example/a', true],
+      ['https://long.example/b', true],
+    ]);
   });
 
   it('ignores calls that failed, are still running, or are not research', () => {
