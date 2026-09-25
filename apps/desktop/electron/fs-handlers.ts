@@ -486,13 +486,19 @@ function deleteSession(
   // Remembered FIRST, so a listing racing this delete already hides them.
   tombstones.add(targets);
   let error: string | undefined;
+  const kept: string[] = [];
   for (const t of targets) {
     try {
       fs.rmSync(t, { force: true });
     } catch (e) {
       error ??= e instanceof Error ? e.message : String(e);
+      kept.push(t);
     }
   }
+  /* A file that could not be removed was not deleted, so it is not remembered
+     as deleted: the row comes back, rather than staying hidden while every
+     listing retries the rm in silence and reappearing when the record expires. */
+  if (kept.length > 0) tombstones.forget(kept);
   /* A running chat's pi writes its aborted reply after this returns; these two
      sweeps take the file away again even if nothing lists sessions meanwhile. */
   for (const ms of [2_000, 10_000]) setTimeout(() => tombstones.sweep(), ms).unref?.();

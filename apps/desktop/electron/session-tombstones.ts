@@ -23,6 +23,8 @@ export const TOMBSTONE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export interface SessionTombstones {
   /** Remember these files as deleted (absolute paths). */
   add(files: readonly string[]): void;
+  /** Forget these files — a delete that failed left them where they were. */
+  forget(files: readonly string[]): void;
   /** Was this file deleted? */
   has(file: string): boolean;
   /** Remove every remembered file that has come back. Returns how many. */
@@ -76,6 +78,12 @@ export function createSessionTombstones(deps: TombstoneDeps): SessionTombstones 
       // Expired entries go on every write, so the record never grows unbounded.
       for (const [f, t] of map) if (at - t >= ttl) map.delete(f);
       save(map);
+    },
+    forget(files) {
+      const map = load();
+      let changed = false;
+      for (const f of files) changed = map.delete(path.resolve(f)) || changed;
+      if (changed) save(map);
     },
     has(file) {
       const map = load();
