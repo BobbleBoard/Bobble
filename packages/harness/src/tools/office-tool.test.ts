@@ -1,3 +1,6 @@
+import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { CAPABILITIES } from '../presets/capabilities.js';
 import {
@@ -5,7 +8,9 @@ import {
   inferOfficeKind,
   OFFICE_MAKE_TOOL,
   OFFICE_TOOL_NAMES,
+  officeGenDir,
   registerOfficeTools,
+  renderOffice,
   runOffice,
   withOfficeFormats,
 } from './office-tool.js';
@@ -155,6 +160,78 @@ describe('runOffice — the pipeline as a subprocess', () => {
     // The reply `{}` is parsed as a (malformed) result; a missing library must
     // still be named, so the fake here returns no JSON line at all.
     expect(r.ok === false || r.ok === undefined).toBe(true);
+  });
+});
+
+describe('renderOffice — a spec drawn with no model (WF-06)', () => {
+  // This checkout's own tools/office-gen, found the way the app finds it.
+  const DIR = officeGenDir({}) ?? ENV.PI_OFFICE_GEN_DIR;
+  const NO_SERVER = { PI_OFFICE_GEN_DIR: DIR, PI_OFFICE_GEN_PYTHON: '/usr/bin/python3' };
+
+  it('runs with no model server and hands the spec over as a file it then removes', async () => {
+    const { spawnImpl, calls } = fakeSpawn({
+      ok: true,
+      kind: 'docx',
+      path: '/ws/r.docx',
+      sources: 1,
+    });
+    let handed: unknown = null;
+    const spy = ((cmd: string, args: string[], o: unknown) => {
+      handed = JSON.parse(readFileSync(args[args.indexOf('--spec') + 1] as string, 'utf8'));
+      return (spawnImpl as unknown as (...a: unknown[]) => unknown)(cmd, args, o);
+    }) as never;
+    const spec = {
+      blocks: [{ type: 'body', paragraphs: ['Water damage is the #1 claim [S1].'] }],
+      sources: [{ id: 'S1', title: 'Claims 2025', url: 'https://midc.example.org/claims' }],
+    };
+    const r = await renderOffice(
+      { kind: 'docx', spec, out: 'reports/r.docx' },
+      { cwd: '/ws', env: NO_SERVER, spawnImpl: spy },
+    );
+    expect(r).toMatchObject({ ok: true, sources: 1 });
+    const args = calls[0]?.args ?? [];
+    expect(args[0]).toMatch(/office\.py$/);
+    expect(args.slice(1, 4)).toEqual(['render', 'docx', '--spec']);
+    expect(args.slice(-2)).toEqual(['--out', '/ws/reports/r.docx']);
+    expect(handed).toEqual(spec);
+    expect(calls[0]?.env.PI_OFFICE_GEN_SERVER).toBeUndefined();
+    expect(existsSync(args[args.indexOf('--spec') + 1] as string)).toBe(false);
+  });
+
+  it('make still needs the model server; render never asks for one', async () => {
+    const { spawnImpl, calls } = fakeSpawn({ ok: true });
+    const make = await runOffice(['make', 'docx', '--brief', 'x'], {
+      cwd: '/ws',
+      env: NO_SERVER,
+      spawnImpl,
+    });
+    expect(make.error).toMatch(/no local model server/);
+    expect(calls).toHaveLength(0);
+    const render = await runOffice(['render', 'pptx', '--spec', 's.json', '--out', 'd.pptx'], {
+      cwd: '/ws',
+      env: NO_SERVER,
+      spawnImpl,
+    });
+    expect(render.ok).toBe(true);
+    expect(calls).toHaveLength(1);
+  });
+
+  it('draws a real file end to end when the office libraries are here', async () => {
+    // The pinned dev venv (tools/office-gen/requirements-dev.txt), if this
+    // checkout made one — the renderers themselves, no fake.
+    const py = path.join(DIR, '.venv', 'bin', 'python');
+    if (!existsSync(py)) return;
+    const out = mkdtempSync(path.join(tmpdir(), 'render-e2e-'));
+    const spec = JSON.parse(
+      readFileSync(path.join(DIR, 'tests', 'fixtures', 'render', 'deck.json'), 'utf8'),
+    );
+    const r = await renderOffice(
+      { kind: 'pptx', spec, out: 'deck.pptx' },
+      { cwd: out, env: { ...NO_SERVER, PI_OFFICE_GEN_PYTHON: py, PI_OFFICE_GEN_SCRATCH: out } },
+    );
+    expect(r).toMatchObject({ ok: true, kind: 'pptx', sources: 5 });
+    expect(existsSync(path.join(out, 'deck.pptx'))).toBe(true);
+    expect(r.summary).toMatch(/sources: Sources/);
   });
 });
 

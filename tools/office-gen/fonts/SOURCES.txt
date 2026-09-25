@@ -1,0 +1,40 @@
+Bundled fonts for textfit.py (XP-16): what measures text off macOS
+====================================================================
+
+Every file below is under the SIL Open Font License 1.1; the licence texts are
+beside them (LICENSE-Liberation.txt, LICENSE-Gelasio.txt). Bundling OFL fonts:
+the user, deliverables/research/PLAN.md question 28, "yes to all". Downloaded
+2026-09-24 from the projects' own upstream repositories, unmodified.
+
+Liberation Fonts 2.1.5 (Red Hat; OFL 1.1, Reserved Font Name "Liberation")
+  upstream  https://github.com/liberationfonts/liberation-fonts
+  release   https://github.com/liberationfonts/liberation-fonts/releases/tag/2.1.5
+  archive   https://github.com/liberationfonts/liberation-fonts/files/7261482/liberation-fonts-ttf-2.1.5.tar.gz
+            sha256 7191c669bf38899f73a2094ed00f7b800553364f90e2637010a69c0e268f25d0
+  metrics   Liberation Sans = Arial (= Helvetica); Liberation Mono = Courier New
+  licence   LICENSE-Liberation.txt (the archive's LICENSE)
+
+  sha256                                                            file
+  76d04c18ea243f426b7de1f3ad208e927008f961dc5945e5aad352d0dfde8ee8  LiberationSans-Regular.ttf
+  788abee4c806d660e8aee46689dd8540cd4bb98da03dcc9d171ce3efd99a9173  LiberationSans-Bold.ttf
+  e5bae5c4cde31f22142753855f4f8fb86da6ff39955ed3c0a11248b0d16948b0  LiberationSans-Italic.ttf
+  698da70fc191cc5f33ad4d6d3fe830fe4624b898ea2e3169955928b7c491f1ee  LiberationSans-BoldItalic.ttf
+  f2b83c763e8afd21709333370bed4774337fae82267937e2b5aea7e2fbd922c1  LiberationMono-Regular.ttf
+  bd62a0672d0b9b6710b01df434c80ad54fa5f0835207eb7b17b7a761463067bb  LiberationMono-Bold.ttf
+
+Gelasio 1.008 (Eben Sorkin / SorkinType; OFL 1.1)
+  upstream  https://github.com/SorkinType/Gelasio
+  commit    7ab20e7e5c42791e603b9ee3201a0b49849cfdb2 (2026-06-06, "version"; the
+            repository has no tags or releases). Files from fonts/ttf/ at that
+            commit; their git blob ids match upstream's.
+  metrics   drawn to be metric-compatible with Georgia
+  licence   LICENSE-Gelasio.txt (the repository's OFL.txt)
+
+  sha256                                                            file
+  48c797fbe0e07c48a18cb962e7bdfa23f19618327dddf54093265328dc9eb39d  Gelasio-Regular.ttf
+  e0ef3addf1acf35f5c6aef2be00d0a2c01363bf70a5950e16650976051a0c462  Gelasio-Bold.ttf
+  1d8bda4ff258bb8251eae4f7d7500c8d97d084136192bb264bc2305168765d1b  Gelasio-Italic.ttf
+  aa87e21b46aef3dcb50a68dc6e1946f0c0a9819d067e4be6a98a6daa8f5b3c16  Gelasio-BoldItalic.ttf
+
+Which face stands in for which, and the measured width scales: textfit.BUNDLED.
+tests/test_fonts.py checks these hashes, so a replaced file is noticed.

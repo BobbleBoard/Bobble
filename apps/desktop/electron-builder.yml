@@ -36,15 +36,18 @@ extraResources:
   - from: ../../packages/gen-service/python
     to: gen-worker
     filter: ['**/*']
-  # The document pipeline (`office make|edit|inspect`): python-pptx/docx/openpyxl
-  # renderers a Python interpreter runs as real files. mesh-host.ts and
-  # office-gen-env.ts resolve <Resources>/office-gen when packaged.
+  # The document pipeline (`office make|edit|inspect|render`): python-pptx/docx/
+  # openpyxl renderers a Python interpreter runs as real files. mesh-host.ts and
+  # office-gen-env.ts resolve <Resources>/office-gen when packaged. fonts/ is the
+  # bundled OFL set textfit.py measures with where the Mac's faces do not exist
+  # (XP-16) — the fonts, their licences and SOURCES.txt, never the tests.
   - from: ../../tools/office-gen
     to: office-gen
     # design_tokens.json: the design kits, exported for Python (VQ-04,
     # tools/office-gen/design_tokens.py) — the same tokens the chart and
-    # diagram tools read.
-    filter: ['*.py', 'README.md', 'design_tokens.json']
+    # diagram tools read. fonts/: the bundled OFL set text fit measures with
+    # off macOS (XP-16, tools/office-gen/fonts/SOURCES.txt).
+    filter: ['*.py', 'README.md', 'design_tokens.json', 'fonts/*.ttf', 'fonts/*.txt']
   # The bundled Mermaid the `diagram` tool draws with (VQ-10), outside the asar
   # because the main process reads it as a file (gen/diagram-render.ts) — MIT,
   # pinned by sha256 (resources/mermaid/README.md).

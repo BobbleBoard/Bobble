@@ -1,0 +1,39 @@
+{
+ "_note": "A render-path deck spec (WF-06): citations as [S#] markers in the text and as a slide's `sources` list; the sources slide last. Fictional: the Tidewell world, sources on reserved .example domains.",
+ "theme": "ink",
+ "running_title": "Leak detection · research brief",
+ "sources": [
+  {"id": "S1", "title": "Tidewell pilot results, Q3 2026", "site": "Tidewell", "date": "12 Sep 2026",
+   "url": "https://tidewell.example/reports/pilot-q3-2026", "accessed": "24 Sep 2026"},
+  {"id": "S2", "title": "Water damage claims in multifamily buildings, 2025", "site": "Multifamily Insurance Data Council",
+   "date": "14 Mar 2026", "url": "https://midc.example.org/reports/water-claims-2025", "accessed": "24 Sep 2026"},
+  {"id": "S3", "title": "Automatic shut-off valves: a field study of 1,200 units", "site": "Building Science Review",
+   "date": "20 Nov 2025", "url": "https://buildingscience.example.org/articles/shutoff-valves-field-study",
+   "accessed": "24 Sep 2026"},
+  {"id": "S4", "title": "US rental housing stock by building size", "site": "Housing Statistics Office",
+   "date": "8 Jan 2026", "url": "https://housing-stats.example.gov/rental-stock-by-size", "accessed": "24 Sep 2026"},
+  {"id": "S5", "title": "Leak sensor response times: a vendor benchmark", "site": "SensorLab", "date": "30 May 2026",
+   "url": "https://sensorlab.example.com/benchmarks/leak-response-2026", "accessed": "24 Sep 2026"}
+ ],
+ "slides": [
+  {"layout": "title", "title": "Leak detection in apartment buildings",
+   "subtitle": "What the claims record, a field study and one pilot agree on"},
+  {"layout": "stats", "title": "What a leak costs, and what stops it",
+   "stats": [{"value": "$24,000", "label": "average multifamily water-damage claim"},
+             {"value": "71%", "label": "lower claim cost with automatic shut-off"},
+             {"value": "22M", "label": "US rental units in mid/large buildings"}],
+   "sources": ["S2", "S3", "S4"]},
+  {"layout": "bullets", "title": "Findings",
+   "bullets": ["Water damage is the #1 multifamily insurance claim [S2].",
+               "Shut-off valves cut the average claim by 71% in a 1,200-unit field study [S3].",
+               "Tidewell's pilot covered 3,100 units in 42 buildings [S1].",
+               "The 14-minute median time to alert rests on one vendor benchmark [S5]."]},
+  {"layout": "flow", "title": "How automatic shut-off works",
+   "steps": [{"label": "Sense", "caption": "a sensor under every sink and heater [S1]"},
+             {"label": "Alert", "caption": "the dashboard pages the manager"},
+             {"label": "Shut off", "caption": "the valve closes within minutes [S5]"}]},
+  {"layout": "quote", "quote": "Automatic shut-off valves cut the average water-damage claim by 71%.",
+   "attribution": "Building Science Review field study [S3]"},
+  {"layout": "sources", "title": "Sources"}
+ ]
+}

@@ -35,10 +35,24 @@ def split_pptx(src: Path, work: Path, prefix: str) -> list[Path]:
         for j, sid in enumerate(list(lst)):
             if j != i:
                 lst.remove(sid)
+        _drop_slide_jumps(prs.slides[0])
         p = work / f"{prefix}__slide{i + 1:02d}.pptx"
         prs.save(str(p))
         outs.append(p)
     return outs
+
+
+def _drop_slide_jumps(slide) -> None:
+    """A link to another slide dangles once the deck is cut to one slide, and
+    QuickLook then draws NOTHING of the shape that carries it (MEASURED
+    2026-09-24: a rendered deck's "Sources: 3, 7" line, which links to its
+    sources slide, vanished from every cut slide and showed in the whole
+    deck). The render should show what a viewer of the whole deck sees, so the
+    cut copy loses the jump and keeps the shape. measure.py reads the original."""
+    for el in list(slide._element.iter()):
+        tag = el.tag.rsplit("}", 1)[-1]
+        if tag in ("hlinkClick", "hlinkHover") and "hlinksldjump" in (el.get("action") or ""):
+            el.getparent().remove(el)
 
 
 def split_pdf(src: Path, work: Path, prefix: str) -> list[Path]:

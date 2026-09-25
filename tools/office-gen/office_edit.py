@@ -78,9 +78,44 @@ def _set_text_keep_style(container, text: str) -> None:
             r._r.getparent().remove(r._r)
     else:
         p0.add_run().text = text
+    # A Word paragraph's links (a rendered document's citation superscripts,
+    # a source's URL) hold runs that `.runs` does not list; the old wording
+    # in them would survive the new text.
+    for h in list(getattr(p0, "hyperlinks", None) or []):
+        h._hyperlink.getparent().remove(h._hyperlink)
     # Any further paragraphs belonged to the old wording.
     for p in paras[1:]:
         p._p.getparent().remove(p._p)
+
+
+def _cited_text(p) -> str:
+    """A rendered paragraph's text with its citation superscripts as "[2]":
+    flat, they run into the word they sit on ("claim2.", "71%3") and read as
+    part of it or of a number."""
+    from docx.text.hyperlink import Hyperlink
+    out = []
+    for item in p.iter_inner_content():
+        if isinstance(item, Hyperlink) and (item.fragment or "").startswith("_RefSource"):
+            out.append(f"[{item.text}]")
+        else:
+            out.append(item.text)
+    # One outline line per paragraph: a sources entry's tab and line break
+    # (number, title — URL on the next line) read as spaces.
+    return " ".join(re.sub(r"\],\[", ",", "".join(out)).split())
+
+
+def _cell_text(c) -> str:
+    """A table cell's text; its citations as "[2]" when it has any."""
+    if not any(p.hyperlinks for p in c.paragraphs):
+        return c.text
+    return "\n".join(_cited_text(p) if p.hyperlinks else p.text for p in c.paragraphs)
+
+
+def _links(addresses) -> list[str]:
+    """The external links among some addresses, once each, in order — what an
+    outline shows so a reader of it can see where a rendered document's
+    sources point (WF-06). A made document has none."""
+    return list(dict.fromkeys(a for a in addresses if a))
 
 
 # ── pptx ──────────────────────────────────────────────────────────────────────
@@ -114,6 +149,9 @@ def inspect_pptx(path: Path) -> dict:
                         col = _hex(runs[0].font.color)
                         if col:
                             item["color"] = col
+                    links = _links(r.hyperlink.address for r in runs)
+                    if links:
+                        item["links"] = links
             shapes.append(item)
         slides.append({"slide": si, "shapes": shapes})
     return {"format": "pptx", "slides": slides,
@@ -266,7 +304,7 @@ def inspect_docx(path: Path) -> dict:
     doc = Document(str(path))
     paras = []
     for i, p in enumerate(doc.paragraphs):
-        txt = p.text.strip()
+        txt = (_cited_text(p) if p.hyperlinks else p.text).strip()
         if not txt:
             continue
         item = {"id": f"p{i}", "text": txt[:300], "style": p.style.name if p.style else None}
@@ -277,12 +315,15 @@ def inspect_docx(path: Path) -> dict:
             col = _hex(r.font.color)
             if col:
                 item["color"] = col
+        links = _links(h.address for h in p.hyperlinks)
+        if links:
+            item["links"] = links
         paras.append(item)
     tables = []
     for ti, t in enumerate(doc.tables):
         rows = []
         for ri, row in enumerate(t.rows):
-            rows.append([{"id": f"t{ti}.r{ri}.c{ci}", "text": c.text.strip()[:120]}
+            rows.append([{"id": f"t{ti}.r{ri}.c{ci}", "text": _cell_text(c).strip()[:120]}
                          for ci, c in enumerate(row.cells)])
         tables.append({"table": ti, "rows": rows})
     return {"format": "docx", "paragraphs": paras, "tables": tables}
@@ -374,8 +415,14 @@ def inspect_xlsx(path: Path, max_rows: int = 60) -> dict:
             for c in row:
                 if c.value is None:
                     continue
-                cells.append({"id": c.coordinate, "value": str(c.value)[:120],
-                              "format": c.number_format})
+                cell = {"id": c.coordinate, "value": str(c.value)[:120], "format": c.number_format}
+                if c.hyperlink is not None:
+                    link = c.hyperlink.target or (f"#{c.hyperlink.location}" if c.hyperlink.location else "")
+                    if link:
+                        cell["link"] = link
+                if c.comment is not None and c.comment.text:
+                    cell["note"] = " ".join(c.comment.text.split())[:200]
+                cells.append(cell)
         sheets.append({"sheet": ws.title, "dims": f"{ws.max_row}x{ws.max_column}",
                        "cells": cells, "charts": len(getattr(ws, "_charts", []))})
     return {"format": "xlsx", "sheets": sheets}
