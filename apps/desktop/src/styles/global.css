@@ -7258,6 +7258,31 @@ body[data-media-expanded="true"] .pd-studio-compose {
   border-color: color-mix(in oklab, var(--pd-text-primary) 10%, transparent);
   background-color: var(--pd-bg-sunken, var(--pd-bg-raised));
 }
+/*
+ * …AND A SOUND TAKES ITS TRANSPORT'S CHROME THE SAME WAY, while its bars travel
+ * to the real peaks. The strip waits with no plate, but the finished audio card
+ * has the border and the sunken ground, and this rule skipping audio left both
+ * to arrive in ONE frame at the swap (MEASURED, audio-handover-look: the studio's
+ * last waiting frame had neither, its first finished frame both). The chat's
+ * handover card mounts already holding the sound, so it starts from no chrome
+ * (`@starting-style`) and eases in like the studio's does.
+ */
+.pd-media-card--pending[data-kind="audio"][data-revealing="true"] .pd-media-frame,
+:root[data-mode="dark"]
+  .pd-media-card--pending[data-kind="audio"][data-revealing="true"]
+  .pd-media-frame {
+  border-color: color-mix(in oklab, var(--pd-text-primary) 10%, transparent);
+  background-color: var(--pd-bg-sunken, var(--pd-bg-raised));
+}
+@starting-style {
+  .pd-media-card--pending[data-kind="audio"][data-revealing="true"] .pd-media-frame,
+  :root[data-mode="dark"]
+    .pd-media-card--pending[data-kind="audio"][data-revealing="true"]
+    .pd-media-frame {
+    border-color: transparent;
+    background-color: transparent;
+  }
+}
 /* Once the result is in, the lift fades with the sweep, so the finished card
    that replaces this one (which has no halo) is not a visible step. */
 .pd-media-card--pending[data-done="true"] .pd-media-frame,
