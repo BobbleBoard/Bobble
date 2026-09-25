@@ -144,7 +144,13 @@ function SourceCitation({
       >
         <div ref={firstLink} className="pd-cite-card-list">
           {sources.map((s) => (
-            <SourceRow key={s.key} source={s} variant="popover" active={open} />
+            <SourceRow
+              key={s.key}
+              source={s}
+              variant="popover"
+              active={open}
+              onOpened={() => setOpen(false)}
+            />
           ))}
         </div>
       </PopoverContent>

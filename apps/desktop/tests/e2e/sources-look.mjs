@@ -764,7 +764,33 @@ try {
     check(false, `keyboard: ${kb.why}`);
   }
 
-  /* A chip click opens its source in the canvas browser, like every chat link. */
+  /* A source opened from a chip's card: the card gets out of the way. */
+  const viaCard = await page.evaluate(async () => {
+    const chip = document.querySelector('[data-testid="source-chip"][data-count="3"]');
+    if (!(chip instanceof HTMLElement)) return null;
+    chip.click();
+    await new Promise((r) => setTimeout(r, 500));
+    const title = document.querySelector(
+      '[data-testid="source-hovercard"] [data-testid="source-row-title"]',
+    );
+    if (!(title instanceof HTMLElement)) return { card: false };
+    title.click();
+    await new Promise((r) => setTimeout(r, 800));
+    return {
+      card: true,
+      closed: document.querySelector('[data-testid="source-hovercard"]') === null,
+      tabs: [...document.querySelectorAll('.pd-canvas-tab')].map((t) =>
+        t.getAttribute('data-kind'),
+      ),
+    };
+  });
+  console.log('opened from the card:', JSON.stringify(viaCard));
+  check(
+    viaCard?.card === true && viaCard.closed === true && viaCard.tabs.includes('browser'),
+    `a title in the card opens the page in the canvas browser and the card closes (${JSON.stringify(viaCard)})`,
+  );
+
+  /* A row of the Sources card opens its page there too, like every chat link. */
   const opened = await page.evaluate(async () => {
     const title = document.querySelector(
       '[data-testid="sources-card"] [data-testid="source-row-title"]',

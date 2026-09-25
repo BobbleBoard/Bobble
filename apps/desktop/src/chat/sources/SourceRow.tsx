@@ -69,12 +69,15 @@ export function SourceRow({
   source,
   variant,
   active = true,
+  onOpened,
 }: {
   source: TurnSource;
   /** `card` — the Sources card (with its ⋮ menu); `popover` — a chip's hover card. */
   variant: 'card' | 'popover';
   /** On screen: only then does the row ask main about the page. */
   active?: boolean;
+  /** After the page has been opened — a hover card closes itself. */
+  onOpened?: () => void;
 }) {
   const openUrl = useOpenUrl();
   const meta = useSourceMeta(source.url, active);
@@ -85,6 +88,7 @@ export function SourceRow({
   const open = (): void => {
     if (openUrl !== undefined) openUrl(source.url);
     else openOutside(source.url);
+    onOpened?.();
   };
   return (
     <div
