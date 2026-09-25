@@ -49,6 +49,7 @@ import { createMacConsentGate } from './permissions.js';
 import type {
   MacActAck,
   MacAgentMethod,
+  MacBrakeAck,
   MacLaunchAck,
   MacMenuAck,
   MacMenuEntry,
@@ -271,6 +272,26 @@ function noticed(bridge: MacBridge | null, session: MacSessionState | undefined)
       return bridge.request<T>(method, params);
     },
   };
+}
+
+/**
+ * THE USER'S BRAKE, FOR THE ROUTES THAT NEVER REACH IT.
+ *
+ * Stop and Take over are enforced where acts arrive — the bridge refuses every
+ * act and look (mac-agent.ts, controlRefusal). Apple Events never arrive there:
+ * with Chrome's JavaScript setting on, chrome_* read and drove the page right
+ * through a Stop, and a refused `chrome snapshot --visual` even told the model
+ * to take that route instead. So those routes ask first. An app too old to
+ * answer is answered as "no brake": the route works as it always did.
+ */
+async function brakeRefusal(bridge: MacBridge | null): Promise<string | null> {
+  if (bridge === null) return null;
+  try {
+    const ack = await bridge.request<MacBrakeAck>('brake');
+    return typeof ack?.refusal === 'string' && ack.refusal !== '' ? ack.refusal : null;
+  } catch {
+    return null;
+  }
 }
 
 function errResult(action: string, message: string): AgentToolResult<MacDetails> {
@@ -1474,6 +1495,8 @@ export function registerMacComputerUseTools(
          */
         const wanted = params.app ?? CHROME_APP;
         if (/chrome/i.test(wanted)) {
+          const braked = await brakeRefusal(bridge);
+          if (braked !== null) return errResult('chrome_tabs', braked);
           const viaEvents = await readChromeTabs();
           if (viaEvents !== null) {
             return textResult(formatChromeTabs(viaEvents), {
@@ -1776,6 +1799,9 @@ export function registerChromeTools(
     /** The mac set's recorder (MacComputerUseHandle), so Chrome taking control
      *  survives a restart and reaches the next chat like any other take. */
     readonly recordControl?: () => void;
+    /** The mac set's consent + policy gate, for the one command that captures
+     *  the screen the way mac_snapshot does (`--visual`). */
+    readonly consent?: MacConsentGate;
     /** Chrome's pid (test seam; default pgrep). */
     readonly chromePid?: () => Promise<number | null>;
     /*
@@ -1791,6 +1817,7 @@ export function registerChromeTools(
   // Chrome's own commands drive through the helper too (ax below), so the turn
   // that used them is the turn that ends the driving.
   const bridge = noticed(appBridge, options.session);
+  const consent = options.consent ?? createMacConsentGate();
   let askedThisSession = false;
   const isChromeRunning = options.isChromeRunning ?? chromeRunning;
   const pidOfChrome = options.chromePid ?? chromePid;
@@ -1907,6 +1934,8 @@ export function registerChromeTools(
     ctx: ExtensionContext,
     js: string,
   ): Promise<{ text: string; ok: boolean }> {
+    const braked = await brakeRefusal(bridge);
+    if (braked !== null) return { text: braked, ok: false };
     const blocked = await ensureChromeJs(ctx);
     if (blocked !== null) return { text: blocked, ok: false };
     const notUp = await ensureChromeRunning();
@@ -1949,9 +1978,38 @@ export function registerChromeTools(
        * and only once Chrome is up, so looking never launches it in front.
        */
       if (params.visual === true) {
+        /*
+         * THE GATE AND THE BRAKE mac_snapshot --visual answers to — it is the
+         * same capture of the user's logged-in window. It had neither: it took
+         * the picture with computer use switched off in Settings or Chrome never
+         * allowed, and it swallowed the brake's refusal into "take a plain chrome
+         * snapshot instead" — the one route the brake could not see.
+         */
+        const decision = await consent.ensure(ctx, CHROME_APP);
+        if (!decision.ok) {
+          const text = `chrome_snapshot failed: ${decision.reason}`;
+          return { content: [{ type: 'text', text }], details: undefined };
+        }
+        const braked = await brakeRefusal(bridge);
+        if (braked !== null) {
+          const text = `chrome_snapshot failed: ${braked}`;
+          return { content: [{ type: 'text', text }], details: undefined };
+        }
         const notUp = await ensureChromeRunning();
         if (notUp !== null) return { content: [{ type: 'text', text: notUp }], details: undefined };
-        const snap = await ax<MacSnapshot>('snapshot', { screenshot: true });
+        let snap: MacSnapshot | null = null;
+        try {
+          snap =
+            bridge === null
+              ? null
+              : await bridge.request<MacSnapshot>('snapshot', {
+                  app: CHROME_APP,
+                  screenshot: true,
+                });
+        } catch (err) {
+          const text = `chrome_snapshot failed: ${messageOf(err)}`;
+          return { content: [{ type: 'text', text }], details: undefined };
+        }
         const shot = snap?.screenshot;
         if (shot?.base64 === undefined || shot.base64 === '') {
           return {

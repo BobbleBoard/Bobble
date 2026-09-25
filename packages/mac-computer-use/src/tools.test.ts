@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { MacBridge } from './bridge-client.js';
 import { registerMacComputerUse } from './index.js';
 import { createMacConsentGate, type MacConsentGate } from './permissions.js';
+import { COMPUTER_USE_OFF_REASON } from './policy.js';
 import type { MacAgentMethod } from './protocol.js';
 import { createMacSessionState } from './session-state.js';
 import { registerChromeTools, registerMacComputerUseTools } from './tools.js';
@@ -1358,7 +1359,7 @@ describe('Chrome work never takes the app the model chose away from it', () => {
       .on('key', () => ({ ok: true, background: true }))
       .on('type', () => ({ found: true }))
       .on('click', () => ({ found: true }))
-      .on('brake' as MacAgentMethod, () => ({ refusal: null }));
+      .on('brake', () => ({ refusal: null }));
     const { pi, tools } = piStub();
     registerMacComputerUseTools(pi, {
       bridge,
@@ -1463,7 +1464,7 @@ describe('only a session that drove the Mac this turn ends the driving', () => {
     const bridge = new FakeBridge()
       .on('snapshot', () => ({ ...SNAP([OK_BUTTON], 4321), app: 'Google Chrome' }))
       .on('setDriving', () => ({ ok: true }))
-      .on('brake' as MacAgentMethod, () => ({ refusal: null }));
+      .on('brake', () => ({ refusal: null }));
     const s = piStub();
     registerMacComputerUseTools(s.pi, {
       bridge,
@@ -1621,6 +1622,75 @@ describe('the "USER has in front" notice reaches the model on every kind of fall
   });
 });
 
+describe('chrome snapshot --visual answers to the brake and the gate like every other look', () => {
+  const STOP =
+    'The user pressed Stop, so Mac control is off. Do not retry: say what you had done to ' +
+    'Google Chrome and ask whether to carry on.';
+
+  it('passes the Stop on instead of sending the model round the brake', async () => {
+    const bridge = new FakeBridge().on('snapshot', () => {
+      throw new Error(STOP);
+    });
+    const r = await run(collectTools(bridge), 'chrome_snapshot', { visual: true });
+    expect(textOf(r)).toContain('pressed Stop');
+    expect(textOf(r)).not.toMatch(/plain chrome snapshot/i);
+  });
+
+  it('asks the gate mac_snapshot asks — and stops when computer use is switched off', async () => {
+    const bridge = new FakeBridge().on('snapshot', () => ({
+      ...SNAP([]),
+      app: 'Google Chrome',
+      screenshot: { path: '/tmp/c.png', base64: 'CCCC' },
+    }));
+    const { pi, tools } = piStub();
+    registerChromeTools(pi, bridge, {
+      isChromeRunning: async () => true,
+      ...NO_APPLE_EVENTS,
+      consent: createMacConsentGate({
+        preConsented: true,
+        policy: async () => ({ enabled: false, apps: [] }),
+      }),
+    });
+    const r = await run(tools, 'chrome_snapshot', { visual: true });
+    expect(textOf(r)).toContain(COMPUTER_USE_OFF_REASON);
+    expect(bridge.countOf('snapshot')).toBe(0);
+  });
+
+  it('and the Apple-Events route stops for the brake too', async () => {
+    const evals: string[] = [];
+    const bridge = new FakeBridge().on('brake', () => ({ refusal: STOP }));
+    const { pi, tools } = piStub();
+    registerChromeTools(pi, bridge, {
+      isChromeRunning: async () => true,
+      ...NO_APPLE_EVENTS,
+      chromeEval: async (js: string) => {
+        evals.push(js);
+        return { ok: true, value: 'Page: example.com' };
+      },
+    });
+    const r = await run(tools, 'chrome_snapshot', {});
+    expect(evals).toHaveLength(0);
+    expect(textOf(r)).toContain('pressed Stop');
+  });
+
+  it('as does the Apple-Events read of the tab list', async () => {
+    let reads = 0;
+    const bridge = new FakeBridge().on('brake', () => ({ refusal: STOP }));
+    const { pi, tools } = piStub();
+    registerMacComputerUseTools(pi, {
+      bridge,
+      consent: preConsented(),
+      readChromeTabs: async () => {
+        reads += 1;
+        return [];
+      },
+    });
+    const r = await run(tools, 'chrome_tabs', {});
+    expect(reads).toBe(0);
+    expect(textOf(r)).toContain('pressed Stop');
+  });
+});
+
 describe('Chrome work leaves Chrome under control whichever route did it — and remembers it', () => {
   it('a default Chrome (no Apple-Events JavaScript) still leaves Chrome under control', async () => {
     const session = createMacSessionState();
@@ -1629,7 +1699,7 @@ describe('Chrome work leaves Chrome under control whichever route did it — and
         ...SNAP([{ index: 1, role: 'AXLink', name: 'Docs' }], 4321),
         app: 'Google Chrome',
       }))
-      .on('brake' as MacAgentMethod, () => ({ refusal: null }));
+      .on('brake', () => ({ refusal: null }));
     const { pi, tools } = piStub();
     registerChromeTools(pi, bridge, {
       session,

@@ -41,12 +41,15 @@ export function registerMacComputerUse(pi: ExtensionAPI, options: MacComputerUse
      commands leaves Chrome as the app a bare `mac snapshot` looks at — and one
      recorder, so that take is remembered like any other. */
   const session = options.session ?? createMacSessionState();
-  const mac = registerMacComputerUseTools(pi, { ...options, session });
+  // One gate too: an app allowed once is allowed for both sets.
+  const consent = options.consent ?? createMacConsentGate();
+  const mac = registerMacComputerUseTools(pi, { ...options, session, consent });
   /* Chrome's own set. It prefers the real DOM over Apple Events and falls back
      to Accessibility when Chrome refuses those — which is the usual case — so
      it takes the bridge as well. */
   registerChromeTools(pi, options.bridge, {
     session,
+    consent,
     recordControl: mac.recordControl,
     ...(options.isChromeRunning === undefined ? {} : { isChromeRunning: options.isChromeRunning }),
     ...(options.chromePid === undefined ? {} : { chromePid: options.chromePid }),
