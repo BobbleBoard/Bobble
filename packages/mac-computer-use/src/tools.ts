@@ -46,16 +46,17 @@ import {
 } from './format.js';
 import type { MacConsentGate } from './permissions.js';
 import { createMacConsentGate } from './permissions.js';
-import type {
-  MacActAck,
-  MacAgentMethod,
-  MacBrakeAck,
-  MacLaunchAck,
-  MacMenuAck,
-  MacMenuEntry,
-  MacSnapshot,
-  MacTccStatus,
-  MacWindowInfo,
+import {
+  MAC_DRIVING_METHODS,
+  type MacActAck,
+  type MacAgentMethod,
+  type MacBrakeAck,
+  type MacLaunchAck,
+  type MacMenuAck,
+  type MacMenuEntry,
+  type MacSnapshot,
+  type MacTccStatus,
+  type MacWindowInfo,
 } from './protocol.js';
 import { scrollDelta } from './scroll.js';
 import { createMacSessionState, type MacSessionState } from './session-state.js';
@@ -245,23 +246,8 @@ function describeOpened(
   return '';
 }
 
-/**
- * The requests that put something on the user's screen: the phantom cursor and
- * the monitor follow each of them (apps/desktop/electron/mac/mac-agent.ts).
- * Reads — the policy, the grants, a tab list — do not.
- */
-const DRIVING_METHODS: ReadonlySet<MacAgentMethod> = new Set<MacAgentMethod>([
-  'snapshot',
-  'click',
-  'type',
-  'key',
-  'scroll',
-  'launch',
-  'menuClick',
-  'tabSelect',
-  'tabNew',
-  'tabClose',
-]);
+/** The requests that put something on the user's screen (see protocol.ts). */
+const DRIVING_METHODS: ReadonlySet<MacAgentMethod> = new Set(MAC_DRIVING_METHODS);
 
 /** The bridge, noting on the session every request that drives (see `endTurn`). */
 function noticed(bridge: MacBridge | null, session: MacSessionState | undefined): MacBridge | null {
