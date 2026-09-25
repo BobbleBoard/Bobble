@@ -483,7 +483,7 @@ function EngineRow({
  * change relaunches the model (the projector / lane is a launch argument), and
  * a reply in flight is paused first so it can be resumed.
  */
-function VisionRow({ onNote }: { onNote: (text: string | null) => void }) {
+export function VisionRow({ onNote }: { onNote: (text: string | null) => void }) {
   const loadVision = useSettingsStore((s) => s.settings.loadVision !== false);
   const update = useSettingsStore((s) => s.update);
   const relaunch = useLlmStore((s) => s.relaunch);
@@ -515,7 +515,10 @@ function VisionRow({ onNote }: { onNote: (text: string | null) => void }) {
     setSwitching(true);
     try {
       await update({ loadVision: on });
-      if (status.serverRunning) {
+      /* A model still LOADING took the old setting with it, and is not
+         running yet — so it is relaunched too (the supervisor waits for the
+         load to land); saved only, it came up the other way round. */
+      if (status.serverRunning || status.phase === 'starting') {
         if (busyTurn) await pausePi();
         const r = await relaunch();
         if (!r.success) onNote(r.error ?? 'could not relaunch the model');

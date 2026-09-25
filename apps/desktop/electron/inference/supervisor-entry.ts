@@ -2368,6 +2368,10 @@ function listLocalGgufs(): Array<{
 
 /** Apply: the same model, mode and profile, launched again with the current flags. */
 async function relaunch(): Promise<{ success: boolean; error?: string }> {
+  /* A load still in flight (the Vision switch flipped mid-load) has not set
+     `current` yet, and captured the old flags: wait for it to land, then
+     relaunch what landed. */
+  await startInFlight;
   if (current === null) return { success: false, error: 'no model is running' };
   const c = current;
   /* A MULTIMODAL launch exists to see (ensureVisionMode's relaunch). Vision

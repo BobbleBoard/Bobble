@@ -287,6 +287,29 @@ describe('Vision off, then Apply (relaunch)', () => {
     expect(s.visionReady).toBe(false);
     expect(s.blindReason).toBe('off');
   });
+
+  it('a switch flipped while the model is still loading is applied when it lands', async () => {
+    gguf('qwen3.5-0.8b-mtp', 'Qwen3.5-0.8B-Q8_0.gguf', true);
+    let release: () => void = () => {};
+    h.hold = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const launched = h.launches.length;
+    const loading = ask<{ success: boolean }>({
+      type: 'start-server',
+      modelId: 'qwen3.5-0.8b-mtp',
+    });
+    await vi.waitFor(() => expect(h.launches.length).toBe(launched + 1));
+    expect((await status()).serverRunning).toBe(false);
+    await vision(false);
+    const applied = ask<{ success: boolean }>({ type: 'relaunch' });
+    h.hold = null;
+    release();
+    expect((await loading).success).toBe(true);
+    expect(await applied).toEqual({ success: true });
+    expect(lastLaunch()?.mmprojPath).toBeUndefined();
+    expect((await status()).blindReason).toBe('off');
+  });
 });
 
 describe('rapid-mlx rows keep the method they name', () => {
