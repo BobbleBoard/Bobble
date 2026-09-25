@@ -409,6 +409,14 @@ button.pd-chain-step-row:hover .pd-chain-step-chevron {
   margin: 2px 0 2px 30px;
 }
 
+/* What a step made (a picture the turn has moved on from): under its row,
+ * indented past the icon + connector like the step's other content, so the
+ * connector line threads it into the run it belongs to. */
+.pd-chain-step-attachment {
+  margin: 6px 0 4px 30px;
+  min-width: 0;
+}
+
 /* Search results keep a bounded scroll; thoughts NEVER scroll (round-5 #3) —
  * they fade + Show more instead (see .pd-chain-thought below). */
 .pd-chain-step-inline--scroll {

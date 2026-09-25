@@ -20,6 +20,7 @@ import {
   IconClose,
   Spinner,
 } from '@pi-desktop/ui';
+import type { SerializedEditorState } from 'lexical';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ExpandedScrim } from '../media/ExpandedScrim';
 import { IconMic, IconPause, IconPlay, IconStop } from '../settings/icons';
@@ -36,6 +37,7 @@ import {
   resumePausedChat,
   runBash,
   sendPrompt,
+  unsendLastSend,
 } from '../state/pi-connect';
 import { usePiStore } from '../state/pi-slice';
 import { assessCurrentSend, useQueueExplainer } from '../state/running-chats';
@@ -64,10 +66,12 @@ import { clipboardEpoch } from './composer/clipboard-epoch';
 import { useDropStore } from './composer/drop-store';
 import type { PillData } from './composer/pill-node';
 import { type AcToken, EMPTY_TOKEN } from './composer/tokens';
+import { claimsUndoForUnsend, isUndoKey, UNSEND_WINDOW_MS } from './composer/unsend-gesture';
 import { GEN_ACTION_PLANS } from './composer-gen-actions';
 import { DictationBar } from './DictationBar';
 import { IconWarning } from './icons-pill';
 import { HELP_TEXT, parseSlashCommand } from './slash-commands';
+import { followToLatest } from './thread-follow';
 import { usePrefillPill } from './use-prefill-pill';
 import { useDictation } from './useDictation';
 
@@ -93,6 +97,20 @@ const MENTION_DEBOUNCE_MS = 90;
 interface SlashCommand {
   name: string;
   description?: string;
+}
+
+/** A message ⌘Z can still take back, and everything needed to put it back. */
+interface ArmedUnsend {
+  /** When it was sent. */
+  at: number;
+  /** What its bubble says — how the thread and the queue know it. */
+  echo: string;
+  images: string[];
+  /** The typed text, for an editor that could not be snapshotted. */
+  raw: string;
+  /** The editor exactly as it was, pills and all. */
+  draft: SerializedEditorState | null;
+  attachments: Attachment[];
 }
 
 interface Attachment {
@@ -637,6 +655,8 @@ export function ChatComposer({
     const onKey = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey;
       if (!mod || e.altKey) return;
+      // Already taken — by the unsend below, which runs first (capture phase).
+      if (e.defaultPrevented) return;
       /*
        * NOT WHILE SOMEONE IS TYPING IN ANOTHER FIELD. These keys are heard at
        * the window, so ⌘V in the image viewer's edit bar (or any dialog's
@@ -687,6 +707,71 @@ export function ChatComposer({
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   });
+
+  /*
+   * ⌘Z JUST AFTER SENDING TAKES THE MESSAGE BACK — composer/unsend-gesture.ts
+   * says exactly when; pi-connect's unsendLastSend says what it undoes.
+   *
+   * submit() arms it with everything needed to put the message back as it was
+   * typed — the editor's own state, so a pill comes back a pill, and the files
+   * that went with it — and the first thing typed or attached drops it for
+   * good, so ⌘Z is text undo again the moment there is text to undo.
+   *
+   * On the window, in the CAPTURE phase: it must decide before the editor's own
+   * undo (Lexical takes ⌘Z on its keydown) and before the attachment undo above,
+   * and when it takes the key nothing else may act on it too. Anywhere else —
+   * outside the window, a box with something in it, another field — it returns
+   * without touching the event.
+   */
+  const unsendRef = useRef<ArmedUnsend | null>(null);
+  const attachmentsRef = useRef(attachments);
+  attachmentsRef.current = attachments;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!isUndoKey(e)) return;
+      const armed = unsendRef.current;
+      if (armed === null) return;
+      const target = e.target instanceof Element ? e.target : null;
+      const inOtherField =
+        target !== null &&
+        target.closest('input, textarea, select, [contenteditable="true"]') !== null &&
+        target.closest('[data-testid="composer-input"]') === null;
+      const now = Date.now();
+      if (now - armed.at > UNSEND_WINDOW_MS) {
+        unsendRef.current = null;
+        return;
+      }
+      if (
+        !claimsUndoForUnsend({
+          armedAt: armed.at,
+          now,
+          draftEmpty: textRef.current.length === 0 && attachmentsRef.current.length === 0,
+          inOtherField,
+        })
+      ) {
+        return;
+      }
+      unsendRef.current = null;
+      // Not the message this composer just sent (it already drained into a turn
+      // of its own, the chat moved on): ordinary undo after all.
+      if (!unsendLastSend({ text: armed.echo, images: armed.images })) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (armed.draft !== null) apiRef.current?.restore(armed.draft);
+      else apiRef.current?.setText(armed.raw);
+      setAttachments(armed.attachments);
+      // The turn it started is gone: the button is Send again, now.
+      setPendingStart(false);
+      setPendingStop(false);
+      apiRef.current?.focus();
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, []);
+  // Attaching something is starting the next message, same as typing.
+  useEffect(() => {
+    if (attachments.length > 0) unsendRef.current = null;
+  }, [attachments]);
 
   // A file removed while selected must not stay "selected" in a ghostly way.
   useEffect(() => {
@@ -1164,6 +1249,14 @@ export function ChatComposer({
   const submit = async () => {
     const raw = text.trim();
     if (raw === '' && attachments.length === 0) return;
+    // Taken BEFORE the box is cleared: what ⌘Z would put back (see unsendRef).
+    const draft = apiRef.current?.snapshot() ?? null;
+    const sentAttachments = attachments;
+    // A new send replaces whatever the last one armed.
+    unsendRef.current = null;
+    /* the user (2026-09-24): "pressing enter on a chat should take you to the
+       bottom" — the thread re-pins and follows the reply (thread-follow.ts). */
+    followToLatest();
     const imageUris = attachments
       .filter((a) => a.kind === 'image')
       .map((a) => a.dataUri)
@@ -1314,6 +1407,16 @@ export function ChatComposer({
      * and what it is waiting on is the machine.
      */
     const modelLoading = assessCurrentSend(piState.promptInFlight).reason.kind === 'model-loading';
+    // From here the message is really going — queued or sent — so ⌘Z can take
+    // it back (bash, slash commands and corp follow-ups returned above).
+    unsendRef.current = {
+      at: Date.now(),
+      echo,
+      images: imageUris,
+      raw,
+      draft,
+      attachments: sentAttachments,
+    };
     if (piState.promptInFlight || streamEmpty || bgBusy || modelLoading) {
       // Snapshot WHY it's waiting (same-model wait vs a model swap vs a model that
       // won't fit) so the faded queued line + the "Why isn't my message sending?"
@@ -1557,7 +1660,12 @@ export function ChatComposer({
           >
             <ComposerEditor
               placeholder={placeholder}
-              onTextChange={setText}
+              onTextChange={(next) => {
+                setText(next);
+                // Typing starts the next message: ⌘Z is text undo from here on,
+                // even if the box is emptied again.
+                if (next.length > 0) unsendRef.current = null;
+              }}
               onTokenChange={setToken}
               onSubmit={() => void submit()}
               onLargePaste={handleLargePaste}

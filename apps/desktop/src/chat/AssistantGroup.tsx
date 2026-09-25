@@ -12,15 +12,11 @@
  * rail while streaming (a thinking run is an ActivityChain, not a component that
  * swaps type when it settles), and real tool/file activity rows.
  */
-import {
-  type AssistantMsg,
-  type ContentBlock,
-  cleanErrorText,
-  type ToolResultMsg,
-} from '@pi-desktop/engine';
+import { type AssistantMsg, cleanErrorText, type ToolResultMsg } from '@pi-desktop/engine';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { type PendingKind, PendingMediaCard } from '../media/PendingMediaCard';
 import { abortPi } from '../state/pi-connect';
+import type { PresentedRecord } from '../state/present-store';
 import { segmentGroup } from './activity-mapping';
 import { InlineArtifact } from './canvas/InlineArtifacts';
 import { useGeneratingJob, useModel3dLive } from './GeneratingMedia';
@@ -29,17 +25,12 @@ import { LiveSvgCard } from './LiveSvgCard';
 import { LongJobCard } from './LongJobCard';
 import { effectiveToolName, estimateFor, type JobKind, jobKindForTool, jobView } from './long-job';
 import { Markdown } from './markdown';
+import { PendingChartCard, pendingChartArgs } from './PendingChartCard';
 import { ThreadActivityChain } from './ThreadActivity';
 import { ThreadMedia } from './ThreadMedia';
 import { mediaFromToolResult, type ThreadMediaItem } from './thread-media';
+import { type CardPlace, placeTurnCards, type TurnCall, type TurnCard } from './turn-cards';
 
-/**
- * The media a chain segment's generate-tool calls produced.
- *
- * Reads the tool RESULTS rather than the calls: a call that is still running,
- * or that failed, has produced nothing to show, and mounting a player for it
- * would be a broken box in the transcript.
- */
 /** The pending card's kind for a job kind, or null for jobs with no media. */
 function pendingKindFor(kind: JobKind): PendingKind | null {
   if (kind === 'image') return 'image';
@@ -55,23 +46,6 @@ function callArgsFor(group: readonly AssistantMsg[], callId: string | undefined)
   for (const m of group)
     for (const b of m.blocks) if (b.type === 'toolCall' && b.id === callId) return b.arguments;
   return undefined;
-}
-
-function mediaForSegment(
-  seg: { kind: string; blocks?: readonly ContentBlock[] },
-  resultForBlock: Map<string, ToolResultMsg>,
-): ThreadMediaItem[] {
-  if (seg.kind !== 'chain' || seg.blocks === undefined) return [];
-  const out: ThreadMediaItem[] = [];
-  for (const b of seg.blocks) {
-    if (b.type !== 'toolCall') continue;
-    const result = resultForBlock.get(b.id);
-    if (result === undefined) continue;
-    // A `bash media generate …` result is the generation tool's result.
-    const toolName = effectiveToolName(result.toolName, b.arguments);
-    out.push(...mediaFromToolResult(toolName, result.text, result.isError));
-  }
-  return out;
 }
 
 /*
@@ -90,6 +64,8 @@ export function AssistantGroup({
   onOpenFile,
   suppressInlineArtifacts = false,
   live,
+  recordsByCall,
+  renderRecord,
 }: {
   group: AssistantMsg[];
   resultByCallId: Map<string, ToolResultMsg>;
@@ -113,6 +89,16 @@ export function AssistantGroup({
    * cannot supply. Omit in the ordinary chat, where the live slice sets it.
    */
   live?: boolean;
+  /**
+   * The cards this turn PRESENTED (a chart, a drawing, a `present`ed file), by
+   * the call that handed each one over (turn-cards.ts `attributeRecords`). They
+   * are placed exactly like the media the turn generated — in the chain while
+   * the work goes on, beneath it once it is an answer — instead of after the
+   * whole reply, where they sat at the foot of a turn that was still working.
+   */
+  recordsByCall?: ReadonlyMap<string, readonly PresentedRecord[]>;
+  /** Draws one presented card; the thread owns the canvas handlers it needs. */
+  renderRecord?: (record: PresentedRecord) => ReactNode;
 }): ReactNode {
   /*
    * A RECONSTRUCTED TRANSCRIPT HAS NO isStreaming, AND THAT READ AS FINISHED.
@@ -258,6 +244,83 @@ export function AssistantGroup({
   const segments = segmentGroup(group);
   const lastSegment = segments[segments.length - 1];
   const groupId = group[0]?.id ?? 'g';
+
+  /*
+   * WHERE EACH FINISHED THING THE TURN MADE GOES — in the chain that made it, or
+   * beneath it. The rule and why are in turn-cards.ts; this gathers its facts.
+   *
+   * The live chain is the one the turn is working in RIGHT NOW: the last
+   * segment of a streaming turn, and only if that segment is a chain — the
+   * same test that holds the chain open (`streaming && seg === lastSegment`).
+   */
+  const liveChain =
+    streaming && lastSegment?.kind === 'chain' ? segments.length - 1 : (null as number | null);
+  const turnCalls: TurnCall[] = [];
+  segments.forEach((seg, index) => {
+    if (seg.kind !== 'chain') return;
+    for (const b of seg.blocks) {
+      if (b.type !== 'toolCall') continue;
+      turnCalls.push({
+        id: b.id,
+        chain: index,
+        tool: effectiveToolName(b.name, b.arguments),
+        args: b.arguments,
+      });
+    }
+  });
+  /*
+   * WHAT THE TURN MADE. Generated images used to reach the thread only as a
+   * 414px markdown embed and generated audio/video only as a path in prose;
+   * the user wants every produced file embedded at full quality with a card to
+   * reveal it. Keyed off the tool RESULT, so a card appears when the file
+   * exists rather than when the model mentions one — a call that is still
+   * running, or that failed, has made nothing, and a player mounted for it
+   * would be a broken box in the transcript.
+   */
+  const mediaByCall = new Map<string, ThreadMediaItem[]>();
+  const turnCards: TurnCard[] = [];
+  for (const call of turnCalls) {
+    const result = resultForBlock.get(call.id);
+    if (result !== undefined) {
+      // A `bash media generate …` result is the generation tool's result.
+      const items = mediaFromToolResult(
+        effectiveToolName(result.toolName, call.args),
+        result.text,
+        result.isError,
+      );
+      if (items.length > 0) mediaByCall.set(call.id, items);
+      for (const item of items) {
+        turnCards.push({
+          key: `m:${call.id}:${item.path}`,
+          callId: call.id,
+          path: item.path,
+          kind: item.kind,
+        });
+      }
+    }
+    for (const record of recordsByCall?.get(call.id) ?? []) {
+      turnCards.push({
+        key: `r:${call.id}:${record.path}`,
+        callId: call.id,
+        path: record.path,
+        kind: 'record',
+      });
+    }
+  }
+  const placed = placeTurnCards(turnCalls, turnCards, liveChain);
+  const placeOf = (kind: 'm' | 'r', callId: string, path: string): CardPlace =>
+    placed.get(`${kind}:${callId}:${path}`) ?? 'beneath';
+  // The picture still coming out from under the sweep is the pending card's
+  // until it is out — see `handing`.
+  const heldBack = (path: string): boolean => handingLive && handingItem?.path === path;
+  const drawRecord = (record: PresentedRecord): ReactNode =>
+    renderRecord === undefined ? null : (
+      /* The wrapper the thread's presented cards have always had, so everything
+         that finds a card by it (probes, the chat-order reader) still does. */
+      <div key={`rec:${record.path}`} className="flex flex-col gap-2" data-testid="presented">
+        {renderRecord(record)}
+      </div>
+    );
   const rawError = group.find((m) => m.errorMessage !== undefined)?.errorMessage;
   // Clean once: a raw provider blob collapses to a short message, and a
   // user-initiated pause/stop ("aborted"/AbortError) collapses to '' — a clean
@@ -314,61 +377,62 @@ export function AssistantGroup({
         // The row is the one that belongs to the tool and it opens the canvas,
         // so this copy goes. The model's own embed is capped to 414px in
         // markdown.css — 1.15x the card the picture was generated in.
-        // While an image is being generated its card is NOT empty: the same box
-        // the finished picture will occupy shows the model's own intermediate
-        // decodes, resolving live (ThreadImagePlaceholder). It renders in the
-        // chain that owns the pending call, which is where the finished image
-        // would appear, so the swap happens in place.
-        const jobHere =
-          runningJob !== null &&
-          seg.kind === 'chain' &&
-          seg.blocks.some((b) => b.type === 'toolCall' && b.id === runningJob?.callId)
-            ? runningJob
-            : null;
-        return (
-          <div key={`${groupId}-a${activityN++}`} className="flex min-w-0 flex-col gap-2">
-            <ThreadActivityChain
-              chainKey={`${groupId}-a${activityN - 1}`}
-              blocks={seg.blocks}
-              resultForBlock={resultForBlock}
-              runningToolCalls={runningToolCalls}
-              streaming={streaming && seg === lastSegment}
-              // Whether the chain is DONE is a fact about the TURN, not about
-              // this segment still being the last one — see `turnStreaming`.
-              turnStreaming={streaming}
-              turnStartedAt={group[0]?.timestamp}
-              tps={tps}
-              {...(onOpenFile !== undefined ? { onOpenFile } : {})}
-            />
-            {/* Deliberately unkeyed and rendered from a stable position: the
-                placeholder subscribes to the frame stream itself and drives its
-                own DOM, so it must MOUNT ONCE per generation. Remounting it
-                would replay its entrance animation mid-run. */}
-            {/*
-              THE WAIT, WITH WORDS ON IT.
+        //
+        // (What DOES sit beneath a chain now is decided per card below — the
+        // newest result of a live chain, and the answers of a finished one;
+        // see turn-cards.ts.)
+        const segIndex = segments.indexOf(seg);
+        const inside = new Map<string, ReactNode>();
+        const beneath: ReactNode[] = [];
+        for (const b of seg.blocks) {
+          if (b.type !== 'toolCall') continue;
+          const media = (mediaByCall.get(b.id) ?? []).filter((item) => !heldBack(item.path));
+          const records = recordsByCall?.get(b.id) ?? [];
+          const mediaIn = media.filter((item) => placeOf('m', b.id, item.path) === 'inside');
+          const recordsIn = records.filter((r) => placeOf('r', b.id, r.path) === 'inside');
+          if (mediaIn.length > 0 || recordsIn.length > 0) {
+            inside.set(
+              b.id,
+              <>
+                {mediaIn.length > 0 ? <ThreadMedia items={mediaIn} /> : null}
+                {recordsIn.map(drawRecord)}
+              </>,
+            );
+          }
 
-              The card wraps whatever the job itself can show — for an image
-              that is the live denoise, which is a far better proof of life than
-              any spinner. For a video or a 3D build there is nothing to show,
-              and the card is all there is: the title, "usually N minutes on
-              this Mac", a clock that moves, and a Cancel.
-
-              Same segment test as the image preview so the card sits in the
-              chain that started the work, and the finished result replaces it
-              in place.
-            */}
-            {jobHere !== null && jobHere.kind === 'svg' ? (
-              /* The drawing, drawn live — see LiveSvgCard. */
-              <LiveSvgCard callId={jobHere.callId} />
-            ) : jobHere !== null && pendingKindFor(jobHere.kind) !== null ? (
-              /*
-               * THE CARD THE RESULT WILL OCCUPY, mounted early — the same one the
-               * studios use. No title, no clock, no Cancel: the row above says
-               * what is being made, the composer's Stop stops it, and the one
-               * line under the bar is the engine's own note or, before it has
-               * said anything, how long this usually takes on this Mac.
-               */
+          /*
+           * BENEATH THE CHAIN, IN THE ORDER THE CALLS WERE WRITTEN: a running
+           * call's generating card, then a finished call's result — so a card
+           * that is waiting and the card that replaces it hold one slot, and a
+           * result never moves when it lands.
+           *
+           * THE GENERATING CARD STAYS OUT. the user: "these should be embedded in
+           * thinking blocks, not the generating card, that stays out" — the
+           * wait is the one thing the chain folding shut must never hide.
+           *
+           * Keyed by the call, so a generating card MOUNTS ONCE per
+           * generation: it subscribes to the frame stream and drives its own
+           * DOM, and a remount would replay its entrance animation mid-run.
+           * The keys also keep it mounted while the results of EARLIER calls
+           * leave this list for the chain.
+           */
+          const jobHere = runningJob !== null && runningJob.callId === b.id ? runningJob : null;
+          if (jobHere !== null && jobHere.kind === 'svg') {
+            /* The drawing, drawn live — see LiveSvgCard. */
+            beneath.push(<LiveSvgCard key={`job:${b.id}`} callId={jobHere.callId} />);
+          } else if (jobHere !== null && pendingKindFor(jobHere.kind) !== null) {
+            /*
+             * THE CARD THE RESULT WILL OCCUPY, mounted early — the same one the
+             * studios use. No title, no clock, no Cancel: the row above says
+             * what is being made, the composer's Stop stops it, and the one
+             * line under the bar is the engine's own note or, before it has
+             * said anything, how long this usually takes on this Mac. For an
+             * image it wraps the live denoise, a far better proof of life than
+             * any spinner.
+             */
+            beneath.push(
               <PendingMediaCard
+                key={`job:${b.id}`}
                 kind={pendingKindFor(jobHere.kind) as PendingKind}
                 progressKey={jobHere.callId}
                 /* The engine's own frames as they land: a picture's denoise
@@ -392,22 +456,24 @@ export function AssistantGroup({
                     ? { progress: live3d.progress }
                     : {})}
                 {...(generating?.aspect !== undefined ? { aspect: generating.aspect } : {})}
-              />
-            ) : jobHere !== null ? (
+              />,
+            );
+          } else if (jobHere !== null) {
+            beneath.push(
               <LongJobCard
+                key={`job:${b.id}`}
                 kind={jobHere.kind}
                 startedAt={jobHere.startedAt}
                 onCancel={() => void abortPi()}
                 {...(generating?.note !== undefined ? { note: generating.note } : {})}
-              />
-            ) : null}
-            {/* The result, coming out from under the sweep — see `handing`. */}
-            {handing !== null &&
-            handingLive &&
-            handingItem !== undefined &&
-            seg.kind === 'chain' &&
-            seg.blocks.some((b) => b.type === 'toolCall' && b.id === handing.callId) ? (
+              />,
+            );
+          }
+          /* The result, coming out from under the sweep — see `handing`. */
+          if (handing !== null && handing.callId === b.id && handingLive && handingItem) {
+            beneath.push(
               <PendingMediaCard
+                key={`hand:${b.id}`}
                 kind={pendingKindFor(handing.kind) ?? 'image'}
                 live={handing.kind === 'image' || handing.kind === 'video'}
                 item={handingItem}
@@ -415,19 +481,63 @@ export function AssistantGroup({
                    restarts the pill nor reopens the frame square. */
                 progressKey={handing.callId}
                 onRevealed={() => setRevealed((cur) => new Set([...cur, handingItem.path]))}
-              />
-            ) : null}
-            {/* WHAT THE TURN MADE, under the chain that made it. Generated
-                images used to reach the thread only as a 414px markdown embed
-                and generated audio/video only as a path in prose; the user wants
-                every produced file embedded at full quality with a card to
-                reveal it. Keyed off the tool RESULT, so it appears when the
-                file exists rather than when the model mentions one. */}
-            <ThreadMedia
-              items={mediaForSegment(seg, resultForBlock).filter(
-                (item) => !(handingLive && item.path === handingItem?.path),
-              )}
+              />,
+            );
+          }
+          /*
+           * THE CHART, WHILE IT IS BEING MADE — a skeleton that builds as the
+           * call's values stream, in the slot its finished card takes. It used
+           * to hang after the whole reply with the rest of the presented cards;
+           * it is a generating card like the others, so it stands beneath the
+           * chain that is making it. (Not in the corp feed, which draws no
+           * inline widgets at all — see `suppressInlineArtifacts`.)
+           */
+          if (streaming && !suppressInlineArtifacts && !resultForBlock.has(b.id)) {
+            const args = pendingChartArgs(b);
+            if (args !== null) {
+              beneath.push(
+                <div key={`chart:${b.id}`} className="flex flex-col gap-2" data-testid="presented">
+                  <PendingChartCard args={{ ...args, id: b.id }} />
+                </div>,
+              );
+            }
+          }
+          const mediaOut = media.filter((item) => placeOf('m', b.id, item.path) === 'beneath');
+          if (mediaOut.length > 0) {
+            beneath.push(<ThreadMedia key={`media:${b.id}`} items={mediaOut} />);
+          }
+          for (const record of records) {
+            if (placeOf('r', b.id, record.path) === 'beneath') beneath.push(drawRecord(record));
+          }
+        }
+        return (
+          <div key={`${groupId}-a${activityN++}`} className="flex min-w-0 flex-col gap-2">
+            <ThreadActivityChain
+              chainKey={`${groupId}-a${activityN - 1}`}
+              blocks={seg.blocks}
+              resultForBlock={resultForBlock}
+              runningToolCalls={runningToolCalls}
+              streaming={streaming && seg === lastSegment}
+              // Whether the chain is DONE is a fact about the TURN, not about
+              // this segment still being the last one — see `turnStreaming`.
+              turnStreaming={streaming}
+              turnStartedAt={group[0]?.timestamp}
+              tps={tps}
+              {...(onOpenFile !== undefined ? { onOpenFile } : {})}
+              {...(inside.size > 0 ? { attachments: inside } : {})}
             />
+            {/* Always mounted and box-less (`contents`): its children lay out
+                in this column exactly as they did before it existed, and it is
+                never torn down between one card leaving and the next arriving —
+                which would remount a generating card mid-run. It exists so the
+                cards beneath a chain can be found as such. */}
+            <div
+              className="contents"
+              data-testid="turn-cards"
+              data-live={segIndex === liveChain ? 'true' : undefined}
+            >
+              {beneath}
+            </div>
           </div>
         );
       })}

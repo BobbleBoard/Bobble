@@ -33,6 +33,7 @@ import {
   KEY_TAB_COMMAND,
   PASTE_COMMAND,
   SELECTION_CHANGE_COMMAND,
+  type SerializedEditorState,
 } from 'lexical';
 import { type MutableRefObject, useEffect, useRef } from 'react';
 import { registerPillRenderer } from './PillRenderer';
@@ -56,6 +57,14 @@ export interface ComposerEditorApi {
   replaceTokenWithPill: (tokenStart: number, data: PillData) => void;
   clear: () => void;
   focus: () => void;
+  /**
+   * The draft exactly as it stands — pills and all — for putting back later.
+   * A message taken back with ⌘Z returns as it was typed, not as its text: a
+   * mention re-typed as a bare path is a different message.
+   */
+  snapshot: () => SerializedEditorState;
+  /** Put a {@link snapshot} back, caret at its end. */
+  restore: (draft: SerializedEditorState) => void;
 }
 
 export interface ComposerKeymap {
@@ -227,6 +236,13 @@ function EditorBridge(props: Omit<ComposerEditorProps, 'placeholder' | 'disabled
         });
       },
       focus: () => editor.focus(),
+      snapshot: () => editor.getEditorState().toJSON(),
+      restore: (draft) => {
+        editor.setEditorState(editor.parseEditorState(draft));
+        editor.update(() => {
+          $getRoot().selectEnd();
+        });
+      },
     };
     return () => {
       props.apiRef.current = null;

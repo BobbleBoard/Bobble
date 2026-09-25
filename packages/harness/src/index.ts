@@ -882,6 +882,50 @@ export function forgetResidentPrefix(): void {
   residentPrefix.warmedKey = null;
 }
 
+/**
+ * WHAT A FORK MUST NOT FORGET — the conversation's frozen prompt and its folder.
+ *
+ * pi's `fork` (editing a message; taking one back with ⌘Z) continues the SAME
+ * conversation on a branch: a new session file, and so a new wiring of this
+ * extension (see RESIDENT above), which starts with nothing — no workspace
+ * (the app pushes `/harness workspace` when a chat opens or first sends, and a
+ * fork is neither) and no frozen prompt. It rebuilt the prompt from what it
+ * had, and that differed from the one the conversation had been sending
+ * whenever the two disagreed about the folder, in EITHER direction. MEASURED
+ * 2026-09-24 (unsend-prefill-probe, qwen3.5-4b on rapid-mlx):
+ *
+ *  - session frozen WITH the folder's name (its first message beat the
+ *    warm-up): the branch dropped it — 9,446 → 9,411 characters, first
+ *    difference at char 6,685 — and the next message re-read its whole
+ *    3,451-token prompt, where an ordinary follow-up re-reads ~40;
+ *  - session frozen WITHOUT it (the folder arrived later, as a note): handing
+ *    the branch the folder alone made it name it — the same divergence the
+ *    other way, 193 tokens re-read.
+ *
+ * The prompt is frozen for the life of a session precisely so it cannot move
+ * under the cache, and a branch is that session continued. So it takes the
+ * prompt itself, byte for byte, with the folder its tools work in and what the
+ * model has already been told about it (so the folder is not announced twice).
+ * Every other session boundary is another chat and starts from nothing, as
+ * before. Same lifetime argument as RESIDENT: the only scope that outlives a
+ * wiring is the process.
+ */
+interface ForkCarry {
+  prompt: string | null;
+  workspaceRoot: string | null;
+  announcedWorkspace: string | null;
+}
+const FORK_CARRY = Symbol.for('pi-desktop.harness.forkCarry');
+const carryGlobals = globalThis as unknown as Record<symbol, ForkCarry | undefined>;
+function processForkCarry(): ForkCarry {
+  const existing = carryGlobals[FORK_CARRY];
+  if (existing !== undefined) return existing;
+  const fresh: ForkCarry = { prompt: null, workspaceRoot: null, announcedWorkspace: null };
+  carryGlobals[FORK_CARRY] = fresh;
+  return fresh;
+}
+const forkCarry = processForkCarry();
+
 export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}): HarnessHandle {
   /*
    * FIRST, before anything registers: wrap `pi.registerTool` so every tool that
@@ -1205,6 +1249,13 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   let postTurnWork: AbortController | null = null;
   /** Timer for the deliberate pause before post-turn work starts. */
   let postTurnTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Note what a branch of this session must keep (ForkCarry) — called
+   * wherever the frozen prompt or the folder changes. */
+  const rememberForFork = (): void => {
+    forkCarry.prompt = runtime.canonicalSystemPrompt;
+    forkCarry.workspaceRoot = runtime.workspaceRoot;
+    forkCarry.announcedWorkspace = runtime.announcedWorkspace;
+  };
   const titler: ConversationTitler | undefined =
     callModel !== undefined ? createConversationTitler(callModel) : undefined;
 
@@ -1398,6 +1449,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       runtime.announcedWorkspace =
         /^Current working directory: (.*)$/m.exec(canonical)?.[1] ?? null;
     }
+    rememberForFork();
     // Build the tool list in the SAME ORDER a real turn does (applyPreset unions
     // resolveBaseTools' order), NOT pi.getAllTools() registry order.
     /*
@@ -3217,8 +3269,9 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   }
 
   // Restore persisted config + start the status timer on session start.
-  pi.on('session_start', (_event, ctx) => {
+  pi.on('session_start', (event, ctx) => {
     runtime.currentCtx = ctx;
+    const isFork = (event as { reason?: string } | undefined)?.reason === 'fork';
     /*
      * REPUBLISH THE PREFILL CONTEXT — the renderer just threw its copy away.
      *
@@ -3250,6 +3303,20 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     pendingCanonicalPrompt = null;
     // …and what the model has been told about its folder starts over with it.
     runtime.announcedWorkspace = null;
+    /*
+     * …EXCEPT ON A FORK, which is not a new session but the same one continued
+     * on a branch: it keeps the prompt it froze, the folder its tools work in
+     * and what the model was told about it — see ForkCarry for what forgetting
+     * them cost. Before anything below publishes or warms, so the warm-up at
+     * the end of this handler warms the prompt the server already holds.
+     */
+    if (isFork) {
+      runtime.canonicalSystemPrompt = forkCarry.prompt;
+      runtime.workspaceRoot = forkCarry.workspaceRoot;
+      runtime.announcedWorkspace = forkCarry.announcedWorkspace;
+    } else {
+      rememberForFork();
+    }
     runtime.config = restoreConfig(getEntries(ctx));
     runtime.permission.setMode(runtime.config.mode);
     // A new / switched session must NOT inherit the previous session's live
@@ -3297,10 +3364,30 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     maybeWarmPrefix(ctx);
   });
 
-  pi.on('session_shutdown', () => {
+  pi.on('session_shutdown', (event) => {
     if (runtime.statusTimer !== null) {
       clearInterval(runtime.statusTimer);
       runtime.statusTimer = null;
+    }
+    /*
+     * A FORK REWINDS THE TURN THIS WIRING WAS ABOUT TO TIDY UP AFTER.
+     *
+     * Post-turn work (naming, review) waits POST_TURN_DELAY_MS after a turn —
+     * including a turn that was stopped — and nothing cancelled it when the
+     * session moved on. After a fork that turn is gone from the conversation:
+     * an edit replaced its message, ⌘Z took it back. MEASURED
+     * (unsend-prefill-probe): 2.5 s after ⌘Z the old wiring still sent the
+     * naming request — the conversation INCLUDING the message the user had
+     * just taken back — onto the single model slot, right as the next message
+     * was going out; left alone it would have titled the chat after that
+     * message. Only a fork: switching chats leaves the old one's naming to
+     * finish, as before.
+     */
+    if ((event as { reason?: string } | undefined)?.reason === 'fork') {
+      if (postTurnTimer !== null) clearTimeout(postTurnTimer);
+      postTurnTimer = null;
+      postTurnWork?.abort();
+      postTurnWork = null;
     }
   });
 
@@ -3391,6 +3478,8 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
      * tokens, persists in the conversation, and leaves the prefix alone.
      */
     const workspaceNote = workspaceMoveNote();
+    // The prompt this turn froze, and what the model now knows of its folder.
+    rememberForFork();
     // Classification REMOVED from the turn path (the user: "we seldom use it at all,
     // let's just completely remove"). The turn-1 {title,class} piggyback cost
     // ~2.5s of TTFT — an awaited utility call before the model could even start.
@@ -4678,6 +4767,8 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
             return;
           }
           runtime.workspaceRoot = dir;
+          // …and a branch of this conversation keeps it (ForkCarry).
+          rememberForFork();
           /*
            * AND THE OTHER EXTENSIONS LEARN IT TOO. gen-tools, web-tools and
            * the rest live in this same process and cannot read `runtime`;
