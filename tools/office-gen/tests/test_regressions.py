@@ -182,6 +182,19 @@ def test_flow_steps_past_five_are_reported(tmp_path):
     assert any("steps — 5 of 7 shown" in w for w in warn)
 
 
+def test_a_flow_with_no_note_is_centred_not_top_heavy(tmp_path):
+    # With no note band under it the diagram hugged the title over an empty
+    # lower half: 34.7% of the slide (flow-diagram a3), 37.5% once the Tidewell
+    # replay's invented note was stripped (VQ-08).
+    for name, index in (("flow-diagram-a3", 1), ("pitch-deck-a", 2)):
+        spec = deck_spec(replies(name))
+        spec["slides"][index].pop("note", None)
+        out = tmp_path / f"{name}.pptx"
+        render_deck.build(spec, out)
+        empties = [e for e in measure.measure_pptx(out, spec)["empty_regions"] if e["slide"] == index + 1]
+        assert empties == [], (name, empties)
+
+
 # ── D7: a failing layout leaves no half slide ─────────────────────────────────
 def test_a_failing_layout_leaves_no_half_slide(tmp_path, monkeypatch):
     from pptx import Presentation

@@ -27,6 +27,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+from provenance import parts_block
 from scratch import post_json, scratch_dir
 
 HERE = Path(__file__).parent
@@ -116,26 +117,43 @@ def parse_json(raw: str, tag: str = "x"):
         raise first
 
 
-def outline(report: str, n: int) -> list[dict]:
+# THE PLAN FOLLOWS THE BRIEF (VQ-08). The planner used to be handed a list of
+# rules — open with hero_title, ONE hero_statement or quote, a flow if there is
+# a process, a matrix for two camps, AT LEAST FOUR data slides — and a 4B
+# planned exactly that list, in that order, whatever the brief said (REAL,
+# raw_plan.txt: hero_title, hero_statement, flow, stats, bars, matrix, waffle,
+# closing). The quotas also asked it to invent: four data slides from a brief
+# with two numbers, a quote from a brief with none. Now the brief's own parts
+# (provenance.brief_parts) are the outline, and a layout is chosen by what a
+# part CONTAINS.
+PLAN_RULES = (
+    "How to plan:\n"
+    "- Slide 1 is the cover (hero_title): what the deck is about.\n"
+    "- The other slides follow the brief's own parts, in the brief's order, one slide per part. "
+    "More parts than slides: put two short parts on one slide. Fewer parts than slides: give the "
+    "part with the most content a second slide. Never plan a slide the brief has no content for.\n"
+    "- Choose each layout from what its part CONTAINS: 2-4 headline numbers -> stats; quantities "
+    "to compare -> bars; one share of a whole -> waffle; steps or a sequence -> flow; two camps -> "
+    "matrix or comparison; a grid of facts -> table; a list of points, or the ask / next steps at "
+    "the end -> closing.\n"
+    "- quote and hero_statement only for words the brief itself gives. Never invent a quote.\n"
+    "- For any slide with an image_query, give 2-4 words describing an ABSTRACT photo "
+    "(architecture, texture, landscape). Never a chart or a diagram.\n"
+    "- Every slide must come from the brief. Invent nothing."
+)
+
+
+
+
+def outline(report: str, n: int, parts=None) -> dict:
     sys_p = (
-        "You are a presentation planner. You read a research report and plan a deck. "
-        "You never write slide content at this stage — only the plan.\n\n"
-        "Available layouts:\n" + MENU + "\n\n"
-        "Rules:\n"
-        "- Open with `hero_title`, close with `closing`.\n"
-        "- Include ONE `hero_statement` or `quote` as the deck's quiet moment.\n"
-        "- Use `flow` if the report describes any process or cycle.\n"
-        "- Use `matrix` for the two-camp comparison rather than two bullet lists.\n"
-        "- For any slide with an image_query, give 2-4 words describing an ABSTRACT photo (architecture, texture, landscape). Never a chart or a diagram.\n"
-        "- DATA VISUALISATION IS THE PRIORITY. The report is full of figures. At least "
-        "FOUR slides must be one of: stats, bars, waffle, range, table.\n"
-        
-        
-        "- Vary the layout from slide to slide. Never use the same layout three times running.\n"
-        "- Every slide must come from the report. Invent nothing."
+        "You are a presentation planner. You read a brief and plan a deck from what the "
+        "brief contains. You never write slide content at this stage — only the plan.\n\n"
+        "Available layouts:\n" + MENU + "\n\n" + PLAN_RULES
     )
     user = (
-        f"REPORT:\n\n{report}\n\n"
+        f"BRIEF:\n\n{report}\n\n"
+        f"{parts_block(parts)}"
         f"Plan exactly {n} slides. Reply as JSON: "
         '{"theme": one of ["midnight","forest","terracotta","charcoal","ink"], '
         '"running_title": "<short deck name>", '
@@ -145,7 +163,7 @@ def outline(report: str, n: int) -> list[dict]:
     return data
 
 
-def fill(report: str, plan_slide: dict, idx: int, total: int) -> dict:
+def fill(report: str, plan_slide: dict, idx: int, total: int, part=None) -> dict:
     layout = plan_slide["layout"]
     sys_p = (
         "You write the content for ONE slide of a presentation, from a research report.\n"
@@ -157,12 +175,20 @@ def fill(report: str, plan_slide: dict, idx: int, total: int) -> dict:
         "- Never invent a number that is not in the report.\n"
         "- For bars/waffle/range/stats, every number MUST appear in the report. "
         "Never invent a value to fill a chart. If the report has no comparable "
-        "figures for this slide, say so in the fields you can fill honestly."
+        "figures for this slide, say so in the fields you can fill honestly.\n"
+        "- kicker / eyebrow: a 1-3 word LABEL naming the part ('The problem', 'Traction'). "
+        "Never a sentence, never a description of the slide ('Bar chart showing ...').\n"
+        "- footnote / note: a source only when the report names it; otherwise leave them "
+        "empty. Never write 'Data sourced from ...' on your own.\n"
+        "- quote, statement, attribution: only words the report itself gives, credited as the "
+        "report credits them. Never invent a quote, a person or a role."
     )
     schema = next((l for l in MENU.splitlines() if l.strip().startswith(layout)), layout)
+    covers = f"This slide covers: {part.label} — {part.text}\n" if part is not None else ""
     user = (
         f"REPORT:\n\n{report}\n\n"
         f"SLIDE {idx} of {total}. Layout: {layout}\n"
+        f"{covers}"
         f"Planned title: {plan_slide.get('title','')}\n"
         f"This slide must say: {plan_slide.get('intent','')}\n\n"
         f"Schema for this layout:\n{schema}\n\n"

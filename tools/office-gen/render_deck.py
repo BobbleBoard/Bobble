@@ -624,7 +624,17 @@ def L_flow(prs, t, s):
               "emphasis": numparse.truthy(_get(x, "emphasis")) if said else i == 0}
              for i, x in enumerate(raw)]
     if steps:
-        viz.flow(sl, t, M, y + Inches(0.5), CW, steps)
+        top = y + Inches(0.5)
+        if not s.get("note"):
+            # No note band under it: the diagram is centred in the body instead
+            # of hugging the title over an empty lower half. MEASURED on the
+            # Tidewell replay: once the invented note line was stripped (VQ-08)
+            # the band went with it and 37.5% of the slide stood empty.
+            block = Inches(0.62) * 2 + (Inches(1.02) if any(st["caption"] for st in steps) else 0)
+            room = H - Inches(0.9) - top
+            if room > block:
+                top += (room - block) / 2
+        viz.flow(sl, t, M, top, CW, steps)
     if _R is not None:
         _R.items = [st["label"] for st in steps]
     if s.get("note"):

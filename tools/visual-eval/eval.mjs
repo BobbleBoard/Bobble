@@ -210,7 +210,17 @@ function writeJson(file, obj) {
 }
 
 // ── 5. report ───────────────────────────────────────────────────────────────
-const OFFICE_KEEP = ['ok', 'error', 'kind', 'items', 'theme', 'chart', 'warnings', 'summary'];
+const OFFICE_KEEP = [
+  'ok',
+  'error',
+  'kind',
+  'items',
+  'theme',
+  'chart',
+  'warnings',
+  'summary',
+  'checks',
+];
 const entries = artifacts.map((a) => {
   const e = {
     id: a.id,
