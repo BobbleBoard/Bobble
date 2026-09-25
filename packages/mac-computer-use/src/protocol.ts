@@ -55,6 +55,25 @@ export type MacAgentMethod =
      Apple Events and so never reaches the bridge's own refusal. */
   | 'brake';
 
+/**
+ * The requests that put something on the user's screen — the phantom overlay
+ * and the monitor follow each of them; reads, the policy and the brake do not.
+ * The extension counts them to know a turn drove (tools.ts); the app counts
+ * them to know which sessions are driving (apps/desktop/…/mac/drivers.ts).
+ */
+export const MAC_DRIVING_METHODS: readonly MacAgentMethod[] = [
+  'snapshot',
+  'click',
+  'type',
+  'key',
+  'scroll',
+  'launch',
+  'menuClick',
+  'tabSelect',
+  'tabNew',
+  'tabClose',
+];
+
 /** The `brake` answer: the refusal an act would get right now, or null while
  * the agent has the wheel. */
 export interface MacBrakeAck {

@@ -47,6 +47,7 @@ import { resolveBundledPackageAsset } from '../app-paths';
 import { isBackgroundMode } from '../background-mode';
 import { readSettings } from '../settings/settings-main';
 import { isTrustedIpcEvent } from '../trusted-senders';
+import { createDriverRegistry, type DriverId } from './drivers';
 import { userLaunchEnv } from './launch-env';
 import { listInstalledApps, sameApp } from './mac-apps';
 import {
@@ -59,9 +60,25 @@ import {
 import { macMonitorMockControl, startMacMonitorMock } from './monitor-mock';
 import { macOverlay } from './overlay-controller';
 import type { OverlayRect } from './overlay-geometry';
+import { aimAwayFromSelf, type FrontApp, refuseSelf } from './self-target';
 
 const log = createLogger('desktop:mac-agent');
 const execFileAsync = promisify(execFile);
+
+/** Bobble's own process — the one that owns its windows (a dev build's too). */
+const OWN_PIDS: readonly number[] = [process.pid];
+
+/** The sessions driving right now, by bridge connection (see drivers.ts). */
+const drivers = createDriverRegistry();
+/** The e2e debug channel's requests, as one session of their own. */
+const E2E_DRIVER: DriverId = Symbol('mac:debug');
+
+/** No session drives any more: the phantom goes, the capture stops, and the
+ *  brake — scoped to the runs it stopped — is released (clearSession). */
+function endDriving(): void {
+  macOverlay.hide();
+  macMonitor.clearSession();
+}
 
 /** How long to let a freshly launched app settle before the model snapshots. */
 const LAUNCH_SETTLE_MS = 600;
@@ -383,6 +400,9 @@ async function launchApp(name: string, background = true): Promise<MacLaunchAck>
     // Still a successful open; the tool degrades to a by-name snapshot.
     return { ok: true, app: appName };
   }
+  // A name that resolved to Bobble itself (a dev build is "Electron"): never
+  // nudged, never taken as the target.
+  refuseSelf(bounds.pid, OWN_PIDS);
   // Let first-paint settle so the snapshot-after-open screenshot shows content.
   await sleep(LAUNCH_SETTLE_MS);
   bounds = (await nudgeOnScreen(bounds)) ?? bounds;
@@ -482,6 +502,9 @@ async function snapshotWithOverlay(params: Record<string, unknown>): Promise<Mac
   // that is the one thing a bubble saying "Thinking" was actively wrong about.
   await macOverlay.reading();
   const snap = await getHelper().request<MacSnapshot>('snapshot', params);
+  // A named look that resolved to Bobble: refused before it is cached, nudged,
+  // followed by the overlay, or read by the model (see self-target.ts).
+  refuseSelf(snap.pid, OWN_PIDS);
   cacheSnapshot(snap);
   if (typeof snap.pid === 'number') {
     /*
@@ -589,10 +612,24 @@ function brakeRefusal(): string | null {
   return `The user pressed Stop, so Mac control is off. Do not retry: say what you had done to ${named} and ask whether to carry on.`;
 }
 
-async function dispatch(method: MacAgentMethod, params: Record<string, unknown>): Promise<unknown> {
+async function dispatch(
+  method: MacAgentMethod,
+  requested: Record<string, unknown>,
+  who: DriverId,
+): Promise<unknown> {
   if (!isSupportedPlatform()) throw new Error('mac computer-use is macOS-only');
   const refusal = controlRefusal(method);
   if (refusal !== null) throw new Error(refusal);
+  // Before any await: lines on one connection are handled concurrently, and
+  // this session's own `driving:false` must not overtake its registration.
+  drivers.noteRequest(who, method);
+  // A request that names no app goes to the front app that is NOT Bobble —
+  // resolved and stamped here, before the helper can pick Bobble itself.
+  const params = await aimAwayFromSelf(method, requested, {
+    ownPids: OWN_PIDS,
+    frontmost: (excludePids) =>
+      getHelper().request<FrontApp>('frontmost', { excludePids: [...excludePids] }),
+  });
   switch (method) {
     case 'check':
       return getHelper().request('check');
@@ -670,12 +707,11 @@ async function dispatch(method: MacAgentMethod, params: Record<string, unknown>)
       return ack;
     }
     // The overlay follows the controlled app; an explicit driving=false from
-    // the extension (session end/reset) puts it away.
+    // the extension (its turn ended) puts it away — once the LAST session
+    // driving has said so. One session's end used to tear down another's run
+    // and lift the Stop the user had pressed on it (drivers.ts).
     case 'setDriving': {
-      if (params.driving === false) {
-        macOverlay.hide();
-        macMonitor.clearSession();
-      }
+      if (params.driving === false && drivers.end(who)) endDriving();
       return { ok: true };
     }
     // The person's standing answer (Settings → Computer use), read fresh on
@@ -702,6 +738,11 @@ function handleConnection(socket: net.Socket): void {
   socket.setEncoding('utf8');
   socket.on('error', () => {
     /* a peer reset must never crash main */
+  });
+  // Its session's process died mid-run (a chat deleted, a child killed): no
+  // `driving:false` will ever come, so the connection's end is its turn's end.
+  socket.on('close', () => {
+    if (drivers.gone(socket)) endDriving();
   });
   socket.on('data', (chunk: string) => {
     buffer += chunk;
@@ -735,7 +776,7 @@ async function handleLine(socket: net.Socket, line: string): Promise<void> {
     return;
   }
   try {
-    const result = await dispatch(req.method, req.params ?? {});
+    const result = await dispatch(req.method, req.params ?? {}, socket);
     respond({ ok: true, result });
   } catch (err) {
     respond({ ok: false, error: err instanceof Error ? err.message : String(err) });
@@ -1028,7 +1069,10 @@ function registerE2eDebugChannel(): void {
           case 'tabClose':
           case 'windows':
           case 'setDriving':
-            return { ok: true, result: await dispatch(req.op as MacAgentMethod, params) };
+            return {
+              ok: true,
+              result: await dispatch(req.op as MacAgentMethod, params, E2E_DRIVER),
+            };
           // Helper-only reads and the recorder, which `dispatch` has no part in.
           case 'promptGrants':
           case 'moveWindow':

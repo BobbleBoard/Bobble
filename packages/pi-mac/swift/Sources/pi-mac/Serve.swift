@@ -843,7 +843,7 @@ private func dispatchInner(method: String, params: [String: Any]) -> [String: An
   case "focus": return doFocus(params)
   case "screenshot": return doScreenshot(params)
   case "bounds": return doBounds(params)
-  case "frontmost": return doFrontmost()
+  case "frontmost": return doFrontmost(params)
   case "appIcon": return doAppIcon(params)
   case "moveWindow": return doMoveWindow(params)
   case "windows": return doWindows(params)
@@ -1132,11 +1132,34 @@ private func doWallpaper(_ params: [String: Any]) -> [String: Any] {
 }
 
 /// `frontmost` method: which app currently owns the user's focus.
-private func doFrontmost() -> [String: Any] {
-  guard let app = frontmostApplicationNow() else {
+///
+/// With `excludePids`, the frontmost app that is NONE of them. The app hosting
+/// this helper passes its own pid: a look or an act that names no app goes to
+/// whatever is in front, and while the user is typing to Bobble that is Bobble
+/// itself. The on-screen windows are walked front to back for the first
+/// ordinary window of an ordinary (Dock) app — the overlay's panels belong to
+/// an accessory process and this helper to a prohibited one, so neither counts.
+private func doFrontmost(_ params: [String: Any]) -> [String: Any] {
+  guard let front = frontmostApplicationNow() else {
     return ["ok": false, "error": "no frontmost application"]
   }
-  return [
+  let excluded = Set(((params["excludePids"] as? [Any]) ?? []).compactMap { intOf($0) })
+  if !excluded.contains(Int(front.processIdentifier)) { return frontmostDict(front) }
+  for w in onScreenWindows()
+  where w.layer == 0 && w.alpha > 0.05 && w.bounds.width > 40 && w.bounds.height > 40 {
+    guard !excluded.contains(Int(w.ownerPid)),
+      let app = NSRunningApplication(processIdentifier: w.ownerPid),
+      app.activationPolicy == .regular
+    else { continue }
+    var d = frontmostDict(app)
+    d["behind"] = front.localizedName ?? ""
+    return d
+  }
+  return ["ok": false, "error": "no app is in front but the excluded ones"]
+}
+
+private func frontmostDict(_ app: NSRunningApplication) -> [String: Any] {
+  [
     "ok": true,
     "app": app.localizedName ?? "",
     "pid": Int(app.processIdentifier),
