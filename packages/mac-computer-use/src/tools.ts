@@ -1251,8 +1251,8 @@ export function registerMacComputerUseTools(
       'delivered to that app alone, still in the background.\n' +
       'NO INDEX: only for an app that exposes nothing to Accessibility. It then types into ' +
       'whatever has focus INSIDE the controlled app — still background. But with no app under ' +
-      'control there is no app to aim at, and the keystrokes follow the SYSTEM focus into ' +
-      'whatever the user is doing: snapshot or launch something first.\n' +
+      'control there is no app to aim at, and the keystrokes go to whatever app is in front ' +
+      '(never this chat): snapshot or launch something first.\n' +
       'submit:true commits a search/URL/filename field; append:true adds instead of replacing.',
     promptSnippet: 'Set text into a Mac field (background) + optional submit',
     parameters: Type.Object({

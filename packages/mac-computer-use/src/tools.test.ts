@@ -1109,10 +1109,12 @@ describe('what the tool descriptions promise', () => {
 
   it('does not describe index-less typing as safe when nothing is controlled', () => {
     // With an app under control the keystrokes are pid-delivered and really are
-    // background; with none there is nothing to aim at and they follow the
-    // SYSTEM focus into whatever the user is doing. Both facts, plainly.
+    // background; with none there is nothing to aim at, and the app aims them at
+    // whatever is in front — past this chat, never into it (mac-agent,
+    // self-target.ts), so no longer "the SYSTEM focus". Both facts, plainly.
     const d = desc('mac_type');
-    expect(d).toContain('SYSTEM focus');
+    expect(d).toContain('go to whatever app is in front (never this chat)');
+    expect(d).not.toContain('SYSTEM focus');
     expect(d).toContain('snapshot or launch something first');
   });
 
