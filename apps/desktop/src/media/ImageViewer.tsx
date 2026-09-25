@@ -93,10 +93,10 @@ export interface ImageViewerProps {
 /** The bar's distance from the window's bottom edge (image-viewer.css). */
 const BAR_BOTTOM = 14;
 /**
- * Air between the bottom of the picture and the top of the bar — room for the
- * waiting card's progress bar and its caption, which hang ~37px under its frame
- * (SEEN at 18px: the "20%" ran under the Download card), and about the gap the
- * approved prototype leaves there.
+ * Air between the bottom of the picture and the top of the bar — about the gap
+ * the approved prototype leaves there, and room for anything the waiting card
+ * hangs under its frame (its old bar and caption did: SEEN at 18px, the "20%"
+ * ran under the Download card; ViewerStage measures whatever hangs there now).
  */
 const BAR_AIR = 44;
 
@@ -377,7 +377,11 @@ function ViewerStage({
             aspect={job.aspect}
             width={Math.round(job.width)}
             label="Editing image"
+            /* The edit's own id keys its % — a viewer closed and reopened mid-run
+               picks the number up where it was instead of starting at nothing. */
+            progressKey={job.requestId}
             {...(progress !== undefined ? { progress } : {})}
+            {...(job.total !== undefined && job.total > 0 ? { steps: job.total } : {})}
             {...(job.note !== undefined ? { note: job.note } : {})}
             {...(job.result !== undefined
               ? {

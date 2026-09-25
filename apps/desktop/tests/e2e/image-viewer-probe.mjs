@@ -639,6 +639,9 @@ try {
             prompt: req.prompt,
             candidates: [{ status: 'generating' }],
             status: 'generating',
+            // Echoed like main echoes it: the viewer follows its own request,
+            // and the chat's live card leaves a stream with an id alone.
+            ...(req.requestId !== undefined ? { requestId: req.requestId } : {}),
           };
           send('gen:open', { tabId, payload: base });
           for (let step = 1; step <= 15; step++) {
@@ -698,6 +701,14 @@ try {
         .catch(() => undefined);
     }
     await shot('11-edit-running-light');
+    /* The edit is the viewer's, not the chat's: no waiting card in the thread
+       behind it (the viewer is portalled outside #root). */
+    check(
+      await page.evaluate(
+        () => document.querySelectorAll('#root [data-testid="pending-media-card"]').length === 0,
+      ),
+      'the edit also drew a waiting card in the chat thread',
+    );
     log(
       'the waiting card says',
       JSON.stringify(

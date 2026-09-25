@@ -23,6 +23,10 @@ import { type ImageVersion, jobIdOfTab, versionLabel } from './image-edit';
 /** An edit in flight, as the viewer draws it. */
 export interface EditJob {
   readonly instruction: string;
+  /** This edit's id on the wire — main echoes it on the job's every event. It
+   * also keys the waiting card's % (PendingMediaCard `progressKey`), so a
+   * viewer reopened mid-run continues the number instead of starting over. */
+  readonly requestId: string;
   readonly startedAt: number;
   /** The box the waiting card holds: the picture's own, measured at Edit. */
   readonly aspect: number;
@@ -117,14 +121,19 @@ export interface EditRequest {
   readonly box: { readonly aspect: number; readonly width: number; readonly height: number };
 }
 
+/** Per-app sequence for request ids, so two edits in one millisecond differ. */
+let editSeq = 0;
+
 /**
  * Edit the version on screen. Resolves when the run has ended, however it ended.
  *
- * PROGRESS: main streams `gen:open` / `gen:update` for every job, keyed by a tab
- * id this call only learns when the whole run is over. The first stream whose
- * prompt is this edit's words is this edit — the same correlation the studio
- * makes, tightened from "the first job to open", which would take a studio run
- * already in flight for this one.
+ * PROGRESS: main streams `gen:open` / `gen:update` for every job, and the reply
+ * to `gen:generate` only comes when the whole run is over. The request carries
+ * an id of its own and main echoes it on every event of the job it starts
+ * (`GenSurfacePayload.requestId`), so this follows exactly its own stream. The
+ * id also keeps the edit OUT of the chat: the thread's live card takes every
+ * stream that has no request id as the chat's own job (gen-stream.ts), and an
+ * edit running behind the viewer would otherwise have drawn itself there.
  */
 export async function runEdit(original: ImageVersion, req: EditRequest): Promise<void> {
   const start = sessionOf(original);
@@ -132,11 +141,14 @@ export async function runEdit(original: ImageVersion, req: EditRequest): Promise
   const instruction = req.instruction.trim();
   if (start.job !== null || from === undefined || instruction === '') return;
 
+  editSeq += 1;
+  const requestId = `viewer-edit-${Date.now().toString(36)}-${editSeq}`;
   patch(original, (s) => ({
     ...s,
     error: null,
     job: {
       instruction,
+      requestId,
       startedAt: Date.now(),
       aspect: req.box.aspect,
       width: req.box.width,
@@ -144,13 +156,8 @@ export async function runEdit(original: ImageVersion, req: EditRequest): Promise
     },
   }));
 
-  let mine: string | null = null;
   const take = (tabId: string, payload: GenSurfacePayload): void => {
-    if (mine === null) {
-      if (payload.modality !== 'image' || payload.prompt !== instruction) return;
-      mine = tabId;
-    }
-    if (tabId !== mine) return;
+    if (payload.requestId !== requestId) return;
     patch(original, (s) => {
       if (s.job === null) return s;
       const id = jobIdOfTab(tabId);
@@ -190,6 +197,7 @@ export async function runEdit(original: ImageVersion, req: EditRequest): Promise
       strength: req.strength,
       size: req.size,
       n: 1,
+      requestId,
     });
     const out = res.outputs[0];
     if ((res.error !== undefined && res.error !== '') || out === undefined) {

@@ -83,6 +83,10 @@ describe('an edit run', () => {
     for (const fn of listeners[channel] ?? []) fn({ tabId, payload });
   };
   const box = { aspect: 1, width: 600, height: 600 };
+  /** The request id this edit sent — main echoes it on its job's events. */
+  const sentRequestId = (): string =>
+    (invoke.mock.calls.find((c) => c[0] === 'gen:generate')?.[1] as { requestId: string })
+      .requestId;
 
   it('edits the picture on screen, follows its own progress, and lands as a new version', async () => {
     const done = runEdit(original, {
@@ -98,19 +102,25 @@ describe('an edit run', () => {
       strength: 0.6,
       size: '1024x1024',
       n: 1,
+      requestId: expect.stringMatching(/^viewer-edit-/),
     });
-    // Someone else's job streaming at the same time is not this edit.
-    emit('gen:open', 'pi:gen-other', { modality: 'image', prompt: 'a castle' });
+    const requestId = sentRequestId();
+    expect(sessionOf(original).job?.requestId).toBe(requestId);
+    /* Someone else's job streaming at the same time is not this edit — not a
+       chat's (no id), and not another request with the very same words. */
+    emit('gen:open', 'pi:gen-chat', { modality: 'image', prompt: 'make it golden hour' });
     emit('gen:update', 'pi:gen-other', {
       modality: 'image',
-      prompt: 'a castle',
+      prompt: 'make it golden hour',
+      requestId: 'studio-image-x-1',
       progress: { candidate: 0, step: 20, total: 24 },
     });
     expect(sessionOf(original).job?.jobId).toBeUndefined();
-    emit('gen:open', 'pi:gen-mine', { modality: 'image', prompt: 'make it golden hour' });
+    emit('gen:open', 'pi:gen-mine', { modality: 'image', prompt: 'x', requestId });
     emit('gen:update', 'pi:gen-mine', {
       modality: 'image',
-      prompt: 'make it golden hour',
+      prompt: 'x',
+      requestId,
       progress: { candidate: 0, step: 6, total: 15 },
     });
     expect(sessionOf(original).job).toMatchObject({ jobId: 'mine', step: 6, total: 15 });
@@ -156,7 +166,7 @@ describe('an edit run', () => {
 
   it('stops quietly: a stopped edit is not an error', async () => {
     const done = runEdit(original, { instruction: 'x', strength: 0.6, size: '512x512', box });
-    emit('gen:open', 'pi:gen-j1', { modality: 'image', prompt: 'x' });
+    emit('gen:open', 'pi:gen-j1', { modality: 'image', prompt: 'x', requestId: sentRequestId() });
     stopEdit(original);
     expect(invoke).toHaveBeenCalledWith('gen:cancel', { jobId: 'j1' });
     resolveGenerate({ jobId: '', outputs: [], error: 'canceled' });
