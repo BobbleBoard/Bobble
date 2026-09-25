@@ -16,8 +16,8 @@ import { conversationNameFrom } from '../../electron/workspace/project-dir';
 import { ensureChatServerReady, maybeRouteAuto } from '../chat/auto-router';
 import { ADVANCED_GROUNDTRUTH_KEY } from './advanced-store';
 import { resetCanvasForNewSession, restoreCanvas, snapshotCanvas } from './canvas-store';
-import { renameChat } from './chat-org';
-import { isChatDeleted } from './deleted-chats';
+import { deleteChat, renameChat } from './chat-org';
+import { isChatDeleted, useDeletedChats } from './deleted-chats';
 import { ensureVisionMode } from './local-model';
 import {
   type BgRun,
@@ -27,6 +27,7 @@ import {
   type QueuedSend,
   usePiStore,
 } from './pi-slice';
+import { UNSAVED_CHAT, usePresentStore } from './present-store';
 import { useProjectStore } from './project-store';
 import { useSettingsStore } from './settings-store';
 import { appendOrMergeBlock, mutateAssistant } from './transcript-fold';
@@ -121,6 +122,24 @@ let pendingNewSession = false;
  * prompt dispatched before pi has moved would land in the previous chat.
  */
 let pendingNewSessionRpc: Promise<unknown> | null = null;
+
+/**
+ * The newest message `sendPrompt` echoed — the one ⌘Z can take back — and how
+ * far it has got. See {@link unsendLastSend}.
+ */
+interface LastSend {
+  /** The echo's id in the thread. */
+  readonly echoId: string;
+  /** What pi was sent, once it has been; null while the send is still parked. */
+  body: string | null;
+  /** Settles once pi has answered the `pi:prompt` for it. */
+  acked: Promise<unknown> | null;
+  /** Taken back before it was dispatched: the dispatch drops it at its guard. */
+  cancelled: boolean;
+}
+let lastSend: LastSend | null = null;
+/** The rewind of a taken-back message, while it runs; a new send waits for it. */
+let unsending: Promise<void> | null = null;
 
 function armSessionInstructions(): void {
   instructionsArmed = true;
@@ -522,6 +541,14 @@ export async function sendPrompt(
   // local thread and does NOT bump the session epoch, so the echo survives the
   // ensureChatServerReady wait below.
   usePiStore.getState().appendUser(message, imageDataUris, agentMessage);
+  // What ⌘Z would take back, and how far it has got (see unsendLastSend).
+  const mine: LastSend = {
+    echoId: usePiStore.getState().messages.at(-1)?.id ?? '',
+    body: null,
+    acked: null,
+    cancelled: false,
+  };
+  lastSend = mine;
   // The chat's folder is created HERE, on the first send — not when the chat was
   // opened. See ensureChatWorkspace.
   await ensureChatWorkspace(message);
@@ -559,6 +586,9 @@ export async function sendPrompt(
   }
 
   async function dispatchPrompt(): Promise<unknown> {
+    // A message taken back a moment ago is still being rewound out of pi's
+    // session; this one goes into the session AFTER that, not the one before.
+    if (unsending !== null) await unsending;
     // pi may be parked on a chat that finished streaming in the background — move it
     // onto the viewed chat (saving the finished bg thread) before we dispatch.
     await ensurePiOnViewedSession();
@@ -600,8 +630,10 @@ export async function sendPrompt(
 
     // ONE guard after all the awaits: a session switch raced us → drop this send (the
     // echo was appended to the now-cleared old session; do NOT dispatch into the new one).
-    if (usePiStore.getState().sessionEpoch !== epochAtSend) {
-      usePiStore.setState({ promptInFlight: false });
+    // …and so did ⌘Z, if the user took the message back while it was still parked
+    // here (a model loading, a vision relaunch): it never reaches pi at all.
+    if (usePiStore.getState().sessionEpoch !== epochAtSend || mine.cancelled) {
+      if (!mine.cancelled) usePiStore.setState({ promptInFlight: false });
       return;
     }
 
@@ -631,7 +663,10 @@ export async function sendPrompt(
     // (the user's blank-gap repro). See {@link deliveryForSend} for which queue it lands
     // in and why.
     const delivery = deliveryForSend(agentInFlight());
-    const ack = await window.piDesktop.invoke('pi:prompt', { ...body, ...delivery.body });
+    mine.body = body.message;
+    const acking = window.piDesktop.invoke('pi:prompt', { ...body, ...delivery.body });
+    mine.acked = acking.catch(() => undefined);
+    const ack = await acking;
     // The dispatch, not a turn, has to lower the in-flight bridge for a steer: it
     // joins a run that ALREADY started, so `agent_start` will not fire again.
     if (delivery.clearsInFlight) usePiStore.setState({ promptInFlight: false });
@@ -1287,6 +1322,197 @@ export async function forkAndReprompt(
   // pi is now on the forked branch; this prompt appends the edited turn there,
   // with its attachments folded back in (see `agentMessage`).
   await window.piDesktop.invoke('pi:prompt', { message: body });
+}
+
+/**
+ * ⌘Z JUST AFTER SENDING TAKES THE MESSAGE BACK.
+ *
+ * the user (2026-09-24): "pressing cmd z within 3 seconds of sending a message and
+ * before any text has been typed into the input box should unsend+rewind the
+ * chat". The composer owns the gesture (the window, the empty box, what goes
+ * back into it); this owns what "unsend" means for the conversation:
+ *
+ *  - QUEUED behind a running turn: it never left. It comes off the queue and
+ *    nothing else is touched — above all, the turn it was waiting behind is
+ *    not stopped.
+ *  - SENT: its turn is stopped, and the message and everything the turn drew
+ *    after it leave the thread at once. pi's session is rewound to before it
+ *    with the mechanism editing a message already uses — `pi:fork` at the
+ *    message, which puts pi on a branch of the chat that ends just before it —
+ *    so the model's context no longer holds the message and the next send
+ *    continues from the turn before. Nothing is written into the session to
+ *    say "ignore that": the branch simply does not contain it.
+ *  - Still PARKED before dispatch (a model loading, a vision relaunch): it is
+ *    dropped at the dispatch's own guard and never reaches pi.
+ *
+ * Why not a branch of the ‹ 1 / 2 › kind, as an edit makes: an edit keeps both
+ * versions because both were answered; a message taken back was never meant to
+ * exist, so there is nothing to switch back to.
+ *
+ * WHAT IT COSTS THE NEXT MESSAGE — nothing, once the harness keeps a fork's
+ * frozen prompt (packages/harness ForkCarry). The branch holds the conversation
+ * up to the message byte for byte, so the next request is the one the engine
+ * already holds up to where the taken-back message began. MEASURED 2026-09-24
+ * on qwen3.5-4b / rapid-mlx (unsend-prefill-probe.mjs, both freeze orders): the
+ * message after an unsend re-read 13 tokens of ~3.5k, an ordinary follow-up
+ * ~40, with the system prompt and tools identical; before that fix the branch
+ * rebuilt the prompt without the folder's name and the next message re-read all
+ * of it.
+ *
+ * Returns whether there was something to take back; `expect` is what the
+ * composer sent, so a message that is not the one it just sent is never touched.
+ */
+export function unsendLastSend(expect: { text: string; images: readonly string[] }): boolean {
+  const state = usePiStore.getState();
+  const sameImages = (a: readonly string[]): boolean =>
+    a.length === expect.images.length && a.every((src, i) => src === expect.images[i]);
+
+  const queued = state.queuedSends.at(-1);
+  if (queued !== undefined && queued.text === expect.text && sameImages(queued.images)) {
+    usePiStore.setState({ queuedSends: state.queuedSends.slice(0, -1) });
+    return true;
+  }
+
+  const mine = lastSend;
+  if (mine === null) return false;
+  const at = state.messages.findIndex((m) => m.id === mine.echoId);
+  const echo = state.messages[at];
+  if (echo === undefined || echo.kind !== 'user' || echo.text !== expect.text) return false;
+  // Only the NEWEST message can be taken back — never one with a later turn.
+  if (state.messages.slice(at + 1).some((m) => m.kind === 'user')) return false;
+
+  mine.cancelled = true;
+  lastSend = null;
+  const kept = state.messages.slice(0, at);
+  const keptIds = new Set(kept.map((m) => m.id));
+  // Nothing the user said before it — see rewindPiPast for why that matters.
+  const firstOfChat = !kept.some((m) => m.kind === 'user');
+  usePiStore.setState({
+    messages: kept,
+    promptInFlight: false,
+    runningToolCalls: [],
+    toolOutputPartials: {},
+  });
+  const prior = unsending;
+  const run: Promise<void> = (async () => {
+    if (prior !== null) await prior;
+    await rewindPiPast(mine, keptIds, firstOfChat);
+  })()
+    .catch((error) => {
+      console.error('[unsend] rewind failed', error);
+    })
+    .finally(() => {
+      if (unsending === run) unsending = null;
+    });
+  unsending = run;
+  return true;
+}
+
+/** Settles once any take-back in progress has finished rewinding pi. */
+export function unsendSettled(): Promise<void> {
+  return unsending ?? Promise.resolve();
+}
+
+/** Resolves when no turn is streaming (or after `timeoutMs`, whichever first). */
+function turnEnded(timeoutMs: number): Promise<void> {
+  return new Promise((resolve) => {
+    if (!usePiStore.getState().agent.isStreaming) {
+      resolve();
+      return;
+    }
+    const stop = (): void => {
+      clearTimeout(timer);
+      unsubscribe();
+      resolve();
+    };
+    const timer = setTimeout(stop, timeoutMs);
+    const unsubscribe = usePiStore.subscribe((s) => {
+      if (!s.agent.isStreaming) stop();
+    });
+  });
+}
+
+/**
+ * Stop the taken-back message's turn and fork pi's session to before it.
+ * `keptIds` is the thread as it stood before the message; `firstOfChat` says
+ * the user had said nothing before it.
+ */
+async function rewindPiPast(
+  mine: LastSend,
+  keptIds: ReadonlySet<string>,
+  firstOfChat: boolean,
+): Promise<void> {
+  /* What the stopped turn still draws on its way out (the aborted reply, a tool
+     row) arrives after the thread was cut; it goes too. A NEW message the user
+     sent in the meantime is theirs and stays — and waits for this to finish
+     before it is dispatched (sendPrompt). */
+  const recut = (): void =>
+    usePiStore.setState((s) => ({
+      messages: s.messages.filter((m) => keptIds.has(m.id) || m.kind === 'user'),
+    }));
+  // Parked before dispatch: `cancelled` drops it at the guard; pi never saw it.
+  if (mine.body === null) return;
+  const body = mine.body;
+  // pi answers `pi:prompt` just before its agent starts, so an abort sent after
+  // the answer lands in the turn instead of racing ahead of it.
+  await mine.acked;
+  // pi's `abort` answers once the agent is idle, so the aborted turn's own
+  // events are ahead of that answer on the same stream; waiting for the turn's
+  // end as well costs nothing then, and holds when they are not (a stand-in pi).
+  await window.piDesktop.invoke('pi:abort', undefined).catch(() => undefined);
+  await turnEnded(4000);
+  recut();
+
+  const listed = await window.piDesktop.invoke('pi:get-fork-messages', undefined);
+  if (!listed.success) return;
+  /* The message is the NEWEST user message pi recorded, or it never recorded
+     it (an abort that beat the agent to it): anything else is not ours to
+     rewind. `includes`, because pi's copy can carry what the harness added to
+     the text (the first message's instructions preamble is in `body` itself). */
+  const newest = listed.messages.at(-1);
+  if (newest === undefined || body.trim() === '' || !newest.text.includes(body.trim())) return;
+
+  const before = usePiStore.getState().session?.sessionFile ?? null;
+  const forked = await window.piDesktop.invoke('pi:fork', { entryId: newest.entryId });
+  if (!forked.success || forked.cancelled === true) return;
+  const after = await getPiState();
+  const branch = after.success ? (after.state?.sessionFile ?? null) : null;
+  if (branch !== null) {
+    // Set here as well as by the router's copy of the same answer, so the
+    // pointer is on the branch the moment this returns.
+    usePiStore.setState((s) => ({ session: { ...s.session, sessionFile: branch } }));
+    usePresentStore
+      .getState()
+      .carry(before ?? UNSAVED_CHAT, branch, (anchor) => anchor === null || keptIds.has(anchor));
+    /*
+     * A CHAT THAT WAS NOTHING BUT THIS MESSAGE IS NOT A CHAT ANY MORE.
+     *
+     * pi writes the branch of a chat's FIRST message as a new session with no
+     * link back to the old one (no `parentSession`; nothing before the message
+     * to branch from), so the sidebar's one-row-per-chain rule cannot fold them
+     * together. SEEN on the real app (2026-09-24): after ⌘Z on a first message
+     * the sidebar listed "New chat" AND a chat holding only the taken-back
+     * message — and it stayed there after the next message, a conversation the
+     * user had unsent. That file is retired through the app's own delete path
+     * (hidden at once, tombstoned in main, removed), and only when BOTH sides
+     * agree it held nothing else: pi had recorded no other user message, and
+     * nor had the thread (pi's list skips a message with no text, the thread
+     * does not).
+     */
+    if (firstOfChat && listed.messages.length === 1 && before !== null && before !== branch) {
+      const old = before;
+      useDeletedChats.getState().hide([old]);
+      void deleteChat(old)
+        .then((res) => {
+          if (!res.ok) useDeletedChats.getState().restore([old]);
+        })
+        .catch(() => useDeletedChats.getState().restore([old]));
+    }
+  }
+  recut();
+  // The first message of a chat carried the saved instructions; the branch
+  // does not have it any more, so the next message carries them instead.
+  if (body.startsWith('<user-instructions>')) armSessionInstructions();
 }
 
 /** Switch the visible transcript to another fork branch and keep pi's active
