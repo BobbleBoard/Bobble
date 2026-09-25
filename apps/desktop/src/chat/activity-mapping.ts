@@ -1063,10 +1063,34 @@ export function mapToolStep(
     };
   }
   if (result?.isError !== true) return withDuration;
+  /*
+   * A CALL THE USER STOPPED DID NOT FAIL. Stop cancels a running generation now
+   * (the tool answers at once, the job goes with it), and its result is an
+   * error — so the row went red and the chain read "1 image failed" over a
+   * picture nobody let finish. It is the chain's own `stopped` state instead:
+   * still, orange, "Stopped", with the words it had while it ran.
+   */
+  if (isStoppedResult(result.text)) {
+    const asRunning = mapToolStepData(block, result, true);
+    return {
+      ...withDuration,
+      data: { ...withDuration.data, status: 'stopped', label: asRunning.data.label },
+    };
+  }
   return {
     ...withDuration,
     data: { ...withDuration.data, failed: true, label: failedLabel(withDuration.data.label) },
   };
+}
+
+/**
+ * A result that says the call was stopped with its turn: the generation tools'
+ * GEN_REQUEST_STOPPED ("stopped — the turn was stopped, and the job with it"),
+ * talk_to_manager's "Stopped". Pure.
+ */
+export function isStoppedResult(text: string | undefined): boolean {
+  if (text === undefined) return false;
+  return /\bthe turn was stopped\b/i.test(text) || /^\s*stopped\b/i.test(text);
 }
 
 /**

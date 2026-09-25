@@ -446,7 +446,13 @@ export function formatDuration(ms: number): string {
   return parts.join(' ');
 }
 
-function phrase(kind: ActivityStepKind, count: number, durationMs: number, failed = 0): string {
+function phrase(
+  kind: ActivityStepKind,
+  count: number,
+  durationMs: number,
+  failed = 0,
+  stopped = 0,
+): string {
   // Thinking is duration-first when we have one ("thought for 1h 20m").
   if (kind === 'thinking') {
     // Test the FORMATTED value, not the raw ms: a sub-second duration is a real
@@ -460,14 +466,19 @@ function phrase(kind: ActivityStepKind, count: number, durationMs: number, faile
    * at all — "edited 6 files" asserts six files changed when none did. Name the
    * ATTEMPTS instead: "6 edits failed".
    */
-  if (failed > 0 && failed === count) {
+  if (failed > 0 && failed + stopped === count) {
     const attempt = spec.attempt ?? 'call';
-    return count > 1 ? `${count} ${attempt}s failed` : `1 ${attempt} failed`;
+    return failed > 1 ? `${failed} ${attempt}s failed` : `1 ${attempt} failed`;
+  }
+  /* Stopped by the user is neither done nor failed: "1 image stopped". */
+  if (stopped > 0 && stopped === count) {
+    const attempt = spec.attempt ?? 'call';
+    return stopped > 1 ? `${stopped} ${attempt}s stopped` : `1 ${attempt} stopped`;
   }
   if (!spec.plural) {
     return spec.singular ? `${spec.verb} ${spec.singular}` : spec.verb;
   }
-  const done = count - failed;
+  const done = count - failed - stopped;
   const noun = done > 1 ? `${done} ${spec.plural}` : spec.singular;
   /*
    * NO "(N failed)" TAIL. the user: "additionally, no (failed)." The count of what
@@ -516,18 +527,23 @@ export function chainIsDone(input: {
 }
 
 export function summarizeActivity(steps: ActivityStepData[]): string {
-  const agg = new Map<ActivityStepKind, { count: number; durationMs: number; failed: number }>();
+  const agg = new Map<
+    ActivityStepKind,
+    { count: number; durationMs: number; failed: number; stopped: number }
+  >();
   for (const step of steps) {
-    const cur = agg.get(step.kind) ?? { count: 0, durationMs: 0, failed: 0 };
+    const cur = agg.get(step.kind) ?? { count: 0, durationMs: 0, failed: 0, stopped: 0 };
     cur.count += 1;
     cur.durationMs += step.durationMs ?? 0;
     if (step.failed === true) cur.failed += 1;
+    else if (step.status === 'stopped') cur.stopped += 1;
     agg.set(step.kind, cur);
   }
   const phrases: string[] = [];
   for (const kind of KIND_ORDER) {
     const entry = agg.get(kind);
-    if (entry) phrases.push(phrase(kind, entry.count, entry.durationMs, entry.failed));
+    if (entry)
+      phrases.push(phrase(kind, entry.count, entry.durationMs, entry.failed, entry.stopped));
   }
   /*
    * PAST TWO DISTINCT ACTIONS, SAY "WORKED FOR <time>".
@@ -549,7 +565,7 @@ export function summarizeActivity(steps: ActivityStepData[]): string {
      * a claim rather than a summary, so keep the itemised line — it is the
      * honest one, and a failing turn is exactly when you want the detail.
      */
-    const anyDone = steps.some((s) => s.failed !== true);
+    const anyDone = steps.some((s) => s.failed !== true && s.status !== 'stopped');
     if (anyDone) {
       const total = steps.reduce((sum, s) => sum + (s.durationMs ?? 0), 0);
       const d = formatDuration(total);
@@ -1859,9 +1875,7 @@ function useFoldingWaitRow(
   // element in the same commit — a remounted row has no height to fold from.
   if (seen.has !== has || seen.stepCount !== stepCount) {
     setSeen({ has, stepCount });
-    setFolding(
-      !has && seen.has && stepCount === seen.stepCount ? (last.current ?? null) : null,
-    );
+    setFolding(!has && seen.has && stepCount === seen.stepCount ? (last.current ?? null) : null);
   }
   useEffect(() => {
     if (folding === null) return;

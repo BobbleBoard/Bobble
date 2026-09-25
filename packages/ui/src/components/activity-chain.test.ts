@@ -217,6 +217,29 @@ describe('activitySummary', () => {
   });
 });
 
+describe('a call the user stopped is neither done nor failed', () => {
+  const step = (kind: ActivityStepData['kind'], status?: 'stopped'): ActivityStepData =>
+    ({ kind, label: '', ...(status === undefined ? {} : { status }) }) as ActivityStepData;
+
+  it('says what was stopped, never "failed" and never done', () => {
+    expect(summarizeActivity([step('image', 'stopped')])).toBe('1 image stopped');
+    expect(summarizeActivity([step('video', 'stopped'), step('video', 'stopped')])).toBe(
+      '2 videos stopped',
+    );
+    // One made, one stopped: the one that was made is the headline.
+    expect(summarizeActivity([step('image'), step('image', 'stopped')])).toBe('Generated an image');
+  });
+
+  it('does not collapse to "Worked for" when nothing was done', () => {
+    const summary = summarizeActivity([
+      step('image', 'stopped'),
+      step('svg', 'stopped'),
+      step('video', 'stopped'),
+    ]);
+    expect(summary.startsWith('Worked')).toBe(false);
+  });
+});
+
 describe('a rejected call is not work done', () => {
   const step = (kind: ActivityStepData['kind'], failed?: boolean): ActivityStepData =>
     ({ kind, label: '', ...(failed === undefined ? {} : { failed }) }) as ActivityStepData;

@@ -16,6 +16,7 @@ import {
   type GroupSegment,
   generatedImageSrc,
   isEmptyThinking,
+  isStoppedResult,
   mapThinkingStep,
   mapToolStep,
   reportedFacts,
@@ -979,6 +980,38 @@ describe('a folder is not a file', () => {
       false,
     );
     expect(step.data.label).toBe('Read a file');
+  });
+});
+
+describe('a call the user stopped is stopped, not failed', () => {
+  // GEN_REQUEST_STOPPED, as the generation tools answer a Stop.
+  const stoppedText = 'stopped — the turn was stopped, and the job with it';
+
+  it('reads the stop the tools answer with, and nothing else', () => {
+    expect(isStoppedResult(stoppedText)).toBe(true);
+    expect(isStoppedResult(`generate_image: ${stoppedText}`)).toBe(true);
+    expect(isStoppedResult('Stopped')).toBe(true);
+    expect(isStoppedResult('the server stopped responding')).toBe(false);
+    expect(isStoppedResult('Could not find edits[1]')).toBe(false);
+    expect(isStoppedResult(undefined)).toBe(false);
+  });
+
+  /* the user's Stop now cancels a running generation; the chain read "1 image failed", in red. */
+  it("is the chain's stopped state, with the words it had while it ran", () => {
+    const step = mapToolStep(
+      call('g1', 'generate_image', { prompt: 'a red fox asleep' }),
+      { ...result('g1', stoppedText), isError: true },
+      false,
+    );
+    expect(step.data.status).toBe('stopped');
+    expect(step.data.failed).toBeUndefined();
+    const running = mapToolStep(
+      call('g1', 'generate_image', { prompt: 'a red fox asleep' }),
+      undefined,
+      true,
+    );
+    expect(step.data.label).toBe(running.data.label);
+    expect(summarizeActivity([step.data])).toBe('1 image stopped');
   });
 });
 
