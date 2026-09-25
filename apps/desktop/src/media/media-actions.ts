@@ -6,17 +6,28 @@
  * separately at each call site, which is how one of them quietly ends up with a
  * hand-built `pd-file://` URL that 404s (it happened; see `pdFileUrl`).
  */
+import { markSystemClipboard } from '../chat/composer/clipboard-epoch';
 
 /** Ask main for a Save-As sheet. Never throws — a cancelled sheet is not an error. */
 export function exportFile(path: string, suggestedName: string): void {
   void window.piDesktop.invoke('canvas:save-as', { path, suggestedName }).catch(() => undefined);
 }
 
-/** Put it on the clipboard — a picture as pixels, anything else as the file. */
+/**
+ * Put it on the clipboard — a picture as pixels, anything else as the file.
+ *
+ * Pixels are what every paste target understands, OUR composer included now
+ * (paste-files.ts). A successful copy also retires the composer's own chip
+ * clipboard (clipboard-epoch.ts): this copy is newer, so it is what ⌘V pastes.
+ */
 export function copyFile(path: string): Promise<boolean> {
   return window.piDesktop
     .invoke('canvas:copy-file', { path })
-    .then((r) => (r as { ok?: boolean }).ok === true)
+    .then((r) => {
+      const ok = (r as { ok?: boolean }).ok === true;
+      if (ok) markSystemClipboard();
+      return ok;
+    })
     .catch(() => false);
 }
 

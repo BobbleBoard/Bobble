@@ -60,6 +60,7 @@ import {
   type ComposerEditorApi,
   type ComposerKeymap,
 } from './composer/ComposerEditor';
+import { clipboardEpoch } from './composer/clipboard-epoch';
 import { useDropStore } from './composer/drop-store';
 import type { PillData } from './composer/pill-node';
 import { type AcToken, EMPTY_TOKEN } from './composer/tokens';
@@ -188,6 +189,17 @@ const TEXT_MAX_BYTES = 256 * 1024;
  * sentence or short snippet still lands inline where you'd expect.
  */
 const PASTE_AS_FILE_MIN_CHARS = 1000;
+
+/**
+ * Focus is in a text field that is NOT this composer — a dialog's input, the
+ * image viewer's edit bar. The composer's window-level ⌘C/⌘V/⌘Z stand down
+ * there: those keys belong to the field being typed in.
+ */
+function typingElsewhere(): boolean {
+  const el = document.activeElement;
+  if (!(el instanceof HTMLElement) || el.closest('.pd-composer-root') !== null) return false;
+  return el.isContentEditable || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA';
+}
 
 function isTextFile(file: File): boolean {
   if (file.type.startsWith('text/')) return true;
@@ -403,7 +415,9 @@ export function ChatComposer({
   /** Removed attachments, newest last — the undo stack. Each entry remembers
    * WHERE it was, so undo puts it back in its place rather than at the end. */
   const removedRef = useRef<{ at: number; items: Attachment[] }[]>([]);
-  const clipboardRef = useRef<Attachment[]>([]);
+  /** The chips last copied, and the system-clipboard epoch they were copied at
+   * (clipboard-epoch.ts) — anything copied since is newer and wins ⌘V. */
+  const clipboardRef = useRef<{ items: Attachment[]; epoch: number }>({ items: [], epoch: -1 });
   const flavor = useThemeStore((s) => s.flavor);
   const isStreaming = usePiStore((s) => s.agent.isStreaming);
   // A corp/hierarchy run is live from start to its terminal `done` — its Stop
@@ -623,6 +637,13 @@ export function ChatComposer({
     const onKey = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey;
       if (!mod || e.altKey) return;
+      /*
+       * NOT WHILE SOMEONE IS TYPING IN ANOTHER FIELD. These keys are heard at
+       * the window, so ⌘V in the image viewer's edit bar (or any dialog's
+       * field) pasted the composer's chips behind it, and ⌘Z there undid a
+       * chip removal instead of the typing.
+       */
+      if (typingElsewhere()) return;
       const key = e.key.toLowerCase();
 
       if (key === 'z' && !e.shiftKey) {
@@ -636,20 +657,29 @@ export function ChatComposer({
        * and cut, which made cut-then-paste impossible: cutting clears the
        * selection, so by the time you press V there is nothing selected and the
        * handler had already returned.
+       *
+       * AND IT IS ONLY OURS WHILE OUR COPY IS THE NEWEST ONE. It used to claim
+       * ⌘V whenever a chip had ever been copied, so a picture copied from a card
+       * afterwards could never be pasted — the old chip came back instead.
        */
-      if (key === 'v' && clipboardRef.current.length > 0) {
+      const held = clipboardRef.current;
+      if (key === 'v') {
+        if (held.items.length === 0 || held.epoch !== clipboardEpoch()) return;
         // New ids: pasting is a COPY, so the original stays where it is and the
         // two can be removed independently.
         setAttachments((prev) => [
           ...prev,
-          ...clipboardRef.current.map((a) => ({ ...a, id: crypto.randomUUID() })),
+          ...held.items.map((a) => ({ ...a, id: crypto.randomUUID() })),
         ]);
         e.preventDefault();
         return;
       }
       if (selection.ids.length === 0) return;
       if (key === 'c' || key === 'x') {
-        clipboardRef.current = attachments.filter((a) => selection.ids.includes(a.id));
+        clipboardRef.current = {
+          items: attachments.filter((a) => selection.ids.includes(a.id)),
+          epoch: clipboardEpoch(),
+        };
         if (key === 'x') removeAttachments(selection.ids);
         e.preventDefault();
       }
@@ -799,6 +829,18 @@ export function ChatComposer({
       ...prev,
       { id: crypto.randomUUID(), name: 'pasted content', kind: 'text', text: pasted, pasted: true },
     ]);
+    return true;
+  };
+
+  /*
+   * A PASTED PICTURE IS A DROPPED PICTURE. the user: "copy and then attempting
+   * pasting into our own apps input bar doesn't work." Same `addFiles` a drop
+   * goes through, so a picture copied from a card chips up with its thumbnail,
+   * a screenshot does too, and a pasted file this composer cannot carry is
+   * named in the same "skipped" note rather than vanishing.
+   */
+  const handlePasteFiles = (files: File[]): boolean => {
+    void addFiles(files);
     return true;
   };
 
@@ -1519,6 +1561,7 @@ export function ChatComposer({
               onTokenChange={setToken}
               onSubmit={() => void submit()}
               onLargePaste={handleLargePaste}
+              onPasteFiles={handlePasteFiles}
               keymap={keymap}
               apiRef={apiRef}
             />

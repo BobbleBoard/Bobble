@@ -36,6 +36,7 @@ import {
 } from 'lexical';
 import { type MutableRefObject, useEffect, useRef } from 'react';
 import { registerPillRenderer } from './PillRenderer';
+import { pastedFiles } from './paste-files';
 import { deleteAdjacentPill } from './pill-delete';
 import { $createPillNode, $isPillNode, type PillData, PillNode } from './pill-node';
 import { type AcToken, detectToken, EMPTY_TOKEN } from './tokens';
@@ -91,9 +92,16 @@ interface ComposerEditorProps {
    * Offered a plain-text clipboard paste BEFORE it lands in the editor. Return
    * true to CONSUME it (the parent turned it into a "pasted content" attachment
    * so a large block doesn't flood the input); return false to let it paste
-   * normally. Only fires for plain-text pastes with no clipboard files.
+   * normally. Only fires when the paste's TEXT is its content (see onPasteFiles).
    */
   onLargePaste?: (text: string) => boolean;
+  /**
+   * Offered the FILES of a paste — a picture copied from a card, a screenshot,
+   * files copied in Finder — when they are the content (paste-files.ts decides).
+   * The plain-text editor below would read `text/plain` and drop them, which is
+   * exactly how a copied picture used to vanish on ⌘V. Return true to consume.
+   */
+  onPasteFiles?: (files: File[]) => boolean;
 }
 
 /**
@@ -311,19 +319,32 @@ function EditorBridge(props: Omit<ComposerEditorProps, 'placeholder' | 'disabled
         },
         COMMAND_PRIORITY_HIGH,
       ),
-      // Large plain-text paste → offer it to the parent BEFORE it enters the
-      // editor. If the parent consumes it (turns it into a "pasted content"
-      // attachment), swallow the paste so a huge block never floods the input;
-      // otherwise fall through to the normal plain-text paste. File/image pastes
-      // and non-clipboard paste events are left untouched.
+      // A paste is offered to the parent BEFORE it enters the editor, in two
+      // shapes. FILES (a copied picture, a screenshot, Finder files) become
+      // attachments — the PlainTextPlugin that handles the paste otherwise reads
+      // `text/plain` alone, so a picture used to land as nothing at all. A LARGE
+      // plain-text block becomes a "pasted content" attachment so it never
+      // floods the input. Anything else falls through to the normal paste.
       editor.registerCommand(
         PASTE_COMMAND,
         (event: ClipboardEvent | InputEvent | KeyboardEvent) => {
-          const { onLargePaste } = cb.current;
-          if (onLargePaste === undefined) return false;
+          const { onLargePaste, onPasteFiles } = cb.current;
           if (!(event instanceof ClipboardEvent) || event.clipboardData === null) return false;
-          if (event.clipboardData.files.length > 0) return false;
-          const pasted = event.clipboardData.getData('text/plain');
+          const data = event.clipboardData;
+          // Read now: a DataTransfer is only readable while its event dispatches.
+          const files = pastedFiles(
+            Array.from(data.files),
+            data.getData('text/plain'),
+            data.getData('text/html'),
+          );
+          if (files.length > 0 && onPasteFiles !== undefined && onPasteFiles([...files])) {
+            event.preventDefault();
+            return true;
+          }
+          if (onLargePaste === undefined) return false;
+          // The files lost to their text (paste-files.ts) — the text is the
+          // paste now, and a big one is still better as an attachment.
+          const pasted = data.getData('text/plain');
           if (pasted.length === 0) return false;
           if (onLargePaste(pasted)) {
             event.preventDefault();
