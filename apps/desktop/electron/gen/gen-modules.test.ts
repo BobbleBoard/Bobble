@@ -92,6 +92,59 @@ describe('the gate — a job waits for the button, then continues', () => {
     await expect(job).rejects.toBeInstanceOf(GenModuleMissingError);
   });
 
+  /*
+   * A CANCELLED JOB IS NOT WAITING (review of the 2026-09-23 wave). A job
+   * stopped at the gate — its turn stopped, its chat deleted — left its waiter
+   * registered, so the card kept saying a generation was waiting on the module
+   * until the four-minute clock ran out.
+   */
+  it('a job stopped while it waits stops waiting — the card no longer counts it', async () => {
+    const { m, emitted, timers } = manager();
+    const stop = new AbortController();
+    const job = m.ensure('image', stop.signal);
+    job.catch(() => undefined);
+    await new Promise((r) => setTimeout(r, 0));
+    const waiting = emitted.at(-1) as Array<{ id: string; wanted: boolean }>;
+    expect(waiting.find((s) => s.id === 'image')?.wanted).toBe(true);
+
+    stop.abort();
+    await expect(job).rejects.toThrow(/canceled/);
+    const after = m.status().find((s) => s.id === 'image');
+    expect(after?.wanted).toBe(false);
+    expect(timers[0]?.cleared).toBe(true);
+    const shown = emitted.at(-1) as Array<{ id: string; wanted: boolean }>;
+    expect(shown.find((s) => s.id === 'image')?.wanted).toBe(false);
+  });
+
+  it('…and one other job still waiting keeps the card', async () => {
+    const { m } = manager();
+    const stop = new AbortController();
+    const stopped = m.ensure('image', stop.signal);
+    stopped.catch(() => undefined);
+    const other = m.ensure('image');
+    other.catch(() => undefined);
+    await new Promise((r) => setTimeout(r, 0));
+    stop.abort();
+    await expect(stopped).rejects.toThrow(/canceled/);
+    expect(m.status().find((s) => s.id === 'image')?.wanted).toBe(true);
+    m.dismiss('image');
+  });
+
+  it('a job already stopped does not wait at all', async () => {
+    const { m, emitted } = manager();
+    const stop = new AbortController();
+    stop.abort();
+    await expect(m.ensure('audio', stop.signal)).rejects.toThrow(/canceled/);
+    expect(m.status().find((s) => s.id === 'audio')?.wanted).toBe(false);
+    expect(
+      emitted.some((states) =>
+        (states as Array<{ id: string; wanted: boolean }>).some(
+          (s) => s.id === 'audio' && s.wanted,
+        ),
+      ),
+    ).toBe(false);
+  });
+
   it('a failed install keeps the job waiting for a retry, and says why', async () => {
     const { m, emitted } = manager({ fail: true });
     const job = m.ensure('image');

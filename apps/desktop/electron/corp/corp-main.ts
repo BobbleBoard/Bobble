@@ -87,6 +87,21 @@ function settleDelivery(taskId: string, result: TaskResult | null): void {
   waiter(result);
 }
 
+/** Stop a production — the composer's Stop, a deleted chat, or a CEO gone. */
+function abortCorpRun(taskId: string): boolean {
+  const task = tasks.get(taskId);
+  if (task === undefined) return false;
+  // Mesh (hierarchy) runs have no engine — fire their cooperative stop instead,
+  // so every subagent is told to wrap up and no new turns start.
+  if (task.engine === undefined) {
+    if (task.abortMesh === undefined) return false;
+    task.abortMesh();
+    return true;
+  }
+  task.engine.abort(task.handle);
+  return true;
+}
+
 /** How many TERMINAL (done/errored) tasks to retain so the situation room + build
  * snapshot keep resolving after completion — `corp:peek`/`get-org-chart`/
  * `worker-transcript` read the on-disk product through the retained engine, and the
@@ -503,19 +518,7 @@ const handlers: CorpHandlers = {
     }
     return { answer: await ask(req.question) };
   },
-  'corp:abort': (_wc, req) => {
-    const task = tasks.get(req.taskId);
-    if (task === undefined) return { ok: false };
-    // Mesh (hierarchy) runs have no engine — fire their cooperative stop instead,
-    // so every subagent is told to wrap up and no new turns start.
-    if (task.engine === undefined) {
-      if (task.abortMesh === undefined) return { ok: false };
-      task.abortMesh();
-      return { ok: true };
-    }
-    task.engine.abort(task.handle);
-    return { ok: true };
-  },
+  'corp:abort': (_wc, req) => ({ ok: abortCorpRun(req.taskId) }),
   'corp:respond-permission': (_wc, req) => {
     const task = tasks.get(req.taskId);
     if (task?.engine === undefined) return { ok: false };
@@ -560,6 +563,8 @@ const handlers: CorpHandlers = {
 export async function runCorpForBridge(
   wc: WebContents | null,
   task: string,
+  /** Fires when the CEO stops waiting — its turn was stopped, or its chat deleted. */
+  signal?: AbortSignal,
 ): Promise<{ ok: boolean; product: string; error?: string; workspace?: string }> {
   if (wc === null || wc.isDestroyed()) {
     return { ok: false, product: '', error: 'no window to run the production in' };
@@ -586,15 +591,34 @@ export async function runCorpForBridge(
     return { ok: false, product: '', error: err instanceof Error ? err.message : String(err) };
   }
   const { taskId } = started;
+  /*
+   * THE CEO IS ALREADY GONE — its turn was stopped, or its chat deleted, while
+   * the team was being put together. Nobody will receive this production, so it
+   * is stopped, and not announced: announced now, the situation room would
+   * bind it to whichever chat is on screen.
+   */
+  if (signal?.aborted === true) {
+    abortCorpRun(taskId);
+    return { ok: false, product: '', error: 'stopped — the CEO stopped waiting' };
+  }
   // Let the situation room bind to this run (it did not start it).
   try {
     if (!wc.isDestroyed()) events.send(wc, 'corp:attached', { taskId });
   } catch {
     /* the run proceeds whether or not anyone is watching */
   }
-  const result = await new Promise<TaskResult | null>((resolve) => {
-    deliveries.set(taskId, resolve);
-  });
+  /* And the moment the CEO stops waiting, the team stops too — the composer's
+     "halt all agents", reached whatever the store points at. */
+  const onGone = (): void => void abortCorpRun(taskId);
+  signal?.addEventListener('abort', onGone, { once: true });
+  let result: TaskResult | null;
+  try {
+    result = await new Promise<TaskResult | null>((resolve) => {
+      deliveries.set(taskId, resolve);
+    });
+  } finally {
+    signal?.removeEventListener('abort', onGone);
+  }
   /*
    * WHAT IS ON DISK, reported alongside the outcome.
    *

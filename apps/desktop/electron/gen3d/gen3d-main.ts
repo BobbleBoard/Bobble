@@ -505,6 +505,26 @@ async function dropJob(jobId: string): Promise<ImageJobResult> {
   return { ok: false, error: 'cancelled' };
 }
 
+/**
+ * Wait for a job the asker may stop waiting for. The chat's image and 3D tools
+ * answer "cancelled" and hang up the moment their turn is stopped; the job
+ * then made a picture or a mesh nobody would ever receive, holding the engine
+ * for minutes. Now it is cancelled when its asker goes.
+ */
+async function waitUnlessAbandoned(
+  jobId: string,
+  signal: AbortSignal | undefined,
+  wait: () => Promise<ImageJobResult>,
+): Promise<ImageJobResult> {
+  const onAbandon = (): void => void cancelGen3dJob(jobId);
+  signal?.addEventListener('abort', onAbandon, { once: true });
+  try {
+    return await wait();
+  } finally {
+    signal?.removeEventListener('abort', onAbandon);
+  }
+}
+
 /** Image gen is ~11 s warm, but a cold call loads a ~15 GB model first. Generous
  * on purpose — the cap exists so nothing hangs forever, not to be tight. */
 const IMAGE_JOB_TIMEOUT_MS = 15 * 60_000;
@@ -583,7 +603,8 @@ export async function runImageJob(
   guardSidecarJob(res.jobId, 'the picture');
   if (req.signal?.aborted === true) return dropJob(res.jobId);
   noteAgentJob(res.jobId, req.agent);
-  return imageJobs.wait(res.jobId, timeoutMs);
+  const jobId = res.jobId;
+  return waitUnlessAbandoned(jobId, req.signal, () => imageJobs.wait(jobId, timeoutMs));
 }
 
 /**
@@ -663,7 +684,13 @@ export async function run3dJob(
   }
   if (req.signal?.aborted === true) return dropJob(res.jobId);
   noteAgentJob(res.jobId, req.agent);
-  return withEndReason(res.jobId, await imageJobs.wait(res.jobId, timeoutMs, 'model-glb'));
+  const jobId = res.jobId;
+  return withEndReason(
+    jobId,
+    await waitUnlessAbandoned(jobId, req.signal, () =>
+      imageJobs.wait(jobId, timeoutMs, 'model-glb'),
+    ),
+  );
 }
 
 export async function runStage3dJob(
@@ -691,7 +718,13 @@ export async function runStage3dJob(
   }
   if (req.signal?.aborted === true) return dropJob(res.jobId);
   noteAgentJob(res.jobId, req.agent);
-  return withEndReason(res.jobId, await imageJobs.wait(res.jobId, timeoutMs, 'model-glb'));
+  const jobId = res.jobId;
+  return withEndReason(
+    jobId,
+    await waitUnlessAbandoned(jobId, req.signal, () =>
+      imageJobs.wait(jobId, timeoutMs, 'model-glb'),
+    ),
+  );
 }
 
 /** Is the 3D module — an engine that can make a mesh — on this machine? */

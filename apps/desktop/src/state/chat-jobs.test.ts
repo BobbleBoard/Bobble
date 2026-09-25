@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { cancelJobsOf, connectChatJobs, ownerOfJob } from './chat-jobs';
+import { cancelJobsOf, connectChatJobs, ownerOfJob, productionHome } from './chat-jobs';
 import { useChildAgentStore } from './child-agent-store';
 import { useDeletedChats } from './deleted-chats';
 import { usePiStore } from './pi-slice';
@@ -97,6 +97,36 @@ describe('the jobs of a deleted chat, as main announces and ends them', () => {
     emit('gen:agent-job', { jobId: 'gen_late', agent: 'kid-1' });
     await Promise.resolve();
     expect(cancels()).toContainEqual({ jobId: 'gen_late' });
+  });
+
+  /*
+   * A PRODUCTION FOR A CHAT THAT IS GONE nests nowhere (review wave-0923). The
+   * delete is under way — the chat is hidden, its turn still winding down
+   * behind the fresh chat that replaced it on screen — when main announces its
+   * CEO's production. It is stopped at once; the situation room must not bind
+   * it, or its roles nest under the fresh chat until the team has wound down.
+   */
+  it('a production announced for a deleted chat is stopped, and has no home to nest in', async () => {
+    const F = '/s/fresh.jsonl';
+    useDeletedChats.getState().hide([A]);
+    usePiStore.setState({
+      session: { sessionFile: F },
+      bgRun: { sessionFile: A, messages: [], streaming: true, title: null },
+    });
+    emit('corp:attached', { taskId: 'task-late' });
+    await Promise.resolve();
+    expect(calls).toContainEqual({ channel: 'corp:abort', req: { taskId: 'task-late' } });
+    expect(productionHome('task-late', F)).toBeNull();
+  });
+
+  it('a production of a live chat nests under that chat, even behind another one', async () => {
+    usePiStore.setState({
+      session: { sessionFile: B },
+      bgRun: { sessionFile: A, messages: [], streaming: true, title: null },
+    });
+    emit('corp:attached', { taskId: 'task-live' });
+    await Promise.resolve();
+    expect(productionHome('task-live', B)).toEqual({ parentId: A });
   });
 
   /*

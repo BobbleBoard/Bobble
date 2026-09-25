@@ -17,7 +17,8 @@
  *   2. everything the chat owns is stopped, all at once: its pi turn (the view
  *      moves to a fresh chat if it was on screen), its subagents, and every
  *      generation and team it started (chat-jobs.ts);
- *   3. the files go, in the background. A failure brings the row back.
+ *   3. the files go, in the background. A failure brings the row back, and
+ *      says why on the error toast.
  */
 import type { SessionSummary } from '../../electron/ipc-contract';
 import { cancelJobsOf } from './chat-jobs';
@@ -25,9 +26,47 @@ import { deleteChat } from './chat-org';
 import { useChildAgentStore } from './child-agent-store';
 import { useDeletedChats } from './deleted-chats';
 import { abandonChats } from './pi-connect';
+import { usePiStore } from './pi-slice';
+
+/**
+ * The sentence a refused delete is shown with: which chat, and why in words
+ * rather than the errno and path main's `rm` failed with.
+ */
+export function deleteFailureMessage(title: string | undefined, error: string | undefined): string {
+  const name = title !== undefined && title.trim() !== '' ? `“${title.trim()}”` : 'that chat';
+  const raw = (error ?? '')
+    .replace(/^Error invoking remote method '[^']*':\s*(?:Error:\s*)?/, '')
+    .trim();
+  const why = /EACCES|EPERM|permission denied|operation not permitted/i.test(raw)
+    ? 'The Mac would not let Bobble remove its file (permission denied).'
+    : /EBUSY|resource busy/i.test(raw)
+      ? 'Its file is in use by another program.'
+      : /^refused: not a session file/.test(raw)
+        ? "Its file is not in Bobble's chat folder."
+        : raw === ''
+          ? 'The Mac did not say why.'
+          : raw;
+  return `Couldn't delete ${name}, so it is back in the list. ${why}`;
+}
+
+let toastSeq = 0;
+
+/** The app's error toast (ToastHost) — raised the way open-outcome.ts and
+ * pi-connect's "Could not open that chat" raise theirs. */
+function toast(message: string): void {
+  toastSeq += 1;
+  const id = `delete-${Date.now()}-${toastSeq}`;
+  usePiStore.setState((s) => ({
+    notifications: [
+      ...s.notifications.slice(-3),
+      { id, level: 'error' as const, message, timestamp: Date.now() },
+    ],
+  }));
+}
 
 export async function deleteChatNow(
-  chat: Pick<SessionSummary, 'file' | 'supersedes'>,
+  /** `title` is what the row showed, for the sentence if the delete fails. */
+  chat: Pick<SessionSummary, 'file' | 'supersedes'> & { readonly title?: string },
 ): Promise<{ ok: boolean; error?: string }> {
   const files = [chat.file, ...chat.supersedes];
 
@@ -58,6 +97,9 @@ export async function deleteChatNow(
   }));
   if (!res.ok) {
     useDeletedChats.getState().restore(files);
+    /* The row coming back is not an explanation. Every caller used to drop
+       this result, so a refused delete put the chat back without a word. */
+    toast(deleteFailureMessage(chat.title, res.error));
     return res;
   }
   /* Once pi has let go of the file, delete once more: whatever the aborted turn

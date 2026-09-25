@@ -48,23 +48,38 @@ export interface CorpRunResult {
    * spoke. It says nothing whatsoever about the tree.
    */
   readonly workspace?: string;
+  /** The CEO's turn was stopped before the team delivered (and the team with it). */
+  readonly stopped?: boolean;
 }
 
 function runViaBridge(
   socketPath: string,
   token: string,
   req: CorpRunRequest,
+  signal?: AbortSignal,
 ): Promise<CorpRunResult> {
   return new Promise<CorpRunResult>((resolve) => {
+    if (signal?.aborted === true) {
+      resolve({ ok: false, product: '', error: 'stopped', stopped: true });
+      return;
+    }
     const socket = net.connect(socketPath);
     let buffer = '';
     let settled = false;
     const done = (r: CorpRunResult): void => {
       if (settled) return;
       settled = true;
+      signal?.removeEventListener('abort', onAbort);
       socket.destroy();
       resolve(r);
     };
+    /*
+     * THE CEO'S TURN WAS STOPPED. pi ends a turn only once this call returns,
+     * so waiting for the team held a Stop for the whole production. Hang up:
+     * the app reads a closed socket as the CEO gone and stops the team.
+     */
+    const onAbort = (): void => done({ ok: false, product: '', error: 'stopped', stopped: true });
+    signal?.addEventListener('abort', onAbort, { once: true });
     const connectTimer = setTimeout(
       () => done({ ok: false, product: '', error: 'corp bridge connect timed out' }),
       CONNECT_TIMEOUT_MS,
@@ -80,8 +95,9 @@ function runViaBridge(
      * still working. The app owns the run's lifetime and its abort, and the
      * harness's per-call watchdog does not cover tool calls anyway (it arms on
      * before_provider_request), so a long tool call is already the supported
-     * shape. Abort travels the other way: the user stops the run, the app
-     * answers this socket.
+     * shape. Abort travels both ways: the user stops the run and the app
+     * answers this socket, or the CEO's turn is stopped and this socket hangs
+     * up (see onAbort above).
      */
     socket.on('connect', () => {
       clearTimeout(connectTimer);
@@ -143,11 +159,11 @@ function runViaBridge(
  */
 export function corpBridgeRunFromEnv(
   env: NodeJS.ProcessEnv = process.env,
-): ((req: CorpRunRequest) => Promise<CorpRunResult>) | null {
+): ((req: CorpRunRequest, signal?: AbortSignal) => Promise<CorpRunResult>) | null {
   const socketPath = env[SOCK_ENV];
   const token = env[TOKEN_ENV];
   if (socketPath === undefined || socketPath === '' || token === undefined || token === '') {
     return null;
   }
-  return (req) => runViaBridge(socketPath, token, req);
+  return (req, signal) => runViaBridge(socketPath, token, req, signal);
 }

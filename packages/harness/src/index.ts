@@ -2298,7 +2298,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       {
         tools: cliVisibleTools,
         groups: () => toolCliGroups(),
-        call: async (name, args) => {
+        call: async (name, args, signal) => {
           const target = cliRunnable(name);
           if (target === undefined) {
             return { text: `${name}: not registered in this build.`, isError: true };
@@ -2321,11 +2321,16 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
            * CLI mode every one of them died with "Cannot read properties of
            * undefined (reading 'hasUI')" — which the model then treated as a
            * syntax error and spent a turn guessing new argument shapes against.
+           *
+           * AND SO IS THE SIGNAL. `undefined` here meant a Stop killed the bash
+           * command and never reached the tool behind it: the turn ended while a
+           * picture sat at its module gate, unasked-for. The bridge fires it
+           * when the command's shim goes away (tool-cli-bridge.ts).
            */
           const res = (await target.execute(
             'tool-cli',
             args,
-            undefined,
+            signal,
             undefined,
             runtime.currentCtx ?? undefined,
           )) as {

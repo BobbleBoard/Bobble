@@ -162,7 +162,7 @@ export interface PromoteToolDeps {
    * in the app it comes from {@link corpBridgeRunFromEnv}. Null/absent outside
    * Pi Desktop, where there is no team to wait for.
    */
-  readonly runCorp?: ((req: CorpRunRequest) => Promise<CorpRunResult>) | null;
+  readonly runCorp?: ((req: CorpRunRequest, signal?: AbortSignal) => Promise<CorpRunResult>) | null;
   /**
    * How many OTHER tools the model has called this session. Drives the
    * standing-start veto below; omitted → no veto (tests, headless callers).
@@ -298,7 +298,7 @@ export function registerCreateHierarchyTool(pi: ExtensionAPI, deps: PromoteToolD
       "Just send the message: say what you want built, in full. You do not need to design divisions — splitting the work is the manager's job.",
     ],
     parameters: PromoteParams,
-    async execute(_toolCallId, params: PromoteInput, _signal, _onUpdate, ctx) {
+    async execute(_toolCallId, params: PromoteInput, signal, _onUpdate, ctx) {
       // No effort gate any more — see corpToolEnabled. A tool that is advertised
       // and then refuses on a condition the model cannot see is the phantom-tool
       // failure wearing a different hat.
@@ -389,7 +389,28 @@ export function registerCreateHierarchyTool(pi: ExtensionAPI, deps: PromoteToolD
       const runCorp = deps.runCorp ?? corpBridgeRunFromEnv();
       if (runCorp !== null) {
         const brief = briefForManager(args, openQuestionsFor(deps.getPlan?.()));
-        const result = await runCorp({ message: brief });
+        /*
+         * THE TURN'S SIGNAL GOES TO THE TEAM. pi ends a turn only once this call
+         * returns, so a Stop that did not reach it waited for the whole
+         * production — tens of minutes to hours. The bridge hangs up at once and
+         * the app stops the team: the same "halt all agents" the composer's Stop
+         * sends while it still points at the production.
+         */
+        const result = await runCorp({ message: brief }, signal);
+        if (result.stopped === true) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text:
+                  'Stopped — this turn was stopped before the team delivered, and the team ' +
+                  'was stopped with it. Whatever it had written is still in the workspace.',
+              },
+            ],
+            isError: true,
+            details: { promoted: true, delivered: false, stopped: true },
+          };
+        }
         if (result.ok && !looksUndelivered(result.product)) {
           /*
            * THE FINAL REVIEW RIDES IN THE TOOL RESULT.

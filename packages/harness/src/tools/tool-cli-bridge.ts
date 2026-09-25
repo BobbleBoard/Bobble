@@ -46,10 +46,15 @@ export interface ToolCliHost {
   tools: () => readonly CliTool[];
   /** Capability groups; the CLI's command names come from these. */
   groups: () => readonly CliGroupSpec[];
-  /** Run a tool by name. Returns the text the command prints. */
+  /**
+   * Run a tool by name. Returns the text the command prints. `signal` fires
+   * when the command is stopped before it answers (its shim's connection
+   * closed) — hand it to the tool, as pi would.
+   */
   call: (
     name: string,
     args: Record<string, unknown>,
+    signal?: AbortSignal,
   ) => Promise<{ text: string; isError: boolean }>;
 }
 
@@ -666,6 +671,7 @@ const VERBATIM_RESULT_TOOLS = new Set(['read', 'ls', 'bash', 'python_run', 'web_
 export async function dispatchToolCli(
   host: ToolCliHost,
   argv: readonly string[],
+  signal?: AbortSignal,
 ): Promise<{ text: string; isError: boolean }> {
   const cli: CliModel = buildCli(host.groups(), host.tools());
   const res = resolveCli(cli, argv);
@@ -680,7 +686,7 @@ export async function dispatchToolCli(
   if (res.kind === 'text') return { text: speakCommands(res.text), isError: false };
   if (res.kind === 'error') return { text: speakCommands(res.text), isError: true };
   try {
-    const r = await host.call(res.tool, res.args);
+    const r = await host.call(res.tool, res.args, signal);
     return { ...r, text: speakCommands(r.text, res.tool) };
   } catch (e) {
     return {
@@ -692,6 +698,22 @@ export async function dispatchToolCli(
 
 function handle(socket: net.Socket, host: ToolCliHost, token: string): void {
   let buffer = '';
+  /*
+   * THE COMMAND WAS STOPPED. One connection is one command, held open until
+   * it answers. Stop kills the bash command and the shim with it, which closes
+   * this socket; the tool behind it was called with no signal, so it went on —
+   * a picture waiting at its module gate after its turn had ended. A close
+   * before the answer is the command being stopped, and its tool hears it.
+   */
+  const stopped = new AbortController();
+  let answered = false;
+  socket.on('close', () => {
+    if (!answered) stopped.abort();
+  });
+  const answer = (payload: string): void => {
+    answered = true;
+    socket.end(payload);
+  };
   socket.on('data', (d) => {
     buffer += d.toString();
     const nl = buffer.indexOf('\n');
@@ -702,17 +724,17 @@ function handle(socket: net.Socket, host: ToolCliHost, token: string): void {
     try {
       req = JSON.parse(line);
     } catch {
-      socket.end(`${JSON.stringify({ text: 'bridge: bad request', isError: true })}\n`);
+      answer(`${JSON.stringify({ text: 'bridge: bad request', isError: true })}\n`);
       return;
     }
     if (req.token !== token) {
-      socket.end(`${JSON.stringify({ text: 'bridge: unauthorized', isError: true })}\n`);
+      answer(`${JSON.stringify({ text: 'bridge: unauthorized', isError: true })}\n`);
       return;
     }
     const argv = Array.isArray(req.argv) ? req.argv.map((a) => String(a)) : [];
-    void dispatchToolCli(host, argv).then(
-      (r) => socket.end(`${JSON.stringify(r)}\n`),
-      (e) => socket.end(`${JSON.stringify({ text: String(e), isError: true })}\n`),
+    void dispatchToolCli(host, argv, stopped.signal).then(
+      (r) => answer(`${JSON.stringify(r)}\n`),
+      (e) => answer(`${JSON.stringify({ text: String(e), isError: true })}\n`),
     );
   });
   socket.on('error', () => socket.destroy());

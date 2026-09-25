@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { mkdtempSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -176,6 +176,77 @@ describe('the installed shell', () => {
         timeout: 15_000,
       }).catch((e: { stdout?: string }) => ({ stdout: e.stdout ?? String(e) }));
       expect(stdout).toContain('unauthorized');
+    } finally {
+      handle.dispose();
+    }
+  });
+});
+
+/*
+ * A COMMAND WHOSE SHELL WAS STOPPED STOPS ITS TOOL (review of the 2026-09-23
+ * wave). In bash-CLI mode — the default — a picture is a `media generate
+ * image` line: Stop kills the bash command and the shim with it, and the turn
+ * ends at once. The tool behind the shim was called with no signal at all, so
+ * it never heard: MEASURED in the app, the job sat at the module gate with its
+ * card up after the turn had ended. The shim's connection closing is the
+ * command being stopped.
+ */
+describe('a command whose shell was stopped', () => {
+  const dirs: string[] = [];
+  afterEach(() => {
+    for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+  });
+
+  function install(call: ToolCliHost['call']) {
+    const env: NodeJS.ProcessEnv = { ...process.env };
+    const shimDir = mkdtempSync(path.join(tmpdir(), 'toolcli-stop-'));
+    dirs.push(shimDir);
+    const handle = registerToolCli(
+      { tools: () => TOOLS, groups: () => GROUPS, call },
+      { shimDir, socketPath: path.join(shimDir, 's.sock'), env, execPath: process.execPath },
+    );
+    const shell = (argv: string[]) =>
+      spawn(path.join(shimDir, 'media'), argv, {
+        env: { ...env, ELECTRON_RUN_AS_NODE: '1' },
+        stdio: 'ignore',
+      });
+    return { handle, shell };
+  }
+
+  it('the shim dying stops the tool it was running', async () => {
+    let seen: AbortSignal | undefined;
+    let started = false;
+    const { handle, shell } = install(
+      (_name, _args, signal) =>
+        new Promise((resolve) => {
+          seen = signal;
+          started = true;
+          signal?.addEventListener('abort', () => resolve({ text: 'stopped', isError: true }));
+        }),
+    );
+    try {
+      const child = shell(['generate', 'image', 'a red fox']);
+      await expect.poll(() => started, { timeout: 15_000 }).toBe(true);
+      expect(seen?.aborted).toBe(false);
+      child.kill('SIGKILL'); // what Stop does to the bash command
+      await expect.poll(() => seen?.aborted, { timeout: 5_000 }).toBe(true);
+    } finally {
+      handle.dispose();
+    }
+  });
+
+  it('a command that finishes is not stopped after the fact', async () => {
+    let seen: AbortSignal | undefined;
+    const { handle, shell } = install(async (_name, _args, signal) => {
+      seen = signal;
+      return { text: 'done', isError: false };
+    });
+    try {
+      const child = shell(['generate', 'image', 'a red fox']);
+      await new Promise((resolve) => child.on('exit', resolve));
+      await new Promise((r) => setTimeout(r, 50));
+      expect(seen).toBeDefined();
+      expect(seen?.aborted).toBe(false);
     } finally {
       handle.dispose();
     }
