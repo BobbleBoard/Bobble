@@ -101,6 +101,29 @@ describe('progress estimate', () => {
     expect(Math.abs(at - measured)).toBeLessThan(0.002);
   });
 
+  it('after a burst, still never runs past the NEXT single step', () => {
+    // Steps 1 and 2 arrive normally, then 3–6 arrive at once (a card coming
+    // back into view, or a stalled stream catching up): the next report is one
+    // step away, not four.
+    const T8 = 8;
+    let e = startEstimate(0);
+    e = report(e, 1 / T8, STEP);
+    e = report(e, 2 / T8, 2 * STEP);
+    e = report(e, 6 / T8, 6 * STEP);
+    const r = run(e, 6 * STEP, 9 * STEP);
+    const nextStep = (7 / T8) * STEPS_END;
+    for (const v of r.values) expect(v).toBeLessThan(nextStep);
+  });
+
+  it('knows the step from the engine when the first advance it sees is a burst', () => {
+    const T8 = 8;
+    let e = startEstimate(0);
+    e = report(e, 3 / T8, STEP, 1 / T8);
+    e = report(e, 6 / T8, 6 * STEP, 1 / T8); // left the room at step 3, back at 6
+    const r = run(e, 6 * STEP, 9 * STEP);
+    for (const v of r.values) expect(v).toBeLessThan((7 / T8) * STEPS_END);
+  });
+
   it('prints a floored integer', () => {
     expect(percentLabel(0.4699)).toBe('46%');
     expect(percentLabel(1)).toBe('100%');

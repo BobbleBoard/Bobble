@@ -242,7 +242,14 @@ try {
   const r3 = await room();
   console.log('03 returned ', JSON.stringify(r3));
   check(r3.pendingCard, 'coming back, the running job is still on screen');
-  check(r3.progress === '75', `showing the progress it made while away (${r3.progress})`);
+  /* The pill maps the steps onto 0–94% (the rest is the decode) and moves
+     toward the next step at the measured speed, so 6 of 8 steps (70.5) reads
+     somewhere short of step 7 (82.25) — never at or past it (see
+     media/progress-estimate). */
+  check(
+    Number(r3.progress) >= 60 && Number(r3.progress) < 82,
+    `showing the progress it made while away (6/8 steps → ${r3.progress} on the pill)`,
+  );
   check(r3.stop, 'and the run button offers Stop, not a second Generate');
   check(r3.empty === false, 'the room is not reset to its empty state');
   check(

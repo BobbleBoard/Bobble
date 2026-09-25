@@ -387,7 +387,7 @@ export function AssistantGroup({
                 {...(generating?.step !== undefined &&
                 generating.total !== undefined &&
                 generating.total > 0
-                  ? { progress: generating.step / generating.total }
+                  ? { progress: generating.step / generating.total, steps: generating.total }
                   : live3d?.progress !== undefined
                     ? { progress: live3d.progress }
                     : {})}

@@ -294,6 +294,7 @@ function ProgressPill({
   done,
   label,
   progressKey,
+  steps,
 }: {
   kind: PendingKind;
   progress: number | undefined;
@@ -301,6 +302,8 @@ function ProgressPill({
   label: string;
   /** The job this number belongs to — a later card for the same job continues it. */
   progressKey?: string;
+  /** How many steps the engine counts, when it counts them. */
+  steps?: number;
 }): JSX.Element {
   const textRef = useRef<HTMLSpanElement | null>(null);
   const est = useRef<ProgressEstimate | null>(
@@ -310,9 +313,10 @@ function ProgressPill({
   useEffect(() => {
     if (progress === undefined) return;
     const now = performance.now();
-    est.current = report(est.current ?? startEstimate(now, priorFor(kind)), progress, now);
+    const unit = steps !== undefined && steps > 0 ? 1 / steps : undefined;
+    est.current = report(est.current ?? startEstimate(now, priorFor(kind)), progress, now, unit);
     setSeen(true);
-  }, [progress, kind]);
+  }, [progress, kind, steps]);
   useEffect(() => {
     if (!done || est.current === null) return;
     est.current = finish(est.current, performance.now());
@@ -371,6 +375,7 @@ export function PendingMediaCard({
   item,
   onRevealed,
   progressKey,
+  steps,
 }: {
   kind: PendingKind;
   /** width / height, as soon as the job says — the box takes it immediately. */
@@ -399,6 +404,8 @@ export function PendingMediaCard({
   /** The job (tool call) this card shows — so the card that sweeps the result in
    * continues the waiting card's number rather than starting one of its own. */
   progressKey?: string;
+  /** The engine's step count, when `progress` is steps / total. */
+  steps?: number;
 }): JSX.Element {
   const frameRef = useRef<HTMLDivElement | null>(null);
   const [swept, setSwept] = useState(false);
@@ -539,6 +546,7 @@ export function PendingMediaCard({
               done={item !== undefined}
               label={label}
               {...(progressKey !== undefined ? { progressKey } : {})}
+              {...(steps !== undefined ? { steps } : {})}
             />
           </>
         )}

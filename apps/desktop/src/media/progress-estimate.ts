@@ -49,6 +49,14 @@ export interface ProgressEstimate {
   readonly msPerUnit: number | undefined;
   /** A first guess from past runs, used only until this run has a speed. */
   readonly priorMsPerUnit: number | undefined;
+  /**
+   * The smallest advance seen — the job's step. The NEXT report is expected one
+   * step on, not one LAST-JUMP on: after a burst (several steps arriving at once,
+   * as when a card comes back into view) sizing the gap by the jump let the
+   * display run past the next step before it was reported (MEASURED: 76 on the
+   * pill with step 7 worth 82 and only step 6 reported).
+   */
+  readonly minStep: number | undefined;
   /** What was last shown, and when — the display never goes below it. */
   readonly shown: number;
   readonly shownAt: number;
@@ -61,23 +69,34 @@ export function startEstimate(t: number, priorMsPerUnit?: number): ProgressEstim
     reports: [],
     msPerUnit: undefined,
     priorMsPerUnit,
+    minStep: undefined,
     shown: 0,
     shownAt: t,
     doneAt: undefined,
   };
 }
 
-/** The engine said `f` (0..1) at time `t`. Lower or repeated values are ignored. */
-export function report(e: ProgressEstimate, f: number, t: number): ProgressEstimate {
+/**
+ * The engine said `f` (0..1) at time `t`. Lower or repeated values are ignored.
+ * `unit` is one step as a fraction (1 / total) when the engine counts steps —
+ * the only way to know the next report's size when the first advance seen is a
+ * burst (3/8 → 6/8 cannot tell a 3-step jump from a 3/8-sized step).
+ */
+export function report(e: ProgressEstimate, f: number, t: number, unit?: number): ProgressEstimate {
   const frac = Math.max(0, Math.min(1, f));
   const last = e.reports[e.reports.length - 1];
   if (last !== undefined && frac <= last.f) return e;
   let msPerUnit = e.msPerUnit;
-  if (last !== undefined && t > last.t) {
-    const sample = (t - last.t) / (frac - last.f);
-    msPerUnit = msPerUnit === undefined ? sample : msPerUnit * (1 - EMA) + sample * EMA;
+  let minStep = unit !== undefined && unit > 0 ? unit : e.minStep;
+  if (last !== undefined) {
+    const delta = frac - last.f;
+    if (unit === undefined) minStep = minStep === undefined ? delta : Math.min(minStep, delta);
+    if (t > last.t) {
+      const sample = (t - last.t) / delta;
+      msPerUnit = msPerUnit === undefined ? sample : msPerUnit * (1 - EMA) + sample * EMA;
+    }
   }
-  return { ...e, reports: [...e.reports.slice(-7), { f: frac, t }], msPerUnit };
+  return { ...e, reports: [...e.reports.slice(-7), { f: frac, t }], msPerUnit, minStep };
 }
 
 /** The result is here: the display finishes to 100 over a short ease. */
@@ -101,10 +120,9 @@ export function target(e: ProgressEstimate, t: number): number {
   const speed = e.msPerUnit ?? e.priorMsPerUnit;
   const base = toDisplay(last.f);
   if (speed === undefined || speed <= 0) return base;
-  // The gap to the next report: the size of the last step, or a step's worth of
-  // the whole when there is only one report so far.
-  const prev = e.reports[e.reports.length - 2];
-  const unitGap = prev !== undefined ? last.f - prev.f : Math.min(1 - last.f, 1 / 24);
+  // The gap to the next report: one step (the smallest advance seen), or a
+  // step's worth of the whole when there is only one report so far.
+  const unitGap = e.minStep ?? Math.min(1 - last.f, 1 / 24);
   let gapDisplay: number;
   let gapMs: number;
   if (last.f >= 1) {
