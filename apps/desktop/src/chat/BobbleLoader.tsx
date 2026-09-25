@@ -38,6 +38,7 @@ import {
   fieldFor,
   type LoaderVariant,
   NO_FIELD,
+  type Scene,
   sceneAt,
 } from './bobble-anim';
 
@@ -173,6 +174,8 @@ export function BobbleLoader({
   const sweepRef = useRef(onSweep);
   sweepRef.current = onSweep;
   exitRef.current = exit;
+  /* Starts the loop again when it has stopped with work left — see below. */
+  const kickRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -196,28 +199,24 @@ export function BobbleLoader({
     /* The grid acts fill the whole box, whatever its shape (the user, 2026-09-23:
        "not locked to a square aspect ratio"). A stamp keeps the icon's board. */
     let field: Field = NO_FIELD;
-    const resize = (): void => {
-      canvas.width = Math.max(1, Math.round(boxW * dpr));
-      canvas.height = Math.max(1, Math.round(boxH * dpr));
+    /*
+     * ASSIGNING A CANVAS'S SIZE CLEARS IT — to the same value, too. It ran on
+     * every ResizeObserver callback, which comes after the frame's draw and
+     * before its paint, so the card showed a cleared canvas for the whole 380ms
+     * ease into the job's aspect, and under Reduce Motion (one frame, drawn
+     * once) the observer's first notification left it blank for good. So the
+     * size is only assigned when it changes, and a change repaints at once.
+     */
+    const resize = (): boolean => {
       canvas.style.width = `${boxW}px`;
       canvas.style.height = `${boxH}px`;
+      const w = Math.max(1, Math.round(boxW * dpr));
+      const h = Math.max(1, Math.round(boxH * dpr));
+      if (canvas.width === w && canvas.height === h) return false;
+      canvas.width = w;
+      canvas.height = h;
+      return true;
     };
-    let ro: ResizeObserver | undefined;
-    if (fill) {
-      const measure = (): void => {
-        const r = host.getBoundingClientRect();
-        if (r.width < 1 || r.height < 1) return;
-        boxW = r.width;
-        boxH = r.height;
-        field = fieldFor(boxW, boxH, BOARD_FILL_WIDE);
-        resize();
-      };
-      measure();
-      ro = new ResizeObserver(measure);
-      ro.observe(host);
-    } else {
-      resize();
-    }
 
     /* The ink follows the theme while the card waits: read once, a card that was
        mounted on the dark theme kept drawing white blocks after a switch to the
@@ -225,41 +224,30 @@ export function BobbleLoader({
     const readInk = (): string =>
       getComputedStyle(host).getPropertyValue('--pd-bobble-ink').trim() || '#ffffff';
     let ink = readInk();
-    const themeWatch = new MutationObserver(() => {
-      ink = readInk();
-    });
-    themeWatch.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['data-mode', 'data-flavor'],
-    });
 
     let raf = 0;
     let running = true;
+    /* What the IntersectionObserver last said — the one reason to stay stopped
+       that is not about the loader itself. */
+    let visible = true;
     const started = performance.now();
 
     /* Set when the sweep begins, so its clock is its own and starts at zero
        wherever in the loop the result happened to land. */
     let exitStarted: number | undefined;
     let finished = false;
+    /* When the frame on the canvas was drawn — so something that has to draw it
+       again (a resize, a theme switch) draws that same moment. */
+    let last: number | undefined;
 
-    const draw = (now: number) => {
-      if (exitStarted === undefined && exitRef.current) exitStarted = now;
-      let scene = sceneAt(reduced ? 0 : now - started, variant, field);
-      if (exitStarted !== undefined) {
-        const p = reduced ? 1 : Math.min(1, (now - exitStarted) / EXIT_MS);
-        scene = exitSceneAt(p, field);
-        // The card masks the finished media with this same number — see
-        // `exitReveal`. One value, so the blocks and the picture cannot
-        // disagree about where the edge of the sweep is.
-        const reveal = exitReveal(p);
-        host.style.setProperty('--pd-bobble-sweep', reveal.toFixed(4));
-        sweepRef.current?.(reveal);
-        if (p >= 1 && !finished) {
-          finished = true;
-          running = false;
-          doneRef.current?.();
-        }
-      }
+    const exitAt = (now: number, from: number): number =>
+      reduced ? 1 : Math.min(1, (now - from) / EXIT_MS);
+    const sceneFor = (now: number): Scene =>
+      exitStarted === undefined
+        ? sceneAt(reduced ? 0 : now - started, variant, field)
+        : exitSceneAt(exitAt(now, exitStarted), field);
+
+    const paint = (scene: Scene): void => {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       /* One transform for the whole scene: board units in, device pixels out.
@@ -322,9 +310,84 @@ export function BobbleLoader({
         }
       }
       ctx.globalAlpha = 1;
+    };
+    /* The frame on the canvas again, as it was: no clock moves, no sweep is
+       reported. For when the canvas was cleared or its ink changed under it. */
+    const repaint = (): void => {
+      if (last !== undefined) paint(sceneFor(last));
+    };
+
+    const draw = (now: number) => {
+      if (exitStarted === undefined && exitRef.current) exitStarted = now;
+      if (exitStarted !== undefined) {
+        const p = exitAt(now, exitStarted);
+        // The card masks the finished media with this same number — see
+        // `exitReveal`. One value, so the blocks and the picture cannot
+        // disagree about where the edge of the sweep is.
+        const reveal = exitReveal(p);
+        host.style.setProperty('--pd-bobble-sweep', reveal.toFixed(4));
+        sweepRef.current?.(reveal);
+        /* A board the sweep has cleared has nothing left to draw — every time,
+           not only the first: the IntersectionObserver restarts a stopped loop,
+           and a finished one restarted by scrolling away and back used to
+           reschedule itself forever, clearing an empty canvas at 60fps. */
+        if (p >= 1) {
+          running = false;
+          if (!finished) {
+            finished = true;
+            doneRef.current?.();
+          }
+        }
+      }
+      last = now;
+      paint(sceneFor(now));
       // The sweep runs even under reduced motion — it is how the card hands over,
       // and skipping it would leave the blocks sitting on top of the result.
       if (running && (!reduced || exitStarted !== undefined)) raf = requestAnimationFrame(draw);
+      // Reduced motion's resting frame is drawn once; the loop is then idle, and
+      // `kick` is what starts it again for the sweep.
+      else running = false;
+    };
+
+    let ro: ResizeObserver | undefined;
+    if (fill) {
+      const measure = (): void => {
+        const r = host.getBoundingClientRect();
+        if (r.width < 1 || r.height < 1) return;
+        boxW = r.width;
+        boxH = r.height;
+        field = fieldFor(boxW, boxH, BOARD_FILL_WIDE);
+        if (resize()) repaint();
+      };
+      measure();
+      ro = new ResizeObserver(measure);
+      ro.observe(host);
+    } else {
+      resize();
+    }
+
+    const themeWatch = new MutationObserver(() => {
+      ink = readInk();
+      // A running loop draws the next frame in the new ink anyway; a stopped
+      // one (Reduce Motion's resting frame) would keep the old one for good.
+      if (!running) repaint();
+    });
+    themeWatch.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-mode', 'data-flavor'],
+    });
+
+    /*
+     * THE EXIT HAS TO REACH A LOOP THAT IS NOT RUNNING. `exit` is read inside
+     * `draw`, so under Reduce Motion — one resting frame, then nothing — the
+     * result arrived and nothing ever drew the sweep: `onExitDone` never fired,
+     * the chat's card never handed over, and a studio never filed the run. The
+     * one stop it must not undo is "nobody is looking" (the observer's call).
+     */
+    kickRef.current = () => {
+      if (running || finished || !visible) return;
+      running = true;
+      raf = requestAnimationFrame(draw);
     };
 
     raf = requestAnimationFrame(draw);
@@ -332,8 +395,8 @@ export function BobbleLoader({
     /* Nobody is looking → stop. A loader inside a collapsed panel or a
        scrolled-away card should not hold a 60fps loop open. */
     const io = new IntersectionObserver((entries) => {
-      const visible = entries.some((e) => e.isIntersecting);
-      if (visible && !running) {
+      visible = entries.some((e) => e.isIntersecting);
+      if (visible && !running && !finished) {
         running = true;
         raf = requestAnimationFrame(draw);
       } else if (!visible && running) {
@@ -345,12 +408,17 @@ export function BobbleLoader({
 
     return () => {
       running = false;
+      kickRef.current = null;
       cancelAnimationFrame(raf);
       io.disconnect();
       ro?.disconnect();
       themeWatch.disconnect();
     };
   }, [size, variant, fill]);
+
+  useEffect(() => {
+    if (exit) kickRef.current?.();
+  }, [exit]);
 
   const pct =
     progress === undefined ? undefined : Math.round(Math.max(0, Math.min(1, progress)) * 100);
