@@ -5955,6 +5955,37 @@
 .pd-inline-chart--pending .pd-chart--building {
   opacity: 0.72;
 }
+/*
+ * …and it GROWS rather than pops (the user, 2026-09-25: "animate/build in real
+ * time smoothly"). Each value that lands re-lays the chart out — the axis
+ * rescales and every bar's height with it — and the new shape used to jump
+ * in once the first second's entrance was over. A bar's outline eases to
+ * its new one (a bar is a path of one shape, so it interpolates; a slice
+ * too), and a bar that arrives late rises from its axis like the first ones
+ * did, at once rather than after its place in the stagger.
+ */
+.pd-chart--building .pd-chart-bar,
+.pd-chart--building .pd-chart-slice {
+  transition:
+    d 280ms var(--pd-easing-standard, ease-out),
+    opacity var(--pd-duration-fast) var(--pd-easing-standard);
+}
+.pd-chart--building .pd-chart-bar {
+  animation: pd-chart-grow 420ms var(--pd-easing-standard, ease-out) both;
+}
+/* The finished card, taking over from a live one that drew it: no second
+   entrance (live-handover.ts) — it only firms up out of the build's dim. */
+.pd-chart--landed {
+  animation: pd-chart-land 240ms var(--pd-easing-standard, ease-out) both;
+}
+@keyframes pd-chart-land {
+  from {
+    opacity: 0.72;
+  }
+  to {
+    opacity: 1;
+  }
+}
 .pd-inline-chart--pending .pd-chart-controls {
   visibility: hidden;
 }
@@ -6029,8 +6060,14 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .pd-chart-skeleton-shape,
-  .pd-chart-building-sheen {
+  .pd-chart-building-sheen,
+  .pd-chart--building .pd-chart-bar,
+  .pd-chart--landed {
     animation: none;
+  }
+  .pd-chart--building .pd-chart-bar,
+  .pd-chart--building .pd-chart-slice {
+    transition: none;
   }
 }
 

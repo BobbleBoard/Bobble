@@ -152,7 +152,7 @@ describe('colours, easing and keys', () => {
     expect(roleOfKey('a:C')).toBe('step');
     expect(roleOfKey('l:L_A_B_0')).toBe('label');
     expect(roleOfKey('mt:i3')).toBe('label');
-    expect(roleOfKey('head:title')).toBe('label');
+    expect(roleOfKey('head:title')).toBe('head');
     expect(roleOfKey('c:Warehouse:name')).toBe('label');
     expect(roleOfKey('c:Warehouse:box')).toBe('group');
     expect(roleOfKey('no:i9:rect')).toBe('group');

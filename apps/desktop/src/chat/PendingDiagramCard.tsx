@@ -22,13 +22,13 @@ import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react'
 import type { DiagramLiveRequest } from '../../electron/gen/diagram-contract';
 import { usePiStore } from '../state/pi-slice';
 import { DiagramDrawing, useDataMode } from './DiagramDrawing';
-import { keepLiveFrame } from './diagram-handover';
 import {
   liveSource,
   nextRender,
   type PendingDiagramArgs,
   type RenderState,
 } from './diagram-stream';
+import { keepLiveFrame } from './live-handover';
 
 /**
  * How tall a diagram card grows before the fade and "Open in canvas" take over

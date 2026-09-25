@@ -20,12 +20,12 @@ import type { PresentedRecord } from '../state/present-store';
 import { segmentGroup } from './activity-mapping';
 import { InlineArtifact } from './canvas/InlineArtifacts';
 import { withViewTransition } from './canvas/view-transition';
-import { DiagramCallContext } from './diagram-handover';
 import { liveSource, pendingDiagramArgs } from './diagram-stream';
 import { useGeneratingJob, useModel3dLive } from './GeneratingMedia';
 import { jobSamples, recordJobDuration } from './job-history';
 import { LiveSvgCard } from './LiveSvgCard';
 import { LongJobCard } from './LongJobCard';
+import { PresentedCallContext } from './live-handover';
 import { effectiveToolName, estimateFor, type JobKind, jobKindForTool, jobView } from './long-job';
 import { Markdown } from './markdown';
 import { PendingChartCard, pendingChartArgs } from './PendingChartCard';
@@ -128,6 +128,11 @@ export function AssistantGroup({
    * from the node's state rather than from rows happening to be still.
    */
   const streaming = live ?? group.some((m) => m.isStreaming === true);
+  // Whether this turn was still being written while on screen: what it adds as
+  // it finishes (the sources under it) comes up into place then; a turn
+  // switched back to is simply there.
+  const sawStreaming = useRef(streaming);
+  if (streaming) sawStreaming.current = true;
   // Owner-scoped result per tool-call id (avoids a bare-id collision with a
   // provider-reused toolCallId in a later user turn).
   const resultForBlock = new Map<string, ToolResultMsg>();
@@ -590,11 +595,11 @@ export function AssistantGroup({
           }
           for (const record of records) {
             if (placeOf('r', b.id, record.path) !== 'beneath') continue;
-            // The call it came from, for a diagram card taking over from its live one.
+            // The call it came from, for a chart or diagram card taking over from its live one.
             beneath.push(
-              <DiagramCallContext.Provider key={`rec:${record.path}`} value={b.id}>
+              <PresentedCallContext.Provider key={`rec:${record.path}`} value={b.id}>
                 {drawRecord(record)}
-              </DiagramCallContext.Provider>,
+              </PresentedCallContext.Provider>,
             );
           }
         }
@@ -636,7 +641,9 @@ export function AssistantGroup({
         // abort (pause/stop) cleaned to '' renders nothing.
         <div className="text-footnote text-status-danger-fg">{errorText}</div>
       ) : null}
-      {!streaming && answered && !suppressInlineArtifacts ? <SourcesCard /> : null}
+      {!streaming && answered && !suppressInlineArtifacts ? (
+        <SourcesCard arriving={sawStreaming.current} />
+      ) : null}
     </div>
   );
   return (

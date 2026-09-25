@@ -44,20 +44,31 @@ export function DiagramDrawing({
   svg,
   live = false,
   from = null,
+  buildIn = false,
+  version,
 }: {
   /** The frame to show; null before the first. */
   svg: string | null;
   /**
    * A live card: every frame moves into the next, the first builds in. A
    * finished card is still — a theme switch just swaps its drawing — unless
-   * it starts `from` a live card's last frame, which it moves on from.
+   * it starts `from` a frame it moves on from (the live card's last, the
+   * file's previous version), or it `buildIn`s from nothing on arrival.
    */
   live?: boolean;
   from?: string | null;
+  buildIn?: boolean;
+  /**
+   * What the drawing is a drawing OF (the source and title): a new drawing of
+   * a new version moves in; a new drawing of the same one — the other theme —
+   * is swapped in still.
+   */
+  version?: string;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const morph = useRef<DiagramMorph | null>(null);
   const first = useRef(true);
+  const shownVersion = useRef(version);
   // The morph lives as long as the card; `from` is where it starts, once.
   // biome-ignore lint/correctness/useExhaustiveDependencies: mounted once, by design
   useLayoutEffect(() => {
@@ -77,7 +88,9 @@ export function DiagramDrawing({
     if (m === null || svg === null) return;
     const isFirst = first.current;
     first.current = false;
-    m.show(svg, live || (isFirst && from !== null));
+    const changed = version !== undefined && version !== shownVersion.current;
+    shownVersion.current = version;
+    m.show(svg, live || changed || (isFirst && (from !== null || buildIn)));
   }, [svg]);
   return <div ref={host} className="pd-canvas-svg pd-scroll" data-testid="diagram-drawing" />;
 }

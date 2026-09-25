@@ -13,7 +13,8 @@
  */
 import { ChartView, IconChart } from '@pi-desktop/canvas';
 import { type ChartSpec, normalizeChartSpec } from '@pi-desktop/charts';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
+import { markLiveChart } from './live-handover';
 import { partialJsonString } from './partial-json';
 
 /** What a chart call has said so far, whichever way it was written. */
@@ -217,6 +218,12 @@ function Skeleton({ shape }: { shape: ReturnType<typeof skeletonShape> }) {
 export function PendingChartCard({ args }: { args: PendingChartArgs }) {
   const spec = useMemo(() => pendingChartSpec(args), [args]);
   const title = args.title ?? '';
+  // Once its bars are on screen, the finished card must not grow them again
+  // from the axis when it takes over (live-handover.ts).
+  const drawn = spec !== null;
+  useEffect(() => {
+    if (drawn && args.id !== undefined) markLiveChart(args.id);
+  }, [drawn, args.id]);
   return (
     <div
       className="pd-inline-chart pd-inline-chart--pending"

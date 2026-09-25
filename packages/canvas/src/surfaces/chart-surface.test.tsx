@@ -54,6 +54,15 @@ function hoverBand(container: HTMLElement, index: number): Promise<void> {
 }
 
 describe('ChartView', () => {
+  it('builds itself on arrival — unless it takes over a chart already drawn live', async () => {
+    const spec = specFromText(JSON.stringify(UNITS));
+    if ('error' in spec) throw new Error(spec.error);
+    const fresh = await render(<ChartView spec={spec} />);
+    expect(fresh.container.querySelector('.pd-chart')?.hasAttribute('data-enter')).toBe(true);
+    const taking = await render(<ChartView spec={spec} enter={false} />);
+    expect(taking.container.querySelector('.pd-chart')?.hasAttribute('data-enter')).toBe(false);
+  });
+
   it('draws the bars with the title and the note, one bar per value', async () => {
     const spec = specFromText(JSON.stringify(UNITS));
     if ('error' in spec) throw new Error(spec.error);

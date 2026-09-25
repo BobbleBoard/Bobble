@@ -189,11 +189,18 @@ body {
   margin-top: 0.5rem;
   animation: pd-inline-canvas-in var(--pd-duration-base, 220ms) var(--pd-easing-enter, ease-out);
 }
+/* A card handed over just now with nothing of its own to build (a file's
+ * card, the sources under an answer) comes up into place the same way; one
+ * switched back to is simply there (useArrival, AssistantGroup). */
+.pd-arrive {
+  animation: pd-inline-canvas-in var(--pd-duration-base, 220ms) var(--pd-easing-enter, ease-out);
+}
 @media (prefers-reduced-motion: reduce) {
   .pd-canvas-rail {
     transition: none;
   }
-  .pd-inline-canvas {
+  .pd-inline-canvas,
+  .pd-arrive {
     animation: none;
   }
 }

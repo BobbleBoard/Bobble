@@ -5,6 +5,7 @@ import { useCanvasStore } from './canvas-store';
 import {
   chartsInTranscript,
   classifyPresented,
+  earlierVersion,
   extOf,
   isInlinePresented,
   openPresented,
@@ -123,6 +124,16 @@ describe('a presented card remembers where it was handed over', () => {
       (i) => i.path === '/a/logo.png',
     );
     expect(logos.map((i) => i.afterMessageId)).toEqual(['m1', 'm9']);
+  });
+
+  it('a new version knows the card it follows (what an edited diagram moves on from)', () => {
+    const s = usePresentStore.getState();
+    const first = s.add({ path: '/a/flow.svg', afterMessageId: 'm1' });
+    s.add({ path: '/a/other.svg', afterMessageId: 'm2' });
+    const second = s.add({ path: '/a/flow.svg', afterMessageId: 'm3', shownAt: 123 });
+    expect(second.shownAt).toBe(123);
+    expect(earlierVersion(usePresentStore.getState(), second)).toBe(first);
+    expect(earlierVersion(usePresentStore.getState(), first)).toBeUndefined();
   });
 });
 

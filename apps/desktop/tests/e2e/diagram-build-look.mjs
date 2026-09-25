@@ -35,9 +35,19 @@ const FORM = process.env.FORM === 'cli' ? 'cli' : 'schema';
 const MODE = process.env.MODE === 'dark' ? 'dark' : 'light';
 mkdirSync(SHOT_DIR, { recursive: true });
 
-const TITLE = 'Order fulfilment';
-const SUBTITLE = 'Checkout to delivery';
-const SOURCE = `flowchart TD
+/**
+ * The diagrams a build is played with (SAMPLE=…): each with how many of its
+ * parts the finished drawing has — steps for a flowchart, participants and
+ * messages for a sequence, classes and relations for a class diagram.
+ */
+const SAMPLES = {
+  flow: {
+    title: 'Order fulfilment',
+    subtitle: 'Checkout to delivery',
+    kind: 'flowchart',
+    parts: 'g.node',
+    count: 7,
+    source: `flowchart TD
   A([Order placed]) --> B{Payment ok?}
   B -- yes --> C[Pick & pack]
   B -- no --> E[Email customer]
@@ -46,16 +56,63 @@ const SOURCE = `flowchart TD
     C --> D{Quality ok?}
     D -- no, repack --> C
   end
-  D -- yes --> F[Ship] --> G([Delivered])`;
-const SVG_PATH = '/w/diagrams/order-fulfilment.svg';
+  D -- yes --> F[Ship] --> G([Delivered])`,
+  },
+  sequence: {
+    title: 'Checkout',
+    subtitle: 'Card payment',
+    kind: 'sequence diagram',
+    parts: '[data-k^="a:"], [data-k^="m:"]',
+    count: 9,
+    source: `sequenceDiagram
+  participant C as Customer
+  participant S as Store
+  participant P as Payments
+  C->>S: Place order
+  S->>P: Charge card
+  alt approved
+    P-->>S: Approved
+    S-->>C: Confirmation email
+  else declined
+    P-->>S: Declined
+    S-->>C: Payment failed
+  end`,
+  },
+  class: {
+    title: 'Orders model',
+    subtitle: '',
+    kind: 'class diagram',
+    parts: 'g.node, [data-k^="e:"]',
+    count: 7,
+    source: `classDiagram
+  class Customer {
+    +String email
+  }
+  class Order {
+    +String id
+    +total() Money
+  }
+  class LineItem {
+    +int qty
+  }
+  Customer "1" --> "*" Order : places
+  Order *-- LineItem : contains
+  Order <|-- RushOrder`,
+  },
+};
+const SAMPLE = SAMPLES[process.env.SAMPLE ?? 'flow'] ?? SAMPLES.flow;
+const TITLE = SAMPLE.title;
+const SUBTITLE = SAMPLE.subtitle;
+const SOURCE = SAMPLE.source;
+const SVG_PATH = '/w/diagrams/live.svg';
 
 /** The call's argument text, as the model writes it in either form. */
 const ARGS_TEXT =
   FORM === 'cli'
     ? JSON.stringify({
-        command: `diagram "${TITLE}" --subtitle "${SUBTITLE}" --source '${SOURCE}'`,
+        command: `diagram "${TITLE}"${SUBTITLE ? ` --subtitle "${SUBTITLE}"` : ''} --source '${SOURCE}'`,
       })
-    : JSON.stringify({ title: TITLE, subtitle: SUBTITLE, source: SOURCE });
+    : JSON.stringify({ title: TITLE, ...(SUBTITLE ? { subtitle: SUBTITLE } : {}), source: SOURCE });
 const ARGS = JSON.parse(ARGS_TEXT);
 const TOOL = FORM === 'cli' ? 'bash' : 'diagram';
 
@@ -171,7 +228,7 @@ const lead = { type: 'text', text: 'I will draw the flow.' };
 
 /** What the thread shows right now: the building card, the finished card, and where. */
 const read = () =>
-  page.evaluate(() => {
+  page.evaluate((parts) => {
     const box = (el) => {
       if (!el) return null;
       const r = el.getBoundingClientRect();
@@ -189,13 +246,13 @@ const read = () =>
       pending: pending !== null,
       pendingBox: box(pending),
       pendingSvg: box(drawing(pending)),
-      pendingNodes: pending?.querySelectorAll('g.node').length ?? 0,
+      pendingNodes: pending?.querySelectorAll(parts).length ?? 0,
       done: done !== null,
       doneBox: box(done),
       doneSvg: box(drawing(done)),
       cards: document.querySelectorAll('[data-testid="presented-diagram"]').length,
     };
-  });
+  }, SAMPLE.parts);
 
 const samples = [];
 try {
@@ -262,7 +319,7 @@ try {
         id: 'tr-d1',
         toolCallId: 'd1',
         toolName: TOOL,
-        text: `Drew a flowchart "${TITLE}" — 7 steps (2 decisions), 8 connections: ${SVG_PATH} (the source beside it: order-fulfilment.diagram.mmd). It is in the chat as a diagram card.`,
+        text: `Drew a ${SAMPLE.kind} "${TITLE}": ${SVG_PATH} (the source beside it: live.diagram.mmd). It is in the chat as a diagram card.`,
         isError: false,
         timestamp: Date.now(),
       },
@@ -290,8 +347,8 @@ try {
     `it grows as lines arrive: nodes ${nodeCounts.join(' → ')}`,
   );
   check(
-    beforeHandover.pendingNodes === 7,
-    `the last building frame has every step: ${beforeHandover.pendingNodes}`,
+    beforeHandover.pendingNodes === SAMPLE.count,
+    `the last building frame has every part: ${beforeHandover.pendingNodes} of ${SAMPLE.count}`,
   );
   check(
     settled.done && !settled.pending && settled.cards === 1,

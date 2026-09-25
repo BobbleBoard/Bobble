@@ -69,6 +69,19 @@ describe('SourcesCard', () => {
     expect(folded).toContain('Page 3');
   });
 
+  it('comes up into place under an answer that just finished, and only then', () => {
+    const { group, results } = turn('No citations.');
+    const shown = (arriving?: boolean) =>
+      renderToStaticMarkup(
+        <TurnSourcesProvider group={group} resultFor={results}>
+          <SourcesCard {...(arriving === undefined ? {} : { arriving })} />
+        </TurnSourcesProvider>,
+      );
+    expect(shown(true)).toContain('class="pd-sources pd-arrive"');
+    expect(shown()).toContain('class="pd-sources"');
+    expect(shown(false)).not.toContain('pd-arrive');
+  });
+
   it('draws nothing for a turn that saw no web pages', () => {
     const html = renderToStaticMarkup(
       <TurnSourcesProvider group={[]} resultFor={new Map()}>

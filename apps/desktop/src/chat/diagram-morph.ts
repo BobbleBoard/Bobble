@@ -230,12 +230,18 @@ export function diffKeys(
   };
 }
 
-/** What a part's key says it is: an edge draws, a step pops, a word fades. */
-export function roleOfKey(key: string): 'edge' | 'line' | 'step' | 'label' | 'group' | 'other' {
+/**
+ * What a part's key says it is: an edge draws, a step pops, a word fades —
+ * after the steps and edges it names; the card's title first of all.
+ */
+export function roleOfKey(
+  key: string,
+): 'head' | 'edge' | 'line' | 'step' | 'label' | 'group' | 'other' {
+  if (/^head:/.test(key)) return 'head';
   if (/^(?:e|m):/.test(key)) return 'edge';
   if (/^(?:al|lp):/.test(key) && /:line:|^al:/.test(key)) return 'line';
   if (/^(?:n|a):/.test(key)) return 'step';
-  if (/^(?:l|mt|t|head):|:name$|:text/.test(key)) return 'label';
+  if (/^(?:l|mt|t):|:name$|:text/.test(key)) return 'label';
   if (/^(?:c|no|lp|act):/.test(key)) return 'group';
   return 'other';
 }
@@ -387,7 +393,7 @@ export class DiagramMorph {
       this.stop(true);
       this.host.replaceChildren(next);
       this.host.style.height = '';
-      this.host.style.clipPath = '';
+      this.host.style.overflowY = '';
       return;
     }
     const t0 = performance.now();
@@ -395,7 +401,7 @@ export class DiagramMorph {
     const hostBefore = this.host.getBoundingClientRect().height;
     this.stop(false);
     this.host.style.height = '';
-    this.host.style.clipPath = '';
+    this.host.style.overflowY = '';
     this.host.replaceChildren(next);
     this.plan(next, before, hostBefore, t0);
     this.tick(t0);
@@ -491,12 +497,16 @@ export class DiagramMorph {
         dur: TIMING.grow.dur,
         apply: (e) => {
           host.style.height = `${mix(hostBefore, hostAfter, e)}px`;
-          // Only the foot is clipped: a label near a side may overhang, as in the finished card.
-          host.style.clipPath = 'inset(-200px -200px 0 -200px)';
+          // Clipped in height only: a label near a side may overhang, as in the
+          // finished card. A clip, not a clip-path — a clip-path hid the rest of
+          // the drawing but left it in the card's overflow, and the card showed
+          // its "Open in canvas" fade (meant for a drawing too tall) while this
+          // one was still growing (filmed 2026-09-25).
+          host.style.overflowY = 'clip';
         },
         done: () => {
           host.style.height = '';
-          host.style.clipPath = '';
+          host.style.overflowY = '';
         },
       });
     }
@@ -640,9 +650,13 @@ export class DiagramMorph {
           ? TIMING.label
           : TIMING.step;
     const slot = role === 'edge' || role === 'line' ? 'edge' : role === 'label' ? 'label' : 'step';
+    // The title leads: it comes in at once, and takes no step's place in line.
     const start =
-      t0 + (from > 0 ? 0 : timing.delay + Math.min(timing.most, counts[slot] * timing.stagger));
-    counts[slot] += 1;
+      t0 +
+      (from > 0 || role === 'head'
+        ? 0
+        : timing.delay + Math.min(timing.most, counts[slot] * timing.stagger));
+    if (role !== 'head') counts[slot] += 1;
     const dur = timing.dur * (1 - from);
     const dashed = (el.getAttribute('stroke-dasharray') ?? 'none') !== 'none';
     const drawable =
