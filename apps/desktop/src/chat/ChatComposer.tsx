@@ -1351,7 +1351,7 @@ export function ChatComposer({
       hasSubmitInterceptors() &&
       (await interceptSubmit({
         text: raw,
-        agentMessage: buildAgentMessage(raw, textFiles, activatable),
+        agentMessage: buildAgentMessage(raw, attachments, activatable),
         images: imageUris,
       }))
     ) {
