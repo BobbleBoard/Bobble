@@ -84,6 +84,16 @@ describe('rehypeCitations — the tree pass', () => {
     expect(flat(tree)).toBe('the result. {a.example/1 b.example/2}');
   });
 
+  it('puts the full stop back before a link glued to its claim, and only then', () => {
+    const glued = run(
+      root(p(t('after manual verification'), a('https://a.example/1', 'Nature'), t('.'))),
+    );
+    expect(flat(glued)).toBe('after manual verification. {a.example/1}');
+    // A link written into the sentence, after a space, keeps its sentence's order.
+    const spaced = run(root(p(t('as reported by '), a('https://a.example/1', 'Nature'), t('.'))));
+    expect(flat(spaced)).toBe('as reported by {a.example/1}.');
+  });
+
   it('joins "(A) (B)" once their brackets are gone', () => {
     const tree = run(
       root(

@@ -96,14 +96,20 @@ function groupChildren(parent: HNode, keyOf: RehypeCitationOptions['keyOf']): vo
     // then the chip, the way a citation follows the claim it supports.
     const before = kids[i - 1];
     const after = kids[end + 1];
-    if (
-      isText(before) &&
-      isText(after) &&
-      /\(\s*$/.test(before.value) &&
-      /^\s*\)/.test(after.value)
-    ) {
+    const bracketed =
+      isText(before) && isText(after) && /\(\s*$/.test(before.value) && /^\s*\)/.test(after.value);
+    if (bracketed) {
       before.value = before.value.replace(/\s*\(\s*$/, ' ');
       after.value = after.value.replace(/^\s*\)/, '');
+    }
+    /*
+     * A link glued to the word before it ("…after manual verification[Nature](…).")
+     * is a citation too — nobody glues a link into their own sentence — and the
+     * same goes for its full stop. SEEN on a real research turn: the chip sat
+     * between the claim and its period.
+     */
+    const glued = isText(before) && /\S$/.test(before.value);
+    if ((bracketed || glued) && isText(before) && isText(after)) {
       const stop = /^[.!?]+/.exec(after.value);
       if (stop !== null) {
         before.value = `${before.value.trimEnd()}${stop[0]} `;
