@@ -42,6 +42,9 @@ jobs:
       - run: node apps/desktop/node_modules/electron/install.js
       - run: test -e apps/desktop/node_modules/electron/dist
 
+      # The gen3d engine's Python tests run on uv's Python 3.12, as the engine does.
+      - uses: astral-sh/setup-uv@v6
+
       - run: pnpm turbo run lint typecheck test build
 
       # Electron smoke probes — macOS runners run headed Electron directly.

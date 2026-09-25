@@ -35,6 +35,17 @@ except ImportError as err:  # trimesh lives in the meshtools venv
     raise Skip(f"needs the meshtools venv ({err})") from err
 
 
+def _needs_scipy() -> None:
+    """The geodesic pass returns None without scipy (skinning falls back to
+    straight-line distance), so these tests can only run where scipy is."""
+    try:
+        import scipy.sparse  # noqa: F401
+    except ImportError as err:
+        from _skip import Skip
+
+        raise Skip(f"needs scipy ({err})") from err
+
+
 def _strip(n: int, x: float, y0: float, y1: float):
     """A vertical ribbon of `n` rows at a fixed x — a stand-in for a limb."""
     ys = np.linspace(y0, y1, n)
@@ -49,6 +60,7 @@ def _strip(n: int, x: float, y0: float, y1: float):
 
 
 def test_an_arm_beside_the_chest_is_far_away_along_the_surface():
+    _needs_scipy()
     """The case that broke: an arm hanging beside a torso, JOINED at the top.
 
     Joined matters. Two separate shells have no path between them at all, and
@@ -89,6 +101,7 @@ def test_an_arm_beside_the_chest_is_far_away_along_the_surface():
 
 
 def test_a_vertex_keeps_its_own_bone_closest():
+    _needs_scipy()
     verts, faces = _strip(20, 0.0, 0.0, 1.0)
     d = np.stack(
         [

@@ -27,7 +27,13 @@ def main() -> int:
     skipped = 0
     total = 0
     for path in sorted(HERE.glob("test_*.py")):
-        mod = importlib.import_module(path.stem)
+        try:
+            mod = importlib.import_module(path.stem)
+        except Skip as why:  # the whole file needs what this interpreter lacks
+            total += 1
+            skipped += 1
+            print(f"  SKIP {path.stem} — {why}")
+            continue
         for name in sorted(n for n in dir(mod) if n.startswith("test_")):
             total += 1
             try:
