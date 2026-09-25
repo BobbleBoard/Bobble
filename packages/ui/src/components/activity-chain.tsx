@@ -144,6 +144,18 @@ interface ActivityStepCommon {
    * activating them opens the canvas. The app reads this flag and routes.
    */
   opensInCanvas?: boolean;
+  /**
+   * WHAT THIS STEP MADE, filed under its row — a finished picture, clip or chart
+   * the turn has since moved on from.
+   *
+   * the user (2026-09-24), on a 4B iterating over its own pictures: "on each of it's
+   * iterations the full image cards are presented at the very bottom of the
+   * chat as if totally finished, these should be embedded in thinking blocks".
+   * The host decides WHICH results belong here (the app's turn-cards.ts); the
+   * chain only draws them — always visible while the chain is open, never
+   * behind the step's own disclosure, and folding away with the chain.
+   */
+  attachment?: ReactNode;
 }
 
 export type ActivityStepData =
@@ -1696,6 +1708,14 @@ export const ActivityStep = forwardRef<HTMLDivElement, ActivityStepProps>(functi
               <StepContent step={data} />
             </div>
           </div>
+        </div>
+      ) : null}
+
+      {/* After the reveal, not before it: opening the row's details pushes the
+          result down rather than splitting the row from what it says. */}
+      {data.attachment !== undefined && data.attachment !== null ? (
+        <div className="pd-chain-step-attachment" data-testid="chain-step-attachment">
+          {data.attachment}
         </div>
       ) : null}
     </div>

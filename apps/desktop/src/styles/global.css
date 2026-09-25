@@ -4324,6 +4324,24 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   min-width: 0;
 }
 
+/*
+ * A RESULT FILED IN THE CHAIN IS A STEP OF THE WORK, not the answer.
+ *
+ * the user (2026-09-24): the iterations of an edit "should be embedded in thinking
+ * blocks" — they are how the model got there, and the chain around them is set
+ * a size below the reply for exactly that reason (activity-chain.css: "process
+ * sits one step below the answer"). The same card at two-thirds the height:
+ * still a picture you can judge an iteration by, no longer a column of
+ * finished-looking results. The answer beneath the chain keeps the full size.
+ */
+.pd-chain-step-attachment {
+  --pd-media-max-h: 240px;
+}
+/* The row above already spaces it; the thread's own top margin would double it. */
+.pd-chain-step-attachment .pd-thread-media {
+  margin-top: 0;
+}
+
 .pd-thread-video {
   width: 100%;
   max-height: 420px;
