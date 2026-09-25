@@ -18,7 +18,12 @@
  */
 
 export type ImageJobResult =
-  | { readonly ok: true; readonly path: string }
+  | {
+      readonly ok: true;
+      readonly path: string;
+      /** A small look at the picture for the model (gen3d-bridge withPreview). */
+      readonly preview?: { readonly data: string; readonly mimeType: string };
+    }
   | { readonly ok: false; readonly error: string };
 
 /** The fields of a `JobUpdate` this tracker cares about. */

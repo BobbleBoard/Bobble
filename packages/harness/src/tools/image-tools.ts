@@ -66,14 +66,28 @@ export function imageToolResult(
   result: ImageBridgeResult,
 ): AgentToolResult<ImageToolDetails> {
   if (!result.ok) return errorResult(tool, result.error);
+  /*
+   * A SMALL LOOK, NEVER THE PICTURE. The image itself stays a URL (the whole
+   * point: a 1024² PNG as base64 in a small model's context and its saved
+   * chat), but the model gets a ~384 px preview to judge what it made against
+   * what was asked — the user: images are "mainly observe + improve loop".
+   */
+  const look = result.preview;
   return {
     content: [
       {
         type: 'text',
         // Line 1 is the renderable URL (the chat picks the first media URL out
         // of the result text); line 2 is the path for a follow-up edit.
-        text: `${pdFileUrl(result.path)}\n${verb} ${result.path}`,
+        text:
+          `${pdFileUrl(result.path)}\n${verb} ${result.path}` +
+          (look !== undefined
+            ? '\nA small preview is attached: check it against what was asked, and edit again if it misses.'
+            : ''),
       },
+      ...(look !== undefined
+        ? [{ type: 'image' as const, data: look.data, mimeType: look.mimeType }]
+        : []),
     ],
     details: { ok: true, path: result.path },
   };

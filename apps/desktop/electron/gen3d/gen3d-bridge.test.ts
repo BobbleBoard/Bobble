@@ -119,6 +119,55 @@ describe('handleMethod', () => {
     const res = await handleMethod('generate_image', { prompt: 'x' }, null);
     expect(res.ok).toBe(false);
   });
+
+  it('hands a finished picture back with a small look at it, for the model to judge', async () => {
+    const run = vi.fn<RunImageJob>(async () => ({ ok: true, path: '/out/edit.png' }));
+    const preview = vi.fn(async (p: string) => ({ data: `jpeg-of:${p}`, mimeType: 'image/jpeg' }));
+    const made = await handleMethod(
+      'generate_image',
+      { prompt: 'x' },
+      run,
+      null,
+      undefined,
+      preview,
+    );
+    expect(made).toEqual({
+      ok: true,
+      path: '/out/edit.png',
+      preview: { data: 'jpeg-of:/out/edit.png', mimeType: 'image/jpeg' },
+    });
+    const edited = await handleMethod(
+      'edit_image',
+      { imagePath: '/in.png', instruction: 'warmer' },
+      run,
+      null,
+      undefined,
+      preview,
+    );
+    expect(edited.ok && edited.preview?.mimeType).toBe('image/jpeg');
+  });
+
+  it('never lets a failed look fail the picture, and adds none to a failure', async () => {
+    const run = vi.fn<RunImageJob>(async () => ({ ok: true, path: '/out/a.png' }));
+    const broken = async () => {
+      throw new Error('cannot decode');
+    };
+    expect(
+      await handleMethod('generate_image', { prompt: 'x' }, run, null, undefined, broken),
+    ).toEqual({
+      ok: true,
+      path: '/out/a.png',
+    });
+    const failing = vi.fn<RunImageJob>(async () => ({ ok: false, error: 'no weights' }));
+    const preview = vi.fn(async () => ({ data: 'x', mimeType: 'image/jpeg' }));
+    expect(
+      await handleMethod('generate_image', { prompt: 'x' }, failing, null, undefined, preview),
+    ).toEqual({
+      ok: false,
+      error: 'no weights',
+    });
+    expect(preview).not.toHaveBeenCalled();
+  });
 });
 
 /*

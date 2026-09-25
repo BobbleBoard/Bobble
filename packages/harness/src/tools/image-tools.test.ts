@@ -103,6 +103,27 @@ describe('generate_image', () => {
     expect(res.details).toMatchObject({ ok: true, path: IMG });
   });
 
+  it('carries the small look main made — never the picture itself — and says to check it', async () => {
+    const { pi, get } = captureTools();
+    const look = { data: 'SMALLJPEG', mimeType: 'image/jpeg' };
+    const bridge = {
+      generateImage: vi.fn(async () => ({ ok: true as const, path: IMG, preview: look })),
+      editImage: vi.fn(async () => ({ ok: true as const, path: IMG, preview: look })),
+      call: vi.fn(async () => ({ ok: true as const, path: IMG })),
+    } as ImageBridge;
+    registerImageTools(pi, bridge);
+    for (const [tool, params] of [
+      [GENERATE_IMAGE_TOOL, { prompt: 'x' }],
+      [EDIT_IMAGE_TOOL, { image_path: IMG, instruction: 'warmer' }],
+    ] as const) {
+      const res = await run(get(tool), params);
+      expect(res.content[0]?.text).toContain('A small preview is attached');
+      expect(res.content[1]).toEqual({ type: 'image', data: 'SMALLJPEG', mimeType: 'image/jpeg' });
+      // Line 1 is still the URL the chat renders.
+      expect((res.content[0]?.text ?? '').split('\n')[0]).toBe(`pd-file://f${IMG}`);
+    }
+  });
+
   it('never base64s the image into the transcript', async () => {
     const { pi, get } = captureTools();
     registerImageTools(pi, okBridge(IMG).bridge);

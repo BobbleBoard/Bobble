@@ -82,12 +82,40 @@ function fail(error: string): ImageJobResult {
   return { ok: false, error };
 }
 
+/**
+ * A SMALL LOOK AT A FINISHED PICTURE, for the model that asked for it.
+ *
+ * the user (2026-09-24): images are "mainly observe + improve loop". The tools
+ * carried only a URL and a path — deliberately, so a 1024² picture never sat in
+ * a small model's context or its saved chat as base64 — which left the model
+ * blind to what it had made. A ~384 px JPEG (tens of KB) is the middle: enough
+ * to judge the result against the ask, not enough to weigh the chat down.
+ * Injected by main (pi-main: Electron's nativeImage), absent in tests.
+ */
+export type ImagePreviewer = (path: string) => Promise<{ data: string; mimeType: string } | null>;
+
+let previewImage: ImagePreviewer | null = null;
+
+async function withPreview(
+  result: ImageJobResult,
+  preview: ImagePreviewer | null,
+): Promise<ImageJobResult> {
+  if (!result.ok || preview === null) return result;
+  try {
+    const look = await preview(result.path);
+    return look === null ? result : { ...result, preview: look };
+  } catch {
+    return result;
+  }
+}
+
 export async function handleMethod(
   method: string,
   params: BridgeRequest['params'],
   run: RunImageJob | null = runJob,
   models: ModelRunners | null = runModel,
   agent?: string,
+  preview: ImagePreviewer | null = previewImage,
 ): Promise<ImageJobResult> {
   /* Who asked travels with the job, so the chat that owns it can stop it. */
   const who = agent !== undefined && agent !== '' ? { agent } : {};
@@ -122,13 +150,13 @@ export async function handleMethod(
   if (run === null) return fail('the image engine is not available');
   if (method === 'generate_image') {
     const prompt = typeof params?.prompt === 'string' ? params.prompt : '';
-    return run({ prompt, ...who });
+    return withPreview(await run({ prompt, ...who }), preview);
   }
   if (method === 'edit_image') {
     const imagePath = typeof params?.imagePath === 'string' ? params.imagePath.trim() : '';
     const instruction = typeof params?.instruction === 'string' ? params.instruction : '';
     if (imagePath === '') return fail('image_path is required');
-    return run({ prompt: instruction, editFrom: imagePath, ...who });
+    return withPreview(await run({ prompt: instruction, editFrom: imagePath, ...who }), preview);
   }
   return fail(`unknown method: ${method}`);
 }
@@ -186,9 +214,14 @@ async function handleLine(socket: net.Socket, line: string): Promise<void> {
  * Called from pi-main's registerPiIpc, beside {@link registerSubagentBridge} and
  * for the same reason: the env must exist BEFORE the first pi spawn reads it.
  */
-export function registerGen3dBridge(run: RunImageJob, models: ModelRunners | null = null): void {
+export function registerGen3dBridge(
+  run: RunImageJob,
+  models: ModelRunners | null = null,
+  preview: ImagePreviewer | null = null,
+): void {
   runJob = run;
   runModel = models;
+  previewImage = preview;
   if (server !== null) return;
   const socketPath = process.env[SOCK_ENV] ?? defaultSocketPath();
   token = process.env[TOKEN_ENV] ?? randomBytes(24).toString('hex');
@@ -210,6 +243,7 @@ export function disposeGen3dBridge(): void {
   server = null;
   runJob = null;
   runModel = null;
+  previewImage = null;
 }
 
 /** Test hook: the env a child would read (undefined before the bridge starts). */

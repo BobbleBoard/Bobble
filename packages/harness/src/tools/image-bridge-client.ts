@@ -32,8 +32,16 @@ const REPLY_TIMEOUT_MS = 20 * 60_000;
 const MODEL_REPLY_TIMEOUT_MS = 45 * 60_000;
 
 export type ImageBridgeResult =
-  | { readonly ok: true; readonly path: string }
+  | {
+      readonly ok: true;
+      readonly path: string;
+      /** A small look at the picture (main's gen3d-bridge), for the model to judge. */
+      readonly preview?: { readonly data: string; readonly mimeType: string };
+    }
   | { readonly ok: false; readonly error: string };
+
+/** A preview travels only while it is small (a ~384 px JPEG is tens of KB). */
+const MAX_PREVIEW_CHARS = 256 * 1024;
 
 export interface ImageBridge {
   generateImage(prompt: string, signal?: AbortSignal): Promise<ImageBridgeResult>;
@@ -111,9 +119,20 @@ function request(
           ok?: boolean;
           path?: string;
           error?: string;
+          preview?: { data?: unknown; mimeType?: unknown };
         };
         if (res.ok === true && typeof res.path === 'string' && res.path.length > 0) {
-          done({ ok: true, path: res.path });
+          const p = res.preview;
+          const preview =
+            p !== undefined &&
+            typeof p.data === 'string' &&
+            p.data.length > 0 &&
+            p.data.length <= MAX_PREVIEW_CHARS &&
+            typeof p.mimeType === 'string' &&
+            p.mimeType.startsWith('image/')
+              ? { data: p.data, mimeType: p.mimeType }
+              : undefined;
+          done({ ok: true, path: res.path, ...(preview !== undefined ? { preview } : {}) });
           return;
         }
         done(failed(res.error ?? 'the image engine returned no image'));

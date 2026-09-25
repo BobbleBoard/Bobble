@@ -18,7 +18,7 @@ import { PiBridge } from '@pi-desktop/engine/main';
 import { FORBID_TOOLS_ENV } from '@pi-desktop/harness/permissions/forbidden';
 import { MESSAGES_SEND_TOOL } from '@pi-desktop/mac-connectors/tool-names';
 import { createIpcEventSender, createLogger } from '@pi-desktop/shared';
-import { app, type IpcMainInvokeEvent, ipcMain, type WebContents } from 'electron';
+import { app, type IpcMainInvokeEvent, ipcMain, nativeImage, type WebContents } from 'electron';
 import { resolveBundledPackageAsset } from '../app-paths';
 import { registerDiagramLiveIpc } from '../gen/diagram-live';
 import { renderDiagram } from '../gen/diagram-render';
@@ -597,7 +597,13 @@ export function registerPiIpc(
   // same timing constraint as the subagent one: its env must be published
   // BEFORE the first pi spawn, or the harness sees no bridge and (by design)
   // never registers the tools.
-  registerGen3dBridge(runImageJob, { generate: run3dJob, stage: runStage3dJob });
+  registerGen3dBridge(runImageJob, { generate: run3dJob, stage: runStage3dJob }, async (file) => {
+    // A small look for the model (gen3d-bridge withPreview): ~384 px JPEG.
+    const img = nativeImage.createFromPath(file);
+    if (img.isEmpty()) return null;
+    const small = img.getSize().width > 384 ? img.resize({ width: 384, quality: 'good' }) : img;
+    return { data: small.toJPEG(80).toString('base64'), mimeType: 'image/jpeg' };
+  });
 
   installPiQuitHold(app, {
     // Reap child-agent pi instances in the same held quit window as the main
