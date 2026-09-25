@@ -12,6 +12,8 @@ import {
   DEFAULT_BASH_TIMEOUT_S,
   HARNESS_CONFIG_ENTRY,
   hasAttachedFileBlock,
+  MEDIA_BASH_TIMEOUT_S,
+  runsCommand,
   type StoredEntryLike,
   type ToolSchemaLike,
   wireHarness,
@@ -521,6 +523,34 @@ describe('withDefaultTimeout — every command comes back', () => {
       timeout: 1800,
     });
     expect(seen?.timeout).toBe(1800);
+  });
+
+  /* A render longer than 300 s (a video took 521 s) must not be cancelled by
+     the clock: a command bash kills now stops the job behind it. */
+  it('gives a generation command the long clock, and only that command', async () => {
+    const seen: unknown[] = [];
+    const clock = (command: string): number =>
+      runsCommand(command, ['media', 'svg', '3d']) ? MEDIA_BASH_TIMEOUT_S : DEFAULT_BASH_TIMEOUT_S;
+    const t = withDefaultTimeout(
+      fake((p) => {
+        seen.push((p as Record<string, unknown>).timeout);
+        return 'ok';
+      }) as never,
+      clock,
+    ) as { execute: (...a: unknown[]) => Promise<unknown> };
+    await t.execute('c', { command: 'media generate video "a paper boat"' });
+    await t.execute('c', { command: 'ls assets && svg "a red heart" --out assets/heart.svg' });
+    await t.execute('c', { command: 'npm run build' });
+    await t.execute('c', { command: 'echo media' });
+    await t.execute('c', { command: 'media generate video x', timeout: 60 });
+    expect(seen).toEqual([
+      MEDIA_BASH_TIMEOUT_S,
+      MEDIA_BASH_TIMEOUT_S,
+      DEFAULT_BASH_TIMEOUT_S,
+      DEFAULT_BASH_TIMEOUT_S,
+      60,
+    ]);
+    expect(MEDIA_BASH_TIMEOUT_S).toBeGreaterThan(521);
   });
 
   /* The bare `timeout:300` pi throws says nothing a 4B can act on. */

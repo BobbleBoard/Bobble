@@ -173,6 +173,26 @@ import {
 export const DEFAULT_BASH_TIMEOUT_S = 300;
 
 /**
+ * …and a generation command (`media generate video`, `svg`, `3d …` in CLI mode)
+ * gets this long. A command bash kills now stops the job behind it (the tool
+ * hears the hang-up, the app cancels it), and a video took 521 s MEASURED — so
+ * at 300 s every long render would be cancelled on the model's behalf, where
+ * before it ran on out of sight and the model's retry queued a second one.
+ */
+export const MEDIA_BASH_TIMEOUT_S = 1800;
+
+/**
+ * Does a shell command run one of these commands — as its first word, or the
+ * first word after a `;`, `&&`, `||` or `|`? Pure.
+ */
+export function runsCommand(command: string, names: readonly string[]): boolean {
+  return command
+    .split(/;|&&|\|\||\|/)
+    .map((part) => part.trim().split(/\s+/)[0] ?? '')
+    .some((word) => names.includes(word));
+}
+
+/**
  * EVERY COMMAND COMES BACK.
  *
  * pi's bash says so itself: "Timeout in seconds (optional, no default
@@ -257,12 +277,14 @@ export function withBackgroundOption<
 
 export function withDefaultTimeout<T extends { execute: (...a: never[]) => unknown }>(
   base: T,
-  seconds: number = DEFAULT_BASH_TIMEOUT_S,
+  clock: number | ((command: string) => number) = DEFAULT_BASH_TIMEOUT_S,
 ): T {
   return {
     ...base,
     async execute(...args: never[]) {
       const params = args[1] as Record<string, unknown> | undefined;
+      const command = typeof params?.command === 'string' ? params.command : '';
+      const seconds = typeof clock === 'number' ? clock : clock(command);
       if (params !== undefined && params.timeout === undefined) {
         (args as unknown[])[1] = { ...params, timeout: seconds };
       }
@@ -2194,6 +2216,12 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
    * background rewrite and the timeout default) and the final result — the two
    * things whose identity it is asserting.
    */
+  // A generation command's clock is MEDIA_BASH_TIMEOUT_S; every other command's the default.
+  const generationCommands = ['generation', 'svg', '3d'].map(commandNameFor);
+  const bashClock = (command: string): number =>
+    toolCliMode && runsCommand(command, generationCommands)
+      ? MEDIA_BASH_TIMEOUT_S
+      : DEFAULT_BASH_TIMEOUT_S;
   pi.registerTool(
     withRepeatNotice(
       withDefaultTimeout(
@@ -2211,6 +2239,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
             }),
           }),
         ),
+        bashClock,
       ),
       'bash',
     ) as never,
@@ -2373,11 +2402,12 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       },
       {
         /*
-         * Past the bash tool's own limit, so a long generation is never reported
-         * as a failure while it is still running. Derived from the same constant
-         * the bash tool uses, so raising one cannot silently strand the other.
+         * Past the bash tool's own limit for a generation command, so a long
+         * generation is never reported as a failure while it is still running.
+         * Derived from the same constant the bash clock uses, so raising one
+         * cannot silently strand the other.
          */
-        dispatchTimeoutMs: (DEFAULT_BASH_TIMEOUT_S + 120) * 1000,
+        dispatchTimeoutMs: (MEDIA_BASH_TIMEOUT_S + 120) * 1000,
         // So the `open` wrapper can name the way to SHOW a file to the user.
         presentCommand: cliCommandForTool?.(PRESENT_TOOL_NAME) ?? null,
       },
