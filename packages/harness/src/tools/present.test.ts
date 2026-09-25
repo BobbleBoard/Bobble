@@ -79,7 +79,10 @@ describe('registerPresentTool', () => {
     expect(tools[0]?.name).toBe(PRESENT_TOOL_NAME);
   });
 
-  const run = async (path: string, stat: () => Promise<{ isDirectory: boolean } | null>) => {
+  const run = async (
+    path: string,
+    stat: (p: string) => Promise<{ isDirectory: boolean } | null>,
+  ) => {
     const { pi, tools } = collect();
     registerPresentTool(pi, { bridge, stat });
     const exec = tools[0]?.execute as (
@@ -100,6 +103,29 @@ describe('registerPresentTool', () => {
     const last = r.content[r.content.length - 1];
     expect(last?.text).toContain('as them');
     expect(last?.text).toContain('present again');
+  });
+
+  /* MEASURED: the 4B presented a diagram it had just drawn, and the preview
+     handed back 1,112 tokens of the drawing's markup. */
+  it('a diagram the diagram tool drew is re-shown, with a short answer and no preview', async () => {
+    bridge.preview.mockClear();
+    bridge.show.mockClear();
+    const r = await run('/a/order-flow.svg', async () => ({ isDirectory: false }));
+    expect(bridge.show).toHaveBeenCalledWith({ path: '/a/order-flow.svg' });
+    expect(bridge.preview).not.toHaveBeenCalled();
+    expect(r.content).toHaveLength(1);
+    expect(r.content[0]?.text).toMatch(
+      /is a diagram the diagram tool drew — its card is already in the chat/,
+    );
+  });
+
+  it('an .svg without a diagram sidecar is still previewed', async () => {
+    bridge.preview.mockClear();
+    const r = await run('/a/logo.svg', async (p) =>
+      p.endsWith('.diagram.json') ? null : { isDirectory: false },
+    );
+    expect(r.content.some((c) => c.type === 'image')).toBe(true);
+    expect(bridge.preview).toHaveBeenCalled();
   });
 
   it('refuses a path that does not exist, rather than showing nothing', async () => {

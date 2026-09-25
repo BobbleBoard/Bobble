@@ -60,18 +60,23 @@ def render(items: list[dict]) -> list[list[str]]:
     try:
         plan: list[list[tuple[Path, Path]]] = []
         cuts: list[Path] = []
-        for it in items:
+        for n, it in enumerate(items):
             src, out_dir, prefix = Path(it["src"]), Path(it["out_dir"]), it["prefix"]
             out_dir.mkdir(parents=True, exist_ok=True)
             ext = src.suffix.lower()
+            # The cut files share ONE work dir (one qlmanage call), so their names
+            # carry the item's index: two artifacts with the same basename (every
+            # kit sheet's `slide`) overwrote each other's cut, and the first one
+            # took the last one's render while the rest came back empty.
+            tag = f"{n:03d}-{prefix}"
             if ext == ".pptx":
-                parts = split_pptx(src, work, prefix)
+                parts = split_pptx(src, work, tag)
                 names = [out_dir / f"{prefix}-slide{k:02d}.png" for k in range(1, len(parts) + 1)]
             elif ext == ".pdf":
-                parts = split_pdf(src, work, prefix)
+                parts = split_pdf(src, work, tag)
                 names = [out_dir / f"{prefix}-page{k:02d}.png" for k in range(1, len(parts) + 1)]
             else:
-                one = work / f"{prefix}__page01{ext}"
+                one = work / f"{tag}__page01{ext}"
                 shutil.copy(src, one)
                 parts = [one]
                 names = [out_dir / f"{prefix}-page01.png"]

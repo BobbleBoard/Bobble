@@ -40,6 +40,20 @@
   height: auto;
 }
 
+/* A DIAGRAM reads at its own size in the canvas (VQ-10). The chat card fits it
+   to the column — a left-to-right flow of eight steps is 1332 px wide, and
+   fitted to the canvas pane its 16 px labels were 7 px ("Open in canvas shows
+   it full size" was not true). Wider than the pane, it scrolls; `safe` keeps
+   its left edge reachable when it does. The chat card's own rule, later in
+   this sheet, fits it again there. */
+.pd-canvas-svg:has(> svg.pd-diagram) {
+  place-items: safe center;
+}
+
+.pd-canvas-svg svg.pd-diagram {
+  max-width: none;
+}
+
 /* Sandboxed interactive HTML fills the pane; the iframe IS the trust boundary. */
 .pd-canvas-html {
   width: 100%;
@@ -5814,6 +5828,48 @@
 /* A chart card has its own head and its own padding (ChartView). */
 .pd-inline-widget[data-kind="chart"] > .pd-inline-widget-box {
   padding: 0;
+}
+
+/*
+ * A DIAGRAM CARD (VQ-10): the code block's frame, head and corner controls,
+ * on the drawing's own paper (--pd-diagram-paper, set per card from the kit)
+ * so the card and the diagram read as one surface. The drawing scales DOWN to
+ * the card, never up past its own size (a three-step flow stays at its type
+ * size, centred), and never scrolls: a tall one fades into "Open in canvas".
+ */
+.pd-inline-diagram .pd-inline-widget {
+  background: var(--pd-diagram-paper, var(--pd-bg-raised));
+  max-width: min(100%, var(--pd-thread-prose-width, 44rem));
+}
+
+.pd-inline-diagram .pd-inline-widget-box {
+  padding: 0 0 6px;
+}
+
+.pd-inline-diagram .pd-inline-widget-box > .pd-canvas-svg {
+  display: block;
+  height: auto;
+  overflow: visible;
+  padding: 0 6px;
+}
+
+.pd-inline-diagram .pd-canvas-svg svg {
+  display: block;
+  margin: 0 auto;
+  max-width: 100%;
+  height: auto;
+}
+
+.pd-inline-diagram .pd-inline-widget-raw {
+  padding: 0 14px 8px;
+}
+
+.pd-inline-diagram .pd-inline-widget-overflow {
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    var(--pd-diagram-paper, var(--pd-bg-raised)) 70%
+  );
 }
 
 /* ─────────────────────────────────────────────────────────────────────────

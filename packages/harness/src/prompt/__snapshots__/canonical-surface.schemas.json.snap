@@ -90,9 +90,9 @@
   },
   {
    "name": "capability",
-   "description": "Turn on a group of tools you need but do not currently have. Call it with no argument to see what is available, or with a name to switch that group on: browser, computer-use, chrome, personal, web-research, generation, svg, chart, office, 3d, connectors. The tools join your list from your NEXT reply onward — they are not callable in the same reply that turns them on. Turn on only what the task actually needs.",
+   "description": "Turn on a group of tools you need but do not currently have. Call it with no argument to see what is available, or with a name to switch that group on: browser, computer-use, chrome, personal, web-research, generation, svg, diagram, chart, office, 3d, connectors. The tools join your list from your NEXT reply onward — they are not callable in the same reply that turns them on. Turn on only what the task actually needs.",
    "promptSnippet": "Turn on a group of tools (browser, computer-use, personal, …)",
-   "parameters": "{\"type\":\"object\",\"properties\":{\"name\":{\"description\":\"The capability to turn on: browser, computer-use, chrome, personal, web-research, generation, svg, chart, office, 3d, connectors. Omit to list them.\",\"type\":\"string\"}}}"
+   "parameters": "{\"type\":\"object\",\"properties\":{\"name\":{\"description\":\"The capability to turn on: browser, computer-use, chrome, personal, web-research, generation, svg, diagram, chart, office, 3d, connectors. Omit to list them.\",\"type\":\"string\"}}}"
   },
   {
    "name": "chart",
@@ -146,6 +146,16 @@
    "description": "Save a recurring task that runs on its own in a fresh chat — daily, on weekdays, weekly, hourly, or only when the user runs it by hand. Use this when the user asks for something to happen regularly or later (\"every morning…\", \"each Friday…\"), rather than agreeing to do it and forgetting. The task appears in Scheduled tasks where they can edit, pause or delete it.",
    "promptSnippet": "create_scheduled_task: save recurring work that runs by itself on a schedule.",
    "parameters": "{\"type\":\"object\",\"required\":[\"name\",\"prompt\",\"frequency\"],\"properties\":{\"name\":{\"description\":\"Short name for the task, as it will appear in the list (e.g. \\\"Morning test run\\\").\",\"type\":\"string\"},\"prompt\":{\"description\":\"What to do when it runs, written as an instruction to yourself in a fresh chat. It must stand alone: the run cannot see this conversation.\",\"type\":\"string\"},\"frequency\":{\"description\":\"How often. \\\"manual\\\" creates it without a schedule, for the user to run by hand.\",\"anyOf\":[{\"const\":\"manual\",\"type\":\"string\"},{\"const\":\"hourly\",\"type\":\"string\"},{\"const\":\"daily\",\"type\":\"string\"},{\"const\":\"weekdays\",\"type\":\"string\"},{\"const\":\"weekly\",\"type\":\"string\"}]},\"hour\":{\"minimum\":0,\"maximum\":23,\"description\":\"Local hour, 0-23 (default 9).\",\"type\":\"number\"},\"minute\":{\"minimum\":0,\"maximum\":59,\"description\":\"Local minute (default 0).\",\"type\":\"number\"},\"weekday\":{\"minimum\":0,\"maximum\":6,\"description\":\"For \\\"weekly\\\": 0=Sunday … 6=Saturday (default Monday).\",\"type\":\"number\"},\"cwd\":{\"description\":\"Working folder for the run. Defaults to the app default.\",\"type\":\"string\"}}}"
+  },
+  {
+   "name": "diagram",
+   "description": "diagram tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "diagram_edit",
+   "description": "diagram_edit tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
   },
   {
    "name": "edit_image",

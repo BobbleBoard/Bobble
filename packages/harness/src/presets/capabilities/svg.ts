@@ -32,7 +32,11 @@ export const svg: Capability = {
     'or not anyone said "SVG". Draw first, then reference the file (<img src>); never ' +
     'write SVG markup by hand. One call per graphic; describe subject, shape and colour ' +
     'plainly, or hand it a reference image to trace. Photos and realistic pictures are ' +
-    'not vectors — those are generation.',
+    'not vectors — those are generation. Nothing with words in it: OmniSVG cannot write text, ' +
+    'so a diagram (steps, arrows, labels) is diagram and a chart of numbers is chart.',
+  /* VQ-10: the guidance (read only when the capability is looked up, so it
+     costs no prompt) sends anything with words to the tools that write them —
+     the summary above is left as it was, because it rides every prompt. */
   /* One tool, and in CLI mode it IS the command: `svg <prompt> --image <path>`
      (tool-cli.ts maps generate_svg to an empty path under this group). */
   tools: ['generate_svg'],

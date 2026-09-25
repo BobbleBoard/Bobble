@@ -30,6 +30,7 @@
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join } from 'node:path';
 import type { ExtensionAPI } from '@mariozechner/pi-coding-agent';
+import type { DiagramTheme } from '@pi-desktop/design-kit';
 import { Type } from '@sinclair/typebox';
 import { pathForModel } from './workspace-relative.js';
 
@@ -154,6 +155,60 @@ export function reviewInstruction(): string {
   );
 }
 
+/**
+ * The `diagram` call over the bridge (diagram-tool.ts → the app's Mermaid
+ * window, apps/desktop/electron/gen/diagram-page.ts): the model's Mermaid and
+ * the kit's two themes in; both drawings, or the line Mermaid could not read,
+ * out. Defined here, beside the bridge it travels on, so both sides read one
+ * contract.
+ */
+export interface DiagramRenderRequest {
+  readonly source: string;
+  readonly title?: string;
+  readonly subtitle?: string;
+  readonly themes: { readonly light: DiagramTheme; readonly dark: DiagramTheme };
+}
+
+export interface DiagramDrawing {
+  readonly svg: string;
+  readonly width: number;
+  readonly height: number;
+}
+
+export type DiagramRenderReply =
+  | {
+      readonly ok: true;
+      /** The source as drawn — after any correction the notes describe. */
+      readonly source: string;
+      readonly notes: readonly string[];
+      /** What it is, in words: "flowchart", "sequence diagram". */
+      readonly kind: string;
+      /** A flowchart's step labels, in the order declared (empty for other kinds). */
+      readonly nodes: readonly string[];
+      readonly edges: number;
+      readonly labelledEdges: readonly string[];
+      readonly failEdges: number;
+      readonly decisions: number;
+      readonly light: DiagramDrawing;
+      readonly dark: DiagramDrawing;
+    }
+  | {
+      readonly ok: false;
+      readonly error: string;
+      /** 1-based, in the source as the model sent it. */
+      readonly line: number | null;
+      readonly lineText: string | null;
+      /** The likely fix, in one line. */
+      readonly hint: string;
+      /**
+       * 'app' when the drawing failed in the app itself (the hidden window,
+       * the bridge), not in the source. MEASURED: a failure of the app's own
+       * reported as "Mermaid could not read the source … simplify it" sent the
+       * 4B rewriting a source that was fine, then back to hand-typed SVG.
+       */
+      readonly cause?: 'app';
+    };
+
 export interface PresentBridge {
   /** Show the card + open the artefact in the canvas. */
   show(req: { path: string; note?: string }): Promise<{ ok: boolean; error?: string }>;
@@ -171,6 +226,11 @@ export interface PresentBridge {
     path: string;
     width?: number;
   }): Promise<{ width?: number; height?: number; rgba?: string; error?: string }>;
+  /**
+   * Draw a diagram with the app's bundled Mermaid. Optional: a bridge without
+   * it (an older app) means the diagram tool is not available here.
+   */
+  diagram?(req: DiagramRenderRequest): Promise<DiagramRenderReply>;
 }
 
 export interface PresentToolDeps {
@@ -295,6 +355,31 @@ export function registerPresentTool(pi: ExtensionAPI, deps: PresentToolDeps): vo
         path: resolved,
         ...(note !== undefined ? { note } : {}),
       });
+      /*
+       * A DIAGRAM IS ALREADY IN FRONT OF THE USER. MEASURED, the research's flow
+       * brief on the 4B with the diagram tool in place: it drew the diagram in
+       * one call, then presented the .svg anyway (both tool modes, against the
+       * tool's own "do not present it again") — and the preview handed back
+       * the drawing's markup, 1,112 tokens of paths the model cannot read, into
+       * a request that had nothing else to do. Its sidecar (diagram-tool.ts's
+       * .diagram.json) marks one; the card is re-shown, and the answer is short.
+       */
+      if (!info.isDirectory && /\.svg$/i.test(resolved)) {
+        const sidecar = await deps.stat(resolved.replace(/\.svg$/i, '.diagram.json'));
+        if (sidecar !== null && !sidecar.isDirectory) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text:
+                  `${pathForModel(resolved, deps.resolvePath?.('.'))} is a diagram the diagram tool drew — its card is already in the chat, so there was nothing more to present. ` +
+                  'Reply in one sentence saying what it shows; a change is diagram_edit on this file.',
+              },
+            ],
+            details: undefined,
+          } as never;
+        }
+      }
       const preview = await deps.bridge.preview({ path: resolved, kind: plan.kind });
 
       const content: Array<Record<string, unknown>> = [];

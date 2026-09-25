@@ -25,6 +25,7 @@ import net from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
+import type { DiagramRenderReply, DiagramRenderRequest } from '@pi-desktop/harness/tools/present';
 import { createIpcEventSender, createLogger } from '@pi-desktop/shared';
 import { nativeImage, type WebContents } from 'electron';
 import { getInferenceVisionReady } from '../inference/llm-main';
@@ -58,12 +59,15 @@ let socketPath = '';
 let token = '';
 let getWindow: (() => WebContents | null) | null = null;
 let renderPage: ((filePath: string) => Promise<string | null>) | null = null;
+let renderDiagram: ((req: DiagramRenderRequest) => Promise<DiagramRenderReply>) | null = null;
 
 interface Request {
   id: number;
   token: string;
   method: string;
-  params?: { path?: string; note?: string; kind?: string; width?: number };
+  params?: { path?: string; note?: string; kind?: string; width?: number } & Partial<
+    Omit<DiagramRenderRequest, 'title'> & { title: string }
+  >;
 }
 
 /** The most pixels a `pixels` reply carries per side (a palette needs few). */
@@ -315,7 +319,35 @@ export async function buildPreview(
   }
 }
 
+/** A diagram request as it arrived over the socket — checked, never trusted. */
+function diagramRequest(params: Request['params']): DiagramRenderRequest | null {
+  const p = params ?? {};
+  if (typeof p.source !== 'string' || p.themes === undefined) return null;
+  const { light, dark } = p.themes as { light?: unknown; dark?: unknown };
+  if (typeof light !== 'object' || light === null || typeof dark !== 'object' || dark === null) {
+    return null;
+  }
+  return {
+    source: p.source,
+    ...(typeof p.title === 'string' ? { title: p.title } : {}),
+    ...(typeof p.subtitle === 'string' ? { subtitle: p.subtitle } : {}),
+    themes: p.themes,
+  };
+}
+
 async function handle(req: Request): Promise<Record<string, unknown>> {
+  /*
+   * A DIAGRAM IS DRAWN HERE because only the app has a browser: the harness
+   * sends the model's Mermaid and the kit's themes, gen/diagram-render.ts lays
+   * it out in a hidden window and hands both drawings back (VQ-10). It has no
+   * file yet, so it comes before the path check the other methods share.
+   */
+  if (req.method === 'diagram') {
+    const request = diagramRequest(req.params);
+    if (request === null) return { ok: false, error: 'a diagram needs its source and themes' };
+    if (renderDiagram === null) return { ok: false, error: 'the diagram renderer is not running' };
+    return { ...(await renderDiagram(request)) };
+  }
   const target = typeof req.params?.path === 'string' ? req.params.path : '';
   if (target === '') return { error: 'no path' };
 
@@ -329,6 +361,7 @@ async function handle(req: Request): Promise<Record<string, unknown>> {
     log.info('presented', {
       path: target,
       chart: inline.chart !== undefined,
+      diagram: inline.diagram !== undefined,
       svg: inline.svg !== undefined ? `${inline.svg.width}x${inline.svg.height}` : undefined,
     });
     return { ok: true };
@@ -397,9 +430,11 @@ function onConnection(socket: net.Socket): void {
 export function registerPresentBridge(deps: {
   getWindow: () => WebContents | null;
   renderPage?: (filePath: string) => Promise<string | null>;
+  renderDiagram?: (req: DiagramRenderRequest) => Promise<DiagramRenderReply>;
 }): void {
   getWindow = deps.getWindow;
   renderPage = deps.renderPage ?? null;
+  renderDiagram = deps.renderDiagram ?? null;
   token = randomBytes(16).toString('hex');
   socketPath = path.join(
     tmpdir(),

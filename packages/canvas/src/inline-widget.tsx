@@ -66,6 +66,17 @@ export interface InlineWidgetProps {
   /** Custom widget to render instead of the registry-resolved surface. */
   children?: ReactNode;
   className?: string;
+  /**
+   * The head's name for the thing, when the content kind's is not it — a
+   * diagram is drawn as `svg` but is a "flowchart".
+   */
+  label?: string;
+  /**
+   * What the raw view shows and Copy copies, when that is not the rendered
+   * content's own text: a diagram's Mermaid, not the SVG it was drawn into
+   * (VQ-10). Its presence also turns the rendered ⇄ raw toggle on.
+   */
+  source?: { text: string; language?: string };
 }
 
 /**
@@ -82,6 +93,8 @@ export function InlineWidget({
   onMoveToCanvas,
   children,
   className,
+  label,
+  source,
 }: InlineWidgetProps) {
   const boxRef = useRef<HTMLDivElement>(null);
   const [overflowing, setOverflowing] = useState(false);
@@ -118,15 +131,18 @@ export function InlineWidget({
    * rest (the expand used to appear on hover, and the card had no name).
    */
   const kind = artifact.content.kind;
-  const toggles = kind === 'svg' || kind === 'html';
+  const toggles = kind === 'svg' || kind === 'html' || source !== undefined;
   const [view, setView] = useState<'rendered' | 'raw'>('rendered');
   const { copied, copy } = useCopyFeedback();
+  const rawText = source?.text ?? artifact.content.text;
+  const rawLanguage = source !== undefined ? (source.language ?? 'plaintext') : kind;
   const raw = useMemo(
-    () => (toggles && view === 'raw' ? highlightCode(artifact.content.text, kind) : null),
-    [toggles, view, artifact.content.text, kind],
+    () => (toggles && view === 'raw' ? highlightCode(rawText, rawLanguage) : null),
+    [toggles, view, rawText, rawLanguage],
   );
 
-  let body: ReactNode = children;
+  // The raw view wins over a custom body too — it is what the toggle asked for.
+  let body: ReactNode = raw === null ? children : undefined;
   if (body === undefined && raw !== null) {
     body = (
       <pre className="pd-inline-widget-raw pd-scroll">
@@ -157,7 +173,7 @@ export function InlineWidget({
     >
       {kind === 'chart' ? null : (
         <div className="pd-inline-widget-head">
-          <span className="pd-inline-widget-kind">{kind}</span>
+          <span className="pd-inline-widget-kind">{label ?? kind}</span>
           <span className="pd-inline-widget-actions">
             {toggles ? (
               <span className="pd-inline-widget-toggle">
@@ -190,7 +206,7 @@ export function InlineWidget({
               className="pd-inline-widget-copy"
               aria-label={copied ? 'Copied' : 'Copy'}
               title={copied ? 'Copied' : 'Copy'}
-              onClick={() => copy(artifact.content.text)}
+              onClick={() => copy(rawText)}
             >
               {copied ? <IconCheck size={16} /> : <IconCopy size={16} />}
             </IconButton>

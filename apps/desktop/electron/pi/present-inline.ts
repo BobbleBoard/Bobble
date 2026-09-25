@@ -21,6 +21,9 @@
 
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { type DiagramCardPayload, readDiagramCard } from './diagram-card';
+
+export { DIAGRAM_SIDECAR_SUFFIX, type DiagramCardPayload, readDiagramCard } from './diagram-card';
 
 /** The spec beside a chart's SVG: `<stem>.svg` + `<stem>.chart.json`. */
 export const CHART_SIDECAR_SUFFIX = '.chart.json';
@@ -41,6 +44,8 @@ export interface PresentedSvgInfo {
 export interface PresentInlinePayload {
   /** The chart spec, parsed — the card renders from it. */
   chart?: Record<string, unknown>;
+  /** A diagram's drawings and source — the card renders them. */
+  diagram?: DiagramCardPayload;
   /** The SVG's size and, for a small one, its markup. */
   svg?: PresentedSvgInfo;
 }
@@ -96,6 +101,14 @@ export async function presentInlinePayload(
     markup = await read(target);
   } catch {
     return out;
+  }
+  // A diagram's card is its two drawings (the diagram tool's sidecar).
+  if (chart === null) {
+    const diagram = await readDiagramCard(target, markup, read);
+    if (diagram !== null) {
+      out.diagram = diagram;
+      return out;
+    }
   }
   const size = svgSize(markup);
   if (size === null) return out;

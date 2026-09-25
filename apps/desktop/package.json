@@ -29,6 +29,7 @@
     "@pi-desktop/charts": "workspace:*",
     "@pi-desktop/code-themes": "workspace:*",
     "@pi-desktop/coordination": "workspace:*",
+    "@pi-desktop/design-kit": "workspace:*",
     "@pi-desktop/engine": "workspace:*",
     "@pi-desktop/gen-canvas": "workspace:*",
     "@pi-desktop/gen-service": "workspace:*",

@@ -1,3 +1,4 @@
+import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { layoutChart } from './layout.ts';
 import {
@@ -42,6 +43,27 @@ describe('the looks', () => {
         if (c === '') continue;
         const h = hue(c);
         expect(h < 255 || h > 300, `${l.name} ${c} is ${Math.round(h)}°`).toBe(true);
+      }
+    }
+  });
+
+  /*
+   * …AND NO DESIGN KIT EITHER (VQ-04). A kit's series and highlight become a
+   * chart's palette (look-from-kit.ts), so the brief reaches them too. Read as
+   * files — design-kit validates itself with this package, so importing it
+   * back would be a cycle — every colour of every kit, both modes.
+   */
+  it('never reach for purple in a design kit either — every colour of every kit file', () => {
+    const dir = new URL('../../design-kit/src/kits/', import.meta.url);
+    const files = readdirSync(dir).filter((f) => f.endsWith('.json'));
+    expect(files.length).toBeGreaterThanOrEqual(6);
+    for (const f of files) {
+      const text = readFileSync(new URL(f, dir), 'utf8');
+      const colours = text.match(/#[0-9A-Fa-f]{6}\b/g) ?? [];
+      expect(colours.length, f).toBeGreaterThan(20);
+      for (const c of colours) {
+        const h = hue(c);
+        expect(h < 255 || h > 300, `${f} ${c} is ${Math.round(h)}°`).toBe(true);
       }
     }
   });

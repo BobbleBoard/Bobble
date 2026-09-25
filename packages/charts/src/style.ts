@@ -83,6 +83,14 @@ export interface ChartStyle {
   /** A ground of the chart's own (paper colour); implies an ink. */
   readonly background?: string;
   readonly ink?: string;
+  /**
+   * The chart's own colours stepped for a dark ground — a design kit's dark
+   * mode (look-from-kit.ts). Worn instead of the palette/accent above when the
+   * chart is drawn dark, the way a look wears its `dark` steps.
+   */
+  readonly dark?: { readonly palette: readonly string[]; readonly accent: string };
+  /** The design kit the colours came from, when they did (VQ-04). */
+  readonly kit?: string;
 }
 
 /** A named look: a full set of defaults. */
@@ -554,6 +562,19 @@ export function normalizeStyle(input: Record<string, unknown>): ChartStyle | und
   if (background !== undefined) out.background = background;
   const ink = hex(get('ink') ?? get('text_color') ?? get('textColor'));
   if (ink !== undefined) out.ink = ink;
+  // A kit's dark steps, as a spec written by the chart tool carries them —
+  // both parts or neither: half a dark palette is not one.
+  const darkRaw = nested.dark ?? input.dark;
+  if (darkRaw !== null && typeof darkRaw === 'object' && !Array.isArray(darkRaw)) {
+    const d = darkRaw as Record<string, unknown>;
+    const darkPalette = paletteOf(d.palette);
+    const darkAccent = hex(d.accent);
+    if (darkPalette !== undefined && darkAccent !== undefined) {
+      out.dark = { palette: darkPalette, accent: darkAccent };
+    }
+  }
+  const kit = get('kit');
+  if (typeof kit === 'string' && /^[a-z][a-z0-9-]{0,60}$/.test(kit.trim())) out.kit = kit.trim();
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
@@ -627,12 +648,15 @@ export function resolveStyle(
       : style?.ink !== undefined && base.ground !== undefined
         ? { ...base.ground, ink: style.ink }
         : (base.ground ?? null);
-  const ownPalette = style?.palette !== undefined && style.palette.length > 0;
   const onDark = ground === null ? opts.theme === 'dark' : lightness(ground.paper) < 0.45;
+  // A chart that brought its own dark steps (a design kit's dark mode) wears
+  // them on a dark ground, exactly as a look wears its own.
+  const ownDark = onDark && style?.dark !== undefined ? style.dark : null;
+  const ownPalette = ownDark === null && style?.palette !== undefined && style.palette.length > 0;
   // A look on a dark ground wears its own dark steps (validated, same hues);
   // colours the chart brought itself — a palette, an accent — are lifted just
   // enough to read instead, since nobody stepped them for the dark.
-  const steps = onDark && base.dark !== undefined ? base.dark : null;
+  const steps = ownDark ?? (onDark && base.dark !== undefined ? base.dark : null);
   const palette = ownPalette
     ? onDark
       ? (style?.palette ?? []).map(liftForDark)
@@ -643,7 +667,7 @@ export function resolveStyle(
         ? base.palette.map(liftForDark)
         : base.palette;
   const accent =
-    style?.accent !== undefined
+    style?.accent !== undefined && ownDark === null
       ? onDark
         ? liftForDark(style.accent)
         : style.accent

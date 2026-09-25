@@ -1,0 +1,89 @@
+{
+  "schema": 1,
+  "id": "bone-oxblood",
+  "name": "Bone & oxblood",
+  "about": "Bone paper, serif type and a deep oxblood accent — editorial: reports, essays, the press.",
+  "light": {
+    "paper": "#F6F1E7",
+    "surface": "#FFFDF8",
+    "ink": "#231E1A",
+    "mute": "#625A51",
+    "line": "#DDD3C3",
+    "accent": "#7F1D2D",
+    "onAccent": "#FFF8F0",
+    "accentInk": "#7F1D2D",
+    "deep": "#2B1A1C",
+    "onDeep": "#F6F1E7",
+    "tint": "#F2E3E1",
+    "good": "#1E6F7A",
+    "bad": "#A8550C",
+    "warn": "#8A6100",
+    "highlight": "#A86E17",
+    "series": ["#7F1D2D", "#A86E17", "#599291", "#426143", "#093E6F", "#57666B"]
+  },
+  "dark": {
+    "paper": "#1A1614",
+    "surface": "#241F1C",
+    "ink": "#F1EBE1",
+    "mute": "#A89E92",
+    "line": "#3B3430",
+    "accent": "#E0707E",
+    "onAccent": "#1A1614",
+    "accentInk": "#E0707E",
+    "deep": "#2B1A1C",
+    "onDeep": "#F1EBE1",
+    "tint": "#3A2426",
+    "good": "#62C3C9",
+    "bad": "#F0A340",
+    "warn": "#E9D07A",
+    "highlight": "#E6B04F",
+    "series": ["#E0707E", "#E6B04F", "#8DD2DA", "#58905A", "#3E85C4", "#BCD6DF"]
+  },
+  "type": {
+    "display": {
+      "mac": "'Iowan Old Style', Palatino, Georgia, serif",
+      "windows": "'Palatino Linotype', Georgia, serif",
+      "linux": "'Noto Serif', 'DejaVu Serif', Georgia, serif"
+    },
+    "text": {
+      "mac": "Charter, 'Iowan Old Style', Georgia, serif",
+      "windows": "Georgia, 'Palatino Linotype', serif",
+      "linux": "'Noto Serif', 'DejaVu Serif', Georgia, serif"
+    },
+    "mono": {
+      "mac": "'SF Mono', Menlo, monospace",
+      "windows": "'Cascadia Mono', Consolas, monospace",
+      "linux": "'DejaVu Sans Mono', 'Liberation Mono', monospace"
+    },
+    "weights": { "regular": 400, "medium": 500, "bold": 600, "display": 600 },
+    "slide": { "caption": 17, "body": 23, "lead": 30, "title": 54, "display": 88, "hero": 124 },
+    "page": { "caption": 14, "body": 19, "lead": 22, "h2": 42, "h1": 76 },
+    "doc": { "caption": 9, "body": 11, "h2": 14, "h1": 23, "title": 32 },
+    "lineHeight": { "body": 1.55, "heading": 1.12 },
+    "tracking": { "display": -0.01, "caps": 0.08 }
+  },
+  "space": {
+    "unit": 8,
+    "margin": 80,
+    "gutter": 28,
+    "radius": { "small": 2, "card": 4 },
+    "stroke": 1
+  },
+  "motion": {
+    "ease": "cubic-bezier(0.25, 0.1, 0.25, 1)",
+    "enter": 0.9,
+    "stagger": 0.12,
+    "hold": 1.6
+  },
+  "image": {
+    "style": "warm editorial light, paper and ink textures, deep red and bone tones, subtle film grain, no text, no logos"
+  },
+  "chart": {
+    "base": "editorial",
+    "radius": 2,
+    "grid": "lines",
+    "line": "straight",
+    "font": "serif"
+  },
+  "diagram": { "look": "clean", "curve": "linear", "fontSize": 16, "radius": 2 }
+}

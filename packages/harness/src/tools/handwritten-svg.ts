@@ -35,6 +35,18 @@
  * drawing), only a file that does not already exist for the .svg case, and
  * only while the `svg` command is registered — with the connector off there
  * is nothing to point at.
+ *
+ * A DIAGRAM IS NOT A DRAWING (VQ-10, the research's D30). Boxes, arrows and
+ * labels typed as markup were refused TOWARD OmniSVG, which cannot write a
+ * word — REAL, asked for "an educational SVG … with equations displayed" it
+ * drew an abstract shape and a car. So markup shaped like a diagram (labelled
+ * boxes and connectors), or asked for as one, is refused toward `diagram` —
+ * Mermaid, laid out and labelled by the app — and that refusal stands whether
+ * or not OmniSVG is installed, whether or not the file exists (MEASURED: the
+ * 4B ran `svg`, then typed its own flow.svg over the result), and whatever
+ * comments the markup carries (the same run's "<!-- Step 1: Order Placed -->"
+ * was read as teaching material and let through). Only a sample's name, a
+ * question about SVG as a format, or an identical repeat lets it by.
  */
 
 const SVG_OPEN = /<svg[\s>]/i;
@@ -73,30 +85,81 @@ const EXPLAINS_ITSELF =
   /<!--\s*(?:(?:(?!-->)\S)+\s+){3,}(?!-->)\S|<(?:title|desc)\b[^>]*>\s*\S|<!DOCTYPE/i;
 
 /** Is this `.svg` wanted as markup — a sample, a lesson, a fixture — rather than as a picture? */
-export function isMarkupTheDeliverable(input: {
-  path: string;
-  content: string;
-  request?: string;
-}): boolean {
+export function isMarkupTheDeliverable(
+  input: {
+    path: string;
+    content: string;
+    request?: string;
+  },
+  opts: { readonly selfExplaining?: boolean } = {},
+): boolean {
   if (SAMPLE_NAME.test(input.path.trim())) return true;
-  if (EXPLAINS_ITSELF.test(input.content)) return true;
+  if (opts.selfExplaining !== false && EXPLAINS_ITSELF.test(input.content)) return true;
   const request = input.request ?? '';
   return /\bsvgs?\b/i.test(request) && MARKUP_REQUEST.test(request);
 }
 
-/** Would this `write` produce a hand-made `.svg` that `svg` should be drawing? */
+/** Words that ask for a diagram rather than a picture. */
+const DIAGRAM_REQUEST =
+  /\b(?:diagram|flow ?charts?|flows?|process(?:es)?|workflow|pipeline|sequence|org(?:anisation|anization)? ?chart|hierarchy|mind ?map|state machine|decision tree|swim ?lanes?|architecture|timeline|entity[- ]relationship|erd|uml)\b/i;
+
+const count = (content: string, re: RegExp): number => (content.match(re) ?? []).length;
+
+/**
+ * Is this markup a DIAGRAM — steps in boxes, joined by lines, with words on
+ * them — rather than a picture? Labels (three or more <text>), boxes (two or
+ * more rects, ellipses, circles or polygons) and connectors (a line, a
+ * polyline, an arrowhead marker, or paths joining them); or, when the request
+ * asks for a diagram in so many words, two labels with boxes or a connector
+ * (two words on one shape is a logo).
+ */
+export function isDiagramShaped(content: string, request?: string): boolean {
+  const labels = count(content, /<text[\s>]/gi);
+  const boxes = count(content, /<(?:rect|ellipse|circle|polygon)[\s/>]/gi);
+  const connectors =
+    count(content, /<(?:line|polyline)[\s/>]/gi) +
+    count(content, /marker-(?:end|start)\s*[=:]/gi) +
+    count(content, /<marker[\s>]/gi);
+  if (labels >= 3 && boxes >= 2 && connectors >= 1) return true;
+  if (labels >= 3 && boxes >= 3 && count(content, /<path[\s/>]/gi) >= 2) return true;
+  // Asked for as a diagram: two labels in boxes, or two labels and a connector.
+  return labels >= 2 && (boxes >= 2 || connectors >= 1) && DIAGRAM_REQUEST.test(request ?? '');
+}
+
+/**
+ * Would this `write` produce a hand-made `.svg` that a tool should be
+ * drawing — `diagram` for a diagram (when it is registered), `svg` for a
+ * picture? `handwrittenSvgRoute` says which.
+ */
 export function isHandwrittenSvg(input: {
   path: string;
   content: string;
   exists: boolean;
   svgCommandAvailable: boolean;
+  /** The `diagram` tool is registered (the app is there to draw it). */
+  diagramAvailable?: boolean;
   /** The person's latest message — what they actually asked for. */
   request?: string;
 }): boolean {
-  if (!input.svgCommandAvailable || input.exists) return false;
-  if (!/\.svg$/i.test(input.path.trim())) return false;
-  if (!SVG_OPEN.test(input.content)) return false;
-  return !isMarkupTheDeliverable(input);
+  return handwrittenSvgRoute(input) !== null;
+}
+
+/** Where a hand-made `.svg` should have come from: `diagram`, `svg`, or nowhere (null: let it through). */
+export function handwrittenSvgRoute(input: {
+  path: string;
+  content: string;
+  exists: boolean;
+  svgCommandAvailable: boolean;
+  diagramAvailable?: boolean;
+  request?: string;
+}): 'diagram' | 'svg' | null {
+  if (!/\.svg$/i.test(input.path.trim())) return null;
+  if (!SVG_OPEN.test(input.content)) return null;
+  if (input.diagramAvailable === true && isDiagramShaped(input.content, input.request)) {
+    return isMarkupTheDeliverable(input, { selfExplaining: false }) ? null : 'diagram';
+  }
+  if (!input.svgCommandAvailable || input.exists) return null;
+  return isMarkupTheDeliverable(input) ? null : 'svg';
 }
 
 /** How many hand-drawn inline graphics a page's markup carries. */
@@ -116,10 +179,70 @@ export function hasHandwrittenInlineSvg(input: {
   path: string;
   content: string;
   svgCommandAvailable: boolean;
+  diagramAvailable?: boolean;
 }): boolean {
-  if (!input.svgCommandAvailable) return false;
-  if (/\.svg$/i.test(input.path.trim())) return false;
-  return INLINE_DRAWN_SVG.test(input.content);
+  return inlineSvgRoute(input) !== null;
+}
+
+/** The inline case's route: a drawn diagram → `diagram`, a drawn graphic → `svg`. */
+export function inlineSvgRoute(input: {
+  path: string;
+  content: string;
+  svgCommandAvailable: boolean;
+  diagramAvailable?: boolean;
+  request?: string;
+}): 'diagram' | 'svg' | null {
+  if (/\.svg$/i.test(input.path.trim())) return null;
+  const drawn = [...input.content.matchAll(new RegExp(INLINE_DRAWN_SVG.source, 'gi'))].map(
+    (m) => m[0],
+  );
+  if (drawn.length === 0) return null;
+  if (input.diagramAvailable === true && drawn.some((d) => isDiagramShaped(d, input.request))) {
+    return 'diagram';
+  }
+  return input.svgCommandAvailable ? 'svg' : null;
+}
+
+/**
+ * The refusal for a diagram typed as SVG (VQ-10): the structure in Mermaid
+ * instead, the call that draws it, and the same way through as the others.
+ * `cli` says it as a command line; schemas mode names the tool.
+ */
+export function handwrittenDiagramRefusal(
+  path: string,
+  opts: { readonly cli?: boolean; readonly inline?: boolean; readonly edit?: boolean } = {},
+): string {
+  const out = opts.inline === true ? 'assets/flow.svg' : path;
+  const call =
+    opts.cli === false
+      ? [
+          `Call the diagram tool with a title and the Mermaid source (out: "${out}"), e.g.`,
+          '  title: "Order fulfilment"',
+          '  source: "flowchart TD\\n  A([Order placed]) --> B{Payment ok?}\\n  B -- no --> C[Email customer]\\n  C -. retry .-> B"',
+          'If it is not in your tool list, turn it on first: capability "diagram".',
+        ]
+      : [
+          'Run it with the bash tool — one line per connection, a branch is a labelled edge:',
+          `  diagram "Order fulfilment" --out ${out} --source 'flowchart TD`,
+          '    A([Order placed]) --> B{Payment ok?}',
+          '    B -- no --> C[Email customer]',
+          "    C -. retry .-> B'",
+        ];
+  const what =
+    opts.inline === true
+      ? `${path} has a diagram drawn by hand inline (<svg> boxes, arrows and labels)`
+      : `${path} is a diagram drawn by hand — boxes, arrows and labels placed one coordinate at a time`;
+  return [
+    `Not ${opts.edit === true ? 'edited' : 'written'}: ${what}. Diagrams are what the diagram tool is for: you write the structure in Mermaid and the app lays it out, labels every step and branch, and draws it in the project's design kit. The svg command cannot draw it — it makes pictures, not words.`,
+    '',
+    ...call,
+    '',
+    opts.inline === true
+      ? `The card appears in the chat; then reference the file in the page: <img src="${out}" alt="…">.`
+      : 'The card appears in the chat.',
+    '',
+    `If this exact markup is truly wanted (a fixture, a sample), ${opts.edit === true ? 'apply the same edit' : 'write the same file'} again UNCHANGED.`,
+  ].join('\n');
 }
 
 /**

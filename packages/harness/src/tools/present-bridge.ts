@@ -11,13 +11,20 @@
  */
 
 import net from 'node:net';
-import type { PresentBridge, PreviewKind } from './present.js';
+import type {
+  DiagramRenderReply,
+  DiagramRenderRequest,
+  PresentBridge,
+  PreviewKind,
+} from './present.js';
 
 const SOCK_ENV = 'PI_DESKTOP_PRESENT_SOCK';
 const TOKEN_ENV = 'PI_DESKTOP_PRESENT_TOKEN';
 
 /** How long to wait for the app; a render+capture is the slow case. */
 const TIMEOUT_MS = 30_000;
+/** A diagram: the Mermaid window's first load (~1 s) plus the app's own 20 s layout cap. */
+const DIAGRAM_TIMEOUT_MS = 45_000;
 
 interface Reply {
   ok?: boolean;
@@ -35,6 +42,7 @@ function call(
   token: string,
   method: string,
   params: Record<string, unknown>,
+  timeoutMs = TIMEOUT_MS,
 ): Promise<Reply> {
   return new Promise<Reply>((resolve) => {
     const socket = net.createConnection(socketPath);
@@ -47,7 +55,7 @@ function call(
       socket.destroy();
       resolve(r);
     };
-    const timer = setTimeout(() => done({ error: 'the app did not answer in time' }), TIMEOUT_MS);
+    const timer = setTimeout(() => done({ error: 'the app did not answer in time' }), timeoutMs);
     socket.on('error', (err) => done({ error: err.message }));
     socket.on('connect', () => {
       socket.setEncoding('utf8');
@@ -89,6 +97,30 @@ export function presentBridgeFromEnv(
         ...(r.mimeType !== undefined ? { mimeType: r.mimeType } : {}),
         ...(r.text !== undefined ? { text: r.text } : {}),
         ...(r.error !== undefined ? { error: r.error } : {}),
+      };
+    },
+    diagram: async (req: DiagramRenderRequest): Promise<DiagramRenderReply> => {
+      const r = (await call(
+        socketPath,
+        token,
+        'diagram',
+        { ...req },
+        DIAGRAM_TIMEOUT_MS,
+      )) as Reply & Partial<DiagramRenderReply>;
+      if (r.ok === true && typeof (r as { source?: unknown }).source === 'string') {
+        return r as DiagramRenderReply;
+      }
+      const failed = r as Partial<Extract<DiagramRenderReply, { ok: false }>> & Reply;
+      // No hint means the reply never came from the renderer's reading of the
+      // source (a dead socket, a timeout on the way): the app's failure.
+      const app = failed.cause === 'app' || typeof failed.hint !== 'string';
+      return {
+        ok: false,
+        error: failed.error ?? 'the app sent no drawing back',
+        line: typeof failed.line === 'number' ? failed.line : null,
+        lineText: typeof failed.lineText === 'string' ? failed.lineText : null,
+        hint: typeof failed.hint === 'string' ? failed.hint : '',
+        ...(app ? { cause: 'app' as const } : {}),
       };
     },
     pixels: async (req: { path: string; width?: number }) => {

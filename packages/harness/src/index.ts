@@ -97,7 +97,7 @@ import {
 } from './title/conversation-title.js';
 import { registerAskUser } from './tools/ask-user.js';
 import { registerCapabilityTool } from './tools/capability-tool.js';
-import { CHART_TOOL, registerChartTool } from './tools/chart-tool.js';
+import { CHART_TOOL, projectChartKit, registerChartTool } from './tools/chart-tool.js';
 import {
   coercedEditRefusal,
   coercedSearchRefusal,
@@ -108,6 +108,7 @@ import {
   isCoercedToolCall,
 } from './tools/coerced-write.js';
 import { degenerateCommandRefusal } from './tools/degenerate-command.js';
+import { DIAGRAM_TOOL, registerDiagramTool } from './tools/diagram-tool.js';
 import { diskWalkRefusal, wouldWalkDisk } from './tools/disk-walk.js';
 import { diagnoseEditFailure } from './tools/edit-diagnosis.js';
 import { handmadeChartRefusal, isHandmadeChart } from './tools/handmade-chart.js';
@@ -121,10 +122,11 @@ import {
 import { handmadeOfficeRefusal, isHandmadeOffice } from './tools/handmade-office.js';
 import {
   countInlineDrawnSvgs,
+  handwrittenDiagramRefusal,
   handwrittenInlineSvgRefusal,
   handwrittenSvgRefusal,
-  hasHandwrittenInlineSvg,
-  isHandwrittenSvg,
+  handwrittenSvgRoute,
+  inlineSvgRoute,
 } from './tools/handwritten-svg.js';
 import { wouldHang } from './tools/hang-guard.js';
 import { registerImageTools } from './tools/image-tools.js';
@@ -2632,7 +2634,27 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   registerChartTool(pi, {
     bridge: readSubagentDepth(process.env) === 0 ? presentBridgeFromEnv() : null,
     root: (ctxCwd) => resolveWorkspaceRoot(ctxCwd),
+    kit: (root) => projectChartKit(root),
   });
+
+  /*
+   * `diagram` — a flowchart, a sequence, an org chart… from Mermaid, drawn in
+   * the chat (diagram-tool.ts, VQ-10). The drawing is the APP's (its bundled
+   * Mermaid, in a hidden window), so it is registered only where the app's
+   * bridge is: a plain pi never advertises a command that can only fail. Any
+   * depth may draw — a child writes the file and reports it up — and only the
+   * top-level model's card is shown, like a chart's.
+   */
+  const diagramBridge = presentBridgeFromEnv();
+  if (diagramBridge?.diagram !== undefined) {
+    const drawDiagram = diagramBridge.diagram;
+    registerDiagramTool(pi, {
+      render: (req) => drawDiagram(req),
+      bridge: readSubagentDepth(process.env) === 0 ? diagramBridge : null,
+      root: (ctxCwd) => resolveWorkspaceRoot(ctxCwd),
+      settingsKit: () => process.env.PI_DESKTOP_DESIGN_KIT,
+    });
+  }
 
   // Only the top-level agent (depth 0) registers the tool — a spawned child
   // (depth >= 1) does not, so subagents can't recursively spawn subagents (v1).
@@ -3993,6 +4015,10 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       };
       const tools = pi.getAllTools();
       const svgCommandAvailable = tools.some((t) => t.name === 'generate_svg');
+      /* The diagram tool draws what used to be refused toward OmniSVG — boxes,
+         arrows and labels (handwritten-svg.ts, VQ-10) — so its presence alone
+         is reason to look at an SVG write. */
+      const diagramAvailable = tools.some((t) => t.name === DIAGRAM_TOOL);
       /* Which generators exist RIGHT NOW. With generation off there is nothing
          to redirect a script to, and the script is the only way the model has. */
       const generators = new Set<MediaKind>();
@@ -4013,7 +4039,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       const officeAvailable = tools.some((t) => t.name === OFFICE_MAKE_TOOL);
       if (
         typeof input.path === 'string' &&
-        (svgCommandAvailable || generators.size > 0 || officeAvailable)
+        (svgCommandAvailable || diagramAvailable || generators.size > 0 || officeAvailable)
       ) {
         const abs = isAbsolute(input.path)
           ? input.path
@@ -4081,20 +4107,30 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
               }),
             };
           }
-          if (
-            event.toolName === 'write' &&
-            svgCommandAvailable &&
-            isHandwrittenSvg({
-              path: input.path,
-              content: body,
-              exists,
-              svgCommandAvailable,
-              request: runtime.lastPrompt,
-            })
-          ) {
+          const svgRoute =
+            event.toolName === 'write'
+              ? handwrittenSvgRoute({
+                  path: input.path,
+                  content: body,
+                  exists,
+                  svgCommandAvailable,
+                  diagramAvailable,
+                  request: runtime.lastPrompt,
+                })
+              : null;
+          if (svgRoute !== null) {
             svgRefused.set(abs, body);
-            pi.appendEntry(HARNESS_LOOP_ENTRY, { action: 'block', cause: 'handwritten-svg' });
-            return { block: true, reason: handwrittenSvgRefusal(input.path) };
+            pi.appendEntry(HARNESS_LOOP_ENTRY, {
+              action: 'block',
+              cause: svgRoute === 'diagram' ? 'handwritten-diagram' : 'handwritten-svg',
+            });
+            return {
+              block: true,
+              reason:
+                svgRoute === 'diagram'
+                  ? handwrittenDiagramRefusal(input.path, { cli: toolCliMode })
+                  : handwrittenSvgRefusal(input.path),
+            };
           }
           /*
            * …AND A SCRIPT THAT SYNTHESISES A PICTURE OR A SOUND — see
@@ -4128,22 +4164,34 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
               reason: handmadeOfficeRefusal(handmadeOffice, { cli: toolCliMode }),
             };
           }
-          if (
-            svgCommandAvailable &&
-            hasHandwrittenInlineSvg({ path: input.path, content: body, svgCommandAvailable })
-          ) {
+          const inlineRoute = inlineSvgRoute({
+            path: input.path,
+            content: body,
+            svgCommandAvailable,
+            diagramAvailable,
+            request: runtime.lastPrompt,
+          });
+          if (inlineRoute !== null) {
             svgRefused.set(abs, body);
             pi.appendEntry(HARNESS_LOOP_ENTRY, {
               action: 'block',
-              cause: 'handwritten-inline-svg',
+              cause:
+                inlineRoute === 'diagram' ? 'handwritten-inline-diagram' : 'handwritten-inline-svg',
             });
             return {
               block: true,
-              reason: handwrittenInlineSvgRefusal(
-                input.path,
-                countInlineDrawnSvgs(body),
-                event.toolName === 'edit',
-              ),
+              reason:
+                inlineRoute === 'diagram'
+                  ? handwrittenDiagramRefusal(input.path, {
+                      cli: toolCliMode,
+                      inline: true,
+                      edit: event.toolName === 'edit',
+                    })
+                  : handwrittenInlineSvgRefusal(
+                      input.path,
+                      countInlineDrawnSvgs(body),
+                      event.toolName === 'edit',
+                    ),
             };
           }
         }

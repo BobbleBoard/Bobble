@@ -1,0 +1,861 @@
+{
+  "schema": 1,
+  "generatedFrom": "packages/design-kit/src/kits/*.json — do not edit; run `pnpm --filter @pi-desktop/design-kit export-tokens`",
+  "default": "paper-teal",
+  "order": [
+    "paper-teal",
+    "fog",
+    "bone-oxblood",
+    "slate-cobalt",
+    "sage-moss",
+    "graphite-amber"
+  ],
+  "kits": {
+    "paper-teal": {
+      "schema": 1,
+      "id": "paper-teal",
+      "name": "Paper & teal",
+      "about": "Ivory paper, warm ink and the mark's own teal — calm and designed; the house default.",
+      "light": {
+        "paper": "#FBFAF7",
+        "surface": "#FFFFFF",
+        "ink": "#1E1C19",
+        "mute": "#5C5A55",
+        "line": "#D9D5CC",
+        "accent": "#0F7B74",
+        "onAccent": "#FFFFFF",
+        "accentInk": "#00756E",
+        "deep": "#0E3A37",
+        "onDeep": "#F3F1EA",
+        "tint": "#E2EFEC",
+        "good": "#0F7B74",
+        "bad": "#B4450E",
+        "warn": "#8A5A00",
+        "highlight": "#D0661C",
+        "series": [
+          "#0F7B74",
+          "#D0661C",
+          "#0056AA",
+          "#6C6158",
+          "#0096AF",
+          "#992641"
+        ]
+      },
+      "dark": {
+        "paper": "#191816",
+        "surface": "#23221F",
+        "ink": "#F2EFE8",
+        "mute": "#A6A198",
+        "line": "#3A3833",
+        "accent": "#3BB3A9",
+        "onAccent": "#0B1C1A",
+        "accentInk": "#3BB3A9",
+        "deep": "#0E3A37",
+        "onDeep": "#F3F1EA",
+        "tint": "#1C3431",
+        "good": "#3BB3A9",
+        "bad": "#EE8A4E",
+        "warn": "#E0A93F",
+        "highlight": "#F09A57",
+        "series": [
+          "#3BB3A9",
+          "#F09A57",
+          "#3280DD",
+          "#8C857C",
+          "#5DC1DB",
+          "#CB4F73"
+        ]
+      },
+      "type": {
+        "display": {
+          "mac": "'Avenir Next', 'Helvetica Neue', Helvetica, Arial, sans-serif",
+          "windows": "'Segoe UI Variable Display', 'Segoe UI', Arial, sans-serif",
+          "linux": "'Noto Sans', Inter, 'DejaVu Sans', Arial, sans-serif"
+        },
+        "text": {
+          "mac": "-apple-system, 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif",
+          "windows": "'Segoe UI Variable Text', 'Segoe UI', Arial, sans-serif",
+          "linux": "Inter, 'Noto Sans', 'DejaVu Sans', Arial, sans-serif"
+        },
+        "mono": {
+          "mac": "'SF Mono', Menlo, monospace",
+          "windows": "'Cascadia Mono', Consolas, monospace",
+          "linux": "'DejaVu Sans Mono', 'Liberation Mono', monospace"
+        },
+        "weights": {
+          "regular": 400,
+          "medium": 500,
+          "bold": 600,
+          "display": 700
+        },
+        "slide": {
+          "caption": 17,
+          "body": 22,
+          "lead": 30,
+          "title": 52,
+          "display": 84,
+          "hero": 120
+        },
+        "page": {
+          "caption": 14,
+          "body": 18,
+          "lead": 21,
+          "h2": 40,
+          "h1": 72
+        },
+        "doc": {
+          "caption": 9,
+          "body": 10.5,
+          "h2": 14,
+          "h1": 22,
+          "title": 30
+        },
+        "lineHeight": {
+          "body": 1.5,
+          "heading": 1.08
+        },
+        "tracking": {
+          "display": -0.02,
+          "caps": 0.06
+        }
+      },
+      "space": {
+        "unit": 8,
+        "margin": 72,
+        "gutter": 24,
+        "radius": {
+          "small": 6,
+          "card": 14
+        },
+        "stroke": 1
+      },
+      "motion": {
+        "ease": "cubic-bezier(0.32, 0.72, 0, 1)",
+        "enter": 0.6,
+        "stagger": 0.08,
+        "hold": 1.2
+      },
+      "image": {
+        "style": "soft daylight, calm, natural materials, teal and warm neutral tones, generous negative space, no text, no logos"
+      },
+      "chart": {
+        "base": "clean",
+        "radius": 8,
+        "grid": "lines",
+        "line": "smooth",
+        "font": "system"
+      },
+      "diagram": {
+        "look": "clean",
+        "curve": "basis",
+        "fontSize": 16,
+        "radius": 8
+      }
+    },
+    "fog": {
+      "schema": 1,
+      "id": "fog",
+      "name": "Fog",
+      "about": "Faintly warm white, graphite ink as the accent, colour only where data needs it — quiet and neutral.",
+      "light": {
+        "paper": "#FAFAF8",
+        "surface": "#FFFFFF",
+        "ink": "#1B1C1E",
+        "mute": "#5D5F64",
+        "line": "#E0E0DB",
+        "accent": "#1B1C1E",
+        "onAccent": "#FFFFFF",
+        "accentInk": "#1B1C1E",
+        "deep": "#1B1C1E",
+        "onDeep": "#F4F4F1",
+        "tint": "#EFEFEB",
+        "good": "#1F7A68",
+        "bad": "#B3401F",
+        "warn": "#8E6200",
+        "highlight": "#C8691F",
+        "series": [
+          "#3F6E9E",
+          "#C8691F",
+          "#295400",
+          "#863A5B",
+          "#2E828B",
+          "#353F43"
+        ]
+      },
+      "dark": {
+        "paper": "#161718",
+        "surface": "#202123",
+        "ink": "#EDEDEA",
+        "mute": "#A2A4A8",
+        "line": "#34363A",
+        "accent": "#EDEDEA",
+        "onAccent": "#161718",
+        "accentInk": "#EDEDEA",
+        "deep": "#0F1011",
+        "onDeep": "#EDEDEA",
+        "tint": "#26282B",
+        "good": "#4FC4B8",
+        "bad": "#F08A63",
+        "warn": "#E6B04A",
+        "highlight": "#F0A04B",
+        "series": [
+          "#7FA7D6",
+          "#F0A04B",
+          "#6C9539",
+          "#BF6291",
+          "#48B7BD",
+          "#CAD3D5"
+        ]
+      },
+      "type": {
+        "display": {
+          "mac": "-apple-system, 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif",
+          "windows": "'Segoe UI Variable Display', 'Segoe UI', Arial, sans-serif",
+          "linux": "Inter, 'Noto Sans', 'DejaVu Sans', Arial, sans-serif"
+        },
+        "text": {
+          "mac": "-apple-system, 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif",
+          "windows": "'Segoe UI Variable Text', 'Segoe UI', Arial, sans-serif",
+          "linux": "Inter, 'Noto Sans', 'DejaVu Sans', Arial, sans-serif"
+        },
+        "mono": {
+          "mac": "'SF Mono', Menlo, monospace",
+          "windows": "'Cascadia Mono', Consolas, monospace",
+          "linux": "'DejaVu Sans Mono', 'Liberation Mono', monospace"
+        },
+        "weights": {
+          "regular": 400,
+          "medium": 500,
+          "bold": 600,
+          "display": 650
+        },
+        "slide": {
+          "caption": 17,
+          "body": 22,
+          "lead": 28,
+          "title": 48,
+          "display": 80,
+          "hero": 112
+        },
+        "page": {
+          "caption": 14,
+          "body": 17,
+          "lead": 20,
+          "h2": 36,
+          "h1": 64
+        },
+        "doc": {
+          "caption": 9,
+          "body": 10.5,
+          "h2": 13,
+          "h1": 20,
+          "title": 28
+        },
+        "lineHeight": {
+          "body": 1.5,
+          "heading": 1.1
+        },
+        "tracking": {
+          "display": -0.025,
+          "caps": 0.05
+        }
+      },
+      "space": {
+        "unit": 8,
+        "margin": 72,
+        "gutter": 24,
+        "radius": {
+          "small": 4,
+          "card": 10
+        },
+        "stroke": 1
+      },
+      "motion": {
+        "ease": "cubic-bezier(0.32, 0.72, 0, 1)",
+        "enter": 0.55,
+        "stagger": 0.07,
+        "hold": 1.2
+      },
+      "image": {
+        "style": "diffuse overcast light, muted greys, minimal and uncluttered, quiet composition, no text, no logos"
+      },
+      "chart": {
+        "base": "clean",
+        "radius": 4,
+        "grid": "lines",
+        "line": "straight",
+        "font": "system"
+      },
+      "diagram": {
+        "look": "clean",
+        "curve": "linear",
+        "fontSize": 16,
+        "radius": 6
+      }
+    },
+    "bone-oxblood": {
+      "schema": 1,
+      "id": "bone-oxblood",
+      "name": "Bone & oxblood",
+      "about": "Bone paper, serif type and a deep oxblood accent — editorial: reports, essays, the press.",
+      "light": {
+        "paper": "#F6F1E7",
+        "surface": "#FFFDF8",
+        "ink": "#231E1A",
+        "mute": "#625A51",
+        "line": "#DDD3C3",
+        "accent": "#7F1D2D",
+        "onAccent": "#FFF8F0",
+        "accentInk": "#7F1D2D",
+        "deep": "#2B1A1C",
+        "onDeep": "#F6F1E7",
+        "tint": "#F2E3E1",
+        "good": "#1E6F7A",
+        "bad": "#A8550C",
+        "warn": "#8A6100",
+        "highlight": "#A86E17",
+        "series": [
+          "#7F1D2D",
+          "#A86E17",
+          "#599291",
+          "#426143",
+          "#093E6F",
+          "#57666B"
+        ]
+      },
+      "dark": {
+        "paper": "#1A1614",
+        "surface": "#241F1C",
+        "ink": "#F1EBE1",
+        "mute": "#A89E92",
+        "line": "#3B3430",
+        "accent": "#E0707E",
+        "onAccent": "#1A1614",
+        "accentInk": "#E0707E",
+        "deep": "#2B1A1C",
+        "onDeep": "#F1EBE1",
+        "tint": "#3A2426",
+        "good": "#62C3C9",
+        "bad": "#F0A340",
+        "warn": "#E9D07A",
+        "highlight": "#E6B04F",
+        "series": [
+          "#E0707E",
+          "#E6B04F",
+          "#8DD2DA",
+          "#58905A",
+          "#3E85C4",
+          "#BCD6DF"
+        ]
+      },
+      "type": {
+        "display": {
+          "mac": "'Iowan Old Style', Palatino, Georgia, serif",
+          "windows": "'Palatino Linotype', Georgia, serif",
+          "linux": "'Noto Serif', 'DejaVu Serif', Georgia, serif"
+        },
+        "text": {
+          "mac": "Charter, 'Iowan Old Style', Georgia, serif",
+          "windows": "Georgia, 'Palatino Linotype', serif",
+          "linux": "'Noto Serif', 'DejaVu Serif', Georgia, serif"
+        },
+        "mono": {
+          "mac": "'SF Mono', Menlo, monospace",
+          "windows": "'Cascadia Mono', Consolas, monospace",
+          "linux": "'DejaVu Sans Mono', 'Liberation Mono', monospace"
+        },
+        "weights": {
+          "regular": 400,
+          "medium": 500,
+          "bold": 600,
+          "display": 600
+        },
+        "slide": {
+          "caption": 17,
+          "body": 23,
+          "lead": 30,
+          "title": 54,
+          "display": 88,
+          "hero": 124
+        },
+        "page": {
+          "caption": 14,
+          "body": 19,
+          "lead": 22,
+          "h2": 42,
+          "h1": 76
+        },
+        "doc": {
+          "caption": 9,
+          "body": 11,
+          "h2": 14,
+          "h1": 23,
+          "title": 32
+        },
+        "lineHeight": {
+          "body": 1.55,
+          "heading": 1.12
+        },
+        "tracking": {
+          "display": -0.01,
+          "caps": 0.08
+        }
+      },
+      "space": {
+        "unit": 8,
+        "margin": 80,
+        "gutter": 28,
+        "radius": {
+          "small": 2,
+          "card": 4
+        },
+        "stroke": 1
+      },
+      "motion": {
+        "ease": "cubic-bezier(0.25, 0.1, 0.25, 1)",
+        "enter": 0.9,
+        "stagger": 0.12,
+        "hold": 1.6
+      },
+      "image": {
+        "style": "warm editorial light, paper and ink textures, deep red and bone tones, subtle film grain, no text, no logos"
+      },
+      "chart": {
+        "base": "editorial",
+        "radius": 2,
+        "grid": "lines",
+        "line": "straight",
+        "font": "serif"
+      },
+      "diagram": {
+        "look": "clean",
+        "curve": "linear",
+        "fontSize": 16,
+        "radius": 2
+      }
+    },
+    "slate-cobalt": {
+      "schema": 1,
+      "id": "slate-cobalt",
+      "name": "Slate & cobalt",
+      "about": "Cool slate greys and one cobalt blue — precise and corporate: finance, operations, engineering.",
+      "light": {
+        "paper": "#F7F8FA",
+        "surface": "#FFFFFF",
+        "ink": "#151A21",
+        "mute": "#586170",
+        "line": "#DCE0E7",
+        "accent": "#1F5FD1",
+        "onAccent": "#FFFFFF",
+        "accentInk": "#1F5FD1",
+        "deep": "#0E1A33",
+        "onDeep": "#EEF2F8",
+        "tint": "#E6EEFB",
+        "good": "#0F7A5C",
+        "bad": "#C2410C",
+        "warn": "#9A6200",
+        "highlight": "#D9651B",
+        "series": [
+          "#1F5FD1",
+          "#D9651B",
+          "#008E7D",
+          "#7C2B50",
+          "#6A8590",
+          "#305A12"
+        ]
+      },
+      "dark": {
+        "paper": "#12161C",
+        "surface": "#1A1F27",
+        "ink": "#EEF1F6",
+        "mute": "#9BA4B2",
+        "line": "#2C333E",
+        "accent": "#6A9EF2",
+        "onAccent": "#0B1220",
+        "accentInk": "#6A9EF2",
+        "deep": "#0B1426",
+        "onDeep": "#EEF1F6",
+        "tint": "#1C2A44",
+        "good": "#4CC39A",
+        "bad": "#F28A5B",
+        "warn": "#E8B04A",
+        "highlight": "#F59E4B",
+        "series": [
+          "#6A9EF2",
+          "#F59E4B",
+          "#6BCCB4",
+          "#B75F84",
+          "#B1C8D9",
+          "#5E9660"
+        ]
+      },
+      "type": {
+        "display": {
+          "mac": "-apple-system, 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif",
+          "windows": "'Segoe UI Variable Display', 'Segoe UI', Arial, sans-serif",
+          "linux": "Inter, 'Noto Sans', 'DejaVu Sans', Arial, sans-serif"
+        },
+        "text": {
+          "mac": "-apple-system, 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif",
+          "windows": "'Segoe UI Variable Text', 'Segoe UI', Arial, sans-serif",
+          "linux": "Inter, 'Noto Sans', 'DejaVu Sans', Arial, sans-serif"
+        },
+        "mono": {
+          "mac": "'SF Mono', Menlo, monospace",
+          "windows": "'Cascadia Mono', Consolas, monospace",
+          "linux": "'DejaVu Sans Mono', 'Liberation Mono', monospace"
+        },
+        "weights": {
+          "regular": 400,
+          "medium": 500,
+          "bold": 600,
+          "display": 700
+        },
+        "slide": {
+          "caption": 16,
+          "body": 21,
+          "lead": 28,
+          "title": 48,
+          "display": 80,
+          "hero": 112
+        },
+        "page": {
+          "caption": 13,
+          "body": 17,
+          "lead": 20,
+          "h2": 36,
+          "h1": 60
+        },
+        "doc": {
+          "caption": 8.5,
+          "body": 10,
+          "h2": 13,
+          "h1": 20,
+          "title": 28
+        },
+        "lineHeight": {
+          "body": 1.45,
+          "heading": 1.1
+        },
+        "tracking": {
+          "display": -0.02,
+          "caps": 0.06
+        }
+      },
+      "space": {
+        "unit": 8,
+        "margin": 64,
+        "gutter": 24,
+        "radius": {
+          "small": 4,
+          "card": 8
+        },
+        "stroke": 1
+      },
+      "motion": {
+        "ease": "cubic-bezier(0.2, 0.8, 0.2, 1)",
+        "enter": 0.5,
+        "stagger": 0.06,
+        "hold": 1
+      },
+      "image": {
+        "style": "clean studio light, cool blue-grey palette, precise geometry, restrained, no text, no logos"
+      },
+      "chart": {
+        "base": "clean",
+        "radius": 6,
+        "grid": "lines",
+        "line": "straight",
+        "font": "system"
+      },
+      "diagram": {
+        "look": "clean",
+        "curve": "step",
+        "fontSize": 15,
+        "radius": 6
+      }
+    },
+    "sage-moss": {
+      "schema": 1,
+      "id": "sage-moss",
+      "name": "Sage & moss",
+      "about": "Pale sage, moss green and earth tones, rounded and soft — nature, food, wellbeing, sustainability.",
+      "light": {
+        "paper": "#F5F6F0",
+        "surface": "#FFFFFF",
+        "ink": "#1B2117",
+        "mute": "#5A6354",
+        "line": "#D9DDD0",
+        "accent": "#2E5A22",
+        "onAccent": "#FFFFFF",
+        "accentInk": "#2E5A22",
+        "deep": "#1E2D1A",
+        "onDeep": "#F1F3EA",
+        "tint": "#E3ECDC",
+        "good": "#1F7A68",
+        "bad": "#B4450E",
+        "warn": "#8A6300",
+        "highlight": "#B8722C",
+        "series": [
+          "#2E5A22",
+          "#B8722C",
+          "#458880",
+          "#5A4234",
+          "#567FA1",
+          "#964267"
+        ]
+      },
+      "dark": {
+        "paper": "#151813",
+        "surface": "#1E221B",
+        "ink": "#EDF0E6",
+        "mute": "#A2A999",
+        "line": "#333A2F",
+        "accent": "#6E9E4E",
+        "onAccent": "#10160C",
+        "accentInk": "#74A454",
+        "deep": "#1E2D1A",
+        "onDeep": "#EDF0E6",
+        "tint": "#243120",
+        "good": "#5CC7A8",
+        "bad": "#EF8E55",
+        "warn": "#E2B24C",
+        "highlight": "#F2B06A",
+        "series": [
+          "#6E9E4E",
+          "#F2B06A",
+          "#72D0D0",
+          "#917C67",
+          "#7CAFE8",
+          "#B85C8B"
+        ]
+      },
+      "type": {
+        "display": {
+          "mac": "'SF Pro Rounded', ui-rounded, 'Avenir Next', 'Helvetica Neue', sans-serif",
+          "windows": "'Segoe UI Variable Display', 'Segoe UI', Arial, sans-serif",
+          "linux": "Nunito, 'Noto Sans', 'DejaVu Sans', sans-serif"
+        },
+        "text": {
+          "mac": "-apple-system, 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif",
+          "windows": "'Segoe UI Variable Text', 'Segoe UI', Arial, sans-serif",
+          "linux": "Inter, 'Noto Sans', 'DejaVu Sans', Arial, sans-serif"
+        },
+        "mono": {
+          "mac": "'SF Mono', Menlo, monospace",
+          "windows": "'Cascadia Mono', Consolas, monospace",
+          "linux": "'DejaVu Sans Mono', 'Liberation Mono', monospace"
+        },
+        "weights": {
+          "regular": 400,
+          "medium": 500,
+          "bold": 600,
+          "display": 700
+        },
+        "slide": {
+          "caption": 17,
+          "body": 22,
+          "lead": 29,
+          "title": 50,
+          "display": 84,
+          "hero": 116
+        },
+        "page": {
+          "caption": 14,
+          "body": 18,
+          "lead": 21,
+          "h2": 38,
+          "h1": 68
+        },
+        "doc": {
+          "caption": 9,
+          "body": 10.5,
+          "h2": 14,
+          "h1": 21,
+          "title": 29
+        },
+        "lineHeight": {
+          "body": 1.55,
+          "heading": 1.1
+        },
+        "tracking": {
+          "display": -0.015,
+          "caps": 0.06
+        }
+      },
+      "space": {
+        "unit": 8,
+        "margin": 72,
+        "gutter": 24,
+        "radius": {
+          "small": 10,
+          "card": 18
+        },
+        "stroke": 1
+      },
+      "motion": {
+        "ease": "cubic-bezier(0.34, 1.3, 0.64, 1)",
+        "enter": 0.7,
+        "stagger": 0.1,
+        "hold": 1.4
+      },
+      "image": {
+        "style": "natural outdoor light, greens and earth tones, organic textures, unhurried, no text, no logos"
+      },
+      "chart": {
+        "base": "soft",
+        "radius": "pill",
+        "grid": "dots",
+        "line": "smooth",
+        "font": "rounded"
+      },
+      "diagram": {
+        "look": "clean",
+        "curve": "basis",
+        "fontSize": 16,
+        "radius": 14
+      }
+    },
+    "graphite-amber": {
+      "schema": 1,
+      "id": "graphite-amber",
+      "name": "Graphite & amber",
+      "about": "Graphite and one amber signal, heavy type and tight spacing — bold: launches, dashboards, tech.",
+      "light": {
+        "paper": "#F5F4F1",
+        "surface": "#FFFFFF",
+        "ink": "#16171A",
+        "mute": "#595A5F",
+        "line": "#DCDBD6",
+        "accent": "#BD7A0C",
+        "onAccent": "#16171A",
+        "accentInk": "#935D00",
+        "deep": "#16171A",
+        "onDeep": "#F5F4F1",
+        "tint": "#F6EBD9",
+        "good": "#1E6F7A",
+        "bad": "#B3261E",
+        "warn": "#8F5C00",
+        "highlight": "#BD7A0C",
+        "series": [
+          "#3A3D44",
+          "#BD7A0C",
+          "#66747B",
+          "#9D2602",
+          "#0059A1",
+          "#3C8A7C"
+        ]
+      },
+      "dark": {
+        "paper": "#141518",
+        "surface": "#1D1F23",
+        "ink": "#EDECE8",
+        "mute": "#A3A3A6",
+        "line": "#303238",
+        "accent": "#F2A516",
+        "onAccent": "#141518",
+        "accentInk": "#F2A516",
+        "deep": "#0B0C0E",
+        "onDeep": "#EDECE8",
+        "tint": "#2E2616",
+        "good": "#46C0C8",
+        "bad": "#F2707A",
+        "warn": "#F2C14E",
+        "highlight": "#F2A516",
+        "series": [
+          "#C9CCD3",
+          "#F2A516",
+          "#86959C",
+          "#D55753",
+          "#67B0F9",
+          "#1F9B82"
+        ]
+      },
+      "type": {
+        "display": {
+          "mac": "'Helvetica Neue', Helvetica, Arial, sans-serif",
+          "windows": "'Segoe UI Variable Display', 'Segoe UI', Arial, sans-serif",
+          "linux": "Inter, 'Noto Sans', 'DejaVu Sans', Arial, sans-serif"
+        },
+        "text": {
+          "mac": "-apple-system, 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif",
+          "windows": "'Segoe UI Variable Text', 'Segoe UI', Arial, sans-serif",
+          "linux": "Inter, 'Noto Sans', 'DejaVu Sans', Arial, sans-serif"
+        },
+        "mono": {
+          "mac": "'SF Mono', Menlo, monospace",
+          "windows": "'Cascadia Mono', Consolas, monospace",
+          "linux": "'DejaVu Sans Mono', 'Liberation Mono', monospace"
+        },
+        "weights": {
+          "regular": 400,
+          "medium": 500,
+          "bold": 700,
+          "display": 800
+        },
+        "slide": {
+          "caption": 16,
+          "body": 21,
+          "lead": 28,
+          "title": 56,
+          "display": 92,
+          "hero": 132
+        },
+        "page": {
+          "caption": 13,
+          "body": 17,
+          "lead": 20,
+          "h2": 40,
+          "h1": 80
+        },
+        "doc": {
+          "caption": 8.5,
+          "body": 10,
+          "h2": 13,
+          "h1": 22,
+          "title": 32
+        },
+        "lineHeight": {
+          "body": 1.45,
+          "heading": 1
+        },
+        "tracking": {
+          "display": -0.03,
+          "caps": 0.08
+        }
+      },
+      "space": {
+        "unit": 8,
+        "margin": 64,
+        "gutter": 20,
+        "radius": {
+          "small": 3,
+          "card": 6
+        },
+        "stroke": 1.5
+      },
+      "motion": {
+        "ease": "cubic-bezier(0.2, 0.8, 0.2, 1)",
+        "enter": 0.45,
+        "stagger": 0.05,
+        "hold": 1
+      },
+      "image": {
+        "style": "low-key light, charcoal and graphite with warm amber highlights, high contrast, no text, no logos"
+      },
+      "chart": {
+        "base": "bold",
+        "radius": 3,
+        "grid": "none",
+        "line": "straight",
+        "font": "system"
+      },
+      "diagram": {
+        "look": "clean",
+        "curve": "step",
+        "fontSize": 16,
+        "radius": 3
+      }
+    }
+  }
+}

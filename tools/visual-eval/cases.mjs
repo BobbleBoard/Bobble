@@ -20,7 +20,21 @@ import {
   svgToPng,
 } from './lib/browser-renders.mjs';
 import { renderChartSpecs, runChartLines } from './lib/chart.mjs';
-import { FIXTURES, importTs, PROMPTS } from './lib/env.mjs';
+import { FIXTURES, importTs, PROMPTS, REPO } from './lib/env.mjs';
+import {
+  heroHtml,
+  htmlShot,
+  kitCharts,
+  measureDiagramSvg,
+  motionFrame,
+  renderDiagramTool,
+} from './lib/kit-sheet.mjs';
+
+/** The design kits, by their files (packages/design-kit/src/kits) — one kit sheet each (VQ-04). */
+const KIT_IDS = readdirSync(path.join(REPO, 'packages', 'design-kit', 'src', 'kits'))
+  .filter((f) => f.endsWith('.json'))
+  .map((f) => f.replace(/\.json$/, ''))
+  .sort();
 
 const brief = (name) => readFileSync(path.join(PROMPTS, `${name}.txt`), 'utf8').trim();
 const replies = (name) => path.join(FIXTURES, 'replies', `${name}.json`);
@@ -195,25 +209,49 @@ export const CASES = [
         '',
       );
       const request = brief('flow-diagram');
-      const refusedFile = g.isHandwrittenSvg({
-        path: 'flow.svg',
-        content: bare,
-        exists: false,
-        svgCommandAvailable: true,
-        request,
-      });
-      const refusedCareful = g.isHandwrittenSvg({
-        path: 'flow.svg',
-        content: raw,
-        exists: false,
-        svgCommandAvailable: true,
-        request,
-      });
-      const refusedInline = g.hasHandwrittenInlineSvg({
-        path: 'index.html',
-        content: `<!doctype html><html><body>${bare}</body></html>`,
-        svgCommandAvailable: true,
-      });
+      const page = `<!doctype html><html><body>${bare}</body></html>`;
+      /* VQ-10: the guard now ROUTES — a diagram-shaped flow goes to the diagram
+         tool (even one written with a <title>: the tool draws it better than any
+         hand-typed boxes), other hand-typed art to OmniSVG. main has no route,
+         so there this reads the old yes/no guard as the OmniSVG redirect. */
+      const routeOf = (content) =>
+        g.handwrittenSvgRoute
+          ? g.handwrittenSvgRoute({
+              path: 'flow.svg',
+              content,
+              exists: false,
+              svgCommandAvailable: true,
+              diagramAvailable: true,
+              request,
+            })
+          : g.isHandwrittenSvg({
+                path: 'flow.svg',
+                content,
+                exists: false,
+                svgCommandAvailable: true,
+                request,
+              })
+            ? 'svg'
+            : null;
+      const inlineRoute = g.inlineSvgRoute
+        ? g.inlineSvgRoute({
+            path: 'index.html',
+            content: page,
+            svgCommandAvailable: true,
+            diagramAvailable: true,
+            request,
+          })
+        : g.hasHandwrittenInlineSvg({
+              path: 'index.html',
+              content: page,
+              svgCommandAvailable: true,
+            })
+          ? 'svg'
+          : null;
+      const route = routeOf(bare);
+      const refusedFile = route !== null;
+      const refusedCareful = routeOf(raw) !== null;
+      const refusedInline = inlineRoute !== null;
       return [
         {
           id,
@@ -222,11 +260,14 @@ export const CASES = [
             refused_as_written_by_4b: refusedFile,
             refused_with_title: refusedCareful,
             refused_inline_in_page: refusedInline,
-            redirects_to: refusedFile
-              ? /`svg`|svg "/.test(g.handwrittenSvgRefusal('flow.svg'))
-                ? 'svg (OmniSVG)'
-                : 'other'
-              : null,
+            redirects_to:
+              route === 'diagram' ? 'diagram (Mermaid)' : route === 'svg' ? 'svg (OmniSVG)' : null,
+            inline_redirects_to:
+              inlineRoute === 'diagram'
+                ? 'diagram (Mermaid)'
+                : inlineRoute === 'svg'
+                  ? 'svg (OmniSVG)'
+                  : null,
           },
         },
       ];
@@ -273,6 +314,43 @@ export const CASES = [
           file: r.svg,
           pngs: [r.png],
           checks: { source_lines: src.split('\n').length, nodes_declared: nodes },
+        },
+      ];
+    },
+  },
+  {
+    id: 'flow-diagram/d',
+    what: 'the diagram tool (VQ-10): the same flow, unstyled, through the app’s own renderer — bundled Mermaid, the house kit, its semantic colours, light and dark',
+    run: async (ctx, id) => {
+      if (!ctx.mermaid)
+        return [{ id, kind: 'check', skipped: 'no mermaid.min.js (pass --mermaid or VQ_MERMAID)' }];
+      const src = readFileSync(path.join(FIXTURES, 'flow', 'd-diagram-source.mmd'), 'utf8');
+      const r = await renderDiagramTool(
+        await ctx.browser(),
+        ctx.mermaid,
+        src,
+        path.join(ctx.files(id), 'flow'),
+        { title: 'Order fulfilment', subtitle: 'Checkout to review request' },
+      );
+      // Measured in the browser, where Mermaid's translated groups are laid out
+      // (see measureDiagramSvg) — the file ruler reads them all at the origin.
+      const labels = [...r.reply.nodes, ...r.reply.labelledEdges];
+      return [
+        {
+          id,
+          kind: 'diagram',
+          file: r.svg,
+          pngs: [r.png, r.darkPng],
+          metrics: await measureDiagramSvg(await ctx.browser(), r.svg, labels),
+          checks: {
+            source_lines: src.trim().split('\n').length,
+            nodes: r.reply.nodes.length,
+            edges: r.reply.edges,
+            labelled_edges: r.reply.labelledEdges.length,
+            failure_edges: r.reply.failEdges,
+            decisions: r.reply.decisions,
+            notes: r.reply.notes,
+          },
         },
       ];
     },
@@ -398,6 +476,65 @@ export const CASES = [
     what: 'an authored, seekable scene in the deck’s brand',
     run: async (ctx, id) => [await motion(ctx, id, html('motion-b-authored-scene.html'))],
   },
+  // ── the design kits (VQ-04): one sheet per kit ────────────────────────────
+  ...KIT_IDS.map((kitId) => ({
+    id: `kits/${kitId}`,
+    what: `the ${kitId} design kit: a slide (python-pptx from design_tokens.json), two charts (lookFromKit), a page hero (kit CSS), a motion frame (the title card), a diagram (the diagram tool)`,
+    run: async (ctx, id) => {
+      const dk = await importTs('packages/design-kit/src/index.ts');
+      const kit = dk.kitOrDefault(kitId);
+      const report = dk.validateKit(kit);
+      const pptx = path.join(ctx.files(id), 'slide.pptx');
+      const python = JSON.parse(ctx.py('kit_slide.py', [kitId, pptx]));
+      const [bars, donut] = await kitCharts(ctx.files(id), kit);
+      const hero = await htmlShot(
+        await ctx.browser(),
+        heroHtml(dk, kit, 'light'),
+        path.join(ctx.renders(id), 'hero.png'),
+      );
+      const motion = await motionFrame(
+        await ctx.browser(),
+        kit,
+        path.join(ctx.renders(id), 'motion.png'),
+      );
+      const arts = [
+        { id: `${id}/slide`, kind: 'pptx', file: pptx },
+        { id: `${id}/chart-bars`, kind: 'svg', file: bars },
+        { id: `${id}/chart-donut`, kind: 'svg', file: donut },
+        { id: `${id}/hero`, kind: 'page', pngs: [hero] },
+        { id: `${id}/motion`, kind: 'motion', pngs: [motion] },
+      ];
+      if (ctx.mermaid) {
+        const dg = await renderDiagramTool(
+          await ctx.browser(),
+          ctx.mermaid,
+          readFileSync(path.join(FIXTURES, 'flow', 'd-diagram-source.mmd'), 'utf8'),
+          path.join(ctx.files(id), 'diagram'),
+          { kit: kitId, title: 'Order fulfilment' },
+        );
+        arts.push({
+          id: `${id}/diagram`,
+          kind: 'diagram',
+          file: dg.svg,
+          pngs: [dg.png],
+          metrics: await measureDiagramSvg(await ctx.browser(), dg.svg, [
+            ...dg.reply.nodes,
+            ...dg.reply.labelledEdges,
+          ]),
+        });
+      }
+      arts.push({
+        id,
+        kind: 'check',
+        checks: {
+          validates: report.ok,
+          issues: report.issues.map((i) => `${i.mode}: ${i.what}`),
+          python_read: python,
+        },
+      });
+      return arts;
+    },
+  })),
   // ── REAL 4B captures, through today's pipeline ─────────────────────────────
   ...['solar-deck', 'tea-docx', 'units-pdf', 'units-chart', 'cookie-docx'].map((key) => ({
     id: `captured/${key}`,

@@ -56,6 +56,9 @@ importers:
       '@pi-desktop/coordination':
         specifier: workspace:*
         version: link:../../packages/coordination
+      '@pi-desktop/design-kit':
+        specifier: workspace:*
+        version: link:../../packages/design-kit
       '@pi-desktop/engine':
         specifier: workspace:*
         version: link:../../packages/engine
@@ -431,6 +434,10 @@ importers:
         version: 4.1.10(@types/node@26.1.0)(jsdom@29.1.1(@noble/hashes@2.2.0))(msw@2.14.6(@types/node@26.1.0)(typescript@6.0.3))(vite@8.1.3(@types/node@26.1.0)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/design-kit:
+    dependencies:
+      '@pi-desktop/charts':
+        specifier: workspace:*
+        version: link:../charts
     devDependencies:
       '@biomejs/biome':
         specifier: ^2.5.2
@@ -591,6 +598,9 @@ importers:
       '@pi-desktop/charts':
         specifier: workspace:*
         version: link:../charts
+      '@pi-desktop/design-kit':
+        specifier: workspace:*
+        version: link:../design-kit
       '@pi-desktop/mac-computer-use':
         specifier: workspace:*
         version: link:../mac-computer-use

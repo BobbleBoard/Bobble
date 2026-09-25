@@ -16,7 +16,8 @@
     "./tools/hang-guard": "./src/tools/hang-guard.ts",
     "./tools/syntax-check": "./src/tools/syntax-check.ts",
     "./permissions/forbidden": "./src/permissions/forbidden.ts",
-    "./presets/capabilities": "./src/presets/capabilities.ts"
+    "./presets/capabilities": "./src/presets/capabilities.ts",
+    "./tools/present": "./src/tools/present.ts"
   },
   "pi": {
     "extensions": [
@@ -33,6 +34,7 @@
     "@mariozechner/pi-coding-agent": "0.68.1",
     "@pi-desktop/browser-use": "workspace:*",
     "@pi-desktop/charts": "workspace:*",
+    "@pi-desktop/design-kit": "workspace:*",
     "@pi-desktop/mac-computer-use": "workspace:*",
     "@pi-desktop/mac-connectors": "workspace:*",
     "@pi-desktop/tool-bus": "workspace:*",

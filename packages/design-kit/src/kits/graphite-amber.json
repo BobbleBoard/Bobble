@@ -1,0 +1,78 @@
+{
+  "schema": 1,
+  "id": "graphite-amber",
+  "name": "Graphite & amber",
+  "about": "Graphite and one amber signal, heavy type and tight spacing — bold: launches, dashboards, tech.",
+  "light": {
+    "paper": "#F5F4F1",
+    "surface": "#FFFFFF",
+    "ink": "#16171A",
+    "mute": "#595A5F",
+    "line": "#DCDBD6",
+    "accent": "#BD7A0C",
+    "onAccent": "#16171A",
+    "accentInk": "#935D00",
+    "deep": "#16171A",
+    "onDeep": "#F5F4F1",
+    "tint": "#F6EBD9",
+    "good": "#1E6F7A",
+    "bad": "#B3261E",
+    "warn": "#8F5C00",
+    "highlight": "#BD7A0C",
+    "series": ["#3A3D44", "#BD7A0C", "#66747B", "#9D2602", "#0059A1", "#3C8A7C"]
+  },
+  "dark": {
+    "paper": "#141518",
+    "surface": "#1D1F23",
+    "ink": "#EDECE8",
+    "mute": "#A3A3A6",
+    "line": "#303238",
+    "accent": "#F2A516",
+    "onAccent": "#141518",
+    "accentInk": "#F2A516",
+    "deep": "#0B0C0E",
+    "onDeep": "#EDECE8",
+    "tint": "#2E2616",
+    "good": "#46C0C8",
+    "bad": "#F2707A",
+    "warn": "#F2C14E",
+    "highlight": "#F2A516",
+    "series": ["#C9CCD3", "#F2A516", "#86959C", "#D55753", "#67B0F9", "#1F9B82"]
+  },
+  "type": {
+    "display": {
+      "mac": "'Helvetica Neue', Helvetica, Arial, sans-serif",
+      "windows": "'Segoe UI Variable Display', 'Segoe UI', Arial, sans-serif",
+      "linux": "Inter, 'Noto Sans', 'DejaVu Sans', Arial, sans-serif"
+    },
+    "text": {
+      "mac": "-apple-system, 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif",
+      "windows": "'Segoe UI Variable Text', 'Segoe UI', Arial, sans-serif",
+      "linux": "Inter, 'Noto Sans', 'DejaVu Sans', Arial, sans-serif"
+    },
+    "mono": {
+      "mac": "'SF Mono', Menlo, monospace",
+      "windows": "'Cascadia Mono', Consolas, monospace",
+      "linux": "'DejaVu Sans Mono', 'Liberation Mono', monospace"
+    },
+    "weights": { "regular": 400, "medium": 500, "bold": 700, "display": 800 },
+    "slide": { "caption": 16, "body": 21, "lead": 28, "title": 56, "display": 92, "hero": 132 },
+    "page": { "caption": 13, "body": 17, "lead": 20, "h2": 40, "h1": 80 },
+    "doc": { "caption": 8.5, "body": 10, "h2": 13, "h1": 22, "title": 32 },
+    "lineHeight": { "body": 1.45, "heading": 1.0 },
+    "tracking": { "display": -0.03, "caps": 0.08 }
+  },
+  "space": {
+    "unit": 8,
+    "margin": 64,
+    "gutter": 20,
+    "radius": { "small": 3, "card": 6 },
+    "stroke": 1.5
+  },
+  "motion": { "ease": "cubic-bezier(0.2, 0.8, 0.2, 1)", "enter": 0.45, "stagger": 0.05, "hold": 1 },
+  "image": {
+    "style": "low-key light, charcoal and graphite with warm amber highlights, high contrast, no text, no logos"
+  },
+  "chart": { "base": "bold", "radius": 3, "grid": "none", "line": "straight", "font": "system" },
+  "diagram": { "look": "clean", "curve": "step", "fontSize": 16, "radius": 3 }
+}
