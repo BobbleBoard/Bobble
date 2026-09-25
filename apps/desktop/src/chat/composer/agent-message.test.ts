@@ -105,7 +105,12 @@ describe('the lines that name attachments by path', () => {
   };
   const FOLDER = { kind: 'folder' as const, name: 'garden', path: '/Users/j/Desktop/garden' };
   const FOX = { kind: 'image' as const, name: 'fox.png', path: '/Users/j/fox.png', bytes: 130_000 };
-  const NOTES = { kind: 'text' as const, name: 'notes.md', path: '/Users/j/notes.md', text: '# hi' };
+  const NOTES = {
+    kind: 'text' as const,
+    name: 'notes.md',
+    path: '/Users/j/notes.md',
+    text: '# hi',
+  };
 
   it('says what each thing is, short, the way the fold does', () => {
     expect(attachmentLine(PDF)).toBe('Attached file: /Users/j/Desktop/Q3 report.pdf (PDF, 2.3 MB)');
@@ -115,7 +120,9 @@ describe('the lines that name attachments by path', () => {
 
   it('gives a text file no line — its fold names the path instead', () => {
     expect(attachmentLine(NOTES)).toBeNull();
-    expect(buildAgentMessage('', [NOTES])).toBe('Attached file `/Users/j/notes.md`:\n```\n# hi\n```');
+    expect(buildAgentMessage('', [NOTES])).toBe(
+      'Attached file `/Users/j/notes.md`:\n```\n# hi\n```',
+    );
   });
 
   it('keeps the bare name for a paste, which never was a file', () => {

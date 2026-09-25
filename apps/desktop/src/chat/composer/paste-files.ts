@@ -44,8 +44,9 @@
  *
  * So nothing in main reads the pasteboard — deliberately. On this macOS a read
  * that is not part of the person's paste can put the "… would like to paste
- * from …" alert on their screen; the paste event's own Files never can. What
- * each File then becomes is incoming-files.ts.
+ * from …" alert on their screen; the paste event's Files are read inside the
+ * paste the person made, the one read the system expects. What each File then
+ * becomes is incoming-files.ts.
  */
 
 /** The part of a `File` this decides on — so it can be tested without a DOM. */

@@ -14,7 +14,10 @@ const gone = { kind: 'missing' as const };
 
 describe('attachPlan — pixels with no file behind them', () => {
   it('saves a screenshot or a card Copy, so it has a path too', () => {
-    expect(attachPlan(file('image.png', 'image/png'), '', null)).toEqual({ as: 'image', save: true });
+    expect(attachPlan(file('image.png', 'image/png'), '', null)).toEqual({
+      as: 'image',
+      save: true,
+    });
   });
 
   it('folds a text blob that never was a file', () => {
@@ -53,16 +56,18 @@ describe('attachPlan — files and folders copied in Finder, or dropped', () => 
 
   it('names a text file too big to fold by its path instead of skipping it', () => {
     const big = TEXT_MAX_BYTES + 1;
-    expect(attachPlan(file('server.log', 'text/plain', big), `${at}/server.log`, onDisk(big))).toEqual(
-      { as: 'file' },
-    );
+    expect(
+      attachPlan(file('server.log', 'text/plain', big), `${at}/server.log`, onDisk(big)),
+    ).toEqual({ as: 'file' });
   });
 
   it('names a PDF, a zip, a spreadsheet by path — the old "skipped" note', () => {
     for (const name of ['Q3 report.pdf', 'site.zip', 'budget.xlsx', 'talk.key', 'clip.mp4']) {
-      expect(attachPlan(file(name, 'application/pdf'), `${at}/${name}`, onDisk(2_400_000))).toEqual({
-        as: 'file',
-      });
+      expect(attachPlan(file(name, 'application/pdf'), `${at}/${name}`, onDisk(2_400_000))).toEqual(
+        {
+          as: 'file',
+        },
+      );
     }
   });
 
