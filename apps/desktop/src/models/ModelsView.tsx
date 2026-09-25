@@ -67,6 +67,7 @@ import { BestForYourMachine } from './BestForYourMachine';
 import { DownloadAction } from './DownloadAction';
 import { FamilyCard } from './FamilyCard';
 import { type HfLadder, hfLadder, pickHfDownload, pickRefusal, quantsOnDisk } from './hf-download';
+import { type LocalUse, pickLocalUse } from './local-use';
 import { ModelCard } from './ModelCard';
 import { CapabilityPills } from './model-pills';
 import { hostFor, type ModelRecommendation, recommendFor } from './model-recommender';
@@ -1212,6 +1213,26 @@ export function ModelsView() {
     }
     return out;
   }, [listings, hw, onDiskFor]);
+  /*
+   * WHAT "USE" STARTS, by repo, for every repo with a file on disk: an entry
+   * that holds it, at a quant that is here — the pick above whenever it is
+   * (local-use.ts). Top Recommended's card names this file once its button
+   * says Use, and the button starts this one, so the two cannot disagree.
+   */
+  const uses = useMemo(() => {
+    const out: Record<string, LocalUse> = {};
+    const totalRamGB = hw?.ramGiB ?? 0;
+    for (const e of catalog) {
+      const repo = e.hfRepo;
+      if (repo === undefined || out[repo] !== undefined) continue;
+      const use = pickLocalUse(catalog, repo, {
+        ...(picks[repo] === undefined ? {} : { pick: picks[repo].quant }),
+        fit: { totalRamGB, mmprojBytes: listings[repo]?.ladder.mmproj?.sizeBytes },
+      });
+      if (use !== undefined) out[repo] = use;
+    }
+    return out;
+  }, [catalog, picks, listings, hw]);
   /* Top Recommended's text pick names its file, so that one listing is read up
      front: the request its card's picker would make, made once. */
   const textPickRepo = useMemo(() => {
@@ -1538,16 +1559,33 @@ export function ModelsView() {
    * card already selects would make that a lie. So a text model becomes the chat
    * model, and a generation model opens the studio that runs it. Both are the
    * thing someone wanted when they pressed it.
+   *
+   * A TEXT MODEL STARTS WHAT IS ON DISK (`uses`). This took the first catalog
+   * entry naming the repo at the recommender's rung: the 27B asked the server
+   * for a Q3_K_M its repo does not publish, and with only the hub's own
+   * download here it started a download of that quant under the curated entry,
+   * which was not downloaded. Whatever the start answers is shown — the result
+   * used to be dropped, so a failed Use looked like a button that did nothing.
    */
   const applyRecommendation = async (rec: ModelRecommendation): Promise<void> => {
     if (rec.family.output === 'text') {
-      const entry = catalog.find((e) => e.hfRepo === rec.variant.repo);
-      if (entry !== undefined) {
-        await activateLocalModel(entry.id, rec.quant?.rung.quant, 'fast-text', {
-          waitForIdleTurn: true,
-        });
+      setError(null);
+      const use = uses[rec.variant.repo];
+      if (use === undefined) {
+        setError(`${rec.family.name} ${rec.variant.label} is no longer on this disk.`);
+        await refreshCatalog();
         return;
       }
+      const started = await activateLocalModel(use.modelId, use.quant, 'fast-text', {
+        waitForIdleTurn: true,
+      }).catch((e: unknown) => ({
+        success: false,
+        error: e instanceof Error ? e.message : String(e),
+      }));
+      if (!started.success) {
+        setError(started.error ?? `${rec.family.name} ${rec.variant.label} did not start.`);
+      }
+      return;
     }
     /* Straight to the room that makes this kind of thing, rather than to one
        studio that then has to be told which mode it is in. */
@@ -2234,6 +2272,7 @@ export function ModelsView() {
                         host={host}
                         downloaded={downloadedRepos}
                         picks={picks}
+                        uses={uses}
                         onSelect={setSelected}
                         onDownload={(rec) => {
                           setSelected(rec.variant.repo);

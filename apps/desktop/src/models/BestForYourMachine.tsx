@@ -60,6 +60,11 @@ export interface BestForYourMachineProps {
    * — what the model's own picker pins and what Download asks for.
    */
   readonly picks?: Readonly<Record<string, { readonly quant: string; readonly bytes: number }>>;
+  /**
+   * The file Use starts, by repo, for repos on disk (local-use.ts) — the pick
+   * when it is here, else what is.
+   */
+  readonly uses?: Readonly<Record<string, { readonly quant: string; readonly bytes: number }>>;
 }
 
 /**
@@ -90,6 +95,7 @@ function Card({
   downloaded,
   progress,
   pick,
+  use,
   onSelect,
   onDownload,
   onUse,
@@ -99,6 +105,7 @@ function Card({
   downloaded: ReadonlySet<string>;
   progress?: { readonly received: number; readonly total: number; readonly fraction: number };
   pick?: { readonly quant: string; readonly bytes: number };
+  use?: { readonly quant: string; readonly bytes: number };
   onSelect: (repo: string) => void;
   onDownload: (rec: ModelRecommendation) => void;
   onUse: (rec: ModelRecommendation) => void;
@@ -112,16 +119,21 @@ function Card({
    * picker that pinned UD-Q3_K_XL at 12 GB. Size and quant now come from the
    * repo's listing (`pick`), and until that arrives the line stays empty
    * rather than showing a guess it would then have to take back.
+   *
+   * Once the button says Use, the line names the file Use STARTS (`use`): with
+   * only a UD-Q2_K_XL here the card read "12 GB · UD-Q3_K_XL" above a button
+   * that could only run the other one.
    */
   const ladder = rec.quant !== undefined && installKindOf(rec.family) === 'gguf';
+  const named = have ? (use ?? pick) : pick;
   const size = ladder
-    ? pick === undefined
+    ? named === undefined
       ? undefined
-      : compactBytes(pick.bytes)
+      : compactBytes(named.bytes)
     : rec.variant.approxBytes !== undefined
       ? compactBytes(rec.variant.approxBytes)
       : `${rec.needsGB} GB`;
-  const quant = ladder ? pick?.quant : rec.quant?.rung.quant;
+  const quant = ladder ? named?.quant : rec.quant?.rung.quant;
   const tag = taskTagFor({
     modality: rec.modality,
     ...(rec.variant.tasks === undefined ? {} : { tasks: rec.variant.tasks }),
@@ -205,6 +217,7 @@ export function BestForYourMachine({
   downloaded,
   progress = {},
   picks = {},
+  uses = {},
   onSelect,
   onDownload,
   onUse,
@@ -230,6 +243,7 @@ export function BestForYourMachine({
               ? {}
               : { progress: progress[rec.variant.repo] })}
             {...(picks[rec.variant.repo] === undefined ? {} : { pick: picks[rec.variant.repo] })}
+            {...(uses[rec.variant.repo] === undefined ? {} : { use: uses[rec.variant.repo] })}
             onSelect={onSelect}
             onDownload={onDownload}
             onUse={onUse}
