@@ -32,6 +32,7 @@ import { conversationNameFrom } from '../../electron/workspace/project-dir';
 import { lazyRoute } from '../RouteBoundary';
 import type { SettingsSection } from '../settings/SettingsView';
 import { registerCanvasController, useCanvasStore } from '../state/canvas-store';
+import { ownerOfTrackedJob } from '../state/chat-jobs';
 import { useChildAgentStore } from '../state/child-agent-store';
 import { resetCorpChildren, syncCorpChildren } from '../state/corp-child-bridge';
 import {
@@ -522,8 +523,11 @@ export function ChatApp({
      * the situation room, so they looked like subchats and were not.
      */
     resetCorpChildren();
-    // Keyed on the SESSION FILE, which is what the sidebar nests children under.
-    const parentId = usePiStore.getState().session?.sessionFile ?? '';
+    // Keyed on the SESSION FILE, which is what the sidebar nests children under:
+    // the chat whose CEO asked for the team (chat-jobs), which is not the chat
+    // on screen when it runs in the background.
+    const parentId =
+      ownerOfTrackedJob(handle.taskId) ?? usePiStore.getState().session?.sessionFile ?? '';
     // A REPLAYABLE stream: this loop folds it into the corp store (drives the
     // inline chat feed's follow target), and the situation tab — opened late,
     // on promotion — replays the same buffered events to reconstruct its state.

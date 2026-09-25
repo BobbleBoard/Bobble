@@ -15,11 +15,16 @@
  *     time — the one running in the background if there is one, otherwise the
  *     one on screen.
  * A studio job is never announced, so no chat can stop one.
+ *
+ * A PRODUCTION is one of these jobs too: the CEO's `talk_to_manager` makes main
+ * start a team (`corp:attached`), and the team works for the chat whose pi
+ * asked. The corp store's team pointer is no guide to that — every chat switch
+ * drops it, and the situation room binds it to whichever chat is on screen.
  */
 import { useChildAgentStore } from './child-agent-store';
 import { usePiStore } from './pi-slice';
 
-export type ChatJobKind = 'gen' | 'gen3d';
+export type ChatJobKind = 'gen' | 'gen3d' | 'corp';
 
 export interface ChatJob {
   readonly jobId: string;
@@ -69,6 +74,11 @@ export function forgetJob(jobId: string): void {
   jobs.delete(jobId);
 }
 
+/** The chat a tracked job belongs to — null when none could be named. */
+export function ownerOfTrackedJob(jobId: string): string | null {
+  return jobs.get(jobId)?.owner ?? null;
+}
+
 /** Every tracked job owned by one of these chat files. */
 export function jobsOwnedBy(files: readonly string[]): ChatJob[] {
   return [...jobs.values()].filter((j) => j.owner !== null && files.includes(j.owner));
@@ -84,6 +94,10 @@ export async function cancelJobsOf(files: readonly string[]): Promise<void> {
   await Promise.all(
     owned.map(async (j) => {
       forgetJob(j.jobId);
+      if (j.kind === 'corp') {
+        await window.piDesktop.invoke('corp:abort', { taskId: j.jobId }).catch(() => undefined);
+        return;
+      }
       const channel = j.kind === 'gen3d' ? 'gen3d:cancel' : 'gen:cancel';
       await window.piDesktop.invoke(channel, { jobId: j.jobId }).catch(() => undefined);
     }),
@@ -96,6 +110,10 @@ export function connectChatJobs(): () => void {
   const offs = [
     bridge.onEvent('gen:agent-job', ({ jobId, agent }) => noteAgentJob('gen', jobId, agent)),
     bridge.onEvent('gen3d:agent-job', ({ jobId, agent }) => noteAgentJob('gen3d', jobId, agent)),
+    // Subscribed before the app mounts, so the owner is known by the time the
+    // situation room binds to the run (ChatApp nests its roles under it). Its
+    // end is seen by corp-connect, which owns `corp:event` (see connectCorp).
+    bridge.onEvent('corp:attached', ({ taskId }) => noteAgentJob('corp', taskId, undefined)),
     bridge.onEvent('gen:update', ({ tabId, payload }) => {
       if (payload.status !== 'generating') forgetJob(tabId.replace(/^pi:gen-/, ''));
     }),
