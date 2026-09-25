@@ -2551,7 +2551,10 @@ async function startServerExclusive(
             visionWanted,
             explicit,
             modelHasProjector: model.mmproj !== undefined,
-            ggufOnDisk: existsSync(modelPathFor(model, file)),
+            /* A GGUF llama.cpp can TAKE: a sharded model is refused below (its
+               shards are never joined), so handing it a vision fallback would
+               stop a model its calibrated MLX engine runs fine. */
+            ggufOnDisk: model.sharded !== true && existsSync(modelPathFor(model, file)),
             mlxTwinHasVision: twinDir !== undefined && mlxTwinHasVision(twinDir),
             rapidVisionReady: rapidVisionReady(),
           },

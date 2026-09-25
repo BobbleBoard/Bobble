@@ -22,7 +22,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { modelDir } from '@pi-desktop/inference';
+import { hardwareKey, modelDir, PINNED_LLAMACPP } from '@pi-desktop/inference';
 import { entryDir, slugFor, writeManifest } from '@pi-desktop/model-store';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LlmStatus } from '../ipc-contract';
@@ -239,6 +239,32 @@ async function visionTwin(repo: string, bytes: number): Promise<string> {
 function engine(path: string): void {
   file(path, '#!/bin/sh\n');
 }
+/** A calibration verdict for this (fake) machine and the pinned llama.cpp build. */
+function calibrated(
+  modelId: string,
+  quant: string,
+  chosen: { engine: string; spec: string },
+): void {
+  const safe = (x: string) => x.replace(/[^A-Za-z0-9._-]+/g, '_');
+  file(
+    join(calibrationDir(), `${safe(modelId)}--${safe(quant)}.json`),
+    JSON.stringify({
+      modelId,
+      quant,
+      hardwareKey: hardwareKey({
+        platform: process.platform,
+        arch: process.arch,
+        chip: 'Apple M5',
+        totalRamGB: 64,
+      }),
+      engineBuild: PINNED_LLAMACPP.tag,
+      at: new Date(0).toISOString(),
+      ranked: [],
+      skips: [],
+      chosen,
+    }),
+  );
+}
 
 beforeEach(async () => {
   await ask({ type: 'stop-server' });
@@ -387,5 +413,27 @@ describe('rapid-mlx rows keep the method they name', () => {
     expect(implicit.visionReady).toBe(true);
     expect(afterCalibration.profile).toEqual(implicit.profile);
     expect(afterCalibration.visionReady).toBe(true);
+  });
+});
+
+describe('a vision fallback llama.cpp cannot take', () => {
+  it('a sharded model calibrated to an MLX engine still starts there, blind', async () => {
+    engine(engineCommand('dflash-mlx'));
+    await stored('mlx-community/Qwen3.5-122B-A10B-4bit');
+    await stored('z-lab/Qwen3.5-122B-A10B-DFlash');
+    // Shard 1 of 3 is on disk (and the projector): llama.cpp cannot join the rest.
+    const dir = modelDir('qwen3.5-122b-a10b-mtp');
+    file(join(dir, 'UD-Q4_K_M', 'Qwen3.5-122B-A10B-UD-Q4_K_M-00001-of-00003.gguf'));
+    file(join(dir, 'mmproj-F16.gguf'));
+    calibrated('qwen3.5-122b-a10b-mtp', 'UD-Q4_K_M', { engine: 'dflash-mlx', spec: 'dflash' });
+    const started = await ask<{ success: boolean; error?: string }>({
+      type: 'start-server',
+      modelId: 'qwen3.5-122b-a10b-mtp',
+    });
+    expect(started.error).toBeUndefined();
+    expect(started.success).toBe(true);
+    const s = await status();
+    expect(s.profile).toEqual({ engine: 'dflash-mlx', spec: 'dflash' });
+    expect(s.blindReason).toBe('engine');
   });
 });
