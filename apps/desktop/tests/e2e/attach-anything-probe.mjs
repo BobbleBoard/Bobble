@@ -35,7 +35,17 @@
  *
  *   PHASE=before SHOT_DIR=/tmp/attach node scripts/with-lock.mjs probe -- \
  *     node apps/desktop/tests/e2e/attach-anything-probe.mjs
+ *
+ * `REAL_CLIPBOARD=1` — NEVER BY DEFAULT, and only by the person whose clipboard
+ * it is: the pastes go through the SYSTEM pasteboard (the paths written as
+ * Finder writes them — a file URL and the name per item — or the pixels, then
+ * `webContents.paste()`, the Edit menu's own command). Whatever was copied
+ * before is gone and cannot be put back, and because that paste is not a key
+ * the person pressed, macOS may show its "would like to paste" alert on their
+ * screen. It is the end-to-end check of what paste-files.ts reads from the
+ * Chromium source; the pasteboard is cleared after if nothing newer landed.
  */
+import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -43,6 +53,7 @@ import { streamedTurn, writeFixture } from './_mock-turns.mjs';
 import { launchApp, probeHome } from './harness.mjs';
 
 const PHASE = process.env.PHASE ?? 'after';
+const REAL_CLIPBOARD = process.env.REAL_CLIPBOARD === '1';
 const SHOT_DIR = process.env.SHOT_DIR ?? path.join(tmpdir(), 'pd-shots', 'attach-anything');
 mkdirSync(SHOT_DIR, { recursive: true });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -89,7 +100,7 @@ const fixture = writeFixture(path.join(tmpdir(), `attach-anything-${process.pid}
   streamedTurn('Done again.', { chunks: 2, stepMs: 60 }),
 ]);
 
-const { page, check, finish } = await launchApp('attach-anything', {
+const { app, page, check, finish } = await launchApp('attach-anything', {
   fixture,
   env: { HOME: home, PI_E2E_NO_SERVER: '1' },
   // The image module shows as installed (as on a Mac that has it) instead of its
@@ -171,8 +182,47 @@ async function loadFiles(paths) {
   );
 }
 
+/*
+ * THE SYSTEM PASTEBOARD — REAL_CLIPBOARD=1 only (see the header). Written as
+ * Finder writes a copy: one item per path, its file URL and its name.
+ */
+let lastWrite = null;
+const pasteboard = (script, args = []) =>
+  execFileSync('osascript', ['-l', 'JavaScript', '-e', script, ...args], {
+    encoding: 'utf8',
+    timeout: 8000,
+    stdio: ['ignore', 'pipe', 'ignore'],
+  }).trim();
+const COPY_FILES = `function run(argv) {
+  ObjC.import('AppKit');
+  const pb = $.NSPasteboard.generalPasteboard;
+  pb.clearContents;
+  const items = $.NSMutableArray.array;
+  for (const p of argv) {
+    const item = $.NSPasteboardItem.alloc.init;
+    item.setStringForType($.NSURL.fileURLWithPath(p).absoluteString, 'public.file-url');
+    item.setStringForType(p.split('/').pop(), 'public.utf8-plain-text');
+    items.addObject(item);
+  }
+  pb.writeObjects(items);
+  return pb.changeCount;
+}`;
+const CHANGE_COUNT = "ObjC.import('AppKit'); $.NSPasteboard.generalPasteboard.changeCount";
+/** The Edit menu's paste (`role: 'paste'` is this command), into the composer. */
+async function realPaste() {
+  await page.click('[data-testid="composer-input"]');
+  await sleep(150);
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.webContents.paste());
+  await sleep(1200);
+}
+
 /** A ⌘V of files copied in Finder: the Files, and their names as text. */
 async function pasteFinder(paths) {
+  if (REAL_CLIPBOARD) {
+    lastWrite = Number(pasteboard(COPY_FILES, paths));
+    await realPaste();
+    return;
+  }
   const files = await loadFiles(paths);
   check(
     files.length === paths.length && files.every((f, i) => f.path === paths[i]),
@@ -198,6 +248,14 @@ async function pasteFinder(paths) {
 
 /** A ⌘V of pixels with no file behind them — a screenshot, a card's Copy. */
 async function pastePixels(dataUrl) {
+  if (REAL_CLIPBOARD) {
+    await app.evaluate(({ clipboard, nativeImage }, url) => {
+      clipboard.writeImage(nativeImage.createFromDataURL(url));
+    }, dataUrl);
+    lastWrite = Number(pasteboard(CHANGE_COUNT));
+    await realPaste();
+    return;
+  }
   await page.click('[data-testid="composer-input"]');
   await sleep(120);
   await page.evaluate((url) => {
@@ -627,5 +685,18 @@ try {
 } catch (error) {
   check(false, `probe crashed: ${error instanceof Error ? error.stack : String(error)}`);
 } finally {
+  // Our fixture paths off the pasteboard — only if nothing newer landed there.
+  if (REAL_CLIPBOARD && lastWrite !== null) {
+    try {
+      if (Number(pasteboard(CHANGE_COUNT)) === lastWrite) {
+        pasteboard("ObjC.import('AppKit'); $.NSPasteboard.generalPasteboard.clearContents");
+        log('cleared the probe paths off the pasteboard');
+      } else {
+        log('the pasteboard changed under the probe — left alone');
+      }
+    } catch {
+      /* best effort */
+    }
+  }
   await finish();
 }
