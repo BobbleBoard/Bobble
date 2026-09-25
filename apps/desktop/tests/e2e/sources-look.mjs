@@ -591,6 +591,26 @@ try {
       await sleep(400);
       let buf = await shot(`03-sources-collapsed-${mode}`);
       await crop(`03-sources-collapsed-${mode}-crop`, buf, cardSel);
+      /* A row's ⋯ menu — the menu sheet, three ways out. Looked at, never
+         used: "Copy link" would write the system pasteboard. */
+      await page.click(`${cardSel} [data-testid="source-row-more"]`);
+      await page.waitForSelector('.pd-src-row-menu', { timeout: 3000 }).catch(() => undefined);
+      await sleep(300);
+      const menu = await page.evaluate(() =>
+        [...document.querySelectorAll('.pd-src-row-menu [role="menuitem"]')].map((i) =>
+          i.textContent?.trim(),
+        ),
+      );
+      buf = await shot(`03b-row-menu-${mode}`);
+      await crop(`03b-row-menu-${mode}-crop`, buf, '.pd-src-row-menu', 60);
+      await page.keyboard.press('Escape');
+      await sleep(300);
+      if (mode === 'dark') {
+        check(
+          menu.join('|') === 'Open in Bobble|Open in your browser|Copy link',
+          `a row's menu offers the three ways out (${JSON.stringify(menu)})`,
+        );
+      }
       // Rows on show: the folded ones are in the DOM (they animate open) but
       // inert and zero-height until "Show all".
       const collapsed = await page.evaluate(
