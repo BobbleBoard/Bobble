@@ -21,6 +21,7 @@ import { Markdown as UiMarkdown, widenUrlTransform } from '@pi-desktop/ui';
 import type { ComponentPropsWithoutRef } from 'react';
 import { usePiStore } from '../state/pi-slice';
 import { pdFileUrl } from './canvas/file-preview';
+import { CITATION_COMPONENTS, useCitationRehype } from './sources/citation-markdown';
 
 /** Kept by the sanitiser so the image component below can see them. */
 const URL_TRANSFORM = widenUrlTransform(/^(?:pd-file:|file:)/i);
@@ -75,11 +76,13 @@ function LocalImage({
   );
 }
 
-const COMPONENTS = { img: LocalImage };
+/* Links to the turn's sources become citation chips (./sources). */
+const COMPONENTS = { img: LocalImage, ...CITATION_COMPONENTS };
 
 export function Markdown({ text }: { text: string }) {
+  const rehypePlugins = useCitationRehype();
   return (
-    <UiMarkdown components={COMPONENTS} urlTransform={URL_TRANSFORM}>
+    <UiMarkdown components={COMPONENTS} urlTransform={URL_TRANSFORM} rehypePlugins={rehypePlugins}>
       {text}
     </UiMarkdown>
   );

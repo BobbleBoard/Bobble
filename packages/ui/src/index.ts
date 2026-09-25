@@ -291,6 +291,7 @@ export {
   OpenUrlProvider,
   SiteIconProvider,
   type UseSiteIcon,
+  useOpenUrl,
   WebSearchResultItem,
   WebSearchResults,
 } from './components/web-search.tsx';

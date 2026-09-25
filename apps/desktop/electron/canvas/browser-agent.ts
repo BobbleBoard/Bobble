@@ -48,6 +48,8 @@ import {
   setValueByIndex,
 } from './browser-scripts';
 import { siteFavicon } from './favicons';
+import { sourceMeta } from './source-meta';
+import { sourceMetaDeps } from './source-meta-main';
 
 const log = createLogger('desktop:browser-agent');
 const events = createIpcEventSender<AppEventMap>();
@@ -496,8 +498,18 @@ export function registerBrowserAgentIpc(getWindow: () => WebContents | null): vo
   // is a null, and the card draws its letter chip.
   ipcMain.handle('canvas:site-icon', async (event, req: { site: string }) => {
     guard(event, 'canvas:site-icon');
+    sourceMetaDeps(); // turns on the on-disk icon cache the first time
     const dataUri = await siteFavicon(typeof req?.site === 'string' ? req.site : '');
     return { dataUri };
+  });
+
+  // A cited source's own name, icon and picture (./source-meta) — same CSP
+  // reasoning as the icon above, and never a rejection: an unreachable page
+  // answers with what is known and the renderer keeps its letter tile.
+  ipcMain.handle('canvas:source-meta', async (event, req: { url: string }) => {
+    guard(event, 'canvas:source-meta');
+    const meta = await sourceMeta(typeof req?.url === 'string' ? req.url : '', sourceMetaDeps());
+    return { meta };
   });
 }
 

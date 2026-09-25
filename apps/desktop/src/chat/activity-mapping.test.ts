@@ -702,6 +702,63 @@ describe('mapToolStep — web_search result parsing', () => {
     expect(step.results?.[1]?.domain).toBe('en.wikipedia.org');
   });
 
+  it("does not read the tools' closing citation hint as the last result's snippet", () => {
+    const step = mapToolStep(
+      call('c1', 'web_search', { query: 'example domain' }),
+      result(
+        'c1',
+        `${toolText}\n\nCite a page you use as [site name](url) right after the sentence it supports.`,
+      ),
+      false,
+    ).data;
+    if (step.kind !== 'search') throw new Error(step.kind);
+    expect(step.results?.[1]?.snippet).toBe('The domain names are reserved by the IANA.');
+  });
+
+  /*
+   * THE CLI SEARCH IS THE SAME ROW. `web search …` through bash used to be a
+   * terminal row over the raw text; it reads the same text into the same
+   * results list the native call shows (the user's sources wave, 2026-09-24).
+   */
+  it('`web search …` in bash is a search row with its results', () => {
+    const step = mapToolStep(
+      call('c2', 'bash', { command: 'web search "example domain"' }),
+      result('c2', toolText),
+      false,
+    ).data;
+    expect(step.kind).toBe('search');
+    if (step.kind !== 'search') return;
+    expect(step.label).toBe('Searched the web');
+    expect(step.query).toBe('example domain');
+    expect(step.results?.map((r) => r.domain)).toEqual(['example.com', 'en.wikipedia.org']);
+  });
+
+  it('…and while it runs it claims no results', () => {
+    const step = mapToolStep(
+      call('c3', 'bash', { command: 'web search "x"' }),
+      undefined,
+      true,
+    ).data;
+    if (step.kind !== 'search') throw new Error(step.kind);
+    expect(step.results).toBeUndefined();
+    expect(step.label).toBe('Searching the web');
+  });
+
+  it('a fetched page is a "Read a page" row with its text — not a browser step', () => {
+    const page = '# Example Domain\nURL: https://example.com/\n\nThis domain is for examples.';
+    for (const block of [
+      call('f1', 'web_fetch', { url: 'https://example.com/' }),
+      call('f2', 'bash', { command: 'web fetch https://example.com/' }),
+    ]) {
+      const step = mapToolStep(block, result(block.id, page), false).data;
+      expect(step.kind).toBe('page');
+      expect(step.label).toBe('Read a page');
+      if (step.kind !== 'page') return;
+      expect(step.url).toBe('https://example.com/');
+      expect(step.preview).toBe(page);
+    }
+  });
+
   it('still handles JSON array / { results } shapes (MCP / API search tools)', () => {
     const json = JSON.stringify({
       results: [{ title: 'T', link: 'https://t.example/x', description: 'a  desc' }],

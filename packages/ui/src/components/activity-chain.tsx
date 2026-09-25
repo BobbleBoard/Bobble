@@ -192,7 +192,7 @@ export type ActivityStepData =
   | (ActivityStepCommon & {
       // Browser-action steps (round-10 #17): the URL/target is carried for a tag,
       // and browser-read expands the page text it returned as an inline preview.
-      kind: 'browser-navigate' | 'browser-click' | 'browser-type' | 'browser-read';
+      kind: 'browser-navigate' | 'browser-click' | 'browser-type' | 'browser-read' | 'page';
       url?: string;
       /**
        * What the page called itself once it loaded, when the tool reported it.
@@ -346,6 +346,7 @@ const VERBS: Record<ActivityStepKind, VerbSpec> = {
   'browser-click': { verb: 'Clicked', singular: '', plural: '' },
   'browser-type': { verb: 'Typed', singular: '', plural: '' },
   'browser-read': { verb: 'Read', singular: 'the page', plural: 'pages' },
+  page: { verb: 'Read', singular: 'a page', plural: 'pages', attempt: 'page read' },
   connector: { verb: 'Used', singular: 'a connector', plural: 'connectors' },
   tool: { verb: 'Used', singular: 'a tool', plural: 'tools' },
   image: { verb: 'Generated', singular: 'an image', plural: 'images', attempt: 'image' },
@@ -397,6 +398,7 @@ const KIND_ORDER: ActivityStepKind[] = [
   'file',
   'skill',
   'search',
+  'page',
   'tool-search',
   'browser-navigate',
   'browser-click',
@@ -579,6 +581,7 @@ const RUNNING_PHRASE: Record<ActivityStepKind, string> = {
   'browser-click': 'Clicking',
   'browser-type': 'Typing',
   'browser-read': 'Reading the page',
+  page: 'Reading a page',
   connector: 'Using a connector',
   tool: 'Running a tool',
   image: 'Generating an image',
@@ -660,6 +663,7 @@ const ARG_HEADER_KINDS = new Set<ActivityStepKind>([
   'skill',
   'folder',
   'browser-read',
+  'page',
 ]);
 
 /** Char count past which an in-chain thought fades + offers "Show more". */
@@ -869,8 +873,11 @@ function StepContent({ step, live = false }: { step: ActivityStepData; live?: bo
       // `results ?? []` rather than a null branch: the empty state names the
       // query and prints the backend `note`, which is the whole answer to "why
       // did that search show me nothing".
+      // Compact: the row above already names the query; what the chain adds
+      // is where the model looked (see CompactResults).
       return (
         <WebSearchResults
+          variant="compact"
           query={step.query ?? step.detail ?? step.label}
           results={step.results ?? []}
           emptyHint={step.note}
@@ -886,6 +893,7 @@ function StepContent({ step, live = false }: { step: ActivityStepData; live?: bo
         <EmptyPreviewNote kind={step.kind} />
       );
     case 'browser-read':
+    case 'page':
       return step.preview !== undefined ? (
         <div className="pd-chain-preview">{step.preview}</div>
       ) : (
@@ -1277,13 +1285,19 @@ export function hasInlineContent(step: ActivityStepData): boolean {
        * dead backend — rendered nothing at all, which looks like the search
        * never happened. WebSearchResults has an empty state built for exactly
        * this; it just was never reached.
+       *
+       * …but only once the search has ANSWERED. While it runs there are no
+       * results yet, and "No results found" under a spinner is a false
+       * statement for the second or two it is up.
        */
+      if (step.status === 'running' && (step.results?.length ?? 0) === 0) return false;
       return step.results !== undefined || nonEmpty(step.query) || nonEmpty(step.note);
     case 'read':
     case 'file':
     case 'skill':
     case 'folder':
     case 'browser-read':
+    case 'page':
       // A path with no content is still worth opening — the row shows a basename,
       // the reveal shows the full path. See {@link EmptyPreviewNote}.
       return step.preview !== undefined || (settled && nonEmpty(step.detail));

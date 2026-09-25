@@ -1,0 +1,456 @@
+/*
+ * SOURCES IN AN ANSWER — the citation chip, its hover card, the Sources card.
+ *
+ * the user's reference is Google's AI overview (2026-09-24); the vocabulary is the
+ * app's own: the menu sheet for the hover card, the in-thread card surface
+ * (raised fill, subtle edge, radius-lg — the present card's family) for the
+ * Sources card, the ink ladder for type, and the one accent left alone. No
+ * purple, no Google colours.
+ */
+
+/* ── the site icon ─────────────────────────────────────────────────────── */
+
+/*
+ * A site's icon sits on a white plate, clipped round — in both modes. Many
+ * favicons are a dark mark on transparency, which vanishes on the dark thread
+ * (Google's overview plates them for the same reason). On the light card the
+ * plate is simply invisible.
+ */
+.pd-src-icon {
+  --pd-src-plate: var(--pd-text-on-accent);
+  display: inline-block;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--pd-src-plate);
+  box-shadow: 0 0 0 0.5px var(--pd-border-default);
+  object-fit: cover;
+}
+
+.pd-src-icon[data-size="14"] {
+  width: 14px;
+  height: 14px;
+}
+
+/* No icon (yet, or ever): the site's initial on the app's inset tile — the
+ * same material the search rows fall back to. */
+.pd-src-icon-tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--pd-bg-inset);
+  color: var(--pd-text-secondary);
+  font-family: var(--pd-font-sans);
+  font-size: 9px;
+  font-weight: var(--pd-font-weight-semibold);
+  line-height: 1;
+}
+
+.pd-src-icon-tile[data-size="16"] {
+  font-size: 10px;
+}
+
+/* ── the chip after a claim ────────────────────────────────────────────── */
+
+.pd-cite {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  height: 20px;
+  margin: 0 1px 0 4px;
+  padding: 0 8px 0 3px;
+  border: 0;
+  border-radius: var(--pd-radius-full);
+  background: color-mix(in srgb, var(--pd-text-primary) 7%, transparent);
+  color: var(--pd-text-secondary);
+  font-family: var(--pd-font-sans);
+  font-size: var(--pd-font-size-caption);
+  font-weight: var(--pd-font-weight-medium);
+  line-height: 16px;
+  /* Centred on the line's x-height: the pill sits in the text rather than on
+     its baseline, and a 20px pill fits inside the 23px response line without
+     opening it up. */
+  vertical-align: middle;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--pd-duration-fast) var(--pd-easing-standard),
+    color var(--pd-duration-fast) var(--pd-easing-standard);
+}
+
+.pd-cite:hover,
+.pd-cite[data-state="open"] {
+  background: color-mix(in srgb, var(--pd-text-primary) 12%, transparent);
+  color: var(--pd-text-primary);
+}
+
+.pd-cite-name {
+  min-width: 0;
+  max-width: 17ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pd-cite-more {
+  color: var(--pd-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.pd-cite:hover .pd-cite-more,
+.pd-cite[data-state="open"] .pd-cite-more {
+  color: var(--pd-text-secondary);
+}
+
+/* A citation that is a whole line of its own (a "Sources:" list): the model's
+ * words, as a link, with the site's icon in front. */
+.pd-cite-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--pd-text-link);
+  font: inherit;
+  font-weight: var(--pd-font-weight-medium);
+  text-align: left;
+  vertical-align: bottom;
+  cursor: pointer;
+}
+
+.pd-cite-line-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pd-cite-line:hover .pd-cite-line-text,
+.pd-cite-line[data-state="open"] .pd-cite-line-text {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* ── the chip's card (the menu sheet) ──────────────────────────────────── */
+
+.pd-menu.pd-cite-card {
+  width: 400px;
+  max-width: calc(100vw - 32px);
+  max-height: min(460px, var(--radix-popover-content-available-height, 460px));
+  padding: 4px 6px;
+  overflow-y: auto;
+}
+
+/* ── one source row: card and hover card alike ─────────────────────────── */
+
+.pd-src-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  /* Two rows, not three: a thumbnail spanning a title row and a snippet row
+     made Chrome give the whole picture's height to the second of them —
+     MEASURED, tracks "24px 20px 66px" for a 64px picture, 20px of nothing
+     under every row. The text is one block beside the picture instead. */
+  grid-template-areas:
+    "site more"
+    "text thumb";
+  column-gap: 14px;
+  padding: 12px 10px;
+  border-radius: var(--pd-radius-md);
+  font-family: var(--pd-font-sans);
+  transition: background-color var(--pd-duration-fast) var(--pd-easing-standard);
+}
+
+.pd-src-row[data-thumb="false"] {
+  grid-template-areas:
+    "site more"
+    "text text";
+}
+
+.pd-src-row-text {
+  grid-area: text;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+/* Hairlines between rows, inset to the text so they read as one list. */
+.pd-src-row + .pd-src-row::before,
+.pd-sources-more-inner > .pd-src-row:first-child::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 10px;
+  left: 10px;
+  height: 1px;
+  background: var(--pd-border-subtle);
+}
+
+.pd-src-row:hover {
+  background: var(--pd-bg-hover);
+}
+
+/* The divider under a hovered row's neighbour would cut its wash in two. */
+.pd-src-row:hover + .pd-src-row::before,
+.pd-src-row:hover::before {
+  opacity: 0;
+}
+
+.pd-src-row:has(.pd-src-row-title:focus-visible) {
+  outline: 2px solid var(--pd-focus-ring, var(--pd-border-focus));
+  outline-offset: -2px;
+}
+
+.pd-src-row-site {
+  grid-area: site;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 20px;
+  margin-bottom: 4px;
+  color: var(--pd-text-secondary);
+  font-size: var(--pd-font-size-footnote);
+  line-height: var(--pd-leading-footnote);
+}
+
+.pd-src-row-name {
+  flex: none;
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pd-src-row-host {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--pd-text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pd-src-row-host::before {
+  content: "·";
+  margin-right: 6px;
+}
+
+/* The title is the row's one control; its hit area covers the whole row. */
+.pd-src-row-title {
+  display: -webkit-box;
+  max-width: 100%;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  background: none;
+  color: var(--pd-text-primary);
+  font: inherit;
+  font-size: var(--pd-font-size-body);
+  font-weight: var(--pd-font-weight-semibold);
+  line-height: 20px;
+  text-align: left;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  outline: none;
+  cursor: pointer;
+}
+
+.pd-src-row-title::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+.pd-src-row:hover .pd-src-row-title {
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
+  text-underline-offset: 3px;
+}
+
+.pd-src-row-snippet {
+  display: -webkit-box;
+  margin: 3px 0 0;
+  overflow: hidden;
+  color: var(--pd-text-secondary);
+  font-size: var(--pd-font-size-footnote);
+  line-height: var(--pd-leading-footnote);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.pd-src-row-thumb {
+  grid-area: thumb;
+  align-self: start;
+  width: 64px;
+  height: 64px;
+  margin-top: 2px;
+  border-radius: var(--pd-radius-md);
+  background: var(--pd-bg-inset);
+  box-shadow: 0 0 0 0.5px var(--pd-border-default);
+  object-fit: cover;
+  animation: pd-src-fade-in var(--pd-duration-base) var(--pd-easing-standard) both;
+}
+
+.pd-src-row[data-variant="popover"] .pd-src-row-thumb {
+  width: 56px;
+  height: 56px;
+}
+
+.pd-src-row[data-variant="popover"] {
+  grid-template-areas:
+    "site site"
+    "text thumb";
+  padding: 10px 8px;
+}
+
+.pd-src-row[data-variant="popover"][data-thumb="false"] {
+  grid-template-areas:
+    "site site"
+    "text text";
+}
+
+/* Link-styled in the hover card, as the reference has it: the card is a list
+ * of places to go, the Sources card a list of things to read. */
+.pd-src-row[data-variant="popover"] .pd-src-row-title {
+  font-weight: var(--pd-font-weight-medium);
+}
+
+.pd-src-row-more {
+  grid-area: more;
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: end;
+  width: 24px;
+  height: 20px;
+  margin: 0 -4px 4px 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--pd-radius-xs);
+  background: transparent;
+  color: var(--pd-text-muted);
+  cursor: pointer;
+}
+
+.pd-src-row-more:hover,
+.pd-src-row-more[data-state="open"] {
+  background: var(--pd-bg-hover);
+  color: var(--pd-text-primary);
+}
+
+@keyframes pd-src-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ── the Sources card ──────────────────────────────────────────────────── */
+
+.pd-sources {
+  width: 100%;
+  max-width: var(--pd-thread-prose-width);
+  margin-top: 6px;
+  padding: 6px 6px 8px;
+  border: 1px solid var(--pd-border-subtle);
+  border-radius: var(--pd-radius-lg);
+  background: var(--pd-bg-raised);
+}
+
+.pd-sources-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 10px 2px;
+  font-family: var(--pd-font-sans);
+}
+
+.pd-sources-title {
+  color: var(--pd-text-primary);
+  font-size: var(--pd-font-size-footnote);
+  font-weight: var(--pd-font-weight-semibold);
+  line-height: var(--pd-leading-footnote);
+}
+
+.pd-sources-count {
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-footnote);
+  line-height: var(--pd-leading-footnote);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The folded rows open IN PLACE: the track grows from nothing to its content
+ * (capped, and then it scrolls, as the reference's expanded card does). */
+.pd-sources-more {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--pd-duration-slow) var(--pd-easing-enter);
+}
+
+.pd-sources-more[data-open="true"] {
+  grid-template-rows: 1fr;
+}
+
+.pd-sources-more-inner {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.pd-sources-more[data-open="true"] .pd-sources-more-inner {
+  max-height: 460px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.pd-sources-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: calc(100% - 20px);
+  height: 34px;
+  margin: 6px 10px 2px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--pd-radius-full);
+  background: color-mix(in srgb, var(--pd-text-primary) 6%, transparent);
+  color: var(--pd-text-primary);
+  font-family: var(--pd-font-sans);
+  font-size: var(--pd-font-size-footnote);
+  font-weight: var(--pd-font-weight-medium);
+  cursor: pointer;
+  transition: background-color var(--pd-duration-fast) var(--pd-easing-standard);
+}
+
+.pd-sources-toggle:hover {
+  background: color-mix(in srgb, var(--pd-text-primary) 10%, transparent);
+}
+
+.pd-sources-toggle-icon {
+  color: var(--pd-text-muted);
+  transition: transform var(--pd-duration-base) var(--pd-easing-standard);
+}
+
+.pd-sources-toggle[aria-expanded="true"] .pd-sources-toggle-icon {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pd-sources-more,
+  .pd-sources-toggle-icon,
+  .pd-src-row-thumb {
+    transition: none;
+    animation: none;
+  }
+}

@@ -235,6 +235,7 @@ const STEP_LABELS: Record<ActivityStepKind, [running: string, done: string]> = {
   'browser-click': ['Clicking', 'Clicked'],
   'browser-type': ['Typing', 'Typed'],
   'browser-read': ['Reading the page', 'Read the page'],
+  page: ['Reading a page', 'Read a page'],
   connector: ['Using a connector', 'Used a connector'],
   tool: ['Running a tool', 'Used a tool'],
   image: ['Generating an image', 'Generated an image'],
@@ -371,6 +372,10 @@ const TOOL_REGISTRY: Record<string, ToolResolution> = {
   chart_edit: { kind: 'chart', label: ['Redrawing the chart', 'Redrew the chart'] },
   // web search
   web_search: { kind: 'search' },
+  /* A fetched page is a page that was READ — its own row with the page's text
+     behind it, not "Used a tool: Web fetch". Not a browser kind: nothing was
+     browsed, so the canvas must not turn to the browser for it. */
+  web_fetch: { kind: 'page', label: ['Reading a page', 'Read a page'] },
   brave_search: { kind: 'search' },
   google: { kind: 'search' },
   search_web: { kind: 'search' },
@@ -727,7 +732,7 @@ function editDiff(args: Record<string, unknown>): DiffFileData[] | undefined {
 }
 
 /** Rows + an optional backend note parsed from a web-search tool result. */
-interface ParsedSearch {
+export interface ParsedSearch {
   results: WebSearchResultData[];
   note?: string;
 }
@@ -770,12 +775,14 @@ function parseSearchText(text: string): ParsedSearch {
     rows.push({ title: cur.title, url: cur.url, domain: hostOf(cur.url), snippet: cur.snippet });
     cur = undefined;
   };
+  let gap = false;
   for (const rawLine of text.split('\n')) {
     const line = rawLine.trim();
     const head = /^\[(?:\d+)\]\s+(.*)$/.exec(line);
     if (head !== null) {
       flush();
       cur = { title: head[1] ?? '' };
+      gap = false;
       continue;
     }
     if (cur === undefined) {
@@ -783,7 +790,19 @@ function parseSearchText(text: string): ParsedSearch {
       if (m !== null) note = m[1];
       continue; // header / note / blank lines before the first result
     }
-    if (line.length === 0) continue;
+    if (line.length === 0) {
+      gap = true;
+      continue;
+    }
+    /*
+     * A result's own lines are INDENTED; an unindented line after a blank one
+     * is the tool talking again — the citation hint the web tools end a search
+     * with — and must not become the last result's snippet.
+     */
+    if (gap && !/^\s/.test(rawLine)) {
+      flush();
+      continue;
+    }
     if (cur.url === undefined && /^https?:\/\//i.test(line)) {
       cur.url = line;
       continue;
@@ -794,8 +813,12 @@ function parseSearchText(text: string): ParsedSearch {
   return { results: rows.slice(0, 20), note };
 }
 
-/** Parse a web-search tool result into rows + note, tolerant of JSON and text. */
-function parseSearchOutcome(result: ToolResultMsg | undefined): ParsedSearch {
+/**
+ * Parse a web-search tool result into rows + note, tolerant of JSON and text.
+ * Exported for the answer's sources (chat/sources), which must read a search
+ * exactly the way its row in the chain does.
+ */
+export function parseSearchOutcome(result: Pick<ToolResultMsg, 'text'> | undefined): ParsedSearch {
   if (result === undefined || result.text.length === 0) return { results: [] };
   const rows = tryJsonRows(result.text);
   if (rows !== undefined) {
@@ -1124,11 +1147,26 @@ function mapToolStepData(
         const cliLabel = status === 'running' ? cli.running : cli.done;
         const text = str(result?.text);
         const k = cli.kind;
+        /* `web search …` is web_search: the same row, reading the same text. */
+        if (k === 'search') {
+          const { results, note } = parseSearchOutcome(result);
+          return {
+            data: {
+              kind: 'search',
+              label: cliLabel,
+              status,
+              detail: cli.detail ?? command,
+              ...(cli.detail === undefined ? {} : { query: cli.detail }),
+              ...(result === undefined ? {} : { results, note }),
+            },
+          };
+        }
         if (
           k === 'browser-navigate' ||
           k === 'browser-click' ||
           k === 'browser-type' ||
-          k === 'browser-read'
+          k === 'browser-read' ||
+          k === 'page'
         ) {
           return {
             data: {
@@ -1140,7 +1178,9 @@ function mapToolStepData(
               ...(cli.target === undefined ? {} : { target: cli.target }),
               ...(cli.typed === undefined ? {} : { typed: cli.typed }),
               // The page's text, for the read row's reveal.
-              ...(k === 'browser-read' && text !== undefined ? { preview: text } : {}),
+              ...((k === 'browser-read' || k === 'page') && text !== undefined
+                ? { preview: text }
+                : {}),
             },
           };
         }
@@ -1273,6 +1313,7 @@ function mapToolStepData(
     case 'browser-click':
     case 'browser-type':
     case 'browser-read':
+    case 'page':
       return {
         data: {
           kind,
@@ -1291,8 +1332,8 @@ function mapToolStepData(
           typed: kind === 'browser-type' ? browserTyped(args) : undefined,
           title: str(args.title),
           pageStatus: str(args.status) ?? str(args.statusText),
-          // Only the read/snapshot step expands the page text it returned.
-          preview: kind === 'browser-read' ? str(result?.text) : undefined,
+          // Only the read/snapshot step (and a fetched page) expands the text it returned.
+          preview: kind === 'browser-read' || kind === 'page' ? str(result?.text) : undefined,
         },
       };
     case 'svg':

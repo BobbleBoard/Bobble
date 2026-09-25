@@ -102,6 +102,10 @@ export type ToolIconKind =
   | 'browser-click'
   | 'browser-type'
   | 'browser-read'
+  // A web page READ without the browser (`web_fetch` / `web fetch`): a page,
+  // not a browsing step — it must not route the canvas to the browser the way
+  // the four above do (canvas/activity-routing), but it reads like one.
+  | 'page'
   // A connector / MCP call (calendar / mail / reminders / a branded MCP server):
   // renders the connector's own inline brand SVG (`iconSvg`), falling back to the
   // neutral plug glyph. "Used <connector icon> <connector name>".
@@ -213,6 +217,7 @@ export function toolIcon(
     case 'browser-type':
       return <IconKeyboard size={size} />;
     case 'browser-read':
+    case 'page':
       return <IconEye size={size} />;
     case 'canvas-open':
       return <IconExternal size={size} />;

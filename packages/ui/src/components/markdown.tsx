@@ -198,6 +198,9 @@ export interface MarkdownProps extends Omit<HTMLAttributes<HTMLDivElement>, 'chi
   /** react-markdown's URL sanitiser; the default drops every scheme but http,
    * https and mailto. A host with its own media scheme widens it here. */
   urlTransform?: Options['urlTransform'];
+  /** A host's own tree passes, run AFTER the defaults (the app's citation
+   * grouping — links to a turn's sources becoming one chip). */
+  rehypePlugins?: Options['rehypePlugins'];
 }
 
 /**
@@ -334,7 +337,7 @@ export function guardCurrencyDollars(text: string): string {
  * hosts should not double-wrap it in `<Prose>`.
  */
 export const Markdown = forwardRef<HTMLDivElement, MarkdownProps>(function Markdown(
-  { children, className, components, urlTransform, ...rest },
+  { children, className, components, urlTransform, rehypePlugins, ...rest },
   ref,
 ) {
   const merged = useMemo(
@@ -346,7 +349,9 @@ export const Markdown = forwardRef<HTMLDivElement, MarkdownProps>(function Markd
     <div ref={ref} className={clsx('pd-prose', 'pd-markdown', className)} {...rest}>
       <ReactMarkdown
         remarkPlugins={REMARK_PLUGINS}
-        rehypePlugins={REHYPE_PLUGINS}
+        rehypePlugins={
+          rehypePlugins == null ? REHYPE_PLUGINS : [...(REHYPE_PLUGINS ?? []), ...rehypePlugins]
+        }
         components={merged}
         {...(urlTransform === undefined ? {} : { urlTransform })}
       >

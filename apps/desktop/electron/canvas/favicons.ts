@@ -19,7 +19,16 @@
  *
  * Never throws. A site with no icon (or no network) resolves to `null`, and the
  * card falls back to the letter chip it already draws.
+ *
+ * KEPT ON DISK (2026-09-24, the sources wave): a hit is written under the
+ * support root for a month, so the icons in yesterday's answer are there with
+ * no network — the app is offline-first, and an icon is the same icon
+ * tomorrow. A miss is remembered for five minutes, not for the life of the
+ * process: being offline for a moment is not a fact about the site.
  */
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { isPublicHost, routeSourceUrl } from './source-fetch';
 
 /** Icon paths to try, in order. Nearly every site answers one of these. */
 const CANDIDATE_PATHS = ['/favicon.ico', '/favicon.png', '/apple-touch-icon.png'] as const;
@@ -32,8 +41,45 @@ const TIMEOUT_MS = 4000;
  * (very common) is rejected here rather than shown as a broken image. */
 const IMAGE_TYPES = /^image\/(x-icon|vnd\.microsoft\.icon|png|jpeg|gif|webp|svg\+xml)$/i;
 
-/** Resolved icons, by host. `null` records a miss so a dead host is asked once. */
-const cache = new Map<string, string | null>();
+/** Resolved icons, by host. `null` records a miss so a dead host is not asked on every render. */
+const cache = new Map<string, { readonly uri: string | null; readonly at: number }>();
+const MISS_TTL_MS = 5 * 60 * 1000;
+const HIT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+/** Where hits persist (set by main at startup); unset keeps them in memory only. */
+let diskDir: string | null = null;
+
+/** Persist hits under `dir` from now on (null: memory only). */
+export function setFaviconCacheDir(dir: string | null): void {
+  diskDir = dir;
+}
+
+function diskFile(host: string): string | null {
+  return diskDir === null ? null : join(diskDir, `${host.replace(/[^a-z0-9.-]/g, '_')}.json`);
+}
+
+function readDiskIcon(host: string): string | null {
+  const file = diskFile(host);
+  if (file === null) return null;
+  try {
+    const raw = JSON.parse(readFileSync(file, 'utf8')) as { at?: number; uri?: string };
+    if (typeof raw.at !== 'number' || typeof raw.uri !== 'string') return null;
+    return Date.now() - raw.at < HIT_TTL_MS && raw.uri.startsWith('data:image/') ? raw.uri : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeDiskIcon(host: string, uri: string): void {
+  const file = diskFile(host);
+  if (file === null) return;
+  try {
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(`${file}.tmp`, JSON.stringify({ at: Date.now(), uri }));
+    renameSync(`${file}.tmp`, file);
+  } catch {
+    // The cache is a convenience; the icon was still found.
+  }
+}
 /** In-flight lookups, so eight results on one domain make one request. */
 const inFlight = new Map<string, Promise<string | null>>();
 
@@ -47,8 +93,9 @@ export function faviconHost(input: string): string | undefined {
     if (url.protocol !== 'https:' && url.protocol !== 'http:') return undefined;
     if (url.username !== '' || url.password !== '') return undefined;
     const host = url.hostname.toLowerCase();
-    // A host with no dot is not a public site (localhost, an intranet name).
-    return host.includes('.') ? host : undefined;
+    // Not a public site — localhost, an intranet name, an address on this
+    // network — is never asked (source-fetch isPublicHost).
+    return isPublicHost(host) ? host : undefined;
   } catch {
     return undefined;
   }
@@ -58,7 +105,7 @@ async function tryPath(host: string, path: string): Promise<string | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const res = await fetch(`https://${host}${path}`, {
+    const res = await fetch(routeSourceUrl(`https://${host}${path}`), {
       signal: controller.signal,
       redirect: 'follow',
       // No cookies, no referrer: this is a decoration, not a visit.
@@ -79,13 +126,21 @@ async function tryPath(host: string, path: string): Promise<string | null> {
 
 /**
  * The site's icon as a `data:` URI, or null if it has none we can use. Cached
- * per host for the life of the process, including misses.
+ * per host — a hit for the life of the process (and on disk), a miss for a
+ * few minutes.
  */
 export async function siteFavicon(input: string): Promise<string | null> {
   const host = faviconHost(input);
   if (host === undefined) return null;
   const cached = cache.get(host);
-  if (cached !== undefined) return cached;
+  if (cached !== undefined && (cached.uri !== null || Date.now() - cached.at < MISS_TTL_MS)) {
+    return cached.uri;
+  }
+  const kept = readDiskIcon(host);
+  if (kept !== null) {
+    cache.set(host, { uri: kept, at: Date.now() });
+    return kept;
+  }
   const existing = inFlight.get(host);
   if (existing !== undefined) return await existing;
 
@@ -99,7 +154,8 @@ export async function siteFavicon(input: string): Promise<string | null> {
   inFlight.set(host, lookup);
   try {
     const result = await lookup;
-    cache.set(host, result);
+    cache.set(host, { uri: result, at: Date.now() });
+    if (result !== null) writeDiskIcon(host, result);
     return result;
   } finally {
     inFlight.delete(host);
