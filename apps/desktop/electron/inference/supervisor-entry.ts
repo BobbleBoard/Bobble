@@ -11,11 +11,14 @@
 import { execFile, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
+  closeSync,
   createReadStream,
   existsSync,
   mkdirSync,
+  openSync,
   readdirSync,
   readFileSync,
+  readSync,
   renameSync,
   rmSync,
   statfsSync,
@@ -1530,13 +1533,24 @@ function mlxTwinHasVision(dir: string): boolean {
     } else {
       const single = join(dir, 'model.safetensors');
       if (existsSync(single)) {
-        const buf = readFileSync(single);
-        const n = Number(buf.readBigUInt64LE(0));
-        const header = JSON.parse(buf.subarray(8, 8 + n).toString('utf8')) as Record<
-          string,
-          unknown
-        >;
-        names = Object.keys(header).filter((k) => k !== '__metadata__');
+        /* THE HEADER ONLY: a u64 length, then that much JSON. This read the
+           whole file — up to 2 GiB on this process's event loop at every start
+           and every menu open — and over 2 GiB readFileSync throws
+           (ERR_FS_FILE_TOO_LARGE), which read as "no vision tower". */
+        const fd = openSync(single, 'r');
+        try {
+          const len = Buffer.alloc(8);
+          readSync(fd, len, 0, 8, 0);
+          const n = Number(len.readBigUInt64LE(0));
+          // The format caps its header at 100 MB; anything larger is not one.
+          if (n > 100_000_000) return false;
+          const buf = Buffer.alloc(n);
+          if (readSync(fd, buf, 0, n, 8) !== n) return false;
+          const header = JSON.parse(buf.toString('utf8')) as Record<string, unknown>;
+          names = Object.keys(header).filter((k) => k !== '__metadata__');
+        } finally {
+          closeSync(fd);
+        }
       }
     }
     return mlxWeightsHaveVision(config, names);

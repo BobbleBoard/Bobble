@@ -25,7 +25,7 @@ import { join } from 'node:path';
 import { hardwareKey, modelDir, PINNED_LLAMACPP } from '@pi-desktop/inference';
 import { entryDir, slugFor, writeManifest } from '@pi-desktop/model-store';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { LlmStatus } from '../ipc-contract';
+import type { LlmCompanion, LlmStatus } from '../ipc-contract';
 import {
   calibrationDir,
   engineCommand,
@@ -435,5 +435,19 @@ describe('a vision fallback llama.cpp cannot take', () => {
     const s = await status();
     expect(s.profile).toEqual({ engine: 'dflash-mlx', spec: 'dflash' });
     expect(s.blindReason).toBe('engine');
+  });
+});
+
+describe("rapid-mlx's vision runtime is offered for a big single-file twin", () => {
+  it('reads the safetensors HEADER, so a twin over 2 GiB still counts as seeing', async () => {
+    engine(engineCommand('rapid-mlx'));
+    rmSync(rapidVisionMarker(), { force: true });
+    // 2.2 GB, the size readFileSync refuses (ERR_FS_FILE_TOO_LARGE).
+    await visionTwin('mlx-community/Qwen3.5-9B-MLX-8bit', 2_200_000_000);
+    const { companions } = await ask<{ companions: LlmCompanion[] }>({
+      type: 'companions',
+      modelId: 'qwen3.5-9b-mtp',
+    });
+    expect(companions.map((c) => c.kind)).toContain('engine:rapid-mlx-vision');
   });
 });
