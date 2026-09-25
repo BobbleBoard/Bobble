@@ -13,8 +13,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 type Call = { channel: string; req: unknown };
 const calls: Call[] = [];
 let forkMessages: Array<{ entryId: string; text: string }> = [];
+/** pi's session file, as `fs:read-session` hands it over (JSONL). */
+let sessionText: string | null = null;
 let serverReady: () => void = () => {};
 let parkSends = false;
+
+/* A picture needs a model that can see; the relaunch is not what is under test. */
+vi.mock('./local-model', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./local-model')>()),
+  ensureVisionMode: vi.fn(async () => ({ ok: true, changed: false })),
+}));
 
 vi.mock('../chat/auto-router', () => ({
   maybeRouteAuto: vi.fn(async () => undefined),
@@ -45,6 +53,7 @@ const invoke = vi.fn(async (channel: string, req: unknown) => {
     return { success: true, state: { sessionFile: '/s/branch.jsonl', sessionId: 'b' } };
   }
   if (channel === 'fs:delete-session') return { ok: true };
+  if (channel === 'fs:read-session') return { text: sessionText };
   return { success: true };
 });
 (globalThis as unknown as { window: unknown }).window = {
@@ -72,6 +81,7 @@ beforeEach(() => {
   calls.length = 0;
   parkSends = false;
   forkMessages = [];
+  sessionText = null;
   usePiStore.setState({
     messages: [...EARLIER],
     queuedSends: [],
@@ -265,5 +275,80 @@ describe('a chat that was nothing but the message taken back', () => {
     unsendLastSend({ text: 'what is this?', images: [] });
     await unsendSettled();
     expect(deletes()).toEqual([]);
+  });
+});
+
+describe('a message that is only a picture', () => {
+  /* pi's fork list names user messages by their TEXT and skips one that has
+     none, so a picture sent with nothing typed (and no file to name — its save
+     failed) was never found, and pi kept it and the reply it had started
+     (unsend-real-pi-probe C4b). pi's own session file has it, by entry id. */
+  const PIC = 'data:image/png;base64,AA==';
+  const jsonl = (entries: unknown[]): string => entries.map((e) => JSON.stringify(e)).join('\n');
+  const user = (id: string, parentId: string | null, content: unknown[]) => ({
+    type: 'message',
+    id,
+    parentId,
+    timestamp: 't',
+    message: { role: 'user', content, timestamp: 1 },
+  });
+  const reply = (id: string, parentId: string, text: string, stopReason = 'stop') => ({
+    type: 'message',
+    id,
+    parentId,
+    timestamp: 't',
+    message: { role: 'assistant', content: [{ type: 'text', text }], stopReason, timestamp: 1 },
+  });
+  const deletes = () => calls.filter((c) => c.channel === 'fs:delete-session').map((c) => c.req);
+
+  it('is rewound too: found in the session by its entry, not by its words', async () => {
+    await sendPrompt('', [PIC]);
+    forkMessages = [{ entryId: 'e0', text: 'hello' }];
+    sessionText = jsonl([
+      { type: 'session', version: 3, id: 's', timestamp: 't', cwd: '/w' },
+      user('e0', null, [{ type: 'text', text: 'hello' }]),
+      reply('r0', 'e0', 'hi there'),
+      user('e1', 'r0', [{ type: 'image', data: 'AA==', mimeType: 'image/png' }]),
+      reply('r1', 'e1', 'The picture shows an evening', 'aborted'),
+    ]);
+    calls.length = 0;
+    expect(unsendLastSend({ text: '', images: [PIC] })).toBe(true);
+    await unsendSettled();
+    expect(calls.find((c) => c.channel === 'pi:fork')?.req).toEqual({ entryId: 'e1' });
+    expect(usePiStore.getState().messages.map((m) => m.id)).toEqual(['u0', 'a0']);
+    // The user had said something before it: the chat stays.
+    expect(deletes()).toEqual([]);
+  });
+
+  it('never forks at a message with words in it — the picture is not there', async () => {
+    await sendPrompt('', [PIC]);
+    forkMessages = [{ entryId: 'e0', text: 'hello' }];
+    // pi never recorded the picture (the abort beat it): its newest user
+    // message is the earlier one, which has text.
+    sessionText = jsonl([
+      { type: 'session', version: 3, id: 's', timestamp: 't', cwd: '/w' },
+      user('e0', null, [{ type: 'text', text: 'hello' }]),
+      reply('r0', 'e0', 'hi there'),
+    ]);
+    calls.length = 0;
+    unsendLastSend({ text: '', images: [PIC] });
+    await unsendSettled();
+    expect(channels()).not.toContain('pi:fork');
+  });
+
+  it('a chat that was only the picture is retired like any other', async () => {
+    usePiStore.setState({ messages: [] });
+    await sendPrompt('', [PIC]);
+    forkMessages = [];
+    sessionText = jsonl([
+      { type: 'session', version: 3, id: 's', timestamp: 't', cwd: '/w' },
+      user('e1', null, [{ type: 'image', data: 'AA==', mimeType: 'image/png' }]),
+      reply('r1', 'e1', 'The picture shows', 'aborted'),
+    ]);
+    unsendLastSend({ text: '', images: [PIC] });
+    await unsendSettled();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(calls.find((c) => c.channel === 'pi:fork')?.req).toEqual({ entryId: 'e1' });
+    expect(deletes()).toEqual([{ file: '/s/chat.jsonl', chain: [] }]);
   });
 });
