@@ -101,7 +101,10 @@ beforeEach(async () => {
     abortRequested: false,
     waitingAborts: [],
   });
-});
+  /* A fresh import of pi-connect's whole module graph, per test. MEASURED: past
+     the default 10 s hook clock once in a full parallel run on a loaded Mac
+     (load average 23); it is 50 ms alone. Nothing here is timed in real time. */
+}, 60_000);
 
 afterEach(() => {
   vi.useRealTimers();
