@@ -734,6 +734,12 @@ let comfy3dRunner: Run3dFn | null = null;
 export function setComfy3dRunner(fn: Run3dFn): void {
   comfy3dRunner = fn;
 }
+/**
+ * The ComfyUI meshes in flight, by the `c3d_` id this file gave them. Their
+ * queue job has an id of its own that nothing here sees, so `gen3d:cancel`
+ * reaches one through this — the sidecar has never heard of it.
+ */
+const comfyJobs = new Map<string, AbortController>();
 
 /*
  * THE SIDECAR'S JOBS UNDER THE MEMORY GUARD.
@@ -990,12 +996,15 @@ function runComfy3d(req: Gen3dInvokeMap['gen3d:generate']['request']): {
     );
   };
 
+  const stop = new AbortController();
+  comfyJobs.set(jobId, stop);
   void runner(
     {
       imagePath,
       outputDir,
       model: COMFY_3D_MODEL_IDS[req.model ?? 'trellis2'],
       finish,
+      signal: stop.signal,
       // A hold's reason, or the room being made — said where the studio's
       // panels read, instead of "Getting the 3D module ready…" for the wait.
       onNote: (text) => say('geometry', text, 0, 0),
@@ -1035,7 +1044,10 @@ function runComfy3d(req: Gen3dInvokeMap['gen3d:generate']['request']): {
         error: message,
       });
     })
-    .finally(() => stopMemorySampling());
+    .finally(() => {
+      comfyJobs.delete(jobId);
+      stopMemorySampling();
+    });
   return { ok: true, jobId };
 }
 
@@ -1226,6 +1238,17 @@ const handlers: IpcHandlers<Gen3dInvokeMap & DictationInvokeMap> = {
     return res;
   },
   'gen3d:cancel': async (req) => {
+    /*
+     * A ComfyUI mesh is not the sidecar's. Posting its id there cancelled
+     * nothing — and booted the engine, uv and all, to do it — while the real
+     * job kept the GPU for its full 5–25 minutes.
+     */
+    const comfy = comfyJobs.get(req.jobId);
+    if (comfy !== undefined) {
+      comfy.abort();
+      return { ok: true };
+    }
+    if (req.jobId.startsWith('c3d_')) return { ok: false }; // already over
     const res = await sidecarPost<{ ok: boolean }>('/cancel', { jobId: req.jobId });
     return res ?? { ok: false };
   },
