@@ -261,17 +261,16 @@ try {
     });
   });
   await page.waitForTimeout(600);
-  // The indicator is the top-left downloads tray now (the user: nothing in the
-  // input area); its panel carries the percentage.
-  const footer = page.locator('[data-testid="download-tray"]');
-  check((await footer.count()) > 0, 'the chat screen shows a download indicator (the tray icon)');
+  // The indicator is the task tray's Downloads group now (the user: nothing in the
+  // input area); a model download reads in bytes, received / total.
+  const footer = page.locator('[data-testid="task-tray"]');
+  check((await footer.count()) > 0, 'the chat screen shows a download indicator (the tray button)');
   if ((await footer.count()) > 0) {
     await footer.click();
-    await page.waitForSelector('[data-testid="download-tray-panel"]', { timeout: 3000 });
-    const text =
-      (await page.locator('[data-testid="download-tray-panel"]').textContent())?.trim() ?? '';
+    await page.waitForSelector('[data-testid="task-tray-panel"]', { timeout: 3000 });
+    const text = (await page.locator('[data-testid="tray-downloads"]').textContent())?.trim() ?? '';
     console.log(`tray panel: "${text}"`);
-    check(/\d+%/.test(text), `the indicator carries a percentage ("${text}")`);
+    check(/\d+(\.\d)? \/ \d+(\.\d)? GB|\d+%/.test(text), `the indicator says how far ("${text}")`);
     await page.screenshot({ path: path.join(OUT, '8-footer-download.png') });
     const box = await footer.boundingBox();
     check(

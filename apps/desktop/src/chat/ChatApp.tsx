@@ -29,7 +29,6 @@ import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CHROME_LEFT, TOP_BAR_HEIGHT } from '../../electron/window-chrome';
 import { conversationNameFrom } from '../../electron/workspace/project-dir';
-import { DownloadTray } from '../models/DownloadTray';
 import { lazyRoute } from '../RouteBoundary';
 import type { SettingsSection } from '../settings/SettingsView';
 import { registerCanvasController, useCanvasStore } from '../state/canvas-store';
@@ -753,13 +752,9 @@ export function ChatApp({
                         <EngineMenu />
                       )
                     ) : null}
-                    {/* The downloads tray, on every route (downloads start on
-                        the hub and are watched from the chat): the icon is up
-                        while anything moves or there is news, and the bars,
-                        the X and the numbers live inside it. the user: "move this
-                        to the top left … with the progressbar and x inside it
-                        shown on click". */}
-                    <DownloadTray />
+                    {/* (The downloads icon that stood here now lists in the task
+                        tray beside the sidebar toggle, under "Downloads" —
+                        the user, 2026-09-24. See state/tray-transfers.ts.) */}
                   </>
                 }
                 /* The app's own state — starting up, getting ready — lives in

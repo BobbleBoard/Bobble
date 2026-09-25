@@ -1,8 +1,9 @@
 /**
  * Composer footer cluster: current-model chip (with a menu that switches pi
  * models and downloads/starts local ones) and a turn-stats info popover. The
- * download progress that used to sit here lives in the top bar's tray now
- * (DownloadTray) — the user: "remove all progressbar and such from the input area". When nothing is set up it shows
+ * download progress that used to sit here lives in the task tray now (its
+ * "Downloads" group, state/tray-transfers.ts) — the user: "remove all progressbar and
+ * such from the input area". When nothing is set up it shows
  * a tasteful "pick a model" affordance that kicks off a download (full model
  * manager is W10).
  *
@@ -138,7 +139,7 @@ export function ComposerFooter({
     <>
       {/* No download bar here any more. the user (2026-09-13): "remove all
           progressbar and such from the input area, move it up to the top bar"
-          — the downloads tray (DownloadTray, top-left) is the one place. */}
+          — the task tray's "Downloads" group (top-left) is the one place. */}
       {/* Anchor for the friendly auto-download card, which floats just above the
           model chip when Auto resolves to an un-downloaded tier. */}
       <span className="relative flex items-center">

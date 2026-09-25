@@ -505,10 +505,21 @@ function pickFile(model: CatalogModel, quant?: string): CatalogFile | undefined 
 /** What the status says while the chat model is parked for a generation. */
 const PARKED_NOTE = 'Paused to make room for a generation — back when it finishes';
 
+/**
+ * The launch in progress, for the status's `loading` — see LlmStatus.loading.
+ * Set as each launch begins (and again when a crashed server is brought back),
+ * reported only while `phase` is `starting`.
+ */
+let loading: { modelId: string; displayName: string; since: number } | undefined;
+function beginLoading(model: CatalogModel): void {
+  loading = { modelId: model.id, displayName: model.displayName, since: Date.now() };
+}
+
 function status(): LlmStatus {
   const parked = current?.supervisor.parked === true;
   return {
     phase,
+    ...(phase === 'starting' && loading !== undefined ? { loading } : {}),
     // Parked counts as running: the URL is still the URL and the model comes
     // back on it — see LlmStatus.parked.
     serverRunning: (current?.supervisor.running ?? false) || parked,
@@ -1162,6 +1173,7 @@ async function startMlxServer(
   if (!isMlxSupported()) {
     return { success: false, error: 'MLX models require Apple Silicon (darwin/arm64)' };
   }
+  beginLoading(model);
   phase = 'starting';
   lastError = undefined;
   metrics = null;
@@ -1187,6 +1199,7 @@ async function startMlxServer(
         metrics = { lastTps: event.metrics.lastTps, avgTps: event.metrics.avgTps };
         emitStatus();
       } else if (event.type === 'crash' || event.type === 'restart') {
+        beginLoading(model);
         phase = 'starting';
         emitStatus();
       } else if (event.type === 'exit' && event.reason === 'failed') {
@@ -1699,6 +1712,7 @@ async function startExternalEngine(
     return { success: true, baseUrl: current.baseUrl };
   }
 
+  beginLoading(model);
   phase = 'starting';
   lastError = undefined;
   metrics = null;
@@ -2628,6 +2642,7 @@ async function startServerExclusive(
     return { success: false, error: fit.reason };
   }
 
+  beginLoading(model);
   phase = 'starting';
   lastError = undefined;
   metrics = null;
@@ -2947,6 +2962,7 @@ async function startServerExclusive(
           if (tps !== undefined) supervisor.recordTimings({ predicted_per_second: tps });
         }
       } else if (event.type === 'crash' || event.type === 'restart') {
+        beginLoading(model);
         phase = 'starting';
         emitStatus();
       } else if (event.type === 'exit' && event.reason === 'failed') {

@@ -44,3 +44,10 @@ export const useDownloadTray = create<DownloadTrayState>((set) => ({
     }),
   markSeen: () => set({ unseen: false }),
 }));
+
+// E2E hook (same ?piE2E=1 opt-in as __pi_store): lets the tray probe show a
+// download in any state without a byte moving.
+if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('piE2E')) {
+  (window as unknown as { __download_tray: () => typeof useDownloadTray }).__download_tray = () =>
+    useDownloadTray;
+}
