@@ -55,6 +55,12 @@ export interface ChartViewProps {
   /** Extra controls rendered in the header's corner (e.g. move to canvas). */
   readonly corner?: React.ReactNode;
   readonly className?: string;
+  /**
+   * Whether the chart builds itself on arrival (the default). Off for a card
+   * taking over from a live one that already drew it: growing every bar from
+   * the axis again would read as the chart starting over.
+   */
+  readonly enter?: boolean;
 }
 
 interface Hover {
@@ -116,7 +122,7 @@ function styleVars(style: ResolvedStyle): CSSProperties {
   return vars as CSSProperties;
 }
 
-export function ChartView({ spec, fill = false, corner, className }: ChartViewProps) {
+export function ChartView({ spec, fill = false, corner, className, enter = true }: ChartViewProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
   const [boxHeight, setBoxHeight] = useState(0);
@@ -134,7 +140,7 @@ export function ChartView({ spec, fill = false, corner, className }: ChartViewPr
    * markers pop); it is dropped once the animation has had its second, so a
    * hover or a redraw never replays it. Reduced motion skips it (CSS).
    */
-  const [entering, setEntering] = useState(true);
+  const [entering, setEntering] = useState(enter);
   useEffect(() => {
     const t = setTimeout(() => setEntering(false), 1100);
     return () => clearTimeout(t);
@@ -347,6 +353,7 @@ export function ChartView({ spec, fill = false, corner, className }: ChartViewPr
                 setHover={setHover}
                 valueLabels={valueLabels}
                 gradientId={gradientId}
+                staggered={entering}
               />
             </svg>
           ) : null}
@@ -378,6 +385,7 @@ function ChartShapes({
   setHover,
   valueLabels = false,
   gradientId,
+  staggered = true,
 }: {
   spec: ChartSpec;
   layout: ChartLayout;
@@ -388,6 +396,12 @@ function ChartShapes({
   /** Write each value on its bar / point (the look, or the canvas view). */
   valueLabels?: boolean;
   gradientId: string;
+  /**
+   * The entrance's beat between bars. Only while it runs: a bar that lands
+   * later in a chart still being written rises at once (styles.css,
+   * .pd-chart--building), not after its place in a stagger long over.
+   */
+  staggered?: boolean;
 }) {
   const horizontal = spec.type === 'hbar';
   const shapes: React.ReactNode[] = [];
@@ -730,7 +744,7 @@ function ChartShapes({
                 : b.side === 'right'
                   ? `${b.x}px ${b.y + b.h / 2}px`
                   : `${b.x + b.w}px ${b.y + b.h / 2}px`,
-          animationDelay: `${Math.min(b.point, 24) * 35}ms`,
+          ...(staggered ? { animationDelay: `${Math.min(b.point, 24) * 35}ms` } : {}),
         }}
         onMouseEnter={() => setHover({ category: b.point, series: b.series, point: b.point })}
       />,

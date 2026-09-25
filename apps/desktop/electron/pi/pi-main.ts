@@ -20,6 +20,7 @@ import { MESSAGES_SEND_TOOL } from '@pi-desktop/mac-connectors/tool-names';
 import { createIpcEventSender, createLogger } from '@pi-desktop/shared';
 import { app, type IpcMainInvokeEvent, ipcMain, type WebContents } from 'electron';
 import { resolveBundledPackageAsset } from '../app-paths';
+import { registerDiagramLiveIpc } from '../gen/diagram-live';
 import { renderDiagram } from '../gen/diagram-render';
 import { guardRun } from '../gen/guardian-main';
 import { openStillWindow } from '../gen/hyperframes-window';
@@ -543,6 +544,9 @@ export function registerPiIpc(
      harness falls back to the project's brand.md or the house default. Read at
      every spawn (settings/features/design-settings.ts). */
   registerPiEnvContributor(() => ({ PI_DESKTOP_DESIGN_KIT: designKitEnv(readSettings().design) }));
+  /* A diagram call's card, drawn as its Mermaid arrives — the same renderer
+     as the tool's own drawing, frame by frame (gen/diagram-live.ts). */
+  registerDiagramLiveIpc();
   if (opts.getWindow !== undefined) {
     registerPresentBridge({
       getWindow: opts.getWindow,

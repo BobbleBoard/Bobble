@@ -29,59 +29,111 @@ import {
   IconToCanvas,
   InlineWidget,
   inlineTransitionStyle,
+  sanitizeSvg,
   useCanvasTabs,
 } from '@pi-desktop/canvas';
-import { IconButton } from '@pi-desktop/ui';
-import { type CSSProperties, useEffect, useState } from 'react';
+import { IconButton, PresentCard, type PresentCardProps } from '@pi-desktop/ui';
+import { type CSSProperties, useContext, useLayoutEffect, useRef, useState } from 'react';
 import { useCanvasStore } from '../state/canvas-store';
-import { openPresented, type PresentedRecord, presentTabKey } from '../state/present-store';
+import {
+  earlierVersion,
+  openPresented,
+  type PresentedRecord,
+  presentTabKey,
+  usePresentStore,
+} from '../state/present-store';
+import { useSvgLive } from '../state/svg-live';
 import { withViewTransition } from './canvas/view-transition';
+import { DiagramDrawing, useDataMode } from './DiagramDrawing';
+import { firstArrival, hadLiveChart, liveFrameFor, PresentedCallContext } from './live-handover';
+import { DIAGRAM_CARD_MAX_HEIGHT, kindLabel } from './PendingDiagramCard';
+import { drawIn } from './svg-draw-in';
 
 function baseName(p: string): string {
   return p.split(/[\\/]/).pop() ?? p;
 }
 
-/**
- * The app's mode as the theme sheet keys it (`data-mode` on the root), watched
- * — a diagram has a light and a dark drawing, and a theme switch swaps them
- * without a remount (the chart card reads the same attribute).
- */
-function readDataMode(): 'light' | 'dark' {
-  return typeof document !== 'undefined' &&
-    document.documentElement.getAttribute('data-mode') === 'dark'
-    ? 'dark'
-    : 'light';
-}
-
-function useDataMode(): 'light' | 'dark' {
-  const [mode, setMode] = useState(readDataMode);
-  useEffect(() => {
-    const mo = new MutationObserver(() => setMode(readDataMode()));
-    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-mode'] });
-    return () => mo.disconnect();
-  }, []);
-  return mode;
+function prefersReducedMotion(): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false)
+  );
 }
 
 /**
- * How tall a diagram card grows before the fade and "Open in canvas" take over.
- * A drawing scales to the card's WIDTH only, so height is what keeps it legible:
- * the research's flow drawn top-down (which the tool's guidance asks for — it
- * fits the chat's 700 px) is 394 × 910 px at its 16 px labels, and the 560 px
- * every other card uses cut it off at the second decision. The chat scrolls
- * vertically, so a diagram gets the height to be read whole.
+ * Whether this card was handed over just now (live-handover's firstArrival) —
+ * read once, on mount, so a card builds in as it arrives and is simply there
+ * when its chat is switched back to or it is scrolled back into being.
  */
-const DIAGRAM_CARD_MAX_HEIGHT = 960;
+export function useArrival(item: PresentedRecord): boolean {
+  const [arriving] = useState(() =>
+    firstArrival(
+      `${presentTabKey(item.path)}|${item.afterMessageId ?? ''}|${item.at}`,
+      item.shownAt,
+    ),
+  );
+  return arriving;
+}
 
-/** A diagram's head label: "Flowchart", "Sequence diagram". */
-function kindLabel(kind: string): string {
-  return kind === '' ? 'Diagram' : `${kind.charAt(0).toUpperCase()}${kind.slice(1)}`;
+/**
+ * A file's card (a document, a folder — PresentCard) that comes up into place
+ * when it is handed over, the inline canvas's fade and 6 px rise: the one
+ * build a row with nothing to draw can have. Filmed 2026-09-25, the rest of
+ * the chat's arrivals built themselves in and this one simply appeared.
+ */
+export function ArrivingPresentCard(props: PresentCardProps & { item: PresentedRecord }) {
+  const arriving = useArrival(props.item);
+  return <PresentCard {...props} {...(arriving ? { className: 'pd-arrive' } : {})} />;
+}
+
+/**
+ * A small drawing in its card — the svg surface's own box, sanitised the same
+ * way — that draws itself in on arrival (svg-draw-in.ts).
+ */
+function ArrivingSvg({ text, arrive }: { text: string; arrive: boolean }) {
+  const host = useRef<HTMLDivElement>(null);
+  const drawn = useRef(false);
+  useLayoutEffect(() => {
+    const el = host.current;
+    if (el === null) return;
+    el.innerHTML = sanitizeSvg(text);
+    const svg = el.querySelector('svg');
+    if (arrive && !drawn.current && svg !== null && !prefersReducedMotion()) drawIn(svg);
+    drawn.current = true;
+  }, [text, arrive]);
+  return <div ref={host} className="pd-canvas-svg pd-scroll" />;
 }
 
 export function PresentedInline({ item }: { item: PresentedRecord }) {
   const { tabs, controller } = useCanvasTabs();
   const mode = useDataMode();
+  /* A card that takes over from its live card (live-handover.ts): a diagram
+     starts from the live card's last frame and moves on from there; a chart
+     does not grow its bars from the axis a second time, it only comes up out
+     of the live card's dimmed build. Read once, on mount: a theme switch later
+     swaps a diagram's drawing still. */
+  const callId = useContext(PresentedCallContext);
   const key = presentTabKey(item.path);
+  /* …and a card that ARRIVES without one builds itself in, once: a diagram
+     moves on from the file's previous version (a diagram_edit a turn later)
+     or, if it has none, builds from nothing; a small drawing draws itself in
+     — unless the svg tool already drew it live (LiveSvgCard). A card scrolled
+     back to, or brought back from a transcript, is simply there. */
+  const arriving = useArrival(item);
+  const [start] = useState(() => {
+    if (item.diagram !== undefined) {
+      const live = liveFrameFor(callId, mode);
+      if (live !== null) return { from: live, buildIn: false, arriving };
+      if (!arriving) return { from: null, buildIn: false, arriving };
+      const earlier = earlierVersion(usePresentStore.getState(), item)?.diagram;
+      const was =
+        earlier === undefined ? null : mode === 'dark' ? earlier.dark.svg : earlier.light.svg;
+      return { from: was, buildIn: was === null, arriving };
+    }
+    const drawnLive = useSvgLive.getState().outputs.some((o) => o.path === item.path);
+    return { from: null, buildIn: false, arriving: arriving && !drawnLive };
+  });
+  const [tookOver] = useState(() => item.chart !== undefined && hadLiveChart(callId));
   const open = tabs.find((t) => t.key === key);
   const name =
     item.chart?.title !== undefined && item.chart.title !== ''
@@ -107,6 +159,8 @@ export function PresentedInline({ item }: { item: PresentedRecord }) {
         <div className="pd-inline-chart" style={transition}>
           <ChartView
             spec={item.chart}
+            enter={!tookOver}
+            {...(tookOver ? { className: 'pd-chart--landed' } : {})}
             corner={
               <IconButton
                 className="pd-inline-chart-move"
@@ -155,7 +209,14 @@ export function PresentedInline({ item }: { item: PresentedRecord }) {
           source={{ text: item.diagram.source }}
           maxHeight={DIAGRAM_CARD_MAX_HEIGHT}
           onMoveToCanvas={moveToCanvas}
-        />
+        >
+          <DiagramDrawing
+            svg={drawing.svg}
+            from={start.from}
+            buildIn={start.buildIn}
+            version={`${item.diagram.title}\n${item.diagram.source}`}
+          />
+        </InlineWidget>
       </div>
     );
   }
@@ -171,7 +232,9 @@ export function PresentedInline({ item }: { item: PresentedRecord }) {
           content: { kind: 'svg', text },
         }}
         onMoveToCanvas={moveToCanvas}
-      />
+      >
+        <ArrivingSvg text={text} arrive={start.arriving} />
+      </InlineWidget>
     </div>
   );
 }

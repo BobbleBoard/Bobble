@@ -28,7 +28,6 @@ import {
   IconTerminal,
   MessageActions,
   MessageRow,
-  PresentCard,
   ScrollArea,
   Spinner,
   Thread,
@@ -62,7 +61,7 @@ import { HarnessChecklistPanel, ThreadStatusIndicator } from './HarnessStatus';
 import { HistoryPole } from './HistoryPole';
 import { effectiveToolName } from './long-job';
 import { MessageErrorBoundary } from './MessageErrorBoundary';
-import { PresentedInline } from './PresentedInline';
+import { ArrivingPresentCard, PresentedInline } from './PresentedInline';
 import { awaitingReplyAfterLatestTurn, sentAttachmentsPrefilling } from './sent-prefill';
 import { ThreadMedia } from './ThreadMedia';
 import { followToLatest, useThreadFollow } from './thread-follow';
@@ -415,7 +414,7 @@ export function ChatThread() {
     return isInlinePresented(item) ? (
       <PresentedInline key={item.path} item={item} />
     ) : (
-      <PresentCard
+      <ArrivingPresentCard
         key={item.path}
         item={item}
         /* Body AND the blue Open → the canvas (the user: "by default it opens

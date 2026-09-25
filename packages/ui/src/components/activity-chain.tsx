@@ -1826,6 +1826,51 @@ function useSettled(quiet: boolean): boolean {
 }
 
 /** Collapsed/expandable run of tool + thinking steps. */
+type ChainPrefill = { percent: number | null; label?: string };
+
+/** How long the wait row takes to fold away — the CSS transition's length. */
+const WAIT_ROW_FOLD_MS = 200;
+
+/**
+ * THE WAIT ROW GROWS IN AND FOLDS AWAY; IT NEVER SNAPS.
+ *
+ * The row appears the moment a tool answers and the model starts reading the
+ * result, and it went in and out at full height in one frame — so a card drawn
+ * beneath the chain jumped 34px down at exactly the moment it was handed over
+ * (the live diagram's filmstrip, 2026-09-25; charts the same), and jumped back
+ * up when the reply started. the user asked for the building to be smooth.
+ *
+ * Growing in is CSS (`@starting-style`). Folding away needs the row to stay
+ * mounted for the length of the fold, so this keeps the last wait on screen,
+ * marked leaving — but only when nothing takes its place: when the next step
+ * arrives in the same render, the new row replaces it at the same height and
+ * nothing below moves, which is what already happened, so that stays a swap.
+ */
+function useFoldingWaitRow(
+  prefill: ChainPrefill | undefined,
+  stepCount: number,
+): { shown: ChainPrefill | undefined; leaving: boolean } {
+  const last = useRef<ChainPrefill | undefined>(prefill);
+  if (prefill !== undefined) last.current = prefill;
+  const has = prefill !== undefined;
+  const [seen, setSeen] = useState({ has, stepCount });
+  const [folding, setFolding] = useState<ChainPrefill | null>(null);
+  // Adjusted during render (not in an effect) so the leaving row is the SAME
+  // element in the same commit — a remounted row has no height to fold from.
+  if (seen.has !== has || seen.stepCount !== stepCount) {
+    setSeen({ has, stepCount });
+    setFolding(
+      !has && seen.has && stepCount === seen.stepCount ? (last.current ?? null) : null,
+    );
+  }
+  useEffect(() => {
+    if (folding === null) return;
+    const t = setTimeout(() => setFolding(null), WAIT_ROW_FOLD_MS);
+    return () => clearTimeout(t);
+  }, [folding]);
+  return { shown: prefill ?? folding ?? undefined, leaving: prefill === undefined };
+}
+
 export const ActivityChain = forwardRef<HTMLDivElement, ActivityChainProps>(function ActivityChain(
   {
     steps,
@@ -1892,6 +1937,7 @@ export const ActivityChain = forwardRef<HTMLDivElement, ActivityChainProps>(func
    * when "Done" may be printed — a claim about the work, not about who is on
    * screen.
    */
+  const waitRow = useFoldingWaitRow(prefill, steps.length);
   const live = active || running || prefill !== undefined;
   const isExpanded = expanded ?? (userChose || !live ? internalExpanded : true);
   /* A PREFILLING turn is not a settled one. Without this the chain has no
@@ -2036,22 +2082,31 @@ export const ActivityChain = forwardRef<HTMLDivElement, ActivityChainProps>(func
                 uses, so one visual language means one thing; replaced by the real
                 tool call or thought the moment tokens resume, because the prop is
                 cleared then. */}
-            {prefill !== undefined ? (
-              <div className="pd-chain-step pd-chain-step--prefill">
-                <div className="pd-chain-step-row">
-                  <span className="pd-chain-step-icon">
-                    <ContextGauge
-                      value={prefill.percent === null ? 0 : Math.min(1, prefill.percent / 100)}
-                      size={14}
-                      className={`pd-processing-ring${prefill.percent === null ? ' pd-processing-ring--indeterminate' : ''}`}
-                      label="processing"
-                    />
-                  </span>
-                  <ShimmerText className="pd-chain-step-label">
-                    {prefill.percent === null
-                      ? `${prefill.label ?? 'Processing'}…`
-                      : `${Math.round(prefill.percent)}% · ${prefill.label ?? 'processing the prompt'}`}
-                  </ShimmerText>
+            {waitRow.shown !== undefined ? (
+              <div
+                className="pd-chain-step pd-chain-step--prefill"
+                data-leaving={waitRow.leaving ? 'true' : undefined}
+              >
+                <div className="pd-chain-step-fold">
+                  <div className="pd-chain-step-row">
+                    <span className="pd-chain-step-icon">
+                      <ContextGauge
+                        value={
+                          waitRow.shown.percent === null
+                            ? 0
+                            : Math.min(1, waitRow.shown.percent / 100)
+                        }
+                        size={14}
+                        className={`pd-processing-ring${waitRow.shown.percent === null ? ' pd-processing-ring--indeterminate' : ''}`}
+                        label="processing"
+                      />
+                    </span>
+                    <ShimmerText className="pd-chain-step-label">
+                      {waitRow.shown.percent === null
+                        ? `${waitRow.shown.label ?? 'Processing'}…`
+                        : `${Math.round(waitRow.shown.percent)}% · ${waitRow.shown.label ?? 'processing the prompt'}`}
+                    </ShimmerText>
+                  </div>
                 </div>
               </div>
             ) : null}

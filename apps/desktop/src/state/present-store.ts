@@ -62,6 +62,32 @@ export interface PresentedRecord {
    * the drawing itself goes inline; a poster stays a canvas tab.
    */
   svg?: { width: number; height: number; bytes: number; text?: string };
+  /**
+   * When it was handed over, in THIS run of the app (wall clock) — absent for
+   * a card brought back from a transcript. A card that has only just arrived
+   * builds itself in (a drawing draws, a diagram moves from its last version);
+   * one scrolled back to, or rehydrated after a restart, is simply there.
+   */
+  shownAt?: number;
+}
+
+/**
+ * The card this one is a new version of: the same file, handed over earlier
+ * in the same chat (a diagram_edit a turn later, a chart redrawn in place) —
+ * what a new version moves on from as it arrives.
+ */
+export function earlierVersion(
+  state: { byChat: Record<string, PresentedRecord[]> },
+  item: PresentedRecord,
+): PresentedRecord | undefined {
+  const chat = Object.values(state.byChat).find((list) => list.includes(item));
+  if (chat === undefined) return undefined;
+  let best: PresentedRecord | undefined;
+  for (const r of chat) {
+    if (r === item || r.path !== item.path || r.at >= item.at) continue;
+    if (best === undefined || r.at > best.at) best = r;
+  }
+  return best;
 }
 
 /** Does this record show the thing itself in the thread (a chart or diagram card, a small SVG)? */
@@ -142,6 +168,8 @@ interface PresentState {
     chart?: Record<string, unknown>;
     diagram?: DiagramCardPayload;
     svg?: { width: number; height: number; bytes: number; text?: string };
+    /** Handed over just now, in this run (see PresentedRecord.shownAt). */
+    shownAt?: number;
   }) => PresentedRecord;
   /** Attach the apps that can open a presented artefact (async, best-effort). */
   setApps: (path: string, apps: OpenWithChoice[], defaultAppId: string | null) => void;
@@ -175,7 +203,16 @@ export function presentedFor(state: PresentState, chat: string): PresentedRecord
 
 export const usePresentStore = create<PresentState>((set, get) => ({
   byChat: {},
-  add: ({ path, note, afterMessageId = null, chat = UNSAVED_CHAT, chart, diagram, svg }) => {
+  add: ({
+    path,
+    note,
+    afterMessageId = null,
+    chat = UNSAVED_CHAT,
+    chart,
+    diagram,
+    svg,
+    shownAt,
+  }) => {
     const { kind } = classifyPresented(path);
     const have = presentedFor(get(), chat);
     // A spec main could read but the chart model cannot make sense of is a
@@ -197,6 +234,7 @@ export const usePresentStore = create<PresentState>((set, get) => ({
       ...(spec !== undefined ? { chart: spec } : {}),
       ...(spec === undefined && diagram !== undefined ? { diagram } : {}),
       ...(svg !== undefined ? { svg } : {}),
+      ...(shownAt !== undefined ? { shownAt } : {}),
     };
     /*
      * A file presented again from the SAME message (the model iterating within
@@ -712,6 +750,7 @@ export function presentFromMain({
     ...(chart !== undefined ? { chart } : {}),
     ...(diagram !== undefined ? { diagram } : {}),
     ...(svg !== undefined ? { svg } : {}),
+    shownAt: Date.now(),
   });
   // The canvas belongs to the chat on screen; a background chat's artefact
   // waits in its card until the user comes back to it. A chart or a small

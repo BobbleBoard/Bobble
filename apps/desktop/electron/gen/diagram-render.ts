@@ -85,7 +85,12 @@ function diagramSession(): Electron.Session {
   return s;
 }
 
-async function openDiagramWindow(): Promise<{ page: DiagramPage; dispose: () => void }> {
+/**
+ * A hidden Mermaid window with the page and Mermaid in it. One per final
+ * render here; the live card keeps one open while a diagram streams in
+ * (diagram-live.ts).
+ */
+export async function openDiagramWindow(): Promise<{ page: DiagramPage; dispose: () => void }> {
   const win = new BrowserWindow({
     width: 1600,
     height: 1200,

@@ -95,8 +95,10 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  /* Buffer spacing between steps (round-3: rows were too tight). */
-  gap: 8px;
+  /* Buffer spacing between steps (round-3: rows were too tight). A variable,
+     because the wait row folds its share of it away with itself. */
+  --pd-chain-gap: 8px;
+  gap: var(--pd-chain-gap);
   padding: 4px 0;
 }
 
@@ -116,6 +118,49 @@
 
 .pd-chain-step {
   position: relative;
+}
+
+/*
+ * THE WAIT ROW GROWS IN AND FOLDS AWAY (useFoldingWaitRow in
+ * activity-chain.tsx). It went in and out at full height in one frame, so a
+ * card beneath the chain jumped 34px down the moment a tool answered and back
+ * up when the reply began. Animating the grid row rather than the height lets
+ * it move to and from its own natural size; `@starting-style` is the frame it
+ * grows from. 200ms matches WAIT_ROW_FOLD_MS, which keeps a leaving row
+ * mounted for exactly as long as it takes to fold. The row's share of the
+ * steps' flex gap folds with it (the negative margin): MEASURED, the gap alone
+ * still arrived in one frame — an 8px step inside an otherwise smooth glide.
+ */
+.pd-chain-step--prefill {
+  display: grid;
+  grid-template-rows: 1fr;
+  margin-top: 0;
+  opacity: 1;
+  transition:
+    grid-template-rows 200ms var(--pd-easing-standard),
+    margin-top 200ms var(--pd-easing-standard),
+    opacity 160ms var(--pd-easing-standard);
+}
+@starting-style {
+  .pd-chain-step--prefill {
+    grid-template-rows: 0fr;
+    margin-top: calc(-1 * var(--pd-chain-gap, 8px));
+    opacity: 0;
+  }
+}
+.pd-chain-step--prefill[data-leaving="true"] {
+  grid-template-rows: 0fr;
+  margin-top: calc(-1 * var(--pd-chain-gap, 8px));
+  opacity: 0;
+}
+.pd-chain-step-fold {
+  min-height: 0;
+  overflow: hidden;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pd-chain-step--prefill {
+    transition: none;
+  }
 }
 
 /*

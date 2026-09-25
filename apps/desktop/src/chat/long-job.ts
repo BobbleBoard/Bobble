@@ -236,11 +236,31 @@ export function commandOfArgs(args: unknown): string | undefined {
 }
 
 /**
+ * The chart or diagram tool behind a command line — `chart bar "Sales" …`,
+ * `diagram "Flow" --source '…'`, their `edit` subcommands — or null. Only as
+ * THE command (the CLI form the model is taught), and not its manual.
+ *
+ * Their cards are the answer and stand beneath the chain (turn-cards.ts
+ * PRESENTING); read as plain `bash`, a CLI-mode chart or diagram — the
+ * default tool interface — was filed INSIDE the chain as a small attachment,
+ * and its live card, beneath the chain, had nowhere to hand over to.
+ */
+export function presentingToolOfCommand(command: string | undefined): string | null {
+  if (typeof command !== 'string') return null;
+  const m = /^\s*(chart|diagram)(?:\s+(edit)(?=\s|$)|(?=\s|$))/.exec(command);
+  if (m === null || /\s(?:--help|-h)(?:\s|$)/.test(command)) return null;
+  return m[2] === 'edit' ? `${m[1]}_edit` : (m[1] ?? null);
+}
+
+/**
  * What a tool call is FOR: its own name, or — for a shell call running one of
- * the media commands — the generation tool behind that command.
+ * the media commands, or the chart or diagram command — the tool behind it.
  */
 export function effectiveToolName(name: string | undefined, args: unknown): string | undefined {
-  if (name === 'bash') return mediaToolOfCommand(commandOfArgs(args)) ?? name;
+  if (name === 'bash') {
+    const command = commandOfArgs(args);
+    return mediaToolOfCommand(command) ?? presentingToolOfCommand(command) ?? name;
+  }
   return name;
 }
 

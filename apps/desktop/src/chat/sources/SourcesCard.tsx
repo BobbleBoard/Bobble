@@ -21,7 +21,11 @@ import './sources.css';
 /** Rows shown before "Show all". */
 export const SOURCES_FOLDED = 3;
 
-export function SourcesCard() {
+/**
+ * `arriving`: the answer above finished in front of you, so the card comes up
+ * into place (pd-arrive) instead of appearing in one frame under it.
+ */
+export function SourcesCard({ arriving = false }: { arriving?: boolean }) {
   const turn = useTurnSources();
   const [expanded, setExpanded] = useState(false);
   const sources = turn?.ordered ?? [];
@@ -29,7 +33,11 @@ export function SourcesCard() {
   const head = sources.slice(0, SOURCES_FOLDED);
   const rest = sources.slice(SOURCES_FOLDED);
   return (
-    <section className="pd-sources" data-testid="sources-card" aria-label="Sources">
+    <section
+      className={arriving ? 'pd-sources pd-arrive' : 'pd-sources'}
+      data-testid="sources-card"
+      aria-label="Sources"
+    >
       <div className="pd-sources-head">
         <span className="pd-sources-title">Sources</span>
         <span className="pd-sources-count">{sources.length}</span>

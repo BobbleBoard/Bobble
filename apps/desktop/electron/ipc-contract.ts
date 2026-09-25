@@ -36,6 +36,7 @@ import {
   type EditorEventMap,
   type EditorInvokeMap,
 } from './editor/editor-contract';
+import { DIAGRAM_INVOKE_CHANNELS, type DiagramInvokeMap } from './gen/diagram-contract';
 import {
   GEN_CATALOG_INVOKE_CHANNELS,
   GEN_INVOKE_CHANNELS,
@@ -1227,6 +1228,7 @@ export type AppInvokeMap = CoreInvokeMap &
   ImportInvokeMap &
   GenCatalogInvokeMap &
   GenInvokeMap &
+  DiagramInvokeMap &
   Gen3dInvokeMap &
   StoreInvokeMap &
   StorageInvokeMap &
@@ -1271,6 +1273,7 @@ export const APP_INVOKE_CHANNELS = [
   ...IMPORT_INVOKE_CHANNELS,
   ...GEN_CATALOG_INVOKE_CHANNELS,
   ...GEN_INVOKE_CHANNELS,
+  ...DIAGRAM_INVOKE_CHANNELS,
   ...GEN3D_INVOKE_CHANNELS,
   ...STORE_INVOKE_CHANNELS,
   ...STORAGE_INVOKE_CHANNELS,
