@@ -1,10 +1,11 @@
 # Bobble — status
 
-Updated: 2026-09-24 (evening) · main `f56047f2` (+ this file) · **installed in /Applications: `candidate/2026-09-24` (`23a2ac12`)** = last night's candidate + the elevation, History-card and sidebar/lockup fixes below, packaged probe + smoke OK, signed with the stable identity · **the user's batch (next section) is on main but NOT installed yet** — it ships together with the two tracks still running, once they are merged and verified · the rest of the big push stays **paused for the user's testing**, except visual quality (pinned)
+Updated: 2026-09-24 (night) · main `27c1d87a` · **installed in /Applications: `candidate/2026-09-24b` (`1ad52471`)** = last night's candidate + everything on main below (the user's batch, the thread and images tracks, VQ wave 1), packaged probe + smoke OK, signed with the stable identity · the rest of the big push stays **paused for the user's testing**, except visual quality (pinned)
 
 ## 📌 PINNED HIGH PRIORITY — Visual quality (office, charts, HyperFrames) — the user, 2026-09-24
 Order of work:
-1. **Land Wave 1 on main, verified** — VQ-00 eval harness, VQ-01 office renderer correctness (`push/vq-office-w1`), VQ-02 chart hardening, VQ-03 palette checks, VQ-11L HyperFrames title card (`push/vq-kit-w1`). Today they exist only in the installed candidate, unverified. Before/after renders from the eval harness for every sample prompt, and the owed prefill/TTFT check on VQ-02's prompt delta (+~0.8k chars per mode).
+1. ✅ **Wave 1 landed on main, verified (2026-09-24 night, `d15ee83b` + `97e9ed82`)** — the eval harness judged main and the merged branch with the same ruler: "22M" drew as **3** and "$1.2M" errored → 22,000,000 and $1.2M/$2.4M; the HyperFrames title card printed the whole prompt → "Tidewell" + tagline; a deck's bars read a bare "GW" → 1,200 GW…; two chart calls overwrote one file → two files; overlaps 3→1, contrast fails 63→56, palette fails 5→3. Prefill: the opening prefix is byte-identical in both tool modes (CLI 3,377 of 3,495 tokens cached, 341→341 ms; schemas 5,087 of 5,205, 343→338 ms); a chart turn now takes one tool round trip (457 tokens computed) where main took two (388 + 976). Unit suites 7,461 pass.
+   Was: **Land Wave 1 on main, verified** — VQ-00 eval harness, VQ-01 office renderer correctness (`push/vq-office-w1`), VQ-02 chart hardening, VQ-03 palette checks, VQ-11L HyperFrames title card (`push/vq-kit-w1`). Today they exist only in the installed candidate, unverified. Before/after renders from the eval harness for every sample prompt, and the owed prefill/TTFT check on VQ-02's prompt delta (+~0.8k chars per mode).
 2. **Finish VQ-08 anti-fabrication** (invented numbers, quotes, URLs and attributions flagged; WIP on `push/vq-office-w1`).
 3. **Wave 2** — VQ-04 design kit, VQ-10 `diagram` tool, VQ-05 HTML → native emitters, WF-06 render-from-spec (deliverables/research/PLAN.md §10).
 
@@ -23,9 +24,20 @@ On main (`f600b3c7` … `f56047f2`), not in the installed candidate yet. Unit su
 | "leaving a studio with a generation running and then going back doesn't keep it going, or maybe it does but the UI resets" | the job ran on; the room forgot it: an empty room with a live Generate over a busy GPU, a picture finished while away never listed, a failure never shown, the 3D clock back at 0 | the job, prompt, knobs, result and error survive leaving; 3D keeps its clock; the % pill carries on instead of counting from 0 | `studio-leave-return-probe.mjs` | `50883cbe`, `7c377390` |
 | "a little notifications button … to the right of the collapse sidebar button, this only appears when you leave a running task … a quick little card" | — | a bell beside the collapse button while a chat turn or studio job you left is running or finished-unseen; its slot opens with it (no gap when empty); compact card, status said once, a row takes you there | `task-tray-look.mjs` | `50883cbe`, `f56047f2` |
 
-**Still running (two agents; not merged):**
-- Thread placement — intermediate generations inside the thinking block (the generating card stays out) · Enter takes you to the bottom · ⌘Z within 3 s of sending, with the input empty, unsends and rewinds.
-- Images — click a finished card to open it · copy an image and paste it into our composer · fullscreen viewer with the studio's left toolbar and a centred "Edit image" bar · plus the Image Studio Edit fix (Known issues).
+**The two tracks — merged and installed (`496971b0`, `4b10d749`, `bfd43b10`; candidate `1ad52471`):**
+| Request (the user) | Before | After | Proof |
+|---|---|---|---|
+| Intermediate generations "should be embedded in thinking blocks, not the generating card, that stays out" | four finished edits stacked full size below the generating card, then above the reply | each result files into the thinking chain under its own row; the generating card stays out, below the chain; when the turn ends the chain folds and only what the turn produced stays out (drafts a later edit used stay in) | `turn-cards-look.mjs` |
+| "pressing enter on a chat should take you to the bottom" | the view stayed 7,200px up | re-pins and follows the reply; scrolling up mid-reply still lets go | `send-follow-probe.mjs` |
+| ⌘Z within 3 s of sending, input empty, "should unsend+rewind the chat" | ⌘Z left the message sent and its reply running | the message leaves the thread, its turn is aborted, pi's session is forked at it, the text goes back in the box; a queued message just comes off the queue. Prefill after an unsend: 13 of 3,460 tokens computed, 213 ms (the fork now keeps its frozen prompt — it was re-reading 3,451) | `unsend-probe.mjs`, `unsend-prefill-probe.mjs` |
+| "clicking on a card … does not expand/open it" | a click did nothing | the picture opens the viewer | `image-viewer-probe.mjs` |
+| "copy and then attempting pasting into our own apps input bar doesn't work" | pictures vanished on ⌘V | a card's copy, a screenshot or an outside PNG attaches as a picture; the newest copy wins over a copied chip | `image-viewer-probe.mjs` (private clipboard — the system pasteboard is never written by a run now) |
+| "images clicked on/fullscreened should have the new studio like ui … a centered bottom 'edit image' input bar" | the old centred overlay | tool rail on the left (Copy, Export, Show in Finder, Send to chat, Open in Image Studio), picture centred, "Edit image" bar with a Low/Medium/High Change picker, History after the first edit; a real edit ran twice on Qwen-Image 2.1 (82 s Medium, 147 s High) | `image-viewer-probe.mjs` (REAL=1 for the real edit) |
+| (found by the tracks) the Image Studio's Edit never edited | `gen:generate` dropped the input image, strength and guidance | forwarded; an edit's waiting card says "Editing your image…" | `image-edit.test.ts`, `pending-phases.test.ts` |
+
+**Now building:**
+- "why not handle this natively so that any image(s)/files/folders… can be pasted into the input box" (the user) — attachments become real files: Finder files and folders (one or many) keep their paths, pasted pixels are saved once, PDFs/zips/folders stop being "skipped" and reach the model as paths; your own images open in the viewer. One agent.
+- The task tray grows "Downloads" and "Loading" sections (the user): white text naming the operation, a thin blue bar with % or GB / GB, a red X to cancel.
 - Not started (optional): ChatGPT's "gravity effect" on the generating card; the subtle glow is done.
 
 ## The big push (from 2026-09-23) — where each track stands
@@ -101,8 +113,10 @@ VQ-08 anti-fabrication (vq-office-w1 WIP), extra w0-b/wf-00b edits (WIP). Branch
 - `deliverables/review/wave-0923-findings.md`: 6 confirmed bugs in the vision work (worst: calibration/clicked rapid-mlx rows silently switched to the vision lane) + 33 unverified candidates.
 - **Image Studio's Edit never edited**: `gen:generate` dropped the input image, strength and guidance, so an "edit" was a fresh picture. Found by the studio track today; the Images track owns the fix.
 - **3D studio (view-only)**: the progress bar overlaps the Finish row. Found today, not fixed.
-- **VQ-02's prompt delta** (+~0.8k chars per mode, in the candidate): prefill/TTFT check owed — the pinned track's first item.
 - A stale Ladle (component browser) build ships inside the app bundle, ~3 MB. Minor.
+- The gen3d-engine Python tests run on the system `python3` (3.9.6, no `tomllib`, no tarfile `filter`): 2 of 81 fail on main too. The engine itself runs on 3.12.
+- From the thread track: a finished card moves into the chain (and remounts) when the next tool call starts; a picture the model also embeds in its reply shows twice (older); ⌘Z into a turn already producing output aborts it and keeps the partial reply; an image-only message cannot be rewound out of pi's session.
+- From the images track: the edit re-renders toward the words (img2img), so a Medium lighting change is subtle; the true instruction editor (Mage-Flow-Edit) needs the Bobble 3D engine.
 
 ## Blocked on the user
 - Testing + feedback on the candidate and the prototypes.
