@@ -23,6 +23,11 @@
  *
  * What is listed and when it clears is decided in state/task-tray.ts; this
  * file only draws it.
+ *
+ * Downloads and loads (the user, 2026-09-24: "put downloads/model load progress
+ * into aswell, eg. headers for 'Downloads' 'Loading'") list under their own
+ * headers — the operation in words, a thin blue bar with how far, a red X when
+ * it can be stopped. What those rows say is state/tray-transfers.ts.
  */
 import {
   formatDuration,
@@ -35,7 +40,12 @@ import {
   Spinner,
 } from '@pi-desktop/ui';
 import { type JSX, useEffect, useMemo, useState } from 'react';
+import { IconPause, IconPlay } from '../settings/icons';
+import { useDownloadTray } from '../state/download-tray';
+import { useGenModulesStore } from '../state/gen-modules-store';
+import { useLlmStore } from '../state/llm-store';
 import { useModalityStore } from '../state/modality-store';
+import { useStoreModels } from '../state/store-models';
 import {
   type TaskPlace,
   type TaskState,
@@ -44,6 +54,13 @@ import {
   trayTone,
   useTaskTray,
 } from '../state/task-tray';
+import {
+  expectedLoadMs,
+  noticeTitle,
+  type TransferCancel,
+  type TransferRow,
+  transferRows,
+} from '../state/tray-transfers';
 
 const WORD: Record<TaskState, string> = {
   running: 'Running',
@@ -191,6 +208,103 @@ function summary(rows: readonly TrayTask[]): string {
   return `${rows.length === 1 ? '1 task' : `${rows.length} tasks`} you left — ${parts.join(', ')}`;
 }
 
+/** The button's label with the downloads and loads counted in. */
+function trayLabel(
+  rows: readonly TrayTask[],
+  transfers: readonly TransferRow[],
+  notices: number,
+): string {
+  const parts: string[] = [];
+  if (rows.length > 0) parts.push(summary(rows));
+  const downloads = transfers.filter((t) => t.section === 'downloads').length;
+  if (downloads > 0) parts.push(downloads === 1 ? '1 download' : `${downloads} downloads`);
+  const load = transfers.find((t) => t.section === 'loading');
+  if (load !== undefined) parts.push(load.title);
+  if (notices > 0)
+    parts.push(notices === 1 ? '1 download to look at' : `${notices} downloads to look at`);
+  return parts.join(' · ');
+}
+
+/**
+ * One download or load: the operation in words, and under it a thin blue bar,
+ * how far (bytes or a percentage), and the red X that stops it.
+ */
+function TransferItem({ row, onCancel }: { row: TransferRow; onCancel: () => void }): JSX.Element {
+  const known = row.fraction !== null;
+  const paused = row.pause?.paused === true;
+  return (
+    <li
+      className="pd-transfer"
+      data-testid="transfer-row"
+      data-key={row.key}
+      data-paused={paused ? 'true' : undefined}
+    >
+      <span className="pd-transfer-head">
+        <span className="pd-transfer-title" data-testid="transfer-title" title={row.title}>
+          {row.title}
+        </span>
+        {row.note !== undefined ? (
+          <span className="pd-transfer-note" data-testid="transfer-note">
+            {row.note}
+          </span>
+        ) : null}
+      </span>
+      <span className="pd-transfer-line">
+        <span
+          className="pd-transfer-bar"
+          role="progressbar"
+          aria-label={row.title}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          {...(known ? { 'aria-valuenow': Math.floor((row.fraction ?? 0) * 100) } : {})}
+          data-indeterminate={known ? undefined : 'true'}
+        >
+          <span
+            className="pd-transfer-fill"
+            {...(known ? { style: { width: `${(row.fraction ?? 0) * 100}%` } } : {})}
+          />
+        </span>
+        <span className="pd-transfer-amount" data-testid="transfer-amount">
+          {row.amount}
+        </span>
+        {row.pause !== undefined ? (
+          <button
+            type="button"
+            className="pd-transfer-pause pd-focusable"
+            aria-label={`${paused ? 'Resume' : 'Pause'} ${row.title}`}
+            title={paused ? 'Resume' : 'Pause'}
+            data-testid="transfer-pause"
+            onClick={() => {
+              const llm = useLlmStore.getState();
+              void (paused ? llm.resumeDownload() : llm.pauseDownload());
+            }}
+          >
+            {paused ? <IconPlay size={12} /> : <IconPause size={12} />}
+          </button>
+        ) : null}
+        {row.cancel !== undefined ? (
+          <button
+            type="button"
+            className="pd-transfer-x pd-focusable"
+            aria-label={`Stop ${row.title}`}
+            title="Stop"
+            data-testid="transfer-cancel"
+            onClick={onCancel}
+          >
+            <IconClose size={10} />
+          </button>
+        ) : null}
+      </span>
+    </li>
+  );
+}
+
+function cancelTransfer(cancel: TransferCancel): void {
+  if (cancel.kind === 'llm-download') void useLlmStore.getState().cancelDownload();
+  else if (cancel.kind === 'store-download') void useStoreModels.getState().cancel(cancel.repo);
+  else void useLlmStore.getState().stopServer();
+}
+
 export function TaskTray({
   onOpenChat,
 }: {
@@ -205,15 +319,61 @@ export function TaskTray({
   const rows = useMemo(() => trayRows({ live, ended, surface }), [live, ended, surface]);
   const tone = trayTone(rows);
   const [open, setOpen] = useState(false);
+
+  const llmDownload = useLlmStore((s) => s.download);
+  const catalog = useLlmStore((s) => s.catalog);
+  const status = useLlmStore((s) => s.status);
+  const storeProgress = useStoreModels((s) => s.progress);
+  const modules = useGenModulesStore((s) => s.modules);
+  const notices = useDownloadTray((s) => s.notices);
+  const unseen = useDownloadTray((s) => s.unseen);
+  const dismissNotice = useDownloadTray((s) => s.dismiss);
+  const markSeen = useDownloadTray((s) => s.markSeen);
+  const loadingNow = status.phase === 'starting' && status.loading !== undefined;
+  const moving =
+    llmDownload !== null ||
+    Object.keys(storeProgress).length > 0 ||
+    modules.some((m) => m.installing) ||
+    loadingNow;
+
+  const now = useNow(open, moving || rows.some((r) => r.state === 'running' || r.state === 'done'));
+  const transfers = useMemo(
+    () =>
+      transferRows({
+        llmDownload,
+        llmName:
+          llmDownload === null
+            ? ''
+            : (catalog.find((c) => c.id === llmDownload.modelId)?.displayName ??
+              llmDownload.modelId),
+        store: Object.values(storeProgress),
+        modules,
+        status,
+        now,
+        expectedLoadMs:
+          status.loading === undefined ? undefined : expectedLoadMs(status.loading.modelId),
+      }),
+    [llmDownload, catalog, storeProgress, modules, status, now],
+  );
+  const downloads = transfers.filter((t) => t.section === 'downloads');
+  const loads = transfers.filter((t) => t.section === 'loading');
+  const shown = rows.length + transfers.length + notices.length;
+  // Tasks alone keep the card they always had; with anything else beside them,
+  // every group says what it is.
+  const sectioned =
+    [rows.length > 0, downloads.length + notices.length > 0, loads.length > 0].filter(Boolean)
+      .length > 1;
+
   // Nothing left to show closes the card rather than leaving an empty sheet up.
   useEffect(() => {
-    if (rows.length === 0) setOpen(false);
-  }, [rows.length]);
-  const now = useNow(
-    open,
-    rows.some((r) => r.state === 'running' || r.state === 'done'),
-  );
+    if (shown === 0) setOpen(false);
+  }, [shown]);
   const finishedCount = rows.filter((r) => r.state === 'done' || r.state === 'failed').length;
+  /* The dot on the button: a task's tone first; otherwise news about a download
+     nobody has looked at yet — blue for finished, red for could-not. */
+  const newsTone =
+    unseen && notices.length > 0 ? (notices[0]?.kind === 'failed' ? 'failed' : 'done') : null;
+  const dot = tone ?? newsTone;
 
   const go = (task: TrayTask): void => {
     setOpen(false);
@@ -234,22 +394,28 @@ export function TaskTray({
     <div
       className="pd-task-tray-slot"
       data-testid="task-tray-slot"
-      data-open={rows.length > 0 ? 'true' : undefined}
+      data-open={shown > 0 ? 'true' : undefined}
     >
-      {rows.length > 0 ? (
-        <Popover open={open} onOpenChange={setOpen}>
+      {shown > 0 ? (
+        <Popover
+          open={open}
+          onOpenChange={(o) => {
+            setOpen(o);
+            if (o) markSeen();
+          }}
+        >
           <PopoverTrigger asChild>
             <button
               type="button"
               className="[-webkit-app-region:no-drag] pd-focusable pd-task-tray-button"
               data-testid="task-tray"
-              data-tone={tone ?? 'running'}
-              aria-label={summary(rows)}
-              title="Tasks you left"
+              data-tone={dot ?? 'running'}
+              aria-label={trayLabel(rows, transfers, notices.length)}
+              title={rows.length > 0 ? 'Tasks you left' : 'Downloads and loading'}
             >
               <Glyph name="notifications" size={16} />
-              {tone !== null ? (
-                <span className="pd-task-tray-dot" data-tone={tone} aria-hidden="true" />
+              {dot !== null ? (
+                <span className="pd-task-tray-dot" data-tone={dot} aria-hidden="true" />
               ) : null}
             </button>
           </PopoverTrigger>
@@ -261,17 +427,79 @@ export function TaskTray({
             data-testid="task-tray-panel"
             aria-label="Tasks you left"
           >
-            <ul className="pd-task-tray-list">
-              {rows.map((task) => (
-                <TaskRow
-                  key={task.key}
-                  task={task}
-                  now={now}
-                  onOpen={() => go(task)}
-                  onDismiss={() => dismiss(task.key)}
-                />
-              ))}
-            </ul>
+            {rows.length > 0 ? (
+              <section className="pd-tray-section" aria-label="Tasks">
+                {sectioned ? <div className="pd-menu-label">Tasks</div> : null}
+                <ul className="pd-task-tray-list">
+                  {rows.map((task) => (
+                    <TaskRow
+                      key={task.key}
+                      task={task}
+                      now={now}
+                      onOpen={() => go(task)}
+                      onDismiss={() => dismiss(task.key)}
+                    />
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+            {downloads.length + notices.length > 0 ? (
+              <section
+                className="pd-tray-section"
+                aria-label="Downloads"
+                data-testid="tray-downloads"
+              >
+                <div className="pd-menu-label">Downloads</div>
+                <ul className="pd-transfer-list">
+                  {downloads.map((t) => (
+                    <TransferItem
+                      key={t.key}
+                      row={t}
+                      onCancel={() => {
+                        if (t.cancel !== undefined) cancelTransfer(t.cancel);
+                      }}
+                    />
+                  ))}
+                  {notices.map((n) => (
+                    <li
+                      key={n.key}
+                      className="pd-transfer-notice"
+                      data-kind={n.kind}
+                      data-testid="transfer-notice"
+                    >
+                      <span className="pd-transfer-title">{noticeTitle(n)}</span>
+                      {n.detail !== undefined ? (
+                        <span className="pd-transfer-detail">{n.detail}</span>
+                      ) : null}
+                      <button
+                        type="button"
+                        className="pd-task-row-x pd-focusable"
+                        aria-label={`Dismiss ${n.name}`}
+                        onClick={() => dismissNotice(n.key)}
+                      >
+                        <IconClose size={10} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+            {loads.length > 0 ? (
+              <section className="pd-tray-section" aria-label="Loading" data-testid="tray-loading">
+                <div className="pd-menu-label">Loading</div>
+                <ul className="pd-transfer-list">
+                  {loads.map((t) => (
+                    <TransferItem
+                      key={t.key}
+                      row={t}
+                      onCancel={() => {
+                        if (t.cancel !== undefined) cancelTransfer(t.cancel);
+                      }}
+                    />
+                  ))}
+                </ul>
+              </section>
+            ) : null}
             {finishedCount > 0 ? (
               <div className="pd-task-tray-foot">
                 <button

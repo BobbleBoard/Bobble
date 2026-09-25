@@ -346,6 +346,13 @@ export interface LlmStatus {
    */
   engineBuild?: { variantId: string; note: string };
   /**
+   * WHAT IS LOADING, while `phase` is `starting`: the model the launch is bringing
+   * up and when it began. `model` cannot say — the old server is disposed first,
+   * so it reads null until the new one is up — and the task tray's Loading row
+   * (the user, 2026-09-24) has to name the thing it is timing.
+   */
+  loading?: { modelId: string; displayName: string; since: number };
+  /**
    * The server's process is stopped ON PURPOSE to make room for a generation
    * and comes back on the same URL when it finishes. `serverRunning` stays
    * true and `phase` stays `ready` while parked: nothing that decides on those

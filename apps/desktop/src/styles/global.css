@@ -3403,141 +3403,172 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   color: var(--pd-text-primary);
 }
 
-/* ── The downloads tray (top-left) ──────────────────────────────────────── */
-.pd-tray-button {
-  position: relative;
-}
-/* Something is moving: a small accent dot on the icon. */
-.pd-tray-dot {
-  position: absolute;
-  right: 3px;
-  bottom: 3px;
-  width: 6px;
-  height: 6px;
-  border-radius: var(--pd-radius-full);
-  background: var(--pd-accent-primary);
-  box-shadow: 0 0 0 2px var(--pd-bg-base);
-}
-/* News since the tray was last opened: a tiny "!" at the icon's top-right. */
-.pd-tray-badge {
-  position: absolute;
-  top: 1px;
-  right: 1px;
-  width: 12px;
-  height: 12px;
-  border-radius: var(--pd-radius-full);
-  background: var(--pd-accent-primary);
-  color: var(--pd-text-on-accent);
-  font-size: 9px;
-  font-weight: 700;
-  line-height: 12px;
-  text-align: center;
-  box-shadow: 0 0 0 2px var(--pd-bg-base);
-}
-.pd-tray-badge[data-kind="failed"] {
-  background: var(--pd-status-danger-fg);
-  color: #fff;
-}
-.pd-tray-popover {
-  width: 320px;
-  max-width: 90vw;
-  padding: 10px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.pd-tray-row {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  padding: 2px 0;
-}
-.pd-tray-row + .pd-tray-row,
-.pd-tray-row + .pd-tray-notice,
-.pd-tray-notice + .pd-tray-notice,
-.pd-tray-notice + .pd-tray-row {
-  padding-top: 10px;
+/* ── The tray's downloads and loads (state/tray-transfers.ts) ─────────────────
+ * the user (2026-09-24): "headers for 'Downloads' 'Loading' … a sort of clean thin
+ * blue progressbar w/ % or ngb/rgb red X on the side below some white text that
+ * says the running operation". The groups are split by the sheet's own hairline;
+ * each row's words start where the header's do (the menu label's 10px). */
+.pd-tray-section + .pd-tray-section {
+  margin-top: 4px;
+  padding-top: 4px;
   border-top: 1px solid var(--pd-border-subtle);
 }
-.pd-tray-row-head {
+.pd-transfer-list {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-}
-.pd-tray-row-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--pd-font-size-footnote);
-  font-weight: var(--pd-font-weight-semibold);
-  color: var(--pd-text-primary);
-}
-.pd-tray-row-pct {
-  flex: none;
-  font-size: var(--pd-font-size-caption);
-  color: var(--pd-text-secondary);
-  font-variant-numeric: tabular-nums;
-}
-.pd-tray-row-sub {
-  font-size: var(--pd-font-size-caption);
-  color: var(--pd-text-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-.pd-tray-row-actions {
-  display: flex;
-  gap: 6px;
-  margin-top: 2px;
-}
-.pd-tray-notice {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-}
-.pd-tray-notice-main {
-  display: flex;
-  flex: 1;
-  min-width: 0;
   flex-direction: column;
   gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
-.pd-tray-notice-title {
+.pd-transfer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 6px 8px 10px;
+}
+.pd-transfer-title {
+  overflow: hidden;
   font-size: var(--pd-font-size-footnote);
-  font-weight: var(--pd-font-weight-semibold);
+  font-weight: var(--pd-font-weight-medium);
+  line-height: var(--pd-leading-footnote);
   color: var(--pd-text-primary);
-  word-break: break-word;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.pd-tray-notice[data-kind="finished"] .pd-tray-notice-title {
-  color: var(--pd-status-success-fg);
+.pd-transfer-head {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 8px;
 }
-.pd-tray-notice[data-kind="failed"] .pd-tray-notice-title {
+.pd-transfer-head .pd-transfer-title {
+  flex: 1;
+  min-width: 0;
+}
+.pd-transfer-note {
+  flex: none;
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+  color: var(--pd-text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.pd-transfer-line {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+/* Thin, and blue end to end — the user on the download bars: "the unfilled part of
+   the bar isn't blue enough it seems grey it should read very blue still just
+   unfilled" — so the track is the hub bars' 45% blue (.pd-dl-track) and the
+   fill their solid one. */
+.pd-transfer-bar {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--pd-status-info-fg) 45%, transparent);
+}
+.pd-transfer-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  border-radius: inherit;
+  background: var(--pd-status-info-fg);
+  /* Updates land about once a second; the fill walks between them. */
+  transition: width 1s linear;
+}
+/* Nothing says how far (a first load, an engine compile): a short run sweeps. */
+.pd-transfer-bar[data-indeterminate="true"] .pd-transfer-fill {
+  width: 32%;
+  animation: pd-transfer-sweep 1.4s var(--pd-easing-standard, ease-in-out) infinite;
+}
+@keyframes pd-transfer-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(320%);
+  }
+}
+.pd-transfer-amount {
+  flex: none;
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+  color: var(--pd-text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+/* Red, and always there: stopping a download is the row's one action. */
+.pd-transfer-x {
+  display: flex;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
   color: var(--pd-status-danger-fg);
 }
-.pd-tray-notice-detail {
-  font-size: var(--pd-font-size-caption);
-  color: var(--pd-text-secondary);
-  white-space: normal;
+.pd-transfer-x:hover {
+  background: color-mix(in srgb, var(--pd-status-danger-fg) 14%, transparent);
 }
-.pd-tray-notice-x {
+/* Pause sits quietly beside the X — the secondary action in the secondary ink. */
+.pd-transfer-pause {
+  display: flex;
   flex: none;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
   border: 0;
-  border-radius: var(--pd-radius-full);
+  border-radius: 999px;
   background: transparent;
-  color: var(--pd-text-muted);
-  font-size: 15px;
-  line-height: 1;
-  cursor: pointer;
+  color: var(--pd-text-secondary);
 }
-.pd-tray-notice-x:hover {
+.pd-transfer-pause:hover {
   background: var(--pd-bg-hover);
   color: var(--pd-text-primary);
 }
+/* Waiting, not moving: the fill steps back from the accent. */
+.pd-transfer[data-paused="true"] .pd-transfer-fill {
+  background: var(--pd-text-muted);
+}
+.pd-transfer-notice {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 30px 6px 10px;
+}
+.pd-transfer-detail {
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+  color: var(--pd-text-secondary);
+}
+.pd-transfer-notice[data-kind="failed"] .pd-transfer-detail {
+  color: var(--pd-status-danger-fg);
+}
+.pd-transfer-notice:hover .pd-task-row-x {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pd-transfer-fill {
+    transition: none;
+  }
+  .pd-transfer-bar[data-indeterminate="true"] .pd-transfer-fill {
+    animation: none;
+    opacity: 0.5;
+  }
+}
+
 .pd-dl-track {
   position: relative;
   display: block;

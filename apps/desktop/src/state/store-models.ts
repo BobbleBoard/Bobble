@@ -136,3 +136,10 @@ export function connectStoreModels(): void {
 export function hasRepo(models: readonly StoredModel[], repo: string): boolean {
   return models.some((m) => m.repo === repo && m.incomplete !== true);
 }
+
+// E2E hook (same ?piE2E=1 opt-in as __pi_store): lets the tray probe show a
+// download in any state without a byte moving.
+if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('piE2E')) {
+  (window as unknown as { __store_models: () => typeof useStoreModels }).__store_models = () =>
+    useStoreModels;
+}

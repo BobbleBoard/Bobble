@@ -180,17 +180,17 @@ try {
     }
 
     if (onChatScreen) {
-      // The chat-screen indicator is the top-left downloads tray (the icon is
-      // up while anything moves; its panel carries the ETA).
-      const footer = page.locator('[data-testid="download-tray"][data-active="1"]');
+      // The chat-screen indicator is the task tray (top-left): its button is
+      // up while anything moves; the Downloads group carries the ETA.
+      const footer = page.locator('[data-testid="task-tray"]');
       if ((await footer.count()) > 0) {
         sawFooter = true;
         const text = (await footer.getAttribute('aria-label')) ?? '';
-        const panelOpen = (await page.locator('[data-testid="download-tray-panel"]').count()) > 0;
+        const panelOpen = (await page.locator('[data-testid="task-tray-panel"]').count()) > 0;
         if (!panelOpen) await footer.click().catch(() => {});
         const panelText =
           (await page
-            .locator('[data-testid="download-tray-panel"]')
+            .locator('[data-testid="tray-downloads"]')
             .textContent()
             .catch(() => '')) ?? '';
         if (/left/.test(panelText)) sawEta = true;

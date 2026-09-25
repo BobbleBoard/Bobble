@@ -15,6 +15,7 @@ import { connectSettings } from './state/settings-store';
 import { connectStoreModels } from './state/store-models';
 import { connectStudioJobs } from './state/studio-jobs';
 import { connectTaskTray } from './state/task-tray';
+import { connectLoadTimer } from './state/tray-transfers';
 import './styles/global.css';
 
 /*
@@ -40,6 +41,8 @@ if (!new URLSearchParams(window.location.search).has('canvasPopout')) {
   // The tasks you walked away from, for the button beside the sidebar toggle.
   connectTaskTray();
   connectLlm();
+  // How long each model took to load here — the tray's Loading bar walks at it.
+  connectLoadTimer();
   // The default engines for this machine, in the background (see llm-store).
   setTimeout(() => void ensureDefaultEngines(), 8_000);
   connectHf();

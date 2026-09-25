@@ -33,7 +33,9 @@
  *     says it — a second row for the same wait would be the "status said
  *     twice" the user's reference card was criticised for.
  *   - Subagents: they ride their parent chat the same way.
- *   - Downloads: they have their own tray (models/DownloadTray.tsx).
+ *   - Downloads and model loads: the same card lists them under their own
+ *     headers, from their own stores (state/tray-transfers.ts) — they are not
+ *     tasks you left, they are the machine working.
  *
  * The rules are pure functions over a small model so they are tested without a
  * window; the zustand store below is only their state. Sources report into it:
