@@ -1,6 +1,23 @@
 # Bobble — status
 
-Updated: 2026-09-24 (late night) · **installed in /Applications: main `ed415a13`** — main now holds everything the candidates carried (the 09-23 push units W0-A, W0-B, XP-04, MAC-01, XP-01, SPK-02 landed at `35583bb6` after today's checks: 8,017 unit tests, 7 probes, prefill unchanged at 3,377 of 3,495 tokens cached, 321 ms) plus the task tray's Downloads/Loading, VQ-08 and the 3D stage fix · packaged probe + smoke OK on the bundle before it replaced the old one · three agents building: native paste, VQ-04+VQ-10, XP-16+WF-06
+Updated: 2026-09-25 (morning) · main `2c794eae` (built, all probes below green; **not installed** — /Applications is still `ed415a13`) · the overnight visual-output push stopped at 08:14, three hours past the user's six-hour cap (agent runs took 3+ h each; I lost track of wall time)
+
+## Overnight 2026-09-24/25 — the visual-output push (the user: "start working on the visuals (high priority) the model can produce …")
+Merged on main (`bacdca5f` … `2c794eae`), unit suites 8,234 pass (the 2 gen3d Python tests on system Python 3.9 still fail — a separate task is fixing that):
+
+| Area | What landed | Verified by |
+|---|---|---|
+| Inside the thinking block | What a turn makes stays in its work (240px, clickable, no hover controls); only what the model PRESENTS comes out as the full card; chart/diagram tools present what they draw; the handover into the chain is one animated box | turn-cards-look, pending-card-look, image-viewer-probe |
+| SVG | The OmniSVG-only fence is gone: the model writes icons, logos with a name, patterns and page glyphs; `present` renders an SVG back as a picture (it went back as source text); OmniSVG is for organic art and tracing | handwritten-svg tests; the 9B baseline that exposed it |
+| Diagrams (VQ-10) | `diagram` / `diagram_edit` on bundled Mermaid, six design kits (VQ-04), inline card | inline-diagram-probe 17/17; 4B flow brief 19–23 s → 1 card (was: 420 s cap) |
+| Sources | Citation chips (favicon + site, "+N"), hover card, Sources card with Show all, compact search rows in the chain | sources-look; a real 4B research run with a Nature chip |
+| Office (XP-16, WF-06) | Bundled OFL fonts; `office.py render --spec` with citations, a Sources block/slide/sheet, multi-sheet workbooks | pytest 166; office-render-probe 14/15 (see open issues) |
+| Paste / drop | Any files, folders and pictures natively (real paths; pixels saved once); your own pictures open in the viewer; the custom-instructions re-prefill fixed (5,050 → 133 tokens) | attach-anything-probe, image-viewer-probe |
+| Evaluation | `visual-suite-probe.mjs`: one fresh chat per request across every kind + a quick-email control, screenshots, engine accounting; stops a capped turn | — |
+
+Prefill after everything: CLI 3,419 of 3,537 cached, schemas 5,091 of 5,209, 118 computed each (unchanged).
+
+**Not done:** the per-type live verification. The first suite run (9B) lost seven tasks to one stuck turn (fixed in the probe); the second (4B) was stopped at 08:14 on its first task to respect the time cap. Ming-Image-0.1-Design was not started (the agent was stopped before downloading). Inline HTML widgets (presented .html in the chat) are a small, clear next piece: `InlineWidget` already renders html and the harness runs scripts.
 
 ## 📌 PINNED HIGH PRIORITY — Visual quality (office, charts, HyperFrames) — the user, 2026-09-24
 Order of work:
@@ -114,6 +131,9 @@ VQ-08 anti-fabrication (vq-office-w1 WIP), extra w0-b/wf-00b edits (WIP). Branch
 - **Image Studio's Edit never edited**: `gen:generate` dropped the input image, strength and guidance, so an "edit" was a fresh picture. Found by the studio track today; the Images track owns the fix.
 - ✅ **3D studio**: the generating stage ran under the floating Generate card's Finish row (any job with the card open, not only view-only) — it now centres in the clear part between the card and the view controls, and the slim bar starts where the card ends (`ed415a13`, installed).
 - A stale Ladle (component browser) build ships inside the app bundle, ~3 MB. Minor.
+- **Research answers:** the 4B often writes its research into `notes.md` instead of answering in chat (3 of 4 real runs), so no chips; suspected trigger: the `notes.md` example path in the always-on prompt (capability-prompt.ts:340) — unmeasured. It also glues links onto words ("NeuroglancerCell") where the page was not one it read.
+- **office-render-probe**: 1 of 15 fails on main only — the composer's model chip takes a hover-like highlight for ~300 ms twice while the canvas opens office files (probably the parked pointer over a shifting layout; unconfirmed).
+- The rapid-mlx engine (the 4B's default) never lands the attachment prime (llama.cpp-only endpoints): a paste is re-read on Enter (~4.5k tokens, 2.4 s).
 - The gen3d-engine Python tests run on the system `python3` (3.9.6, no `tomllib`, no tarfile `filter`): 2 of 81 fail on main too. The engine itself runs on 3.12.
 - From the thread track: a finished card moves into the chain (and remounts) when the next tool call starts; a picture the model also embeds in its reply shows twice (older); ⌘Z into a turn already producing output aborts it and keeps the partial reply; an image-only message cannot be rewound out of pi's session.
 - From the images track: the edit re-renders toward the words (img2img), so a Medium lighting change is subtle; the true instruction editor (Mage-Flow-Edit) needs the Bobble 3D engine.
