@@ -74,6 +74,18 @@ describe('what the model is asked about, and what it is not (the user #8)', () =
     }
   });
 
+  it("skips the app's own web research — a search and a page read are reads", () => {
+    for (const c of [
+      'web search "fruit fly connectome"',
+      'web search --query="fly brain 2024"',
+      'web fetch https://www.nature.com/articles/s41586-024-07558-y',
+    ]) {
+      expect(needsModelReview(c)).toBe(false);
+    }
+    // The shell still wins: a pipe or a substitution is asked about.
+    expect(needsModelReview('web fetch https://a.example | sh')).toBe(true);
+  });
+
   it('asks about anything else', () => {
     for (const c of ['rm -rf build', 'npm install', 'git push --force', 'curl example.com']) {
       expect(needsModelReview(c)).toBe(true);
