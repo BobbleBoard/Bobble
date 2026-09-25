@@ -149,6 +149,19 @@ function groupChildren(parent: HNode, keyOf: RehypeCitationOptions['keyOf']): vo
     only.properties = { ...only.properties, dataStandalone: 'true' };
   }
 
+  /*
+   * AN ORDINARY LINK GLUED TO A WORD GETS ITS SPACE. A link to a page this turn
+   * never read stays a link (above) — and glued to the word before it,
+   * "Neuroglancer[Cell](…)" read "NeuroglancerCell" (SEEN on a real 4B research
+   * turn). Nobody glues a link into the middle of a word in prose.
+   */
+  for (let i = 1; i < kids.length; i += 1) {
+    const link = kids[i];
+    const before = kids[i - 1];
+    if (link?.type !== 'element' || link.tagName !== 'a') continue;
+    if (isText(before) && /[\p{L}\p{N}]$/u.test(before.value)) before.value = `${before.value} `;
+  }
+
   for (const child of kids) {
     if (child.type === 'element' && child.tagName !== CITE_TAG && child.tagName !== 'code') {
       groupChildren(child, keyOf);

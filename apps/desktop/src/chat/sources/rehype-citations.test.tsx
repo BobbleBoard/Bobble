@@ -118,6 +118,17 @@ describe('rehypeCitations — the tree pass', () => {
     expect(flat(tree)).toBe('{a.example/1} <https://elsewhere.example/> {b.example/2}');
   });
 
+  it('gives an ordinary link glued to a word its space, and nothing else', () => {
+    // SEEN on a real 4B research turn: "Neuroglancer[Cell](…)" read "NeuroglancerCell".
+    const glued = run(
+      root(p(t('opened in Neuroglancer'), a('https://unread.example/x', 'Cell'), t('.'))),
+    );
+    expect(flat(glued)).toBe('opened in Neuroglancer <https://unread.example/x>.');
+    // A link after a space, a bracket or a quote is left as written.
+    const spaced = run(root(p(t('see ('), a('https://unread.example/x', 'this'), t(')'))));
+    expect(flat(spaced)).toBe('see (<https://unread.example/x>)');
+  });
+
   it('keeps brackets that hold more than citations', () => {
     const tree = run(root(p(t('(see '), a('https://a.example/1', 'A'), t(', page 3)'))));
     expect(flat(tree)).toBe('(see {a.example/1}, page 3)');
