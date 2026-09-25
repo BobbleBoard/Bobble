@@ -82,6 +82,7 @@ export {
   colorFromToken,
   decodeOmniSvg,
   decodeOmniSvgPartial,
+  loopStart,
   OMNISVG_4B,
   pathsToSvg,
   tokensToXY,

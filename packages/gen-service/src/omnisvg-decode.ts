@@ -226,6 +226,36 @@ export function decodeOmniSvg(
 }
 
 /**
+ * WHERE A RUNAWAY LOOP BEGINS in a stream of ids, or -1.
+ *
+ * MEASURED (2026-09-25, the authors' prompts through the app's pipeline): a
+ * quarter to a half of the samples spend the whole 1,536-token budget on one
+ * command repeated — `C40 188 40 188 40 188`, 320 times over, a curve of no
+ * length — and stop at the limit with the drawing unfinished. Exactly the same
+ * ids over and over is never a drawing (the same point, the same curve, again
+ * and again), so the tail is checked for a block of up to `maxPeriod` ids
+ * repeated `minRepeats` times back to back. The answer is where the FIRST copy
+ * of the block starts: everything before it is the drawing, kept.
+ */
+export function loopStart(
+  ids: readonly number[],
+  { maxPeriod = 24, minRepeats = 12 }: { maxPeriod?: number; minRepeats?: number } = {},
+): number {
+  const n = ids.length;
+  let start = -1;
+  for (let p = 1; p <= maxPeriod && p * minRepeats <= n; p++) {
+    // How far back from the end each id equals the one a period before it.
+    let run = 0;
+    while (run < n - p && ids[n - 1 - run] === ids[n - 1 - run - p]) run++;
+    if (run >= p * (minRepeats - 1)) {
+      const first = n - run - p;
+      if (start === -1 || first < start) start = first;
+    }
+  }
+  return start;
+}
+
+/**
  * The drawing SO FAR, from a prefix of the ids — for the card that shows the
  * model drawing while it draws.
  *

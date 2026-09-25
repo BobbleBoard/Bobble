@@ -2,7 +2,13 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { colorFromToken, decodeOmniSvg, decodeOmniSvgPartial, OMNISVG_4B } from './omnisvg-decode';
+import {
+  colorFromToken,
+  decodeOmniSvg,
+  decodeOmniSvgPartial,
+  loopStart,
+  OMNISVG_4B,
+} from './omnisvg-decode';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const fixture = (name: string) => path.join(here, 'fixtures', name);
@@ -68,5 +74,35 @@ describe('colour tokens', () => {
 
   it('greys out an index past the palette', () => {
     expect(colorFromToken(40_012 + 4_098)).toBe('#808080');
+  });
+});
+
+describe('loopStart — a runaway repeat in the stream', () => {
+  // A drawing: distinct ids, then the measured failure — one 4-id command
+  // (a curve of no length) over and over.
+  const drawing = Array.from({ length: 40 }, (_, i) => 1000 + i);
+  const curve = [7, 501, 501, 501];
+
+  it('finds where the repeated block first starts, and keeps the drawing before it', () => {
+    const ids = [...drawing, ...Array.from({ length: 20 }, () => curve).flat()];
+    expect(loopStart(ids)).toBe(40);
+  });
+
+  it('waits for enough repeats: eleven copies are not yet a loop, twelve are', () => {
+    expect(loopStart([...drawing, ...Array.from({ length: 11 }, () => curve).flat()])).toBe(-1);
+    expect(loopStart([...drawing, ...Array.from({ length: 12 }, () => curve).flat()])).toBe(40);
+  });
+
+  it('sees a one-id stutter and a longer block alike', () => {
+    expect(loopStart([...drawing, ...Array(12).fill(9)])).toBe(40);
+    const block = Array.from({ length: 20 }, (_, i) => 3000 + i);
+    expect(loopStart([...drawing, ...Array.from({ length: 12 }, () => block).flat()])).toBe(40);
+  });
+
+  it('never calls a drawing that repeats a shape once or twice a loop', () => {
+    const shape = Array.from({ length: 30 }, (_, i) => 2000 + i);
+    expect(loopStart([...drawing, ...shape, ...shape, ...shape])).toBe(-1);
+    expect(loopStart(drawing)).toBe(-1);
+    expect(loopStart([])).toBe(-1);
   });
 });

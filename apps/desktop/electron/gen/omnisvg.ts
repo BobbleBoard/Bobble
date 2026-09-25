@@ -27,6 +27,7 @@ import {
   decodeOmniSvg,
   decodeOmniSvgPartial,
   idsFromCompletion,
+  loopStart,
 } from '@pi-desktop/gen-service';
 import {
   cacheRoot,
@@ -155,21 +156,35 @@ async function waitHealthy(base: string, ms: number): Promise<void> {
 const PARTIAL_EVERY_MS = 120;
 
 /**
+ * A sample that runs into a loop (loopStart) is cut there and does not count as
+ * one of the candidates: another is drawn in its place, up to this many more.
+ * MEASURED 2026-09-25: a quarter to a half of the samples looped, each burning
+ * the full 1,536 ids (~22 s) on one repeated command of no length; cut at the
+ * loop, one costs the few seconds before it.
+ */
+const LOOP_RETRIES = 3;
+
+/**
  * One `/completion`, STREAMED: the ids as they arrive, so the caller can show
  * the drawing forming. llama-server sends `data: {…}` lines, each with the
  * chunk's `tokens` (return_tokens) and the last with `stop: true` and the
  * timings. Returns the same shape `idsFromCompletion` reads off a non-streamed
- * reply, so the decode below is unchanged.
+ * reply, so the decode below is unchanged — except that a sample caught in a
+ * loop is hung up on (llama-server stops a streamed generation whose client has
+ * gone) and comes back cut where the loop began, `stop: 'loop'`.
  */
-async function streamCompletion(
+export async function streamCompletion(
   base: string,
   body: ReturnType<typeof buildOmniSvgRequest>,
   onIds: (ids: readonly number[]) => void,
 ): Promise<{ ids: number[]; stop: string; tokPerSec: number | null } | { error: string }> {
+  const cut = new AbortController();
+  let looped = -1;
   const res = await fetch(`${base}/completion`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ ...body, stream: true }),
+    signal: cut.signal,
   });
   if (!res.ok || res.body === null) {
     return { error: `llama-server answered ${res.status}` };
@@ -203,6 +218,12 @@ async function streamCompletion(
     }
     if (Array.isArray(chunk.tokens) && chunk.tokens.length > 0) {
       for (const t of chunk.tokens) ids.push(Number(t));
+      const at = loopStart(ids);
+      if (at >= 0) {
+        looped = at;
+        cut.abort();
+        return;
+      }
       onIds(ids);
     }
     if (chunk.stop === true) {
@@ -212,16 +233,24 @@ async function streamCompletion(
     }
   };
   for (;;) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
+    let chunk: ReadableStreamReadResult<Uint8Array>;
+    try {
+      chunk = await reader.read();
+    } catch (err) {
+      if (looped >= 0) break;
+      throw err;
+    }
+    if (chunk.done) break;
+    buffer += decoder.decode(chunk.value, { stream: true });
     let nl = buffer.indexOf('\n');
-    while (nl !== -1) {
+    while (nl !== -1 && looped < 0) {
       take(buffer.slice(0, nl).trim());
       buffer = buffer.slice(nl + 1);
       nl = buffer.indexOf('\n');
     }
+    if (looped >= 0) break;
   }
+  if (looped >= 0) return { ids: ids.slice(0, looped), stop: 'loop', tokPerSec };
   if (buffer.trim() !== '') take(buffer.trim());
   if (error !== undefined) return { error };
   return { ids, stop, tokPerSec };
@@ -298,7 +327,12 @@ export async function generateSvg(
     let n = 0;
     for (const job of jobs) {
       let best: (OmniSvgOutput & { svg: string }) | null = null;
-      for (let k = 0; k < candidates; k++) {
+      // `k` counts the samples that ran their course; one cut at a loop is drawn again.
+      for (
+        let k = 0, attempt = 0;
+        k < candidates && attempt < candidates + LOOP_RETRIES;
+        attempt++
+      ) {
         if (params.signal?.aborted === true) throw new Error('the drawing was stopped');
         /*
          * STREAMED, so the drawing can be watched forming (the user: the thread
@@ -341,23 +375,37 @@ export async function generateSvg(
                 });
               });
         if ('error' in parsed) throw new Error(parsed.error);
-        const decoded = decodeOmniSvg(parsed.ids);
+        // The non-streamed reply ran its loop to the limit: cut it the same way.
+        const at = parsed.stop === 'loop' ? -1 : loopStart(parsed.ids);
+        const run = at >= 0 ? { ...parsed, ids: parsed.ids.slice(0, at), stop: 'loop' } : parsed;
+        if (run.stop === 'loop') {
+          log.info('omnisvg sample looped; cut and drawn again', {
+            source: job.source,
+            attempt: attempt + 1,
+            kept: run.ids.length,
+          });
+        } else {
+          k += 1;
+        }
+        const decoded = decodeOmniSvg(run.ids);
         if (decoded === null) continue;
         const cand = {
           outputPath: '',
           paths: decoded.paths,
           source: job.source,
-          stop: parsed.stop,
-          tokPerSec: parsed.tokPerSec,
-          tokens: parsed.ids.length,
+          stop: run.stop,
+          tokPerSec: run.tokPerSec,
+          tokens: run.ids.length,
           svg: decoded.svg,
         };
         /* Best = finished on eos first, then the most paths — a shape that ran
-           into the token limit is one the model never completed. */
+           into the token limit, or was cut at a loop, is one the model never
+           completed. */
+        const finished = (c: { stop: string }): boolean => c.stop === 'eos';
         const better =
           best === null ||
-          (cand.stop === 'eos' && best.stop !== 'eos') ||
-          (cand.stop === best.stop && cand.paths > best.paths);
+          (finished(cand) && !finished(best)) ||
+          (finished(cand) === finished(best) && cand.paths > best.paths);
         if (better) best = cand;
       }
       if (best === null) {
