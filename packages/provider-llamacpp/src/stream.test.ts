@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   type AssistantMessage,
   type AssistantMessageEvent,
@@ -1142,6 +1145,44 @@ describe('images on a text-only server', () => {
     } finally {
       if (prev === undefined) delete process.env.PI_DESKTOP_VISION;
       else process.env.PI_DESKTOP_VISION = prev;
+    }
+  });
+
+  /*
+   * A TOOL'S IMAGE GETS THE REASON TOO. The screenshot a tool takes is the path
+   * the reasons were written for, and it was the one path still told only "the
+   * model server cannot read images right now" — never that vision is switched
+   * off, or where to turn it back on.
+   */
+  it('names the reason for a tool-returned image, as it does for an attached one', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'pd-vision-state-'));
+    const file = join(dir, 'vision-state');
+    writeFileSync(file, '0:off');
+    const prev = process.env[VISION_STATE_FILE_ENV];
+    process.env[VISION_STATE_FILE_ENV] = file;
+    try {
+      const body = buildChatCompletionsRequest(makeModel(), {
+        systemPrompt: 's',
+        messages: [
+          {
+            role: 'toolResult',
+            toolCallId: 'a',
+            toolName: 'browser_snapshot',
+            content: [{ type: 'image', data: 'QUJD', mimeType: 'image/png' }],
+            isError: false,
+            timestamp: 0,
+          },
+        ],
+      } as unknown as Context) as { messages: Array<{ role: string; content: unknown }> };
+      const last = body.messages[body.messages.length - 1];
+      expect(String(last?.content)).toContain('[image returned by browser_snapshot]');
+      expect(String(last?.content)).toContain('vision is switched off');
+      expect(String(last?.content)).toContain('engine menu → Vision');
+      expect(JSON.stringify(body)).not.toContain('QUJD');
+    } finally {
+      if (prev === undefined) delete process.env[VISION_STATE_FILE_ENV];
+      else process.env[VISION_STATE_FILE_ENV] = prev;
+      rmSync(dir, { recursive: true, force: true });
     }
   });
 });
