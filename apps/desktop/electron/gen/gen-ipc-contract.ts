@@ -112,8 +112,15 @@ export type SvgLiveEvent =
         readonly paths: number;
       }[];
       readonly prompt?: string;
+      /** The drawing's `svg-<n>` id (see `gen:agent-job`) — which one ended. */
+      readonly jobId?: string;
     }
-  | { readonly status: 'error'; readonly error: string; readonly prompt?: string };
+  | {
+      readonly status: 'error';
+      readonly error: string;
+      readonly prompt?: string;
+      readonly jobId?: string;
+    };
 
 export type GenEventMap = {
   /** A job has started: its first surface state. `tabId` is the stream's id. */

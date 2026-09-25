@@ -1233,7 +1233,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
             : err instanceof Error
               ? err.message
               : String(err);
-          send('gen:svg-live', { status: 'error', error: message, ...prompt });
+          send('gen:svg-live', { status: 'error', error: message, ...prompt, jobId: svgId });
           throw err;
         } finally {
           svgRuns.delete(svgId);
@@ -1255,7 +1255,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
           }
           outputs.push({ path: o.outputPath, svg, paths: o.paths });
         }
-        send('gen:svg-live', { status: 'done', outputs, ...prompt });
+        send('gen:svg-live', { status: 'done', outputs, ...prompt, jobId: svgId });
         return result;
       }
       case 'omnisvgStatus':
