@@ -38,15 +38,18 @@ export * from './tools.js';
 /** Register the mac tool set with an explicit bridge (test / app seam). */
 export function registerMacComputerUse(pi: ExtensionAPI, options: MacComputerUseOptions): void {
   /* ONE controlled-app state for both sets, so work done through Chrome's own
-     commands leaves Chrome as the app a bare `mac snapshot` looks at. */
+     commands leaves Chrome as the app a bare `mac snapshot` looks at — and one
+     recorder, so that take is remembered like any other. */
   const session = options.session ?? createMacSessionState();
-  registerMacComputerUseTools(pi, { ...options, session });
+  const mac = registerMacComputerUseTools(pi, { ...options, session });
   /* Chrome's own set. It prefers the real DOM over Apple Events and falls back
      to Accessibility when Chrome refuses those — which is the usual case — so
      it takes the bridge as well. */
   registerChromeTools(pi, options.bridge, {
     session,
+    recordControl: mac.recordControl,
     ...(options.isChromeRunning === undefined ? {} : { isChromeRunning: options.isChromeRunning }),
+    ...(options.chromePid === undefined ? {} : { chromePid: options.chromePid }),
   });
 }
 
@@ -64,14 +67,11 @@ export default function activate(pi: ExtensionAPI): void {
     bridge === null
       ? undefined
       : async () => bridge.request<ComputerUsePolicy | null>('policy').catch(() => null);
-  const session = createMacSessionState();
-  registerMacComputerUseTools(pi, {
+  registerMacComputerUse(pi, {
     bridge,
-    session,
     lastControlFile:
       process.env.PI_MAC_LAST_CONTROL_FILE ??
       join(homedir(), '.pi', 'agent', 'mac-last-control.json'),
     consent: createMacConsentGate({ preConsented, ...(policy === undefined ? {} : { policy }) }),
   });
-  registerChromeTools(pi, bridge, { session });
 }

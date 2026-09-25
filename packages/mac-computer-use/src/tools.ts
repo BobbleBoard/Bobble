@@ -161,6 +161,8 @@ export interface MacComputerUseOptions {
   /** Whether Chrome is running (the chrome_* set) — same reason: a unit test
    *  must not depend on, or launch, the Chrome of the machine running it. */
   readonly isChromeRunning?: () => Promise<boolean>;
+  /** Chrome's pid (the chrome_* set; default pgrep) — the same reason again. */
+  readonly chromePid?: () => Promise<number | null>;
   /** Turns short texts into vectors, for the `like` search. Absent until an
    *  embedding model is deployed; the keyword half answers alone until then. */
   readonly embedText?: Embedder;
@@ -332,11 +334,18 @@ function dialogRedirect(
   );
 }
 
+/** What the mac set hands Chrome's set (index.ts). */
+export interface MacComputerUseHandle {
+  /** Remember the app now under control — as this chat's own (its session
+   *  entry) and as the last one computer use worked in (the cross-chat file). */
+  readonly recordControl: () => void;
+}
+
 /** Register every mac_* tool onto `pi`. */
 export function registerMacComputerUseTools(
   pi: ExtensionAPI,
   options: MacComputerUseOptions,
-): void {
+): MacComputerUseHandle {
   const cap = options.elementCap ?? DEFAULT_ELEMENT_CAP;
   const consent = options.consent ?? createMacConsentGate();
   const readChromeTabs = options.readChromeTabs ?? chromeTabs;
@@ -1733,6 +1742,8 @@ export function registerMacComputerUseTools(
       }
     },
   });
+
+  return { recordControl };
 }
 
 /** Probe the TCC grant status through the bridge (drives the capabilities UI). */
@@ -1762,6 +1773,9 @@ export function registerChromeTools(
     readonly isChromeRunning?: () => Promise<boolean>;
     /** The mac set's controlled-app state — shared, so Chrome work is remembered. */
     readonly session?: MacSessionState;
+    /** The mac set's recorder (MacComputerUseHandle), so Chrome taking control
+     *  survives a restart and reaches the next chat like any other take. */
+    readonly recordControl?: () => void;
     /** Chrome's pid (test seam; default pgrep). */
     readonly chromePid?: () => Promise<number | null>;
     /*
@@ -1788,13 +1802,29 @@ export function registerChromeTools(
    * touch no state at all, so after a run of them a bare `mac snapshot` found
    * nothing controlled and fell back to whatever the user had in front — the user
    * (2026-09-23): the model "at times randomly say[s] 'the user is on activity
-   * monitor'". One shared state; Chrome takes it whenever these act.
+   * monitor'". One shared state, taken on whichever route did the work (a
+   * default Chrome answers through Accessibility, never through Apple Events),
+   * and recorded like any other take, so a restarted chat comes back to Chrome.
+   *
+   * BUT NEVER OVER AN APP THE MODEL CHOSE. It did, on every chrome_* call: after
+   * `mac launch TextEdit` — whose answer says mac_key and mac_type target
+   * TextEdit now — one `chrome snapshot` moved the target, so `mac key cmd+s`
+   * opened Chrome's Save Page dialog and a typed note went into a web form, and
+   * nothing said control had moved. Chrome fills a gap (nothing under control)
+   * or replaces a guess (an app carried over from another chat, never looked at
+   * here); a chosen app stays the target until the model moves it.
    */
   const noteChrome = async (): Promise<void> => {
     const session = options.session;
-    if (session === undefined || session.controlled()?.app === CHROME_APP) return;
-    const pid = await pidOfChrome().catch(() => null);
-    if (pid !== null) session.restore({ app: CHROME_APP, pid });
+    if (session === undefined) return;
+    const c = session.controlled();
+    if (c !== null && c.carriedOver !== true && c.app !== CHROME_APP) return;
+    if (c === null || c.carriedOver === true) {
+      const pid = await pidOfChrome().catch(() => null);
+      if (pid === null) return;
+      session.restore({ app: CHROME_APP, pid });
+    }
+    options.recordControl?.();
   };
 
   /**
@@ -1881,9 +1911,9 @@ export function registerChromeTools(
     if (blocked !== null) return { text: blocked, ok: false };
     const notUp = await ensureChromeRunning();
     if (notUp !== null) return { text: notUp, ok: false };
-    await noteChrome();
     const res = await evalJs(js);
     if (!res.ok) return { text: res.error ?? 'Chrome did not respond.', ok: false };
+    await noteChrome();
     return { text: res.value, ok: true };
   }
 
@@ -1921,7 +1951,6 @@ export function registerChromeTools(
       if (params.visual === true) {
         const notUp = await ensureChromeRunning();
         if (notUp !== null) return { content: [{ type: 'text', text: notUp }], details: undefined };
-        await noteChrome();
         const snap = await ax<MacSnapshot>('snapshot', { screenshot: true });
         const shot = snap?.screenshot;
         if (shot?.base64 === undefined || shot.base64 === '') {
@@ -1941,6 +1970,7 @@ export function registerChromeTools(
             details: undefined,
           };
         }
+        await noteChrome();
         return {
           content: [{ type: 'image', data: shot.base64, mimeType: shot.mimeType ?? 'image/jpeg' }],
           details: undefined,
@@ -1954,6 +1984,7 @@ export function registerChromeTools(
       if (snap === null) {
         return { content: [{ type: 'text', text: out.text }], details: undefined };
       }
+      await noteChrome();
       return {
         content: [{ type: 'text', text: formatMacSnapshot(snap) }],
         details: undefined,
@@ -1976,6 +2007,7 @@ export function registerChromeTools(
       if (out.ok) return { content: [{ type: 'text', text: out.text }], details: undefined };
       const ack = await ax<{ found?: boolean; mode?: string }>('click', { index: params.index });
       if (ack === null) return { content: [{ type: 'text', text: out.text }], details: undefined };
+      await noteChrome();
       return {
         content: [
           {
@@ -2014,6 +2046,7 @@ export function registerChromeTools(
         ...(params.submit === true ? { submit: true } : {}),
       });
       if (ack === null) return { content: [{ type: 'text', text: out.text }], details: undefined };
+      await noteChrome();
       return {
         content: [
           { type: 'text', text: `Set [${params.index}] to ${JSON.stringify(params.text)}.` },

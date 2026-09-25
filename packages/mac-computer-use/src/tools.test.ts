@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import type { ExtensionAPI, ExtensionContext, ToolDefinition } from '@mariozechner/pi-coding-agent';
 import { describe, expect, it, vi } from 'vitest';
 import type { MacBridge } from './bridge-client.js';
+import { registerMacComputerUse } from './index.js';
 import { createMacConsentGate, type MacConsentGate } from './permissions.js';
 import type { MacAgentMethod } from './protocol.js';
 import { createMacSessionState } from './session-state.js';
@@ -1336,6 +1337,80 @@ const textOf = (r: { content: readonly unknown[] }) =>
     .join('\n');
 const OK_BUTTON = { index: 1, role: 'AXButton', name: 'OK' };
 
+describe('Chrome work never takes the app the model chose away from it', () => {
+  function setup(session = createMacSessionState()) {
+    const bridge = new FakeBridge()
+      .on('launch', () => ({
+        ok: true,
+        app: 'TextEdit',
+        pid: 555,
+        bounds: { x: 0, y: 0, w: 8, h: 6 },
+      }))
+      .on('snapshot', (p) =>
+        p?.app === 'Google Chrome'
+          ? {
+              ...SNAP([], 4321),
+              app: 'Google Chrome',
+              screenshot: { path: '/tmp/c.png', base64: 'CCCC' },
+            }
+          : SNAP([{ index: 3, role: 'AXTextArea', name: 'body' }], 555),
+      )
+      .on('key', () => ({ ok: true, background: true }))
+      .on('type', () => ({ found: true }))
+      .on('click', () => ({ found: true }))
+      .on('brake' as MacAgentMethod, () => ({ refusal: null }));
+    const { pi, tools } = piStub();
+    registerMacComputerUseTools(pi, {
+      bridge,
+      session,
+      consent: preConsented(),
+      readChromeTabs: async () => null,
+    });
+    registerChromeTools(pi, bridge, {
+      session,
+      isChromeRunning: async () => true,
+      chromePid: async () => 4321,
+      ...NO_APPLE_EVENTS,
+      chromeEval: async () => ({ ok: true, value: 'Page: example.com' }),
+    });
+    return { session, bridge, tools };
+  }
+
+  it('a picture of Chrome leaves keys and typing aimed at the app the model launched', async () => {
+    const { bridge, tools } = setup();
+    await run(tools, 'mac_launch', { app: 'TextEdit' });
+    await run(tools, 'chrome_snapshot', { visual: true });
+    await run(tools, 'mac_key', { combo: 'cmd+s' });
+    expect(bridge.lastParams('key')).toMatchObject({ pid: 555, app: 'TextEdit' });
+    await run(tools, 'mac_type', { index: 3, text: 'secret note' });
+    expect(bridge.lastParams('type')).toMatchObject({ pid: 555, app: 'TextEdit' });
+  });
+
+  it('so does reading the page through Apple Events', async () => {
+    const { bridge, tools, session } = setup();
+    await run(tools, 'mac_launch', { app: 'TextEdit' });
+    await run(tools, 'chrome_snapshot', {});
+    expect(session.controlled()).toMatchObject({ app: 'TextEdit', pid: 555 });
+    await run(tools, 'mac_click', { x: 10, y: 10 });
+    expect(bridge.lastParams('click')).toMatchObject({ pid: 555 });
+  });
+
+  it('still takes Chrome when nothing was under control — the gap it was for', async () => {
+    const { tools, session } = setup();
+    await run(tools, 'chrome_snapshot', {});
+    expect(session.controlled()).toMatchObject({ app: 'Google Chrome', pid: 4321 });
+  });
+
+  it('and replaces an app merely carried over from another chat, which nobody chose here', async () => {
+    const carried = createMacSessionState();
+    carried.restore({ app: 'Blender', pid: 1472, carriedOver: true });
+    const { tools, session } = setup(carried);
+    await run(tools, 'chrome_snapshot', {});
+    expect(session.controlled()).toMatchObject({ app: 'Google Chrome', pid: 4321 });
+    expect(session.controlled()?.carriedOver).toBeUndefined();
+  });
+});
+
 describe('only a session that drove the Mac this turn ends the driving', () => {
   it('a chat that carried an app over and touched nothing sends no setDriving', async () => {
     const bridge = new FakeBridge().on('setDriving', () => ({ ok: true }));
@@ -1543,6 +1618,57 @@ describe('the "USER has in front" notice reaches the model on every kind of fall
     expect(r.content.find((c) => c.type === 'image')).toBeDefined();
     expect(textOf(r)).toContain('Activity Monitor');
     expect(textOf(r)).toContain('the app the USER has in front');
+  });
+});
+
+describe('Chrome work leaves Chrome under control whichever route did it — and remembers it', () => {
+  it('a default Chrome (no Apple-Events JavaScript) still leaves Chrome under control', async () => {
+    const session = createMacSessionState();
+    const bridge = new FakeBridge()
+      .on('snapshot', () => ({
+        ...SNAP([{ index: 1, role: 'AXLink', name: 'Docs' }], 4321),
+        app: 'Google Chrome',
+      }))
+      .on('brake' as MacAgentMethod, () => ({ refusal: null }));
+    const { pi, tools } = piStub();
+    registerChromeTools(pi, bridge, {
+      session,
+      isChromeRunning: async () => true,
+      chromePid: async () => 4321,
+      ...NO_APPLE_EVENTS,
+      chromeJsAllowed: async () => false,
+    });
+    const r = await run(tools, 'chrome_snapshot', {}, ctxStub(false));
+    expect(textOf(r)).toContain('Docs');
+    expect(session.controlled()).toMatchObject({ app: 'Google Chrome', pid: 4321 });
+  });
+
+  it('and records Chrome as the chat’s own, so a restart comes back to it', async () => {
+    const file = join(mkdtempSync(join(tmpdir(), 'mac-last-')), 'last.json');
+    const bridge = new FakeBridge().on('snapshot', () => ({
+      ...SNAP([]),
+      app: 'Google Chrome',
+      screenshot: { path: '/tmp/c.png', base64: 'CCCC' },
+    }));
+    const s = piStub();
+    registerMacComputerUse(s.pi, {
+      bridge,
+      consent: preConsented(),
+      readChromeTabs: async () => null,
+      isChromeRunning: async () => true,
+      chromePid: async () => process.pid,
+      lastControlFile: file,
+    });
+    s.start();
+    await run(s.tools, 'chrome_snapshot', { visual: true });
+    expect(s.appended).toContainEqual({
+      customType: 'mac-control',
+      data: expect.objectContaining({ app: 'Google Chrome', pid: process.pid }),
+    });
+    expect(JSON.parse(readFileSync(file, 'utf8'))).toMatchObject({
+      app: 'Google Chrome',
+      pid: process.pid,
+    });
   });
 });
 
