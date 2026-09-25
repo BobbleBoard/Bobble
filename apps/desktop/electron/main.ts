@@ -16,6 +16,7 @@ import {
   type NativeImage,
   Notification,
   nativeImage,
+  nativeTheme,
   screen,
   session,
   type WebContents,
@@ -727,6 +728,12 @@ function registerAppIpc(): void {
         // "fresh window" the card offers. Plain reload keeps the same URL.
         if (req.fresh === true) loadRenderer(win);
         else win.webContents.reload();
+        return { ok: true };
+      },
+      'app:set-theme-source': (req) => {
+        const source = req?.source;
+        if (source !== 'system' && source !== 'dark' && source !== 'light') return { ok: false };
+        nativeTheme.themeSource = source;
         return { ok: true };
       },
     },

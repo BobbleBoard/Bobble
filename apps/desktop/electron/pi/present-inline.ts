@@ -12,7 +12,14 @@
  *     is the file on disk;
  *   - a SMALL SVG: its markup, when the drawing is icon-sized and its file is
  *     light enough to travel inline (a poster-sized illustration stays a
- *     canvas tab).
+ *     canvas tab);
+ *   - an INTERACTIVE WIDGET: a presented .html that is one self-contained
+ *     file (it loads nothing of its own by a relative path), small, with
+ *     something to interact with, and not a web page (no nav, no header and
+ *     footer, not a stack of sections). the user (2026-09-24): "really clean,
+ *     intuitive interactive widgets inline/+canvas, eg. for math explanation
+ *     NN inner working visualizations". It runs in the chat's sandboxed frame;
+ *     a site stays a canvas tab.
  *
  * Read here, in main, because the renderer has no file system of its own and
  * the present tool must stay electron-free. Pure over an injected reader so
@@ -22,6 +29,7 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { type DiagramCardPayload, readDiagramCard } from './diagram-card';
+import { htmlWidget, type PresentedHtmlWidget } from './html-widget';
 
 export { DIAGRAM_SIDECAR_SUFFIX, type DiagramCardPayload, readDiagramCard } from './diagram-card';
 
@@ -48,7 +56,11 @@ export interface PresentInlinePayload {
   diagram?: DiagramCardPayload;
   /** The SVG's size and, for a small one, its markup. */
   svg?: PresentedSvgInfo;
+  /** An interactive widget's page — the card runs it. */
+  html?: PresentedHtmlWidget;
 }
+
+export { htmlWidget, INLINE_HTML_MAX_BYTES, type PresentedHtmlWidget } from './html-widget';
 
 /** width/height from the root element: attributes first, else the viewBox. */
 export function svgSize(markup: string): { width: number; height: number } | null {
@@ -87,6 +99,15 @@ export async function presentInlinePayload(
 ): Promise<PresentInlinePayload> {
   const out: PresentInlinePayload = {};
   const ext = path.extname(target).toLowerCase();
+  if (ext === '.html' || ext === '.htm') {
+    try {
+      const widget = htmlWidget(await read(target));
+      if (widget !== null) out.html = widget;
+    } catch {
+      /* unreadable: the card describes it and the canvas opens it */
+    }
+    return out;
+  }
   if (ext === '.json' && target.endsWith(CHART_SIDECAR_SUFFIX)) {
     const chart = await readChart(target, read);
     if (chart !== null) out.chart = chart;

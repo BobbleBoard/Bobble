@@ -26,6 +26,7 @@
  */
 import {
   ChartView,
+  HtmlSurface,
   IconToCanvas,
   InlineWidget,
   inlineTransitionStyle,
@@ -47,6 +48,10 @@ import { withViewTransition } from './canvas/view-transition';
 import { DiagramDrawing, useDataMode } from './DiagramDrawing';
 import { firstArrival, hadLiveChart, liveFrameFor, PresentedCallContext } from './live-handover';
 import { DIAGRAM_CARD_MAX_HEIGHT, kindLabel } from './PendingDiagramCard';
+
+/** How tall a widget grows in the chat before its page scrolls inside. */
+const WIDGET_CARD_MAX_HEIGHT = 560;
+
 import { drawIn } from './svg-draw-in';
 
 function baseName(p: string): string {
@@ -215,6 +220,37 @@ export function PresentedInline({ item }: { item: PresentedRecord }) {
             from={start.from}
             buildIn={start.buildIn}
             version={`${item.diagram.title}\n${item.diagram.source}`}
+          />
+        </InlineWidget>
+      </div>
+    );
+  }
+
+  /*
+   * AN INTERACTIVE WIDGET (html-widget.ts): the page runs in the chat's
+   * sandboxed frame, as tall as it says up to a cap and scrolling inside past
+   * it; the raw view is its HTML; the corner opens it in the canvas, where a
+   * page has room.
+   */
+  if (item.html !== undefined) {
+    return (
+      <div className="flex flex-col gap-1" data-testid="presented-widget" style={transition}>
+        <InlineWidget
+          artifact={{
+            id: key,
+            title: item.html.title ?? name,
+            filename: baseName(item.path),
+            content: { kind: 'html', text: item.html.text },
+          }}
+          label="Interactive"
+          source={{ text: item.html.text, language: 'html' }}
+          maxHeight={WIDGET_CARD_MAX_HEIGHT + 64}
+          onMoveToCanvas={moveToCanvas}
+        >
+          <HtmlSurface
+            content={{ kind: 'html', text: item.html.text }}
+            streaming={false}
+            fitMax={WIDGET_CARD_MAX_HEIGHT}
           />
         </InlineWidget>
       </div>

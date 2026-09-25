@@ -362,6 +362,13 @@ export async function launchApp(name, options = {}) {
     waitFor = '.pd-composer-editor',
     timeout = 30_000,
     realCache = false,
+    /*
+     * Playwright's Electron launch EMULATES prefers-color-scheme — 'light'
+     * unless told otherwise — so no page in a probe ever sees dark, whatever
+     * the app's native theme is. `null` turns the emulation off, for a probe
+     * that checks how the app's own light/dark reaches embedded pages.
+     */
+    colorScheme,
   } = options;
 
   const shotDir = process.env.SHOT_DIR ?? path.join(tmpdir(), 'pd-shots', tagged(name));
@@ -401,6 +408,7 @@ export async function launchApp(name, options = {}) {
     app = await electron.launch({
       executablePath: require('electron'),
       args: [APP_ROOT, `--user-data-dir=${userDataDir}`, ...args],
+      ...(colorScheme === undefined ? {} : { colorScheme }),
       env: {
         ...process.env,
         // Before PI_BIN and friends so an explicit `env.HOME` still wins, and

@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { CanvasConfigContext } from '../context.ts';
 import {
   type FrameToHostMessage,
@@ -70,7 +70,16 @@ export class HtmlSurfaceController {
 export interface HtmlSurfaceProps extends SurfaceProps {
   /** Override the harness URL (else from CanvasConfigContext). For tests. */
   harnessUrl?: string;
+  /**
+   * Fit the frame to what the page reports it needs, up to this many px (a
+   * widget in the chat); past it the page scrolls inside. Unset, the frame
+   * fills its box (the canvas).
+   */
+  fitMax?: number;
 }
+
+/** A fitted frame's height before the page has said how tall it is. */
+const FIT_FIRST_PX = 180;
 
 /**
  * HTML surface — the differentiating "no reload while streaming" surface.
@@ -85,11 +94,14 @@ export interface HtmlSurfaceProps extends SurfaceProps {
  * patches it in place so running scripts, focus, input values and scroll survive
  * each streaming delta — no reload.
  */
-export function HtmlSurface({ content, harnessUrl }: HtmlSurfaceProps) {
+export function HtmlSurface({ content, harnessUrl, fitMax }: HtmlSurfaceProps) {
   const config = useContext(CanvasConfigContext);
   const url = harnessUrl ?? config.harnessUrl;
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const controllerRef = useRef<HtmlSurfaceController | null>(null);
+  const [fitted, setFitted] = useState<number | null>(null);
+  const fitRef = useRef(fitMax);
+  fitRef.current = fitMax;
 
   useEffect(() => {
     const controller = new HtmlSurfaceController({
@@ -103,6 +115,12 @@ export function HtmlSurface({ content, harnessUrl }: HtmlSurfaceProps) {
     const onMessage = (event: MessageEvent): void => {
       // Accept only messages from OUR frame's window.
       if (event.source !== iframeRef.current?.contentWindow) return;
+      const data = event.data as { type?: unknown; height?: unknown };
+      const max = fitRef.current;
+      if (max !== undefined && isFrameToHostMessage(data) && data.type === 'resize') {
+        const h = typeof data.height === 'number' && Number.isFinite(data.height) ? data.height : 0;
+        if (h > 0) setFitted(Math.min(max, Math.ceil(h)));
+      }
       controller.handleFrameMessage(event.data);
     };
     window.addEventListener('message', onMessage);
@@ -124,6 +142,12 @@ export function HtmlSurface({ content, harnessUrl }: HtmlSurfaceProps) {
       // No allow-same-origin: opaque origin is the containment boundary.
       sandbox="allow-scripts"
       src={url}
+      {...(fitMax !== undefined
+        ? {
+            'data-fit': 'true',
+            style: { height: `${fitted ?? Math.min(FIT_FIRST_PX, fitMax)}px` },
+          }
+        : {})}
     />
   );
 }

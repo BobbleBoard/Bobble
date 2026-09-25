@@ -16,6 +16,7 @@ import { type ChartSpec, normalizeChartSpec } from '@pi-desktop/charts';
 import type { PresentKind } from '@pi-desktop/ui';
 import { create } from 'zustand';
 import { type DiagramCardPayload, readDiagramCard } from '../../electron/pi/diagram-card';
+import { htmlWidget } from '../../electron/pi/html-widget';
 import { previewKindForExt } from '../chat/canvas/file-preview';
 import { fileTabKey, openFileInCanvas } from '../chat/canvas/file-tabs';
 import { svgCardPayload } from '../chat/svg-size';
@@ -62,6 +63,8 @@ export interface PresentedRecord {
    * the drawing itself goes inline; a poster stays a canvas tab.
    */
   svg?: { width: number; height: number; bytes: number; text?: string };
+  /** An interactive widget's page (present-inline.ts `htmlWidget`): the thread runs it. */
+  html?: { text: string; title?: string };
   /**
    * When it was handed over, in THIS run of the app (wall clock) — absent for
    * a card brought back from a transcript. A card that has only just arrived
@@ -92,9 +95,14 @@ export function earlierVersion(
 
 /** Does this record show the thing itself in the thread (a chart or diagram card, a small SVG)? */
 export function isInlinePresented(
-  item: Pick<PresentedRecord, 'chart' | 'diagram' | 'svg'>,
+  item: Pick<PresentedRecord, 'chart' | 'diagram' | 'svg' | 'html'>,
 ): boolean {
-  return item.chart !== undefined || item.diagram !== undefined || item.svg?.text !== undefined;
+  return (
+    item.chart !== undefined ||
+    item.diagram !== undefined ||
+    item.svg?.text !== undefined ||
+    item.html !== undefined
+  );
 }
 
 /** The canvas tab key a presented path opens under — the inline card's twin. */
@@ -168,6 +176,7 @@ interface PresentState {
     chart?: Record<string, unknown>;
     diagram?: DiagramCardPayload;
     svg?: { width: number; height: number; bytes: number; text?: string };
+    html?: { text: string; title?: string };
     /** Handed over just now, in this run (see PresentedRecord.shownAt). */
     shownAt?: number;
   }) => PresentedRecord;
@@ -211,6 +220,7 @@ export const usePresentStore = create<PresentState>((set, get) => ({
     chart,
     diagram,
     svg,
+    html,
     shownAt,
   }) => {
     const { kind } = classifyPresented(path);
@@ -234,6 +244,7 @@ export const usePresentStore = create<PresentState>((set, get) => ({
       ...(spec !== undefined ? { chart: spec } : {}),
       ...(spec === undefined && diagram !== undefined ? { diagram } : {}),
       ...(svg !== undefined ? { svg } : {}),
+      ...(html !== undefined ? { html } : {}),
       ...(shownAt !== undefined ? { shownAt } : {}),
     };
     /*
@@ -362,6 +373,8 @@ export function chartsInTranscript(
     const match =
       /^(?:Drew|Changed)\b[^\n]*?:\s+(\S+\.svg)\b/.exec(text) ??
       /^Presented (\S+\.svg) to the user/.exec(text) ??
+      // A presented page: its card is the widget, when it is one (html-widget.ts).
+      /^Presented (\S+\.html?) to the user/i.exec(text) ??
       // The svg tool's own reply: "Made 1 SVG:\n  1. /abs/01.svg — 30 paths".
       /^Made \d+ SVGs?[^\n]*\n\s*1\.\s+(\S+\.svg)\s+—/.exec(text);
     const said = match?.[1];
@@ -392,6 +405,21 @@ export async function rehydratePresented(
   if (bridge === undefined) return 0;
   let added = 0;
   for (const { path, afterMessageId } of chartsInTranscript(messages, root)) {
+    if (/\.html?$/i.test(path)) {
+      let html: { text: string; title?: string } | null = null;
+      try {
+        const read = (await bridge.invoke('fs:read-file', { path })) as { text?: string | null };
+        html = typeof read?.text === 'string' ? htmlWidget(read.text) : null;
+      } catch {
+        html = null;
+      }
+      if (html === null) continue;
+      const have = presentedFor(usePresentStore.getState(), chat);
+      if (have.some((r) => r.path === path && r.afterMessageId === afterMessageId)) continue;
+      usePresentStore.getState().add({ path, chat, afterMessageId, html });
+      added += 1;
+      continue;
+    }
     const sidecar = `${path.slice(0, -4)}.chart.json`;
     let chart: Record<string, unknown> | undefined;
     try {
@@ -726,12 +754,14 @@ export function presentFromMain({
   chart,
   diagram,
   svg,
+  html,
 }: {
   path: string;
   note?: string;
   chart?: Record<string, unknown>;
   diagram?: DiagramCardPayload;
   svg?: { width: number; height: number; bytes: number; text?: string };
+  html?: { text: string; title?: string };
 }): void {
   // Anchor it to the turn that produced it — see `afterMessageId` — in the
   // chat that is RUNNING: the one in the background if a turn is going there,
@@ -750,6 +780,7 @@ export function presentFromMain({
     ...(chart !== undefined ? { chart } : {}),
     ...(diagram !== undefined ? { diagram } : {}),
     ...(svg !== undefined ? { svg } : {}),
+    ...(html !== undefined ? { html } : {}),
     shownAt: Date.now(),
   });
   // The canvas belongs to the chat on screen; a background chat's artefact

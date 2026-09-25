@@ -387,6 +387,7 @@ async function handle(req: Request): Promise<Record<string, unknown>> {
       chart: inline.chart !== undefined,
       diagram: inline.diagram !== undefined,
       svg: inline.svg !== undefined ? `${inline.svg.width}x${inline.svg.height}` : undefined,
+      html: inline.html !== undefined ? inline.html.text.length : undefined,
     });
     return { ok: true };
   }

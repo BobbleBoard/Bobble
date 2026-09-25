@@ -61,6 +61,26 @@
   border: 0;
   background: var(--pd-bg-raised);
 }
+/* A page asks prefers-color-scheme; inside a frame the answer is the frame's
+   own color-scheme — so it follows Bobble's light/dark, not the Mac's (a dark
+   chat showed a widget with dark styles of its own in white). */
+:root[data-mode="dark"] .pd-canvas-html {
+  color-scheme: dark;
+}
+:root[data-mode="light"] .pd-canvas-html {
+  color-scheme: light;
+}
+/* A widget in the chat: as tall as its page says (inline style, capped), and
+   it eases to a new height rather than jumping when its content grows. */
+.pd-canvas-html[data-fit] {
+  display: block;
+  transition: height 180ms var(--pd-easing-standard, ease);
+}
+@media (prefers-reduced-motion: reduce) {
+  .pd-canvas-html[data-fit] {
+    transition: none;
+  }
+}
 
 .pd-canvas-raw {
   height: 100%;

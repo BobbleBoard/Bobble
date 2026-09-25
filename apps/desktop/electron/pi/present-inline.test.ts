@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  htmlWidget,
+  INLINE_HTML_MAX_BYTES,
   INLINE_SVG_MAX_BYTES,
   presentInlinePayload,
   readDiagramCard,
@@ -142,5 +144,64 @@ describe('a presented diagram', () => {
     );
     expect(card?.title).toBe('Order fulfilment');
     expect(await readDiagramCard('/ws/order-fulfilment.svg', 'not svg', reader({}))).toBeNull();
+  });
+});
+
+describe('htmlWidget — an interactive widget in the chat, a site in the canvas', () => {
+  const widget = `<!doctype html><html><head><title>Gradient descent</title>
+<style>body{margin:0;font:14px system-ui}</style></head><body>
+<canvas id="c" width="480" height="240"></canvas><input type="range" id="lr" min="0" max="1" step="0.01">
+<script>const c=document.getElementById('c');/* draws the loss curve */</script></body></html>`;
+
+  it('keeps a small, self-contained, interactive page as a widget, titled', () => {
+    expect(htmlWidget(widget)).toEqual({ text: widget, title: 'Gradient descent' });
+  });
+
+  it('lets a page load from the web (a CDN script) and still be one file', () => {
+    const cdn = widget.replace(
+      '<script>',
+      '<script src="https://cdn.jsdelivr.net/npm/d3@7"></script><script>',
+    );
+    expect(htmlWidget(cdn)).not.toBeNull();
+  });
+
+  it('sends a page with files beside it to the canvas (a stylesheet, an image, a link)', () => {
+    expect(
+      htmlWidget(widget.replace('<style>', '<link rel="stylesheet" href="styles.css"><style>')),
+    ).toBeNull();
+    expect(htmlWidget(widget.replace('<canvas', '<img src="assets/hero.jpg"><canvas'))).toBeNull();
+    expect(htmlWidget(widget.replace('body{', 'body{background:url(bg.png);'))).toBeNull();
+  });
+
+  it('sends a web page to the canvas: navigation, a header and footer, a stack of sections', () => {
+    expect(
+      htmlWidget(widget.replace('<canvas', '<nav><a href="#a">A</a></nav><canvas')),
+    ).toBeNull();
+    expect(
+      htmlWidget(widget.replace('<canvas', '<header>h</header><footer>f</footer><canvas')),
+    ).toBeNull();
+    expect(
+      htmlWidget(
+        widget.replace(
+          '<canvas',
+          '<section></section><section></section><section></section><canvas',
+        ),
+      ),
+    ).toBeNull();
+  });
+
+  it('sends a page with nothing to interact with, or a heavy one, to the canvas', () => {
+    expect(htmlWidget('<html><body><p>Just words.</p></body></html>')).toBeNull();
+    expect(htmlWidget(widget + ' '.repeat(INLINE_HTML_MAX_BYTES))).toBeNull();
+  });
+
+  it('comes through presentInlinePayload for a presented .html', async () => {
+    const out = await presentInlinePayload('/w/grad.html', async () => widget);
+    expect(out.html?.title).toBe('Gradient descent');
+    const site = await presentInlinePayload(
+      '/w/index.html',
+      async () => '<nav></nav><script></script>',
+    );
+    expect(site.html).toBeUndefined();
   });
 });

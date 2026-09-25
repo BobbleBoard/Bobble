@@ -168,6 +168,17 @@ export type CoreInvokeMap = {
    * window was carrying along with every scrap of renderer state.
    */
   'app:reload-window': { request: { fresh?: boolean }; response: { ok: boolean } };
+  /**
+   * The light/dark the person chose, for everything Electron draws on its own
+   * and every page embedded in the app: a presented widget's
+   * `prefers-color-scheme` answers from this, not from the Mac (a dark chat ran
+   * a widget with dark styles of its own in white). The SETTING, not the
+   * resolved mode — 'system' keeps following the Mac.
+   */
+  'app:set-theme-source': {
+    request: { source: 'system' | 'dark' | 'light' };
+    response: { ok: boolean };
+  };
 };
 
 // ---------------------------------------------------------------------------
@@ -1260,6 +1271,7 @@ export const APP_INVOKE_CHANNELS = [
   'app:notify',
   'app:set-badge',
   'app:reload-window',
+  'app:set-theme-source',
   ...FS_INVOKE_CHANNELS,
   ...ATTACHMENTS_INVOKE_CHANNELS,
   ...LLM_INVOKE_CHANNELS,
@@ -1381,6 +1393,12 @@ export type AppEventMap = {
     };
     /** A presented SVG's size and, when icon-sized and light, its markup. */
     svg?: { width: number; height: number; bytes: number; text?: string };
+    /**
+     * An interactive widget: a presented .html that is one small, self-contained,
+     * interactive file and not a web page — the thread runs it in a sandboxed
+     * frame. See electron/pi/present-inline.ts `htmlWidget`.
+     */
+    html?: { text: string; title?: string };
   };
   /**
    * Download progress. `received`/`total`/`fraction` are THIS FILE's; the

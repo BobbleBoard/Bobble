@@ -112,6 +112,11 @@ function applyTheme(settings: DesktopSettings): void {
   const theme = useThemeStore.getState();
   theme.setFlavor(settings.theme.flavor);
   theme.setMode(resolveMode(settings.theme.mode));
+  // Electron's own light/dark follows the SETTING ('system' stays system), so
+  // an embedded page's prefers-color-scheme — a presented widget — matches.
+  void window.piDesktop
+    ?.invoke('app:set-theme-source', { source: settings.theme.mode })
+    .catch(() => undefined);
 }
 
 /** Drive the global icon stroke: an inline `--pd-icon-stroke` on the document
