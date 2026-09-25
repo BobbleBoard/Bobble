@@ -1,6 +1,6 @@
 # Bobble — status
 
-Updated: 2026-09-24 · **PAUSED for the user's testing** · main `2ea663a7` · **installed in /Applications: `candidate/2026-09-24` (`e3276740`)** = last night's candidate + the elevation fix + the History-card fix below, packaged probe + smoke OK, signed with the stable identity
+Updated: 2026-09-24 · **PAUSED for the user's testing** · main `ea0ef232` · **installed in /Applications: `candidate/2026-09-24` (`23a2ac12`)** = last night's candidate + the elevation, History-card and sidebar/lockup fixes below, packaged probe + smoke OK, signed with the stable identity
 
 ## Since your review (2026-09-24): "everything has the same softness" / the History card looks "flimsy"
 | Where | Before | After | Proof |
@@ -12,6 +12,18 @@ Updated: 2026-09-24 · **PAUSED for the user's testing** · main `2ea663a7` · *
 | Prototypes (gallery) | same soft cards + 12 proto rules edged with the divider colour | follow the live tokens; those 12 edges on border-default; **all 10 prototypes re-shot** (804 shots; the gallery shows the 437 at 1440 wide). Help (B) links the app's compiled CSS by content hash — re-pointed at the current build | `deliverables/gallery.html` |
 
 Commits: `b493d344` (tokens + studio material), `bc44d674` (four hard-coded shadows; `fec48c2d` on the candidate), `9135cb54` (the studio probe `elevation-look.mjs`). Themes suite 27/27, token-hygiene + terminal-surface CSS tests pass.
+
+## Then (2026-09-24): the sidebar's hierarchy and the new-chat "Bobble" line
+| Where | Before (measured) | After |
+|---|---|---|
+| Rail inks | every nav row, studio and chat title 14px/400 at 6.6:1; icons louder than labels | a row with an icon is a place → primary ink (15.1:1); chat titles stay 6.6:1; the current chat lifts with pill + primary |
+| New chat | a row like any other, 48px from both neighbours | the lead action: medium weight, the rail's only accent (its icon), one row under Search |
+| Search (compact, click to type) | 2.4:1 — fainter than the section labels, read as disabled | 6.6:1, glass in the icon ink; behaviour unchanged |
+| Modalities | a 14px row over a 13px indented tree (read as a folder of chats) | the same section header as Workspace/Projects/Chats (still folds, still no icon); studios are the same rows as Workspace |
+| New-chat lockup | the mark's tiles 40px beside 32px capitals (5px over the cap line, under the baseline) | tiles = capital height (1cap / 0.828), meeting cap line and baseline; gap tightened |
+
+Commit `62a32658` (`23a2ac12` on the candidate), probe `apps/desktop/tests/e2e/sidebar-look.mjs` (per-row size/weight/contrast/gap + shots). Claude/Codex flavors: only the Modalities structure changes; their inks are untouched.
+**Installed while the user's Bobble was open** (my miss: the running-check and the ship shared one command) — quit and reopen Bobble to load this build. `ship-local.sh` now quits a running Bobble first (`ea0ef232`).
 
 ## Then (2026-09-24): the History cards — "text not vertically centered inside dots and overlapping not well done dotted lines especially around the curves"
 | Where | Before | After | Proof |
