@@ -158,6 +158,14 @@ export function prepareSource(raw: string): PreparedSource {
     text = text.replace(/\\n/g, '\n').replace(/\\t/g, '  ');
     notes.push('Read the \\n in it as line breaks.');
   }
+  // MEASURED, the 4B in schemas mode: `A[\"Order Placed\"]` — a quote escaped
+  // once too often in the JSON, arriving as a backslash and a quote. Mermaid
+  // has no backslash escapes (a quote inside a label is #quot;), so a \" is
+  // always a quote.
+  if (text.includes('\\"')) {
+    text = text.replace(/\\"/g, '"');
+    notes.push('Read each \\" in it as a plain quote (Mermaid has no backslash escapes).');
+  }
   // Leading blank lines shift nothing a person counts; trailing spaces are noise.
   const leading = /^(?:[ \t]*\n)+/.exec(text)?.[0] ?? '';
   if (leading !== '') {
@@ -205,7 +213,51 @@ export function prepareSource(raw: string): PreparedSource {
       notes.push(`Wrote its ${arrows === 1 ? 'arrow' : 'arrows'} as --> (a flowchart's arrow).`);
     }
   }
+  const unstyled = withoutStyling(text, type?.kind ?? '');
+  if (unstyled.dropped > 0) {
+    text = unstyled.source;
+    notes.push(
+      `Took out ${unstyled.dropped === 1 ? 'a style line' : `${unstyled.dropped} style lines`}: the design kit colours a diagram (where it starts and ends, the failure paths) — no colours in the source.`,
+    );
+  }
   return { source: text, notes, lineOffset };
+}
+
+/** The styling lines each kind of diagram can carry — the kit's to decide. */
+const STYLE_LINES: Readonly<Record<string, RegExp>> = {
+  flowchart: /^\s*(?:style|classDef|class|linkStyle)\s/,
+  'state diagram': /^\s*(?:style|classDef|class)\s/,
+  'class diagram': /^\s*(?:style|classDef|cssClass)\s/,
+};
+
+/**
+ * The source with its own colours taken out. MEASURED, the research's flow
+ * brief on the 4B with the tool in place: its first call wrote a `style A
+ * fill:#e1f5fe` line for all seven steps, unasked and against the guidance —
+ * pastels, a lavender and a pink among them (the user: no purple) — and a source
+ * that dresses itself keeps its own dress, over the kit's roles. So styling is
+ * the kit's: style / classDef / class / linkStyle lines, `%%{init}%%` theme
+ * directives and `:::name` tags go. A line becomes a bare `%%` comment rather
+ * than going away, so Mermaid's line N is still the model's line N.
+ */
+export function withoutStyling(source: string, kind: string): { source: string; dropped: number } {
+  const styleLine = STYLE_LINES[kind];
+  let dropped = 0;
+  const lines = source.split('\n').map((line) => {
+    if (/^\s*%%\{.*\}%%\s*$/.test(line) || (styleLine?.test(line) ?? false)) {
+      dropped += 1;
+      return '%%';
+    }
+    if (kind === 'flowchart' && line.includes(':::')) {
+      // Outside quoted labels only, like the arrows above.
+      return line
+        .split('"')
+        .map((part, k) => (k % 2 === 1 ? part : part.replace(/:::[\w-]+/g, '')))
+        .join('"');
+    }
+    return line;
+  });
+  return { source: lines.join('\n'), dropped };
 }
 
 /** The shapes a flowchart node can open with, longest first, and what closes each. */
@@ -408,7 +460,11 @@ export function flowRoles(parsed: ParseOk): FlowRoles {
   return { start, end, failEdges, failNodes };
 }
 
-/** Whether the source dresses itself — then its choices stand. */
+/**
+ * Whether the source still dresses itself. prepareSource takes a flowchart's
+ * own styling out (withoutStyling), so this is the guard for whatever it did
+ * not recognise: the kit's roles are not layered over colours of the source's.
+ */
 export function stylesItself(source: string): boolean {
   return /^\s*(?:classDef|class\s|style\s|linkStyle)\b/m.test(source) || source.includes(':::');
 }
@@ -591,6 +647,30 @@ export const PAGE_HTML = `<!doctype html><html><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:">
 <style>html,body{margin:0;background:#fff}#host{position:absolute;left:0;top:0}</style>
 </head><body><div id="host"></div></body></html>`;
+
+/**
+ * Geometry to a hundredth of a pixel, as page JavaScript (PAGE_SCRIPT takes it
+ * in; the tests run the same text). Mermaid writes fifteen digits — a stadium
+ * node alone was 32 KB of path.
+ *
+ * Compact path data runs numbers together: "M12.258.001l.256.004" is 12.258,
+ * .001, .256, .004 — a point starts a new number once the one before already
+ * has one. So the numbers are read left to right by the SVG number grammar (a
+ * search from any digit read ".01.249" as ".0" + "1.249"), and a rounded one
+ * is kept apart on both sides: a space before it when it starts with a digit
+ * after a digit or a point (".001" → "0" glued onto "12.26" as "12.260"), and
+ * after it when it lost its point before a ".26" (which then read as "0.26").
+ * All three broke the clock symbol Mermaid puts in every sequence diagram into
+ * a path the browser refused ("Expected number" — the real window's console,
+ * 2026-09-25); the test reads the whole symbol back.
+ */
+export const ROUND_GEOMETRY_JS = String.raw`(v) => v.replace(/-?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?/g, (n, at, s) => {
+  if (!/\.\d{3,}/.test(n)) return n;
+  let r = String(Math.round(Number(n) * 100) / 100);
+  if (/[\d.]/.test(at > 0 ? s[at - 1] : '') && /^\d/.test(r)) r = ' ' + r;
+  if (!r.includes('.') && s[at + n.length] === '.') r += ' ';
+  return r;
+}).replace(/ {2,}/g, ' ')`;
 
 /**
  * The page's two calls, as plain JavaScript (it runs in the window, not in
@@ -778,9 +858,9 @@ export const PAGE_SCRIPT = String.raw`(() => {
       }
     }
     for (const m of root.querySelectorAll('marker')) if (!used.has(m.id)) m.remove();
-    // Geometry to a hundredth of a pixel (Mermaid writes fifteen digits: a
-    // stadium node alone was 32 KB of path), and Mermaid's own bookkeeping out.
-    const round = (v) => v.replace(/-?\d*\.\d{3,}(?:e-?\d+)?/g, (n) => String(Math.round(Number(n) * 100) / 100));
+    // Geometry to a hundredth of a pixel (ROUND_GEOMETRY_JS), and Mermaid's
+    // own bookkeeping out.
+    const round = ${ROUND_GEOMETRY_JS};
     for (const el of root.querySelectorAll('[d], [points], [transform]')) {
       for (const a of ['d', 'points', 'transform']) {
         const v = el.getAttribute(a);
@@ -797,6 +877,17 @@ export const PAGE_SCRIPT = String.raw`(() => {
       : { x: 0, y: 0, width: Number(root.getAttribute('width')) || 400, height: Number(root.getAttribute('height')) || 300 };
     const w = Math.ceil(vb.width);
     const h = Math.ceil(vb.height);
+    // Mermaid draws a sequence diagram's lifelines 2000 px long and lets its
+    // own viewport cut them. Nested here the drawing overflows visibly (so an
+    // edge label near a side is never clipped), and the lifelines ran on to the
+    // bottom of the paper — so they stop at the drawing's foot instead.
+    const foot = vb.y + vb.height;
+    for (const line of root.querySelectorAll('line')) {
+      for (const a of ['y1', 'y2']) {
+        const v = Number(line.getAttribute(a));
+        if (Number.isFinite(v) && v > foot) line.setAttribute(a, String(Math.floor(foot)));
+      }
+    }
     const pad = 28;
     const titleSize = 22;
     const subSize = 15;
@@ -839,13 +930,40 @@ export const PAGE_SCRIPT = String.raw`(() => {
     root.setAttribute('viewBox', [vb.x, vb.y, vb.width, vb.height].join(' '));
     root.setAttribute('overflow', 'visible');
     const drawing = new XMLSerializer().serializeToString(root);
+    // class="pd-diagram": the canvas shows a diagram at its own size (and
+    // scrolls), where any other SVG is fitted to the pane.
     const svg =
-      '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(title || req.kind || 'diagram') + '" font-family="' + esc(t.font) + '">' +
+      '<svg xmlns="http://www.w3.org/2000/svg" class="pd-diagram" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(title || req.kind || 'diagram') + '" font-family="' + esc(t.font) + '">' +
       '<rect width="' + W + '" height="' + H + '" fill="' + t.paper + '"/>' + head + drawing + '</svg>';
     host.innerHTML = '';
     return { svg, width: W, height: H, labelsFixed: fixed };
   };
 })();`;
+
+// ── crossing into the page ──────────────────────────────────────────────────
+
+/**
+ * A script for `webContents.executeJavaScript` that answers NOTHING.
+ *
+ * The value of a script's last statement is sent back to the main process, and
+ * it has to survive a structured clone. mermaid.min.js ends by assigning the
+ * mermaid object to globalThis — a value full of functions — so the injection
+ * itself rejected with "An object could not be cloned." and EVERY diagram in
+ * the real app failed as "Mermaid could not read the source"
+ * (inline-diagram-probe, 2026-09-25). The eval and the Chromium tests add the
+ * library as a <script> tag, which answers nothing, so only the app met it.
+ */
+export function asStatement(code: string): string {
+  return `${code}\n;void 0;`;
+}
+
+/**
+ * A call into the page whose answer crosses as JSON TEXT: whatever the page
+ * builds, nothing in it can fail to clone, and main parses it back.
+ */
+export function pageCall(fn: '__pdParse' | '__pdRender', arg: unknown): string {
+  return `Promise.resolve(window.${fn}(${JSON.stringify(arg)})).then((r) => JSON.stringify(r))`;
+}
 
 // ── the whole job, against any page ──────────────────────────────────────────
 

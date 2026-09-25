@@ -200,6 +200,13 @@ export type DiagramRenderReply =
       readonly lineText: string | null;
       /** The likely fix, in one line. */
       readonly hint: string;
+      /**
+       * 'app' when the drawing failed in the app itself (the hidden window,
+       * the bridge), not in the source. MEASURED: a failure of the app's own
+       * reported as "Mermaid could not read the source … simplify it" sent the
+       * 4B rewriting a source that was fine, then back to hand-typed SVG.
+       */
+      readonly cause?: 'app';
     };
 
 export interface PresentBridge {
@@ -348,6 +355,31 @@ export function registerPresentTool(pi: ExtensionAPI, deps: PresentToolDeps): vo
         path: resolved,
         ...(note !== undefined ? { note } : {}),
       });
+      /*
+       * A DIAGRAM IS ALREADY IN FRONT OF THE USER. MEASURED, the research's flow
+       * brief on the 4B with the diagram tool in place: it drew the diagram in
+       * one call, then presented the .svg anyway (both tool modes, against the
+       * tool's own "do not present it again") — and the preview handed back
+       * the drawing's markup, 1,112 tokens of paths the model cannot read, into
+       * a request that had nothing else to do. Its sidecar (diagram-tool.ts's
+       * .diagram.json) marks one; the card is re-shown, and the answer is short.
+       */
+      if (!info.isDirectory && /\.svg$/i.test(resolved)) {
+        const sidecar = await deps.stat(resolved.replace(/\.svg$/i, '.diagram.json'));
+        if (sidecar !== null && !sidecar.isDirectory) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text:
+                  `${pathForModel(resolved, deps.resolvePath?.('.'))} is a diagram the diagram tool drew — its card is already in the chat, so there was nothing more to present. ` +
+                  'Reply in one sentence saying what it shows; a change is diagram_edit on this file.',
+              },
+            ],
+            details: undefined,
+          } as never;
+        }
+      }
       const preview = await deps.bridge.preview({ path: resolved, kind: plan.kind });
 
       const content: Array<Record<string, unknown>> = [];

@@ -9,6 +9,7 @@ import {
   DIAGRAM_SOURCE_SUFFIX,
   DIAGRAM_TOOL,
   diagramSlug,
+  looksLikeMermaid,
   registerDiagramTool,
   renderFailure,
   svgPathFor,
@@ -136,6 +137,24 @@ describe('the diagram command, as a person (or a 4B) types it', () => {
     });
   });
 
+  /* MEASURED: the 4B's first call in CLI mode — one positional, the Mermaid
+     itself — was refused "missing --source" with the whole usage. */
+  it('`diagram "<mermaid>"` alone reaches the tool (it reads the Mermaid for itself)', () => {
+    const r = resolveCli(cli, ['diagram', FLOW]);
+    expect(r).toMatchObject({ kind: 'call', tool: DIAGRAM_TOOL, args: { title: FLOW } });
+  });
+
+  it('knows Mermaid from a title', () => {
+    expect(looksLikeMermaid(FLOW)).toBe(true);
+    expect(looksLikeMermaid('%% the flow\nsequenceDiagram\n  A->>B: hi')).toBe(true);
+    expect(looksLikeMermaid('A --> B\nB --> C')).toBe(true);
+    expect(looksLikeMermaid('Order fulfilment')).toBe(false);
+    expect(looksLikeMermaid('Flowchart of the order process')).toBe(false);
+    expect(looksLikeMermaid('Graphs --> meaning')).toBe(false);
+    expect(looksLikeMermaid('graph of sales')).toBe(false);
+    expect(looksLikeMermaid('flowchart TD\\n  A --> B')).toBe(true);
+  });
+
   it('`diagram edit flow.svg --direction LR` is diagram_edit with the file', () => {
     const r = resolveCli(cli, ['diagram', 'edit', 'flow.svg', '--direction', 'LR']);
     expect(r).toMatchObject({
@@ -147,6 +166,18 @@ describe('the diagram command, as a person (or a 4B) types it', () => {
 });
 
 describe('diagram', () => {
+  it('draws Mermaid that came in the title’s place, untitled, and says so', async () => {
+    const { render, calls } = fakeRender();
+    const { exec } = rig({ render });
+    const r = await exec(DIAGRAM_TOOL)('1', { title: FLOW }, undefined, undefined, {
+      cwd: root,
+    });
+    expect(r.isError).toBeUndefined();
+    expect(calls[0]?.source).toBe(FLOW);
+    expect(calls[0]?.title).toBeUndefined();
+    expect(r.content[0]?.text).toMatch(/Read the Mermaid given in the title’s place as the source/);
+  });
+
   it('draws it, writes the drawing, its source and the card sidecar, and presents the drawing', async () => {
     const { render, calls } = fakeRender();
     const shown: string[] = [];
@@ -339,5 +370,19 @@ describe('the pure parts', () => {
         hint: 'Start with the type.',
       }),
     ).toContain('could not read the source');
+  });
+
+  it('a failure of the app’s own is not blamed on the source', () => {
+    const text = renderFailure({
+      ok: false,
+      error: 'An object could not be cloned.',
+      line: null,
+      lineText: null,
+      hint: '',
+      cause: 'app',
+    });
+    expect(text).toMatch(/the app could not draw it — the source is not the problem/);
+    expect(text).toMatch(/Try the same call once more/);
+    expect(text).not.toMatch(/simplify|could not read/);
   });
 });

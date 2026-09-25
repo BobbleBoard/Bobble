@@ -63,6 +63,16 @@ function useDataMode(): 'light' | 'dark' {
   return mode;
 }
 
+/**
+ * How tall a diagram card grows before the fade and "Open in canvas" take over.
+ * A drawing scales to the card's WIDTH only, so height is what keeps it legible:
+ * the research's flow drawn top-down (which the tool's guidance asks for — it
+ * fits the chat's 700 px) is 394 × 910 px at its 16 px labels, and the 560 px
+ * every other card uses cut it off at the second decision. The chat scrolls
+ * vertically, so a diagram gets the height to be read whole.
+ */
+const DIAGRAM_CARD_MAX_HEIGHT = 960;
+
 /** A diagram's head label: "Flowchart", "Sequence diagram". */
 function kindLabel(kind: string): string {
   return kind === '' ? 'Diagram' : `${kind.charAt(0).toUpperCase()}${kind.slice(1)}`;
@@ -143,7 +153,7 @@ export function PresentedInline({ item }: { item: PresentedRecord }) {
           }}
           label={kindLabel(item.diagram.kind)}
           source={{ text: item.diagram.source }}
-          maxHeight={560}
+          maxHeight={DIAGRAM_CARD_MAX_HEIGHT}
           onMoveToCanvas={moveToCanvas}
         />
       </div>

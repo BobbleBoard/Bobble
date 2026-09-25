@@ -28,6 +28,7 @@ import path from 'node:path';
 import { createLogger } from '@pi-desktop/shared';
 import { app, BrowserWindow, session } from 'electron';
 import {
+  asStatement,
   type DiagramPage,
   type DiagramRenderReply,
   type DiagramRenderRequest,
@@ -35,6 +36,7 @@ import {
   MERMAID_VERSION,
   PAGE_HTML,
   PAGE_SCRIPT,
+  pageCall,
   runDiagram,
 } from './diagram-page.js';
 
@@ -42,6 +44,7 @@ const log = createLogger('desktop:diagram');
 
 /** A render that takes longer than this is a pathological graph, not a slow one. */
 const RENDER_TIMEOUT_MS = 20_000;
+const TOO_LONG = 'laying the diagram out took too long';
 
 /** Where the bundled Mermaid is: beside the asar when packaged, in the repo in dev. */
 export function mermaidPath(): string {
@@ -107,14 +110,16 @@ async function openDiagramWindow(): Promise<{ page: DiagramPage; dispose: () => 
   };
   try {
     await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(PAGE_HTML)}`);
-    await win.webContents.executeJavaScript(await loadMermaid(), true);
-    await win.webContents.executeJavaScript(PAGE_SCRIPT, true);
+    // asStatement: the library's last statement is the mermaid object, and a
+    // script's value is cloned back to main — it could not be (diagram-page.ts).
+    await win.webContents.executeJavaScript(asStatement(await loadMermaid()), true);
+    await win.webContents.executeJavaScript(asStatement(PAGE_SCRIPT), true);
   } catch (err) {
     dispose();
     throw err;
   }
-  const call = <T>(fn: string, arg: unknown): Promise<T> =>
-    win.webContents.executeJavaScript(`window.${fn}(${JSON.stringify(arg)})`, true) as Promise<T>;
+  const call = async <T>(fn: '__pdParse' | '__pdRender', arg: unknown): Promise<T> =>
+    JSON.parse((await win.webContents.executeJavaScript(pageCall(fn, arg), true)) as string) as T;
   return {
     page: {
       parse: (source) => call('__pdParse', source),
@@ -139,10 +144,7 @@ export function renderDiagram(req: DiagramRenderRequest): Promise<DiagramRenderR
       opened = await openDiagramWindow();
       const page = opened.page;
       const timeout = new Promise<never>((_, reject) => {
-        timer = setTimeout(
-          () => reject(new Error('laying the diagram out took too long')),
-          RENDER_TIMEOUT_MS,
-        );
+        timer = setTimeout(() => reject(new Error(TOO_LONG)), RENDER_TIMEOUT_MS);
       });
       const reply = await Promise.race([runDiagram(page, req), timeout]);
       log.info('diagram', {
@@ -154,12 +156,19 @@ export function renderDiagram(req: DiagramRenderRequest): Promise<DiagramRenderR
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       log.warn('diagram failed', { message });
+      // A layout that runs past the limit is the graph's doing — say so to the
+      // model. Anything else threw in the window or on the way to it, and is
+      // ours: "simplify the source" would send it rewriting a good one.
+      const tooBig = err instanceof Error && err.message === TOO_LONG;
       return {
         ok: false,
         error: message,
         line: null,
         lineText: null,
-        hint: 'Mermaid could not draw it; simplify the source (fewer nodes per line, plain labels) and try again.',
+        hint: tooBig
+          ? 'Mermaid could not lay it out in time; draw fewer steps per diagram (split it in two) and try again.'
+          : '',
+        ...(tooBig ? {} : { cause: 'app' as const }),
       };
     } finally {
       if (timer !== undefined) clearTimeout(timer);

@@ -40,6 +40,20 @@
   height: auto;
 }
 
+/* A DIAGRAM reads at its own size in the canvas (VQ-10). The chat card fits it
+   to the column — a left-to-right flow of eight steps is 1332 px wide, and
+   fitted to the canvas pane its 16 px labels were 7 px ("Open in canvas shows
+   it full size" was not true). Wider than the pane, it scrolls; `safe` keeps
+   its left edge reachable when it does. The chat card's own rule, later in
+   this sheet, fits it again there. */
+.pd-canvas-svg:has(> svg.pd-diagram) {
+  place-items: safe center;
+}
+
+.pd-canvas-svg svg.pd-diagram {
+  max-width: none;
+}
+
 /* Sandboxed interactive HTML fills the pane; the iframe IS the trust boundary. */
 .pd-canvas-html {
   width: 100%;

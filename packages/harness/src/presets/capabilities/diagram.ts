@@ -21,7 +21,7 @@ export const diagram: Capability = {
      (the command list), so it is one sentence; the how-to is in `guidance`
      and in `diagram --help`, which cost nothing until read. */
   summary:
-    'Draw a flowchart, process, sequence, org chart, mind map or any diagram of steps and relationships in the chat, from Mermaid text — never hand-written SVG or the svg command.',
+    'Draw a flowchart, process, sequence, org chart, mind map or any diagram of steps and relationships in the chat, from Mermaid text — never hand-written SVG, the svg command or an image.',
   guidance:
     'diagram takes a title and the Mermaid source — "flowchart TD" then one line per connection: ' +
     'A([Order placed]) --> B{Payment ok?}, B -- no --> C[Email customer], C -. retry .-> B. Every ' +

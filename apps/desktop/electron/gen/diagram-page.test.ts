@@ -1,8 +1,10 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
 import { diagramTheme, isPurple, kitOrDefault } from '@pi-desktop/design-kit';
 import { describe, expect, it } from 'vitest';
 import {
+  asStatement,
   type DiagramPage,
   diagramId,
   diagramTypeOf,
@@ -13,9 +15,11 @@ import {
   mermaidConfig,
   type ParseFailed,
   type ParseOk,
+  pageCall,
   prepareSource,
   quoteAllLabels,
   quoteNodeLabels,
+  ROUND_GEOMETRY_JS,
   roleStyling,
   runDiagram,
   stylesItself,
@@ -87,6 +91,13 @@ describe('prepareSource — the source as a small model sends it', () => {
     expect(r.notes[0]).toMatch(/line breaks/);
   });
 
+  it('reads a quote escaped once too often as a quote (the 4B in schemas mode)', () => {
+    const r = prepareSource('flowchart TD\n  A[\\"Order Placed\\"] --> B{\\"Payment Check\\"}');
+    expect(r.source).toBe('flowchart TD\n  A["Order Placed"] --> B{"Payment Check"}');
+    expect(r.notes.join(' ')).toMatch(/plain quote/);
+    expect(r.lineOffset).toBe(0);
+  });
+
   it('gives lines of arrows with no type line a top-down flowchart, and shifts the line count', () => {
     const r = prepareSource('A --> B\nB --> C');
     expect(r.source).toBe('flowchart TD\nA --> B\nB --> C');
@@ -103,6 +114,36 @@ describe('prepareSource — the source as a small model sends it', () => {
     );
     expect(prepareSource('flowchart LR\n  A -.-> B\n  C ==> D').notes).toEqual([]);
     expect(prepareSource('sequenceDiagram\n  A->B: hi').source).toBe('sequenceDiagram\n  A->B: hi');
+  });
+
+  it('takes a flowchart’s own colours out — the kit dresses it — and keeps its line numbers', () => {
+    // The 4B's first call, verbatim in shape: a style line per step, a lavender among them.
+    const src = [
+      'flowchart TD',
+      '    A[Order Placed] --> B{Payment Check}',
+      '    B -->|Failed| D[Email Customer]:::warn',
+      '    style A fill:#e1f5fe',
+      '    style G fill:#f3e5f5',
+      '    classDef warn fill:#fce4ec',
+      '    linkStyle 0 stroke:#f00',
+    ].join('\n');
+    const r = prepareSource(src);
+    expect(r.source.split('\n')).toHaveLength(7);
+    expect(r.source).not.toMatch(/fill:|stroke:|:::/);
+    expect(r.source.split('\n').slice(3)).toEqual(['%%', '%%', '%%', '%%']);
+    expect(r.notes.join(' ')).toMatch(/Took out 4 style lines: the design kit colours/);
+    expect(stylesItself(r.source)).toBe(false);
+    // a label that merely says "style" or ":::" is a label
+    expect(prepareSource('flowchart LR\n  A["style: :::bold"] --> B').notes).toEqual([]);
+  });
+
+  it('leaves a class diagram’s classes and a sequence diagram alone, but not a theme directive', () => {
+    const cls = 'classDiagram\n  class Animal {\n    +name\n  }';
+    expect(prepareSource(cls).source).toBe(cls);
+    expect(prepareSource('sequenceDiagram\n  A->>B: style me').notes).toEqual([]);
+    const init = prepareSource("%%{init: {'theme': 'forest'}}%%\nflowchart TD\n  A --> B");
+    expect(init.source).toBe('%%\nflowchart TD\n  A --> B');
+    expect(init.notes.join(' ')).toMatch(/Took out a style line/);
   });
 
   it('names the kind', () => {
@@ -302,5 +343,73 @@ describe('runDiagram — the whole job against a page', () => {
     expect(diagramId('a')).toBe(diagramId('a'));
     expect(diagramId('a')).not.toBe(diagramId('b'));
     expect(diagramId('a')).toMatch(/^dg[0-9a-z]+$/);
+  });
+});
+
+describe('ROUND_GEOMETRY_JS — the page’s rounding, run as the page runs it', () => {
+  const round = vm.runInNewContext(ROUND_GEOMETRY_JS) as (v: string) => string;
+
+  it('keeps compact path numbers apart (Mermaid’s clock symbol, in every sequence diagram)', () => {
+    // 12.258 .001 .256 .004 — the ".001" rounded to "0" once glued on as "12.260"
+    expect(round('M12.258.001l.256.004.255.005')).toBe('M12.26 0l0.26 0 0.26 0.01');
+    // .251 .01 .249 — a search from the digit once read ".01.249" as ".0" + "1.249"
+    expect(round('l.251.01.249.012')).toBe('l0.25.01 0.25 0.01');
+    // .001 .26 — the ".001" lost its point, and ".26" then read as "0.26"
+    expect(round('l.259.001.26-.001.257')).toBe('l0.26 0 .26 0 0.26');
+    // The whole symbol, read back by the SVG number grammar: the same numbers,
+    // a hundredth apart at most.
+    const NUM = /[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?/g;
+    const bundle = readFileSync(
+      new URL('../../resources/mermaid/mermaid.min.js', import.meta.url),
+      'utf8',
+    );
+    const paths = [...bundle.matchAll(/["'](M[-0-9.][^"']{20,})["']/g)].map((m) => m[1] ?? '');
+    expect(paths.some((d) => d.startsWith('M12.258.001'))).toBe(true);
+    for (const d of paths) {
+      const a = (d.match(NUM) ?? []).map(Number);
+      const b = (round(d).match(NUM) ?? []).map(Number);
+      expect(b).toHaveLength(a.length);
+      expect(b.every((v, i) => Math.abs(v - (a[i] ?? Number.NaN)) <= 0.0051)).toBe(true);
+    }
+  });
+
+  it('rounds long numbers to a hundredth and leaves short ones alone', () => {
+    expect(round('M1.23456,7.891 L3.5,4.25')).toBe('M1.23,7.89 L3.5,4.25');
+    expect(round('translate(10.12345 -3.00001)')).toBe('translate(10.12 -3)');
+    expect(round('M0.5.5l1.25.75')).toBe('M0.5.5l1.25.75');
+  });
+});
+
+describe('crossing into the page — nothing that cannot be cloned comes back', () => {
+  it('an injected script answers undefined, even one whose last statement is an object', () => {
+    // The shape mermaid.min.js ends in: globalThis["mermaid"] = <an object of functions>.
+    const lib = 'globalThis["mermaid"] = { initialize() {}, render() {} };';
+    expect(typeof vm.runInNewContext(lib)).toBe('object');
+    expect(vm.runInNewContext(asStatement(lib))).toBeUndefined();
+    // a trailing line comment (a source map) does not swallow it
+    expect(vm.runInNewContext(asStatement(`${lib}\n//# sourceMappingURL=x.map`))).toBeUndefined();
+    // …and the real bundle does end that way
+    const tail = readFileSync(
+      new URL('../../resources/mermaid/mermaid.min.js', import.meta.url),
+      'utf8',
+    ).slice(-200);
+    expect(tail).toMatch(/globalThis\["mermaid"\]\s*=/);
+  });
+
+  it('a page call answers JSON text, whatever the page built', async () => {
+    const window = {
+      __pdParse: async (s: string) => ({ ok: true, source: s, fn: () => 1, nested: { at: 2 } }),
+    };
+    const text = await vm.runInNewContext(pageCall('__pdParse', 'flowchart TD\n  A --> B'), {
+      window,
+      Promise,
+      JSON,
+    });
+    expect(typeof text).toBe('string');
+    expect(JSON.parse(text)).toEqual({
+      ok: true,
+      source: 'flowchart TD\n  A --> B',
+      nested: { at: 2 },
+    });
   });
 });

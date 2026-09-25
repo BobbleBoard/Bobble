@@ -111,15 +111,16 @@ export function presentBridgeFromEnv(
         return r as DiagramRenderReply;
       }
       const failed = r as Partial<Extract<DiagramRenderReply, { ok: false }>> & Reply;
+      // No hint means the reply never came from the renderer's reading of the
+      // source (a dead socket, a timeout on the way): the app's failure.
+      const app = failed.cause === 'app' || typeof failed.hint !== 'string';
       return {
         ok: false,
         error: failed.error ?? 'the app sent no drawing back',
         line: typeof failed.line === 'number' ? failed.line : null,
         lineText: typeof failed.lineText === 'string' ? failed.lineText : null,
-        hint:
-          typeof failed.hint === 'string'
-            ? failed.hint
-            : 'Try again; if it repeats, simplify the source.',
+        hint: typeof failed.hint === 'string' ? failed.hint : '',
+        ...(app ? { cause: 'app' as const } : {}),
       };
     },
     pixels: async (req: { path: string; width?: number }) => {

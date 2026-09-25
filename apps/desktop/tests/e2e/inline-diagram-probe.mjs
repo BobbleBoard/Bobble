@@ -243,6 +243,22 @@ try {
       (await cards()).length === 0,
     JSON.stringify(tabs),
   );
+  const inCanvas = await page.evaluate(() => {
+    const svg = document.querySelector('.pd-canvas-svg svg.pd-diagram');
+    if (!svg) return null;
+    return {
+      drawn: Math.round(svg.getBoundingClientRect().width),
+      own: Number(svg.getAttribute('width')),
+      scrolls: svg.parentElement
+        ? svg.parentElement.scrollWidth > svg.parentElement.clientWidth
+        : false,
+    };
+  });
+  note(
+    'the canvas shows the diagram at its own size (it scrolls when wider than the pane)',
+    inCanvas !== null && Math.abs(inCanvas.drawn - inCanvas.own) <= 1,
+    JSON.stringify(inCanvas),
+  );
   await page.screenshot({ path: path.join(SHOT_DIR, '03-canvas-dark.png') });
   await page.evaluate(() => document.querySelector('.pd-canvas-show-inline')?.click());
   await sleep(1000);
@@ -307,6 +323,48 @@ try {
     /Put quotes round 2 labels/.test(repaired.out),
     repaired.out.split('\n').slice(0, 2).join(' | '),
   );
+
+  // ── 6. the same flow top-down, as the guidance asks for in the chat ──────
+  const tdFlow = await run(
+    `diagram "Order fulfilment, top-down" --source '${FLOW.replace('flowchart LR', 'flowchart TD')}'`,
+  );
+  note(
+    'the research flow top-down draws',
+    /Drew a flowchart "Order fulfilment, top-down" — 8 steps/.test(tdFlow.out),
+    tdFlow.out.split('\n')[0].slice(0, 160),
+  );
+  await sleep(1200);
+  const tall = await page.evaluate(() => {
+    const cardsNow = [...document.querySelectorAll('[data-testid="presented-diagram"]')];
+    const last = cardsNow.at(-1);
+    const svg = last?.querySelector('.pd-inline-widget-box svg');
+    const box = svg?.getBoundingClientRect();
+    // Words only: an empty <text> (an edge with no label) measures 0.
+    const labels = [...(svg?.querySelectorAll('text') ?? [])]
+      .filter((t) => (t.textContent ?? '').trim() !== '')
+      .map((t) => t.getBoundingClientRect().height);
+    return {
+      overflowing: last?.querySelector('.pd-inline-widget')?.hasAttribute('data-overflowing'),
+      width: box ? Math.round(box.width) : 0,
+      height: box ? Math.round(box.height) : 0,
+      smallestLabelPx: labels.length ? Math.round(Math.min(...labels)) : 0,
+    };
+  });
+  note(
+    'a top-down flow shows whole at full size (no fade, labels at their own size)',
+    tall.overflowing !== true && tall.smallestLabelPx >= 14,
+    JSON.stringify(tall),
+  );
+  // The card is taller than the 940 px window's thread: grow the (hidden)
+  // window for the shot — the crop comes from a viewport screenshot.
+  await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((w) =>
+      /index\.html|localhost/.test(w.webContents.getURL()),
+    );
+    win?.setContentSize(1440, 1500);
+  });
+  await sleep(800);
+  await cardShot('06-flow-td-light', -1);
 
   // The render time, from the app's own log.
   writeFileSync(path.join(SHOT_DIR, 'findings.json'), `${JSON.stringify(findings, null, 2)}\n`);

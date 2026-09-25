@@ -288,7 +288,27 @@ function sourceParam() {
   return Type.String({
     description:
       'The diagram as Mermaid text, one statement per line. A flowchart: "flowchart TD" then lines like A([Order placed]) --> B{Payment ok?}, B -- no --> C[Email customer], C -. retry .-> B. Also sequenceDiagram, classDiagram, stateDiagram-v2, erDiagram, gantt, mindmap, timeline, pie. Quote a label with brackets in it: A["Pick (and pack)"]. No colours or style lines: the kit colours it (start, end, failure paths). TD (top-down) fits the chat; LR only for a few steps. Or a path to a .mmd file.',
+    // The tool reads Mermaid that arrived in the title's place (below), so the
+    // CLI leaves a missing --source to it rather than refusing at the door.
+    cliOptional: true,
   });
+}
+
+/** The words a Mermaid source can open with (after any %% comment lines). */
+const MERMAID_OPENING =
+  /^\s*(?:```\s*(?:mermaid|mmd)?\s*\n\s*)?(?:%%[^\n]*\n\s*)*(?:flowchart|graph|sequenceDiagram|classDiagram|stateDiagram(?:-v2)?|erDiagram|journey|gantt|pie|mindmap|timeline|quadrantChart|gitGraph|sankey(?:-beta)?|requirementDiagram|C4\w+|block(?:-beta)?|architecture-beta|xychart-beta|packet-beta|kanban|radar-beta|treemap-beta)\b/;
+
+/**
+ * Whether text given as a TITLE is really the diagram. MEASURED, the 4B's
+ * first call in CLI mode: `diagram "flowchart TD\n  A[Order Placed] --> …"` —
+ * one positional, which the command reads as the title, so it came back
+ * "missing --source" with the whole usage (806 tokens) and cost a second call.
+ * A diagram runs over lines (or a typed \n) and has arrows or a type line; a
+ * title does neither — "graph of sales" is a title.
+ */
+export function looksLikeMermaid(text: string): boolean {
+  const lines = /\n|\\n/.test(text.trim());
+  return lines && (MERMAID_OPENING.test(text) || /-->|->>|-\.->|==>/.test(text));
 }
 
 export function registerDiagramTool(pi: ExtensionAPI, deps: DiagramToolDeps): void {
@@ -305,10 +325,13 @@ export function registerDiagramTool(pi: ExtensionAPI, deps: DiagramToolDeps): vo
       'Draw a diagram — a flowchart or process, a decision tree, a sequence of messages, an org chart, a state machine, an entity-relationship or class diagram, a mind map, a timeline — from Mermaid text, straight into the chat as a card in the project’s design kit. Every request to diagram, map out, or draw a flow, process, pipeline, architecture, hierarchy or relationships goes here: never hand-written SVG, never the svg command (it draws pictures, not words), never an image model, never a slide. Give each step a short label; branches are labelled edges (B -- no --> C). Mermaid lays it out, so every step and branch you write is drawn. It writes a .svg (and the source beside it) into the project, so the same diagram can go into a page or a document. To change a diagram afterwards, use diagram_edit.',
     promptSnippet:
       'diagram: a flowchart / sequence / org chart / mind map in the chat, from Mermaid',
-    promptGuidelines: [
-      'A diagram of a process, a flow, a decision, a hierarchy or relationships is the diagram tool with Mermaid text — never hand-written SVG, the svg command or an image model.',
-      'After a diagram, say ONE line of what it shows — the user is looking at it, so do not list its steps again.',
-    ],
+    /* No promptGuidelines. MEASURED in the real request (CLI mode, where every
+       tool's guidelines ride the system prompt): the two lines the chart tool's
+       pattern gave this one were 290 of the 480 characters VQ-10 added to
+       EVERY opening prompt, and both said again what is already said where it
+       counts — the routing in the capability line beside the command, the
+       one-line reply in the tool's own result (REPLY_LINE), read at the moment
+       it applies. Prefix is paid on every turn; a result only when drawn. */
     parameters: Type.Object({
       // Required so `diagram "Title" '<mermaid>'` fills it first — but
       // `cliOptional`: an untitled diagram is still a diagram (the chart tool's
@@ -343,13 +366,21 @@ export function registerDiagramTool(pi: ExtensionAPI, deps: DiagramToolDeps): vo
       if (deps.render === null) return unavailable();
       const p = params as Record<string, unknown>;
       const root = deps.root(ctx?.cwd);
-      const rawSource = typeof p.source === 'string' ? p.source : '';
+      let rawSource = typeof p.source === 'string' ? p.source : '';
+      let title = typeof p.title === 'string' ? p.title.trim() : '';
+      const sourceNotes: string[] = [];
+      if (rawSource.trim() === '' && looksLikeMermaid(title)) {
+        rawSource = title;
+        title = '';
+        sourceNotes.push(
+          'Read the Mermaid given in the title’s place as the source, so it has no title (diagram_edit --title adds one).',
+        );
+      }
       if (rawSource.trim() === '') {
         return errorResult(
           'diagram needs its Mermaid source: --source "flowchart TD\\n  A[Start] --> B{Paid?}\\n  B -- no --> C[Email]" (one statement per line).',
         );
       }
-      const title = typeof p.title === 'string' ? p.title.trim() : '';
       const subtitle =
         typeof p.subtitle === 'string' && p.subtitle.trim() !== '' ? p.subtitle.trim() : undefined;
       const source = await sourceFrom(rawSource, root, read);
@@ -376,7 +407,7 @@ export function registerDiagramTool(pi: ExtensionAPI, deps: DiagramToolDeps): vo
         diagramSlug(title, reply.kind),
       );
       const svgPath = await placeDiagram(target, reply.source, read);
-      const notes = [...reply.notes, ...kitNotes];
+      const notes = [...sourceNotes, ...reply.notes, ...kitNotes];
       if (svgPath !== target) {
         notes.push(
           `${path.basename(target)} already holds a different diagram, so this one is ${path.basename(svgPath)}.`,
@@ -521,6 +552,14 @@ export function registerDiagramTool(pi: ExtensionAPI, deps: DiagramToolDeps): vo
 
 /** A parse error, as the line and the fix — "parse errors name the line" (VQ-10's acceptance). */
 export function renderFailure(reply: Extract<DiagramRenderReply, { ok: false }>): string {
+  if (reply.cause === 'app') {
+    // Not the source's fault, so not "fix your source": MEASURED, that sent the
+    // 4B rewriting a good flowchart three times, then typing SVG by hand.
+    return [
+      `diagram: the app could not draw it — the source is not the problem (it said: ${reply.error}).`,
+      'Nothing was drawn. Try the same call once more; if it fails again, tell the user the diagram could not be drawn and give them the Mermaid source in a ```mermaid block.',
+    ].join('\n');
+  }
   const where =
     reply.line !== null
       ? `line ${reply.line}${reply.lineText ? `: ${reply.lineText}` : ''}`
