@@ -5872,6 +5872,54 @@
   );
 }
 
+/*
+ * THE DIAGRAM WHILE IT IS BEING MADE (PendingDiagramCard): the finished
+ * card's own frame, so the hand-over moves nothing. Its name shimmers the way
+ * a working row does; there is nothing to copy or move yet (the raw view
+ * stays — the Mermaid can be watched arriving); before the first frame the
+ * card holds a little room for it, which the frame then grows out of; and it
+ * takes on the kit's paper with that first frame gently, not in a blink.
+ */
+.pd-inline-diagram--building .pd-inline-widget {
+  transition: background-color 180ms var(--pd-easing-standard, ease-out);
+}
+
+.pd-inline-diagram--building .pd-inline-widget-kind {
+  color: transparent;
+  background-image:
+    linear-gradient(90deg, transparent 20%, var(--pd-shimmer-highlight) 50%, transparent 80%),
+    linear-gradient(var(--pd-shimmer-base), var(--pd-shimmer-base));
+  background-size:
+    200% 100%,
+    100% 100%;
+  background-position:
+    -100% 0,
+    0 0;
+  background-repeat: no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: pd-shimmer-floor-sweep var(--pd-shimmer-duration, 2.25s)
+    var(--pd-shimmer-easing, ease-in-out) infinite;
+}
+
+.pd-inline-diagram--building .pd-inline-widget-copy,
+.pd-inline-diagram--building .pd-inline-widget-move,
+.pd-inline-diagram--building .pd-inline-widget-open {
+  visibility: hidden;
+}
+
+.pd-inline-diagram--building .pd-canvas-svg:empty {
+  min-height: 72px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pd-inline-diagram--building .pd-inline-widget-kind {
+    animation: none;
+    background: none;
+    color: var(--pd-text-muted);
+  }
+}
+
 /* ─────────────────────────────────────────────────────────────────────────
  * Presented inline (a chart card, a small SVG) and the stub it leaves behind
  * while its tab is open in the canvas

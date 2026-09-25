@@ -564,6 +564,21 @@ describe('runDiagram — the whole job against a page', () => {
     expect(r.svg).toBe('<svg>dark</svg>');
   });
 
+  it('a partial frame has no END yet: its newest step is not the flow’s last', async () => {
+    const { p, renders } = page(() => null);
+    await runDiagramLive(p, {
+      id: 'x',
+      source: 'flowchart LR\n  A --> B',
+      theme: themes.light,
+      partial: true,
+    });
+    await runDiagramLive(p, { id: 'x', source: 'flowchart LR\n  A --> B', theme: themes.light });
+    // FLOW's roles: A starts, H ends. The partial frame keeps the start.
+    expect(renders[0]?.source).toContain('class A pdStart');
+    expect(renders[0]?.source).not.toContain('pdEnd');
+    expect(renders[1]?.source).toContain('class H pdEnd');
+  });
+
   it('a live frame Mermaid cannot read yet is a miss, not an error to anyone', async () => {
     const { p, renders } = page(() => bad(2, 'PS'));
     const r = await runDiagramLive(p, {

@@ -20,6 +20,8 @@ import type { PresentedRecord } from '../state/present-store';
 import { segmentGroup } from './activity-mapping';
 import { InlineArtifact } from './canvas/InlineArtifacts';
 import { withViewTransition } from './canvas/view-transition';
+import { DiagramCallContext } from './diagram-handover';
+import { liveSource, pendingDiagramArgs } from './diagram-stream';
 import { useGeneratingJob, useModel3dLive } from './GeneratingMedia';
 import { jobSamples, recordJobDuration } from './job-history';
 import { LiveSvgCard } from './LiveSvgCard';
@@ -27,6 +29,7 @@ import { LongJobCard } from './LongJobCard';
 import { effectiveToolName, estimateFor, type JobKind, jobKindForTool, jobView } from './long-job';
 import { Markdown } from './markdown';
 import { PendingChartCard, pendingChartArgs } from './PendingChartCard';
+import { PendingDiagramCard } from './PendingDiagramCard';
 import { SourcesCard } from './sources/SourcesCard';
 import { TurnSourcesProvider } from './sources/turn-sources';
 import { ThreadActivityChain } from './ThreadActivity';
@@ -544,12 +547,39 @@ export function AssistantGroup({
            * chain that is making it. (Not in the corp feed, which draws no
            * inline widgets at all — see `suppressInlineArtifacts`.)
            */
-          if (streaming && !suppressInlineArtifacts && !resultForBlock.has(b.id)) {
+          /*
+           * …AND THE DIAGRAM, WHILE IT IS BEING TYPED (PendingDiagramCard) —
+           * from the call's first whole line of Mermaid, drawn by the tool's
+           * own renderer and moving from frame to frame.
+           *
+           * Both step aside the moment the call's card is PRESENTED, not when
+           * its answer lands: the card arrives a beat before the answer and
+           * is filed under this call already (turn-cards.ts), so the one
+           * takes the other's slot in the same frame — never two at once.
+           */
+          if (
+            streaming &&
+            !suppressInlineArtifacts &&
+            !resultForBlock.has(b.id) &&
+            records.length === 0
+          ) {
             const args = pendingChartArgs(b);
             if (args !== null) {
               beneath.push(
                 <div key={`chart:${b.id}`} className="flex flex-col gap-2" data-testid="presented">
                   <PendingChartCard args={{ ...args, id: b.id }} />
+                </div>,
+              );
+            }
+            const diagram = pendingDiagramArgs(b);
+            if (diagram !== null && liveSource(diagram.source, diagram.sourceClosed) !== null) {
+              beneath.push(
+                <div
+                  key={`diagram:${b.id}`}
+                  className="flex flex-col gap-2"
+                  data-testid="presented"
+                >
+                  <PendingDiagramCard callId={b.id} args={diagram} />
                 </div>,
               );
             }
@@ -559,7 +589,13 @@ export function AssistantGroup({
             beneath.push(<ThreadMedia key={`media:${b.id}`} items={mediaOut} />);
           }
           for (const record of records) {
-            if (placeOf('r', b.id, record.path) === 'beneath') beneath.push(drawRecord(record));
+            if (placeOf('r', b.id, record.path) !== 'beneath') continue;
+            // The call it came from, for a diagram card taking over from its live one.
+            beneath.push(
+              <DiagramCallContext.Provider key={`rec:${record.path}`} value={b.id}>
+                {drawRecord(record)}
+              </DiagramCallContext.Provider>,
+            );
           }
         }
         return (

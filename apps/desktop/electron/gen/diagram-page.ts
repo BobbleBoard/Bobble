@@ -1866,6 +1866,13 @@ export interface DiagramLiveRequest {
   readonly title?: string;
   readonly subtitle?: string;
   readonly theme: DiagramTheme;
+  /**
+   * More lines are still coming. The flow's END is not known yet — its last
+   * step so far is only the newest one — so no step wears the end's colour
+   * until the source is whole: otherwise each new last step lit up in the
+   * accent and faded out again a line later.
+   */
+  readonly partial?: boolean;
 }
 
 export type DiagramLiveReply =
@@ -1899,12 +1906,13 @@ export async function runDiagramLive(
       line: read.failed?.line ?? null,
     };
   }
-  const drawn = await drawOne(page, read, {
-    id: req.id,
-    theme: req.theme,
-    title: req.title,
-    subtitle: req.subtitle,
-  });
+  const roles =
+    req.partial === true && read.roles !== null ? { ...read.roles, end: [] } : read.roles;
+  const drawn = await drawOne(
+    page,
+    { ...read, roles },
+    { id: req.id, theme: req.theme, title: req.title, subtitle: req.subtitle },
+  );
   return {
     ok: true,
     svg: drawn.svg,

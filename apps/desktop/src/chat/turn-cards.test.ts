@@ -193,4 +193,32 @@ describe('which call a presented card came from', () => {
     );
     expect(loose).toHaveLength(1);
   });
+
+  it('a diagram or chart presented a beat before its answer goes to the call still waiting for one', () => {
+    const flow = '/Users/j/Bobble/q3/flow.svg';
+    const calls = [
+      { id: 'd0', tool: 'diagram', text: 'Drew a flowchart: old.svg', isError: false },
+      { id: 'c1', tool: 'chart', text: undefined, isError: false },
+      { id: 'd1', tool: 'diagram', text: undefined, isError: false },
+    ];
+    // present:show has landed; no result names the file yet.
+    const { byCall, loose } = attributeRecords(calls, [
+      { path: flow, diagram: {} },
+      { path: units, chart: {} },
+    ]);
+    expect(byCall.get('d1')?.map((r) => r.path)).toEqual([flow]);
+    expect(byCall.get('c1')?.map((r) => r.path)).toEqual([units]);
+    expect(loose).toEqual([]);
+  });
+
+  it('…but not a plain file, and not to a call that has answered or failed', () => {
+    const { loose } = attributeRecords(
+      [
+        { id: 'd1', tool: 'diagram', text: 'Drew a flowchart: other.svg', isError: false },
+        { id: 'd2', tool: 'diagram', text: undefined, isError: true },
+      ],
+      [{ path: units, diagram: {} }, { path: '/w/notes.md' }],
+    );
+    expect(loose.map((r) => r.path)).toEqual([units, '/w/notes.md']);
+  });
 });

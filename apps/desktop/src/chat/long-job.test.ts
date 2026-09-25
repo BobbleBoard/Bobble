@@ -8,6 +8,7 @@ import {
   jobKindForTool,
   jobView,
   mediaToolOfCommand,
+  presentingToolOfCommand,
   shouldShowCard,
   timerText,
 } from './long-job';
@@ -184,5 +185,24 @@ describe('a shell call running a media command IS the generation (bash-CLI mode)
     expect(effectiveToolName('bash', undefined)).toBe('bash');
     expect(effectiveToolName('generate_image', { prompt: 'x' })).toBe('generate_image');
     expect(effectiveToolName('read', { command: 'media generate image' })).toBe('read');
+  });
+
+  it('a chart or diagram command through bash is the chart or diagram tool (its card is the answer)', () => {
+    expect(effectiveToolName('bash', { command: `diagram "Flow" --source 'flowchart TD'` })).toBe(
+      'diagram',
+    );
+    expect(effectiveToolName('bash', { command: 'diagram edit flow.svg --title X' })).toBe(
+      'diagram_edit',
+    );
+    expect(effectiveToolName('bash', { command: 'chart bar "Sales" --labels a,b' })).toBe('chart');
+    expect(effectiveToolName('bash', { command: 'chart edit units.svg --type line' })).toBe(
+      'chart_edit',
+    );
+    expect(presentingToolOfCommand('diagram --help')).toBeNull();
+    expect(presentingToolOfCommand('diagrams/make.sh')).toBeNull();
+    expect(presentingToolOfCommand('cat chart.json')).toBeNull();
+    // No job card for either: they are quick, and their live cards stand in.
+    expect(jobKindForTool('diagram')).toBeNull();
+    expect(jobKindForTool('chart')).toBeNull();
   });
 });

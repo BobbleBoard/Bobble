@@ -210,12 +210,26 @@ export function resultNamesPath(text: string, absPath: string): boolean {
   return stringNames(text, absPath);
 }
 
+/** The calls whose answer is a chart's card, and a diagram's (their CLI forms included). */
+const CHART_CALLS: ReadonlySet<string> = new Set(['chart', 'chart_edit']);
+const DIAGRAM_CALLS: ReadonlySet<string> = new Set(['diagram', 'diagram_edit']);
+
 /**
  * Pin each presented card to the call that made it. Cards no call in the turn
  * can account for — presented by hand, or from a turn that has been edited away
  * — come back as `loose`, and are drawn where they always were.
+ *
+ * A CHART'S OR A DIAGRAM'S CARD ARRIVES A BEAT BEFORE ITS TOOL'S ANSWER: the
+ * tool presents it (present:show), then returns. In that gap no result names
+ * its file, so it was loose — drawn at the foot of the turn while the live
+ * card still stood beneath the chain: two cards, then one jumping into the
+ * other's place (diagram-build-look.mjs, BEFORE). So a chart or diagram card
+ * no answer names belongs to the newest call of its tool still waiting for
+ * one — the call whose live card it replaces, in the same slot.
  */
-export function attributeRecords<R extends { readonly path: string }>(
+export function attributeRecords<
+  R extends { readonly path: string; readonly chart?: unknown; readonly diagram?: unknown },
+>(
   calls: readonly CallResultFacts[],
   records: readonly R[],
 ): { byCall: Map<string, R[]>; loose: R[] } {
@@ -237,7 +251,22 @@ export function attributeRecords<R extends { readonly path: string }>(
         pick = call;
       }
     }
-    const owner = pick ?? fallback;
+    let owner = pick ?? fallback;
+    if (owner === undefined) {
+      const tools =
+        record.diagram !== undefined
+          ? DIAGRAM_CALLS
+          : record.chart !== undefined
+            ? CHART_CALLS
+            : null;
+      if (tools !== null) {
+        owner = [...calls]
+          .reverse()
+          .find(
+            (c) => c.text === undefined && !c.isError && c.tool !== undefined && tools.has(c.tool),
+          );
+      }
+    }
     if (owner === undefined) {
       loose.push(record);
       continue;
