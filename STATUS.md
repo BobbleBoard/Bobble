@@ -32,14 +32,14 @@ Updated: 2026-09-25 (late afternoon) · main `0bfbbbac` (built; installed is `89
 |---|---|
 | Website (images as backgrounds, scroll features, SVG, UI) | ❌ not worked on beyond the SVG unblock; not verified |
 | UI (app-like screens) | ❌ not started |
-| pptx / docx / xlsx | 🟡 renderer-from-spec fixed (fonts, citations, Sources slide/sheet, multi-sheet); no model-driven run; docs open with a "Missing document fonts" warning (cause known, not fixed) |
-| Charts / dataviz | 🟡 VQ-02/03 fixes + live growth; no model-driven run tonight |
-| Diagrams | ✅ tool, look, live build, today's elbow/arrow/border restyle |
+| pptx / docx / xlsx | 🟡 renderer-from-spec fixed (fonts, citations, Sources slide/sheet, multi-sheet); the "Missing document fonts" warning fixed (`420ea136`); no model-driven run |
+| Charts / dataviz | 🟡 VQ-02/03 fixes + live growth, lines and areas glide too (`407386de`); no model-driven run |
+| Diagrams | ✅ tool, look, live build, today's elbow/arrow/border restyle; class and ER lines square too (`0bfbbbac`) |
 | Math explanations, math animations, NN inner workings | ❌ not started |
 | Animations (HyperFrames) | 🟡 title-card fix only |
-| Interactive widgets inline + canvas | ❌ not built (the path is known: a presented .html → PresentedInline → InlineWidget 'html') |
+| Interactive widgets inline + canvas | 🟡 built `14a91cc6`: a presented one-file page with something to use (canvas/svg/controls/script, ≤64 KB, not page-like) runs live in the chat, sized to its content, light and dark (widget-inline-look: gradient-descent fixture, a click, the fit). No model-driven run yet |
 | SVG icons / artwork | 🟡 policy + render-back done, no model run since; OmniSVG quality open (above) |
-| Images: observe + improve loop | 🟡 generate_image returns pixels; edit_image does not; no loop work |
+| Images: observe + improve loop | 🟡 generate_image and edit_image both hand the model a small look (~384 px) at what they made (`ee33de15`); no loop work beyond that |
 | 3D for games (generate, rig, retopo) | ❌ not touched in the push |
 | Sources UI | ✅ chips, hover card, Sources card — but the 4B puts research into notes.md 3 of 4 times (unfixed) |
 | Mixes (deck with diagrams + data + images + animation; site with images + SVG + UI) and improve-loops inside a big task | ❌ not started |
