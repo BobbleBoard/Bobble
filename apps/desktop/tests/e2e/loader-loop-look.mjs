@@ -14,8 +14,11 @@
  *   B  a live picture card whose first decoded step played the closing sweep,
  *      scrolled out of view and back: frames its canvas is drawn in 1.5 s — a
  *      finished loop that restarted and never stops draws every frame
- *   C  Reduce Motion, the Image studio: the waiting mark (a1), after a theme
- *      switch to light (a2), and whether the finished run is filed (a3) — the
+ *   D  a running loader whose theme switches to light mid-generation: the ink
+ *      has to follow (it was read once when the review found it; de9ffd6a
+ *      re-reads it — this keeps it that way)
+ *   C  Reduce Motion, the Image studio: the waiting mark (c1), after a theme
+ *      switch to light (c2), and whether the finished run is filed (c3) — the
  *      exit used to never reach a loader that had stopped drawing
  *
  * The checks assert the fixed behaviour, so the unmodified app fails them —
@@ -81,10 +84,12 @@ const inked = (scope) =>
   }, scope);
 
 const user = { kind: 'user', id: 'u1', text: 'a red fox asleep in tall grass', timestamp: 1 };
-const running = (name, args) => ({
+/* A call id per part: the waiting card remembers a job's shape by its call, so
+   reusing one would carry part A's 16:9 into the next card. */
+const running = (name, args, callId) => ({
   kind: 'assistant',
   id: 'a1',
-  blocks: [{ type: 'toolCall', id: 'g1', name, arguments: args }],
+  blocks: [{ type: 'toolCall', id: callId, name, arguments: args }],
   timestamp: 2,
   isStreaming: true,
 });
@@ -102,7 +107,7 @@ try {
   await set({
     session: { cwd: media },
     agent: { isStreaming: true },
-    messages: [user, running('generate_video', { prompt: 'a red fox asleep in tall grass' })],
+    messages: [user, running('generate_video', { prompt: 'a red fox asleep in tall grass' }, 'g1')],
     runningToolCalls: ['g1'],
   });
   await page.evaluate(() =>
@@ -167,8 +172,8 @@ try {
   }
   await page.evaluate(() => window.__gen_live().getState().clear());
   await set({
-    messages: [...filler, user, running('generate_image', { prompt: 'a red fox' })],
-    runningToolCalls: ['g1'],
+    messages: [...filler, user, running('generate_image', { prompt: 'a red fox' }, 'g2')],
+    runningToolCalls: ['g2'],
   });
   await page.waitForSelector('[data-testid="pending-media-card"] canvas', { timeout: 10_000 });
   const toBottom = () =>
@@ -179,8 +184,14 @@ try {
   await toBottom();
   await sleep(1200);
   // The engine's first decoded step: the card's live preview starts the sweep.
+  // Announced first, as main announces the chat's own job (a card only takes
+  // frames of a job its chat started — see live-frames-look).
   await app.evaluate(({ BrowserWindow }, png) => {
     for (const w of BrowserWindow.getAllWindows()) {
+      w.webContents.send('pi-desktop:event', {
+        channel: 'gen3d:agent-job',
+        payload: { jobId: 'img1' },
+      });
       w.webContents.send('pi-desktop:event', {
         channel: 'gen3d:job',
         payload: {
@@ -254,6 +265,26 @@ try {
     writes === 0,
     `a finished loader stays stopped after scrolling back (${writes} frames drawn in 1.5 s)`,
   );
+
+  /* ── D. a running loader, the theme switched to light mid-generation ── */
+  await set({
+    messages: [user, running('generate_image', { prompt: 'a red fox' }, 'g3')],
+    runningToolCalls: ['g3'],
+  });
+  await page.waitForSelector('[data-testid="pending-media-card"] canvas', { timeout: 10_000 });
+  await sleep(1200);
+  const d0 = await inked('[data-testid="pending-media-card"]');
+  await page.evaluate(() => window.__pi_theme?.()?.setMode?.('light'));
+  await sleep(900);
+  const d1 = await inked('[data-testid="pending-media-card"]');
+  await cardShot('d-running-light', '[data-testid="pending-media-card"]');
+  console.log('D theme switch mid-generation:', JSON.stringify({ d0, d1 }));
+  check(
+    d1 !== null && d1.lit > 0 && d1.dark === d1.lit,
+    `a running loader draws in the light theme's dark ink after the switch (${JSON.stringify(d1)})`,
+  );
+  await page.evaluate(() => window.__pi_theme?.()?.setMode?.('dark'));
+  await sleep(300);
 
   /* ── C. Reduce Motion: the Image studio ────────────────────────────── */
   await page.evaluate(() => window.__gen_live().getState().clear());
