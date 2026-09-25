@@ -26,7 +26,7 @@
  * refuses it, so there is nothing drawn to open.
  */
 import { Markdown as UiMarkdown, widenUrlTransform } from '@pi-desktop/ui';
-import type { ComponentPropsWithoutRef } from 'react';
+import { type ComponentPropsWithoutRef, createContext, useContext } from 'react';
 import { usePictureViewer } from '../media/picture-viewer';
 import { usePiStore } from '../state/pi-slice';
 import { baseName } from './attached-files';
@@ -39,6 +39,19 @@ const RASTER = /\.(png|jpe?g|gif|webp|bmp|tiff?|heic|heif)$/i;
 
 /** Kept by the sanitiser so the image component below can see them. */
 const URL_TRANSFORM = widenUrlTransform(/^(?:pd-file:|file:)/i);
+
+/**
+ * THE FILES THIS TURN ALREADY SHOWS AS CARDS, outside its chain.
+ *
+ * The prompt tells the model to `present` what it makes — its card, full size,
+ * beneath the chain — and a model that has just made a picture also writes it
+ * into its reply (see the header): the answer showed the same picture twice,
+ * one above the other (STATUS, from the thread track). The card is the fuller
+ * of the two (full size, its controls), so the reply's copy of a file the turn
+ * presented is not drawn again. AssistantGroup provides the set; a picture the
+ * turn did not present keeps the reply's copy, which is then the only one.
+ */
+export const TurnCardsContext = createContext<ReadonlySet<string>>(new Set());
 
 /** The absolute path a markdown image source names on this machine, or null. */
 export function localImagePath(src: string, cwd: string | undefined): string | null {
@@ -66,6 +79,7 @@ function LocalImage({
 }: ComponentPropsWithoutRef<'img'> & { node?: unknown }) {
   const cwd = usePiStore((s) => s.session?.cwd ?? undefined);
   const { open: openPicture, viewer } = usePictureViewer();
+  const shownAsCard = useContext(TurnCardsContext);
   const served = typeof src === 'string' && src.startsWith('pd-file:');
   const local =
     typeof src === 'string'
@@ -73,6 +87,7 @@ function LocalImage({
         ? (pdFilePath(src) ?? null)
         : localImagePath(src, cwd)
       : null;
+  if (local !== null && shownAsCard.has(local)) return null;
   const resolved = local === null || served ? src : pdFileUrl(local);
   const img = <img {...rest} src={resolved} alt={alt ?? ''} className="pd-md-image" />;
   if (local === null) return img;

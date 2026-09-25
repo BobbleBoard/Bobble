@@ -1508,6 +1508,48 @@ function turnEnded(timeoutMs: number): Promise<void> {
 }
 
 /**
+ * The newest user message in pi's session file, by entry id — when it has no
+ * text. That is the one kind pi's fork list cannot name, and the only one
+ * asked for here: a newest message WITH words is not the picture being taken
+ * back (pi never recorded it), so the answer is null. `others` counts the user
+ * messages before it. Null too when the file cannot be read.
+ */
+async function newestTextlessUserEntry(
+  file: string | null,
+): Promise<{ entryId: string; others: number } | null> {
+  if (file === null) return null;
+  const read = await window.piDesktop.invoke('fs:read-session', { file }).catch(() => null);
+  if (read === null || read.text === null) return null;
+  const users: { id: string; text: string }[] = [];
+  for (const line of read.text.split('\n')) {
+    if (line.trim() === '') continue;
+    let entry: { type?: unknown; id?: unknown; message?: { role?: unknown; content?: unknown } };
+    try {
+      entry = JSON.parse(line) as typeof entry;
+    } catch {
+      continue;
+    }
+    if (entry.type !== 'message' || entry.message?.role !== 'user') continue;
+    if (typeof entry.id !== 'string') continue;
+    const content = entry.message.content;
+    const text =
+      typeof content === 'string'
+        ? content
+        : Array.isArray(content)
+          ? content
+              .map((part: { type?: unknown; text?: unknown }) =>
+                part?.type === 'text' && typeof part.text === 'string' ? part.text : '',
+              )
+              .join('')
+          : '';
+    users.push({ id: entry.id, text });
+  }
+  const newest = users.at(-1);
+  if (newest === undefined || newest.text.trim() !== '') return null;
+  return { entryId: newest.id, others: users.length - 1 };
+}
+
+/**
  * Stop the taken-back message's turn and fork pi's session to before it.
  * `keptIds` is the thread as it stood before the message; `firstOfChat` says
  * the user had said nothing before it.
@@ -1540,15 +1582,28 @@ async function rewindPiPast(
 
   const listed = await window.piDesktop.invoke('pi:get-fork-messages', undefined);
   if (!listed.success) return;
+  const before = usePiStore.getState().session?.sessionFile ?? null;
   /* The message is the NEWEST user message pi recorded, or it never recorded
      it (an abort that beat the agent to it): anything else is not ours to
      rewind. `includes`, because pi's copy can carry what the harness added to
-     the text (the first message's instructions preamble is in `body` itself). */
-  const newest = listed.messages.at(-1);
-  if (newest === undefined || body.trim() === '' || !newest.text.includes(body.trim())) return;
+     the text (the first message's instructions preamble is in `body` itself).
+     A message with NO text — a picture sent alone that had no file to name —
+     is the one kind pi's list cannot name: it lists user messages by their text
+     and skips one without. pi kept it, and the reply it had started, in the
+     model's context (MEASURED, unsend-real-pi-probe C4b), so it is found in
+     pi's session file by its entry instead. */
+  let target: { readonly entryId: string; readonly others: number } | null = null;
+  if (body.trim() === '') {
+    target = await newestTextlessUserEntry(before);
+  } else {
+    const newest = listed.messages.at(-1);
+    if (newest?.text.includes(body.trim()) === true) {
+      target = { entryId: newest.entryId, others: listed.messages.length - 1 };
+    }
+  }
+  if (target === null) return;
 
-  const before = usePiStore.getState().session?.sessionFile ?? null;
-  const forked = await window.piDesktop.invoke('pi:fork', { entryId: newest.entryId });
+  const forked = await window.piDesktop.invoke('pi:fork', { entryId: target.entryId });
   if (!forked.success || forked.cancelled === true) return;
   const after = await getPiState();
   const branch = after.success ? (after.state?.sessionFile ?? null) : null;
@@ -1574,7 +1629,7 @@ async function rewindPiPast(
      * nor had the thread (pi's list skips a message with no text, the thread
      * does not).
      */
-    if (firstOfChat && listed.messages.length === 1 && before !== null && before !== branch) {
+    if (firstOfChat && target.others === 0 && before !== null && before !== branch) {
       const old = before;
       useDeletedChats.getState().hide([old]);
       void deleteChat(old)

@@ -13,7 +13,8 @@
  * swaps type when it settles), and real tool/file activity rows.
  */
 import { type AssistantMsg, cleanErrorText, type ToolResultMsg } from '@pi-desktop/engine';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { type PendingKind, PendingMediaCard } from '../media/PendingMediaCard';
 import { abortPi } from '../state/pi-connect';
 import type { PresentedRecord } from '../state/present-store';
@@ -27,7 +28,7 @@ import { LiveSvgCard } from './LiveSvgCard';
 import { LongJobCard } from './LongJobCard';
 import { PresentedCallContext } from './live-handover';
 import { effectiveToolName, estimateFor, type JobKind, jobKindForTool, jobView } from './long-job';
-import { Markdown } from './markdown';
+import { Markdown, TurnCardsContext } from './markdown';
 import { PendingChartCard, pendingChartArgs } from './PendingChartCard';
 import { PendingDiagramCard } from './PendingDiagramCard';
 import { SourcesCard } from './sources/SourcesCard';
@@ -42,6 +43,72 @@ function handoverName(path: string): string {
   let h = 0;
   for (let i = 0; i < path.length; i += 1) h = (Math.imul(h, 31) + path.charCodeAt(i)) | 0;
   return `pd-handover-${(h >>> 0).toString(36)}`;
+}
+
+/*
+ * A PRESENTED CARD IS MOVED, NOT REBUILT.
+ *
+ * turn-cards.ts files a presented card into its chain while the chain works on
+ * and brings it back out beneath the chain when it is done. Those are two
+ * places in the tree, and React rebuilds a component that changes parents: the
+ * card was a NEW card each time, and a chart grew its bars from the axis again
+ * on both moves (MEASURED, turn-card-move-look: three elements, 133 frames of
+ * entrance each move). STATUS, from the thread track: "a finished card moves
+ * into the chain (and remounts) when the next tool call starts".
+ *
+ * So each presented card is rendered ONCE, through a portal, into a home of its
+ * own — a box-less element that belongs to the card — and whichever place the
+ * card stands in now adopts that element. Only the element moves.
+ */
+const lastBox = new WeakMap<HTMLElement, DOMRect>();
+
+/** Where a presented card stands: adopts the card's home, and glides it in. */
+function CardSlot({ home }: { home: HTMLElement }): ReactNode {
+  const ref = useRef<HTMLDivElement | null>(null);
+  useLayoutEffect(() => {
+    const slot = ref.current;
+    if (slot === null) return;
+    slot.appendChild(home);
+    /* From where it stood to where it stands, over the move — the chain row is
+       smaller than the place beneath it, so the scale says where it went. */
+    const card = home.firstElementChild;
+    const from = lastBox.get(home);
+    const reduced =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (card instanceof HTMLElement && from !== undefined && !reduced && card.animate) {
+      const to = card.getBoundingClientRect();
+      if (to.width > 0 && (Math.abs(from.top - to.top) > 1 || Math.abs(from.left - to.left) > 1)) {
+        /* Above the rows it passes over — they come after it in the page, and
+           painted over the card while it travelled (SEEN in the filmstrip). */
+        card.style.position = 'relative';
+        card.style.zIndex = '1';
+        const glide = card.animate(
+          [
+            {
+              transformOrigin: 'top left',
+              transform: `translate(${from.left - to.left}px, ${from.top - to.top}px) scale(${from.width / to.width})`,
+            },
+            { transformOrigin: 'top left', transform: 'none' },
+          ],
+          { duration: 320, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' },
+        );
+        const settle = (): void => {
+          card.style.position = '';
+          card.style.zIndex = '';
+        };
+        glide.onfinish = settle;
+        glide.oncancel = settle;
+      }
+    }
+    return () => {
+      // Still in the page here: the next place this card stands glides from it.
+      const box = home.firstElementChild?.getBoundingClientRect();
+      if (box !== undefined && box.width > 0) lastBox.set(home, box);
+      if (home.parentNode === slot) slot.removeChild(home);
+    };
+  }, [home]);
+  return <div ref={ref} className="contents" />;
 }
 
 /** The pending card's kind for a job kind, or null for jobs with no media. */
@@ -328,6 +395,41 @@ export function AssistantGroup({
   const placed = placeTurnCards(turnCalls, turnCards, liveChain);
   const placeOf = (kind: 'm' | 'r', callId: string, path: string): CardPlace =>
     placed.get(`${kind}:${callId}:${path}`) ?? 'beneath';
+  /* Each presented card's home (see CardSlot), by its card key — kept while the
+     card is shown anywhere, so moving it between places never rebuilds it. */
+  const homes = useRef(new Map<string, HTMLDivElement>());
+  const homeFor = (key: string): HTMLDivElement => {
+    let home = homes.current.get(key);
+    if (home === undefined) {
+      home = document.createElement('div');
+      home.style.display = 'contents';
+      homes.current.set(key, home);
+    }
+    return home;
+  };
+  const shownRecords = turnCards
+    .filter((c) => c.kind === 'record' && placed.get(c.key) !== 'none')
+    .flatMap((c) => {
+      const record = recordsByCall?.get(c.callId)?.find((r) => r.path === c.path);
+      return record === undefined ? [] : [{ key: c.key, callId: c.callId, record }];
+    });
+  const shownKeys = shownRecords.map((r) => r.key).join('\n');
+  useEffect(() => {
+    const keep = new Set(shownKeys.split('\n'));
+    for (const key of [...homes.current.keys()]) if (!keep.has(key)) homes.current.delete(key);
+  }, [shownKeys]);
+  /* The files this turn shows as a card OUTSIDE its chain — its reply's own copy
+     of one is not drawn again (markdown.tsx TurnCardsContext). */
+  const outsideKey = turnCards
+    .filter(
+      (c) => placed.get(c.key) === 'beneath' && (c.kind !== 'record' || renderRecord !== undefined),
+    )
+    .map((c) => c.path)
+    .join('\n');
+  const outside = useMemo(
+    () => new Set(outsideKey === '' ? [] : outsideKey.split('\n')),
+    [outsideKey],
+  );
   // The picture still coming out from under the sweep is the pending card's
   // until it is out — see `handing`.
   const heldBack = (path: string): boolean => handingLive && handingItem?.path === path;
@@ -434,7 +536,11 @@ export function AssistantGroup({
                     <ThreadMedia items={mediaIn} />
                   </div>
                 ) : null}
-                {recordsIn.map(drawRecord)}
+                {renderRecord === undefined
+                  ? null
+                  : recordsIn.map((r) => (
+                      <CardSlot key={`rec:${r.path}`} home={homeFor(`r:${b.id}:${r.path}`)} />
+                    ))}
               </>,
             );
           }
@@ -594,12 +700,11 @@ export function AssistantGroup({
             beneath.push(<ThreadMedia key={`media:${b.id}`} items={mediaOut} />);
           }
           for (const record of records) {
+            if (renderRecord === undefined) break;
             if (placeOf('r', b.id, record.path) !== 'beneath') continue;
-            // The call it came from, for a chart or diagram card taking over from its live one.
+            // The card itself is drawn once, below, into this home.
             beneath.push(
-              <PresentedCallContext.Provider key={`rec:${record.path}`} value={b.id}>
-                {drawRecord(record)}
-              </PresentedCallContext.Provider>,
+              <CardSlot key={`rec:${record.path}`} home={homeFor(`r:${b.id}:${record.path}`)} />,
             );
           }
         }
@@ -644,11 +749,25 @@ export function AssistantGroup({
       {!streaming && answered && !suppressInlineArtifacts ? (
         <SourcesCard arriving={sawStreaming.current} />
       ) : null}
+      {/* Every presented card, drawn once into its home — which the place it
+          stands now has adopted (CardSlot). With the call it came from, for a
+          chart or diagram card taking over from its live one. */}
+      {renderRecord === undefined
+        ? null
+        : shownRecords.map(({ key, callId, record }) =>
+            createPortal(
+              <PresentedCallContext.Provider value={callId}>
+                {drawRecord(record)}
+              </PresentedCallContext.Provider>,
+              homeFor(key),
+              key,
+            ),
+          )}
     </div>
   );
   return (
     <TurnSourcesProvider group={group} resultFor={resultForBlock}>
-      {body}
+      <TurnCardsContext.Provider value={outside}>{body}</TurnCardsContext.Provider>
     </TurnSourcesProvider>
   );
 }
