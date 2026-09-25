@@ -113,16 +113,18 @@ def _one(v, n: int = 90) -> str:
     return s if len(s) <= n else s[: n - 1] + "…"
 
 
-MAX_WARNINGS = 6
+MAX_WARNINGS = 8
 
 
 def compact(warnings: list[str]) -> list[str]:
     """At most MAX_WARNINGS lines for the model, duplicates folded — it acts on
-    a short list and loops on a long one."""
+    a short list and loops on a long one. The brief checks are one line per KIND
+    of finding (provenance.Review.lines), so eight holds them and the
+    renderer's own notes together."""
     seen = list(dict.fromkeys(w for w in warnings if w))
     if len(seen) <= MAX_WARNINGS:
         return seen
-    return seen[: MAX_WARNINGS - 1] + [f"…and {len(seen) - MAX_WARNINGS + 1} more like these"]
+    return seen[: MAX_WARNINGS - 1] + [f"…and {len(seen) - MAX_WARNINGS + 1} more warnings"]
 
 
 def _drawn_line(n: int, d: dict, unit: str) -> str:
@@ -263,25 +265,46 @@ def retry(fn, what: str):
         return fn()
 
 
+def _part_for(plan_slide: dict, parts: list, index: int):
+    """The brief part a planned slide covers — by the words they share (the
+    cover, slide 1, covers none)."""
+    if index == 1 or not parts:
+        return None
+    import provenance
+    want = set(provenance._content(f"{plan_slide.get('title', '')} {plan_slide.get('intent', '')}"))
+    best, score = None, 0.0
+    for p in parts:
+        label = set(provenance._content(p.label))
+        words = set(provenance._content(p.text))
+        s = 2.0 * len(want & label) + len(want & words) / max(1, len(words)) * 3
+        if s > score:
+            best, score = p, s
+    return best if score >= 1.0 else None
+
+
 def make(kind: str, brief: str, out: Path, slides: int | None, auto_out: bool = False) -> dict:
+    import provenance
     t0 = time.time()
     warnings: list[str] = []
     drawn: list[dict] = []
+    parts = provenance.brief_parts(brief)
+    review = None
     if kind == "pptx":
         import make_deck
         import render_deck
         n = max(3, min(24, slides or slides_in(brief) or 8))
-        log(f"[plan] {n} slides")
-        plan = retry(lambda: make_deck.outline(brief, n), "plan")
+        log(f"[plan] {n} slides" + (f", {len(parts)} parts in the brief" if parts else ""))
+        plan = retry(lambda: make_deck.outline(brief, n, parts), "plan")
         planned = plan.get("slides", [])[:n]
         if not planned:
             raise RuntimeError("the model returned no slide plan")
         filled = []
         for i, ps in enumerate(planned, 1):
             layout = ps.get("layout", "bullets")
+            part = _part_for(ps, parts, i)
             for attempt in (1, 2):
                 try:
-                    filled.append(make_deck.fill(brief, ps, i, len(planned)))
+                    filled.append(make_deck.fill(brief, ps, i, len(planned), part))
                     log(f"[fill] {i}/{len(planned)} {layout}")
                     break
                 except Exception as err:  # noqa: BLE001 — one slide, retried once
@@ -293,6 +316,10 @@ def make(kind: str, brief: str, out: Path, slides: int | None, auto_out: bool = 
             "running_title": plan.get("running_title", ""),
             "slides": filled,
         }
+        # What the slides say that the brief did not — checked BEFORE drawing:
+        # invented source lines come out, the rest is flagged (provenance.py).
+        review = provenance.review("pptx", brief, spec, parts=parts)
+        spec = review.spec
         render_deck.build(spec, out, drawn=drawn, warnings=warnings)
         design = {"theme": spec["theme"]}
         items = len(filled)
@@ -302,6 +329,8 @@ def make(kind: str, brief: str, out: Path, slides: int | None, auto_out: bool = 
         import chart_render
         import make_chart
         spec = retry(lambda: make_chart.spec_from_brief(brief), "chart")
+        review = provenance.review("chart", brief, spec, parts=[])
+        spec = review.spec
         if auto_out:
             # Named after the chart, not after a slug of its numbers — a brief
             # that is JSON made `units-sold-by-year----label---2021---value--12.svg`.
@@ -318,7 +347,10 @@ def make(kind: str, brief: str, out: Path, slides: int | None, auto_out: bool = 
         items = info["points"]
     else:
         import make_doc
-        spec = retry(lambda: make_doc.generate(kind, brief), "spec")
+        doc_parts = parts if kind != "xlsx" else None
+        spec = retry(lambda: make_doc.generate(kind, brief, doc_parts), "spec")
+        review = provenance.review(kind, brief, spec, parts=parts if kind != "xlsx" else [])
+        spec = review.spec
         if kind == "docx":
             import doc_render as renderer
         elif kind == "xlsx":
@@ -343,9 +375,30 @@ def make(kind: str, brief: str, out: Path, slides: int | None, auto_out: bool = 
         "items": items,
         **design,
         "seconds": round(time.time() - t0, 1),
-        "warnings": compact(warnings),
+        "warnings": compact(_ordered(review, kind, warnings)),
         "summary": summary_of(kind, spec, drawn),
+        "checks": _checks(review),
     }
+
+
+def _ordered(review, kind: str, warnings: list[str]) -> list[str]:
+    """What the model reads, most urgent first: content that is wrong or not in
+    the brief (provenance), then what the renderer had to cut or change, then
+    the brief's parts left out and the kicker labels."""
+    if review is None:
+        return warnings
+    lead, trail = review.lines("slide" if kind == "pptx" else "block")
+    return lead + warnings + trail
+
+
+def _checks(review) -> dict:
+    """The brief checks as numbers, for a card footer or an eval."""
+    if review is None:
+        return {}
+    return {"not_in_brief": review.flagged, "contradicts_brief": len(review.mismatches),
+            "units_dropped": len(review.unit_dropped), "sources_removed": len(review.stripped),
+            "kickers_dropped": sum(1 for k in review.kickers if k[2]),
+            "parts_left_out": list(review.missing_parts)}
 
 
 # ── edit ─────────────────────────────────────────────────────────────────────

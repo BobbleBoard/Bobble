@@ -78,26 +78,60 @@ PALETTE_RULE = ('"palette":{"primary":"#RRGGBB","accent":"#RRGGBB"} — choose B
   'for the subject matter. Not generic blue unless the subject is genuinely corporate. '
   'primary is the dominant dark; accent is one sharp signal colour used sparingly.')
 
-def generate(kind, prompt):
+# CONTENT-DRIVEN (VQ-08). The rules used to be "Open with `cover`", "at least
+# one stats, one callout and one table (and one bars)" and "9-14 blocks" — for
+# ANY brief. A 4B obeyed: a "one-page" report came out as a full cover band and
+# 13 blocks over three pages, and a brief of four numbers got a regional table
+# nobody gave it (REAL: the Annual Unit Sales PDF). The length now comes from
+# the brief ("one-page", "2 pages"), and a block type is used for content the
+# brief has, never to satisfy a quota.
+NO_INVENTION = (
+    "- Use stats, table" + "{bars} only for numbers the brief gives. Never invent data, rows, "
+    "categories or totals to fill a block.\n"
+    "- quote: only words the brief itself gives, credited as the brief credits them. Never invent a "
+    "quote, a person, a role or a source.\n"
+    "- No URL, citation or 'Data sourced from ...' line unless the brief gives it.\n"
+)
+
+
+def length_rule(pages):
+    if pages == 1:
+        return ("- It must fit ONE page: no `cover` — a `heading` is the masthead — and 4-7 blocks.\n")
+    if pages:
+        return (f"- It should run to about {pages} pages: at most {pages * 6} blocks"
+                + ("; open with `cover`" if pages >= 3 else "; a `heading` is the masthead, no `cover`")
+                + ".\n")
+    return ("- Open with `cover` only for a document longer than two pages; otherwise a `heading` is "
+            "the masthead. As many blocks as the content needs, no more.\n")
+
+
+def generate(kind, prompt, parts=None):
+    """`parts` are the brief's own parts (provenance.brief_parts): given, they
+    follow the brief in the user message as the outline the document keeps."""
+    import provenance
     if kind == "xlsx":
         sysp = ("You design spreadsheets. Reply as JSON only.\n"
             "Fields: title, subtitle, sheet_name, " + PALETTE_RULE + ", "
-            'kpis:[{"value","label"}] (2-4 headline figures), headers:[...], '
-            'rows:[[...]] (8-14 rows; numbers as NUMBERS not strings), '
+            'kpis:[{"value","label"}] (2-4 headline figures from the rows), headers:[...], '
+            'rows:[[...]] (numbers as NUMBERS not strings), '
             'total_row:true, total_label, chart:{"type":"bar"|"line"|"pie","title"}, '
             'number_format (e.g. "#,##0" or "$#,##0").\n'
-            "Data must be realistic and internally consistent. Never invent a KPI "
-            "that contradicts the rows.")
+            "rows are the request's own data, one row per item it gives. Only when the request "
+            "asks for an example or a template may you make rows up — then say so in the subtitle. "
+            "Never invent a KPI that contradicts the rows.")
         return parse(ask(sysp, prompt, 2600), kind)
     sysp = ("You design documents. Reply as JSON only.\n"
         "Top level: title, running_title, " + PALETTE_RULE + ', blocks:[...].\n'
         "Block types:\n" + MENUS[kind] + "\n"
-        "Rules:\n- Open with `cover`.\n"
-        "- Alternate block types; never three `body` blocks in a row.\n"
-        "- Include at least one `stats`, one `callout`, and one `table`"
-        + (" and one `bars`" if kind == "pdf" else "") + ".\n"
-        "- 9-14 blocks. Prose is tight: a sentence, not a paragraph, wherever possible.")
-    return parse(ask(sysp, prompt, 3000), kind)
+        "Rules:\n"
+        "- Build the document from what the brief contains, in the brief's order. Every block "
+        "carries the brief's content; no filler ('This report details ...').\n"
+        + length_rule(provenance.pages_in(prompt))
+        + NO_INVENTION.replace("{bars}", ", bars" if kind == "pdf" else "")
+        + "- Alternate block types; never three `body` blocks in a row.\n"
+        "- Prose is tight: a sentence, not a paragraph, wherever possible.")
+    user = prompt if not parts else f"{prompt}\n\n{provenance.parts_block(parts).rstrip()}"
+    return parse(ask(sysp, user, 3000), kind)
 
 if __name__ == "__main__":
     kind, prompt = sys.argv[1], sys.argv[2]

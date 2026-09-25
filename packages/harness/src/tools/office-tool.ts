@@ -78,6 +78,17 @@ export interface OfficeResult {
   missed?: string[];
 }
 
+/**
+ * The pipeline's warnings as one line of the tool result: what it had to cut or
+ * change, and what the file says that the brief did not (provenance.py — the
+ * reply should say so). Every path that makes a file carries it.
+ */
+export function warningsLine(r: OfficeResult): string {
+  return r.warnings !== undefined && r.warnings.length > 0
+    ? `\nWarnings: ${r.warnings.join('; ')}`
+    : '';
+}
+
 /** Find the scripts: the app's env, else the repo's tools/office-gen above this file. */
 export function officeGenDir(env: Record<string, string | undefined> = process.env): string | null {
   const fromEnv = env[OFFICE_GEN_DIR_ENV];
@@ -561,11 +572,7 @@ export function registerOfficeTools(pi: ExtensionAPI, deps: OfficeToolDeps): voi
                 ? `a ${r.chart ?? ''} chart (${r.items ?? '?'} points)`
                 : `a document (${r.items ?? '?'} blocks)`;
       const shown = await presentFile(deps.bridge, r.path, `${what} — made from your brief`);
-      const warn =
-        r.warnings !== undefined && r.warnings.length > 0
-          ? `\nWarnings: ${r.warnings.join('; ')}`
-          : '';
-      const text = `Made ${what}: ${pathForModel(r.path, root)} (${kb(r.bytes)}, ${r.seconds ?? '?'}s).${shown.shown}${warn}\n\n${r.summary ?? ''}\n\n${CHECK_LINE}`;
+      const text = `Made ${what}: ${pathForModel(r.path, root)} (${kb(r.bytes)}, ${r.seconds ?? '?'}s).${shown.shown}${warningsLine(r)}\n\n${r.summary ?? ''}\n\n${CHECK_LINE}`;
       lastMade.set(memoKey, { brief, text });
       const content: Content = [{ type: 'text', text }];
       if (shown.image !== undefined) {
@@ -932,7 +939,7 @@ export function withOfficeFormats(
           r.path,
           `${NOUN[kind]} — made from what you wrote`,
         );
-        const text = `${raw} is ${NOUN[kind]}, so the text you wrote became the BRIEF and the document pipeline made the file: ${r.path} (${kb(r.bytes)}, ${r.items ?? '?'} ${kind === 'pptx' ? 'slides' : 'blocks'}, ${r.seconds ?? '?'}s).${shown.shown}\n\n${r.summary ?? ''}\n\n${CHECK_LINE} The file EXISTS and is finished — do not write it again, and do not edit it to resemble the text you wrote: that text was the brief, and this designed file is what it became.`;
+        const text = `${raw} is ${NOUN[kind]}, so the text you wrote became the BRIEF and the document pipeline made the file: ${r.path} (${kb(r.bytes)}, ${r.items ?? '?'} ${kind === 'pptx' ? 'slides' : 'blocks'}, ${r.seconds ?? '?'}s).${shown.shown}${warningsLine(r)}\n\n${r.summary ?? ''}\n\n${CHECK_LINE} The file EXISTS and is finished — do not write it again, and do not edit it to resemble the text you wrote: that text was the brief, and this designed file is what it became.`;
         lastMade.set(file, { brief: content, text });
         const content2: Content = [{ type: 'text', text }];
         if (shown.image !== undefined) content2.push({ type: 'image', ...shown.image });

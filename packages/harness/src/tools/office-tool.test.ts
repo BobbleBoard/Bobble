@@ -267,6 +267,31 @@ describe('withOfficeFormats — the natural call does the right thing', () => {
     expect(r.content.some((c) => c.type === 'image')).toBe(true);
   });
 
+  it('carries the pipeline’s warnings back, as office_make does — invented numbers are flagged in the reply', async () => {
+    const flagged =
+      'numbers not in the brief — confirm them with the user or mark them as estimates: 2.5B+ (block 4)';
+    const { spawnImpl } = fakeSpawn({
+      ok: true,
+      kind: 'docx',
+      path: '/ws/notes.docx',
+      bytes: 40000,
+      items: 5,
+      seconds: 12,
+      warnings: [flagged, 'block 3 (table): rows — 12 of 14 shown; split the rest'],
+      summary: 'title: Tea',
+    });
+    const w = withOfficeFormats(baseTool, { bridge, root: () => '/ws', env: ENV, spawnImpl });
+    const r = (await w.execute('t', {
+      path: 'notes.docx',
+      content:
+        'A short note about tea for the team newsletter: green, black and herbal teas, when to drink each, and how long to steep them.',
+    })) as { content: Array<{ type: string; text?: string }>; isError?: boolean };
+    expect(r.isError).toBeUndefined();
+    expect(r.content[0]?.text).toContain(
+      `\nWarnings: ${flagged}; block 3 (table): rows — 12 of 14`,
+    );
+  });
+
   it('turns `edit deck.pptx old→new` into a pipeline edit instruction', async () => {
     const { spawnImpl, calls: spawned } = fakeSpawn({
       ok: true,

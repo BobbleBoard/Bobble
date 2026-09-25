@@ -32,6 +32,7 @@ renderers and `office_edit.py` need nothing but Python.
 | --- | --- |
 | `palette.py` | the model's two chosen colours → a full palette, with WCAG contrast enforced |
 | `numparse.py` | numbers, booleans and text as a model writes them: `22M`, `$38k`, `3,100`, `"false"`, a unit-only display |
+| `provenance.py` | what a spec says that its brief did not — every number, quote, URL and attribution checked against the brief (or simple arithmetic on it) before render; invented source lines stripped, the rest flagged in `warnings`; descriptive kickers dropped; the brief's parts no slide carries named |
 | `textfit.py` | real font metrics (PIL against the system TTFs) — python-pptx/docx have none |
 | `render_deck.py`, `doc_render.py`, `sheet_render.py`, `pdf_render.py` | spec → file, one per format |
 | `viz.py` | charts drawn as native shapes rather than chart-library defaults |
