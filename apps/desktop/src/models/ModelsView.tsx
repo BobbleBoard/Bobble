@@ -62,9 +62,10 @@ import { hasRepo, useStoreModels } from '../state/store-models';
 import { BestForYourMachine } from './BestForYourMachine';
 import { DownloadAction } from './DownloadAction';
 import { FamilyCard } from './FamilyCard';
+import { type HfLadder, hfLadder, pickHfDownload, pickRefusal } from './hf-download';
 import { ModelCard } from './ModelCard';
 import { CapabilityPills } from './model-pills';
-import type { ModelRecommendation } from './model-recommender';
+import { hostFor, type ModelRecommendation, recommendFor } from './model-recommender';
 import {
   CAPABILITY_OPTIONS,
   compactBytes,
@@ -248,28 +249,19 @@ function hfToHubModel(h: HfModelHitDTO): HubModel {
 }
 
 /**
- * A readable name for one downloadable file.
- *
- * HF only sometimes reports a `quant`; the rest of the time the picker fell back
- * to the whole filename, so the row read
- * "zimageuncensoredtextencoderV10_v10.gguf" instead of "Q4_K_M". Pull the quant
- * out of the filename where it is there — it almost always is, that being the
- * convention — and only then fall back to the stem.
+ * One repo's `hf:list-files`, read once and shared by everything on the page that
+ * asks which file of that repo to fetch (see `listingFor`).
  */
-function quantLabel(quant: string | undefined, filePath: string): string {
-  // Do NOT trust `quant` blindly: the supervisor falls back to the filename
-  // when it cannot parse one, so a naive check shows the whole ".gguf" path.
-  const looksParsed =
-    quant !== undefined &&
-    quant.length > 0 &&
-    quant.length < 24 &&
-    !quant.toLowerCase().endsWith('.gguf');
-  if (looksParsed) return quant;
-  const file = (quant ?? filePath).split('/').pop() ?? filePath;
-  const stem = file.replace(/\.gguf$/i, '');
-  // UD-Q4_K_XL / IQ3_M / Q8_0 / BF16 / F16 — the shapes that actually appear.
-  const m = /((?:UD-)?(?:IQ|Q)\d[A-Z0-9_]*|BF16|F16|F32)/i.exec(stem);
-  return m?.[1] ?? stem;
+interface RepoListing {
+  readonly repo: string;
+  /* The RAW file objects, kept because registering an HF model needs the file
+     itself (path/sha/size), not the display label we ranked it by. Dropping
+     them is what made every Discover download fail with "unknown model". */
+  readonly files: readonly HfGgufFileDTO[];
+  /** The rows the picker ranks — hf-download.ts owns what is and is not one. */
+  readonly ladder: HfLadder;
+  /** Why the listing is empty, when it failed. */
+  readonly error?: string;
 }
 
 /**
@@ -780,19 +772,63 @@ export function ModelsView() {
     /** Explicit, so the pane never spins by default — see the fetch effect. */
     loading?: boolean;
   } | null>(null);
-  /* The quant ladder for the selected model. HF entries need a file listing;
-     local catalog entries already carry theirs. */
-  const [quants, setQuants] = useState<{
-    repo: string;
-    options: QuantOption[];
-    /* The RAW file objects, kept because registering an HF model needs the file
-       itself (path/sha/size), not the display label we ranked it by. Dropping
-       them is what made every Discover download fail with "unknown model". */
-    files: HfGgufFileDTO[];
-    mmproj?: HfGgufFileDTO;
-    mmprojBytes?: number;
-    loading: boolean;
-  } | null>(null);
+  /*
+   * EVERY HUGGING FACE LISTING THIS PAGE HAS READ, by repo.
+   *
+   * ONE LISTING, READ BY EVERYONE WHO ASKS. The picker's ladder lived in state
+   * that followed the selection, and the Download buttons read it out of
+   * whichever render made them — so Top Recommended and Quick Download, which
+   * select a repo and download it in the same click, read the PREVIOUS
+   * selection's ladder. On a fresh hub that is none at all, and the 27B came
+   * back as "unsloth/Qwen3.8-27B-GGUF publishes no GGUF weights" about a repo
+   * that publishes thirty files. A download now asks for the listing of the
+   * repo it is downloading, and the picker draws the very same object.
+   */
+  const [listings, setListings] = useState<Readonly<Record<string, RepoListing>>>({});
+  const reads = useRef(new Map<string, Promise<RepoListing>>());
+  /* A token changes what a gated repo lists; answers read without it are dropped. */
+  const readsFor = useRef(hfToken);
+  const listingFor = useCallback(
+    (repo: string): Promise<RepoListing> => {
+      if (readsFor.current !== hfToken) {
+        readsFor.current = hfToken;
+        reads.current.clear();
+        setListings({});
+      }
+      const reading = reads.current.get(repo);
+      if (reading !== undefined) return reading;
+      const read = window.piDesktop
+        .invoke('hf:list-files', {
+          repoId: repo,
+          ...(hfToken.length > 0 ? { hfToken } : {}),
+        })
+        .then(
+          (res): RepoListing => ({
+            repo,
+            files: res.files ?? [],
+            ladder: hfLadder(res.files ?? []),
+            ...(res.error === undefined ? {} : { error: res.error }),
+          }),
+          (): RepoListing => ({
+            repo,
+            files: [],
+            ladder: hfLadder([]),
+            error: 'Could not reach Hugging Face.',
+          }),
+        )
+        .then((listing) => {
+          // Stale: the token changed while this was in flight.
+          if (reads.current.get(repo) !== read) return listing;
+          // A failure is shown, not kept — the next ask tries again.
+          if (listing.error !== undefined) reads.current.delete(repo);
+          setListings((all) => ({ ...all, [repo]: listing }));
+          return listing;
+        });
+      reads.current.set(repo, read);
+      return read;
+    },
+    [hfToken],
+  );
 
   /*
    * DISCOVER SEARCHES HUGGING FACE. It used to filter the same 19 bundled
@@ -1068,8 +1104,30 @@ export function ModelsView() {
    * own list, so that path costs no request. Vision projectors are pulled out
    * rather than offered as a choice — you never download an mmproj INSTEAD of
    * the weights, it loads alongside them, and its bytes belong in the fit maths.
+   *
+   * ONE ROW PER MODEL, NOT PER FILE, and only rows a Download can fetch — the
+   * rules live in hf-download.ts (`hfLadder`), because every Download on this
+   * page has to resolve its file by the same ones.
+   *
+   * DERIVED, NOT STORED. An HF ladder is the listing's own object, so a catalog
+   * refresh — which every download attempt ends with — no longer hands the
+   * picker a fresh array and wipes the quant someone had just picked.
    */
-  useEffect(() => {
+  const localEntry = useMemo(
+    () => (detailRepo === undefined ? undefined : catalog.find((e) => e.id === detailRepo)),
+    [catalog, detailRepo],
+  );
+  const localOptions = useMemo(
+    () => localEntry?.quants.filter((q) => q.bytes > 0) ?? [],
+    [localEntry],
+  );
+  const listing = detailRepo === undefined ? undefined : listings[detailRepo];
+  const quants = useMemo((): {
+    repo: string;
+    options: readonly QuantOption[];
+    mmprojBytes?: number;
+    loading: boolean;
+  } | null => {
     /*
      * DATASETS HAVE NO QUANT LADDER, and asking anyway is not harmless.
      *
@@ -1081,68 +1139,72 @@ export function ModelsView() {
      * gated or private. Paste a Hugging Face token" about a public dataset it
      * had just listed. A wrong question producing a confident wrong answer.
      */
-    if (kind !== 'models') {
-      setQuants(null);
-      return;
+    if (kind !== 'models' || detailRepo === undefined) return null;
+    if (localEntry !== undefined) {
+      return { repo: detailRepo, options: localOptions, loading: false };
     }
-    if (detailRepo === undefined) {
-      setQuants(null);
-      return;
-    }
-    const local = catalog.find((e) => e.id === detailRepo);
-    if (local !== undefined) {
-      setQuants({
-        repo: detailRepo,
-        options: local.quants.filter((q) => q.bytes > 0),
-        files: [],
-        loading: false,
-      });
-      return;
-    }
-    if (!detailRepo.includes('/')) {
-      setQuants({ repo: detailRepo, options: [], files: [], loading: false });
-      return;
-    }
+    if (!detailRepo.includes('/')) return { repo: detailRepo, options: [], loading: false };
+    if (listing === undefined) return { repo: detailRepo, options: [], loading: true };
+    return {
+      repo: detailRepo,
+      options: listing.ladder.options,
+      mmprojBytes: listing.ladder.mmproj?.sizeBytes,
+      loading: false,
+    };
+  }, [kind, detailRepo, localEntry, localOptions, listing]);
+  const detailIsLocal = localEntry !== undefined;
+  useEffect(() => {
+    if (kind !== 'models' || detailRepo === undefined || detailIsLocal) return;
+    if (!detailRepo.includes('/')) return;
     let cancelled = false;
-    setQuants({ repo: detailRepo, options: [], files: [], loading: true });
-    void window.piDesktop
-      .invoke('hf:list-files', {
-        repoId: detailRepo,
-        ...(hfToken.length > 0 ? { hfToken } : {}),
-      })
-      .then((res) => {
-        if (cancelled) return;
-        /*
-         * A 401 here is not a failure to explain away — it means the repo is
-         * gated or private and we have no token. Say that, and offer the fix
-         * inline, rather than printing "HTTP 401" and leaving the user to guess.
-         */
-        if (res.error !== undefined && /401|403|gated/i.test(res.error)) {
-          setNeedsToken(true);
-        }
-        const files = res.files ?? [];
-        const mmproj = files.find((f) => f.mmproj === true);
-        setQuants({
-          repo: detailRepo,
-          files,
-          mmproj,
-          options: files
-            .filter((f) => f.mmproj !== true && (f.sizeBytes ?? 0) > 0)
-            .map((f) => ({
-              quant: quantLabel(f.quant, f.path),
-              bytes: f.sizeBytes ?? 0,
-            })),
-          mmprojBytes: mmproj?.sizeBytes,
-          loading: false,
-        });
-      })
-      .catch(() => {
-        if (!cancelled) setQuants({ repo: detailRepo, options: [], files: [], loading: false });
-      });
+    void listingFor(detailRepo).then((read) => {
+      /*
+       * A 401 here is not a failure to explain away — it means the repo is
+       * gated or private and we have no token. Say that, and offer the fix
+       * inline, rather than printing "HTTP 401" and leaving the user to guess.
+       */
+      if (!cancelled && read.error !== undefined && /401|403|gated/i.test(read.error)) {
+        setNeedsToken(true);
+      }
+    });
     return () => {
       cancelled = true;
     };
-  }, [detailRepo, catalog, hfToken, kind]);
+  }, [detailRepo, detailIsLocal, kind, listingFor]);
+
+  /*
+   * THE FILE A LADDER RECOMMENDATION WILL FETCH, for the cards that name a size
+   * and a quant before anyone opens a picker (Top Recommended, Quick Download).
+   *
+   * The recommender chooses the MODEL from a bytes-per-weight estimate, and it
+   * used to name the quant as well: "17.2 GB · Q3_K_M" on the 27B, a quant that
+   * repo does not publish, above a picker pinning UD-Q3_K_XL. Which FILE is the
+   * listing's answer, by the same call a Download makes, so wherever a repo's
+   * listing is here the card, the picker and the button name one file.
+   */
+  const picks = useMemo(() => {
+    const out: Record<string, { quant: string; bytes: number }> = {};
+    const totalRamGB = hw?.ramGiB ?? 0;
+    if (totalRamGB <= 0) return out;
+    for (const [repo, read] of Object.entries(listings)) {
+      const pick = pickHfDownload(read.files, {
+        totalRamGB,
+        mmprojBytes: read.ladder.mmproj?.sizeBytes,
+      });
+      if (pick.kind === 'file') out[repo] = { quant: pick.quant, bytes: pick.file.sizeBytes ?? 0 };
+    }
+    return out;
+  }, [listings, hw]);
+  /* Top Recommended's text pick names its file, so that one listing is read up
+     front: the request its card's picker would make, made once. */
+  const textPickRepo = useMemo(() => {
+    if (!curated || hardware === null) return undefined;
+    const rec = recommendFor('text', hostFor(hardware));
+    return rec !== undefined && installKindOf(rec.family) === 'gguf' ? rec.variant.repo : undefined;
+  }, [curated, hardware]);
+  useEffect(() => {
+    if (textPickRepo !== undefined) void listingFor(textPickRepo);
+  }, [textPickRepo, listingFor]);
   /*
    * WHICH REPO'S CARD TO FETCH.
    *
@@ -1332,26 +1394,46 @@ export function ModelsView() {
                 tags: [],
                 gated: false,
               });
-        const files = quants?.repo === id ? quants.files : [];
-        // Match on the label the picker showed, then fall back to the ladder's
-        // best — a user who never opened the picker still gets a sane file.
-        const file =
-          files.find((f) => quantLabel(f.quant, f.path) === quant) ??
-          files.find((f) => f.mmproj !== true && (f.sizeBytes ?? 0) > 0);
-        if (hit === undefined || file === undefined) {
-          // Being specific about WHICH half failed: a repo with no GGUF in it is
-          // an image/video/audio model that this downloader cannot install, and
-          // saying "could not resolve a file" sends people looking for a bug.
-          setError(
-            file === undefined && hit !== undefined
-              ? `${id} publishes no GGUF weights. The generation stack fetches it on first use.`
-              : 'Could not resolve a file to download for this model.',
+        if (hit === undefined) {
+          setError('Could not resolve a file to download for this model.');
+        } else {
+          /*
+           * THE FILE IS THE PICKER'S. `pickHfDownload` ranks this repo's listing
+           * with the picker's own call and inputs, so Download pressed without
+           * opening the picker fetches the row it pins. It used to take the
+           * listing's FIRST file — alphabetically, on the 27B, one 50 GB shard of
+           * a BF16 that cannot load on the 24 GB Mac it was fetched for — and a
+           * label chosen in the picker found the speed head of that name first.
+           *
+           * The listing is the one for `id`, read now if it has not been: this
+           * click may also have just selected `id` (Top Recommended, Quick
+           * Download), and the picker's state still belongs to the last card.
+           */
+          const read = await listingFor(id);
+          const totalRamGB =
+            hw?.ramGiB ??
+            (await window.piDesktop
+              .invoke('app:get-info', undefined)
+              .then((i) => Math.round(i.totalMemoryBytes / 1024 ** 3))
+              .catch(() => 0));
+          const pick = pickHfDownload(
+            read.files,
+            { totalRamGB, mmprojBytes: read.ladder.mmproj?.sizeBytes },
+            {
+              ...(quant === undefined ? {} : { quant }),
+              ...(detail?.id === id ? { isDownloaded: quantOnDisk } : {}),
+            },
           );
-        } else if (await roomFor((file.sizeBytes ?? 0) + (quants?.mmproj?.sizeBytes ?? 0))) {
-          await useHfStore.getState().addAndDownload(hit, file, {
-            mmproj: quants?.mmproj,
-            mtpFile: files.find((f) => f.mtp === true),
-          });
+          if (pick.kind !== 'file') {
+            // Gated: the token row says so and takes the token; one message is enough.
+            if (read.error !== undefined && /401|403|gated/i.test(read.error)) setNeedsToken(true);
+            else setError(pickRefusal(id, pick, read.error));
+          } else if (await roomFor((pick.file.sizeBytes ?? 0) + (pick.mmproj?.sizeBytes ?? 0))) {
+            await useHfStore.getState().addAndDownload(hit, pick.file, {
+              ...(pick.mmproj === undefined ? {} : { mmproj: pick.mmproj }),
+              ...(pick.mtpFile === undefined ? {} : { mtpFile: pick.mtpFile }),
+            });
+          }
         }
       }
     } catch (e) {
@@ -2147,6 +2229,7 @@ export function ModelsView() {
                       <BestForYourMachine
                         hardware={hardware}
                         downloaded={downloadedRepos}
+                        picks={picks}
                         onSelect={setSelected}
                         onDownload={(rec) => {
                           setSelected(rec.variant.repo);
@@ -2180,6 +2263,7 @@ export function ModelsView() {
                             memoryGB={hw?.ramGiB ?? 0}
                             progress={storeFractions}
                             bytes={storeProgressByRepo}
+                            picks={picks}
                             onSelect={setSelected}
                             onDownload={(variant) => void downloadVariant(family, variant)}
                             onCancel={(variant) => void cancelVariant(family, variant)}

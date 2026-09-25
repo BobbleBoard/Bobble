@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { recommendAll, recommendFor } from './model-recommender';
+import { hostFor, recommendAll, recommendFor } from './model-recommender';
 import { DIFFUSION_LADDER, floorApplies, quantForBudget, TEXT_LADDER } from './quant-ladder';
 
 /**
@@ -131,5 +131,25 @@ describe('every modality at once', () => {
     expect(all.text?.family.id).toBe('qwen3.8');
     // With room to spare it should take a better quant, not a bigger floor.
     expect(all.text?.quant?.rung.quant).toBe('Q8_0');
+  });
+});
+
+describe('hostFor — the machine the hub recommends for', () => {
+  it('uses the detected budget when there is one', () => {
+    expect(hostFor({ totalRamGB: 24, usableMemoryGB: 18 })).toEqual({
+      usableMemoryGB: 18,
+      totalRamGB: 24,
+    });
+  });
+
+  it('falls back to three quarters of RAM, never below 1 GB', () => {
+    expect(hostFor({ totalRamGB: 24 }).usableMemoryGB).toBe(18);
+    expect(hostFor({ totalRamGB: 1 }).usableMemoryGB).toBe(1);
+  });
+
+  it('on a 24 GB Mac the text pick is the 27B — the repo the hub reads a listing for', () => {
+    expect(
+      recommendFor('text', hostFor({ totalRamGB: 24, usableMemoryGB: 18 }))?.variant.repo,
+    ).toBe('unsloth/Qwen3.8-27B-GGUF');
   });
 });

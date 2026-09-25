@@ -34,10 +34,10 @@ import type { LlmHardware } from '../../electron/ipc-contract';
 import { OrgAvatar } from '../settings/brand-icons';
 import { Carousel } from './Carousel';
 import { DownloadBar } from './DownloadBar';
-import { type ModelRecommendation, recommendAll } from './model-recommender';
+import { hostFor, type ModelRecommendation, recommendAll } from './model-recommender';
 import { compactBytes } from './models-layout';
 import { Pill } from './Pill';
-import type { ModelTask, OutputModality } from './recommended-catalog';
+import { installKindOf, type ModelTask, type OutputModality } from './recommended-catalog';
 
 export interface BestForYourMachineProps {
   readonly hardware: LlmHardware | null;
@@ -52,6 +52,11 @@ export interface BestForYourMachineProps {
   readonly progress?: Readonly<
     Record<string, { readonly received: number; readonly total: number; readonly fraction: number }>
   >;
+  /**
+   * The file each GGUF pick will fetch, by repo, once its listing has been read
+   * — what the model's own picker pins and what Download asks for.
+   */
+  readonly picks?: Readonly<Record<string, { readonly quant: string; readonly bytes: number }>>;
 }
 
 /**
@@ -81,6 +86,7 @@ function Card({
   rec,
   downloaded,
   progress,
+  pick,
   onSelect,
   onDownload,
   onUse,
@@ -89,16 +95,30 @@ function Card({
   rec: ModelRecommendation;
   downloaded: ReadonlySet<string>;
   progress?: { readonly received: number; readonly total: number; readonly fraction: number };
+  pick?: { readonly quant: string; readonly bytes: number };
   onSelect: (repo: string) => void;
   onDownload: (rec: ModelRecommendation) => void;
   onUse: (rec: ModelRecommendation) => void;
   onCancel: (rec: ModelRecommendation) => void;
 }): JSX.Element {
   const have = downloaded.has(rec.variant.repo);
-  const size =
-    rec.variant.approxBytes !== undefined
+  /*
+   * A GGUF PICK NAMES THE FILE ITS BUTTON FETCHES. The recommender chose this
+   * MODEL from a bytes-per-weight estimate and used to name the quant too —
+   * "17.2 GB · Q3_K_M" on the 27B, a quant its repo does not publish, above a
+   * picker that pinned UD-Q3_K_XL at 12 GB. Size and quant now come from the
+   * repo's listing (`pick`), and until that arrives the line stays empty
+   * rather than showing a guess it would then have to take back.
+   */
+  const ladder = rec.quant !== undefined && installKindOf(rec.family) === 'gguf';
+  const size = ladder
+    ? pick === undefined
+      ? undefined
+      : compactBytes(pick.bytes)
+    : rec.variant.approxBytes !== undefined
       ? compactBytes(rec.variant.approxBytes)
       : `${rec.needsGB} GB`;
+  const quant = ladder ? pick?.quant : rec.quant?.rung.quant;
   const tag = taskTagFor({
     modality: rec.modality,
     ...(rec.variant.tasks === undefined ? {} : { tasks: rec.variant.tasks }),
@@ -113,6 +133,7 @@ function Card({
          shadow, and p-4 keeps the footer button off the edge it was touching. */
       className="pd-hub-card flex w-[300px] shrink-0 flex-col gap-3 p-4"
       data-testid={`best-${rec.modality}`}
+      data-repo={rec.variant.repo}
     >
       <button
         type="button"
@@ -124,9 +145,13 @@ function Card({
           <span className="block truncate text-body text-text-primary">
             {rec.family.name} {rec.variant.label}
           </span>
-          <span className="block truncate text-caption text-text-muted">
-            {size}
-            {rec.quant === undefined ? '' : ` · ${rec.quant.rung.quant}`}
+          <span
+            className="block truncate text-caption text-text-muted"
+            data-testid={`best-size-${rec.modality}`}
+          >
+            {/* A no-break space holds the line while the listing is on its way. */}
+            {size ?? '\u00a0'}
+            {quant === undefined ? '' : ` · ${quant}`}
           </span>
         </span>
       </button>
@@ -175,14 +200,14 @@ export function BestForYourMachine({
   hardware,
   downloaded,
   progress = {},
+  picks = {},
   onSelect,
   onDownload,
   onUse,
   onCancel,
 }: BestForYourMachineProps): JSX.Element | null {
   if (hardware === null) return null;
-  const usable = hardware.usableMemoryGB ?? Math.max(1, Math.round(hardware.totalRamGB * 0.75));
-  const all = recommendAll({ usableMemoryGB: usable, totalRamGB: hardware.totalRamGB });
+  const all = recommendAll(hostFor(hardware));
   const order: OutputModality[] = ['text', 'image', 'video', 'audio', '3d'];
   const cards = order.map((m) => all[m]).filter((r): r is ModelRecommendation => r !== undefined);
   if (cards.length === 0) return null;
@@ -200,6 +225,7 @@ export function BestForYourMachine({
             {...(progress[rec.variant.repo] === undefined
               ? {}
               : { progress: progress[rec.variant.repo] })}
+            {...(picks[rec.variant.repo] === undefined ? {} : { pick: picks[rec.variant.repo] })}
             onSelect={onSelect}
             onDownload={onDownload}
             onUse={onUse}

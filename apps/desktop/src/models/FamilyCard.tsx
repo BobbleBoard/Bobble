@@ -59,6 +59,8 @@ export interface FamilyCardProps {
   readonly bytes?: Readonly<
     Record<string, { readonly received: number; readonly total: number; readonly fraction: number }>
   >;
+  /** The file a GGUF repo's Download fetches, where its listing has been read. */
+  readonly picks?: Readonly<Record<string, { readonly quant: string; readonly bytes: number }>>;
 }
 
 /** "2.6B" / "820M" — the size column, from a parameter count in billions. */
@@ -91,6 +93,7 @@ export function FamilyCard({
   memoryGB,
   progress = {},
   bytes,
+  picks = {},
   onSelect,
   onDownload,
   onCancel,
@@ -272,6 +275,15 @@ export function FamilyCard({
       : undefined;
   const quickHave = quick !== undefined && downloaded.has(quick.variant.repo);
   const quickProgress = quick === undefined ? undefined : bytes?.[quick.variant.repo];
+  /* The quant it names is the file the click fetches — the repo listing's pick,
+     as on Top Recommended — never the estimate's rung, which the 27B's repo
+     does not even publish. Unread yet: just the version. */
+  const quickQuant =
+    quick === undefined
+      ? undefined
+      : installKindOf(family) === 'gguf'
+        ? picks[quick.variant.repo]?.quant
+        : quick.quant?.rung.quant;
 
   return (
     <div
@@ -388,8 +400,9 @@ export function FamilyCard({
               data-testid={
                 quickHave ? `family-quick-use-${family.id}` : `family-quick-${family.id}`
               }
+              data-repo={quick.variant.repo}
               onClick={() => (quickHave ? onSelect(quick.variant.repo) : onDownload(quick.variant))}
-              title={`${quick.variant.label}${quick.quant === undefined ? '' : ` · ${quick.quant.rung.quant}`}`}
+              title={`${quick.variant.label}${quickQuant === undefined ? '' : ` · ${quickQuant}`}`}
               className="pd-focusable shrink-0 rounded-full bg-accent-primary px-4 py-1.5 text-body font-medium text-text-on-accent transition-opacity hover:opacity-90"
             >
               {quickHave ? 'Use' : 'Quick Download'}
