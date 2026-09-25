@@ -42,6 +42,7 @@ import {
   isAxOpaque,
   type MacSnapshotView,
   type ResolvedDialog,
+  whoseLookLines,
 } from './format.js';
 import type { MacConsentGate } from './permissions.js';
 import { createMacConsentGate } from './permissions.js';
@@ -416,8 +417,6 @@ export function registerMacComputerUseTools(
       return null;
     }
   };
-  /** The next look uses an app carried over from an earlier chat — said once. */
-  let carriedOver = false;
   let recordedPid: number | null = null;
   const recordControl = (): void => {
     const c = session.controlled();
@@ -466,10 +465,7 @@ export function registerMacComputerUseTools(
          it read the file again and took whatever another chat had driven since.
          The first look that uses it records it like any other take. */
       const carried = readLastControl();
-      if (carried !== null) {
-        session.restore?.(carried);
-        carriedOver = true;
-      }
+      if (carried !== null) session.restore?.({ ...carried, carriedOver: true });
     }
   });
 
@@ -530,18 +526,29 @@ export function registerMacComputerUseTools(
     return `${verb} [${index}]${name !== undefined && name !== '' ? ` "${name}"` : ''}`;
   }
 
-  /** What the tool layer knows and the snapshot does not — today, the model's
-   * own last act, which the header reads back so it is not re-derived. */
-  /** Set by a look that fell back to the user's frontmost app (see MacSnapshotView). */
-  let lastLookFrontmost = false;
-  function view(): MacSnapshotView {
-    const v: MacSnapshotView = {
-      lastAct: session.controlled()?.lastAct,
-      ...(lastLookFrontmost ? { frontmostFallback: true } : {}),
-      ...(carriedOver ? { carriedOver: true } : {}),
-    };
-    carriedOver = false;
-    return v;
+  /**
+   * WHERE A LOOK THAT NAMED NO APP LANDS, AND WHY — decided BEFORE it goes out.
+   *
+   * Both notes used to be flags set on the side. "The USER has in front" was
+   * recomputed by every request, so the automatic re-take of an app with no
+   * Accessibility tree — aimed at the pid the first look had just taken —
+   * erased it, and the model again called the user's app where the user was.
+   * "Carried over" was printed by whichever text look came first and cleared:
+   * `mac snapshot "Safari"`, the look after a launch, or a look at some other
+   * app long after a `--visual` one had used the carried app without a word.
+   */
+  function landing(app: string | undefined): MacSnapshotView {
+    if (app !== undefined && app !== '') return {};
+    const c = session.controlled();
+    if (c === null) return { frontmostFallback: true };
+    return c.carriedOver === true ? { carriedOver: true } : {};
+  }
+
+  /** What the tool layer knows and the snapshot does not — the model's own last
+   * act, which the header reads back so it is not re-derived, and where the look
+   * landed. */
+  function view(landed: MacSnapshotView): MacSnapshotView {
+    return { lastAct: session.controlled()?.lastAct, ...landed };
   }
 
   /** Gate helper: consent + denylist, returns null when allowed. */
@@ -575,8 +582,6 @@ export function registerMacComputerUseTools(
     // control exists. The resolved snapshot then takes/refreshes control.
     if (app !== undefined && app !== '') params.app = app;
     else Object.assign(params, session.targetParams());
-    // No app named and nothing controlled: the helper answers with the frontmost.
-    lastLookFrontmost = params.app === undefined && params.pid === undefined;
     if (screenshot === true) params.screenshot = true;
     if (typeof page.find === 'string' && page.find.trim() !== '') params.find = page.find.trim();
     if (typeof page.from === 'number' && page.from > 0) params.from = Math.floor(page.from);
@@ -866,6 +871,7 @@ export function registerMacComputerUseTools(
          * window and tells the model to work in coordinates.
          */
         const page = { find: params.find, from: params.from };
+        const landed = landing(params.app);
         /*
          * --visual: THE PICTURE AND NOTHING ELSE. the user (2026-09-23): "the
          * snapshot tool should accept a flag that gives a visual snapshot no
@@ -910,8 +916,21 @@ export function registerMacComputerUseTools(
             iw: sizeOf(sent.inlineWidth, sent.width) ?? rect.w,
             ih: sizeOf(sent.inlineHeight, sent.height) ?? rect.h,
           };
+          /*
+           * …EXCEPT WHEN NOTHING ELSE SAYS WHOSE PICTURE IT IS. A look that named
+           * no app and landed on the user's front app — or on one carried over
+           * from another chat — took control of it, and a bare picture never
+           * says which app that is: exactly the "the user is on Activity
+           * Monitor" misreport the text look's header exists to stop. Those two
+           * looks, and only those, keep the header's lines.
+           */
+          const whose =
+            landed.frontmostFallback === true || landed.carriedOver === true
+              ? [{ type: 'text' as const, text: whoseLookLines(snapV, landed).join('\n') }]
+              : [];
           return {
             content: [
+              ...whose,
               { type: 'image', data: shotV.base64, mimeType: shotV.mimeType ?? 'image/jpeg' },
             ],
             details: {
@@ -1011,7 +1030,7 @@ export function registerMacComputerUseTools(
                 'window on screen right now). The controls below are your view.\n\n'
             : '';
         const content: AgentToolResult<MacDetails>['content'] = [
-          { type: 'text', text: `${noPicture}${formatMacSnapshot(snap, view())}${nearMiss}` },
+          { type: 'text', text: `${noPicture}${formatMacSnapshot(snap, view(landed))}${nearMiss}` },
         ];
         if (wantImage && shot?.base64 !== undefined && shot.base64 !== '') {
           content.push({

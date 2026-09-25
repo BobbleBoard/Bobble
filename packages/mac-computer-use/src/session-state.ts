@@ -63,6 +63,12 @@ export interface ControlledApp {
    * there is — one clause, written by the tool that did the thing.
    */
   readonly lastAct?: string;
+  /**
+   * Restored from the app ANOTHER chat last drove (tools.ts), and not yet looked
+   * at here. A guess, not a choice: the first look that uses it says so, and
+   * work elsewhere may replace it — nothing may replace an app this chat chose.
+   */
+  readonly carriedOver?: boolean;
 }
 
 /** Snapshot-shaped input (structural: the wire MacSnapshot satisfies it). */
@@ -106,9 +112,10 @@ export interface MacSessionState {
   /**
    * Take control back from a record — the app this session was driving before
    * the pi child was restarted or the chat reopened (see the `mac-control`
-   * entry in tools.ts). Nothing is known about its windows or its last act.
+   * entry in tools.ts), or, `carriedOver`, the one another chat last drove.
+   * Nothing is known about its windows or its last act.
    */
-  restore(record: { app: string; pid: number; windowId?: number }): void;
+  restore(record: { app: string; pid: number; windowId?: number; carriedOver?: boolean }): void;
   /** Params every act must be stamped with: `{ pid, app }` while controlling
    * (the name is the fallback for a pid that has since quit), `{}` before
    * control exists (legacy frontmost behavior). */
@@ -222,8 +229,13 @@ export function createMacSessionState(): MacSessionState {
       current = null;
     },
 
-    restore(record: { app: string; pid: number; windowId?: number }): void {
-      current = { pid: record.pid, app: record.app, windowId: record.windowId };
+    restore(record: { app: string; pid: number; windowId?: number; carriedOver?: boolean }): void {
+      current = {
+        pid: record.pid,
+        app: record.app,
+        windowId: record.windowId,
+        ...(record.carriedOver === true ? { carriedOver: true } : {}),
+      };
     },
 
     targetParams(): Record<string, unknown> {

@@ -189,7 +189,8 @@ describe('registerMacComputerUseTools', () => {
       },
     }));
     const tools = collectTools(bridge);
-    const r = await run(tools, 'mac_snapshot', { visual: true });
+    // Named: a look that lands on an app the model did not name says which (below).
+    const r = await run(tools, 'mac_snapshot', { app: 'TextEdit', visual: true });
     expect(bridge.calls[0]).toMatchObject({ method: 'snapshot', params: { screenshot: true } });
     expect(r.content).toHaveLength(1);
     expect(r.content[0]).toMatchObject({ type: 'image', data: 'BBBB' });
@@ -1329,6 +1330,10 @@ function lastControl(app: string, pid: number): string {
 }
 
 const preConsented = () => createMacConsentGate({ preConsented: true });
+const textOf = (r: { content: readonly unknown[] }) =>
+  r.content
+    .map((c) => ((c as { type: string }).type === 'text' ? (c as { text: string }).text : ''))
+    .join('\n');
 const OK_BUTTON = { index: 1, role: 'AXButton', name: 'OK' };
 
 describe('only a session that drove the Mac this turn ends the driving', () => {
@@ -1453,6 +1458,91 @@ describe('carried-over control becomes the chat’s own once used, and the recor
     const now = JSON.parse(readFileSync(file, 'utf8')) as { app: string; pid: number; at: number };
     expect(now).toMatchObject({ app: 'TextEdit', pid: process.pid });
     expect(Date.now() - now.at).toBeLessThan(60_000);
+  });
+});
+
+describe('"carried over" is said on the look that used the carried app, and on no other', () => {
+  function carried() {
+    const bridge = new FakeBridge()
+      .on('snapshot', (p) => ({
+        ...SNAP([OK_BUTTON], typeof p?.pid === 'number' ? p.pid : 777),
+        app: typeof p?.app === 'string' ? p.app : 'TextEdit',
+        ...(p?.screenshot === true
+          ? { screenshot: { path: '/tmp/v.png', base64: 'VVVV', rect: { x: 0, y: 0, w: 9, h: 9 } } }
+          : {}),
+      }))
+      .on('launch', () => ({ ok: true, app: 'Notes', pid: 888 }));
+    const s = piStub();
+    registerMacComputerUseTools(s.pi, {
+      bridge,
+      consent: preConsented(),
+      readChromeTabs: async () => null,
+      lastControlFile: lastControl('TextEdit', process.pid),
+    });
+    s.start();
+    return s.tools;
+  }
+
+  it('not on a look at an app the model named', async () => {
+    const r = await run(carried(), 'mac_snapshot', { app: 'Safari' });
+    expect(textOf(r)).not.toContain('Carried over');
+  });
+
+  it('not on the look after a launch', async () => {
+    const tools = carried();
+    await run(tools, 'mac_launch', { app: 'Notes' });
+    const r = await run(tools, 'mac_snapshot', {});
+    expect(textOf(r)).not.toContain('Carried over');
+  });
+
+  it('not later, on another app, after a --visual first look', async () => {
+    const tools = carried();
+    await run(tools, 'mac_snapshot', { visual: true });
+    const r = await run(tools, 'mac_snapshot', { app: 'Safari' });
+    expect(textOf(r)).not.toContain('Carried over');
+  });
+
+  it('on the bare look that does use it — once', async () => {
+    const tools = carried();
+    const r = await run(tools, 'mac_snapshot', {});
+    expect(textOf(r)).toContain('Carried over from an earlier chat');
+    expect(textOf(await run(tools, 'mac_snapshot', {}))).not.toContain('Carried over');
+  });
+
+  it('and on a --visual look that uses it, which otherwise names no app at all', async () => {
+    const r = await run(carried(), 'mac_snapshot', { visual: true });
+    expect(r.content.find((c) => c.type === 'image')).toBeDefined();
+    expect(textOf(r)).toContain('Carried over from an earlier chat');
+    expect(textOf(r)).toContain('TextEdit');
+  });
+});
+
+describe('the "USER has in front" notice reaches the model on every kind of fallback look', () => {
+  it('survives the automatic re-take of an app with no Accessibility tree', async () => {
+    const bridge = new FakeBridge().on('snapshot', (p) => ({
+      ...SNAP([], 555),
+      app: 'Blender',
+      ...(p?.screenshot === true
+        ? { screenshot: { path: '/tmp/b.png', base64: 'BBBB', rect: { x: 0, y: 0, w: 9, h: 9 } } }
+        : {}),
+    }));
+    const tools = collectTools(bridge);
+    const r = await run(tools, 'mac_snapshot', {});
+    expect(bridge.countOf('snapshot')).toBe(2);
+    expect(bridge.lastParams('snapshot')).toMatchObject({ pid: 555, screenshot: true });
+    expect(textOf(r)).toContain('the app the USER has in front');
+  });
+
+  it('a --visual look that fell back says which app the picture is of', async () => {
+    const bridge = new FakeBridge().on('snapshot', () => ({
+      ...SNAP([{ index: 1, role: 'AXButton', name: 'CPU' }], 555),
+      app: 'Activity Monitor',
+      screenshot: { path: '/tmp/a.png', base64: 'AAAA', rect: { x: 0, y: 0, w: 9, h: 9 } },
+    }));
+    const r = await run(collectTools(bridge), 'mac_snapshot', { visual: true });
+    expect(r.content.find((c) => c.type === 'image')).toBeDefined();
+    expect(textOf(r)).toContain('Activity Monitor');
+    expect(textOf(r)).toContain('the app the USER has in front');
   });
 });
 

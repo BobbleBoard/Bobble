@@ -83,6 +83,17 @@ describe('createMacSessionState (controlled-app state machine)', () => {
     expect(s.controlled()).toEqual({ pid: 8131, app: 'Google Chrome', windowId: 2661 });
     expect(s.targetParams()).toEqual({ pid: 8131, app: 'Google Chrome' });
   });
+
+  it('an app carried over from another chat stays a guess until this chat looks at it', () => {
+    const s = createMacSessionState();
+    s.restore({ app: 'TextEdit', pid: 42, carriedOver: true });
+    expect(s.controlled()?.carriedOver).toBe(true);
+    // A blind act on it is not a look: it still has not been seen here.
+    s.noteAct('pressed cmd+s');
+    expect(s.controlled()?.carriedOver).toBe(true);
+    s.noteSnapshot({ app: 'TextEdit', pid: 42 });
+    expect(s.controlled()?.carriedOver).toBeUndefined();
+  });
 });
 
 /*
