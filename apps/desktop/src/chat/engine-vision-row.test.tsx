@@ -45,8 +45,10 @@ function setUp(status: { phase: 'starting' | 'ready' | 'idle'; serverRunning: bo
   useLlmStore.setState((s) => ({ status: { ...s.status, ...status }, relaunch }));
   useSettingsStore.setState((s) => ({
     settings: { ...s.settings, loadVision: true },
-    update: async (patch) => {
-      useSettingsStore.setState((x) => ({ settings: { ...x.settings, ...patch } }));
+    update: async ({ loadVision }) => {
+      useSettingsStore.setState((x) => ({
+        settings: { ...x.settings, ...(loadVision !== undefined ? { loadVision } : {}) },
+      }));
     },
   }));
   host = document.createElement('div');
