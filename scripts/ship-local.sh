@@ -13,6 +13,25 @@ pnpm --filter @pi-desktop/afm build:swift
 # Build the Mac computer-use Swift helper (pi-mac) the same way — it is
 # asarUnpack'd and spawned by main (pi-mac --serve). arm64/macOS-only.
 pnpm --filter @pi-desktop/pi-mac build:swift
+# THE OFFICE EDITORS ARE BUILD OUTPUTS, NOT SOURCES. vendor/genoffice's out/
+# folders and the sheets sidecar are ignored by git, so a fresh worktree has none
+# of them — and electron-builder packages their absence without a word
+# (2026-09-24: a candidate built in a new worktree was installed with no office
+# editors). Stop here, before five minutes of packaging.
+for need in \
+  vendor/genoffice/embed/out/index.cjs \
+  vendor/genoffice/embed/out/assets/harfbuzz.wasm \
+  vendor/genoffice/apps/docs/out/renderer/index.html \
+  vendor/genoffice/apps/sheets/out/renderer/index.html \
+  vendor/genoffice/apps/slides/out/renderer/index.html \
+  vendor/genoffice/apps/pdf/out/renderer/index.html \
+  vendor/genoffice/apps/markdown/out \
+  vendor/genoffice/apps/sheets/native/xlsx-engine/target/release/xlsx-sidecar; do
+  [ -e "$need" ] || {
+    echo "ship-local: $need is missing — build vendor/genoffice here, or copy its out/ folders and the sidecar from a checkout that has them" >&2
+    exit 1
+  }
+done
 pnpm --filter @pi-desktop/desktop exec electron-builder --dir --config electron-builder.yml
 
 # A STABLE signing identity (scripts/signing-identity.sh explains why ad-hoc
@@ -65,6 +84,19 @@ sign --deep "$APP_SRC"
 # the next build and the cause is right here.
 echo "ship-local: $(codesign -d -r- "$APP_SRC" 2>&1 | grep designated || true)"
 
+# CHECK THE BUNDLE BEFORE IT REPLACES ANYTHING. Boot/theme probe, then the
+# packaging smoke: proves the bundle loads its 3 pi extensions, spawns pi from the
+# bundled cli.js, and serves the pd-preview canvas harness (the old ship regressed
+# to `count: 0` extensions and dev-only chat). They used to run on the INSTALLED
+# copy, after the old one was deleted — so a bundle that failed them was already
+# in /Applications when they said so (2026-09-24). The copy below is these same
+# bytes (ditto), so checking them here proves the same thing and risks nothing.
+# Set SMOKE_MODEL=1 to also stream a real Gemma completion when the model +
+# llama.cpp are cached at ~/.cache/pi-desktop.
+APP_ABS="$(cd "$(dirname "$APP_SRC")" && pwd)/$(basename "$APP_SRC")"
+(cd apps/desktop && node tests/e2e/packaged-probe.mjs "$APP_ABS")
+(cd apps/desktop && node tests/e2e/packaged-smoke.mjs "$APP_ABS")
+
 DEST="/Applications/Bobble.app"
 # Never replace the bundle under a running Bobble: its lazily loaded chunks would
 # then resolve against the NEW asar (other hashes) and fail. Ask it to quit the
@@ -86,13 +118,8 @@ fi
 rm -rf "$DEST"
 ditto "$APP_SRC" "$DEST"
 
-# Boot/theme smoke, then the packaging smoke: proves the SHIPPED bundle loads
-# its 3 pi extensions, spawns pi from the bundled cli.js, and serves the
-# pd-preview canvas harness (the old ship regressed to `count: 0` extensions and
-# dev-only chat). Set SMOKE_MODEL=1 to also stream a real Gemma completion when
-# the model + llama.cpp are cached at ~/.cache/pi-desktop.
-(cd apps/desktop && node tests/e2e/packaged-probe.mjs "$DEST")
-(cd apps/desktop && node tests/e2e/packaged-smoke.mjs "$DEST")
+# The installed copy is the checked bundle, byte for byte and still signed.
+codesign --verify --deep --strict "$DEST"
 
 # CLEAN UP THE ORPHAN THIS SCRIPT JUST MADE.
 #
