@@ -1,0 +1,8 @@
+flowchart LR
+  A([Order placed]) --> B{Payment ok?}
+  B -- yes --> C[Pick & pack]
+  B -- no --> E[Email customer]
+  E -. retry .-> B
+  C --> D{Quality ok?}
+  D -- no, repack --> C
+  D -- yes --> F[Ship] --> G[Delivered] --> H([Review request])

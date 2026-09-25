@@ -6,7 +6,7 @@ in well under three minutes (about 40 s on the M5).
 
     pnpm vq:eval                                  # = node tools/visual-eval/eval.mjs
     node tools/visual-eval/eval.mjs --out /tmp/vq --only pitch-deck,captured
-    node tools/visual-eval/eval.mjs --mermaid path/to/mermaid.min.js   # adds the diagram prototype
+    node tools/visual-eval/eval.mjs --only kits,flow-diagram          # the kit sheets and the diagram tool
     VQ_OFFICE_GEN=/path/to/other/tools/office-gen node tools/visual-eval/eval.mjs --out /tmp/before
                                                   # judge another copy of the pipeline, same ruler
 
@@ -21,8 +21,10 @@ in well under three minutes (about 40 s on the M5).
 - **macOS QuickLook** (`qlmanage -t`, a command-line thumbnailer) for pptx/docx/pdf.
   Eval-only: the app never depends on it.
 - **Playwright's headless Chromium** from the workspace (`pnpm install`).
-- Optionally **Mermaid 11** for the `diagram` prototype (`--mermaid` / `VQ_MERMAID`);
-  without it that one variant is reported as skipped.
+- **Mermaid 11** for the diagram cases — by default the copy the app bundles
+  (`apps/desktop/resources/mermaid/`), so `flow-diagram/d` and every kit's
+  diagram tile are drawn by exactly the bytes the app ships (VQ-10).
+  `--mermaid` / `VQ_MERMAID` name another; with none, those tiles are skipped.
 
 ## What comes out (`--out`, default `tools/visual-eval/out/`)
 
@@ -36,6 +38,15 @@ in well under three minutes (about 40 s on the M5).
 The run fails (exit 1) if a case errors, a sheet is blank, or anything it started
 took the screen (the frontmost app is read before and between phases).
 
+## The kit sheets (`kits/<id>`)
+
+One sheet per design kit in `packages/design-kit/src/kits` (VQ-04): a slide
+built by python-pptx from `tools/office-gen/design_tokens.json` ALONE
+(`py/kit_slide.py` — no colour, face or size written in it), two charts dressed
+by `lookFromKit`, a page hero in the kit's CSS variables, the HyperFrames title
+card on the kit's deep ground, and the flow through the diagram tool. The
+check row says whether the kit validates and what Python read back.
+
 ## How it measures
 
 `py/measure.py` reads the **file**, never the code that wrote it, and its ruler
@@ -44,6 +55,11 @@ change cannot move the measurement. Text geometry is calibrated against
 QuickLook: a paragraph at spacing multiple *m* advances 1.2 × size × *m* per line
 (measured on Helvetica Neue at 14–58 pt). Contrast and palette arithmetic is in
 `py/palette_check.py` (WCAG 2, OKLab, Machado 2009 CVD).
+
+A diagram (kind `diagram`) is measured IN the browser instead: Mermaid places
+nodes and labels with nested transforms, which the file-reading ruler cannot
+follow (it saw 78 overlaps in a clean drawing), so `lib/kit-sheet.mjs` lays the
+SVG out and reads each label's box and the painted shape under it.
 
 ## Layout
 

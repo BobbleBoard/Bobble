@@ -45,12 +45,25 @@ const opt = (name, fallback) => {
 const OUT = path.resolve(opt('out', path.join(EVAL_ROOT, 'out')));
 const ONLY = (opt('only', '') || '').split(',').filter(Boolean);
 const { VQ_MERMAID } = process.env;
-const MERMAID = opt('mermaid', VQ_MERMAID ?? '') || null;
+/* The Mermaid the app bundles (VQ-10) is the default: the diagram cases draw
+   with exactly the bytes the app ships. --mermaid / VQ_MERMAID name another. */
+const BUNDLED_MERMAID = path.join(
+  REPO,
+  'apps',
+  'desktop',
+  'resources',
+  'mermaid',
+  'mermaid.min.js',
+);
+const MERMAID =
+  opt('mermaid', VQ_MERMAID ?? '') || (existsSync(BUNDLED_MERMAID) ? BUNDLED_MERMAID : null);
 const python = resolvePython(opt('python', null));
 
 for (const d of ['files', 'renders', 'sheets', 'work'])
   rmSync(path.join(OUT, d), { recursive: true, force: true });
-mkdirSync(OUT, { recursive: true });
+/* work/ holds the phase manifests, so it cannot wait for a case to make it:
+   `--only kits` runs no case that touches ctx.work and the render phase fell over. */
+mkdirSync(path.join(OUT, 'work'), { recursive: true });
 
 const rel = (p) => (p ? path.relative(OUT, p) : null);
 const slug = (id) => id.replaceAll('/', path.sep);
@@ -185,7 +198,7 @@ const sheetJobs = [...byCase.entries()].map(([id, pngs]) => ({
   title: id,
   cols: id.startsWith('landing-page')
     ? 2
-    : id.startsWith('one-page-report')
+    : id.startsWith('one-page-report') || id.startsWith('kits/')
       ? 3
       : pngs.length >= 7
         ? 4
