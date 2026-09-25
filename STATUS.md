@@ -71,12 +71,13 @@ Every row below was reproduced first (a failing test, or a probe/filmstrip on th
 | llama-server's sampler chain ≠ theirs (min_p 0.05, temperature last, 64-token penalty window) | 25% → 17% looping with theirs | `b13ec0ec` |
 | The icon/illustration rule was not theirs | their icon prompts sampled as illustrations | `dd9284bf` |
 | Terse prompts ("a fox", "a coffee cup icon") | junk; the same as captions draw clean marks (kiln, cup) | the tool's prompt guidance → caption style (queued with a prefill check) |
-| Characters/scenes | weak at 1,536; some recognisable at 2,048 (a bust silhouette, two avatars), 46% still loop | pending: their bf16 PyTorch pipeline on the same prompts (running) |
+| Characters/scenes | weak at 1,536; some recognisable at 2,048 (a bust silhouette, two avatars), 46% still loop | — the model's own limit (next row) |
+| **The authors' own bf16 PyTorch pipeline, same 19 prompts** (their `generate` settings, run on this Mac, 17:00) | **loops 26% (ours 25%, with their sampler 17%); icons equal to ours; characters equally hit-and-miss** (it drew a clean avatar and the pink-✕ scene where ours missed, and missed the running figure and the silhouette where ours drew them) | **the conversion and our pipeline are at parity with theirs.** Their showcase characters are best-of-many picks. What is left is how the chat model uses it: caption-style prompts, and single icons/pictograms/marks + tracing (its strengths) over characters — the guidance change is next after the suite's baseline (with a prefill check) |
 
 ### E. The overall request, by request
 | the user asked | State |
 |---|---|
-| "omnisvg should be really good … figure this out" | 🟡 two causes found and fixed; the decisive reference run is going |
+| "omnisvg should be really good … figure this out" | ✅ figured out: our Q8 pipeline is at parity with the authors' own bf16 pipeline (loops 25% vs 26%, icons equal, characters equally hit-and-miss); the loops are cut and redrawn now, the sampler is theirs; the remaining lever is caption-style prompts from the chat model (queued after the suite) |
 | "why such a pale blue" | ✅ |
 | "custom mermaid arrows and box styling … animate/build in real time" | ✅ |
 | "arrows should not be triangles … elbow arrows … clean solid borders" | ✅ (and class/ER) |
