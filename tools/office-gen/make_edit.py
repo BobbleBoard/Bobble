@@ -76,6 +76,8 @@ def outline_text(o: dict) -> str:
                 if sh.get("size"):
                     bits.append(f"{sh['size']}pt")
                 bits.append(f"at {sh.get('x')},{sh.get('y')} {sh.get('w')}x{sh.get('h')}in")
+                if sh.get("links"):
+                    bits.append(LINK + " ".join(sh["links"]))
                 lines.append("  " + " ".join(str(b) for b in bits))
     elif fmt == "docx":
         for p in o["paragraphs"]:
@@ -86,6 +88,8 @@ def outline_text(o: dict) -> str:
                 bits.append("bold")
             if p.get("color"):
                 bits.append(p["color"])
+            if p.get("links"):
+                bits.append(LINK + " ".join(p["links"]))
             lines.append(" ".join(str(b) for b in bits))
         for t in o["tables"]:
             lines.append(f"-- table {t['table']} --")
@@ -95,8 +99,18 @@ def outline_text(o: dict) -> str:
         for s in o["sheets"]:
             lines.append(f"-- sheet {s['sheet']} ({s['dims']}, {s['charts']} charts) --")
             for c in s["cells"]:
-                lines.append(f'  {c["id"]} = "{c["value"][:40]}" [{c["format"]}]')
+                line = f'  {c["id"]} = "{c["value"][:40]}" [{c["format"]}]'
+                if c.get("link"):
+                    line += f" {LINK}{c['link']}"
+                if c.get("note"):
+                    line += f' note: "{c["note"][:80]}"'
+                lines.append(line)
     return "\n".join(lines)
+
+
+# What marks a link in an outline line — in full, never cut: a rendered
+# document's sources are only worth listing with where they point (WF-06).
+LINK = "→ "
 
 
 OPS = {

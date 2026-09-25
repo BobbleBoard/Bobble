@@ -185,6 +185,12 @@ def B_heading(d, b):
     d.need(58)
     d.y -= 10
     title = _s(b.get("title", ""))
+    if _C is not None and _R is not None and _R.index in _HEADS:
+        # The render path: a named destination the contents list links to, and
+        # an entry in the viewer's outline (its sidebar), for every heading.
+        key = _HEADS[_R.index]
+        d.c.bookmarkHorizontal(key, 0, d.y + 10)
+        d.c.addOutlineEntry(title, key, level=0)
     lines = simpleSplit(title, SANS_B, 15, CW)
     d.c.setFont(SANS_B, 15)
     d.c.setFillColor(HexColor(d.t.primary))
@@ -388,6 +394,74 @@ BLOCKS = {"cover": B_cover, "heading": B_heading, "body": B_body,
           "table": B_table, "quote": B_quote, "bullets": B_bullets}
 
 
+# ── render path only (WF-06) ─────────────────────────────────────────────────
+_C = None
+_HEADS: dict[int, str] = {}      # block index -> its named destination
+_TITLES: dict[int, str] = {}     # block index -> the title a contents list shows
+
+
+def B_toc(d, b):
+    """Contents: each heading (and the sources) as a link to where it starts."""
+    B_heading(d, {"title": _s(b.get("title")) or "Contents"})
+    for i in sorted(_TITLES):
+        d.need(16)
+        d.c.setFont(SANS, 10.5)
+        d.c.setFillColor(HexColor(d.t.primary))
+        d.c.drawString(M, d.y - 10.5, _TITLES[i])
+        w = stringWidth(_TITLES[i], SANS, 10.5)
+        d.c.linkRect("", _HEADS[i], (M, d.y - 13, M + w, d.y), relative=0, thickness=0)
+        d.y -= 16
+    d.y -= 8
+    if _R is not None:
+        _R.items = [_TITLES[i] for i in sorted(_TITLES)]
+
+
+def _short(text: str, font: str, size: float, width: float) -> str:
+    """One line of `text` inside `width`, cut with an ellipsis — for a URL,
+    whose link is the whole URL whatever the line shows."""
+    if stringWidth(text, font, size) <= width:
+        return text
+    while text and stringWidth(text + "…", font, size) > width:
+        text = text[:-1]
+    return text + "…"
+
+
+def B_sources(d, b):
+    """The spec's sources, numbered as the text's [n] cites them; each URL a
+    live link (a PDF link annotation over the drawn URL)."""
+    B_heading(d, {"title": _s(b.get("title")) or "Sources"})
+    items = []
+    ind = 24
+    for src in _C.sources:
+        lines = simpleSplit(src.title, SANS_B, 10.5, CW - ind)
+        meta = ", ".join(x for x in (src.site, src.date) if x)
+        d.need(len(lines) * 14 + (13 if meta else 0) + (13 if src.url else 0) + 8)
+        d.c.setFont(SANS_B, 10.5)
+        d.c.setFillColor(HexColor(d.t.accent))
+        d.c.drawString(M, d.y - 10.5, str(src.n))
+        d.c.setFillColor(HexColor(d.t.ink))
+        for j, ln in enumerate(lines):
+            d.c.drawString(M + ind, d.y - 10.5 - j * 14, ln)
+        d.y -= len(lines) * 14
+        if meta:
+            d.c.setFont(SANS, 9.5)
+            d.c.setFillColor(HexColor(d.t.mute))
+            d.c.drawString(M + ind, d.y - 9.5, meta)
+            d.y -= 13
+        if src.url:
+            shown = _short(src.url.split("://", 1)[-1], SANS, 9.5, CW - ind)
+            d.c.setFont(SANS, 9.5)
+            d.c.setFillColor(HexColor(d.t.primary))
+            d.c.drawString(M + ind, d.y - 9.5, shown)
+            w = stringWidth(shown, SANS, 9.5)
+            d.c.linkURL(src.url, (M + ind, d.y - 12, M + ind + w, d.y), relative=0, thickness=0)
+            d.y -= 13
+        d.y -= 8
+        items.append(f"{src.n}. {src.label()}" + (f" {src.url}" if src.url else ""))
+    if _R is not None:
+        _R.items = items
+
+
 def _dry_run(fn, d: Doc, b: dict) -> Exception | None:
     """Draw the block on a throwaway canvas first: a canvas cannot be undone, so
     a block that fails halfway must fail HERE, not on the page."""
@@ -405,18 +479,47 @@ def _dry_run(fn, d: Doc, b: dict) -> Exception | None:
         _R = real
 
 
-def build(spec: dict, out: Path, drawn: list | None = None, warnings: list | None = None) -> Path:
-    global _R
+def build(spec: dict, out: Path, drawn: list | None = None, warnings: list | None = None, *,
+          cite=None) -> Path:
+    """Render the PDF. `cite` (citations.Citations) is the render path's: given,
+    `[S3]` markers read "[3]" and the spec's sources are listed with live links
+    (in a `sources` block, or appended at the end); make never passes it."""
+    global _R, _C, _HEADS, _TITLES
     t = pal.from_spec(spec)
     out.parent.mkdir(parents=True, exist_ok=True)
     d = Doc(out, t)
     d.running = _s(spec.get("running_title", ""))
-    for i, b in enumerate(spec.get("blocks", []), 1):
+    blocks = spec.get("blocks", [])
+    registry = BLOCKS
+    if cite is not None:
+        import citations
+        _C = cite
+        blocks = citations.plain_all(list(blocks), cite)
+        if cite.sources and not any(isinstance(b, dict) and b.get("type") == "sources" for b in blocks):
+            blocks.append({"type": "sources"})
+        registry = {**BLOCKS, "sources": B_sources, "toc": B_toc}
+        for i, b in enumerate(blocks, 1):
+            kind = _s(b.get("type")) if isinstance(b, dict) else ""
+            if kind in ("heading", "sources"):
+                _HEADS[i] = f"h{i}"
+                _TITLES[i] = _s(b.get("title")) or ("Sources" if kind == "sources" else "")
+    try:
+        _draw(d, blocks, registry, drawn, warnings)
+    finally:
+        _R, _C, _HEADS, _TITLES = None, None, {}, {}
+    d.footer()
+    d.c.save()
+    return out
+
+
+def _draw(d, blocks: list, registry: dict, drawn: list | None, warnings: list | None) -> None:
+    global _R
+    for i, b in enumerate(blocks, 1):
         if not isinstance(b, dict):
             b = {"type": "body", "paragraphs": [_s(b)]}
         kind = _s(b.get("type")) or "body"
         _R = BlockReport(i, kind)
-        fn = BLOCKS.get(kind)
+        fn = registry.get(kind)
         if fn is None:
             _R.notes.append(f"block type '{kind}' does not exist; set as body text")
             fn, b = B_body, {**b, "paragraphs": b.get("paragraphs") or [b.get("text", "")]}
@@ -434,10 +537,6 @@ def build(spec: dict, out: Path, drawn: list | None = None, warnings: list | Non
                                 f"the block holds {shown}, put the rest in another block")
             for note in dict.fromkeys(_R.notes):
                 warnings.append(f"block {i} ({kind}): {note}")
-    _R = None
-    d.footer()
-    d.c.save()
-    return out
 
 
 if __name__ == "__main__":

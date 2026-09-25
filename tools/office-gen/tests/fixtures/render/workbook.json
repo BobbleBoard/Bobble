@@ -1,0 +1,35 @@
+{
+ "_note": "A render-path workbook spec (WF-06): Findings (claim, status, cited sources), Data (a table with a cell note and a chart), and the Sources sheet the renderer adds from `sources`. Fictional: the Tidewell world, sources on reserved .example domains.",
+ "palette": {"primary": "#1F3A5F", "accent": "#C8742B"},
+ "sources": [
+  {"id": "S1", "title": "Tidewell pilot results, Q3 2026", "site": "Tidewell", "date": "12 Sep 2026",
+   "url": "https://tidewell.example/reports/pilot-q3-2026", "accessed": "24 Sep 2026"},
+  {"id": "S2", "title": "Water damage claims in multifamily buildings, 2025", "site": "Multifamily Insurance Data Council",
+   "date": "14 Mar 2026", "url": "https://midc.example.org/reports/water-claims-2025", "accessed": "24 Sep 2026"},
+  {"id": "S3", "title": "Automatic shut-off valves: a field study of 1,200 units", "site": "Building Science Review",
+   "date": "20 Nov 2025", "url": "https://buildingscience.example.org/articles/shutoff-valves-field-study",
+   "accessed": "24 Sep 2026"},
+  {"id": "S4", "title": "US rental housing stock by building size", "site": "Housing Statistics Office",
+   "date": "8 Jan 2026", "url": "https://housing-stats.example.gov/rental-stock-by-size", "accessed": "24 Sep 2026"},
+  {"id": "S5", "title": "Leak sensor response times: a vendor benchmark", "site": "SensorLab", "date": "30 May 2026",
+   "url": "https://sensorlab.example.com/benchmarks/leak-response-2026", "accessed": "24 Sep 2026"}
+ ],
+ "sheets": [
+  {"name": "Findings", "title": "Leak detection: findings", "subtitle": "Each claim, how well it is supported, and where it comes from",
+   "headers": ["Claim", "Status", "Sources"],
+   "rows": [
+    ["Water damage is the #1 multifamily insurance claim", "corroborated", {"cite": ["S2", "S4"]}],
+    ["Shut-off valves cut the average claim by 71%", "single source", {"cite": ["S3"]}],
+    ["The median leak-to-alert time is 14 minutes",
+     {"text": "single source", "note": "One vendor benchmark [S5]; no independent measurement found."}, {"cite": ["S5"]}],
+    ["Tidewell's pilot covered 3,100 units in 42 buildings", "corroborated", {"cite": ["S1"]}]]},
+  {"name": "Data", "title": "Claims by cause, 2025", "subtitle": "Multifamily Insurance Data Council [S2]",
+   "headers": ["Cause", "Share of claims (%)", "Average claim ($)"],
+   "rows": [
+    [{"text": "Water damage", "note": "The #1 cause in every year of the series [S2]."}, 29, 24000],
+    ["Fire", 11, 61000],
+    ["Theft", 9, 3200],
+    ["Liability", 7, 18500]],
+   "chart": {"type": "bar", "title": "Share of claims by cause (%)"}}
+ ]
+}

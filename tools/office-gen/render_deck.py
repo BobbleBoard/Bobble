@@ -30,6 +30,18 @@ input, measured by tools/visual-eval on replays of real 4B output:
     slide behind and says so, a blank table header no longer crashes;
   - `build` reports what it DREW (`drawn=`), which is what office.py tells the
     model — not what the spec asked for.
+
+WF-06 (2026-09-24), the render path's deck — `office.py render pptx`, a spec
+built by code from pages it fetched, never by the make path's model. Given
+`cite=` (citations.py):
+  - a slide's `[S3]` markers come out of its text, and with its `sources` list
+    become one small line, "Sources: 3, 7", placed where nothing else on the
+    slide is (measured against every shape) and linked to the sources slide;
+  - a `sources` slide lists the spec's sources in two columns, each URL a live
+    link, continued onto as many slides as the list needs — never cut, since
+    a footer number must always have its entry. Added at the end when the spec
+    has sources and no such slide.
+Without `cite` (every make) none of it runs.
 """
 from __future__ import annotations
 
@@ -705,6 +717,232 @@ DARK = {"title", "section", "quote", "closing", "stats",
         "hero_title", "hero_statement", "flow", "matrix"}
 
 
+# ── the render path's sources (WF-06) ────────────────────────────────────────
+SRC_COLS = 2
+SRC_NUM = Inches(0.5)               # the number's column inside an entry
+SRC_GAP = Inches(0.22)              # between entries
+SRC_FLOOR = H - Inches(0.8)         # entries end above the footer
+SRC_TITLE, SRC_META = 13.5, 11      # pt
+
+
+def _head_bottom(title: str) -> int:
+    """Where `_head` leaves the content for a slide with this title and no
+    kicker — the same arithmetic, so a sources page can be planned before it
+    is drawn (tests hold the two together)."""
+    size, lines = _fit(title, 11.5 * 0.82, [34, 30, 26, 22], 2, bold=True)
+    end = Inches(1.28) + Inches(textfit.height_pt(len(lines), size, 1.04) / 72 + 0.06)
+    return end + Inches(0.10) + Inches(0.5)
+
+
+def _src_box() -> int:
+    return (CW - GUT * (SRC_COLS - 1)) // SRC_COLS
+
+
+def _one_line(s: str, box_pt: float, size: float) -> str:
+    """`s` on one line of its box, cut with an ellipsis if it must be — the
+    line is written with reflow off, so a longer one would run into the next
+    column."""
+    if textfit.width_pt(s, size) <= box_pt:
+        return s
+    while s and textfit.width_pt(s + "…", size) > box_pt:
+        s = s[:-1]
+    return s.rstrip() + "…"
+
+
+def _short_url(url: str, box_pt: float, size: float) -> str:
+    """The URL as a reader reads it — no scheme — on one line of its box. The
+    link itself is always the whole URL."""
+    s = url.split("://", 1)[-1]
+    if s.startswith("www."):
+        s = s[4:]
+    return _one_line(s, box_pt, size)
+
+
+def _src_entry(src) -> tuple[list[str], str, int]:
+    """(title lines, "site, date", height) of one entry — measured."""
+    box_pt = (_src_box() - SRC_NUM) / EMU_PT
+    lines = textfit.wrap(src.title, box_pt, SRC_TITLE, bold=True, max_lines=2)
+    meta = ", ".join(x for x in (src.site, src.date) if x)
+    h = textfit.height_pt(len(lines), SRC_TITLE, 1.1)
+    h += textfit.height_pt(1, SRC_META, 1.2) * ((1 if meta else 0) + (1 if src.url else 0))
+    return lines, meta, Pt(h)
+
+
+def _plan_sources(title: str, sources: list) -> list[tuple[list, int]]:
+    """The sources split into pages of two columns, by measured height: each
+    page as (its entries, how many go in the first column). A page is filled
+    column by column, then its columns balanced — five entries read as three
+    and two, not four and one."""
+    tops = [_head_bottom(title), _head_bottom(f"{title}, continued")]
+    pages: list[list] = [[]]
+    col, top = 0, tops[0]
+    y = top
+    for src in sources:
+        h = _src_entry(src)[2]
+        if y + h > SRC_FLOOR and y > top:
+            col = col + 1
+            if col == SRC_COLS:
+                pages.append([])
+                col, top = 0, tops[1]
+            y = top
+        pages[-1].append(src)
+        y += h + SRC_GAP
+    out = []
+    for n, page in enumerate(pages):
+        room = SRC_FLOOR - tops[min(n, 1)] + SRC_GAP
+        hs = [_src_entry(s)[2] + SRC_GAP for s in page]
+        best = (None, len(page))
+        for k in range(len(page) + 1):
+            a, b = sum(hs[:k]), sum(hs[k:])
+            # `<=`: on a tie the FIRST column takes the extra entry (3 + 2).
+            if (a <= room or k == 1) and (b <= room or k == len(page) - 1) and \
+                    (best[0] is None or max(a, b) <= best[0]):
+                best = (max(a, b), k)
+        out.append((page, best[1]))
+    return out
+
+
+_SOURCE_SLIDE: dict[int, object] = {}      # source number -> the slide listing it
+_FOOT_LINKS: list[tuple[object, int]] = []  # (footer line shape, first number it cites)
+
+
+def L_sources(prs, t, s):
+    sl = _blank(prs)
+    _bg(sl, t.paper)
+    _rect(sl, 0, 0, Inches(0.16), H, t.primary)   # the spine, as on a bullets slide
+    y0 = _head(sl, t, {"title": s.get("title")})
+    items = []
+    page = s.get("_page") or []
+    split = s.get("_split", len(page))
+    y = y0
+    for k, src in enumerate(page):
+        lines, meta, h = _src_entry(src)
+        if k == split:
+            y = y0
+        col = 0 if k < split else 1
+        x = M + col * (_src_box() + GUT)
+        num = _tf(sl, x, y, SRC_NUM, Pt(SRC_TITLE * 1.3), wrap=False)
+        _p(num, str(src.n), SRC_TITLE, t.accent, bold=True, first=True)
+        tx, box = x + SRC_NUM, _src_box() - SRC_NUM
+        tf = _tf(sl, tx, y, box, h, wrap=False)
+        for i, ln in enumerate(lines):
+            _p(tf, ln, SRC_TITLE, t.ink, bold=True, first=(i == 0), line=1.1)
+        if meta:
+            _p(tf, _one_line(meta, box / EMU_PT, SRC_META), SRC_META, t.mute, line=1.2)
+        if src.url:
+            p = _p(tf, _short_url(src.url, box / EMU_PT, SRC_META), SRC_META, t.primary, line=1.2)
+            p.runs[0].hyperlink.address = src.url
+        _SOURCE_SLIDE.setdefault(src.n, sl)
+        items.append(f"{src.n}. {src.label()}" + (f" {src.url}" if src.url else ""))
+        y += h + SRC_GAP
+    if _R is not None:
+        _R.head = _s(s.get("title"))
+        _R.items = items
+    return sl
+
+
+def _render_plan(slides: list, cite) -> tuple[list, list[list[int]]]:
+    """The render path's slide list: each slide's markers taken out of its text
+    (its `sources` ids joined to them) and the sources slide expanded into as
+    many pages as the list needs — or appended when the spec has sources and
+    no such slide. Returns the slides and each one's cited numbers."""
+    import citations
+    out, cites = [], []
+    listed = False
+    for s in slides:
+        if not isinstance(s, dict):
+            out.append(s)
+            cites.append([])
+            continue
+        if _s(s.get("layout")) == "sources":
+            if not cite.sources:
+                cite.warnings.append("the sources slide had no sources to list; left out")
+                continue
+            listed = True
+            title = _s(s.get("title")) or "Sources"
+            for k, (page, split) in enumerate(_plan_sources(title, cite.sources)):
+                out.append({"layout": "sources", "title": title if k == 0 else f"{title}, continued",
+                            "_page": page, "_split": split})
+                cites.append([])
+            continue
+        found: list[int] = []
+        clean = citations.strip_all({k: v for k, v in s.items() if k != "sources"}, cite, found)
+        if s.get("sources") is not None:
+            found += cite.resolve_ids(s.get("sources"))
+        out.append(clean)
+        cites.append(sorted(dict.fromkeys(found)))
+    if cite.sources and not listed:
+        for k, (page, split) in enumerate(_plan_sources("Sources", cite.sources)):
+            out.append({"layout": "sources", "title": "Sources" if k == 0 else "Sources, continued",
+                        "_page": page, "_split": split})
+            cites.append([])
+    return out, cites
+
+
+def _content_boxes(sl) -> list[tuple[int, int, int, int]]:
+    """What a line must not touch: every shape with text, and every mark
+    smaller than a fifth of the slide (a bar, a dot, a rule) — not the colour
+    fields a layout is built on."""
+    boxes = []
+    for sh in sl.shapes:
+        if sh.left is None or sh.width is None:
+            continue
+        has_text = sh.has_text_frame and sh.text_frame.text.strip() != ""
+        if has_text or sh.width * sh.height < 0.2 * W * H:
+            boxes.append((sh.left, sh.top, sh.left + sh.width, sh.top + sh.height))
+    return boxes
+
+
+def _fill_under(sl, x: int, y: int):
+    """The colour of the topmost filled shape under a point."""
+    colour = None
+    for sh in sl.shapes:
+        if sh.left is None or not (sh.left <= x <= sh.left + sh.width and sh.top <= y <= sh.top + sh.height):
+            continue
+        try:
+            if sh.fill.type == 1:            # MSO_FILL.SOLID
+                colour = sh.fill.fore_color.rgb
+        except (AttributeError, TypeError, ValueError):
+            continue
+    return colour
+
+
+def _source_line(sl, t, nums: list[int]):
+    """"Sources: 3, 7" in 9 pt, in the first free place along the foot of the
+    slide (then the top right), in a colour that reads on what is under it."""
+    import citations
+    text = f"Sources: {citations.numbers_text(nums)}"
+    size = 9
+    # Untracked, and a quarter inch of slack: QuickLook wrapped "Sources:
+    # 1–3, 5" onto two lines in a box measured to within 0.08 in of it
+    # (SEEN 2026-09-24), and the text is set flush to the side it hugs, so
+    # the slack is empty space, not a gap.
+    w = Inches(textfit.width_pt(text, size) / 72 + 0.25)
+    h = Inches(0.28)
+    foot = H - Inches(0.52)
+    places = [(W - M - Inches(0.75) - w, foot, PP_ALIGN.RIGHT),   # left of the page number
+              (W - M - w, foot, PP_ALIGN.RIGHT),                   # where a dark slide has none
+              (M, foot, PP_ALIGN.LEFT),                            # where a dark slide has no footer
+              (W - M - w, Inches(0.3), PP_ALIGN.RIGHT)]            # top right, over the kicker line
+    pad = Inches(0.06)
+    boxes = _content_boxes(sl)
+    x, y, align = places[0]
+    for px, py, al in places:
+        if not any(px - pad < b[2] and b[0] < px + w + pad and py - pad < b[3] and b[1] < py + h + pad
+                   for b in boxes):
+            x, y, align = px, py, al
+            break
+    else:
+        _note("no free place for its Sources line; set over the footer")
+    under = _fill_under(sl, x + w // 2, y + h // 2)
+    dark = under is not None and (0.2126 * under[0] + 0.7152 * under[1] + 0.0722 * under[2]) < 128
+    tf = _tf(sl, x, y, w, h, wrap=False)
+    _p(tf, text, size, t.support if dark else t.mute, first=True, align=align)
+    shape = sl.shapes[-1]
+    _FOOT_LINKS.append((shape, min(nums)))
+    return shape
+
+
 def _footer(sl, t, text, page):
     tf = _tf(sl, M, H - Inches(0.52), CW * 0.7, Inches(0.28))
     _p(tf, text, 9, t.mute, first=True, spacing=0.6)
@@ -745,21 +983,34 @@ def _as_bullets(s: dict) -> list[str]:
     return [x for x in out if x.strip()] or [_s(s.get("title"))]
 
 
-def build(spec: dict, out: Path, drawn: list | None = None, warnings: list | None = None) -> Path:
+def build(spec: dict, out: Path, drawn: list | None = None, warnings: list | None = None, *,
+          cite=None) -> Path:
     """Render the deck. `drawn` (if given) receives one record per slide of what
     was actually drawn; `warnings` receives one line per thing the model should
-    know (an item cut, a layout that failed, a highlight that points nowhere)."""
+    know (an item cut, a layout that failed, a highlight that points nowhere).
+    `cite` (citations.Citations) is the render path's: given, the slides'
+    citations and the sources slide are drawn; make never passes it."""
     global _R
     prs = Presentation()
     prs.slide_width, prs.slide_height = W, H
     t = THEMES.get(spec.get("theme", "ink"), THEMES["ink"])
     running = _s(spec.get("running_title"))
-    for i, s in enumerate(spec.get("slides", [])):
+    slides = spec.get("slides", [])
+    cites: list[list[int]] = []
+    registry = LAYOUTS
+    _SOURCE_SLIDE.clear()
+    _FOOT_LINKS.clear()
+    if cite is not None:
+        import citations
+        slides, cites = _render_plan(list(slides), cite)
+        registry = {**LAYOUTS, "sources": L_sources}
+        citations.theme_links(prs.slide_master.part, str(t.primary))
+    for i, s in enumerate(slides):
         if not isinstance(s, dict):
             s = {"layout": "bullets", "title": _s(s)}
         layout = _s(s.get("layout")) or "bullets"
         _R = SlideReport(i + 1, layout)
-        fn = LAYOUTS.get(layout)
+        fn = registry.get(layout)
         if fn is None:
             _R.notes.append(f"layout '{layout}' does not exist; drawn as bullets")
             s = {**s, "bullets": _as_bullets(s)}
@@ -781,6 +1032,8 @@ def build(spec: dict, out: Path, drawn: list | None = None, warnings: list | Non
         _R.layout = layout
         if i > 0 and layout not in DARK:
             _footer(sl, t, running, i + 1)
+        if cites and cites[i]:
+            _source_line(sl, t, cites[i])      # after the footer: it must miss that too
         if drawn is not None:
             drawn.append(_R.as_dict())
         if warnings is not None:
@@ -789,7 +1042,13 @@ def build(spec: dict, out: Path, drawn: list | None = None, warnings: list | Non
                                 f"the layout holds {shown}, split the rest onto another slide")
             for note in _R.notes:
                 warnings.append(f"slide {i+1} ({_R.asked}): {note}")
+    # A "Sources: 3, 7" line is a link to the slide that lists source 3.
+    for shape, n in _FOOT_LINKS:
+        if n in _SOURCE_SLIDE:
+            shape.click_action.target_slide = _SOURCE_SLIDE[n]
     _R = None
+    _SOURCE_SLIDE.clear()
+    _FOOT_LINKS.clear()
     out.parent.mkdir(parents=True, exist_ok=True)
     prs.save(str(out))
     return out

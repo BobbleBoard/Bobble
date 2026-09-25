@@ -13,6 +13,8 @@ this pipeline exists to prevent.
 So this is the surface that is actually called, with one shape for all of it:
 
     office.py make    <pptx|docx|xlsx|pdf> --brief "<what, with the real facts>" --out <path> [--slides N]
+    office.py make    <kind> --brief-file brief.txt --out <path>       # a brief too long for a command line
+    office.py render  <pptx|docx|xlsx|pdf|chart> --spec spec.json --out <path>
     office.py edit    <file> --instruction "<change>" [--out <path>]
     office.py inspect <file>
 
@@ -23,6 +25,15 @@ the caller — the harness's `office` tool — never has to parse prose.
 The division of labour is unchanged: the local model writes the words and picks
 the design; deterministic code owns every byte of the file. This script only
 wires those two together and reports what came out.
+
+`render` is the one command with NO model in it (WF-06). Its caller already has
+the spec — a research workflow that wrote every section from pages it fetched
+(deliverables/research/workflows.md §4.5) — and wants that exact spec drawn:
+nothing planned, nothing filled, nothing added. It is also the only command
+whose spec may carry `sources` and `[S3]` citation markers (citations.py): a
+docx gets linked superscripts and a Sources block, a deck "Sources: 3, 7"
+footers and a sources slide, a workbook a Sources sheet with live links. The
+make path's specs come from a small model and never get those (VQ-08).
 """
 from __future__ import annotations
 
@@ -42,6 +53,7 @@ KINDS = ("pptx", "docx", "xlsx", "pdf", "chart")
 # A chart is an .svg (chart_render.py); every other kind's extension is its name.
 EXT = {"chart": "svg"}
 OUTLINE_LINES = 80
+OUTLINE_LINKS = 40
 
 
 def log(msg: str) -> None:
@@ -102,7 +114,16 @@ def outline_of(path: Path, kind: str) -> str:
     text = make_edit.outline_text(o)
     lines = text.splitlines()
     if len(lines) > OUTLINE_LINES:
-        lines = lines[:OUTLINE_LINES] + [f"… ({len(lines) - OUTLINE_LINES} more lines)"]
+        rest = lines[OUTLINE_LINES:]
+        # A rendered report's sources sit at its END, past the cut; the lines
+        # that carry a link are kept, so the outline still says where the
+        # document's facts came from (WF-06). A made file has none.
+        linked = [ln for ln in rest if make_edit.LINK + "http" in ln][:OUTLINE_LINKS]
+        if linked:
+            lines = lines[:OUTLINE_LINES] + [
+                f"… ({len(rest) - len(linked)} more lines; the {len(linked)} with links follow)"] + linked
+        else:
+            lines = lines[:OUTLINE_LINES] + [f"… ({len(lines) - OUTLINE_LINES} more lines)"]
     return "\n".join(lines)
 
 
@@ -185,6 +206,20 @@ def summary_of(kind: str, spec: dict, drawn: list[dict] | None = None) -> str:
             f"{len(series)} series, {pts} points — {labels}",
             f"highlight: {spec.get('highlight')}" if spec.get("highlight") else "",
         ] if x)
+    if kind == "xlsx" and drawn:
+        # The render path's workbook: one line per sheet it drew.
+        out = []
+        for d in drawn:
+            line = f"sheet '{d.get('sheet')}': {_one(d.get('title', ''), 60)} — {d.get('rows', 0)} rows"
+            if d.get("headers"):
+                line += f"; columns: {_one(' | '.join(d['headers']), 70)}"
+            extras = [f"{d[k]} {k}" for k in ("links", "notes") if d.get(k)]
+            if d.get("chart"):
+                extras.append(f"{d['chart']} chart")
+            if extras:
+                line += f" ({', '.join(extras)})"
+            out.append(line)
+        return "\n".join(out)
     if kind == "xlsx":
         kpis = ", ".join(f'{k.get("value")} {k.get("label")}' for k in spec.get("kpis", []) if isinstance(k, dict))
         headers = " | ".join(str(h) for h in spec.get("headers", []))
@@ -401,6 +436,100 @@ def _checks(review) -> dict:
             "parts_left_out": list(review.missing_parts)}
 
 
+# ── render ───────────────────────────────────────────────────────────────────
+# What each kind's spec must have before anything is drawn — a spec with the
+# wrong shape fails loudly rather than rendering an empty file.
+SPEC_NEEDS = {
+    "pptx": ("slides", "a deck spec needs a non-empty `slides` list"),
+    "docx": ("blocks", "a document spec needs a non-empty `blocks` list"),
+    "pdf": ("blocks", "a document spec needs a non-empty `blocks` list"),
+    "xlsx": ("sheets", "a workbook spec needs `headers` and `rows`, or a non-empty `sheets` list"),
+    "chart": ("series", "a chart spec needs a non-empty `series` list"),
+}
+_SOURCES_PART = {"blocks": "type", "slides": "layout", "sheets": "kind"}
+
+
+def sources_of(spec: dict) -> list:
+    """The spec's sources: its top-level `sources`, else the `items` of the
+    block, slide or sheet that lists them."""
+    if isinstance(spec.get("sources"), list):
+        return spec["sources"]
+    for key, field in _SOURCES_PART.items():
+        for part in spec.get(key) or []:
+            if isinstance(part, dict) and part.get(field) == "sources" and isinstance(part.get("items"), list):
+                return part["items"]
+    return []
+
+
+def read_spec(raw: str) -> dict:
+    """--spec as a path to a JSON file (or, for a person at a shell, the JSON itself)."""
+    text = raw.strip()
+    if not text.startswith("{"):
+        p = Path(raw).expanduser()
+        if not p.is_file():
+            raise ValueError(f"no spec file at {p}")
+        text = p.read_text()
+    spec = json.loads(text)
+    if not isinstance(spec, dict):
+        raise ValueError("the spec must be a JSON object")
+    return spec
+
+
+def render(kind: str, spec: dict, out: Path) -> dict:
+    """Draw exactly this spec: no model call, no plan, no fill, no brief check
+    (there is no brief — the spec IS the content). What the renderers had to
+    cut, and any citation that names no source, come back as warnings."""
+    import citations
+    t0 = time.time()
+    key, need = SPEC_NEEDS[kind]
+    has = spec.get(key)
+    if not (isinstance(has, list) and has) and not (kind == "xlsx" and isinstance(spec.get("headers"), list)):
+        raise ValueError(need)
+    cite = citations.Citations.of(sources_of(spec))
+    warnings: list[str] = []
+    drawn: list[dict] = []
+    if kind == "pptx":
+        import render_deck
+        render_deck.build(spec, out, drawn=drawn, warnings=warnings, cite=cite)
+        items = len(drawn)
+    elif kind == "docx":
+        import doc_render
+        doc_render.build(spec, out, drawn=drawn, warnings=warnings, cite=cite)
+        items = len(drawn)
+    elif kind == "pdf":
+        import pdf_render
+        pdf_render.build(spec, out, drawn=drawn, warnings=warnings, cite=cite)
+        items = len(drawn)
+    elif kind == "xlsx":
+        import sheet_render
+        sheet_render.build(spec, out, drawn=drawn, warnings=warnings, cite=cite)
+        items = sum(d.get("rows", 0) for d in drawn)
+    else:
+        import chart_render
+        info = chart_render.render(spec, out)
+        warnings += info.get("warnings", [])
+        out.with_suffix(".chart.json").write_text(json.dumps(chart_render.normalise(spec), indent=1))
+        items = info["points"]
+    if not out.exists() or out.stat().st_size < (512 if kind == "chart" else 1024):
+        raise RuntimeError(f"the renderer wrote nothing usable at {out}")
+    cited = [s for s in cite.sources if s.n in cite.used]
+    return {
+        "ok": True,
+        "kind": kind,
+        "path": str(out),
+        "bytes": out.stat().st_size,
+        "items": items,
+        "seconds": round(time.time() - t0, 1),
+        # Every warning, not the model's eight: the caller is code.
+        "warnings": list(dict.fromkeys(cite.report() + warnings)),
+        "summary": summary_of(kind, spec, drawn),
+        "sources": len(cite.sources),
+        "checks": {"sources": len(cite.sources), "cited": [s.id for s in cited],
+                   "not_cited": [s.id for s in cite.sources if s.n not in cite.used],
+                   "unknown_citations": list(cite.unknown)},
+    }
+
+
 # ── edit ─────────────────────────────────────────────────────────────────────
 def edit_chart(src: Path, instruction: str, out: Path | None) -> dict:
     """Revise the spec beside the chart and draw it again."""
@@ -567,9 +696,16 @@ def main(argv: list[str]) -> None:
     # too — MEASURED, a 4B wrote `office make --brief="…docx…"` and was sent
     # back for a word it had already given.
     m.add_argument("kind", nargs="?", choices=KINDS)
-    m.add_argument("--brief", required=True)
+    # --brief-file: a brief the size of a report does not belong on a command
+    # line (argv limits, quoting); the workflow engine writes it to a file.
+    m.add_argument("--brief")
+    m.add_argument("--brief-file")
     m.add_argument("--out")
     m.add_argument("--slides", type=int)
+    r = sub.add_parser("render")
+    r.add_argument("kind", choices=KINDS)
+    r.add_argument("--spec", required=True, help="a JSON spec file (or the JSON itself)")
+    r.add_argument("--out", required=True)
     e = sub.add_parser("edit")
     e.add_argument("file")
     e.add_argument("--instruction", required=True)
@@ -582,8 +718,20 @@ def main(argv: list[str]) -> None:
     i.add_argument("file")
     a = ap.parse_args(argv)
     try:
-        if a.cmd == "make":
-            brief = a.brief.strip()
+        if a.cmd == "render":
+            emit(render(a.kind, read_spec(a.spec), resolve_out(a.out, a.kind, "")))
+        elif a.cmd == "make":
+            if a.brief is None and a.brief_file is None:
+                fail("office make needs the brief: --brief \"…\" or --brief-file <path>.")
+            if a.brief is not None and a.brief_file is not None:
+                fail("office make takes --brief or --brief-file, not both.")
+            if a.brief_file is not None:
+                bf = Path(a.brief_file).expanduser()
+                if not bf.is_file():
+                    fail(f"no brief file at {bf}")
+                brief = bf.read_text(encoding="utf-8").strip()
+            else:
+                brief = a.brief.strip()
             if len(brief) < 12:
                 fail("the brief is too short to make anything from — say what the document is "
                      "about and give it the real content: names, numbers, sections.")

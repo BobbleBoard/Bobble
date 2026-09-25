@@ -28,6 +28,8 @@
 
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ExtensionAPI } from '@mariozechner/pi-coding-agent';
@@ -76,6 +78,10 @@ export interface OfficeResult {
   ops?: number;
   applied?: string[];
   missed?: string[];
+  /** render: how many sources the spec listed. */
+  sources?: number;
+  /** render: which source ids were cited, which were not, and any citation naming none. */
+  checks?: Record<string, unknown>;
 }
 
 /**
@@ -118,6 +124,10 @@ export interface OfficeRunOptions {
  * missing, the interpreter missing its libraries, the server down, a crash —
  * because the model reads this, and "exit code 1" is the message that sends a
  * model back to hand-writing the format.
+ *
+ * `render` (WF-06) draws a spec the caller already has and calls no model, so
+ * it runs with no model server at all — a workflow can make its report while
+ * the chat model is still loading, or with none loaded.
  */
 export async function runOffice(
   args: readonly string[],
@@ -131,7 +141,8 @@ export async function runOffice(
   const python = env[OFFICE_GEN_PYTHON_ENV] ?? 'python3';
   const endpoint = utilityEndpointFromEnv(env);
   const server = env[OFFICE_GEN_SERVER_ENV] ?? endpoint?.baseUrl;
-  if (server === undefined) {
+  const needsModel = args[0] !== 'render';
+  if (server === undefined && needsModel) {
     return {
       ok: false,
       error:
@@ -140,7 +151,7 @@ export async function runOffice(
   }
   const childEnv: Record<string, string> = {};
   for (const [k, v] of Object.entries(env)) if (typeof v === 'string') childEnv[k] = v;
-  childEnv[OFFICE_GEN_SERVER_ENV] = server;
+  if (server !== undefined) childEnv[OFFICE_GEN_SERVER_ENV] = server;
   // Never inherit a proxy into the pipeline: the server is on this machine.
   childEnv.no_proxy = '*';
   childEnv.NO_PROXY = '*';
@@ -229,6 +240,49 @@ export async function runOffice(
       });
     });
   });
+}
+
+/** What `office.py render` draws: a spec, exactly as given (WF-06). */
+export interface OfficeRenderRequest {
+  readonly kind: OfficeKind;
+  /**
+   * The spec — `slides`, `blocks` or `sheets` as the renderers read them —
+   * plus `sources` and `[S3]` citation markers, which only this path draws.
+   */
+  readonly spec: Record<string, unknown>;
+  /** Where the file goes: absolute, or relative to `opts.cwd`. */
+  readonly out: string;
+}
+
+/**
+ * Draw a spec the caller built: no model call, nothing planned, nothing
+ * invented. The research workflow's render step (deliverables/research/
+ * workflows.md §4.5) writes every section from pages it fetched and hands the
+ * whole document over here; the model never sees this — it is harness
+ * plumbing, not a tool, so it adds no words to any prompt.
+ *
+ * The spec travels as a temp file, never argv: a report's spec is far longer
+ * than a command line may be, and a file has no quoting to get wrong.
+ */
+export async function renderOffice(
+  req: OfficeRenderRequest,
+  opts: OfficeRunOptions,
+): Promise<OfficeResult> {
+  let dir: string | null = null;
+  try {
+    dir = await mkdtemp(path.join(tmpdir(), 'office-render-'));
+    const specPath = path.join(dir, 'spec.json');
+    await writeFile(specPath, JSON.stringify(req.spec));
+    const out = path.isAbsolute(req.out) ? req.out : path.join(opts.cwd, req.out);
+    return await runOffice(['render', req.kind, '--spec', specPath, '--out', out], opts);
+  } catch (err) {
+    return {
+      ok: false,
+      error: `could not hand the spec to the pipeline: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  } finally {
+    if (dir !== null) await rm(dir, { recursive: true, force: true }).catch(() => undefined);
+  }
 }
 
 // ── the tools ────────────────────────────────────────────────────────────────

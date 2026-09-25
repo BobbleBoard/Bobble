@@ -29,6 +29,17 @@ tables out the same way):
     set "12,480" against "2h 14m" and "Billing questions" against "31%";
   - lists longer than a block holds are cut AND reported, a failing block is
     rolled back and reported, and `build(drawn=…)` says what was drawn.
+
+WF-06 (2026-09-24), the render path's document — `office.py render docx`, a
+spec built by code from pages it fetched (workflows.md §4.5), never by the make
+path's model. Given `cite=` (citations.py) the document can:
+  - carry a `sources` block: the spec's sources, numbered, each a paragraph
+    with a bookmark and its URL as a real external link;
+  - set every `[S3]` marker as a superscript "3" that is an internal link to
+    source 3 — so a reader clicks from the claim to where it came from;
+  - carry a `toc` block: the headings, each an internal link to its bookmark.
+Without `cite` (every make) none of it exists and nothing here runs: a small
+model's spec does not get to add a bibliography (VQ-08).
 """
 from __future__ import annotations
 
@@ -38,6 +49,7 @@ from pathlib import Path
 
 from docx import Document
 from docx.enum.text import WD_BREAK
+from docx.opc.constants import RELATIONSHIP_TYPE as RT
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Inches, Pt, RGBColor
@@ -76,6 +88,11 @@ class BlockReport:
 
 
 _R: BlockReport | None = None
+# The render path only (WF-06): the spec's sources, and the (bookmark, title)
+# of each block a contents list links to. None / empty on every make.
+_C = None
+_T = None             # the palette, for the links' colour
+_TOC: dict[int, tuple[str, str]] = {}
 
 
 def _cap(seq, n: int, field: str) -> list:
@@ -239,8 +256,8 @@ def _spacer(doc, after_pt: float):
     return p
 
 
-def _text(p, s, *, size=11, colour=None, bold=False, italic=False, font=SANS,
-          spacing=None):
+def _run(p, s, *, size=11, colour=None, bold=False, italic=False, font=SANS,
+         spacing=None):
     r = p.add_run(_s(s))
     r.font.size = Pt(size)
     r.font.bold = bold
@@ -253,6 +270,84 @@ def _text(p, s, *, size=11, colour=None, bold=False, italic=False, font=SANS,
         el.set(qn("w:val"), str(int(spacing * 20)))
         _put(r._r.get_or_add_rPr(), el, RPR_SEQ)
     return r
+
+
+def _text(p, s, *, size=11, colour=None, bold=False, italic=False, font=SANS,
+          spacing=None):
+    """One run of text — or, on the render path, the text around its citation
+    markers with each marker set as linked superscripts."""
+    fmt = {"size": size, "colour": colour, "bold": bold, "italic": italic, "font": font,
+           "spacing": spacing}
+    if _C is None:
+        return _run(p, s, **fmt)
+    first = None
+    for seg in _C.split(_s(s)):
+        r = _run(p, seg, **fmt) if isinstance(seg, str) else _cite(p, seg, size=size, font=font)
+        first = first if first is not None else r
+    return first
+
+
+# ── links and anchors (render path) ──────────────────────────────────────────
+# Bookmark names start with "_": Word, GenOffice and mammoth all treat those as
+# document-internal anchors (Word's own _Ref/_Toc), not as bookmarks a person
+# made — so they never clutter a bookmark list, and a link to one still works.
+def _source_anchor(n: int) -> str:
+    return f"_RefSource{n}"
+
+
+_BOOKMARK_ID = [0]
+
+
+def _bookmark(p, name: str) -> None:
+    """Mark the whole paragraph as `name`, the target of an internal link."""
+    _BOOKMARK_ID[0] += 1
+    bid = str(_BOOKMARK_ID[0])
+    start = OxmlElement("w:bookmarkStart")
+    start.set(qn("w:id"), bid)
+    start.set(qn("w:name"), name)
+    end = OxmlElement("w:bookmarkEnd")
+    end.set(qn("w:id"), bid)
+    ppr = p._p.pPr
+    if ppr is not None:
+        ppr.addnext(start)
+    else:
+        p._p.insert(0, start)
+    p._p.append(end)
+
+
+def _link(p, text: str, *, url: str | None = None, anchor: str | None = None, size=11,
+          colour=None, bold=False, underline=False, superscript=False, font=SANS):
+    """A run inside a w:hyperlink: an external URL (a relationship, TargetMode
+    External) or an internal anchor. Styled directly — the built-in Hyperlink
+    style would bring Word's followed-link purple with it."""
+    r = _run(p, text, size=size, colour=colour, bold=bold, font=font)
+    if underline:
+        r.font.underline = True
+    if superscript:
+        r.font.superscript = True
+    h = OxmlElement("w:hyperlink")
+    if url:
+        h.set(qn("r:id"), p.part.relate_to(url, RT.HYPERLINK, is_external=True))
+    else:
+        h.set(qn("w:anchor"), anchor or "")
+    h.set(qn("w:history"), "1")
+    r._r.addprevious(h)
+    h.append(r._r)
+    return r
+
+
+def _cite(p, nums: list[int], *, size=11, font=SANS):
+    """Superscript source numbers, each a link to its entry: "rose 14%¹˒³"."""
+    colour = _T.primary if _T is not None else None
+    first = None
+    for i, n in enumerate(nums):
+        if i:
+            sep = _run(p, ",", size=size, colour=colour, font=font)
+            sep.font.superscript = True
+        r = _link(p, str(n), anchor=_source_anchor(n), size=size, colour=colour, superscript=True,
+                  font=font)
+        first = first if first is not None else r
+    return first
 
 
 def _para(doc, *, before=0, after=8, align=None, line=None):
@@ -303,6 +398,8 @@ def B_cover(doc, t, b):
 def B_heading(doc, t, b):
     p = _para(doc, before=16, after=2)
     _text(p, b.get("title", ""), size=17, colour=t.primary, bold=True)
+    if _R is not None and _R.index in _TOC:
+        _bookmark(p, _TOC[_R.index][0])    # a contents entry links here
     _rule(doc, t.accent, width_pct=10, space_after=4)
     if b.get("standfirst"):
         p2 = _para(doc, after=10, line=1.35)
@@ -453,15 +550,84 @@ def B_pagebreak(doc, t, b):
     doc.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
 
 
+# ── render path only (WF-06) ─────────────────────────────────────────────────
+NUM_W = 0.34          # inches: the number column of a sources entry
+
+
+def B_sources(doc, t, b):
+    """The spec's sources, in its order and numbered as the citations number
+    them: title and site, then the URL as a live external link. Each entry is
+    a bookmark, so a superscript in the text lands on it."""
+    B_heading(doc, t, {"title": _s(b.get("title")) or "Sources"})
+    items = []
+    for src in _C.sources:
+        p = _para(doc, after=7, line=1.2)
+        pf = p.paragraph_format
+        pf.left_indent = Inches(NUM_W)
+        pf.first_line_indent = Inches(-NUM_W)
+        pf.tab_stops.add_tab_stop(Inches(NUM_W))
+        _bookmark(p, _source_anchor(src.n))
+        _run(p, f"{src.n}\t", size=10, colour=t.accent, bold=True)
+        _run(p, src.title, size=10.5, colour=t.ink, bold=True)
+        tail = ", ".join(x for x in (src.site, src.date) if x)
+        if tail:
+            _run(p, f" — {tail}", size=10, colour=t.mute)
+        if src.url or src.accessed:
+            p.add_run().add_break()
+        if src.url:
+            _link(p, src.url, url=src.url, size=9.5, colour=t.primary, underline=True)
+        if src.accessed:
+            _run(p, f"{'  ·  ' if src.url else ''}accessed {src.accessed}", size=9, colour=t.mute)
+        items.append(f"{src.n}. {src.label()}" + (f" {src.url}" if src.url else ""))
+    if _R is not None:
+        _R.items = items
+
+
+def B_toc(doc, t, b):
+    """Contents: every heading (and the sources) as an internal link to its
+    bookmark. No page numbers — a viewer that does not lay the document out
+    cannot know them, and a wrong page number is worse than none."""
+    B_heading(doc, t, {"title": _s(b.get("title")) or "Contents"})
+    for _i, (anchor, title) in sorted(_TOC.items()):
+        p = _para(doc, after=4, line=1.2)
+        _link(p, title, anchor=anchor, size=11, colour=t.primary)
+    if _R is not None:
+        _R.items = [title for _a, title in (_TOC[i] for i in sorted(_TOC))]
+
+
 BLOCKS = {
     "cover": B_cover, "heading": B_heading, "body": B_body, "callout": B_callout,
     "stats": B_stats, "table": B_table, "quote": B_quote, "bullets": B_bullets,
     "pagebreak": B_pagebreak,
 }
+RENDER_BLOCKS = {"sources": B_sources, "toc": B_toc}
 
 
-def build(spec: dict, out: Path, drawn: list | None = None, warnings: list | None = None) -> Path:
-    global _R
+def _render_plan(blocks: list, cite) -> list:
+    """The render path's block list: the sources appended when the spec has
+    sources but placed no block for them (a citation must never point at
+    nothing), and a bookmark for every heading when there is a contents list."""
+    global _TOC
+    kinds = [_s(b.get("type")) if isinstance(b, dict) else "body" for b in blocks]
+    if cite.sources and "sources" not in kinds:
+        blocks = blocks + [{"type": "sources"}]
+        kinds.append("sources")
+    _TOC = {}
+    if "toc" in kinds:
+        for i, (b, kind) in enumerate(zip(blocks, kinds), 1):
+            if kind == "heading":
+                _TOC[i] = (f"_TocSection{i}", _s(b.get("title")))
+            elif kind == "sources":
+                _TOC[i] = (f"_TocSection{i}", _s(b.get("title")) or "Sources")
+    return blocks
+
+
+def build(spec: dict, out: Path, drawn: list | None = None, warnings: list | None = None, *,
+          cite=None) -> Path:
+    """Render the document. `cite` (citations.Citations) is the render path's:
+    given, the spec's sources, citations and contents are drawn; make never
+    passes it."""
+    global _R, _C, _T, _TOC
     t = pal.from_spec(spec)
     doc = Document()
     for s in doc.sections:
@@ -471,13 +637,33 @@ def build(spec: dict, out: Path, drawn: list | None = None, warnings: list | Non
     normal.font.name = SANS
     normal.font.size = Pt(11)
 
+    blocks = list(spec.get("blocks", []))
+    registry = BLOCKS
+    if cite is not None:
+        import citations
+        _C, _T = cite, t
+        _BOOKMARK_ID[0] = 0
+        blocks = _render_plan(blocks, cite)
+        registry = {**BLOCKS, **RENDER_BLOCKS}
+        citations.theme_links(doc.part, t.primary)
+    try:
+        _draw(doc, t, blocks, registry, drawn, warnings)
+    finally:
+        _R, _C, _T, _TOC = None, None, None, {}
+    out.parent.mkdir(parents=True, exist_ok=True)
+    doc.save(str(out))
+    return out
+
+
+def _draw(doc, t, blocks: list, registry: dict, drawn: list | None, warnings: list | None) -> None:
+    global _R
     body = doc.element.body
-    for i, b in enumerate(spec.get("blocks", []), 1):
+    for i, b in enumerate(blocks, 1):
         if not isinstance(b, dict):
             b = {"type": "body", "paragraphs": [_s(b)]}
         kind = _s(b.get("type")) or "body"
         _R = BlockReport(i, kind)
-        fn = BLOCKS.get(kind)
+        fn = registry.get(kind)
         if fn is None:
             _R.notes.append(f"block type '{kind}' does not exist; set as body text")
             fn = B_body
@@ -501,10 +687,6 @@ def build(spec: dict, out: Path, drawn: list | None = None, warnings: list | Non
                                 f"the block holds {shown}, put the rest in another block")
             for note in _R.notes:
                 warnings.append(f"block {i} ({kind}): {note}")
-    _R = None
-    out.parent.mkdir(parents=True, exist_ok=True)
-    doc.save(str(out))
-    return out
 
 
 if __name__ == "__main__":
