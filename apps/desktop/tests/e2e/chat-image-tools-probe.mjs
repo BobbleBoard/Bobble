@@ -319,7 +319,7 @@ try {
     // The controls are hover-revealed on the card, so hover before clicking.
     await page.locator('[data-testid="media-card"]').first().hover();
     await page.locator('[data-testid="media-expand"]').first().click();
-    await page.waitForSelector('[data-testid="media-expanded"]', { timeout: 5_000 });
+    await page.waitForSelector('[data-testid="image-viewer"]', { timeout: 5_000 });
     await shot('B-lightbox');
     await page.keyboard.press('Escape');
   }

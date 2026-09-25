@@ -25,6 +25,7 @@
  */
 import { type JSX, useCallback, useEffect, useMemo, useRef } from 'react';
 import { ThreadMedia } from '../chat/ThreadMedia';
+import { EDIT_STRENGTHS } from '../media/image-edit';
 import { ModuleCard } from '../media/ModuleCard';
 import { useGenStore } from '../state/gen-store';
 import { aspectOf, RunHeader, StudioJob, widthOf } from './StudioRun';
@@ -464,11 +465,9 @@ export function ImageStudio(): JSX.Element {
                   testid="image-strength-rail"
                   value={strength}
                   onChange={setStrength}
-                  options={[
-                    { value: 0.3, label: 'Low', hint: 'Touch it up — same picture' },
-                    { value: 0.6, label: 'Medium', hint: 'Clearly reworked, still recognisable' },
-                    { value: 0.85, label: 'High', hint: 'Keeps the composition, redraws it' },
-                  ]}
+                  /* One list with the image viewer's Edit bar (media/image-edit),
+                     so the two places that edit a picture cannot drift. */
+                  options={EDIT_STRENGTHS.map((s) => ({ ...s }))}
                 />
               </Knob>
             </RailGroup>
