@@ -2,6 +2,13 @@
 
 Updated: 2026-09-25 (morning) · main `2c794eae` (built, all probes below green; **not installed** — /Applications is still `ed415a13`) · the overnight visual-output push stopped at 08:14, three hours past the user's six-hour cap (agent runs took 3+ h each; I lost track of wall time)
 
+## Morning 2026-09-25 (the user back)
+| Item | State |
+|---|---|
+| "why such a pale blue for the notifications?" | **Done** `23d21af6`: progress bars + unread dots use a new per-theme `--pd-status-*-solid` (the hue at full strength, #0a84ff on Bobble dark) instead of `fg`, a text colour lifted toward white on dark. tray-transfers-look + notif-redesign-probe green, looked at. |
+| "omnisvg should be really good … figure this out" | **In progress.** Ruled out, measured: the GGUF conversion (embedding rows identical to OmniSVG's own checkpoint, cos 1.0000; the matrix is tied, as their config says), prompt tokenization (llama-server parses `<\|im_start\|>` as specials). Our "fox" fixture decodes to a red abstract shape; the authors' demos are clean flat icons and characters. Suspects: our prompts (terse/abstract, with text) vs their caption style, candidate choice (eos-first favours short drawings; 1,536-token cap vs their 4,096 table), sampler order. A side-by-side (our Q8 pipeline ×2 samplers vs their bf16 PyTorch pipeline, same prompts) is queued behind the AC-power gate. |
+| "custom mermaid arrows and box styling … animate/build in real time" | **In progress** (worktree lane): a custom diagram look + live building from the streaming `source`, then applied to other cards. |
+
 ## Overnight 2026-09-24/25 — the visual-output push (the user: "start working on the visuals (high priority) the model can produce …")
 Merged on main (`bacdca5f` … `2c794eae`), unit suites 8,234 pass (the 2 gen3d Python tests on system Python 3.9 still fail — a separate task is fixing that):
 
