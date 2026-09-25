@@ -94,6 +94,7 @@ export {
   idsFromCompletion,
   MEDIA_MARKER,
   OMNISVG_MAX_TOKENS,
+  OMNISVG_SAMPLER_CHAIN,
   OMNISVG_SAMPLING,
   OMNISVG_SYSTEM_PROMPT,
   textSubtype,

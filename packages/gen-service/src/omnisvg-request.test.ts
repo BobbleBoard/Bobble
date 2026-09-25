@@ -28,6 +28,19 @@ describe('the prompt OmniSVG is sent', () => {
     expect(r.temperature).toBe(0.3);
   });
 
+  /* Their chain (transformers' generate), not llama-server's default one: the
+     penalty over the whole sequence, then temperature, top-k, top-p — no min_p. */
+  it('samples the way the authors do, for a text prompt and an image alike', () => {
+    for (const r of [
+      buildOmniSvgRequest({ prompt: 'a red heart' }),
+      buildOmniSvgRequest({ imageBase64: 'AAAA' }),
+    ]) {
+      expect(r.samplers).toEqual(['penalties', 'temperature', 'top_k', 'top_p']);
+      expect(r.min_p).toBe(0);
+      expect(r.repeat_last_n).toBeGreaterThanOrEqual(2048);
+    }
+  });
+
   /* Their task_configs: an icon samples cooler than an illustration. */
   it('picks sampling by their subtype rule', () => {
     expect(textSubtype('a fox icon')).toBe('icon');

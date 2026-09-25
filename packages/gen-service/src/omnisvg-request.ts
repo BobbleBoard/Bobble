@@ -138,6 +138,9 @@ export interface OmniSvgRequest {
   readonly top_p: number;
   readonly top_k: number;
   readonly repeat_penalty: number;
+  readonly samplers: readonly string[];
+  readonly min_p: number;
+  readonly repeat_last_n: number;
   /** The ids are the output; the text is empty (the SVG tokens have no text form). */
   readonly return_tokens: true;
   readonly cache_prompt: false;
@@ -147,6 +150,26 @@ export interface OmniSvgRequest {
 
 /** Their `MAX_MAX_LENGTH`-ish ceiling; config.yaml's `model.max_length` is 1536. */
 export const OMNISVG_MAX_TOKENS = 1536;
+
+/**
+ * HOW THE AUTHORS SAMPLE — not llama-server's default chain. Their pipeline is
+ * transformers' `generate(do_sample=True, temperature, top_k, top_p,
+ * repetition_penalty)`: the penalty over every token in the sequence, then the
+ * temperature, then top-k, then top-p, and nothing else. llama-server's
+ * defaults differ three ways: the temperature LAST, a min_p of 0.05 on top, and
+ * a penalty window of only the last 64 tokens. MEASURED 2026-09-25 on the
+ * authors' own prompts through the app's pipeline (17 prompts × 3): with the
+ * defaults 22% of the samples ran into a loop — one command of no length, over
+ * and over, to the 1,536-id limit — and with this chain 10%. The rest are cut
+ * at the loop and drawn again (loopStart, the app's generateSvg).
+ */
+export const OMNISVG_SAMPLER_CHAIN = {
+  samplers: ['penalties', 'temperature', 'top_k', 'top_p'],
+  min_p: 0,
+  // "Every token in the sequence": the whole context the app gives the server
+  // (-c 4096). This llama-server build refuses -1.
+  repeat_last_n: 4096,
+} as const;
 
 /**
  * The body for `POST /completion`. Text-to-SVG when there is no image;
@@ -164,6 +187,7 @@ export function buildOmniSvgRequest(input: {
       prompt: chatml(`${MEDIA_MARKER}Generate SVG code that accurately represents this image:`),
       n_predict,
       ...OMNISVG_SAMPLING.image,
+      ...OMNISVG_SAMPLER_CHAIN,
       return_tokens: true,
       cache_prompt: false,
       multimodal_data: [input.imageBase64],
@@ -174,6 +198,7 @@ export function buildOmniSvgRequest(input: {
     prompt: chatml(textInstruction(prompt)),
     n_predict,
     ...OMNISVG_SAMPLING[textSubtype(prompt)],
+    ...OMNISVG_SAMPLER_CHAIN,
     return_tokens: true,
     cache_prompt: false,
   };
