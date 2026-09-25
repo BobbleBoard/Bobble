@@ -67,6 +67,7 @@ import { GEN_ACTION_PLANS } from './composer-gen-actions';
 import { DictationBar } from './DictationBar';
 import { IconWarning } from './icons-pill';
 import { HELP_TEXT, parseSlashCommand } from './slash-commands';
+import { followToLatest } from './thread-follow';
 import { usePrefillPill } from './use-prefill-pill';
 import { useDictation } from './useDictation';
 
@@ -1122,6 +1123,9 @@ export function ChatComposer({
   const submit = async () => {
     const raw = text.trim();
     if (raw === '' && attachments.length === 0) return;
+    /* the user (2026-09-24): "pressing enter on a chat should take you to the
+       bottom" — the thread re-pins and follows the reply (thread-follow.ts). */
+    followToLatest();
     const imageUris = attachments
       .filter((a) => a.kind === 'image')
       .map((a) => a.dataUri)

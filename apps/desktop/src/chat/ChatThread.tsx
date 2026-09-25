@@ -62,6 +62,7 @@ import { effectiveToolName } from './long-job';
 import { MessageErrorBoundary } from './MessageErrorBoundary';
 import { PresentedInline } from './PresentedInline';
 import { awaitingReplyAfterLatestTurn, sentAttachmentsPrefilling } from './sent-prefill';
+import { followToLatest, useThreadFollow } from './thread-follow';
 import { attributeRecords, type CallResultFacts } from './turn-cards';
 import { BlindImageNote, UserImage } from './UserImage';
 
@@ -379,6 +380,8 @@ export function ChatThread() {
     // The bubble shows the typed text; pi receives it with the (possibly
     // edited) attachments folded back in — see forkAndReprompt's `agentMessage`.
     const body = buildAgentMessage(text, files);
+    // Saving an edit sends it: follow the new reply like any other send.
+    followToLatest();
     void forkAndReprompt(id, text, body === text ? undefined : body);
   };
 
@@ -502,6 +505,22 @@ export function ChatThread() {
   useEffect(() => {
     if (pinnedRef.current) follow();
   });
+  /*
+   * …AND A SEND RE-PINS IT. the user (2026-09-24): "pressing enter on a chat should
+   * take you to the bottom". The same re-arm scrolling back down to the foot
+   * gives — pinned, meaning down — so the reply is followed from here, and the
+   * next wheel tick up releases it exactly as before (see thread-follow.ts).
+   * Deliberately not on every new message: a queued message draining, or a
+   * reply arriving, must never pull a reader back down from what they are
+   * reading. Only the reader's own send does.
+   */
+  const followRequests = useThreadFollow((s) => s.requests);
+  useEffect(() => {
+    if (followRequests === 0) return;
+    pinnedRef.current = true;
+    intentRef.current = 'down';
+    follow();
+  }, [followRequests, follow]);
   /*
    * …and when the content grows WITHOUT a render: a card revealing, a picture
    * decoding, a chart building itself. Those used to leave the foot a card's
