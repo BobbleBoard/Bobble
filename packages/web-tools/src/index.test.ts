@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import type { ExtensionAPI } from '@mariozechner/pi-coding-agent';
 import { describe, expect, it } from 'vitest';
 import {
+  CITE_HINT,
   PYTHON_RUN_TOOL,
   type PythonRunResult,
   type PythonRuntime,
@@ -113,6 +114,31 @@ describe('registerWebTools wiring', () => {
     expect(res.content[0]?.text).toContain('Example Domain');
     expect(res.content[0]?.text).toContain('via duckduckgo');
     expect(res.details).toMatchObject({ backend: 'duckduckgo', count: 3 });
+  });
+
+  /*
+   * The citation hint rides at the END of a search that found something — the
+   * one place the model reads it right before it uses the results — and never
+   * in the tool's description, which is prompt prefix (see CITE_HINT).
+   */
+  it('web_search ends a result list with the citation hint, and only then', async () => {
+    const { pi, tools } = createFakePi();
+    registerWebTools(pi, {
+      search: { backend: 'duckduckgo', fetchImpl: async () => new Response(ddgHtml) },
+      python: { runtime: makeRuntime({}) },
+    });
+    const tool = getTool(tools, WEB_SEARCH_TOOL);
+    const res = await tool.execute('t1', { query: 'example' });
+    expect((res.content[0]?.text ?? '').endsWith(CITE_HINT)).toBe(true);
+    expect(JSON.stringify(tools.get(WEB_SEARCH_TOOL))).not.toContain('cite each page');
+
+    const empty = createFakePi();
+    registerWebTools(empty.pi, {
+      search: { backend: 'duckduckgo', fetchImpl: async () => new Response('<html></html>') },
+      python: { runtime: makeRuntime({}) },
+    });
+    const none = await getTool(empty.tools, WEB_SEARCH_TOOL).execute('t2', { query: 'zzz' });
+    expect(none.content[0]?.text).not.toContain(CITE_HINT);
   });
 
   it('web_fetch returns markdown with title/url details', async () => {

@@ -74,6 +74,15 @@ const READ_ONLY_COMMANDS: ReadonlySet<string> = new Set([
   'basename',
   'dirname',
   'realpath',
+  /*
+   * `web search …` / `web fetch …` — the app's own web tools in CLI mode, and
+   * both only READ. MEASURED on a real research turn (2026-09-24, qwen3.5-4b on
+   * rapid-mlx, whose exact prefix cache keeps TWO entries): three `web` calls in
+   * one message made three reviews, the conversation's entry was evicted, and
+   * the next two requests re-read 4,036 and 5,181 tokens from cold. Research is
+   * a run of these; none of them needs a second opinion.
+   */
+  'web',
 ]);
 
 /** Shell syntax that can turn a harmless-looking command into anything. */

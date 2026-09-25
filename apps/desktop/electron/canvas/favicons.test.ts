@@ -84,6 +84,33 @@ describe('fetching', () => {
   });
 });
 
+describe("the home page's declared icon", () => {
+  it('is read when none of the usual paths has one', async () => {
+    const calls: string[] = [];
+    globalThis.fetch = (async (input: string | URL) => {
+      const url = String(input);
+      calls.push(url);
+      if (url === 'https://declared.test/') {
+        return new Response(
+          '<html><head><link rel="icon" type="image/png" sizes="32x32" href="/static/icon-32.png"></head>',
+          { headers: { 'content-type': 'text/html' } },
+        );
+      }
+      if (url === 'https://declared.test/static/icon-32.png') {
+        return new Response(new Uint8Array(PNG), { headers: { 'content-type': 'image/png' } });
+      }
+      return new Response('no', { status: 404, headers: { 'content-type': 'text/html' } });
+    }) as typeof fetch;
+    expect(await siteFavicon('declared.test')).toBe(
+      `data:image/png;base64,${Buffer.from(PNG).toString('base64')}`,
+    );
+    expect(calls.slice(-2)).toEqual([
+      'https://declared.test/',
+      'https://declared.test/static/icon-32.png',
+    ]);
+  });
+});
+
 describe('asking once', () => {
   it('caches a hit, so eight results on one domain are one request', async () => {
     const { fn, calls } = fakeFetch({ '/favicon.ico': { type: 'image/png', body: PNG } });
@@ -100,6 +127,7 @@ describe('asking once', () => {
     globalThis.fetch = fn;
     await siteFavicon('nothing.test');
     await siteFavicon('nothing.test');
-    expect(calls).toHaveLength(3); // the three candidate paths, once
+    // The three candidate paths and the home page's head, once.
+    expect(calls).toHaveLength(4);
   });
 });

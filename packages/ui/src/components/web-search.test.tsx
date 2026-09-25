@@ -69,3 +69,43 @@ describe('WebSearchResults', () => {
     expect(html).toContain('E'); // initial of example.com
   });
 });
+
+/*
+ * COMPACT: the search row inside a thinking chain. What the model found, at a
+ * glance — the sites and the titles — not the whole result list reprinted.
+ */
+describe('WebSearchResults — compact (the chain row)', () => {
+  const many: WebSearchResultData[] = Array.from({ length: 8 }, (_, i) => ({
+    title: `Result ${i + 1}`,
+    url: `https://site${i + 1}.example/page`,
+    domain: `site${i + 1}.example`,
+    snippet: `Snippet ${i + 1}`,
+  }));
+
+  it('draws one line per result — title and site, no snippet, no header', () => {
+    const html = renderToStaticMarkup(
+      <WebSearchResults variant="compact" query="q" results={rows} />,
+    );
+    expect(html).toContain('Example Domain');
+    expect(html).toContain('en.wikipedia.org');
+    expect(html).not.toContain('pd-websearch-snippet');
+    expect(html).not.toContain('pd-websearch-header');
+  });
+
+  it('shows the first five and a "Show N more" for the rest', () => {
+    const html = renderToStaticMarkup(
+      <WebSearchResults variant="compact" query="q" results={many} />,
+    );
+    expect(html.match(/pd-websearch-row/g)).toHaveLength(5);
+    expect(html).toContain('Show 3 more');
+    expect(html).not.toContain('Result 6');
+  });
+
+  it('keeps its empty state, with the reason', () => {
+    const html = renderToStaticMarkup(
+      <WebSearchResults variant="compact" query="q" results={[]} emptyHint="Rate-limited." />,
+    );
+    expect(html).toContain('No results found');
+    expect(html).toContain('Rate-limited.');
+  });
+});

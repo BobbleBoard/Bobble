@@ -47,6 +47,8 @@ export interface CliCommandLabel {
    * kind its native tool call would have, and the row draws the same mark.
    */
   readonly kind?:
+    | 'search'
+    | 'page'
     | 'browser-navigate'
     | 'browser-click'
     | 'browser-type'
@@ -422,16 +424,25 @@ export function cliCommandLabel(command: string | undefined): CliCommandLabel | 
     };
   }
 
-  /* `web search --query=…` / `web fetch --url=…`: said as what they do; the
-     answer stays a terminal reveal, which is what the text result is. */
+  /*
+   * `web search --query=…` / `web fetch --url=…`: the SAME rows the native
+   * web_search / web_fetch calls draw. They were terminal rows — "Searched the
+   * web for …" over a reveal of the tool's raw text — which made the default
+   * (CLI) mode's research read as a log while the same search in schemas mode
+   * showed what it found. the user's sources wave (2026-09-24) asked for the
+   * research to read as research: a search row lists its results (the sites'
+   * icons and titles), a fetch row is a page that was read (`page` — not a
+   * browser kind, so it never turns the canvas to the browser).
+   */
   if (group === 'web') {
     const { flags, bare } = cliFlags(argsOf(line));
     const verb = bare[0];
     if (verb === 'search') {
       const q = brief(flags.query ?? flags.q ?? bare[1]);
       return {
-        running: q === undefined ? 'Searching the web' : `Searching the web for “${q}”`,
-        done: q === undefined ? 'Searched the web' : `Searched the web for “${q}”`,
+        running: 'Searching the web',
+        done: 'Searched the web',
+        kind: 'search',
         ...(q === undefined ? {} : { detail: q }),
       };
     }
@@ -440,6 +451,8 @@ export function cliCommandLabel(command: string | undefined): CliCommandLabel | 
       return {
         running: 'Reading a page',
         done: 'Read a page',
+        // A page, not the browser: nothing was browsed, so the canvas stays put.
+        kind: 'page',
         ...(url === undefined ? {} : { detail: url, url }),
       };
     }

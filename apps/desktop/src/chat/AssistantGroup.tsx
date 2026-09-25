@@ -26,6 +26,8 @@ import { LongJobCard } from './LongJobCard';
 import { effectiveToolName, estimateFor, type JobKind, jobKindForTool, jobView } from './long-job';
 import { Markdown } from './markdown';
 import { PendingChartCard, pendingChartArgs } from './PendingChartCard';
+import { SourcesCard } from './sources/SourcesCard';
+import { TurnSourcesProvider } from './sources/turn-sources';
 import { ThreadActivityChain } from './ThreadActivity';
 import { ThreadMedia } from './ThreadMedia';
 import { mediaFromToolResult, type ThreadMediaItem } from './thread-media';
@@ -328,7 +330,16 @@ export function AssistantGroup({
   const errorText = rawError !== undefined ? cleanErrorText(rawError) : '';
   let textN = 0;
   let activityN = 0;
-  return (
+  /*
+   * THE PAGES THIS TURN SAW, for its citations. the user (2026-09-24): "source
+   * citing (for research and such, examples from google search summary
+   * shown)". Links to them become chips in the text, and a finished answer
+   * that used the web ends with a Sources card (./sources). The corp feed
+   * (J3: text, thoughts and rows only) keeps the chips, which are text, and
+   * leaves out the card, which is a widget.
+   */
+  const answered = segments.some((s) => s.kind === 'text');
+  const body = (
     /*
      * min-w-0 so this flex child can shrink below its content's intrinsic width
      * and the prose reflows when the canvas narrows the column (blindtest #9).
@@ -553,6 +564,12 @@ export function AssistantGroup({
         // abort (pause/stop) cleaned to '' renders nothing.
         <div className="text-footnote text-status-danger-fg">{errorText}</div>
       ) : null}
+      {!streaming && answered && !suppressInlineArtifacts ? <SourcesCard /> : null}
     </div>
+  );
+  return (
+    <TurnSourcesProvider group={group} resultFor={resultForBlock}>
+      {body}
+    </TurnSourcesProvider>
   );
 }

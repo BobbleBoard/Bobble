@@ -1127,7 +1127,29 @@ export type CanvasInvokeMap = {
    * `dataUri` is null when the site has none we can use — the card then draws
    * the letter chip it already falls back to. */
   'canvas:site-icon': { request: { site: string }; response: { dataUri: string | null } };
+  /**
+   * What a SOURCE page says about itself — its site's name, title, description,
+   * icon and share picture (og:image, shrunk to a thumbnail) — for the chips,
+   * hover card and Sources card of an answer that cites it. Fetched in MAIN
+   * from the page itself (first-party only, head only, cached on disk under the
+   * support root) and handed over as `data:` URIs, for the same CSP reason as
+   * the site icon above. `meta` is null only for a URL that is not http(s);
+   * a page that could not be reached still answers, with what is known.
+   */
+  'canvas:source-meta': { request: { url: string }; response: { meta: SourceMetaDto | null } };
 };
+
+/** A source page's own account of itself — see `canvas:source-meta`. */
+export interface SourceMetaDto {
+  readonly url: string;
+  readonly siteName?: string;
+  readonly title?: string;
+  readonly description?: string;
+  /** The page's icon (or its site's), as a `data:` URI. */
+  readonly icon?: string;
+  /** The page's share picture, shrunk to a thumbnail, as a `data:` URI. */
+  readonly image?: string;
+}
 
 export const CANVAS_INVOKE_CHANNELS = [
   'canvas:popout',
@@ -1144,6 +1166,7 @@ export const CANVAS_INVOKE_CHANNELS = [
   'canvas:send-bytes-to',
   'canvas:report-state',
   'canvas:site-icon',
+  'canvas:source-meta',
 ] as const satisfies readonly (keyof CanvasInvokeMap)[];
 
 // ---------------------------------------------------------------------------

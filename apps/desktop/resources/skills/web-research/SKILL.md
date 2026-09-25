@@ -38,7 +38,9 @@ independent ones.
 ## Synthesize
 
 - Answer the question directly and first. Then the supporting detail.
-- Cite sources inline for every non-obvious claim (title + link). If sources
+- Cite every non-obvious claim with a markdown link to the page, right after
+  the sentence it supports: `[site name](url)`. Two sources for one claim sit
+  side by side. The app shows each as a chip naming the site. If sources
   conflict, say so and explain which you trust and why.
 - Separate what you know from what you inferred. State remaining uncertainty and
   what would resolve it.

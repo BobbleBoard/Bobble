@@ -197,3 +197,75 @@
   font-size: var(--pd-font-size-footnote);
   line-height: var(--pd-leading-footnote);
 }
+
+/*
+ * COMPACT — the search row inside a thinking chain: one line per result (the
+ * site's icon, the title, the site), no header and no snippets. The list keeps
+ * the card's material so the results still read as one group; five rows, then
+ * "Show N more" (the chain's own Show more, below the list).
+ */
+.pd-websearch--compact {
+  gap: 0;
+}
+
+.pd-websearch-list--compact {
+  max-height: none;
+  overflow: visible;
+  padding: 3px 0;
+}
+
+.pd-websearch--compact .pd-websearch-row {
+  align-items: center;
+  gap: 9px;
+  padding: 5px 12px;
+}
+
+.pd-websearch--compact .pd-websearch-row + .pd-websearch-row {
+  box-shadow: none;
+}
+
+.pd-websearch--compact .pd-websearch-favicon {
+  width: 16px;
+  height: 16px;
+  margin-top: 0;
+}
+
+.pd-websearch--compact .pd-websearch-favicon-img {
+  width: 14px;
+  height: 14px;
+}
+
+.pd-websearch--compact .pd-websearch-favicon-chip {
+  width: 16px;
+  height: 16px;
+  font-size: 9px;
+}
+
+.pd-websearch--compact .pd-websearch-title {
+  color: var(--pd-text-secondary);
+  font-size: var(--pd-font-size-footnote);
+  line-height: var(--pd-leading-footnote);
+  transition: color var(--pd-duration-base) var(--pd-easing-standard);
+}
+
+.pd-websearch--compact .pd-websearch-row:hover .pd-websearch-title {
+  color: var(--pd-text-primary);
+}
+
+.pd-websearch--compact .pd-websearch-domain {
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+}
+
+/* Left, under the list, like the chain's own Show more — not centred by the
+ * column's stretch. */
+.pd-websearch--compact .pd-showmore {
+  align-self: flex-start;
+  margin: 6px 0 0 2px;
+}
+
+.pd-websearch-empty--compact {
+  align-items: flex-start;
+  padding: 10px 12px;
+  text-align: left;
+}

@@ -73,11 +73,13 @@ function domainInitial(row: WebSearchResultData): string {
 export interface WebSearchResultItemProps extends Omit<HTMLAttributes<HTMLElement>, 'onSelect'> {
   result: WebSearchResultData;
   onSelect?: (result: WebSearchResultData) => void;
+  /** One line: icon, title, site — no snippet (the chain's search row). */
+  compact?: boolean;
 }
 
 /** One favicon + title + domain + snippet row. Renders as a link if `url` is present. */
 export const WebSearchResultItem = forwardRef<HTMLElement, WebSearchResultItemProps>(
-  function WebSearchResultItem({ result, onSelect, className, ...rest }, ref) {
+  function WebSearchResultItem({ result, onSelect, compact = false, className, ...rest }, ref) {
     const [broken, setBroken] = useState(false);
     // An explicit `faviconUrl` wins; otherwise ask the installed resolver for the
     // site's own icon. Either way a failure falls through to the letter chip, so
@@ -107,7 +109,9 @@ export const WebSearchResultItem = forwardRef<HTMLElement, WebSearchResultItemPr
               <span className="pd-websearch-domain">{result.domain}</span>
             ) : null}
           </span>
-          {result.snippet ? <span className="pd-websearch-snippet">{result.snippet}</span> : null}
+          {result.snippet && !compact ? (
+            <span className="pd-websearch-snippet">{result.snippet}</span>
+          ) : null}
         </span>
       </>
     );
@@ -167,14 +171,104 @@ export interface WebSearchResultsProps
   /** Secondary line shown in the empty state (e.g. a backend note). */
   emptyHint?: ReactNode;
   onSelect?: (result: WebSearchResultData) => void;
+  /**
+   * `compact` — the search row in a thinking chain: no header (the row above
+   * already says what was searched), one line per result (the site's icon,
+   * the title, the site), the first five and a "Show N more".
+   */
+  variant?: 'full' | 'compact';
+}
+
+/** Results a compact list shows before "Show N more". */
+export const COMPACT_VISIBLE = 5;
+
+/**
+ * WHAT A SEARCH FOUND, AT A GLANCE — the chain's search row.
+ *
+ * Part of the user's sources wave (2026-09-24: "the app's own ui for showing
+ * sources and such"): the row should read like research, not a raw log. A
+ * list of eight 68px cards with two-line snippets was the whole search result
+ * reprinted in the middle of the work; what a person scanning the chain wants
+ * is WHERE the model looked — which sites, which pages — and the snippets live
+ * on in the answer's Sources card.
+ */
+function CompactResults({
+  results,
+  emptyHint,
+  onSelect,
+  className,
+  ...rest
+}: Omit<WebSearchResultsProps, 'query' | 'count' | 'maxVisible' | 'variant'>) {
+  const [all, setAll] = useState(false);
+  if (results.length === 0) {
+    return (
+      <div className={clsx('pd-websearch pd-websearch--compact', className)} {...rest}>
+        <div className="pd-websearch-empty pd-websearch-empty--compact" role="status">
+          <span className="pd-websearch-empty-title">No results found</span>
+          <span className="pd-websearch-empty-hint">
+            {emptyHint ?? 'Try rephrasing the search or checking your connection.'}
+          </span>
+        </div>
+      </div>
+    );
+  }
+  const shown = all ? results : results.slice(0, COMPACT_VISIBLE);
+  const hidden = results.length - COMPACT_VISIBLE;
+  return (
+    <div className={clsx('pd-websearch pd-websearch--compact', className)} {...rest}>
+      <div className="pd-websearch-list pd-websearch-list--compact">
+        {shown.map((result) => (
+          <WebSearchResultItem
+            key={result.url ?? result.title}
+            result={result}
+            onSelect={onSelect}
+            compact
+          />
+        ))}
+      </div>
+      {hidden > 0 ? (
+        <button
+          type="button"
+          className="pd-showmore pd-focusable"
+          aria-expanded={all}
+          onClick={() => setAll((v) => !v)}
+        >
+          {all ? 'Show less' : `Show ${hidden} more`}
+        </button>
+      ) : null}
+    </div>
+  );
 }
 
 /** Web-search step body: header row + bordered scrollable result list, or an empty state. */
 export const WebSearchResults = forwardRef<HTMLDivElement, WebSearchResultsProps>(
   function WebSearchResults(
-    { query, results, count, maxVisible = 4, emptyHint, onSelect, className, style, ...rest },
+    {
+      query,
+      results,
+      count,
+      maxVisible = 4,
+      emptyHint,
+      onSelect,
+      variant = 'full',
+      className,
+      style,
+      ...rest
+    },
     ref,
   ) {
+    if (variant === 'compact') {
+      return (
+        <CompactResults
+          results={results}
+          emptyHint={emptyHint}
+          onSelect={onSelect}
+          className={className}
+          style={style}
+          {...rest}
+        />
+      );
+    }
     const total = count ?? results.length;
     const isEmpty = results.length === 0;
     return (

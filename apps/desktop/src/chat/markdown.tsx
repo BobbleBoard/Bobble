@@ -31,6 +31,7 @@ import { usePictureViewer } from '../media/picture-viewer';
 import { usePiStore } from '../state/pi-slice';
 import { baseName } from './attached-files';
 import { pdFileUrl } from './canvas/file-preview';
+import { CITATION_COMPONENTS, useCitationRehype } from './sources/citation-markdown';
 import { pdFilePath } from './thread-media';
 
 /** What the image viewer opens (the pictures pd-file:// serves as pictures). */
@@ -108,11 +109,13 @@ function LocalImage({
   );
 }
 
-const COMPONENTS = { img: LocalImage };
+/* Links to the turn's sources become citation chips (./sources). */
+const COMPONENTS = { img: LocalImage, ...CITATION_COMPONENTS };
 
 export function Markdown({ text }: { text: string }) {
+  const rehypePlugins = useCitationRehype();
   return (
-    <UiMarkdown components={COMPONENTS} urlTransform={URL_TRANSFORM}>
+    <UiMarkdown components={COMPONENTS} urlTransform={URL_TRANSFORM} rehypePlugins={rehypePlugins}>
       {text}
     </UiMarkdown>
   );

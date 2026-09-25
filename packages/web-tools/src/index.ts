@@ -59,6 +59,27 @@ export * from './uv-locations.js';
 export * from './uv-pins.js';
 export * from './uv-platform.js';
 
+/**
+ * HOW TO CITE WHAT A SEARCH FOUND — told where the model is about to use it:
+ * at the end of the results, not in the always-on prompt.
+ *
+ * the user (2026-09-24): "source citing (for research and such, examples from
+ * google search summary shown)". The app turns a markdown link to a page the
+ * turn saw into a citation chip after the sentence (apps/desktop/src/chat/
+ * sources), so all the model has to do is write a link — which every model
+ * already does — in the right place. One line per search, and it rides in the
+ * conversation after the cached prefix: the prompt the model is warmed on does
+ * not change by a byte. Both tool modes read it — the CLI's `web search`
+ * prints this same text.
+ *
+ * "IN YOUR REPLY" because of what the first real research turn did (the 4B,
+ * 2026-09-24): it wrote the summary into notes.md with its citations and told
+ * the chat "the document includes full citations" — the reply, where the
+ * chips are, had none.
+ */
+export const CITE_HINT =
+  'In your reply, cite each page you use as [site name](url) right after the sentence it supports.';
+
 /** Stable tool names — also the identifiers W5 gates on via pi's `tool_call` event. */
 export const WEB_SEARCH_TOOL = 'web_search';
 export const WEB_FETCH_TOOL = 'web_fetch';
@@ -222,7 +243,8 @@ export function registerWebTools(pi: ExtensionAPI, options: WebToolsOptions = {}
           ? `${outcome.results.length} result(s) via ${outcome.backend}`
           : `No results (via ${outcome.backend}).`;
       const note = outcome.note !== undefined ? `\n(note: ${outcome.note})` : '';
-      const text = `${header}${note}\n\n${lines.join('\n\n')}`.trim();
+      const cite = outcome.results.length > 0 ? `\n\n${CITE_HINT}` : '';
+      const text = `${header}${note}\n\n${lines.join('\n\n')}${cite}`.trim();
       return textResult(text, {
         backend: outcome.backend,
         count: outcome.results.length,
