@@ -570,9 +570,17 @@ async function typeWithOverlay(params: Record<string, unknown>): Promise<MacActA
  * nothing is captured and nothing is read.
  */
 function controlRefusal(method: MacAgentMethod): string | null {
+  if (method === 'check' || method === 'setDriving' || method === 'policy' || method === 'brake') {
+    return null;
+  }
+  return brakeRefusal();
+}
+
+/** The sentence every act and look is refused with while the user holds the
+ * brake — null while the agent has the wheel. */
+function brakeRefusal(): string | null {
   const control = macMonitor.control();
   if (control === 'agent') return null;
-  if (method === 'check' || method === 'setDriving' || method === 'policy') return null;
   const app = macMonitor.state().appName.trim();
   const named = app === '' ? 'the app' : app;
   if (control === 'user') {
@@ -674,6 +682,10 @@ async function dispatch(method: MacAgentMethod, params: Record<string, unknown>)
     // every gate so a change applies to the next action — see policy.ts.
     case 'policy':
       return computerUsePolicy();
+    // The Chrome DOM route acts over Apple Events, which never passes through
+    // here — so it asks first, and hears the sentence any other act would.
+    case 'brake':
+      return { refusal: brakeRefusal() };
     default:
       throw new Error(`unknown method: ${String(method)}`);
   }

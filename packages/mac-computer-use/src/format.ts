@@ -631,13 +631,18 @@ export interface MacSnapshotView {
    * off a look that had simply fallen back to his frontmost window.
    */
   readonly frontmostFallback?: boolean;
-  /** The controlled app was carried over from an earlier chat (tools.ts). */
+  /** This look named no app and used the one carried over from an earlier chat
+   * (tools.ts) — said on that look, and on no other. */
   readonly carriedOver?: boolean;
 }
 
-export function formatMacSnapshot(snap: MacSnapshot, view: MacSnapshotView = {}): string {
-  const dialog = dialogOf(snap);
-  const head: string[] = [
+/**
+ * Which app this look is of — and, when the model named none, why it landed
+ * there. The first lines of every text look, and the only text a `--visual`
+ * look carries when it landed somewhere the model did not name.
+ */
+export function whoseLookLines(snap: MacSnapshot, view: MacSnapshotView = {}): string[] {
+  return [
     `App: "${snap.app}"${snap.window ? ` — window "${snap.window}"` : ''}`,
     ...(view.frontmostFallback === true
       ? [
@@ -652,6 +657,13 @@ export function formatMacSnapshot(snap: MacSnapshot, view: MacSnapshotView = {})
             'task is in another app, name it: mac snapshot "<app>".)',
         ]
       : []),
+  ];
+}
+
+export function formatMacSnapshot(snap: MacSnapshot, view: MacSnapshotView = {}): string {
+  const dialog = dialogOf(snap);
+  const head: string[] = [
+    ...whoseLookLines(snap, view),
     contextLine(snap, view),
     /* Not wrapped: this one is fixed authored copy, and a sentence a model has
      * to reassemble across a line break is a sentence it can miss. */

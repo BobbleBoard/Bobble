@@ -42,6 +42,7 @@ const METHODS: MacAgentMethod[] = [
   'recordStop',
   'setDriving',
   'policy',
+  'brake',
 ];
 
 const here = path.dirname(fileURLToPath(import.meta.url));

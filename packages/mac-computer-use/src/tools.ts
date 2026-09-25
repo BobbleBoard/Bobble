@@ -42,12 +42,14 @@ import {
   isAxOpaque,
   type MacSnapshotView,
   type ResolvedDialog,
+  whoseLookLines,
 } from './format.js';
 import type { MacConsentGate } from './permissions.js';
 import { createMacConsentGate } from './permissions.js';
 import type {
   MacActAck,
   MacAgentMethod,
+  MacBrakeAck,
   MacLaunchAck,
   MacMenuAck,
   MacMenuEntry,
@@ -160,6 +162,8 @@ export interface MacComputerUseOptions {
   /** Whether Chrome is running (the chrome_* set) — same reason: a unit test
    *  must not depend on, or launch, the Chrome of the machine running it. */
   readonly isChromeRunning?: () => Promise<boolean>;
+  /** Chrome's pid (the chrome_* set; default pgrep) — the same reason again. */
+  readonly chromePid?: () => Promise<number | null>;
   /** Turns short texts into vectors, for the `like` search. Absent until an
    *  embedding model is deployed; the keyword half answers alone until then. */
   readonly embedText?: Embedder;
@@ -241,6 +245,55 @@ function describeOpened(
   return '';
 }
 
+/**
+ * The requests that put something on the user's screen: the phantom cursor and
+ * the monitor follow each of them (apps/desktop/electron/mac/mac-agent.ts).
+ * Reads — the policy, the grants, a tab list — do not.
+ */
+const DRIVING_METHODS: ReadonlySet<MacAgentMethod> = new Set<MacAgentMethod>([
+  'snapshot',
+  'click',
+  'type',
+  'key',
+  'scroll',
+  'launch',
+  'menuClick',
+  'tabSelect',
+  'tabNew',
+  'tabClose',
+]);
+
+/** The bridge, noting on the session every request that drives (see `endTurn`). */
+function noticed(bridge: MacBridge | null, session: MacSessionState | undefined): MacBridge | null {
+  if (bridge === null || session === undefined) return bridge;
+  return {
+    request<T>(method: MacAgentMethod, params?: Record<string, unknown>): Promise<T> {
+      if (DRIVING_METHODS.has(method)) session.noteDriving();
+      return bridge.request<T>(method, params);
+    },
+  };
+}
+
+/**
+ * THE USER'S BRAKE, FOR THE ROUTES THAT NEVER REACH IT.
+ *
+ * Stop and Take over are enforced where acts arrive — the bridge refuses every
+ * act and look (mac-agent.ts, controlRefusal). Apple Events never arrive there:
+ * with Chrome's JavaScript setting on, chrome_* read and drove the page right
+ * through a Stop, and a refused `chrome snapshot --visual` even told the model
+ * to take that route instead. So those routes ask first. An app too old to
+ * answer is answered as "no brake": the route works as it always did.
+ */
+async function brakeRefusal(bridge: MacBridge | null): Promise<string | null> {
+  if (bridge === null) return null;
+  try {
+    const ack = await bridge.request<MacBrakeAck>('brake');
+    return typeof ack?.refusal === 'string' && ack.refusal !== '' ? ack.refusal : null;
+  } catch {
+    return null;
+  }
+}
+
 function errResult(action: string, message: string): AgentToolResult<MacDetails> {
   return textResult(`${action} failed: ${message}`, { action, ok: false, error: message });
 }
@@ -302,12 +355,18 @@ function dialogRedirect(
   );
 }
 
+/** What the mac set hands Chrome's set (index.ts). */
+export interface MacComputerUseHandle {
+  /** Remember the app now under control — as this chat's own (its session
+   *  entry) and as the last one computer use worked in (the cross-chat file). */
+  readonly recordControl: () => void;
+}
+
 /** Register every mac_* tool onto `pi`. */
 export function registerMacComputerUseTools(
   pi: ExtensionAPI,
   options: MacComputerUseOptions,
-): void {
-  const bridge = options.bridge;
+): MacComputerUseHandle {
   const cap = options.elementCap ?? DEFAULT_ELEMENT_CAP;
   const consent = options.consent ?? createMacConsentGate();
   const readChromeTabs = options.readChromeTabs ?? chromeTabs;
@@ -325,6 +384,7 @@ export function registerMacComputerUseTools(
    * pid only (postToPid — background, no focus steal).
    */
   const session = options.session ?? createMacSessionState();
+  const bridge = noticed(options.bridge, session);
 
   /*
    * THE CONTROLLED APP IS REMEMBERED ACROSS TURNS AND RESTARTS.
@@ -387,14 +447,17 @@ export function registerMacComputerUseTools(
       return null;
     }
   };
-  /** The next look uses an app carried over from an earlier chat — said once. */
-  let carriedOver = false;
   let recordedPid: number | null = null;
   const recordControl = (): void => {
     const c = session.controlled();
-    if (c === null || c.pid === recordedPid) return;
-    recordedPid = c.pid;
+    if (c === null) return;
+    /* On EVERY use, not only on a change: `at` is when the app was last used,
+       which is what the 12 h window means, and another chat may have written
+       its own app since — the app this chat is working in is the last one
+       again the moment it is used. The session entry stays once per change. */
     writeLastControl(c);
+    if (c.pid === recordedPid) return;
+    recordedPid = c.pid;
     try {
       pi.appendEntry?.(MAC_CONTROL_ENTRY, {
         app: c.app,
@@ -427,12 +490,12 @@ export function registerMacComputerUseTools(
       session.restore?.(last);
       recordedPid = last.pid;
     } else {
+      /* NOT recorded as this chat's own until it is used. It was, by setting
+         recordedPid here, so the chat never wrote its entry: after a restart
+         it read the file again and took whatever another chat had driven since.
+         The first look that uses it records it like any other take. */
       const carried = readLastControl();
-      if (carried !== null) {
-        session.restore?.(carried);
-        recordedPid = carried.pid;
-        carriedOver = true;
-      }
+      if (carried !== null) session.restore?.({ ...carried, carriedOver: true });
     }
   });
 
@@ -444,9 +507,17 @@ export function registerMacComputerUseTools(
    * running — indefinitely, long after the model had finished and the user had
    * moved on. A "Thinking…" bubble hovering over an app nobody is driving is
    * the most alarming thing this feature can do, and it costs battery to say it.
+   *
+   * ONLY THE TURN THAT DROVE. `setDriving` is global — it puts away the one
+   * overlay and the one monitor session, and lifts the user's brake — so a turn
+   * that touched nothing must not send it. It used to be sent whenever an app
+   * was under control, and control can be RESTORED without driving: the app
+   * another chat last used, carried into every new session (a subagent, a
+   * corp role, a scheduled run) — each of whose turns then ended a live run in
+   * another chat and released the Stop its user had pressed.
    */
   pi.on?.('agent_end', () => {
-    if (bridge === null || session.controlled() === null) return;
+    if (bridge === null || !session.endTurn()) return;
     void bridge.request('setDriving', { driving: false }).catch(() => {
       /* the app may already be gone; nothing to release */
     });
@@ -485,18 +556,29 @@ export function registerMacComputerUseTools(
     return `${verb} [${index}]${name !== undefined && name !== '' ? ` "${name}"` : ''}`;
   }
 
-  /** What the tool layer knows and the snapshot does not — today, the model's
-   * own last act, which the header reads back so it is not re-derived. */
-  /** Set by a look that fell back to the user's frontmost app (see MacSnapshotView). */
-  let lastLookFrontmost = false;
-  function view(): MacSnapshotView {
-    const v: MacSnapshotView = {
-      lastAct: session.controlled()?.lastAct,
-      ...(lastLookFrontmost ? { frontmostFallback: true } : {}),
-      ...(carriedOver ? { carriedOver: true } : {}),
-    };
-    carriedOver = false;
-    return v;
+  /**
+   * WHERE A LOOK THAT NAMED NO APP LANDS, AND WHY — decided BEFORE it goes out.
+   *
+   * Both notes used to be flags set on the side. "The USER has in front" was
+   * recomputed by every request, so the automatic re-take of an app with no
+   * Accessibility tree — aimed at the pid the first look had just taken —
+   * erased it, and the model again called the user's app where the user was.
+   * "Carried over" was printed by whichever text look came first and cleared:
+   * `mac snapshot "Safari"`, the look after a launch, or a look at some other
+   * app long after a `--visual` one had used the carried app without a word.
+   */
+  function landing(app: string | undefined): MacSnapshotView {
+    if (app !== undefined && app !== '') return {};
+    const c = session.controlled();
+    if (c === null) return { frontmostFallback: true };
+    return c.carriedOver === true ? { carriedOver: true } : {};
+  }
+
+  /** What the tool layer knows and the snapshot does not — the model's own last
+   * act, which the header reads back so it is not re-derived, and where the look
+   * landed. */
+  function view(landed: MacSnapshotView): MacSnapshotView {
+    return { lastAct: session.controlled()?.lastAct, ...landed };
   }
 
   /** Gate helper: consent + denylist, returns null when allowed. */
@@ -530,8 +612,6 @@ export function registerMacComputerUseTools(
     // control exists. The resolved snapshot then takes/refreshes control.
     if (app !== undefined && app !== '') params.app = app;
     else Object.assign(params, session.targetParams());
-    // No app named and nothing controlled: the helper answers with the frontmost.
-    lastLookFrontmost = params.app === undefined && params.pid === undefined;
     if (screenshot === true) params.screenshot = true;
     if (typeof page.find === 'string' && page.find.trim() !== '') params.find = page.find.trim();
     if (typeof page.from === 'number' && page.from > 0) params.from = Math.floor(page.from);
@@ -821,6 +901,7 @@ export function registerMacComputerUseTools(
          * window and tells the model to work in coordinates.
          */
         const page = { find: params.find, from: params.from };
+        const landed = landing(params.app);
         /*
          * --visual: THE PICTURE AND NOTHING ELSE. the user (2026-09-23): "the
          * snapshot tool should accept a flag that gives a visual snapshot no
@@ -842,23 +923,44 @@ export function registerMacComputerUseTools(
               { action: 'snapshot', ok: false, app: snapV.app, pid: snapV.pid },
             );
           }
-          const inline = shotV as { inlineWidth?: number; inlineHeight?: number };
+          /*
+           * THE SIZE OF THE PICTURE THAT WAS SENT. The inline copy is at points;
+           * when the helper could not make one it sends the full capture — at
+           * backing pixels, twice the points on a Retina display — with that
+           * size as width/height. Reading it as points put every click twice as
+           * far from the corner as the model aimed.
+           */
+          const sent = shotV as {
+            inlineWidth?: number;
+            inlineHeight?: number;
+            width?: number;
+            height?: number;
+          };
+          const sizeOf = (...sides: (number | undefined)[]): number | undefined =>
+            sides.find((s) => typeof s === 'number' && s > 0);
           visualFrame = {
             x: rect.x,
             y: rect.y,
             w: rect.w,
             h: rect.h,
-            iw:
-              typeof inline.inlineWidth === 'number' && inline.inlineWidth > 0
-                ? inline.inlineWidth
-                : rect.w,
-            ih:
-              typeof inline.inlineHeight === 'number' && inline.inlineHeight > 0
-                ? inline.inlineHeight
-                : rect.h,
+            iw: sizeOf(sent.inlineWidth, sent.width) ?? rect.w,
+            ih: sizeOf(sent.inlineHeight, sent.height) ?? rect.h,
           };
+          /*
+           * …EXCEPT WHEN NOTHING ELSE SAYS WHOSE PICTURE IT IS. A look that named
+           * no app and landed on the user's front app — or on one carried over
+           * from another chat — took control of it, and a bare picture never
+           * says which app that is: exactly the "the user is on Activity
+           * Monitor" misreport the text look's header exists to stop. Those two
+           * looks, and only those, keep the header's lines.
+           */
+          const whose =
+            landed.frontmostFallback === true || landed.carriedOver === true
+              ? [{ type: 'text' as const, text: whoseLookLines(snapV, landed).join('\n') }]
+              : [];
           return {
             content: [
+              ...whose,
               { type: 'image', data: shotV.base64, mimeType: shotV.mimeType ?? 'image/jpeg' },
             ],
             details: {
@@ -958,7 +1060,7 @@ export function registerMacComputerUseTools(
                 'window on screen right now). The controls below are your view.\n\n'
             : '';
         const content: AgentToolResult<MacDetails>['content'] = [
-          { type: 'text', text: `${noPicture}${formatMacSnapshot(snap, view())}${nearMiss}` },
+          { type: 'text', text: `${noPicture}${formatMacSnapshot(snap, view(landed))}${nearMiss}` },
         ];
         if (wantImage && shot?.base64 !== undefined && shot.base64 !== '') {
           content.push({
@@ -1393,6 +1495,8 @@ export function registerMacComputerUseTools(
          */
         const wanted = params.app ?? CHROME_APP;
         if (/chrome/i.test(wanted)) {
+          const braked = await brakeRefusal(bridge);
+          if (braked !== null) return errResult('chrome_tabs', braked);
           const viaEvents = await readChromeTabs();
           if (viaEvents !== null) {
             return textResult(formatChromeTabs(viaEvents), {
@@ -1661,6 +1765,8 @@ export function registerMacComputerUseTools(
       }
     },
   });
+
+  return { recordControl };
 }
 
 /** Probe the TCC grant status through the bridge (drives the capabilities UI). */
@@ -1685,30 +1791,67 @@ const CHROME_APP = 'Google Chrome';
 
 export function registerChromeTools(
   pi: ExtensionAPI,
-  bridge: MacBridge | null = null,
+  appBridge: MacBridge | null = null,
   options: {
     readonly isChromeRunning?: () => Promise<boolean>;
     /** The mac set's controlled-app state — shared, so Chrome work is remembered. */
     readonly session?: MacSessionState;
+    /** The mac set's recorder (MacComputerUseHandle), so Chrome taking control
+     *  survives a restart and reaches the next chat like any other take. */
+    readonly recordControl?: () => void;
+    /** The mac set's consent + policy gate, for the one command that captures
+     *  the screen the way mac_snapshot does (`--visual`). */
+    readonly consent?: MacConsentGate;
     /** Chrome's pid (test seam; default pgrep). */
     readonly chromePid?: () => Promise<number | null>;
+    /*
+     * The Apple-Events route (test seams; defaults read Chrome's setting, write
+     * it, and run osascript). A unit test must never script — or change the
+     * preferences of — the Chrome of the machine running it.
+     */
+    readonly chromeJsAllowed?: () => Promise<boolean>;
+    readonly enableChromeJs?: () => Promise<{ ok: boolean; stderr: string }>;
+    readonly chromeEval?: (js: string) => Promise<{ ok: boolean; value: string; error?: string }>;
   } = {},
 ): void {
+  // Chrome's own commands drive through the helper too (ax below), so the turn
+  // that used them is the turn that ends the driving.
+  const bridge = noticed(appBridge, options.session);
+  const consent = options.consent ?? createMacConsentGate();
   let askedThisSession = false;
   const isChromeRunning = options.isChromeRunning ?? chromeRunning;
   const pidOfChrome = options.chromePid ?? chromePid;
+  const jsAllowed = options.chromeJsAllowed ?? chromeJsAllowed;
+  const enableJs = options.enableChromeJs ?? enableChromeJs;
+  const evalJs = options.chromeEval ?? chromeEval;
   /**
    * WORK IN CHROME LEAVES CHROME UNDER CONTROL. The chrome_* commands used to
    * touch no state at all, so after a run of them a bare `mac snapshot` found
    * nothing controlled and fell back to whatever the user had in front — the user
    * (2026-09-23): the model "at times randomly say[s] 'the user is on activity
-   * monitor'". One shared state; Chrome takes it whenever these act.
+   * monitor'". One shared state, taken on whichever route did the work (a
+   * default Chrome answers through Accessibility, never through Apple Events),
+   * and recorded like any other take, so a restarted chat comes back to Chrome.
+   *
+   * BUT NEVER OVER AN APP THE MODEL CHOSE. It did, on every chrome_* call: after
+   * `mac launch TextEdit` — whose answer says mac_key and mac_type target
+   * TextEdit now — one `chrome snapshot` moved the target, so `mac key cmd+s`
+   * opened Chrome's Save Page dialog and a typed note went into a web form, and
+   * nothing said control had moved. Chrome fills a gap (nothing under control)
+   * or replaces a guess (an app carried over from another chat, never looked at
+   * here); a chosen app stays the target until the model moves it.
    */
   const noteChrome = async (): Promise<void> => {
     const session = options.session;
-    if (session === undefined || session.controlled()?.app === CHROME_APP) return;
-    const pid = await pidOfChrome().catch(() => null);
-    if (pid !== null) session.restore({ app: CHROME_APP, pid });
+    if (session === undefined) return;
+    const c = session.controlled();
+    if (c !== null && c.carriedOver !== true && c.app !== CHROME_APP) return;
+    if (c === null || c.carriedOver === true) {
+      const pid = await pidOfChrome().catch(() => null);
+      if (pid === null) return;
+      session.restore({ app: CHROME_APP, pid });
+    }
+    options.recordControl?.();
   };
 
   /**
@@ -1736,7 +1879,7 @@ export function registerChromeTools(
 
   /** Make sure Chrome will run our JavaScript, asking the user once if not. */
   async function ensureChromeJs(ctx: ExtensionContext): Promise<string | null> {
-    if (await chromeJsAllowed()) return null;
+    if (await jsAllowed()) return null;
     if (ctx.hasUI !== true) {
       return (
         'Chrome will not run JavaScript from Apple Events yet, and there is no UI here to ' +
@@ -1755,7 +1898,7 @@ export function registerChromeTools(
         'for it to take effect. Nothing else about Chrome is changed.',
     );
     if (!ok) return 'The user declined to enable Chrome scripting.';
-    const res = await enableChromeJs();
+    const res = await enableJs();
     if (!res.ok) return `Could not change the Chrome setting: ${res.stderr}`;
     return (
       'ENABLED — but Chrome must be RESTARTED before it takes effect. Tell the user to quit ' +
@@ -1791,13 +1934,15 @@ export function registerChromeTools(
     ctx: ExtensionContext,
     js: string,
   ): Promise<{ text: string; ok: boolean }> {
+    const braked = await brakeRefusal(bridge);
+    if (braked !== null) return { text: braked, ok: false };
     const blocked = await ensureChromeJs(ctx);
     if (blocked !== null) return { text: blocked, ok: false };
     const notUp = await ensureChromeRunning();
     if (notUp !== null) return { text: notUp, ok: false };
-    await noteChrome();
-    const res = await chromeEval(js);
+    const res = await evalJs(js);
     if (!res.ok) return { text: res.error ?? 'Chrome did not respond.', ok: false };
+    await noteChrome();
     return { text: res.value, ok: true };
   }
 
@@ -1833,10 +1978,38 @@ export function registerChromeTools(
        * and only once Chrome is up, so looking never launches it in front.
        */
       if (params.visual === true) {
+        /*
+         * THE GATE AND THE BRAKE mac_snapshot --visual answers to — it is the
+         * same capture of the user's logged-in window. It had neither: it took
+         * the picture with computer use switched off in Settings or Chrome never
+         * allowed, and it swallowed the brake's refusal into "take a plain chrome
+         * snapshot instead" — the one route the brake could not see.
+         */
+        const decision = await consent.ensure(ctx, CHROME_APP);
+        if (!decision.ok) {
+          const text = `chrome_snapshot failed: ${decision.reason}`;
+          return { content: [{ type: 'text', text }], details: undefined };
+        }
+        const braked = await brakeRefusal(bridge);
+        if (braked !== null) {
+          const text = `chrome_snapshot failed: ${braked}`;
+          return { content: [{ type: 'text', text }], details: undefined };
+        }
         const notUp = await ensureChromeRunning();
         if (notUp !== null) return { content: [{ type: 'text', text: notUp }], details: undefined };
-        await noteChrome();
-        const snap = await ax<MacSnapshot>('snapshot', { screenshot: true });
+        let snap: MacSnapshot | null = null;
+        try {
+          snap =
+            bridge === null
+              ? null
+              : await bridge.request<MacSnapshot>('snapshot', {
+                  app: CHROME_APP,
+                  screenshot: true,
+                });
+        } catch (err) {
+          const text = `chrome_snapshot failed: ${messageOf(err)}`;
+          return { content: [{ type: 'text', text }], details: undefined };
+        }
         const shot = snap?.screenshot;
         if (shot?.base64 === undefined || shot.base64 === '') {
           return {
@@ -1855,6 +2028,7 @@ export function registerChromeTools(
             details: undefined,
           };
         }
+        await noteChrome();
         return {
           content: [{ type: 'image', data: shot.base64, mimeType: shot.mimeType ?? 'image/jpeg' }],
           details: undefined,
@@ -1868,6 +2042,7 @@ export function registerChromeTools(
       if (snap === null) {
         return { content: [{ type: 'text', text: out.text }], details: undefined };
       }
+      await noteChrome();
       return {
         content: [{ type: 'text', text: formatMacSnapshot(snap) }],
         details: undefined,
@@ -1890,6 +2065,7 @@ export function registerChromeTools(
       if (out.ok) return { content: [{ type: 'text', text: out.text }], details: undefined };
       const ack = await ax<{ found?: boolean; mode?: string }>('click', { index: params.index });
       if (ack === null) return { content: [{ type: 'text', text: out.text }], details: undefined };
+      await noteChrome();
       return {
         content: [
           {
@@ -1928,6 +2104,7 @@ export function registerChromeTools(
         ...(params.submit === true ? { submit: true } : {}),
       });
       if (ack === null) return { content: [{ type: 'text', text: out.text }], details: undefined };
+      await noteChrome();
       return {
         content: [
           { type: 'text', text: `Set [${params.index}] to ${JSON.stringify(params.text)}.` },

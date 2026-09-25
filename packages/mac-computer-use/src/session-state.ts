@@ -18,6 +18,10 @@
  *     first snapshot moves control to the snapshotted app; a default snapshot
  *     of the already-controlled app just refreshes its metadata.
  *   - `release()`                → drops control (app gone / session reset).
+ *
+ * And, beside control, whether this session DROVE anything this turn
+ * (`noteDriving` / `endTurn`) — which is not the same question: a chat can hold
+ * control it restored from a record and not touch the Mac all turn.
  */
 
 /** The app this session is currently driving. */
@@ -59,6 +63,12 @@ export interface ControlledApp {
    * there is — one clause, written by the tool that did the thing.
    */
   readonly lastAct?: string;
+  /**
+   * Restored from the app ANOTHER chat last drove (tools.ts), and not yet looked
+   * at here. A guess, not a choice: the first look that uses it says so, and
+   * work elsewhere may replace it — nothing may replace an app this chat chose.
+   */
+  readonly carriedOver?: boolean;
 }
 
 /** Snapshot-shaped input (structural: the wire MacSnapshot satisfies it). */
@@ -102,15 +112,30 @@ export interface MacSessionState {
   /**
    * Take control back from a record — the app this session was driving before
    * the pi child was restarted or the chat reopened (see the `mac-control`
-   * entry in tools.ts). Nothing is known about its windows or its last act.
+   * entry in tools.ts), or, `carriedOver`, the one another chat last drove.
+   * Nothing is known about its windows or its last act.
    */
-  restore(record: { app: string; pid: number; windowId?: number }): void;
+  restore(record: { app: string; pid: number; windowId?: number; carriedOver?: boolean }): void;
   /** Params every act must be stamped with: `{ pid, app }` while controlling
    * (the name is the fallback for a pid that has since quit), `{}` before
    * control exists (legacy frontmost behavior). */
   targetParams(): Record<string, unknown>;
   /** One human/model-readable line naming the controlled target ('' if none). */
   describe(): string;
+  /** A look or an act went to the Mac — the overlay and the monitor follow those. */
+  noteDriving(): void;
+  /**
+   * The turn ended: whether THIS session drove anything in it, and a clean
+   * slate for the next.
+   *
+   * Only a session that drove may put the driving away (tools.ts, agent_end).
+   * The overlay, the monitor and the user's Stop / Take-over brake belong to the
+   * app, not to whichever session's turn happens to end: a chat that carried an
+   * app over from another chat — or a subagent, a corp role, a scheduled run —
+   * holds control without having touched anything, and its turn ending used to
+   * tear down another chat's live run and lift the brake the user had pressed.
+   */
+  endTurn(): boolean;
   /**
    * What a click at this point ACTUALLY hit, when the answer is "nothing".
    *
@@ -156,9 +181,20 @@ function contains(el: SnapElementLike, x: number, y: number): boolean {
 /** Build a fresh session state (one per extension instance / pi session). */
 export function createMacSessionState(): MacSessionState {
   let current: ControlledApp | null = null;
+  let drove = false;
 
   return {
     controlled: () => current,
+
+    noteDriving(): void {
+      drove = true;
+    },
+
+    endTurn(): boolean {
+      const did = drove;
+      drove = false;
+      return did;
+    },
 
     noteLaunched(app: string, pid: number, windowId?: number): void {
       current = { pid, app, windowId, lastAct: `opened ${app}` };
@@ -193,8 +229,13 @@ export function createMacSessionState(): MacSessionState {
       current = null;
     },
 
-    restore(record: { app: string; pid: number; windowId?: number }): void {
-      current = { pid: record.pid, app: record.app, windowId: record.windowId };
+    restore(record: { app: string; pid: number; windowId?: number; carriedOver?: boolean }): void {
+      current = {
+        pid: record.pid,
+        app: record.app,
+        windowId: record.windowId,
+        ...(record.carriedOver === true ? { carriedOver: true } : {}),
+      };
     },
 
     targetParams(): Record<string, unknown> {

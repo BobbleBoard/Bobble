@@ -216,8 +216,13 @@ function browserLabel(verb: string, pair: [string, string], line: string): CliCo
     flags.direction ?? (verb === 'scroll' ? after.find((w) => scrollWords.has(w)) : undefined);
   const amount =
     verb === 'scroll' ? (flags.amount ?? after.find((w) => /^\d+$/.test(w))) : undefined;
+  /* A bare `--amount` (nothing after it, or `-300`, which neither this nor the
+     CLI takes as its value) is the flag's 'true' — no distance to say, rather
+     than "down NaN px". */
   const distance =
-    amount === undefined ? undefined : `${Number(amount).toLocaleString('en-US')} px`;
+    amount === undefined || !Number.isFinite(Number(amount))
+      ? undefined
+      : `${Number(amount).toLocaleString('en-US')} px`;
   const target =
     index !== undefined
       ? `element ${index}`

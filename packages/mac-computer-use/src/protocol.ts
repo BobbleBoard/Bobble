@@ -49,7 +49,17 @@ export type MacAgentMethod =
   | 'setDriving'
   /* The person's standing computer-use policy (Settings → Computer use): on/off
      and the apps allowed without asking — see policy.ts. */
-  | 'policy';
+  | 'policy'
+  /* Whether the user's Stop / Take over is on, as the sentence every act would
+     be refused with (MacBrakeAck) — for the Chrome DOM route, which acts over
+     Apple Events and so never reaches the bridge's own refusal. */
+  | 'brake';
+
+/** The `brake` answer: the refusal an act would get right now, or null while
+ * the agent has the wheel. */
+export interface MacBrakeAck {
+  readonly refusal: string | null;
+}
 
 /** One request on the wire. */
 export interface MacAgentRequest {

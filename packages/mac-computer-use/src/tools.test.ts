@@ -1,10 +1,12 @@
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ExtensionAPI, ExtensionContext, ToolDefinition } from '@mariozechner/pi-coding-agent';
 import { describe, expect, it, vi } from 'vitest';
 import type { MacBridge } from './bridge-client.js';
+import { registerMacComputerUse } from './index.js';
 import { createMacConsentGate, type MacConsentGate } from './permissions.js';
+import { COMPUTER_USE_OFF_REASON } from './policy.js';
 import type { MacAgentMethod } from './protocol.js';
 import { createMacSessionState } from './session-state.js';
 import { registerChromeTools, registerMacComputerUseTools } from './tools.js';
@@ -70,11 +72,22 @@ function collectTools(
      failed when it had one. Returning null here puts the fake bridge back in
      charge, which is the only thing these tests are supposed to be measuring. */
   registerMacComputerUseTools(pi, { bridge, consent, readChromeTabs: async () => null });
-  registerChromeTools(pi, bridge, { isChromeRunning: async () => chromeUp });
+  registerChromeTools(pi, bridge, { isChromeRunning: async () => chromeUp, ...NO_APPLE_EVENTS });
   return tools;
 }
 /** What the fake "is Chrome running?" answers; tests flip it. */
 let chromeUp = true;
+/*
+ * NEVER THE REAL CHROME. The Apple-Events route reads Chrome's setting, can
+ * WRITE it (after a confirm the ctx stub answers yes to), and runs osascript
+ * against whatever Chrome the machine running the suite has open. Every test
+ * gets this instead: scripting allowed, and a page that never answers.
+ */
+const NO_APPLE_EVENTS = {
+  chromeJsAllowed: async () => true,
+  enableChromeJs: async () => ({ ok: false, stderr: 'not in a unit test' }),
+  chromeEval: async () => ({ ok: false, value: '', error: 'no Chrome in a unit test' }),
+};
 
 async function run(
   tools: Map<string, ToolDefinition>,
@@ -178,7 +191,8 @@ describe('registerMacComputerUseTools', () => {
       },
     }));
     const tools = collectTools(bridge);
-    const r = await run(tools, 'mac_snapshot', { visual: true });
+    // Named: a look that lands on an app the model did not name says which (below).
+    const r = await run(tools, 'mac_snapshot', { app: 'TextEdit', visual: true });
     expect(bridge.calls[0]).toMatchObject({ method: 'snapshot', params: { screenshot: true } });
     expect(r.content).toHaveLength(1);
     expect(r.content[0]).toMatchObject({ type: 'image', data: 'BBBB' });
@@ -1281,5 +1295,474 @@ describe('the controlled app is remembered, and a fallback says what it is', () 
     expect(session.controlled()).toBeNull();
     await run(tools, 'chrome_snapshot', { visual: true });
     expect(session.controlled()).toMatchObject({ app: 'Google Chrome', pid: 4321 });
+  });
+});
+
+/*
+ * THE REVIEW OF THE 2026-09-23 WAVE (deliverables/review/wave-0923-findings.md,
+ * "computer-use"). Each case reproduces a finding against fakes — no real app,
+ * no real Chrome, no real screen.
+ */
+
+/** A pi stub that keeps its tools, its event handlers and what it appended. */
+function piStub() {
+  const tools = new Map<string, ToolDefinition>();
+  const handlers = new Map<string, (e: unknown, ctx: unknown) => void>();
+  const appended: { customType: string; data: unknown }[] = [];
+  const pi = {
+    registerTool: (def: ToolDefinition) => tools.set(def.name, def),
+    on: (name: string, fn: (e: unknown, ctx: unknown) => void) => handlers.set(name, fn),
+    appendEntry: (customType: string, data: unknown) => appended.push({ customType, data }),
+  } as unknown as ExtensionAPI;
+  /** session_start, with the session's own entries — what a reopened chat has. */
+  const start = (own: readonly { customType: string; data: unknown }[] = []) =>
+    handlers.get('session_start')?.(
+      {},
+      { sessionManager: { getEntries: () => own.map((e) => ({ type: 'custom', ...e })) } },
+    );
+  const end = () => handlers.get('agent_end')?.({}, {});
+  return { pi, tools, start, end, appended };
+}
+
+/** The last-control file as another chat left it. `pid` must be alive. */
+function lastControl(app: string, pid: number): string {
+  const file = join(mkdtempSync(join(tmpdir(), 'mac-last-')), 'last.json');
+  writeFileSync(file, JSON.stringify({ app, pid, at: Date.now() }));
+  return file;
+}
+
+const preConsented = () => createMacConsentGate({ preConsented: true });
+const textOf = (r: { content: readonly unknown[] }) =>
+  r.content
+    .map((c) => ((c as { type: string }).type === 'text' ? (c as { text: string }).text : ''))
+    .join('\n');
+const OK_BUTTON = { index: 1, role: 'AXButton', name: 'OK' };
+
+describe('Chrome work never takes the app the model chose away from it', () => {
+  function setup(session = createMacSessionState()) {
+    const bridge = new FakeBridge()
+      .on('launch', () => ({
+        ok: true,
+        app: 'TextEdit',
+        pid: 555,
+        bounds: { x: 0, y: 0, w: 8, h: 6 },
+      }))
+      .on('snapshot', (p) =>
+        p?.app === 'Google Chrome'
+          ? {
+              ...SNAP([], 4321),
+              app: 'Google Chrome',
+              screenshot: { path: '/tmp/c.png', base64: 'CCCC' },
+            }
+          : SNAP([{ index: 3, role: 'AXTextArea', name: 'body' }], 555),
+      )
+      .on('key', () => ({ ok: true, background: true }))
+      .on('type', () => ({ found: true }))
+      .on('click', () => ({ found: true }))
+      .on('brake', () => ({ refusal: null }));
+    const { pi, tools } = piStub();
+    registerMacComputerUseTools(pi, {
+      bridge,
+      session,
+      consent: preConsented(),
+      readChromeTabs: async () => null,
+    });
+    registerChromeTools(pi, bridge, {
+      session,
+      isChromeRunning: async () => true,
+      chromePid: async () => 4321,
+      ...NO_APPLE_EVENTS,
+      chromeEval: async () => ({ ok: true, value: 'Page: example.com' }),
+    });
+    return { session, bridge, tools };
+  }
+
+  it('a picture of Chrome leaves keys and typing aimed at the app the model launched', async () => {
+    const { bridge, tools } = setup();
+    await run(tools, 'mac_launch', { app: 'TextEdit' });
+    await run(tools, 'chrome_snapshot', { visual: true });
+    await run(tools, 'mac_key', { combo: 'cmd+s' });
+    expect(bridge.lastParams('key')).toMatchObject({ pid: 555, app: 'TextEdit' });
+    await run(tools, 'mac_type', { index: 3, text: 'secret note' });
+    expect(bridge.lastParams('type')).toMatchObject({ pid: 555, app: 'TextEdit' });
+  });
+
+  it('so does reading the page through Apple Events', async () => {
+    const { bridge, tools, session } = setup();
+    await run(tools, 'mac_launch', { app: 'TextEdit' });
+    await run(tools, 'chrome_snapshot', {});
+    expect(session.controlled()).toMatchObject({ app: 'TextEdit', pid: 555 });
+    await run(tools, 'mac_click', { x: 10, y: 10 });
+    expect(bridge.lastParams('click')).toMatchObject({ pid: 555 });
+  });
+
+  it('still takes Chrome when nothing was under control — the gap it was for', async () => {
+    const { tools, session } = setup();
+    await run(tools, 'chrome_snapshot', {});
+    expect(session.controlled()).toMatchObject({ app: 'Google Chrome', pid: 4321 });
+  });
+
+  it('and replaces an app merely carried over from another chat, which nobody chose here', async () => {
+    const carried = createMacSessionState();
+    carried.restore({ app: 'Blender', pid: 1472, carriedOver: true });
+    const { tools, session } = setup(carried);
+    await run(tools, 'chrome_snapshot', {});
+    expect(session.controlled()).toMatchObject({ app: 'Google Chrome', pid: 4321 });
+    expect(session.controlled()?.carriedOver).toBeUndefined();
+  });
+});
+
+describe('only a session that drove the Mac this turn ends the driving', () => {
+  it('a chat that carried an app over and touched nothing sends no setDriving', async () => {
+    const bridge = new FakeBridge().on('setDriving', () => ({ ok: true }));
+    const s = piStub();
+    registerMacComputerUseTools(s.pi, {
+      bridge,
+      consent: preConsented(),
+      readChromeTabs: async () => null,
+      lastControlFile: lastControl('Google Chrome', process.pid),
+    });
+    s.start();
+    s.end();
+    expect(bridge.countOf('setDriving')).toBe(0);
+  });
+
+  it('nor does a reopened chat whose own record names an app it did not touch this turn', async () => {
+    const bridge = new FakeBridge().on('setDriving', () => ({ ok: true }));
+    const s = piStub();
+    registerMacComputerUseTools(s.pi, {
+      bridge,
+      consent: preConsented(),
+      readChromeTabs: async () => null,
+    });
+    s.start([{ customType: 'mac-control', data: { app: 'TextEdit', pid: 555 } }]);
+    s.end();
+    expect(bridge.countOf('setDriving')).toBe(0);
+  });
+
+  it('a turn that drove the Mac puts the overlay away when it ends — and only that turn', async () => {
+    const bridge = new FakeBridge()
+      .on('snapshot', () => SNAP([OK_BUTTON]))
+      .on('setDriving', () => ({ ok: true }));
+    const s = piStub();
+    registerMacComputerUseTools(s.pi, {
+      bridge,
+      consent: preConsented(),
+      readChromeTabs: async () => null,
+    });
+    s.start();
+    await run(s.tools, 'mac_snapshot', { app: 'TextEdit' });
+    s.end();
+    expect(bridge.countOf('setDriving')).toBe(1);
+    expect(bridge.lastParams('setDriving')).toMatchObject({ driving: false });
+    s.end(); // the next turn did nothing with the Mac
+    expect(bridge.countOf('setDriving')).toBe(1);
+  });
+
+  it("a turn whose driving was Chrome's own commands ends it too", async () => {
+    const session = createMacSessionState();
+    const bridge = new FakeBridge()
+      .on('snapshot', () => ({ ...SNAP([OK_BUTTON], 4321), app: 'Google Chrome' }))
+      .on('setDriving', () => ({ ok: true }))
+      .on('brake', () => ({ refusal: null }));
+    const s = piStub();
+    registerMacComputerUseTools(s.pi, {
+      bridge,
+      session,
+      consent: preConsented(),
+      readChromeTabs: async () => null,
+    });
+    registerChromeTools(s.pi, bridge, {
+      session,
+      isChromeRunning: async () => true,
+      chromePid: async () => 4321,
+      ...NO_APPLE_EVENTS,
+      chromeJsAllowed: async () => false,
+    });
+    s.start();
+    await run(s.tools, 'chrome_snapshot', {}, ctxStub(false));
+    s.end();
+    expect(bridge.countOf('setDriving')).toBe(1);
+  });
+});
+
+describe('carried-over control becomes the chat’s own once used, and the record stays fresh', () => {
+  it('the first look at a carried app records it, so a restart does not take another chat’s app', async () => {
+    const file = lastControl('TextEdit', process.pid);
+    const bridge = new FakeBridge().on('snapshot', (p) => ({
+      ...SNAP([OK_BUTTON], typeof p?.pid === 'number' ? p.pid : process.pid),
+      app: typeof p?.app === 'string' ? p.app : 'TextEdit',
+    }));
+    const b = piStub();
+    registerMacComputerUseTools(b.pi, {
+      bridge,
+      consent: preConsented(),
+      readChromeTabs: async () => null,
+      lastControlFile: file,
+    });
+    b.start();
+    await run(b.tools, 'mac_snapshot', {});
+    expect(b.appended).toContainEqual({
+      customType: 'mac-control',
+      data: expect.objectContaining({ app: 'TextEdit', pid: process.pid }),
+    });
+    // Another chat moves on to Blender; this chat's pi child restarts.
+    writeFileSync(file, JSON.stringify({ app: 'Blender', pid: process.ppid, at: Date.now() }));
+    b.start(b.appended);
+    await run(b.tools, 'mac_snapshot', {});
+    expect(bridge.lastParams('snapshot')).toMatchObject({ pid: process.pid, app: 'TextEdit' });
+  });
+
+  it('every use refreshes the record, so the app a chat is working in is the last one again', async () => {
+    const file = join(mkdtempSync(join(tmpdir(), 'mac-last-')), 'last.json');
+    const bridge = new FakeBridge().on('snapshot', () => SNAP([OK_BUTTON], process.pid));
+    const a = piStub();
+    registerMacComputerUseTools(a.pi, {
+      bridge,
+      consent: preConsented(),
+      readChromeTabs: async () => null,
+      lastControlFile: file,
+    });
+    a.start();
+    await run(a.tools, 'mac_snapshot', { app: 'TextEdit' });
+    // Another chat drives Blender and says so — hours ago, as far as the file knows.
+    writeFileSync(
+      file,
+      JSON.stringify({ app: 'Blender', pid: process.ppid, at: Date.now() - 11 * 3600_000 }),
+    );
+    await run(a.tools, 'mac_snapshot', {});
+    const now = JSON.parse(readFileSync(file, 'utf8')) as { app: string; pid: number; at: number };
+    expect(now).toMatchObject({ app: 'TextEdit', pid: process.pid });
+    expect(Date.now() - now.at).toBeLessThan(60_000);
+  });
+});
+
+describe('"carried over" is said on the look that used the carried app, and on no other', () => {
+  function carried() {
+    const bridge = new FakeBridge()
+      .on('snapshot', (p) => ({
+        ...SNAP([OK_BUTTON], typeof p?.pid === 'number' ? p.pid : 777),
+        app: typeof p?.app === 'string' ? p.app : 'TextEdit',
+        ...(p?.screenshot === true
+          ? { screenshot: { path: '/tmp/v.png', base64: 'VVVV', rect: { x: 0, y: 0, w: 9, h: 9 } } }
+          : {}),
+      }))
+      .on('launch', () => ({ ok: true, app: 'Notes', pid: 888 }));
+    const s = piStub();
+    registerMacComputerUseTools(s.pi, {
+      bridge,
+      consent: preConsented(),
+      readChromeTabs: async () => null,
+      lastControlFile: lastControl('TextEdit', process.pid),
+    });
+    s.start();
+    return s.tools;
+  }
+
+  it('not on a look at an app the model named', async () => {
+    const r = await run(carried(), 'mac_snapshot', { app: 'Safari' });
+    expect(textOf(r)).not.toContain('Carried over');
+  });
+
+  it('not on the look after a launch', async () => {
+    const tools = carried();
+    await run(tools, 'mac_launch', { app: 'Notes' });
+    const r = await run(tools, 'mac_snapshot', {});
+    expect(textOf(r)).not.toContain('Carried over');
+  });
+
+  it('not later, on another app, after a --visual first look', async () => {
+    const tools = carried();
+    await run(tools, 'mac_snapshot', { visual: true });
+    const r = await run(tools, 'mac_snapshot', { app: 'Safari' });
+    expect(textOf(r)).not.toContain('Carried over');
+  });
+
+  it('on the bare look that does use it — once', async () => {
+    const tools = carried();
+    const r = await run(tools, 'mac_snapshot', {});
+    expect(textOf(r)).toContain('Carried over from an earlier chat');
+    expect(textOf(await run(tools, 'mac_snapshot', {}))).not.toContain('Carried over');
+  });
+
+  it('and on a --visual look that uses it, which otherwise names no app at all', async () => {
+    const r = await run(carried(), 'mac_snapshot', { visual: true });
+    expect(r.content.find((c) => c.type === 'image')).toBeDefined();
+    expect(textOf(r)).toContain('Carried over from an earlier chat');
+    expect(textOf(r)).toContain('TextEdit');
+  });
+});
+
+describe('the "USER has in front" notice reaches the model on every kind of fallback look', () => {
+  it('survives the automatic re-take of an app with no Accessibility tree', async () => {
+    const bridge = new FakeBridge().on('snapshot', (p) => ({
+      ...SNAP([], 555),
+      app: 'Blender',
+      ...(p?.screenshot === true
+        ? { screenshot: { path: '/tmp/b.png', base64: 'BBBB', rect: { x: 0, y: 0, w: 9, h: 9 } } }
+        : {}),
+    }));
+    const tools = collectTools(bridge);
+    const r = await run(tools, 'mac_snapshot', {});
+    expect(bridge.countOf('snapshot')).toBe(2);
+    expect(bridge.lastParams('snapshot')).toMatchObject({ pid: 555, screenshot: true });
+    expect(textOf(r)).toContain('the app the USER has in front');
+  });
+
+  it('a --visual look that fell back says which app the picture is of', async () => {
+    const bridge = new FakeBridge().on('snapshot', () => ({
+      ...SNAP([{ index: 1, role: 'AXButton', name: 'CPU' }], 555),
+      app: 'Activity Monitor',
+      screenshot: { path: '/tmp/a.png', base64: 'AAAA', rect: { x: 0, y: 0, w: 9, h: 9 } },
+    }));
+    const r = await run(collectTools(bridge), 'mac_snapshot', { visual: true });
+    expect(r.content.find((c) => c.type === 'image')).toBeDefined();
+    expect(textOf(r)).toContain('Activity Monitor');
+    expect(textOf(r)).toContain('the app the USER has in front');
+  });
+});
+
+describe('chrome snapshot --visual answers to the brake and the gate like every other look', () => {
+  const STOP =
+    'The user pressed Stop, so Mac control is off. Do not retry: say what you had done to ' +
+    'Google Chrome and ask whether to carry on.';
+
+  it('passes the Stop on instead of sending the model round the brake', async () => {
+    const bridge = new FakeBridge().on('snapshot', () => {
+      throw new Error(STOP);
+    });
+    const r = await run(collectTools(bridge), 'chrome_snapshot', { visual: true });
+    expect(textOf(r)).toContain('pressed Stop');
+    expect(textOf(r)).not.toMatch(/plain chrome snapshot/i);
+  });
+
+  it('asks the gate mac_snapshot asks — and stops when computer use is switched off', async () => {
+    const bridge = new FakeBridge().on('snapshot', () => ({
+      ...SNAP([]),
+      app: 'Google Chrome',
+      screenshot: { path: '/tmp/c.png', base64: 'CCCC' },
+    }));
+    const { pi, tools } = piStub();
+    registerChromeTools(pi, bridge, {
+      isChromeRunning: async () => true,
+      ...NO_APPLE_EVENTS,
+      consent: createMacConsentGate({
+        preConsented: true,
+        policy: async () => ({ enabled: false, apps: [] }),
+      }),
+    });
+    const r = await run(tools, 'chrome_snapshot', { visual: true });
+    expect(textOf(r)).toContain(COMPUTER_USE_OFF_REASON);
+    expect(bridge.countOf('snapshot')).toBe(0);
+  });
+
+  it('and the Apple-Events route stops for the brake too', async () => {
+    const evals: string[] = [];
+    const bridge = new FakeBridge().on('brake', () => ({ refusal: STOP }));
+    const { pi, tools } = piStub();
+    registerChromeTools(pi, bridge, {
+      isChromeRunning: async () => true,
+      ...NO_APPLE_EVENTS,
+      chromeEval: async (js: string) => {
+        evals.push(js);
+        return { ok: true, value: 'Page: example.com' };
+      },
+    });
+    const r = await run(tools, 'chrome_snapshot', {});
+    expect(evals).toHaveLength(0);
+    expect(textOf(r)).toContain('pressed Stop');
+  });
+
+  it('as does the Apple-Events read of the tab list', async () => {
+    let reads = 0;
+    const bridge = new FakeBridge().on('brake', () => ({ refusal: STOP }));
+    const { pi, tools } = piStub();
+    registerMacComputerUseTools(pi, {
+      bridge,
+      consent: preConsented(),
+      readChromeTabs: async () => {
+        reads += 1;
+        return [];
+      },
+    });
+    const r = await run(tools, 'chrome_tabs', {});
+    expect(reads).toBe(0);
+    expect(textOf(r)).toContain('pressed Stop');
+  });
+});
+
+describe('Chrome work leaves Chrome under control whichever route did it — and remembers it', () => {
+  it('a default Chrome (no Apple-Events JavaScript) still leaves Chrome under control', async () => {
+    const session = createMacSessionState();
+    const bridge = new FakeBridge()
+      .on('snapshot', () => ({
+        ...SNAP([{ index: 1, role: 'AXLink', name: 'Docs' }], 4321),
+        app: 'Google Chrome',
+      }))
+      .on('brake', () => ({ refusal: null }));
+    const { pi, tools } = piStub();
+    registerChromeTools(pi, bridge, {
+      session,
+      isChromeRunning: async () => true,
+      chromePid: async () => 4321,
+      ...NO_APPLE_EVENTS,
+      chromeJsAllowed: async () => false,
+    });
+    const r = await run(tools, 'chrome_snapshot', {}, ctxStub(false));
+    expect(textOf(r)).toContain('Docs');
+    expect(session.controlled()).toMatchObject({ app: 'Google Chrome', pid: 4321 });
+  });
+
+  it('and records Chrome as the chat’s own, so a restart comes back to it', async () => {
+    const file = join(mkdtempSync(join(tmpdir(), 'mac-last-')), 'last.json');
+    const bridge = new FakeBridge().on('snapshot', () => ({
+      ...SNAP([]),
+      app: 'Google Chrome',
+      screenshot: { path: '/tmp/c.png', base64: 'CCCC' },
+    }));
+    const s = piStub();
+    registerMacComputerUse(s.pi, {
+      bridge,
+      consent: preConsented(),
+      readChromeTabs: async () => null,
+      isChromeRunning: async () => true,
+      chromePid: async () => process.pid,
+      lastControlFile: file,
+    });
+    s.start();
+    await run(s.tools, 'chrome_snapshot', { visual: true });
+    expect(s.appended).toContainEqual({
+      customType: 'mac-control',
+      data: expect.objectContaining({ app: 'Google Chrome', pid: process.pid }),
+    });
+    expect(JSON.parse(readFileSync(file, 'utf8'))).toMatchObject({
+      app: 'Google Chrome',
+      pid: process.pid,
+    });
+  });
+});
+
+describe('a --visual click maps the picture the helper actually sent', () => {
+  it('uses the image’s own size when the helper sent no inline copy', async () => {
+    const bridge = new FakeBridge()
+      .on('snapshot', () => ({
+        ...SNAP([OK_BUTTON]),
+        // The composite at native pixels: the inline encoding failed, so the full-size
+        // PNG went instead — 2000×1600 pixels of a 1000×800-point rect.
+        screenshot: {
+          path: '/tmp/x.png',
+          base64: 'PPPP',
+          mimeType: 'image/png',
+          rect: { x: 100, y: 100, w: 1000, h: 800 },
+          width: 2000,
+          height: 1600,
+        },
+      }))
+      .on('click', () => ({ found: true }));
+    const tools = collectTools(bridge);
+    await run(tools, 'mac_snapshot', { app: 'TextEdit', visual: true });
+    await run(tools, 'mac_click', { x: 1000, y: 800 });
+    // The middle of the picture is the middle of the rect.
+    expect(bridge.lastParams('click')).toMatchObject({ x: 600, y: 500 });
   });
 });

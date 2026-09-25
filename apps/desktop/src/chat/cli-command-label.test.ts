@@ -138,6 +138,12 @@ describe("browser rows — the app's own kinds, not terminal lines (the user 202
     expect(cliCommandLabel('browser scroll 5000')?.target).toBe('5,000 px');
     expect(cliCommandLabel('browser scroll down 10000')?.target).toBe('down 10,000 px');
     expect(cliCommandLabel('browser scroll 5000')?.target).not.toContain('element');
+    /* An --amount with no number attached is a bare flag ('true' — the next word
+       starts with '-', so the CLI does not take it either); the row must not
+       read "down NaN px". */
+    expect(cliCommandLabel('browser scroll --direction down --amount -300')?.target).toBe('down');
+    expect(cliCommandLabel('browser scroll down --amount')?.target).toBe('down');
+    expect(cliCommandLabel('browser scroll --amount')?.target).toBeUndefined();
     expect(cliCommandLabel('browser snapshot')).toMatchObject({
       running: 'Reading the page in the browser',
       kind: 'browser-read',

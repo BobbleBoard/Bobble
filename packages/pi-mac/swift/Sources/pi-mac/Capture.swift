@@ -225,8 +225,14 @@ func captureAppSurfaces(pid: pid_t, withBase64: Bool, maxWidth: Int? = nil) -> [
     return result
   }
   // Legacy fallbacks — one window, then the whole screen.
-  if let first = ids.first, var shot = captureWindow(windowID: first, withBase64: withBase64) {
-    shot["rect"] = rectDict(rect)
+  //
+  // ONE window is captured here, so the rect is THAT window's frame. It used to
+  // be the union of every surface, so a point read off a picture of the front
+  // sheet alone was mapped across the whole app — and clicked behind the sheet.
+  if let front = windows.first(where: { $0.windowId != nil }), let first = front.windowId,
+    var shot = captureWindow(windowID: first, withBase64: withBase64)
+  {
+    shot["rect"] = rectDict(front.frame)
     shot["windows"] = windows.map(windowDict)
     shot["composite"] = false
     return shot
