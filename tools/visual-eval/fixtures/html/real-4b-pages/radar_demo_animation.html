@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Radar Chart Animation Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        h1 {
+            color: #e94560;
+            margin-bottom: 30px;
+            text-shadow: 0 0 20px rgba(233, 69, 96, 0.5);
+        }
+        .chart-container {
+            width: 600px;
+            height: 500px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+        }
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 15px;
+        }
+        button {
+            padding: 12px 30px;
+            font-size: 16px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+        .play-btn {
+            background: linear-gradient(135deg, #e94560, #ff6b6b);
+            color: white;
+            box-shadow: 0 4px 15px rgba(233, 69, 96, 0.4);
+        }
+        .play-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(233, 69, 96, 0.6);
+        }
+        .play-btn:disabled {
+            background: #555;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        .stop-btn {
+            background: linear-gradient(135deg, #4a4a6a, #2d2d44);
+            color: white;
+        }
+        .stop-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(74, 74, 106, 0.4);
+        }
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-top: 20px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: white;
+            font-size: 14px;
+        }
+        .legend-color {
+            width: 20px;
+            height: 3px;
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body>
+    <h1>📊 Animated Radar Chart Demo</h1>
+    <div class="chart-container">
+        <canvas id="radarChart" width="600" height="500"></canvas>
+    </div>
+    <div class="controls">
+        <button id="playBtn" class="play-btn">▶ Play Animation</button>
+        <button id="stopBtn" class="stop-btn">⏹ Stop</button>
+    </div>
+    <div class="legend">
+        <div class="legend-item">
+            <div class="legend-color" style="background: linear-gradient(135deg, #e94560, #ff6b6b);"></div>
+            <span>Analysis</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: linear-gradient(135deg, #4a4a6a, #2d2d44);"></div>
+            <span>Performance</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: linear-gradient(135deg, #00d9ff, #00a8ff);"></div>
+            <span>Quality</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: linear-gradient(135deg, #ff6b6b, #ff8787);"></div>
+            <span>Efficiency</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: linear-gradient(135deg, #00ff88, #00cc66);"></div>
+            <span>Reliability</span>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('radarChart');
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+        const centerX = width / 2;
+        const centerY = height / 2;
+        const radius = 200;
+        const points = 6;
+        
+        const categories = ['Analysis', 'Performance', 'Quality', 'Efficiency', 'Reliability', 'Scalability'];
+        
+        // Calculate angles for each axis
+        const angles = [];
+        for (let i = 0; i < points; i++) {
+            angles.push((i * 2 * Math.PI / points) - Math.PI / 2);
+        }
+        
+        // Base data values
+        const baseData = [
+            75, 80, 90, 65, 85, 70
+        ];
+        
+        // Animation state
+        let isAnimating = false;
+        let animationId = null;
+        let currentIndex = 0;
+        let currentData = [...baseData];
+        let opacity = 0;
+        
+        // Draw the chart
+        function drawChart() {
+            // Clear canvas
+            ctx.clearRect(0, 0, width, height);
+            
+            // Draw background gradient
+            const bgGradient = ctx.createRadialGradient(centerX, centerY, radius * 0.2, centerX, centerY, radius);
+            bgGradient.addColorStop(0, 'rgba(255, 255, 255, 0.1)');
+            bgGradient.addColorStop(1, 'rgba(255, 255, 255, 0.02)');
+            ctx.fillStyle = bgGradient;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+            ctx.fill();
+            
+            // Draw axes (outer circle)
+            ctx.strokeStyle = 'rgba(233, 69, 96, 0.3)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            for (let i = 0; i <= points; i++) {
+                const angle = (i * 2 * Math.PI / points) - Math.PI / 2;
+                const x = centerX + radius * Math.cos(angle);
+                const y = centerY + radius * Math.sin(angle);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+            
+            // Draw category labels
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            ctx.font = 'bold 14px Segoe UI';
+            ctx.textAlign = 'center';
+            for (let i = 0; i < points; i++) {
+                const angle = angles[i];
+                const labelRadius = radius + 30;
+                const x = centerX + labelRadius * Math.cos(angle);
+                const y = centerY + labelRadius * Math.sin(angle);
+                
+                ctx.rotate(angle + Math.PI / 2);
+                ctx.fillText(categories[i], 15, 5);
+                ctx.rotate(-angle - Math.PI / 2);
+            }
+            
+            // Draw connecting lines based on current data
+            ctx.strokeStyle = `rgba(233, 69, 96, ${opacity})`;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            for (let i = 0; i <= points; i++) {
+                const angle = (i * 2 * Math.PI / points) - Math.PI / 2;
+                const value = i === points ? 0 : currentData[i];
+                const x = centerX + (value / 100) * radius * Math.cos(angle);
+                const y = centerY + (value / 100) * radius * Math.sin(angle);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+            
+            // Draw gradient fill
+            const gradient = ctx.createLinearGradient(
+                centerX - radius * 0.7, centerY - radius * 0.7,
+                centerX + radius * 0.7, centerY + radius * 0.7
+            );
+            gradient.addColorStop(0, 'rgba(233, 69, 96, 0.5)');
+            gradient.addColorStop(1, 'rgba(233, 69, 96, 0)');
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            for (let i = 0; i <= points; i++) {
+                const angle = (i * 2 * Math.PI / points) - Math.PI / 2;
+                const value = i === points ? 0 : currentData[i];
+                const x = centerX + (value / 101) * radius * Math.cos(angle);
+                const y = centerY + (value / 101) * radius * Math.sin(angle);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.closePath();
+            ctx.fill();
+            
+            // Draw data points
+            for (let i = 0; i < points; i++) {
+                const angle = angles[i];
+                const value = currentData[i];
+                const x = centerX + (value / 100) * radius * Math.cos(angle);
+                const y = centerY + (value / 100) * radius * Math.sin(angle);
+                
+                // Draw point
+                ctx.fillStyle = `rgba(233, 69, 96, ${opacity})`;
+                ctx.beginPath();
+                ctx.arc(x, y, 6, 0, 2 * Math.PI);
+                ctx.fill();
+                
+                // Draw glow effect
+                const glow = ctx.createRadialGradient(x, y, 0, x, y, 15);
+                glow.addColorStop(0, `rgba(233, 69, 96, ${opacity})`);
+                glow.addColorStop(1, 'rgba(233, 69, 96, 0)');
+                ctx.fillStyle = glow;
+                ctx.beginPath();
+                ctx.arc(x, y, 15, 0, 2 * Math.PI);
+                ctx.fill();
+                
+                // Draw label
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                ctx.font = 'bold 12px Segoe UI';
+                ctx.textAlign = 'center';
+                ctx.fillText(value, x, y + 18);
+            }
+            
+            // Draw center point
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 5, 0, 2 * Math.PI);
+            ctx.fill();
+        }
+        
+        // Animate point by point expansion
+        function animate() {
+            if (!isAnimating) return;
+            
+            if (opacity < 1) {
+                opacity += 0.03;
+            }
+            
+            // Expand each point sequentially
+            for (let i = 0; i < points; i++) {
+                const angle = angles[i];
+                const targetValue = baseData[i];
+                const currentX = centerX + currentData[i] * radius / 100 * Math.cos(angle);
+                const targetX = centerX + targetValue * radius / 100 * Math.cos(angle);
+                const targetY = centerY + targetValue * radius / 100 * Math.sin(angle);
+                
+                // Smooth expansion for this point
+                const expansion = (targetValue - currentData[i]) * 0.02;
+                currentData[i] += expansion;
+                
+                if (currentData[i] > targetValue) currentData[i] = targetValue;
+                if (currentData[i] < targetValue - 1) currentData[i] = targetValue - 1;
+                
+                // Draw chart
+                drawChart();
+                
+                if (i < points - 1) {
+                    // Small delay between points
+                    animationId = requestAnimationFrame(animate);
+                }
+            }
+            
+            if (opacity >= 1) {
+                isAnimating = false;
+                document.getElementById('playBtn').disabled = false;
+                document.getElementById('stopBtn').disabled = true;
+            }
+        }
+        
+        // Reset and replay
+        function resetAndReplay() {
+            currentData = [...baseData];
+            opacity = 0;
+            isAnimating = true;
+            animate();
+        }
+        
+        // Event listeners
+        document.getElementById('playBtn').addEventListener('click', () => {
+            if (!isAnimating) {
+                resetAndReplay();
+            }
+        });
+        
+        document.getElementById('stopBtn').addEventListener('click', () => {
+            isAnimating = false;
+            cancelAnimationFrame(animationId);
+            document.getElementById('playBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            drawChart();
+        });
+        
+        // Initial draw
+        drawChart();
+    </script>
+</body>
+</html>

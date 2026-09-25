@@ -1,0 +1,59 @@
+{
+  "_note": "Reconstructed block by block from the REAL docx the 4B made in the user's app on 2026-09-12 (~/Bobble/make-a-document-with-a-cooking-recipe-for-6-gian.docx): every string below is copied from that file. The spec itself was overwritten in the scratch cache by a later run, so the palette is not the original one.",
+  "title": "Giant Chocolate Chip Cookies",
+  "running_title": "The Kitchen",
+  "palette": { "primary": "#3B2A2A", "accent": "#C8762B" },
+  "blocks": [
+    {
+      "type": "cover",
+      "eyebrow": "Cookie recipe",
+      "title": "Giant Chocolate Chip Cookies",
+      "subtitle": "Six large, buttery treats",
+      "byline": "The Kitchen"
+    },
+    { "type": "heading", "title": "Ingredients", "standfirst": "Everything you need, measured." },
+    {
+      "type": "body",
+      "paragraphs": [
+        "Gather your ingredients before you start baking. The larger the cookie, the more care you need."
+      ]
+    },
+    {
+      "type": "table",
+      "headers": ["Ingredient", "Amount"],
+      "rows": [
+        ["All-purpose flour", "2 cups"],
+        ["Unsalted butter", "1 cup"],
+        ["Granulated sugar", "3 cups"],
+        ["Brown sugar (packed)", "1 cup"],
+        ["Chocolate chips", "2 cups"],
+        ["Eggs", "2 large"]
+      ]
+    },
+    { "type": "heading", "title": "Instructions", "standfirst": "Bake, then let them cool." },
+    {
+      "type": "body",
+      "paragraphs": [
+        "Melt the butter and sugars. Mix in the dry ingredients. Fold in the chocolate chips.",
+        "Portion the dough onto a baking sheet. Bake at 350°F for 10–12 minutes.",
+        "Let the cookies cool on the sheet before transferring them to a wire rack."
+      ]
+    },
+    {
+      "type": "callout",
+      "label": "Tip",
+      "text": "For extra chew, let the cookies cool in the oven before removing them from the sheet."
+    },
+    {
+      "type": "stats",
+      "stats": [
+        { "value": "6", "label": "cookies" },
+        { "value": "2", "label": "cups of butter" },
+        { "value": "2", "label": "cups of chocolate chips" },
+        { "value": "12", "label": "minutes of baking" }
+      ]
+    },
+    { "type": "quote", "quote": "Bigger is better.", "attribution": "A note on cookie size" },
+    { "type": "body", "paragraphs": ["Source: https://www.allrecipes.com/recipe/123456/"] }
+  ]
+}

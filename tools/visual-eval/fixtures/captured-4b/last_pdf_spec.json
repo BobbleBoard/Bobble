@@ -1,0 +1,146 @@
+{
+ "title": "Annual Unit Sales Report",
+ "running_title": "Performance Metrics 2021-2024",
+ "palette": {
+  "primary": "#1E3A5F",
+  "accent": "#E63946"
+ },
+ "blocks": [
+  {
+   "type": "cover",
+   "eyebrow": "Sales Performance",
+   "title": "Annual Unit Sales Overview",
+   "subtitle": "A four-year analysis of production volumes and market reach.",
+   "byline": "Q4 2024 Financial Review"
+  },
+  {
+   "type": "body",
+   "paragraphs": [
+    "This report details the trajectory of unit sales across the fiscal years 2021 through 2024, highlighting key growth periods and market adjustments."
+   ]
+  },
+  {
+   "type": "heading",
+   "title": "Sales Trajectory Analysis",
+   "standfirst": "Visualizing the fluctuation in demand over the last four years."
+  },
+  {
+   "type": "bars",
+   "items": [
+    {
+     "label": "2021",
+     "value": 12,
+     "display": "12 units"
+    },
+    {
+     "label": "2022",
+     "value": 19,
+     "display": "19 units"
+    },
+    {
+     "label": "2023",
+     "value": 15,
+     "display": "15 units"
+    },
+    {
+     "label": "2024",
+     "value": 22,
+     "display": "22 units"
+    }
+   ],
+   "highlight_index": 3
+  },
+  {
+   "type": "callout",
+   "label": "Key Insight",
+   "text": "2024 marks the highest volume in four years, driven by a 46.7% increase from the previous year's baseline."
+  },
+  {
+   "type": "body",
+   "paragraphs": [
+    "Despite a dip in 2023, the upward trend resumed in 2024, indicating a recovery in customer acquisition strategies."
+   ]
+  },
+  {
+   "type": "stats",
+   "stats": [
+    {
+     "value": "28",
+     "label": "Total Units (2021-2024)"
+    },
+    {
+     "value": "10",
+     "label": "Average Annual Growth"
+    },
+    {
+     "value": "83%",
+     "label": "YoY Growth (2023 to 2024)"
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "title": "Regional Distribution",
+   "standfirst": "Breakdown of sales by primary market sector."
+  },
+  {
+   "type": "table",
+   "headers": [
+    "Market Sector",
+    "2021",
+    "2022",
+    "2023",
+    "2024"
+   ],
+   "rows": [
+    [
+     "North America",
+     "4",
+     "7",
+     "5",
+     "9"
+    ],
+    [
+     "Europe",
+     "3",
+     "6",
+     "4",
+     "8"
+    ],
+    [
+     "Asia Pacific",
+     "5",
+     "6",
+     "6",
+     "5"
+    ]
+   ]
+  },
+  {
+   "type": "bullets",
+   "items": [
+    "Strategic inventory adjustments contributed to the 2022 peak.",
+    "Supply chain normalization stabilized volumes in 2023.",
+    "Aggressive marketing campaigns drove the 2024 surge."
+   ]
+  },
+  {
+   "type": "quote",
+   "quote": "The resilience of the market in 2024 proves the adaptability of our core product line.",
+   "attribution": "Director of Operations"
+  },
+  {
+   "type": "body",
+   "paragraphs": [
+    "Future projections suggest maintaining this momentum with targeted expansion into emerging regions."
+   ]
+  },
+  {
+   "type": "cover",
+   "eyebrow": "Conclusion",
+   "title": "Strategic Outlook",
+   "subtitle": "Continued focus on efficiency and growth.",
+   "byline": "End of Report"
+  }
+ ]
+}

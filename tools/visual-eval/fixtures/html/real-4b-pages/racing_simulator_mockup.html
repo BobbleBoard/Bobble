@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Racing Simulator Mockup</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        header { text-align: center; padding: 40px 0; border-bottom: 2px solid #e94560; margin-bottom: 40px; }
+        h1 { font-size: 3em; color: #E94560; text-shadow: 0 0 20px rgba(233, 69, 96, 0.5); margin-bottom: 10px; }
+        .subtitle { font-size: 1.2em; color: #a0a0a0; }
+        .dashboard { background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 100%); border-radius: 15px; padding: 30px; border: 1px solid rgba(233, 69, 96,0.3); margin-bottom: 30px; }
+        .dashboard h2 { color: #E94560; margin-bottom: 20px; }
+        .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
+        .stat-box { background: rgba(233,69,96,0.1); padding: 20px; border-radius: 10px; text-align: center; }
+        .stat-value { font-size: 2em; font-weight: bold; color: #E94560; }
+        .stat-label { font-size: 0.9em; color: #a0a0a0; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-bottom: 40px; }
+        .card { background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); border-radius: 15px; padding: 25px; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.3s, box-shadow 0.3s; }
+        .card:hover { transform: translateY(-5px); box-shadow: 0 10px 30px rgba(233,69,96,0.3); }
+        .card h3 { color: #E94560; margin-bottom: 15px; font-size: 1.4em; }
+        .card ul { list-style: none; padding-left: 0; }
+        .card li { padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .card li:last-child { border-bottom: none; }
+        .card li::before { content: "✓"; color: #E94560; margin-right: 10px; }
+        .settings-preview { display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap; }
+        .setting { background: rgba(255,255,255,0.1); padding: 10px 15px; border-radius: 8px; cursor: pointer; transition: background 0.2s; }
+        .setting:hover { background: rgba(233,69,96,0.3); }
+        .car-preview { width: 100%; height: 180px; background: rgba(0,0,0,0.3); border-radius: 10px; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
+        .car { width: 60px; height: 30px; background: linear-gradient(90deg, #E94560, #FF6B6B); border-radius: 5px; position: relative; animation: drive 2s infinite ease-in-out; }
+        .car::before { content: ""; position: absolute; top: 5px; left: 0; right: 0; height: 5px; background: #333; box-shadow: -15px 0 0 #333, 15px 0 0 #333; }
+        @keyframes drive { 0%,100% { transform: translateX(0) rotate(0deg); } 50% { transform: translateX(80px) rotate(2deg); } }
+        .footer { text-align: center; padding: 30px; color: #a0a0a0; border-top: 1px solid rgba(255,255,255,0.1); margin-top: 40px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>⚡ Racing Simulator</h1>
+            <p class="subtitle">Experience the Ultimate Racing Experience</p>
+        </header>
+        <div class="dashboard">
+            <h2>O Game Modes</h2>
+            <div class="stats">
+                <div class="stat-box"><div class="stat-value">4</div><div class="stat-label">Game Modes</div></div>
+                <div class="stat-box"><div class="stat-value">∞</div><div class="stat-label">Tracks</div></div>
+                <div class="stat-box"><div class="stat-value">20+</div><div class="stat-label">Vehicles</div></div>
+                <div class="stat-box"><div class="stat-value">∞</div><div class="stat-label">Playtime</div></div>
+            </div>
+        </div>
+        <div class="grid">
+            <div class="card">
+                <h3>🎮 Core Gameplay</h3>
+                <ul>
+                    <li>Realistic vehicle physics engine</li>
+                    <li>Dynamic weather systems</li>
+                    <li>Time-of-day cycles</li>
+                    <li>Multiple difficulty levels</li>
+                    <li>Leaderboards and rankings</li>
+                    <li>Online multiplayer</li>
+                </ul>
+            </div>
+            <div class="card">
+                <h3>🚗 Vehicle Customization</h3>
+                <ul>
+                    <li>Engine tuning (power, torque)</li>
+                    <li>Suspension setup</li>
+                    <li>Tire selection & pressure</li>
+                    <li>Body kits & aerodynamics</li>
+                    <li>Paint, decals, wheels</li>
+                    <li>Interior upgrades</li>
+                </ul>
+            </div>
+            <div class="card">
+                <h3>🛣️ Track Design</h3>
+                <ul>
+                    <li>Build your own tracks</li>
+                    <li>Import external tracks</li>
+                    <li>Terrain modification tools</li>
+                    <li>Multiple track types</li>
+                    <li>Track builder interface</li>
+                </ul>
+            </dir>
+            <div class="card">
+                <h3>⚙️ Settings</h3>
+                <div class="settings-preview">
+                    <div class="setting">Audio</div>
+                    <div class="setting">Graphics</div>
+                    <div class="setting">Physics</div>
+                    <div class="setting">Controls</div>
+                    <div class="setting">Difficulty</div>
+                    <div class="setting">Language</div>
+                </div>
+            </div>
+        </div>
+        <div class="dashboard">
+            <h2>🚘 Car Preview</h2>
+            <div class="car-preview">
+                <div class="car"></div>
+            </div>
+            <p style="margin-top: 15px; color: #a0a0a0;">Select a vehicle from the garage and customize it!</p>
+        </div>
+        <div class="dashboard">
+            <h2>🌦️ Dynamic Environment</h2>
+            <div class="stats">
+                <div class="stat-box"><div class="stat-value" style="color:#3498db;">☀️</div><div class="stat-label">Sunny</div></div>
+                <div class="stat-box"><div class="stat-value" style="color:#9b59b6;">🌧️</div><div class="stat-label">Rain</div></div>
+                <div class="stat-box"><div class="stat-value" style="color:#e74c3c;">🌫️</div><div class="stat-label">Fog</div></div>
+            </div>
+        </div>
+        <footer class="footer">
+            <p>🏎️ Racing Simulator Mockup • Designed for Speed & Precision</p>
+        </footer>
+    </div>
+</body>
+</html>

@@ -1,0 +1,30 @@
+{
+  "type": "scatter",
+  "title": "User Engagement Metrics",
+  "series": [
+    {
+      "name": "",
+      "points": [
+        {
+          "label": "X",
+          "value": 10
+        },
+        {
+          "label": "Y",
+          "value": 20
+        },
+        {
+          "label": "Z",
+          "value": 15
+        },
+        {
+          "label": "W",
+          "value": 25
+        }
+      ]
+    }
+  ],
+  "style": {
+    "look": "forest"
+  }
+}

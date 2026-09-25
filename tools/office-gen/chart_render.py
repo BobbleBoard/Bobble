@@ -29,6 +29,7 @@ import math
 from pathlib import Path
 from xml.sax.saxutils import escape
 
+import numparse
 import palette as pal
 
 W, H = 960, 600
@@ -38,12 +39,9 @@ TYPES = ("bar", "hbar", "line", "donut")
 
 
 def _num(v) -> float:
-    try:
-        if isinstance(v, str):
-            v = v.replace(",", "").replace("%", "").replace("$", "").strip()
-        return float(v)
-    except (TypeError, ValueError):
-        return 0.0
+    """"22M", "$38k", "1.2B" and "3,100" as the numbers they are (numparse);
+    the old parser knew commas, % and $ but read "22M" as 0 (D3)."""
+    return numparse.num(v, 0.0)
 
 
 def _fmt(v: float) -> str:
@@ -63,8 +61,13 @@ def _nice_step(span: float, ticks: int = 5) -> float:
     return 10 * mag
 
 
-def normalise(spec: dict) -> dict:
-    """Coerce whatever the model returned into the shape the renderer draws."""
+def normalise(spec: dict, warnings: list | None = None) -> dict:
+    """Coerce whatever the model returned into the shape the renderer draws.
+    `warnings` (if given) hears about anything left out or unreadable."""
+    def warn(msg: str) -> None:
+        if warnings is not None and msg not in warnings:
+            warnings.append(msg)
+
     kind = str(spec.get("type") or "bar").lower().strip()
     kind = {"column": "bar", "columns": "bar", "bars": "bar", "horizontal": "hbar",
             "pie": "donut", "lines": "line", "area": "line"}.get(kind, kind)
@@ -90,16 +93,26 @@ def normalise(spec: dict) -> dict:
                 items = [{"label": str(l), "value": v} for l, v in zip(spec["labels"], values)]
         series_in = [{"name": spec.get("y_label") or "", "points": items}]
     series = []
+    if len(series_in) > 4:
+        warn(f"4 of {len(series_in)} series drawn — a chart holds 4")
     for s in series_in[:4]:
         if not isinstance(s, dict):
             continue
         pts = []
-        for p in (s.get("points") or s.get("items") or s.get("data") or [])[:24]:
+        raw_pts = s.get("points") or s.get("items") or s.get("data") or []
+        if len(raw_pts) > 24:
+            warn(f"24 of {len(raw_pts)} points drawn in '{s.get('name') or 'the series'}' — a chart holds 24")
+        for p in raw_pts[:24]:
             if isinstance(p, dict):
-                pts.append({"label": str(p.get("label") or p.get("x") or p.get("name") or ""),
-                            "value": _num(p.get("value") if "value" in p else p.get("y"))})
+                raw = p.get("value") if "value" in p else p.get("y")
+                label = str(p.get("label") or p.get("x") or p.get("name") or "")
             elif isinstance(p, (list, tuple)) and len(p) >= 2:
-                pts.append({"label": str(p[0]), "value": _num(p[1])})
+                raw, label = p[1], str(p[0])
+            else:
+                continue
+            if numparse.parse(raw) is None:
+                warn(f"'{raw}' ({label}) is not a number; drawn as 0")
+            pts.append({"label": label, "value": _num(raw)})
         if pts:
             series.append({"name": str(s.get("name") or ""), "points": pts})
     if not series:
@@ -310,7 +323,8 @@ def _donut(spec, t, top) -> list[str]:
 
 
 def render(spec: dict, out: Path) -> dict:
-    spec = normalise(spec)
+    warnings: list[str] = []
+    spec = normalise(spec, warnings)
     t = pal.from_spec({"palette": spec["palette"]})
     parts: list[str] = [
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" role="img" aria-label="{escape(spec["title"] or "chart")}">',
@@ -327,4 +341,4 @@ def render(spec: dict, out: Path) -> dict:
     out.write_text("\n".join(parts) + "\n")
     points = sum(len(s["points"]) for s in spec["series"])
     return {"type": spec["type"], "title": spec["title"], "series": len(spec["series"]),
-            "points": points, "bytes": out.stat().st_size}
+            "points": points, "bytes": out.stat().st_size, "warnings": warnings}

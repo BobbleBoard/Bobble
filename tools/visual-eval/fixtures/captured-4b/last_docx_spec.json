@@ -1,0 +1,121 @@
+{
+ "title": "The Art of Tea",
+ "running_title": "Global Comfort & Aromatic Tradition",
+ "palette": {
+  "primary": "#5D4037",
+  "accent": "#D7CCC8"
+ },
+ "blocks": [
+  {
+   "type": "cover",
+   "eyebrow": "A Warm Tradition",
+   "title": "The Art of Tea",
+   "subtitle": "From Classic Black to Delicate Green",
+   "byline": "A Global Beverage of Relaxation"
+  },
+  {
+   "type": "heading",
+   "title": "Worldwide Comfort",
+   "standfirst": "A soothing ritual enjoyed by people across every continent."
+  },
+  {
+   "type": "body",
+   "paragraphs": [
+    "Tea is more than a drink; it is a universal language of comfort that brings people together in moments of peace.",
+    "Whether steeped in a quiet morning or served chilled on a sweltering afternoon, this aromatic beverage offers a consistent sense of calm."
+   ]
+  },
+  {
+   "type": "stats",
+   "stats": [
+    {
+     "value": "2.5B+",
+     "label": "Daily Consumers"
+    },
+    {
+     "value": "500+",
+     "label": "Varieties Available"
+    },
+    {
+     "value": "180",
+     "label": "Countries"
+    }
+   ]
+  },
+  {
+   "type": "callout",
+   "label": "The Ritual",
+   "text": "The act of preparing tea is a deliberate pause in a busy day, fostering mindfulness and relaxation."
+  },
+  {
+   "type": "heading",
+   "title": "A Spectrum of Flavors",
+   "standfirst": "From robust black blends to subtle herbal infusions."
+  },
+  {
+   "type": "table",
+   "headers": [
+    "Category",
+    "Primary Flavor Profile",
+    "Best Time to Enjoy"
+   ],
+   "rows": [
+    [
+     "Black Tea",
+     "Bold, Malty",
+     "Morning"
+    ],
+    [
+     "Green Tea",
+     "Grassy, Fresh",
+     "Afternoon"
+    ],
+    [
+     "Herbal Tea",
+     "Floral, Spicy",
+     "Evening"
+    ]
+   ]
+  },
+  {
+   "type": "bullets",
+   "items": [
+    "Classic Black Tea offers a rich, warming experience perfect for starting the day.",
+    "Delicate Green Tea provides a light, refreshing taste ideal for midday focus.",
+    "Herbal options deliver unique flavors ranging from floral to spicy without caffeine."
+   ]
+  },
+  {
+   "type": "quote",
+   "quote": "In every cup, there is a moment of stillness.",
+   "attribution": "The Tea Lover's Perspective"
+  },
+  {
+   "type": "pagebreak"
+  },
+  {
+   "type": "body",
+   "paragraphs": [
+    "The versatility of tea allows it to adapt to any season, serving as a bridge between hot and cool climates alike.",
+    "It remains a timeless companion, offering a pleasant aromatic experience that transcends cultural boundaries."
+   ]
+  },
+  {
+   "type": "heading",
+   "title": "The Future of Infusion",
+   "standfirst": "Modern innovations meet ancient traditions."
+  },
+  {
+   "type": "body",
+   "paragraphs": [
+    "As global demand grows, the variety of teas continues to expand, introducing new leaves and rare blends to the market.",
+    "This evolution ensures that tea remains a dynamic and ever-refreshing part of daily life."
+   ]
+  },
+  {
+   "type": "callout",
+   "label": "Final Thought",
+   "text": "No matter the variety, the ultimate goal of tea is to provide a soothing moment of relaxation."
+  }
+ ]
+}

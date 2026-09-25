@@ -1,0 +1,1 @@
+Build a landing page for "Kiln", a pottery studio in Portland offering wheel-throwing classes (6-week beginner course $280, drop-in open studio $25), with a hero, class schedule, pricing, and a signup CTA.

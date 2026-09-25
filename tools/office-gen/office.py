@@ -113,9 +113,51 @@ def _one(v, n: int = 90) -> str:
     return s if len(s) <= n else s[: n - 1] + "…"
 
 
-def summary_of(kind: str, spec: dict) -> str:
-    """What was MADE, one line per slide/block/row group — from the spec, which
-    is the truth about content; the shape outline is for editing, not reading."""
+MAX_WARNINGS = 6
+
+
+def compact(warnings: list[str]) -> list[str]:
+    """At most MAX_WARNINGS lines for the model, duplicates folded — it acts on
+    a short list and loops on a long one."""
+    seen = list(dict.fromkeys(w for w in warnings if w))
+    if len(seen) <= MAX_WARNINGS:
+        return seen
+    return seen[: MAX_WARNINGS - 1] + [f"…and {len(seen) - MAX_WARNINGS + 1} more like these"]
+
+
+def _drawn_line(n: int, d: dict, unit: str) -> str:
+    """One line of what a slide/block SHOWS — its cuts said as 'k of n shown'."""
+    kind = d.get("layout") or d.get("type") or "?"
+    asked = d.get("asked")
+    label = f"{kind} (asked for {asked})" if asked and asked != kind else kind
+    head = d.get("head") or ""
+    line = f"{n}. {label}: {_one(head)}" if head else f"{n}. {label}"
+    if d.get("tail"):
+        line += f" — {_one(d['tail'], 70)}"
+    items = [x for x in (d.get("items") or []) if x]
+    cuts = d.get("cuts") or []
+    if cuts:
+        c = cuts[0]
+        more = f" (+{len(cuts) - 1} more cut)" if len(cuts) > 1 else ""
+        line += f" [{c['field']}: {c['shown']} of {c['given']} shown{more} — {_one(items, 80)}]"
+    elif items:
+        line += f" [{_one(items, 80)}]"
+    for note in d.get("notes") or []:
+        if "shortened" not in note:
+            line += f" ({note})"
+    return line
+
+
+def summary_of(kind: str, spec: dict, drawn: list[dict] | None = None) -> str:
+    """What was MADE, one line per slide/block/row group.
+
+    From the renderer's record of what it DREW when there is one (VQ-01, D19):
+    a list cut to fit, a layout that fell back, a title shortened — the model
+    is told what the file shows, not what the spec asked for."""
+    if drawn and kind in ("pptx", "docx", "pdf"):
+        head = [] if kind == "pptx" else [f"title: {_one(spec.get('title', ''))}"]
+        return "\n".join(head + [_drawn_line(i, d, "slide" if kind == "pptx" else "block")
+                                 for i, d in enumerate(drawn, 1)])
     if kind == "pptx":
         out = []
         for i, sl in enumerate(spec.get("slides", []), 1):
@@ -224,6 +266,7 @@ def retry(fn, what: str):
 def make(kind: str, brief: str, out: Path, slides: int | None, auto_out: bool = False) -> dict:
     t0 = time.time()
     warnings: list[str] = []
+    drawn: list[dict] = []
     if kind == "pptx":
         import make_deck
         import render_deck
@@ -250,7 +293,7 @@ def make(kind: str, brief: str, out: Path, slides: int | None, auto_out: bool = 
             "running_title": plan.get("running_title", ""),
             "slides": filled,
         }
-        render_deck.build(spec, out)
+        render_deck.build(spec, out, drawn=drawn, warnings=warnings)
         design = {"theme": spec["theme"]}
         items = len(filled)
     elif kind == "chart":
@@ -268,6 +311,7 @@ def make(kind: str, brief: str, out: Path, slides: int | None, auto_out: bool = 
             if stem:
                 out = out.with_name(f"{stem}.svg")
         info = chart_render.render(spec, out)
+        warnings += info.get("warnings", [])
         # The spec beside the file is what `office edit chart.svg` revises.
         out.with_suffix(".chart.json").write_text(json.dumps(chart_render.normalise(spec), indent=1))
         design = {"palette": spec.get("palette", {}), "chart": info["type"]}
@@ -281,7 +325,10 @@ def make(kind: str, brief: str, out: Path, slides: int | None, auto_out: bool = 
             import sheet_render as renderer
         else:
             import pdf_render as renderer
-        renderer.build(spec, out)
+        if kind == "xlsx":
+            renderer.build(spec, out)
+        else:
+            renderer.build(spec, out, drawn=drawn, warnings=warnings)
         design = {"palette": spec.get("palette", {})}
         items = len(spec.get("blocks", spec.get("rows", [])))
     from scratch import scratch_dir
@@ -296,8 +343,8 @@ def make(kind: str, brief: str, out: Path, slides: int | None, auto_out: bool = 
         "items": items,
         **design,
         "seconds": round(time.time() - t0, 1),
-        "warnings": warnings,
-        "summary": summary_of(kind, spec),
+        "warnings": compact(warnings),
+        "summary": summary_of(kind, spec, drawn),
     }
 
 
@@ -316,7 +363,8 @@ def edit_chart(src: Path, instruction: str, out: Path | None) -> dict:
     info = chart_render.render(revised, dst)
     dst.with_suffix(".chart.json").write_text(json.dumps(chart_render.normalise(revised), indent=1))
     return {"ok": True, "kind": "chart", "path": str(dst), "bytes": info["bytes"], "items": info["points"],
-            "seconds": round(time.time() - t0, 1), "summary": summary_of("chart", chart_render.normalise(revised))}
+            "seconds": round(time.time() - t0, 1), "warnings": compact(info.get("warnings", [])),
+            "summary": summary_of("chart", chart_render.normalise(revised))}
 
 
 def apply(src: Path, ops: list[dict], out: Path | None) -> dict:

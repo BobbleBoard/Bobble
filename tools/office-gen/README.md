@@ -31,6 +31,7 @@ renderers and `office_edit.py` need nothing but Python.
 | file | owns |
 | --- | --- |
 | `palette.py` | the model's two chosen colours → a full palette, with WCAG contrast enforced |
+| `numparse.py` | numbers, booleans and text as a model writes them: `22M`, `$38k`, `3,100`, `"false"`, a unit-only display |
 | `textfit.py` | real font metrics (PIL against the system TTFs) — python-pptx/docx have none |
 | `render_deck.py`, `doc_render.py`, `sheet_render.py`, `pdf_render.py` | spec → file, one per format |
 | `viz.py` | charts drawn as native shapes rather than chart-library defaults |
@@ -42,3 +43,14 @@ renderers and `office_edit.py` need nothing but Python.
 Never hand-write the file format. If something is missing, add it to the
 renderer — that is a change one person makes once, instead of a mistake every
 agent makes forever.
+
+## Tests
+
+    uv venv --python 3.12 tools/office-gen/.venv
+    uv pip install --python tools/office-gen/.venv/bin/python -r tools/office-gen/requirements-dev.txt
+    tools/office-gen/.venv/bin/python -m pytest tools/office-gen/tests -q
+
+The regression tests judge the renderers on the REAL 4B captures and the
+visual-quality research's replays (`tools/visual-eval/fixtures`), measuring the
+written file with the eval's own ruler. `pnpm vq:eval` renders all of it into
+contact sheets.

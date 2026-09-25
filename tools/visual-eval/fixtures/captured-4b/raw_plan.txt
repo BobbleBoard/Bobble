@@ -1,0 +1,46 @@
+{
+  "theme": "midnight",
+  "running_title": "Make a trend",
+  "slides": [
+    {
+      "layout": "hero_title",
+      "title": "Make a trend",
+      "intent": "Set the stage with a bold, full-bleed cover image."
+    },
+    {
+      "layout": "hero_statement",
+      "title": "Trends are not random; they are signals waiting to be decoded.",
+      "intent": "Provide the deck's quiet moment to shift perspective."
+    },
+    {
+      "layout": "flow",
+      "title": "The Cycle of a Trend",
+      "intent": "Map the lifecycle of a trend from emergence to saturation."
+    },
+    {
+      "layout": "stats",
+      "title": "The Speed of Adoption",
+      "intent": "Highlight key metrics showing how fast trends currently move."
+    },
+    {
+      "layout": "bars",
+      "title": "Top Current Movements",
+      "intent": "Compare the volume and velocity of the top five active trends."
+    },
+    {
+      "layout": "matrix",
+      "title": "Opportunities vs. Risks",
+      "intent": "Compare potential gains against the volatility of emerging trends."
+    },
+    {
+      "layout": "waffle",
+      "title": "Sustainability Check",
+      "intent": "Show the proportion of trends likely to persist versus die out."
+    },
+    {
+      "layout": "closing",
+      "title": "Takeaways",
+      "intent": "Summarize three actionable insights for the audience."
+    }
+  ]
+}

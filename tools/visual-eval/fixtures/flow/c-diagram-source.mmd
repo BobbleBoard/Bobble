@@ -1,0 +1,15 @@
+flowchart LR
+  A([Order placed]) --> B{Payment ok?}
+  B -- yes --> C[Pick & pack]
+  B -- no --> E[Email customer]
+  E -. retry .-> B
+  C --> D{Quality ok?}
+  D -- no, repack --> C
+  D -- yes --> F[Ship] --> G[Delivered] --> H([Review request])
+  classDef fail fill:#FFF4EC,stroke:#C2410C,color:#9A3412
+  classDef done fill:#0E7C7B,stroke:#0E7C7B,color:#FFFFFF
+  classDef start fill:#0F1E26,stroke:#0F1E26,color:#FFFFFF
+  class E fail
+  class H done
+  class A start
+  linkStyle 2,3,5 stroke:#C2410C,color:#C2410C

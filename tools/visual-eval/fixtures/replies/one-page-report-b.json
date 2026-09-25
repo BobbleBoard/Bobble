@@ -1,0 +1,16 @@
+{
+  "_note": "The same make_doc -> doc_render pipeline driven well for a ONE-page brief: no cover band (a heading is the masthead — the menu has nothing smaller than a full cover), the brief's numbers only (derived ones are arithmetic on them: 3h40m-2h14m, 31+22+18), each recommendation tied to the driver it fixes, then the chart tool's hbar put in with office edit --chart (a PNG picture in docx).",
+  "doc": {
+    "title": "Q3 Support Review",
+    "running_title": "Q3 Support Review",
+    "palette": {"primary": "#12343B", "accent": "#2A9D8F"},
+    "blocks": [
+      {"type": "heading", "title": "Q3 support: faster answers, a third of the backlog", "standfirst": "Customer support, July to September — 12,480 tickets."},
+      {"type": "stats", "stats": [{"value": "12,480", "label": "tickets, up 9% on Q2"}, {"value": "2h 14m", "label": "median first response, was 3h 40m"}, {"value": "91%", "label": "CSAT, against a 90% target"}, {"value": "640", "label": "backlog, down from 1,900"}]},
+      {"type": "body", "paragraphs": ["Volume rose 9% and the team still answered faster: the median first response fell by 1h 26m, the backlog is a third of what it was, and CSAT held above target."]},
+      {"type": "heading", "title": "Three drivers are 71% of tickets", "standfirst": "Each has a fix we can ship in Q4."},
+      {"type": "bullets", "items": ["Billing questions (31%) — self-serve refunds.", "Login issues (22%) — SSO rollout.", "Shipping delays (18%) — carrier tracking emails."]},
+      {"type": "callout", "label": "Recommendation", "text": "Ship all three in Q4, starting with self-serve refunds: billing is the largest driver."}
+    ]
+  }
+}

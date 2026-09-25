@@ -1,0 +1,33 @@
+{
+  "_note": "The brief each captured spec answered. A spec is only judgeable against what the person actually asked for, so every entry says where its brief came from. The 4B's own --brief strings for the 2026-09-16 deep-tasks run were not captured (that run's HOME was thrown away); for those the USER's request is used, which is what the provenance check must hold the document to anyway.",
+  "solar-deck": {
+    "spec": "last_pptx_spec.json",
+    "kind": "pptx",
+    "brief": "Make a 4-slide presentation (pptx) about the growth of solar power this decade, with one slide holding a bar chart of rough capacity numbers, and show it to me.",
+    "source": "apps/desktop/tests/e2e/deep-tasks-probe.mjs task 'deck' (run 2026-09-16 04:26, qwen3.5-4b-mtp)"
+  },
+  "tea-docx": {
+    "spec": "last_docx_spec.json",
+    "kind": "docx",
+    "brief": "Create a Word document called notes.docx with the title \"Draft\" and one short paragraph about tea. Then change its title to \"Final\" and show me the result.",
+    "source": "apps/desktop/tests/e2e/deep-tasks-probe.mjs task 'office-edit' (run 2026-09-16 04:09, qwen3.5-4b-mtp)"
+  },
+  "units-pdf": {
+    "spec": "last_pdf_spec.json",
+    "kind": "pdf",
+    "brief": "Units sold by year: 2021: 12, 2022: 19, 2023: 15, 2024: 22. Make a PDF report of it.",
+    "source": "reconstructed: the numbers are the brief's (visual-quality.md §2.2.2, 'brief: 12/19/15/22'); the exact wording of the 2026-09-16 19:15 request was not captured"
+  },
+  "units-chart": {
+    "spec": "last_chart_spec.json",
+    "kind": "chart",
+    "brief": "Units sold by year: 2021: 12, 2022: 19, 2023: 15, 2024: 22. Make a bar chart of it.",
+    "source": "reconstructed, as units-pdf (2026-09-16 19:11, four minutes before it)"
+  },
+  "cookie-docx": {
+    "spec": "cookie_docx_spec.json",
+    "kind": "docx",
+    "brief": "Make a document with a cooking recipe for 6 giant chocolate chip cookies along with a link to a source. Include ingredients, instructions, and the source URL.",
+    "source": "the 4B's own `office make --brief` in the user's session of 2026-09-12 (verbatim)"
+  }
+}

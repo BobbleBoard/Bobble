@@ -1,0 +1,8 @@
+{
+  "layout": "hero_title",
+  "title": "Global Energy Transition Report 2024",
+  "subtitle": "Accelerating Renewable Adoption",
+  "eyebrow": "Key findings from the Q3 analysis",
+  "footnote": "Data sourced from IEA and national grids",
+  "image_query": "A dramatic full-bleed image of solar panels on a desert landscape at sunset"
+}
