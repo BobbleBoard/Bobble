@@ -43,11 +43,19 @@ import {
 } from '../state/corp-connect';
 import { useCorpStore } from '../state/corp-store';
 import { useModalityStore } from '../state/modality-store';
-import { getModels, newSession, setSessionName, startPi, syncWorkspace } from '../state/pi-connect';
+import {
+  getModels,
+  newSession,
+  setSessionName,
+  startPi,
+  switchSession,
+  syncWorkspace,
+} from '../state/pi-connect';
 import { usePiStore } from '../state/pi-slice';
 import { connectPresent } from '../state/present-store';
 import { useProjectStore } from '../state/project-store';
 import { applySavedHarnessConfig, useUserMode } from '../state/settings-store';
+import { useTaskTray } from '../state/task-tray';
 import { useStudioUiStore } from '../studio/studio-ui-store';
 import { AdvancedParamsPanel } from './AdvancedParamsPanel';
 import { preloadFastestModel } from './auto-router';
@@ -69,6 +77,7 @@ import { ModuleNotice } from './ModuleNotice';
 import { SessionSidebar } from './SessionSidebar';
 import { StageAnnouncer } from './StageAnnouncer';
 import { useSiteIcon } from './site-icons';
+import { TaskTray } from './TaskTray';
 import { ToastHost } from './ToastHost';
 import { TopBarStatus } from './TopBarStatus';
 import { UiRequestDialogs } from './UiRequestDialogs';
@@ -254,6 +263,26 @@ export function ChatApp({
    */
   const modality = useModalityStore((s) => s.view);
   const inStudio = modality !== 'chat';
+
+  /*
+   * WHETHER THE CHAT IS ON SCREEN, for the task tray. A studio, the model hub,
+   * Scheduled and Extensions all arrive through `contentOverride`, and a chat
+   * whose reply is still streaming behind one of them has been LEFT exactly as
+   * much as one you switched away from (state/task-tray.ts).
+   */
+  const chatCovered = contentOverride !== undefined;
+  useEffect(() => {
+    useTaskTray.getState().setCovered(chatCovered);
+  }, [chatCovered]);
+  /* A chat row in the tray: the same two steps a sidebar row takes — bring the
+     chat forward over whatever route is up, then open it. */
+  const openChatFromTray = useCallback(
+    (file: string) => {
+      onEnterChat?.();
+      void switchSession(file);
+    },
+    [onEnterChat],
+  );
 
   /*
    * ⌘K — one way in, instead of a growing table of keys.
@@ -923,6 +952,16 @@ export function ChatApp({
               >
                 <IconSidebar size={16} />
               </button>
+              {/*
+                THE TASKS YOU LEFT, immediately right of the toggle and in the
+                same no-drag zone (a control outside it would lose its clicks to
+                the drag rect, like the toggle once did). the user (2026-09-24): "a
+                little notifications button … always simply to the right of the
+                collapse sidebar button, this only appears when you leave a
+                running task". Here rather than in the sidebar so it is there
+                whether the sidebar is open or collapsed. See TaskTray.tsx.
+              */}
+              <TaskTray onOpenChat={openChatFromTray} />
               {/*
                 CHAT | WORK, in the corner Claude puts it in.
 

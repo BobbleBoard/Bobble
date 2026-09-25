@@ -31,7 +31,7 @@
  *   lands" was the thesis, and four identical-looking cards for one prompt read
  *   as an accident next to the music mode's one (the user, 2026-09-17).
  */
-import { type JSX, useCallback, useMemo, useRef, useState } from 'react';
+import { type JSX, useCallback, useMemo, useRef } from 'react';
 import { ThreadMedia } from '../chat/ThreadMedia';
 import { ModuleCard } from '../media/ModuleCard';
 import { useGenStore } from '../state/gen-store';
@@ -46,6 +46,7 @@ import {
   StudioShell,
   type StudioStarter,
 } from './StudioShell';
+import { useStudioDraft } from './studio-draft';
 import { useStudioUiStore } from './studio-ui-store';
 import { useEnhancer } from './use-enhancer';
 import { useStudioInput } from './use-handoff';
@@ -118,18 +119,20 @@ const EXAMPLES: Record<Mode, readonly string[]> = {
 };
 
 export function AudioStudio(): JSX.Element {
-  const [mode, setMode] = useState<Mode>('speech');
-  const [prompt, setPrompt] = useState('');
-  const [model, setModel] = useState<string>('');
-  const [voice, setVoice] = useState('');
-  const [speed, setSpeed] = useState(1);
-  const [seconds, setSeconds] = useState<number | undefined>(undefined);
+  /* Drafts, not plain state: the room's inputs are still here when you come
+     back to it (studio-draft.ts). */
+  const [mode, setMode] = useStudioDraft<Mode>('audio', 'mode', 'speech');
+  const [prompt, setPrompt] = useStudioDraft('audio', 'prompt', '');
+  const [model, setModel] = useStudioDraft<string>('audio', 'model', '');
+  const [voice, setVoice] = useStudioDraft('audio', 'voice', '');
+  const [speed, setSpeed] = useStudioDraft('audio', 'speed', 1);
+  const [seconds, setSeconds] = useStudioDraft<number | undefined>('audio', 'seconds', undefined);
   // One take by default (the user, 2026-09-17: four cards for one prompt read as
   // "random amount of output"); the rail's Count still asks for more.
-  const [count, setCount] = useState(1);
-  const [refAudio, setRefAudio] = useState('');
-  const [steps, setSteps] = useState<number | ''>('');
-  const [seed, setSeed] = useState<number | ''>('');
+  const [count, setCount] = useStudioDraft('audio', 'count', 1);
+  const [refAudio, setRefAudio] = useStudioDraft('audio', 'refAudio', '');
+  const [steps, setSteps] = useStudioDraft<number | ''>('audio', 'steps', '');
+  const [seed, setSeed] = useStudioDraft<number | ''>('audio', 'seed', '');
   const fileInput = useRef<HTMLInputElement>(null);
 
   const catalog = useGenStore((s) => s.catalog);
@@ -152,7 +155,7 @@ export function AudioStudio(): JSX.Element {
    */
   const blocked = studioBlockedReason(models, mode === 'speech' ? 'speech' : 'sound');
 
-  const enhancer = useEnhancer(useCallback((next: string) => setPrompt(next), []));
+  const enhancer = useEnhancer(useCallback((next: string) => setPrompt(next), [setPrompt]));
 
   /* Media handed to this room — from a card in the transcript, or dropped on
 
@@ -160,7 +163,7 @@ export function AudioStudio(): JSX.Element {
 
   const handoff = useStudioInput(
     'audio',
-    useCallback((p: string) => setPrompt(p), []),
+    useCallback((p: string) => setPrompt(p), [setPrompt]),
   );
   const setSettingsOpen = useStudioUiStore((st) => st.setSettingsOpen);
 

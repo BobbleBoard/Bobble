@@ -49,6 +49,11 @@ export function latestPreview(payload: GenSurfacePayload): string | undefined {
   return withPreview.length > 0 ? withPreview[withPreview.length - 1]?.previewSrc : undefined;
 }
 
+/** A job a studio started (its request id rides on every event), not a chat's. */
+export function isStudioPayload(payload: GenSurfacePayload): boolean {
+  return typeof payload.requestId === 'string' && payload.requestId.length > 0;
+}
+
 /** Every output that has actually landed, in candidate order. */
 export function finishedOutputs(payload: GenSurfacePayload): string[] {
   return payload.candidates
@@ -91,7 +96,15 @@ export function useGenStream(): void {
     if (bridge === undefined) return;
     const { open, update } = useGenLive.getState();
 
+    /*
+     * A STUDIO'S JOB IS NOT THE THREAD'S. Its events carry the studio's
+     * `requestId`, and its studio follows them (state/studio-jobs.ts). Taken in
+     * here, a picture started in the Image studio replaced the live job a
+     * chat's own generate call was waiting on — `open` keeps one job — and the
+     * chat's card went on to draw the studio's progress.
+     */
     const unsubOpen = bridge.onEvent('gen:open', ({ tabId, payload }) => {
+      if (isStudioPayload(payload)) return;
       open(jobFromPayload(tabId, payload, Date.now()));
     });
     /*
@@ -121,6 +134,7 @@ export function useGenStream(): void {
       });
     });
     const unsubUpdate = bridge.onEvent('gen:update', ({ tabId, payload }) => {
+      if (isStudioPayload(payload)) return;
       const existing = useGenLive.getState().jobs[tabId];
       if (existing === undefined) {
         // An update for a stream we never saw open (a reload mid-job) still

@@ -180,3 +180,47 @@ export function compositePng(base, overlay, { x, y, width, height }) {
   }
   return encodePng({ width: a.width, height: a.height, channels: a.channels, data: out });
 }
+
+/**
+ * A picture that LOOKS like a result — an evening sky, a low sun, a field —
+ * for probes that put a finished generation on screen. A 1×1 pixel scaled up
+ * reads as an empty white card in a screenshot, which is exactly what a look
+ * at a result card cannot afford to be mistaken for.
+ */
+export function eveningPng(width = 384, height = 384) {
+  const data = Buffer.alloc(width * height * 3);
+  const mix = (a, b, t) => Math.round(a + (b - a) * Math.max(0, Math.min(1, t)));
+  const sun = { x: width * 0.62, y: height * 0.58, r: width * 0.09 };
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const i = (y * width + x) * 3;
+      const t = y / (height - 1);
+      // Sky: blue at the top, through a pale haze (a straight blue→amber blend
+      // goes mauve in the middle), to amber at the horizon.
+      const top = [44, 86, 138];
+      const haze = [214, 200, 178];
+      const low = [246, 164, 96];
+      const s = Math.min(1, t / 0.66);
+      let rgb =
+        s < 0.5
+          ? top.map((c, k) => mix(c, haze[k], s / 0.5))
+          : haze.map((c, k) => mix(c, low[k], (s - 0.5) / 0.5));
+      const d = Math.hypot(x - sun.x, y - sun.y);
+      if (d < sun.r) rgb = [255, 214, 140];
+      else if (d < sun.r * 2.2) {
+        const glow = 1 - (d - sun.r) / (sun.r * 1.2);
+        rgb = rgb.map((c, k) => mix(c, [255, 200, 130][k], glow * 0.45));
+      }
+      // The field, with a soft rise across it.
+      const horizon = height * (0.66 + 0.05 * Math.sin((x / width) * Math.PI * 1.4));
+      if (y > horizon) {
+        const f = (y - horizon) / (height - horizon);
+        rgb = [mix(122, 58, f), mix(118, 74, f), mix(52, 36, f)];
+      }
+      data[i] = rgb[0];
+      data[i + 1] = rgb[1];
+      data[i + 2] = rgb[2];
+    }
+  }
+  return encodePng({ width, height, channels: 3, data });
+}

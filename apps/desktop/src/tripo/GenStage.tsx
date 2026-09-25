@@ -92,21 +92,20 @@ const STAGE_HINT: Record<Gen3dRole, string> = {
 };
 
 /** mm:ss since this job started. Null for the first few seconds — a timer on a
- * two-second stage is noise. */
-function useElapsed(jobId: string | null, done: boolean): string | null {
+ * two-second stage is noise.
+ *
+ * The start is the STORE's (`jobStartedAt`), not a ref here: a ref restarted
+ * the clock at 0s every time you left the studio and came back, over a job that
+ * had been running the whole time. */
+function useElapsed(jobId: string | null, done: boolean, startedAt: number | null): string | null {
   const [, force] = useState(0);
-  const startRef = useRef<{ id: string; at: number } | null>(null);
-  if (jobId !== null && startRef.current?.id !== jobId) {
-    startRef.current = { id: jobId, at: Date.now() };
-  }
   useEffect(() => {
     if (jobId === null || done) return;
     const t = setInterval(() => force((n) => n + 1), 1000);
     return () => clearInterval(t);
   }, [jobId, done]);
-  const start = startRef.current;
-  if (start === null || jobId === null) return null;
-  const secs = Math.max(0, Math.floor((Date.now() - start.at) / 1000));
+  if (startedAt === null || jobId === null) return null;
+  const secs = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
   if (secs < 3) return null;
   return secs < 60
     ? `${secs}s`
@@ -307,7 +306,8 @@ export function GenStage(): JSX.Element | null {
   const cancelJob = useGen3dStore((s) => s.cancelJob);
   const clearJob = useGen3dStore((s) => s.clearJob);
   const loadedAssetId = useTripoStore((s) => s.loadedAssetId);
-  const elapsed = useElapsed(job?.jobId ?? null, job?.done ?? true);
+  const jobStartedAt = useGen3dStore((s) => s.jobStartedAt);
+  const elapsed = useElapsed(job?.jobId ?? null, job?.done ?? true, jobStartedAt);
   // The bar owns the number; the readouts follow it. See ChunkedProgress.
   const [shownPercent, setShownPercent] = useState(0);
 
