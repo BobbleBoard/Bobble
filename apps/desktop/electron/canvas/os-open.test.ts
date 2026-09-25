@@ -1,8 +1,10 @@
+import { execFile } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 import {
   describeOpenFailure,
   isBundleId,
   openArgv,
+  openFailureDetail,
   openPolicy,
   openRequestsFor,
   resolveOpenTarget,
@@ -181,6 +183,26 @@ describe('describeOpenFailure — why, in words a person can act on', () => {
           'because there is no such file." UserInfo={NSFilePath=/Applications/Foo.app}',
       ),
     ).toBe('Foo is not installed on this Mac.');
+  });
+
+  /*
+   * A TIMEOUT IS "DID NOT ANSWER", NOT A COMMAND LINE. execFile's timeout
+   * kills `open` with SIGTERM and says so only in `signal`/`killed`: the
+   * message is "Command failed: open -a … <file>" and stderr is empty. A real
+   * one, from `sleep`, through what canvas-main hands describeOpenFailure.
+   */
+  it('an `open` killed by its timeout reads as the app not answering', async () => {
+    const error = await new Promise<Error>((resolve) => {
+      execFile('sleep', ['5'], { timeout: 50 }, (e) => resolve(e as Error));
+    });
+    expect(
+      describeOpenFailure(
+        { kind: 'app', app: '/Applications/Slow.app', target: '/w/file.png' },
+        openFailureDetail(error),
+      ),
+    ).toBe('The app did not answer in time.');
+    // Anything else that failed still says what `open` said.
+    expect(openFailureDetail(Object.assign(new Error('x'), { stderr: ' nope \n' }))).toBe('nope');
   });
 
   it('passes anything else through, first line only', () => {

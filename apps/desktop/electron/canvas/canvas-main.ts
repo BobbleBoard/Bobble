@@ -60,6 +60,7 @@ import {
   type OpenOutcome,
   type OpenRequest,
   openArgv,
+  openFailureDetail,
   openPolicy,
   openRequestsFor,
   resolveOpenTarget,
@@ -680,8 +681,7 @@ async function launch(channel: string, req: OpenRequest): Promise<OpenOutcome> {
       await runOpen(argv);
       outcome = { ok: true };
     } catch (error) {
-      const detail = (error as { stderr?: string }).stderr?.trim() || String(error);
-      outcome = { ok: false, error: describeOpenFailure(req, detail) };
+      outcome = { ok: false, error: describeOpenFailure(req, openFailureDetail(error)) };
     }
   }
   noteForProbes({ channel, argv, ran: true, outcome });

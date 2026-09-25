@@ -182,6 +182,18 @@ export function describeOpenFailure(req: OpenRequest, detail: string): string {
 }
 
 /**
+ * What a failed `open` said, for {@link describeOpenFailure}: its stderr — or,
+ * when execFile's timeout killed it, that it timed out. That kill is told only
+ * in `killed`/`signal`; the message is "Command failed: open -a … <file>" and
+ * stderr is empty, so a slow app read as an engineer's command line.
+ */
+export function openFailureDetail(error: unknown): string {
+  const e = error as { stderr?: string; killed?: boolean };
+  if (e.killed === true) return 'timed out';
+  return e.stderr?.trim() || String(error);
+}
+
+/**
  * May this process really hand things to the OS?
  *
  * A probe must never launch Preview, Finder or a browser over someone's work
