@@ -143,6 +143,16 @@ interface PresentState {
    * earlier made some visuals in and it didn't have them there").
    */
   claimUnsaved: (chat: string) => void;
+  /**
+   * The same conversation, continued in another session file. Taking back a
+   * message rewinds pi onto a branch of the chat (`pi:fork` writes a new file),
+   * and the thread then reads its cards under the new key — where there were
+   * none, so every card the chat had shown vanished with the one message. The
+   * cards belong to the conversation: those still anchored in it (`keep`) are
+   * copied across; one already there (rehydrated from the transcript) is not
+   * doubled.
+   */
+  carry: (from: string, to: string, keep: (afterMessageId: string | null) => boolean) => void;
   clear: () => void;
 }
 
@@ -244,6 +254,18 @@ export const usePresentStore = create<PresentState>((set, get) => ({
       if (chat === UNSAVED_CHAT || unsaved === undefined || unsaved.length === 0) return {};
       const { [UNSAVED_CHAT]: _moved, ...rest } = s.byChat;
       return { byChat: { ...rest, [chat]: [...(rest[chat] ?? []), ...unsaved] } };
+    }),
+  carry: (from, to, keep) =>
+    set((s) => {
+      if (from === to) return {};
+      const have = s.byChat[to] ?? [];
+      const add = (s.byChat[from] ?? []).filter(
+        (r) =>
+          keep(r.afterMessageId) &&
+          !have.some((h) => h.path === r.path && h.afterMessageId === r.afterMessageId),
+      );
+      if (add.length === 0) return {};
+      return { byChat: { ...s.byChat, [to]: [...have, ...add] } };
     }),
   clear: () => set({ byChat: {} }),
 }));

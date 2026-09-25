@@ -242,8 +242,9 @@
  * pages, studios, project folders): primary ink, level with its icon. A row
  * without one is CONTENT (a chat title): it stays secondary, so the long list is
  * the quiet part of the rail and the chat you are in (pill + primary) stands out
- * of it. "New chat" is the one lead action: medium weight, and the rail's only
- * accent, on its icon.
+ * of it. "New chat" is the one lead action: medium weight. (It also wore the
+ * accent on its icon for a day; the user: "one thing I don't like is the blue 'new
+ * chat' button, so let's drop that.")
  */
 :root[data-flavor="bobble"] .pd-sidebar-row:has(> .pd-sidebar-row-icon) {
   color: var(--pd-text-primary);
@@ -251,11 +252,24 @@
 :root[data-flavor="bobble"] .pd-sidebar-row--lead {
   font-weight: var(--pd-font-weight-medium);
 }
-:root[data-flavor="bobble"] .pd-sidebar-row--lead .pd-sidebar-row-icon {
-  color: var(--pd-accent-primary);
-}
 :root[data-flavor="bobble"] .pd-sidebar-row--lead .pd-sidebar-row-meta {
   font-weight: var(--pd-font-weight-regular);
+}
+/* Mac density (tokens.ts, bobbleLayout): 13px text in the 28px rows, and
+ * section breaks a step tighter so the groups still read as groups at that
+ * size. The Size sliders (Settings › Interface) scale all of it. */
+:root[data-flavor="bobble"] .pd-sidebar {
+  font-size: calc(13px * var(--pd-sidebar-scale, 1));
+}
+:root[data-flavor="bobble"] .pd-sidebar-section {
+  padding-top: calc(12px * var(--pd-sidebar-scale, 1));
+}
+:root[data-flavor="bobble"] .pd-sidebar-section-header {
+  height: calc(22px * var(--pd-sidebar-scale, 1));
+}
+:root[data-flavor="bobble"] .pd-sidebar .pd-collapsible-search--collapsed,
+:root[data-flavor="bobble"] .pd-sidebar .pd-search-field-input {
+  font-size: calc(13px * var(--pd-sidebar-scale, 1));
 }
 /* Search and New chat are the rail's two actions: one row apart, as rows are,
  * rather than New chat floating halfway (48px each way) between Search and the

@@ -1019,16 +1019,27 @@ const bobbleMotion: ThemeTokens['motion'] = {
   toastEnterY: '-8px',
 };
 
+/*
+ * NATIVE DENSITY. the user (2026-09-24): "the size of the dropdowns and default
+ * scale/size of the app eg. the sidebar's buttons are like 1.5x as tall as the
+ * ones I see in claude/chatgpt/other apps". The WEB references measure no
+ * smaller than we were (claude.ai ~32px rows at 14px, chatgpt.com 36px at 16px),
+ * so the gap he sees is to the Mac's own density — 13px system text in ~28px
+ * rows, menus a step tighter — which is the Apple-like brief this flavor was
+ * written to. Rows and controls come down a step (32 → 28, 26/32/40 → 24/28/36);
+ * the sidebar and menus take 13px text (sidebar.css, menu.css). Settings ›
+ * Interface keeps its sliders for anyone who wants the old size back.
+ */
 const bobbleControl: ThemeTokens['control'] = {
-  sm: '26px',
-  md: '32px',
-  lg: '40px',
+  sm: '24px',
+  md: '28px',
+  lg: '36px',
   icon: '18px',
   iconStroke: '1.25',
 };
 
 const bobbleLayout: ThemeTokens['layout'] = {
-  rowHeight: '32px',
+  rowHeight: '28px',
   sidebarWidth: '272px',
   topbarHeight: '48px',
   threadWidth: '800px',
@@ -1060,8 +1071,11 @@ const bobbleSurface: ThemeTokens['surface'] = {
  *   cast     0 3-10px    — negative spread, so it falls below, not around
  *   ambient  (md and up) — the lift, also pulled in by its spread
  * The EDGE is drawn separately (shadow.hairline, or a border-default on the
- * studio's floating panels); `edge` itself is now a 2px definition, not a
- * 14px glow.
+ * studio's floating panels). `edge` is the all-round lift the menus, palette
+ * and suggestion lists add to the downward throw — the user asked for it ("add to
+ * the universal dropdown styling a subtle shadow effect around the edges"), so
+ * it stays a soft halo, a little tighter than the 14px it was; cutting it to a
+ * 2px line (a day, 2026-09-24) sat the tops of the menus flush again.
  */
 const bobbleShadowBase = {
   sm: '0 0.5px 1px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.07)',
@@ -1069,7 +1083,7 @@ const bobbleShadowBase = {
   lg: '0 1px 2px rgba(0, 0, 0, 0.06), 0 6px 14px -4px rgba(0, 0, 0, 0.1), 0 22px 44px -14px rgba(0, 0, 0, 0.18)',
   popover:
     '0 1px 2px rgba(0, 0, 0, 0.06), 0 10px 24px -8px rgba(0, 0, 0, 0.14), 0 30px 60px -18px rgba(0, 0, 0, 0.24)',
-  edge: '0 0 2px rgba(0, 0, 0, 0.05)',
+  edge: '0 0 10px rgba(0, 0, 0, 0.07)',
 };
 
 const bobbleLight: ThemeTokens = {
@@ -1283,7 +1297,7 @@ const bobbleDark: ThemeTokens = {
     lg: 'inset 0 0.5px 0 rgba(255, 255, 255, 0.08), 0 1px 2px rgba(0, 0, 0, 0.5), 0 8px 18px -6px rgba(0, 0, 0, 0.45), 0 26px 52px -16px rgba(0, 0, 0, 0.6)',
     popover:
       'inset 0 0.5px 0 rgba(255, 255, 255, 0.09), 0 1px 2px rgba(0, 0, 0, 0.5), 0 12px 28px -8px rgba(0, 0, 0, 0.5), 0 34px 68px -20px rgba(0, 0, 0, 0.65)',
-    edge: '0 0 2px rgba(0, 0, 0, 0.4)',
+    edge: '0 0 12px rgba(0, 0, 0, 0.3)',
     hairline: '0 0 0 0.5px rgba(255, 255, 255, 0.14)',
   },
   surface: bobbleSurface,

@@ -1333,7 +1333,7 @@ export function SessionSidebar({
       </div>
 
       <SidebarScroll>
-        {/* The rail's one lead action: it carries the accent (sidebar.css). */}
+        {/* The rail's one lead action (sidebar.css). */}
         <SidebarRow
           className="pd-sidebar-row--lead"
           icon={<Glyph name="newChat" />}

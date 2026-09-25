@@ -95,6 +95,7 @@ import { buildComfyImageJob, isComfyImageModel } from './image-dispatch';
 import { createRoomKeeper, type RoomKeeper } from './make-room';
 import { generateSvg, omniSvgFiles } from './omnisvg';
 import { canEnhance, type EnhancerEndpoint, enhancePrompt } from './prompt-enhancer';
+import { parseTqdm } from './tqdm';
 import {
   buildVideoJob,
   defaultExtractPosterFrame,
@@ -114,6 +115,16 @@ const log = createLogger('desktop:gen');
  */
 interface AgentSource {
   readonly agent?: string;
+}
+
+/**
+ * The studio request a job answers, echoed on every surface event it streams
+ * (GenSurfacePayload.requestId). Absent on the agents' path. Spread into each
+ * handler's payload, so a studio can follow its job while the room itself is
+ * not mounted — see src/state/studio-jobs.ts.
+ */
+function studioTag(requestId: string | undefined): { readonly requestId?: string } {
+  return requestId !== undefined && requestId !== '' ? { requestId } : {};
 }
 
 export interface GenManagerOptions {
@@ -622,6 +633,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
   async function handleGenerate(
     raw: GenerateImageParams,
     from?: AgentSource,
+    requestId?: string,
   ): Promise<GenerateImageResult> {
     const model = getModel(raw.model ?? defaultImageModel().id);
     // An image model runs one of two ways: the mflux worker (its `mflux`
@@ -761,6 +773,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
       status,
       error,
       note,
+      ...studioTag(requestId),
     });
 
     send('gen:open', { tabId, payload: payload('generating') });
@@ -795,6 +808,27 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
          * being dropped, so the room said "Starting…" throughout and he reported
          * the studio as not working at all.
          */
+        const steps = event.event === 'log' ? parseTqdm(event.text) : undefined;
+        if (steps !== undefined) {
+          /*
+           * A worker that only PRINTS its steps (tqdm on stderr — the image-edit
+           * path) still has a counter: it becomes the same progress a structured
+           * event gives, and the line itself is never shown. the user (2026-09-24):
+           * "that terminal logging style text below it needs to go". tqdm does
+           * not say which candidate; the first one not yet done is being drawn.
+           */
+          const idx = Math.max(
+            0,
+            candidates.findIndex((c) => c.status !== 'done'),
+          );
+          const c = candidates[idx];
+          if (c !== undefined && c.status === 'pending') {
+            candidates[idx] = { ...c, status: 'generating' };
+          }
+          progress = { candidate: idx, step: steps.step, total: steps.total };
+          send('gen:update', { tabId, payload: payload('generating') });
+          return;
+        }
         const line =
           event.event === 'log' ? noteFrom(event.text) : downloadNote(event.detail, event.ratio);
         if (line !== undefined && line !== note) {
@@ -848,6 +882,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
   async function handleGenerateVideo(
     raw: GenerateVideoParams,
     from?: AgentSource,
+    requestId?: string,
   ): Promise<GenerateVideoResult> {
     const model = getModel(raw.model ?? defaultVideoModel().id);
     if (model === undefined || model.modality !== 'video') {
@@ -904,6 +939,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
       status,
       error,
       note,
+      ...studioTag(requestId),
     });
 
     send('gen:open', { tabId, payload: payload('generating') });
@@ -992,6 +1028,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
   async function handleGenerateAudio(
     raw: GenerateAudioParams,
     from?: AgentSource,
+    requestId?: string,
   ): Promise<GenerateAudioResult> {
     const kind = raw.kind ?? 'speech';
     const fallback = defaultAudioModel(kind, activeModels());
@@ -1067,6 +1104,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
       status,
       error,
       note,
+      ...studioTag(requestId),
     });
 
     /*
@@ -1303,7 +1341,8 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
    * agent bridge reaches, so a studio job and a chat job are the same job: one
    * queue, one cancel, one heavy gate, one asset prompt. Errors come back as a
    * field rather than a rejection so a studio can render the sentence instead of
-   * an unhandled promise.
+   * an unhandled promise. The studio's `requestId` rides on every event the job
+   * streams (studioTag), which is how the room follows a job it is not in.
    */
   ipcMain.handle(
     'gen:generate',
@@ -1313,32 +1352,43 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
     ): Promise<GenInvokeMap['gen:generate']['response']> => {
       try {
         if (req.kind === 'audio') {
-          const r = await handleGenerateAudio({
-            prompt: req.prompt,
-            kind: req.audioKind ?? 'speech',
-            ...(req.model !== undefined ? { model: req.model } : {}),
-            ...(req.seconds !== undefined ? { seconds: req.seconds } : {}),
-            ...(req.steps !== undefined ? { steps: req.steps } : {}),
-            ...(req.voice !== undefined ? { voice: req.voice } : {}),
-            ...(req.speed !== undefined ? { speed: req.speed } : {}),
-            ...(req.lang !== undefined ? { lang: req.lang } : {}),
-            ...(req.refAudio !== undefined ? { refAudio: req.refAudio } : {}),
-            ...(req.refText !== undefined ? { refText: req.refText } : {}),
-            ...(req.seed !== undefined ? { seed: req.seed } : {}),
-            ...(req.n !== undefined ? { count: req.n } : {}),
-          });
+          const r = await handleGenerateAudio(
+            {
+              prompt: req.prompt,
+              kind: req.audioKind ?? 'speech',
+              ...(req.model !== undefined ? { model: req.model } : {}),
+              ...(req.seconds !== undefined ? { seconds: req.seconds } : {}),
+              ...(req.steps !== undefined ? { steps: req.steps } : {}),
+              ...(req.voice !== undefined ? { voice: req.voice } : {}),
+              ...(req.speed !== undefined ? { speed: req.speed } : {}),
+              ...(req.lang !== undefined ? { lang: req.lang } : {}),
+              ...(req.refAudio !== undefined ? { refAudio: req.refAudio } : {}),
+              ...(req.refText !== undefined ? { refText: req.refText } : {}),
+              ...(req.seed !== undefined ? { seed: req.seed } : {}),
+              ...(req.n !== undefined ? { count: req.n } : {}),
+            },
+            undefined,
+            req.requestId,
+          );
           return { jobId: r.jobId, outputs: r.outputs };
         }
         if (req.kind === 'video') {
-          const r = await handleGenerateVideo({
-            prompt: req.prompt,
-            ...(req.model !== undefined ? { model: req.model } : {}),
-            ...(req.seconds !== undefined ? { seconds: req.seconds } : {}),
-            ...(req.size !== undefined ? { size: req.size } : {}),
-            ...(req.fps !== undefined ? { fps: req.fps } : {}),
-            ...(req.seed !== undefined ? { seed: req.seed } : {}),
-            ...(req.negativePrompt !== undefined ? { negativePrompt: req.negativePrompt } : {}),
-          });
+          const r = await handleGenerateVideo(
+            {
+              prompt: req.prompt,
+              ...(req.model !== undefined ? { model: req.model } : {}),
+              ...(req.seconds !== undefined ? { seconds: req.seconds } : {}),
+              ...(req.size !== undefined ? { size: req.size } : {}),
+              ...(req.fps !== undefined ? { fps: req.fps } : {}),
+              ...(req.seed !== undefined ? { seed: req.seed } : {}),
+              ...(req.negativePrompt !== undefined ? { negativePrompt: req.negativePrompt } : {}),
+              // The studio's Steps knob — dropped here the same way, so it
+              // changed nothing (handleGenerateVideo clamps and uses it).
+              ...(req.steps !== undefined ? { steps: req.steps } : {}),
+            },
+            undefined,
+            req.requestId,
+          );
           return {
             jobId: r.jobId,
             outputs: r.outputs.map((o) => ({
@@ -1348,15 +1398,33 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
             })),
           };
         }
-        const r = await handleGenerate({
-          prompt: req.prompt,
-          ...(req.model !== undefined ? { model: req.model } : {}),
-          ...(req.size !== undefined ? { size: req.size } : {}),
-          ...(req.n !== undefined ? { n: req.n } : {}),
-          ...(req.steps !== undefined ? { steps: req.steps } : {}),
-          ...(req.seed !== undefined ? { seed: req.seed } : {}),
-          ...(req.negativePrompt !== undefined ? { negativePrompt: req.negativePrompt } : {}),
-        });
+        /*
+         * THE EDIT HALF WAS NEVER FORWARDED. The contract has carried
+         * `inputImage` / `strength` / `guidance` since the studios learned to
+         * edit, and `handleGenerate` has honoured them since the same day — but
+         * this call dropped all three, so every "Edit" the Image Studio ever ran
+         * was a plain text-to-image run of the instruction, and the round-2 edit
+         * probe passed anyway (a fresh picture of the same subject is "different
+         * from the input" too). Found wiring the image viewer's Edit bar to it.
+         */
+        const r = await handleGenerate(
+          {
+            prompt: req.prompt,
+            ...(req.model !== undefined ? { model: req.model } : {}),
+            ...(req.size !== undefined ? { size: req.size } : {}),
+            ...(req.n !== undefined ? { n: req.n } : {}),
+            ...(req.steps !== undefined ? { steps: req.steps } : {}),
+            ...(req.seed !== undefined ? { seed: req.seed } : {}),
+            ...(req.negativePrompt !== undefined ? { negativePrompt: req.negativePrompt } : {}),
+            ...(req.guidance !== undefined ? { guidance: req.guidance } : {}),
+            ...(req.inputImage !== undefined && req.inputImage.length > 0
+              ? { inputImage: req.inputImage }
+              : {}),
+            ...(req.strength !== undefined ? { strength: req.strength } : {}),
+          },
+          undefined,
+          req.requestId,
+        );
         return {
           jobId: r.jobId,
           outputs: r.outputs.map((o) => ({

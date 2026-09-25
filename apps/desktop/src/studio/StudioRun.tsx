@@ -148,9 +148,13 @@ export function StudioJob({
       <PendingMediaCard
         kind={kind}
         label={job.prompt}
+        /* One number per job across leaving and coming back: the card that
+           mounts on return continues the pill rather than counting up from 0. */
+        progressKey={`studio:${kind}:${job.startedAt}`}
+        edit={job.edit === true}
         {...(aspect === undefined ? {} : { aspect })}
         {...(width === undefined ? {} : { width })}
-        {...(hasSteps ? { progress: frac } : {})}
+        {...(hasSteps ? { progress: frac, steps: job.total } : {})}
         {...(job.note === undefined ? {} : { note: job.note })}
         {...(job.items !== undefined && job.items.length > 0 ? { item: job.items[0] } : {})}
         {...(onRevealed === undefined ? {} : { onRevealed })}

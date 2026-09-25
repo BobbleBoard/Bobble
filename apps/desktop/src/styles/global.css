@@ -3157,6 +3157,252 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   flex: 1;
   min-width: 48px;
 }
+/* ── The task tray (beside the sidebar toggle) — chat/TaskTray.tsx ─────────
+ *
+ * the user's reference for this was a stack of flat task cards with oversized
+ * titles, a status pill AND the same status as text, and a blue "View" link.
+ * This is the opposite on each count: one firm sheet (the shared .pd-menu
+ * surface), a list-sized ink ladder, the status once, and the row itself as the
+ * way there. Compact on purpose — a two-line row is 40px.
+ */
+.pd-task-tray-slot {
+  /* Closed until there is a task to show, then eased open — the collapsed top
+     bar's title starts after this corner (chrome-corner.ts measures it), so it
+     slides aside rather than being shoved, and there is no empty gap when the
+     tray is empty (TaskTray.tsx). */
+  display: flex;
+  flex: none;
+  width: 0;
+  height: 32px;
+  margin-left: 0;
+  transition:
+    width 220ms var(--pd-easing-standard, ease),
+    margin-left 220ms var(--pd-easing-standard, ease);
+}
+.pd-task-tray-slot[data-open="true"] {
+  width: 32px;
+  margin-left: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pd-task-tray-slot {
+    transition: none;
+  }
+}
+.pd-task-tray-button {
+  position: relative;
+  display: flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  /* The collapse toggle's own shape and ink, so the pair reads as one cluster. */
+  border-radius: 6px;
+  background: transparent;
+  color: var(--pd-text-muted);
+  transition:
+    background-color var(--pd-duration-fast, 120ms) var(--pd-easing-standard, ease),
+    color var(--pd-duration-fast, 120ms) var(--pd-easing-standard, ease);
+  animation: pd-task-tray-in 200ms var(--pd-easing-standard, ease) both;
+}
+.pd-task-tray-button:hover,
+.pd-task-tray-button[data-state="open"] {
+  background: var(--pd-bg-hover);
+  color: var(--pd-text-primary);
+}
+@keyframes pd-task-tray-in {
+  from {
+    opacity: 0;
+    transform: scale(0.86);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+/* The button's one mark: the most urgent row's colour, the sidebar's own dot. */
+.pd-task-tray-dot {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+.pd-task-tray-dot,
+.pd-task-dot {
+  display: inline-block;
+  flex: none;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  animation: pd-chat-dot-pop 0.28s var(--pd-easing-standard) both;
+}
+.pd-task-tray-dot[data-tone="done"],
+.pd-task-dot[data-tone="done"] {
+  background: var(--pd-status-info-fg);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pd-status-info-fg) 22%, transparent);
+}
+.pd-task-tray-dot[data-tone="needs-input"],
+.pd-task-dot[data-tone="needs-input"] {
+  background: var(--pd-status-warning-fg);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pd-status-warning-fg) 22%, transparent);
+}
+.pd-task-tray-dot[data-tone="failed"],
+.pd-task-dot[data-tone="failed"] {
+  background: var(--pd-status-danger-fg);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pd-status-danger-fg) 22%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .pd-task-tray-button {
+    animation: none;
+  }
+}
+/* The card: the shared menu sheet, sized for a short list. (Two classes so the
+   menu family's own padding does not win on source order.) */
+.pd-menu.pd-task-tray {
+  width: 300px;
+  max-width: calc(100vw - 24px);
+  padding: 4px;
+}
+.pd-task-tray-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pd-task-row {
+  position: relative;
+}
+.pd-task-row-open {
+  display: flex;
+  width: 100%;
+  min-height: 40px;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px;
+  border: 0;
+  /* Concentric with the sheet: its radius less the 4px it is inset by. */
+  border-radius: calc(var(--pd-radius-popover, 14px) - 4px);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: default;
+  outline: none;
+}
+/* A finished row keeps room for its × so the title's ellipsis stops short of it. */
+.pd-task-row[data-state="done"] .pd-task-row-open,
+.pd-task-row[data-state="failed"] .pd-task-row-open {
+  padding-right: 30px;
+}
+/* Keyboard focus is the menu family's highlight, not a ring clipped by the
+   sheet — and only in keyboard mode (ui/focus-ring.ts): the card focuses its
+   first row as it opens, and a click-opened card must not arrive with a row
+   already lit. */
+.pd-task-row-open:hover,
+:root[data-focus-ring="on"] .pd-task-row-open:focus-visible {
+  background: var(--pd-bg-hover);
+}
+.pd-task-row-glyph {
+  display: flex;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+  color: var(--pd-text-muted);
+}
+.pd-task-row-text {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+.pd-task-row-title {
+  overflow: hidden;
+  font-size: var(--pd-font-size-footnote);
+  font-weight: var(--pd-font-weight-medium);
+  line-height: var(--pd-leading-footnote);
+  color: var(--pd-text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pd-task-row-meta {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+  color: var(--pd-text-secondary);
+  white-space: nowrap;
+}
+.pd-task-row-spinner {
+  flex: none;
+  color: var(--pd-text-secondary);
+}
+.pd-task-row-word,
+.pd-task-row-sep {
+  flex: none;
+}
+.pd-task-row-sep,
+.pd-task-row-time {
+  color: var(--pd-text-muted);
+}
+.pd-task-row-time {
+  min-width: 0;
+  overflow: hidden;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+}
+.pd-task-row-x {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  display: flex;
+  width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--pd-text-muted);
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: opacity var(--pd-duration-fast, 120ms) var(--pd-easing-standard, ease);
+}
+.pd-task-row:hover .pd-task-row-x,
+.pd-task-row-x:focus-visible {
+  opacity: 1;
+}
+.pd-task-row-x:hover {
+  background: var(--pd-bg-active);
+  color: var(--pd-text-primary);
+}
+.pd-task-tray-foot {
+  display: flex;
+  margin-top: 4px;
+  padding: 4px 0 0;
+  border-top: 1px solid var(--pd-border-subtle);
+}
+.pd-task-tray-clear {
+  /* Its words start on the titles' line (row padding 8 + glyph 16 + gap 10),
+     the way a menu's text column lines up past its icons. */
+  margin-left: 26px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: calc(var(--pd-radius-popover, 14px) - 4px);
+  background: transparent;
+  color: var(--pd-text-secondary);
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+}
+.pd-task-tray-clear:hover {
+  background: var(--pd-bg-hover);
+  color: var(--pd-text-primary);
+}
+
 /* ── The downloads tray (top-left) ──────────────────────────────────────── */
 .pd-tray-button {
   position: relative;
@@ -4254,6 +4500,11 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   inset: 0;
   cursor: zoom-out;
 }
+/* …and the picture that opens it says so. A card click opens the image
+   viewer (MediaCard `data-opens`); the corner controls keep their pointer. */
+.pd-media-frame[data-opens="true"] {
+  cursor: zoom-in;
+}
 .pd-media-stage {
   position: relative;
   z-index: 1;
@@ -4322,6 +4573,24 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   flex-direction: column;
   gap: 8px;
   min-width: 0;
+}
+
+/*
+ * A RESULT FILED IN THE CHAIN IS A STEP OF THE WORK, not the answer.
+ *
+ * the user (2026-09-24): the iterations of an edit "should be embedded in thinking
+ * blocks" — they are how the model got there, and the chain around them is set
+ * a size below the reply for exactly that reason (activity-chain.css: "process
+ * sits one step below the answer"). The same card at two-thirds the height:
+ * still a picture you can judge an iteration by, no longer a column of
+ * finished-looking results. The answer beneath the chain keeps the full size.
+ */
+.pd-chain-step-attachment {
+  --pd-media-max-h: 240px;
+}
+/* The row above already spaces it; the thread's own top margin would double it. */
+.pd-chain-step-attachment .pd-thread-media {
+  margin-top: 0;
 }
 
 .pd-thread-video {
@@ -6658,6 +6927,12 @@ body[data-media-expanded="true"] .pd-studio-compose {
 .pd-media-card--pending {
   gap: 9px;
   align-items: stretch;
+  /* The column's width, not shrink-to-fit. A shrink-wrapped card gave the
+     frame's `100%` nothing to resolve against, and the waiting frame came out
+     at its contents' size — MEASURED 271px for a 4:3 picture that then arrived
+     at 482px (the user: "significantly smaller than the images generated"). The
+     frame states its own width inside it and stays left, as the finished one. */
+  align-self: stretch;
 }
 
 .pd-media-card--pending .pd-media-frame {
@@ -6667,8 +6942,12 @@ body[data-media-expanded="true"] .pd-studio-compose {
      will be — by the column, and by the same max height (`--pd-media-max-h`,
      through the aspect ratio). SEEN: a 512² request rendered as a 512px
      pending frame and a 480px picture, a 30px step at the handover. */
+  /* With no stated width the frame is exactly the box the finished picture
+     will take — the max height times the aspect, capped by the column. It used
+     to fall back to 330px, which is how a wide result arrived "significantly
+     smaller than the images generated" (the user, 2026-09-24) and jumped. */
   width: min(
-    var(--pd-pending-w, 330px),
+    var(--pd-pending-w, 100vw),
     calc(var(--pd-media-max-h) * var(--pd-pending-aspect, 1)),
     100%
   );
@@ -6789,45 +7068,77 @@ body[data-media-expanded="true"] .pd-studio-compose {
 }
 
 /*
- * A CARD THAT IS STILL BEING MADE HAS NO EDGE AND NO PLATE.
+ * THE CARD THAT IS STILL BEING MADE IS A CARD — distinct, raised, borderless.
  *
- * the user (2026-09-17): "image and I assume video generating animations need to
- * be unbordered cards, just with some subtle but smooth falloff so it's not a
- * hard unbordered edge." And again (2026-09-23), for every kind: "image/video/
- * other 'generating' inline cards should have no border at all, but with some
- * falloff into the background color of the chat".
+ * the user (2026-09-24), with ChatGPT's generating card beside ours: "I don't
+ * actually think there is a difference between the background color of the
+ * generation card and the chat area, what I want here is for there to be a
+ * distinct black background card that makes it feel raised, not lowered, but
+ * without a border, just quick but noticeable falloff around the edge into the
+ * background color."
  *
- * The first answer kept the plate and painted the page colour over its rim — an
- * 8% band that still read as a dark card with soft corners. Now there is no card
- * while it waits: no border, no ground, the blocks drawn straight onto the chat,
- * and the loader itself fading out toward every edge (a mask, so what it fades
- * into is whatever the chat's background really is, in either theme). The
- * border and the ground come back with the result, so the card that arrives is
- * the card every other picture wears.
+ * This reverses the plateless wait of 2026-09-17/23 ("unbordered cards, just
+ * with some subtle but smooth falloff"): that became no ground at all, blocks
+ * drawn on the chat, which is exactly what he could no longer tell apart. The
+ * border stays away; the ground comes back as black on the dark theme — a sheet
+ * with a faint lift in its middle (the "subtle glow") — and its edge is a short
+ * falloff, a black halo that fades into whatever the chat is, so there is no
+ * line and the card sits ON the page. On the light theme the raised sheet is
+ * white with the same falloff in a light shadow.
  */
 .pd-media-card--pending .pd-media-frame {
   border-color: transparent;
-  background-color: transparent;
+  background-color: #fff;
+  box-shadow:
+    0 0 14px 3px rgb(0 0 0 / 6%),
+    0 12px 28px -10px rgb(0 0 0 / 14%);
   transition:
     aspect-ratio 380ms var(--pd-easing-standard, ease),
     width 380ms var(--pd-easing-standard, ease),
     border-color 520ms var(--pd-easing-standard, ease),
-    background-color 520ms var(--pd-easing-standard, ease);
+    background-color 520ms var(--pd-easing-standard, ease),
+    box-shadow 520ms var(--pd-easing-standard, ease);
+}
+:root[data-mode="dark"] .pd-media-card--pending .pd-media-frame {
+  background-color: #000;
+  background-image: radial-gradient(
+    120% 90% at 50% 38%,
+    rgb(255 255 255 / 4.5%),
+    rgb(255 255 255 / 0%) 62%
+  );
+  box-shadow:
+    0 0 14px 4px rgb(0 0 0 / 62%),
+    0 14px 34px -10px rgb(0 0 0 / 70%);
+}
+/* A sound's strip keeps no plate: it is the transport's own box, and a black
+   bar under a waveform would be a second, heavier strip. */
+.pd-media-card--pending[data-kind="audio"] .pd-media-frame,
+:root[data-mode="dark"] .pd-media-card--pending[data-kind="audio"] .pd-media-frame {
+  background-color: transparent;
+  background-image: none;
+  box-shadow: none;
 }
 .pd-media-card--pending[data-revealing="true"]:not([data-kind="audio"]) .pd-media-frame {
   border-color: color-mix(in oklab, var(--pd-text-primary) 10%, transparent);
   background-color: var(--pd-bg-sunken, var(--pd-bg-raised));
 }
-/* The falloff: a feathered rectangle, not a vignette — the field reaches the
-   edges and fades there, rather than shrinking to an oval in the middle. */
+/* Once the result is in, the lift fades with the sweep, so the finished card
+   that replaces this one (which has no halo) is not a visible step. */
+.pd-media-card--pending[data-done="true"] .pd-media-frame,
+:root[data-mode="dark"] .pd-media-card--pending[data-done="true"] .pd-media-frame {
+  box-shadow: none;
+}
+/* The field reaches the card's edges and fades there into the card's own
+   ground, so a block is never cut by the frame or its rounded corner — a narrow
+   feather now that the card, not the loader, is what meets the chat. */
 .pd-media-card--pending .pd-bobble-loader-host[data-fill="true"] {
   -webkit-mask-image:
-    linear-gradient(to right, transparent, #000 13%, #000 87%, transparent),
-    linear-gradient(to bottom, transparent, #000 15%, #000 85%, transparent);
+    linear-gradient(to right, transparent, #000 8%, #000 92%, transparent),
+    linear-gradient(to bottom, transparent, #000 9%, #000 91%, transparent);
   -webkit-mask-composite: source-in;
   mask-image:
-    linear-gradient(to right, transparent, #000 13%, #000 87%, transparent),
-    linear-gradient(to bottom, transparent, #000 15%, #000 85%, transparent);
+    linear-gradient(to right, transparent, #000 8%, #000 92%, transparent),
+    linear-gradient(to bottom, transparent, #000 9%, #000 91%, transparent);
   mask-composite: intersect;
 }
 /* With no plate under them, white blocks on a light chat would be invisible:
@@ -6837,23 +7148,18 @@ body[data-media-expanded="true"] .pd-studio-compose {
   --pd-bobble-scrim: transparent;
 }
 
-/*
- * THE BAR. Floating — no trough card, no panel, no border. It is the only other
- * thing on screen while the card waits, and it leaves the moment the sweep
- * starts, because a progress bar over a finished picture is measuring nothing.
- */
 /* The phase line — top-left inside the frame, over the mark, the thinking
-   shimmer (packages/ui shimmer.css). It goes with the loader at the reveal. */
-.pd-pending-phase {
+   shimmer (packages/ui shimmer.css) — and the number, bottom-right. The same
+   small pill for both, on the card's own ground. The phase goes with the loader
+   at the reveal; the number stays until the result is out. */
+.pd-pending-phase,
+.pd-pending-pill {
   position: absolute;
-  top: 10px;
-  left: 12px;
   z-index: 4;
   padding: 2px 8px;
-  border-radius: 8px;
-  /* The dot field runs under the words, so they sit on a soft plate of the
-     chat's own ground — the card has no ground of its own while it waits. */
-  background: color-mix(in srgb, var(--pd-bg-base) 66%, transparent);
+  border-radius: var(--pd-radius-full);
+  border: 1px solid rgb(0 0 0 / 10%);
+  background: rgb(255 255 255 / 82%);
   -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
   font-size: var(--pd-font-size-caption);
@@ -6861,8 +7167,43 @@ body[data-media-expanded="true"] .pd-studio-compose {
   font-weight: var(--pd-font-weight-medium);
   pointer-events: none;
 }
-/* The words take the ink's colour: near-white on the dark theme, the text's
-   own on the light one, where there is no longer a dark plate behind them. */
+:root[data-mode="dark"] .pd-pending-phase,
+:root[data-mode="dark"] .pd-pending-pill {
+  border-color: rgb(255 255 255 / 14%);
+  background: rgb(22 22 24 / 72%);
+}
+.pd-pending-phase {
+  top: 10px;
+  left: 12px;
+}
+/*
+ * THE NUMBER. the user (2026-09-24): "a little bordered pill at the bottom right of
+ * the image card that says n% and smoothly goes up". Tabular figures so a digit
+ * turning over does not shift the pill; it fades in with the first real step
+ * and out a moment after the result is complete, so 100 is seen.
+ */
+.pd-pending-pill {
+  right: 12px;
+  bottom: 12px;
+  min-width: 3.4em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  color: var(--pd-text-primary);
+  opacity: 0;
+  transition: opacity 240ms var(--pd-easing-standard, ease);
+}
+:root[data-mode="dark"] .pd-pending-pill {
+  color: rgb(255 255 255 / 92%);
+}
+.pd-pending-pill[data-visible="true"] {
+  opacity: 1;
+}
+.pd-media-card--pending[data-done="true"] .pd-pending-pill {
+  opacity: 0;
+  transition: opacity 320ms var(--pd-easing-standard, ease) 520ms;
+}
+/* The words take the ink's colour: near-white on the dark card, the text's own
+   on the light one. */
 .pd-pending-phase .pd-shimmer {
   --pd-shimmer-base: rgb(255 255 255 / 62%);
   --pd-shimmer-highlight: rgb(255 255 255 / 100%);
@@ -6870,45 +7211,6 @@ body[data-media-expanded="true"] .pd-studio-compose {
 :root:not([data-mode="dark"]) .pd-pending-phase .pd-shimmer {
   --pd-shimmer-base: color-mix(in srgb, var(--pd-text-primary) 55%, transparent);
   --pd-shimmer-highlight: var(--pd-text-primary);
-}
-
-.pd-pending-bar {
-  position: relative;
-  width: min(var(--pd-pending-w, 330px), 100%);
-  height: 3px;
-  border-radius: var(--pd-radius-full);
-  overflow: hidden;
-  background: color-mix(in srgb, var(--pd-text-primary) 12%, transparent);
-  transition: opacity 260ms var(--pd-easing-standard, ease);
-}
-
-.pd-pending-fill {
-  height: 100%;
-  border-radius: inherit;
-  /* White, as asked — and white on both themes, because it sits under a card
-     whose ground is dark in either. */
-  background: color-mix(in srgb, var(--pd-text-primary) 88%, transparent);
-  transition: width 320ms var(--pd-easing-standard, ease-out);
-}
-
-.pd-pending-fill[data-indeterminate="true"] {
-  width: 38%;
-  transition: none;
-  animation: pd-bobble-sweep 1450ms ease-in-out infinite;
-}
-
-.pd-pending-pct {
-  font-size: var(--pd-font-size-caption);
-  font-variant-numeric: tabular-nums;
-  color: var(--pd-text-tertiary, var(--pd-text-secondary));
-  transition: opacity 260ms var(--pd-easing-standard, ease);
-}
-
-/* Handing over: the measurement goes, the picture stays. */
-.pd-media-card--pending[data-revealing="true"] .pd-pending-bar,
-.pd-media-card--pending[data-revealing="true"] .pd-pending-pct {
-  opacity: 0;
-  pointer-events: none;
 }
 
 .pd-bobble-loader-host {

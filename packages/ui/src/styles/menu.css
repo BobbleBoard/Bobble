@@ -222,6 +222,13 @@
  * gap beside a short item is dead space that looks clickable and is not. Moved
  * here so every menu behaves the same and one change moves all of them.
  */
+/* Mac density (tokens.ts): 13px on 18px lines, so a one-line item is the 26px
+ * its min-height asks for rather than growing past it. */
+:root[data-flavor="bobble"] .pd-menu {
+  font-size: calc(13px * var(--pd-menu-scale, 1));
+  line-height: calc(18px * var(--pd-menu-scale, 1));
+}
+
 .pd-menu-item {
   position: relative;
   display: flex;

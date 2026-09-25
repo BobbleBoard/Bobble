@@ -1,0 +1,216 @@
+/*
+ * THE IMAGE VIEWER — a picture opened into a small studio (ImageViewer.tsx).
+ *
+ * Only what is new to this room lives here. The rail is the 3D viewport's
+ * `tp-float-group`, the History card is its `tp-history-rail`, the bar is the
+ * studio's `pd-studio-composer`: their recipes stay where they are defined
+ * (tripo.css, global.css) and this file only places them. Tokens only.
+ */
+
+/*
+ * THE GROUND IS THE 3D STUDIO'S STAGE, not the dialog's dim glass.
+ *
+ * The `stage` scrim is a 35% black veil over the chat — right for a card that
+ * floats in the middle, wrong for a room: the rail, the bar and the picker row
+ * under it would sit on a darkened, blurred transcript at whatever contrast the
+ * messages behind happened to give them. And not see-through at all: at 94%
+ * the card this picture was opened from ghosted through the middle of the room
+ * the moment the picture left the stage for an edit (SEEN). So it is the ground
+ * the floating group already stands on in the 3D studio (`.tp-viewport`), solid.
+ */
+.pd-media-scrim[data-layout="room"] {
+  display: block;
+  padding: 0;
+  background: radial-gradient(
+    ellipse 90% 75% at 50% 42%,
+    color-mix(in srgb, var(--pd-text-primary) 7%, var(--pd-bg-base)),
+    var(--pd-bg-base) 78%
+  );
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/*
+ * ANYTHING THAT FLOATS FROM INSIDE IT FLOATS ABOVE IT. Menus and tooltips are
+ * portalled to <body> at z-index 50 and the scrim is 60, so the rail's labels
+ * and the picker's dropup opened BEHIND the room they belong to.
+ */
+body[data-media-expanded="true"] .pd-tooltip,
+body[data-media-expanded="true"] .pd-menu {
+  z-index: 70;
+}
+
+.pd-viewer {
+  /* Rail and margin on the left, the same on the right, so a picture with no
+     History beside it centres on the WINDOW. */
+  --pd-viewer-side: 84px;
+  /* The title strip — traffic lights on the left, Close on the right. */
+  --pd-viewer-top: 52px;
+  /* The bar, the picker row under it and air above it — MEASURED in
+     ImageViewer (the bar grows a Download card, an error line); this is only
+     the first frame's guess. */
+  --pd-viewer-bottom: 140px;
+  /* How far the picture's axis sits left of the window's (History open). */
+  --pd-viewer-shift: 0px;
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  /* The ground between the pieces is the scrim's: a click there closes. */
+  pointer-events: none;
+}
+.pd-viewer > * {
+  pointer-events: auto;
+}
+
+/* ── the rail ─────────────────────────────────────────────────────────── */
+.pd-viewer-tools {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* ── the picture ──────────────────────────────────────────────────────── */
+.pd-viewer .pd-viewer-stage {
+  position: absolute;
+  top: var(--pd-viewer-top);
+  bottom: var(--pd-viewer-bottom);
+  left: var(--pd-viewer-side);
+  right: var(--pd-viewer-side);
+  /* Flex, not grid: a flex container's definite height is what the picture's
+     `max-height: 100%` resolves against, with no auto row in between. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  /* The stage is layout; only what is ON it takes clicks. */
+  pointer-events: none;
+  /* Arrives like a dialog, ONCE: on the stage, which mounts with the room,
+     not on the picture, which remounts per version — a History click is a
+     flip for comparing, and a fade in the middle of a comparison hides it. */
+  animation: pd-dialog-in var(--pd-duration-dialog-in) var(--pd-easing-enter);
+}
+/*
+ * The History card opening makes room by sliding the picture over — the "quick
+ * smooth resize" the user allows a card, not a jump. Only once the room is on
+ * screen (`data-ready`), so opening it never slides. The bottom does not
+ * animate: the bar's height settles as its Download card answers, just after
+ * opening, and a picture easing up and down then reads as the room settling.
+ */
+.pd-viewer[data-ready="true"] .pd-viewer-stage {
+  transition: right var(--pd-duration-slow) var(--pd-easing-standard);
+}
+/* With the History card at the right, the picture centres in what is left —
+   and the bar follows it, so the words sit under the picture they change. */
+.pd-viewer[data-history="true"] {
+  --pd-viewer-shift: calc((232px + 32px - var(--pd-viewer-side)) / 2);
+}
+.pd-viewer[data-history="true"] .pd-viewer-stage {
+  right: calc(232px + 32px);
+}
+
+/*
+ * A PICTURE ON A SURFACE, not a card in a list: its own edge and a firm drop,
+ * the grounded-elevation recipe the floating panels use — so it reads as the
+ * document the tools around it act on.
+ */
+.pd-viewer-picture {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow:
+    0 0 0 1px var(--pd-border-default),
+    var(--pd-shadow-lg);
+  pointer-events: auto;
+}
+
+/*
+ * THE WAITING CARD TAKES THE PICTURE'S PLACE AND ITS BOX. ImageViewer gives the
+ * host the picture's width (and the stage the height cap the card reads), and
+ * measures the bar-and-caption tail under the frame so it can be taken back out
+ * here: the stage then centres the FRAME exactly where the picture was.
+ */
+.pd-viewer-pending {
+  max-width: 100%;
+  margin-bottom: calc(-1 * var(--pd-viewer-pending-tail, 0px));
+  pointer-events: auto;
+}
+.pd-viewer-pending .pd-media-card {
+  width: 100%;
+}
+/* The corners the picture it becomes has, so the handover is not a reshape. */
+.pd-viewer-pending .pd-media-frame {
+  border-radius: 8px;
+}
+
+/* ── the History card ─────────────────────────────────────────────────── */
+.pd-viewer .pd-viewer-history {
+  /* Under the Close, not beside it. */
+  top: var(--pd-viewer-top);
+  right: 16px;
+  width: 232px;
+  max-width: 232px;
+  max-height: calc(100% - var(--pd-viewer-top) - var(--pd-viewer-bottom));
+  overflow-y: auto;
+}
+.pd-viewer-history-head {
+  cursor: default;
+}
+.pd-viewer-count {
+  margin-left: 6px;
+  color: var(--pd-text-muted);
+  font-weight: var(--pd-font-weight-regular);
+}
+
+/* ── the edit bar ─────────────────────────────────────────────────────── */
+.pd-viewer-bar {
+  position: absolute;
+  left: calc(50% - var(--pd-viewer-shift));
+  /* BAR_BOTTOM in ImageViewer.tsx — the stage's reserve is measured from it. */
+  bottom: 14px;
+  transform: translateX(-50%);
+  width: min(620px, calc(100% - 2 * var(--pd-viewer-side)));
+  display: flex;
+  flex-direction: column;
+}
+.pd-viewer[data-ready="true"] .pd-viewer-bar {
+  transition: left var(--pd-duration-slow) var(--pd-easing-standard);
+}
+
+/*
+ * A FIRM SHEET ON THE GROUND. In a studio the composer sits on the page; here
+ * it floats over the room, so it takes the floating surfaces' material — the
+ * overlay fill, the drawn default edge, the large drop.
+ */
+.pd-viewer-composer {
+  background: var(--pd-bg-overlay);
+  border-color: var(--pd-border-default);
+  box-shadow: var(--pd-shadow-lg);
+  -webkit-backdrop-filter: blur(var(--pd-blur-overlay));
+  backdrop-filter: blur(var(--pd-blur-overlay));
+}
+.pd-viewer-underbar {
+  justify-content: center;
+  padding-top: 6px;
+}
+.pd-viewer-error {
+  justify-content: center;
+  text-align: center;
+}
+
+/* ── close ────────────────────────────────────────────────────────────── */
+.pd-viewer-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pd-viewer .pd-viewer-stage,
+  .pd-viewer-bar {
+    animation: none;
+    transition: none;
+  }
+}

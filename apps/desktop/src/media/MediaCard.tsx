@@ -24,18 +24,31 @@
  * behind it — so it reads as looking closer at something rather than leaving.
  */
 import { useCopyFeedback } from '@pi-desktop/ui';
-import { type JSX, useEffect, useMemo, useState } from 'react';
+import { type JSX, type MouseEvent, useEffect, useMemo, useState } from 'react';
 import { pdFileUrl } from '../chat/canvas/file-preview';
 import { ThreadAudio } from '../chat/ThreadAudio';
 import { humanSize, type ThreadMediaItem } from '../chat/thread-media';
+import { lazyRoute } from '../RouteBoundary';
 import { useModalityStore } from '../state/modality-store';
 import { studioFor, useStudioHandoff } from '../state/studio-handoff';
 import { ExpandedScrim } from './ExpandedScrim';
 import { ModelControls } from './ModelControls';
 import { ModelSurface } from './ModelSurface';
 import { copyFile, exportFile, revealFile, startFileDrag } from './media-actions';
+import { shapeOf } from './media-shapes';
 import { createModelView, type ModelView } from './model-view';
 import { VideoSurface } from './VideoSurface';
+
+/*
+ * A PICTURE OPENS INTO THE IMAGE VIEWER — the studio-shaped room around one
+ * image (ImageViewer.tsx). Lazy, because it brings the 3D studio's stylesheet
+ * for the rail and the History card, and a transcript of six pictures should
+ * not pay for that until one is opened.
+ */
+const ImageViewer = lazyRoute('Image viewer', () => import('./ImageViewer'), {
+  pick: (m) => m.ImageViewer,
+  variant: 'inline',
+});
 
 /** The media itself, at whatever size the frame around it gives. */
 function Surface({
@@ -49,6 +62,11 @@ function Surface({
   view?: ModelView;
 }): JSX.Element {
   const src = pdFileUrl(item.path);
+  /* A picture the waiting card just swept in has a known shape: hold its box
+     until this copy decodes, so the handover has no frame at the empty size
+     (see media-shapes). */
+  const known = item.kind === 'image' ? shapeOf(item.path) : undefined;
+  const [decoded, setDecoded] = useState(known === undefined);
   if (item.kind === 'image') {
     return (
       <img
@@ -57,6 +75,15 @@ function Surface({
         src={src}
         alt={item.name}
         draggable={false}
+        onLoad={() => setDecoded(true)}
+        style={
+          decoded || known === undefined
+            ? undefined
+            : {
+                aspectRatio: String(known),
+                width: `min(calc(var(--pd-media-max-h) * ${known}), 100%)`,
+              }
+        }
       />
     );
   }
@@ -329,17 +356,39 @@ export function MediaCard({ item }: MediaCardProps): JSX.Element {
    * same hover.
    */
   const beside = item.kind === 'audio';
+  /*
+   * CLICKING THE PICTURE OPENS IT. the user: "clicking on a card (eg image once
+   * finished generating) does not expand/open it." Only the corner button did,
+   * and only once you had found it on hover. A picture only — a clip's frame is
+   * its transport, a model's is a viewport you drag to turn, a sound's is a
+   * scrubber — and never a click that was really one of the corner controls.
+   */
+  const openOnClick =
+    item.kind === 'image'
+      ? (e: MouseEvent<HTMLDivElement>) => {
+          if ((e.target as HTMLElement).closest('button') !== null) return;
+          setOpen(true);
+        }
+      : undefined;
   const frame = (
     /*
       Drag is a pointer gesture by nature, which is what the a11y rule warns
-      about — the Export button beside it is the same outcome by keyboard.
+      about — the Export button beside it is the same outcome by keyboard, and
+      "Open larger" is the keyboard's route to the click.
     */
-    // biome-ignore lint/a11y/noStaticElementInteractions: Export is the accessible equivalent.
+    // biome-ignore lint/a11y/noStaticElementInteractions: Export and Open larger are the accessible equivalents.
+    // biome-ignore lint/a11y/useKeyWithClickEvents: Open larger is the keyboard route to the same view.
     <div
       className="pd-media-frame"
       draggable
       onDragStart={(e) => startFileDrag(e, item.path)}
-      title={`Drag to save · ${item.path}`}
+      onClick={openOnClick}
+      data-opens={openOnClick !== undefined ? 'true' : undefined}
+      title={
+        openOnClick !== undefined
+          ? `Click to open · drag to save · ${item.path}`
+          : `Drag to save · ${item.path}`
+      }
     >
       <Surface item={item} large={false} {...(modelView ? { view: modelView } : {})} />
       {beside ? null : <Controls item={item} onExpand={() => setOpen(true)} />}
@@ -375,7 +424,9 @@ export function MediaCard({ item }: MediaCardProps): JSX.Element {
           {bytes !== undefined ? ` · ${humanSize(bytes)}` : ''}
         </span>
       </figcaption>
-      {open ? (
+      {open && item.kind === 'image' ? (
+        <ImageViewer item={item} onClose={() => setOpen(false)} />
+      ) : open ? (
         <Expanded
           item={item}
           onClose={() => setOpen(false)}

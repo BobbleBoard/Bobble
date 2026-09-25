@@ -19,7 +19,7 @@
  *
  *   SHAPE, NOT PIXELS, for the same reason as the image studio.
  */
-import { type JSX, useCallback, useMemo, useState } from 'react';
+import { type JSX, useCallback, useMemo } from 'react';
 import { ThreadMedia } from '../chat/ThreadMedia';
 import { ModuleCard } from '../media/ModuleCard';
 import { useGenStore } from '../state/gen-store';
@@ -34,6 +34,7 @@ import {
   StudioShell,
   type StudioStarter,
 } from './StudioShell';
+import { useStudioDraft } from './studio-draft';
 import { useStudioUiStore } from './studio-ui-store';
 import { useEnhancer } from './use-enhancer';
 import { useStudioInput } from './use-handoff';
@@ -80,25 +81,27 @@ const EXAMPLES = [
 ];
 
 export function VideoStudio(): JSX.Element {
-  const [prompt, setPrompt] = useState('');
-  const [model, setModel] = useState('');
-  const [shape, setShape] = useState<Shape>('landscape');
-  const [long, setLong] = useState<number>(512);
-  const [seconds, setSeconds] = useState<number>(4);
-  const [steps, setSteps] = useState<number | ''>('');
-  const [seed, setSeed] = useState<number | ''>('');
+  /* Drafts, not plain state: the room's inputs are still here when you come
+     back to it (studio-draft.ts). */
+  const [prompt, setPrompt] = useStudioDraft('video', 'prompt', '');
+  const [model, setModel] = useStudioDraft('video', 'model', '');
+  const [shape, setShape] = useStudioDraft<Shape>('video', 'shape', 'landscape');
+  const [long, setLong] = useStudioDraft<number>('video', 'long', 512);
+  const [seconds, setSeconds] = useStudioDraft<number>('video', 'seconds', 4);
+  const [steps, setSteps] = useStudioDraft<number | ''>('video', 'steps', '');
+  const [seed, setSeed] = useStudioDraft<number | ''>('video', 'seed', '');
 
   const catalog = useGenStore((s) => s.catalog);
   const { busy, error, runs, job, run, cancel, finishReveal } = useStudio('video');
   const models = useMemo(() => catalog.filter((m) => m.modality === 'video'), [catalog]);
   const blocked = studioBlockedReason(models, 'video');
   const size = (SHAPES.find((x) => x.value === shape) ?? SHAPES[0]).of(long);
-  const enhancer = useEnhancer(useCallback((next: string) => setPrompt(next), []));
+  const enhancer = useEnhancer(useCallback((next: string) => setPrompt(next), [setPrompt]));
   /* Media handed to this room — from a card in the transcript, or dropped on
      it. Seeds the prompt with whatever made it. See useStudioInput. */
   const handoff = useStudioInput(
     'video',
-    useCallback((p: string) => setPrompt(p), []),
+    useCallback((p: string) => setPrompt(p), [setPrompt]),
   );
   const setSettingsOpen = useStudioUiStore((st) => st.setSettingsOpen);
 
@@ -339,8 +342,9 @@ export function VideoStudio(): JSX.Element {
         <StudioJob
           job={job}
           variant="video"
-          aspect={aspectOf(size)}
-          width={widthOf(size)}
+          /* The JOB's shape, not the knobs' — see ImageStudio. */
+          aspect={aspectOf(job.size ?? size)}
+          width={widthOf(job.size ?? size)}
           model={model}
           onRevealed={finishReveal}
         />

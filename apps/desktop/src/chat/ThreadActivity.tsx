@@ -97,6 +97,7 @@ export function ThreadActivityChain({
   tps,
   onOpenFile,
   chainKey,
+  attachments,
 }: {
   blocks: ActivityBlock[];
   /** Tool result keyed by tool-call id (owner-scoped by the caller). */
@@ -142,6 +143,13 @@ export function ThreadActivityChain({
    * the start time of the first thought he saw that session.
    */
   chainKey?: string;
+  /**
+   * The finished results filed INTO this chain, by the id of the call that made
+   * each — drawn under that call's row, and folding away with the chain. Which
+   * results belong in here rather than beneath the chain is AssistantGroup's
+   * call (turn-cards.ts); this only puts them in their rows.
+   */
+  attachments?: ReadonlyMap<string, ReactNode>;
 }): ReactNode {
   const canvas = useCanvasTabs();
   // The folder the TOOLS resolve a relative path against (the chat's working
@@ -308,7 +316,11 @@ export function ThreadActivityChain({
     // restarting its spinner mid-turn. A tool call's id never moves; a thinking
     // block has none, so its slot in the append-only block list stands in.
     const id = block.type === 'thinking' ? `${chainScope}:thinking:${i}` : block.id;
-    return { ...mapped, data: { ...mapped.data, id } };
+    const attachment = block.type === 'toolCall' ? attachments?.get(block.id) : undefined;
+    return {
+      ...mapped,
+      data: { ...mapped.data, id, ...(attachment !== undefined ? { attachment } : {}) },
+    };
   });
 
   return (

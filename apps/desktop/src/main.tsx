@@ -14,6 +14,8 @@ import { connectLlm, ensureDefaultEngines } from './state/llm-store';
 import { connectPi } from './state/pi-connect';
 import { connectSettings } from './state/settings-store';
 import { connectStoreModels } from './state/store-models';
+import { connectStudioJobs } from './state/studio-jobs';
+import { connectTaskTray } from './state/task-tray';
 import './styles/global.css';
 
 /*
@@ -33,6 +35,11 @@ if (!new URLSearchParams(window.location.search).has('canvasPopout')) {
   connectChildAgents();
   // Which chat started which generation — a deleted chat's jobs are stopped.
   connectChatJobs();
+  // A studio's job is followed here, not in the room — leaving the room must
+  // not lose it (state/studio-jobs.ts).
+  connectStudioJobs();
+  // The tasks you walked away from, for the button beside the sidebar toggle.
+  connectTaskTray();
   connectLlm();
   // The default engines for this machine, in the background (see llm-store).
   setTimeout(() => void ensureDefaultEngines(), 8_000);

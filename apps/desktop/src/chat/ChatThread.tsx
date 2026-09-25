@@ -58,11 +58,13 @@ import { useDropStore } from './composer/drop-store';
 import { corpChatView } from './corp/corp-thread-view';
 import { HarnessChecklistPanel, ThreadStatusIndicator } from './HarnessStatus';
 import { HistoryPole } from './HistoryPole';
+import { effectiveToolName } from './long-job';
 import { MessageErrorBoundary } from './MessageErrorBoundary';
-import { type PendingChartArgs, PendingChartCard, pendingChartArgs } from './PendingChartCard';
 import { PresentedInline } from './PresentedInline';
 import { awaitingReplyAfterLatestTurn, sentAttachmentsPrefilling } from './sent-prefill';
 import { useThreadSlots } from './thread-slots';
+import { followToLatest, useThreadFollow } from './thread-follow';
+import { attributeRecords, type CallResultFacts } from './turn-cards';
 import { BlindImageNote, UserImage } from './UserImage';
 
 /** Concatenated visible text of an assistant response group (for copy). */
@@ -278,70 +280,43 @@ export function ChatThread() {
   }, [editingId]);
 
   /*
-   * THE CHARTS STILL BEING MADE, in the slot their cards will take. A chart
-   * call whose tool has not answered yet draws as a PendingChartCard — the
-   * skeleton, then the chart building as its values stream — under the same
-   * message its finished card will hang from (present:show anchors to the
-   * streaming assistant message, which is this one). When the result lands
-   * the pending card goes and the real one appears in the same container.
+   * WHICH CALL HANDED EACH CARD OVER. A presented card belongs with the call
+   * that made it — the chart call, the drawing, the `present` — and the turn
+   * places it the way it places the media it generated: filed in the chain
+   * while the work goes on, beneath it once it is an answer (AssistantGroup,
+   * turn-cards.ts). They used to render after the whole reply, which during a
+   * turn is the foot of the conversation — the user (2026-09-24): "generations/
+   * inline cards of any kind always seem to get pinned to the bottom of the
+   * chat for quite some time, including during working/iteration".
+   *
+   * The charts still being MADE went with them: a pending chart is a
+   * generating card like any other, and stands beneath the chain making it.
    */
-  type Slot =
-    | { kind: 'record'; record: PresentedRecord }
-    | { kind: 'pending'; args: PendingChartArgs };
-  const resultNames = (text: string, absPath: string): boolean => {
-    if (text.includes(absPath)) return true;
-    const said = /^(?:Drew|Changed)\b[^\n]*?:\s+(\S+\.svg)\b/.exec(text)?.[1];
-    if (said === undefined) return false;
-    return absPath === said || absPath.endsWith(`/${said}`);
-  };
-  const slotsFor = (
+  const attributeTurn = (
     group: readonly AssistantMsg[],
     records: readonly PresentedRecord[],
-  ): Slot[] => {
-    const live = group.some((g) => g.isStreaming === true);
-    const placed = new Set<PresentedRecord>();
-    const out: Slot[] = [];
-    // In the order the calls were written: a finished call's card, a pending
-    // call's building card — so a card never moves when its result lands.
+  ): ReturnType<typeof attributeRecords<PresentedRecord>> => {
+    const calls: CallResultFacts[] = [];
     for (const m of group) {
       for (const b of m.blocks) {
         if (b.type !== 'toolCall') continue;
-        const args = pendingChartArgs(b);
-        if (args === null) continue;
         const result = resultByCallId.get(`${m.id}:${b.id}`) ?? resultByCallId.get(b.id);
-        if (result === undefined) {
-          if (live) out.push({ kind: 'pending', args: { ...args, id: b.id } });
-          continue;
-        }
-        // The reply names the file relative to the working folder (2026-09-17),
-        // the record has it absolute: match on the file's own name, then on
-        // the path the reply said ending the record's.
-        const record = records.find((r) => !placed.has(r) && resultNames(result.text, r.path));
-        if (record !== undefined) {
-          placed.add(record);
-          out.push({ kind: 'record', record });
-        }
+        calls.push({
+          id: b.id,
+          tool: effectiveToolName(b.name, b.arguments),
+          text: result?.text,
+          isError: result?.isError ?? false,
+        });
       }
     }
-    for (const record of records) {
-      if (!placed.has(record)) out.push({ kind: 'record', record });
-    }
-    return out;
+    return attributeRecords(calls, records);
   };
 
-  /* One card, wherever it is drawn — anchored to its turn or at the foot. */
-  const renderPresented = (
-    records: readonly PresentedRecord[],
-    slots?: readonly Slot[],
-  ): ReactNode => (
+  /* One card, wherever it is drawn — after its turn when no call in the turn
+     accounts for it, or at the foot when its turn is not in this thread. */
+  const renderPresented = (records: readonly PresentedRecord[]): ReactNode => (
     <div className="flex flex-col gap-2 pt-2" data-testid="presented">
-      {(slots ?? records.map((record): Slot => ({ kind: 'record', record }))).map((slot) =>
-        slot.kind === 'pending' ? (
-          <PendingChartCard key={`pending-${slot.args.id ?? ''}`} args={slot.args} />
-        ) : (
-          renderRecord(slot.record)
-        ),
-      )}
+      {records.map((record) => renderRecord(record))}
     </div>
   );
   /* A chart, or a small SVG, IS shown here — the card is the thing, not a
@@ -406,6 +381,8 @@ export function ChatThread() {
     // The bubble shows the typed text; pi receives it with the (possibly
     // edited) attachments folded back in — see forkAndReprompt's `agentMessage`.
     const body = buildAgentMessage(text, files);
+    // Saving an edit sends it: follow the new reply like any other send.
+    followToLatest();
     void forkAndReprompt(id, text, body === text ? undefined : body);
   };
 
@@ -529,6 +506,22 @@ export function ChatThread() {
   useEffect(() => {
     if (pinnedRef.current) follow();
   });
+  /*
+   * …AND A SEND RE-PINS IT. the user (2026-09-24): "pressing enter on a chat should
+   * take you to the bottom". The same re-arm scrolling back down to the foot
+   * gives — pinned, meaning down — so the reply is followed from here, and the
+   * next wheel tick up releases it exactly as before (see thread-follow.ts).
+   * Deliberately not on every new message: a queued message draining, or a
+   * reply arriving, must never pull a reader back down from what they are
+   * reading. Only the reader's own send does.
+   */
+  const followRequests = useThreadFollow((s) => s.requests);
+  useEffect(() => {
+    if (followRequests === 0) return;
+    pinnedRef.current = true;
+    intentRef.current = 'down';
+    follow();
+  }, [followRequests, follow]);
   /*
    * …and when the content grows WITHOUT a render: a card revealing, a picture
    * decoding, a chart building itself. Those used to leave the foot a card's
@@ -697,8 +690,13 @@ export function ChatThread() {
              * and the card is drawn there; anything whose anchor is not in this
              * thread still falls to the foot, which is where it used to live.
              */
-            const cards = presentedByAnchor.get(threadItemId(item));
-            const slots = item.kind === 'assistant' ? slotsFor(item.group, cards ?? []) : undefined;
+            const anchored = presentedByAnchor.get(threadItemId(item));
+            const turn =
+              item.kind === 'assistant' && anchored !== undefined
+                ? attributeTurn(item.group, anchored)
+                : null;
+            // Only what no call in the turn accounts for still hangs after it.
+            const cards = turn !== null ? turn.loose : anchored;
             const node = ((): ReactNode => {
               if (item.kind === 'notice') {
                 /* The harness saying something the user needs — a model too small
@@ -912,6 +910,10 @@ export function ChatThread() {
                         resultByCallId={resultByCallId}
                         runningToolCalls={runningToolCalls}
                         tps={streaming ? undefined : tps}
+                        {...(turn !== null && turn.byCall.size > 0
+                          ? { recordsByCall: turn.byCall }
+                          : {})}
+                        renderRecord={renderRecord}
                       />
                     </MessageErrorBoundary>
                   </MessageRow>
@@ -947,10 +949,7 @@ export function ChatThread() {
                 </ActivityRow>
               );
             })();
-            const hasPresented = !(
-              cards === undefined &&
-              (slots === undefined || slots.length === 0)
-            );
+            const hasPresented = cards !== undefined && cards.length > 0;
             // Every registered feature slot, told which row it is under.
             const featureSlots =
               threadSlotDefs.length === 0
@@ -970,7 +969,7 @@ export function ChatThread() {
             return (
               <Fragment key={`anchored-${threadItemId(item)}`}>
                 {node}
-                {hasPresented ? renderPresented(cards ?? [], slots) : null}
+                {hasPresented ? renderPresented(cards) : null}
                 {featureSlots}
               </Fragment>
             );

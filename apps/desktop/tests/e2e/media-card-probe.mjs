@@ -109,50 +109,51 @@ try {
   );
   await shot('hover');
 
-  // --- expanded: large, centred, blurred, and the chrome stands down -------
+  /*
+   * --- expanded: a PICTURE opens into the image viewer ---------------------
+   *
+   * The centred card on blurred glass was the first answer to "large and
+   * centered and blurs background like settings panel". For pictures it is now
+   * the studio-shaped room the user asked for after (2026-09-24: "images clicked
+   * on/fullscreened should have the new studio like ui with the left toolbar
+   * and such and a centered bottom 'edit image' input bar") — image-viewer-probe
+   * covers that room in full; this keeps the card's side of the contract: the
+   * corner button opens it, the picture is centred and large, the chrome
+   * stands down, and Escape closes it and nothing else.
+   */
   await page.locator('[data-testid="media-expand"]').first().click();
-  await page.waitForSelector('[data-testid="media-expanded"]');
+  await page.waitForSelector('[data-testid="image-viewer"]');
   await page.waitForTimeout(500);
   const stage = await page.evaluate(() => {
-    const s = document.querySelector('.pd-media-stage').getBoundingClientRect();
-    const cs = getComputedStyle(document.querySelector('.pd-media-scrim'));
+    const s = document.querySelector('[data-testid="viewer-picture"]').getBoundingClientRect();
     const hidden = (sel) => {
       const el = document.querySelector(sel);
       return el === null ? true : Number(getComputedStyle(el).opacity) === 0;
     };
     return {
-      blur: cs.backdropFilter || cs.webkitBackdropFilter,
       cx: s.x + s.width / 2,
-      cy: s.y + s.height / 2,
       w: s.width,
       h: s.height,
       vw: innerWidth,
       vh: innerHeight,
+      bar: document.querySelector('[data-testid="viewer-edit-input"]')?.getAttribute('placeholder'),
       topBarHidden: hidden('.pd-topbar'),
       composerHidden: hidden('.pd-studio-compose'),
       toggleHidden: hidden('[data-testid="sidebar-toggle-zone"]'),
     };
   });
-  check(/blur\(\d/.test(stage.blur), `the backdrop does not blur: ${stage.blur}`);
-  check(Math.abs(stage.cx - stage.vw / 2) < 3, 'the expanded view is not horizontally centred');
-  check(Math.abs(stage.cy - stage.vh / 2) < 3, 'the expanded view is not vertically centred');
-  check(
-    stage.w < stage.vw && stage.h < stage.vh,
-    'the expanded view is fullscreen — the user asked for large and centred, not fullscreen',
-  );
-  check(stage.w > stage.vw * 0.35, `the expanded view is too small: ${Math.round(stage.w)}px`);
-  check(stage.topBarHidden, 'the top bar is still showing behind the expanded view');
-  check(stage.composerHidden, 'the input bar is still showing behind the expanded view');
-  check(stage.toggleHidden, 'the sidebar toggle is still showing behind the expanded view');
+  check(Math.abs(stage.cx - stage.vw / 2) < 3, 'the opened picture is not horizontally centred');
+  check(stage.h > stage.vh * 0.35, `the opened picture is too small: ${Math.round(stage.h)}px`);
+  check(stage.bar === 'Edit image', `the viewer has no "Edit image" bar (${stage.bar})`);
+  check(stage.topBarHidden, 'the top bar is still showing behind the viewer');
+  check(stage.composerHidden, "the studio's input bar is still showing behind the viewer");
+  check(stage.toggleHidden, 'the sidebar toggle is still showing behind the viewer');
   await shot('expanded');
 
   // --- Escape closes the view and NOTHING ELSE -----------------------------
   await page.keyboard.press('Escape');
   await page.waitForTimeout(500);
-  check(
-    (await rect('[data-testid="media-expanded"]')) === null,
-    'Escape did not close the expanded view',
-  );
+  check((await rect('[data-testid="image-viewer"]')) === null, 'Escape did not close the viewer');
   check(
     (await rect('[data-testid="image-studio"]')) !== null,
     'Escape closed the view AND left the studio — the scrim needs role="dialog"',

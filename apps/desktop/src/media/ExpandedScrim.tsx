@@ -23,6 +23,16 @@ import { createPortal } from 'react-dom';
  *    top bar staying here aswell." Faded rather than unmounted, so the composer
  *    does not reflow and lose whatever was typed in it — hence a flag on <body>,
  *    since the two things to quieten live in other subtrees.
+ *  - `aria-modal` alone does not stop Tab: the page behind stayed focusable, so
+ *    tabbing out of the image viewer's edit bar walked into the chat composer
+ *    under the glass, and a keystroke meant for the viewer typed there. The app
+ *    root is `inert` while this is up (the portal lives outside it), and focus
+ *    goes back where it came from when it closes.
+ *
+ * TWO LAYOUTS. `stage` is the original: the media on a centred card with the
+ * room blurred behind it. `room` hands the whole window to the children on the
+ * studio's own ground — the image viewer, which lays out a tool rail, the
+ * picture and an edit bar the way the studios do (ImageViewer.tsx).
  */
 export function ExpandedScrim({
   label,
@@ -30,6 +40,7 @@ export function ExpandedScrim({
   children,
   testid = 'media-expanded',
   stageKind,
+  layout = 'stage',
 }: {
   /** Accessible name for the dialog (the file being looked at). */
   readonly label: string;
@@ -38,10 +49,14 @@ export function ExpandedScrim({
   readonly testid?: string;
   /** Sizes the stage — see `.pd-media-stage[data-kind=…]`. */
   readonly stageKind?: string;
+  /** `stage`: a centred card. `room`: the children take the window. */
+  readonly layout?: 'stage' | 'room';
 }): ReactNode {
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') {
+      /* A menu or tooltip inside (the viewer's pickers) already used this
+         Escape to close itself — Radix marks it handled. One press, one layer. */
+      if (e.key === 'Escape' && !e.defaultPrevented) {
         e.stopPropagation();
         onClose();
       }
@@ -55,21 +70,66 @@ export function ExpandedScrim({
     return () => document.body.removeAttribute('data-media-expanded');
   }, []);
 
+  useEffect(() => holdPageBehind(), []);
+
   return createPortal(
     <div
       className="pd-media-scrim"
       data-testid={testid}
+      data-layout={layout}
       role="dialog"
       aria-modal="true"
       aria-label={label}
     >
       {/* The backdrop dismisses. A button rather than a div so Enter and Space
-          close it too, without a keyboard shim. */}
-      <button type="button" className="pd-media-scrim-hit" aria-label="Close" onClick={onClose} />
-      <div className="pd-media-stage" data-kind={stageKind}>
-        {children}
-      </div>
+          close it too, without a keyboard shim. In a room it leaves the tab
+          order: the room has a Close of its own, and a full-window "Close" stop
+          in the middle of its tools would be noise. */}
+      <button
+        type="button"
+        className="pd-media-scrim-hit"
+        aria-label="Close"
+        tabIndex={layout === 'room' ? -1 : undefined}
+        onClick={onClose}
+      />
+      {layout === 'room' ? (
+        children
+      ) : (
+        <div className="pd-media-stage" data-kind={stageKind}>
+          {children}
+        </div>
+      )}
     </div>,
     document.body,
   );
+}
+
+/** Open scrims holding the page inert — nested ones share one hold. */
+let holds = 0;
+
+/**
+ * Make the page behind the scrim inert, and hand focus back when it closes.
+ *
+ * Returns the release. Released FIRST, restored second: an inert element cannot
+ * take focus, so restoring before lifting it would land on <body>.
+ */
+function holdPageBehind(): () => void {
+  const root = document.getElementById('root');
+  const cameFrom = document.activeElement;
+  if (root === null) return () => undefined;
+  holds += 1;
+  root.inert = true;
+  return () => {
+    holds = Math.max(0, holds - 1);
+    if (holds === 0) root.inert = false;
+    const now = document.activeElement;
+    // Only when nothing else has claimed focus since — never steal it back.
+    if (
+      (now === null || now === document.body) &&
+      cameFrom instanceof HTMLElement &&
+      cameFrom.isConnected
+    ) {
+      cameFrom.focus({ preventScroll: true });
+    }
+  };
 }

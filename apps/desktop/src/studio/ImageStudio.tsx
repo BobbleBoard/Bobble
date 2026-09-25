@@ -23,8 +23,9 @@
  *   chore: nobody wants to enumerate what should not be in their picture. Say
  *   what you want instead.
  */
-import { type JSX, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type JSX, useCallback, useEffect, useMemo, useRef } from 'react';
 import { ThreadMedia } from '../chat/ThreadMedia';
+import { EDIT_STRENGTHS } from '../media/image-edit';
 import { ModuleCard } from '../media/ModuleCard';
 import { useGenStore } from '../state/gen-store';
 import { aspectOf, RunHeader, StudioJob, widthOf } from './StudioRun';
@@ -38,6 +39,7 @@ import {
   StudioShell,
   type StudioStarter,
 } from './StudioShell';
+import { useStudioDraft } from './studio-draft';
 import { useStudioUiStore } from './studio-ui-store';
 import { useEnhancer } from './use-enhancer';
 import { useStudioInput } from './use-handoff';
@@ -148,10 +150,12 @@ const EXAMPLES = [
 ];
 
 export function ImageStudio(): JSX.Element {
-  const [prompt, setPrompt] = useState('');
-  const [model, setModel] = useState('');
-  const [shape, setShape] = useState<Shape>('square');
-  const [long, setLong] = useState<number>(1024);
+  /* Drafts, not plain state: the room's inputs are still here when you come
+     back to it (studio-draft.ts). */
+  const [prompt, setPrompt] = useStudioDraft('image', 'prompt', '');
+  const [model, setModel] = useStudioDraft('image', 'model', '');
+  const [shape, setShape] = useStudioDraft<Shape>('image', 'shape', 'square');
+  const [long, setLong] = useStudioDraft<number>('image', 'long', 1024);
   /*
    * THE DEFAULT SIZE IS THE MACHINE'S, not the model's.
    *
@@ -162,11 +166,18 @@ export function ImageStudio(): JSX.Element {
    * Until the reader picks a size, the machine picks: 512² under 32 GB, 768²
    * under 48, 1024² above. `app:get-info` is the same fact the model hub reads.
    */
-  const sizeTouched = useRef(false);
-  const pickLong = useCallback((v: number) => {
-    sizeTouched.current = true;
-    setLong(v);
-  }, []);
+  /* Kept with the size itself, so coming back does not hand a size you chose
+     back to the machine's default. */
+  const [sizeChosen, setSizeChosen] = useStudioDraft('image', 'sizeChosen', false);
+  const sizeTouched = useRef(sizeChosen);
+  const pickLong = useCallback(
+    (v: number) => {
+      sizeTouched.current = true;
+      setSizeChosen(true);
+      setLong(v);
+    },
+    [setLong, setSizeChosen],
+  );
   /*
    * …re-measured since. Every mflux job runs `--low-ram` now (klein 1024² is
    * 5.8 GB of the OS's memory, not 19 — see the catalog), and the default
@@ -185,12 +196,12 @@ export function ImageStudio(): JSX.Element {
         setLong(gb < 16 ? 512 : gb < 24 ? 768 : 1024);
       })
       .catch(() => undefined);
-  }, []);
-  const [style, setStyle] = useState<string>('');
-  const [count, setCount] = useState(1);
-  const [steps, setSteps] = useState<number | ''>('');
-  const [guidance, setGuidance] = useState<number | ''>('');
-  const [seed, setSeed] = useState<number | ''>('');
+  }, [setLong]);
+  const [style, setStyle] = useStudioDraft<string>('image', 'style', '');
+  const [count, setCount] = useStudioDraft('image', 'count', 1);
+  const [steps, setSteps] = useStudioDraft<number | ''>('image', 'steps', '');
+  const [guidance, setGuidance] = useStudioDraft<number | ''>('image', 'guidance', '');
+  const [seed, setSeed] = useStudioDraft<number | ''>('image', 'seed', '');
 
   const catalog = useGenStore((s) => s.catalog);
   const { busy, error, runs, job, run, cancel, finishReveal } = useStudio('image');
@@ -199,18 +210,18 @@ export function ImageStudio(): JSX.Element {
   /** The model a run will use: the chosen one, else the catalog's default. */
   const wantedModel = model !== '' ? model : (models[0]?.id ?? '');
   const size = (SHAPES.find((x) => x.value === shape) ?? SHAPES[0]).of(long);
-  const enhancer = useEnhancer(useCallback((next: string) => setPrompt(next), []));
+  const enhancer = useEnhancer(useCallback((next: string) => setPrompt(next), [setPrompt]));
   /*
    * HOW FAR AN EDIT MAY TRAVEL from its input picture, 0..1. Only meaningful
    * with an input, so it is only offered with one — a slider that does nothing
    * most of the time teaches people to ignore it.
    */
-  const [strength, setStrength] = useState(0.6);
+  const [strength, setStrength] = useStudioDraft('image', 'strength', 0.6);
   /* Media handed to this room — from a card in the transcript, or dropped on
      it. Seeds the prompt with whatever made it. See useStudioInput. */
   const handoff = useStudioInput(
     'image',
-    useCallback((p: string) => setPrompt(p), []),
+    useCallback((p: string) => setPrompt(p), [setPrompt]),
   );
   const setSettingsOpen = useStudioUiStore((st) => st.setSettingsOpen);
 
@@ -454,11 +465,9 @@ export function ImageStudio(): JSX.Element {
                   testid="image-strength-rail"
                   value={strength}
                   onChange={setStrength}
-                  options={[
-                    { value: 0.3, label: 'Low', hint: 'Touch it up — same picture' },
-                    { value: 0.6, label: 'Medium', hint: 'Clearly reworked, still recognisable' },
-                    { value: 0.85, label: 'High', hint: 'Keeps the composition, redraws it' },
-                  ]}
+                  /* One list with the image viewer's Edit bar (media/image-edit),
+                     so the two places that edit a picture cannot drift. */
+                  options={EDIT_STRENGTHS.map((s) => ({ ...s }))}
                 />
               </Knob>
             </RailGroup>
@@ -593,8 +602,10 @@ export function ImageStudio(): JSX.Element {
         <StudioJob
           job={job}
           variant="image"
-          aspect={aspectOf(size)}
-          width={widthOf(size)}
+          /* The JOB's shape, not the knobs': coming back to a room mid-job,
+             the knobs may say something else by then. */
+          aspect={aspectOf(job.size ?? size)}
+          width={widthOf(job.size ?? size)}
           model={model}
           onRevealed={finishReveal}
         />
