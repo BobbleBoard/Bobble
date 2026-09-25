@@ -110,6 +110,47 @@ describe('dispatching', () => {
   });
 });
 
+/*
+ * THE CALL INSIDE `use` IS HELD TO THE SAME RULES. pi's `tool_call` fires for
+ * `use`, not for the tool it names, so the harness hands its per-tool rules in
+ * as `admit` and they run before the target does.
+ */
+describe('the rules of the tool it names', () => {
+  const setup = (admit: (toolName: string, args: unknown) => string | undefined) => {
+    const { pi } = fakePi();
+    const registry = captureRegisteredTools(pi);
+    const execute = vi.fn(async (..._a: unknown[]) => ({
+      content: [{ type: 'text', text: 'written' }],
+    }));
+    pi.registerTool({ name: 'write', execute });
+    registerUseTool(pi as never, { registry, active: () => [], admit });
+    const use = registry.get(USE_TOOL_NAME);
+    if (use === undefined) throw new Error('use was not registered');
+    return { use, execute };
+  };
+
+  it('refuses as the tool would, and never runs it', async () => {
+    const admit = vi.fn((_t: string, _a: unknown) => 'Not written: flow.svg is a diagram.');
+    const { use, execute } = setup(admit);
+    const args = { path: 'flow.svg', content: '<svg/>' };
+    // Thrown, so pi hands it back as an error result, as it does a blocked call.
+    await expect(use.execute('id-1', { tool: 'write', args })).rejects.toThrow(
+      'Not written: flow.svg is a diagram.',
+    );
+    expect(admit).toHaveBeenCalledWith('write', args);
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('runs the tool when the rules let it', async () => {
+    const { use, execute } = setup(() => undefined);
+    const out = (await use.execute('id-1', { tool: 'write', args: { path: 'a.md' } })) as {
+      content: { text: string }[];
+    };
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(out.content[0]?.text).toBe('written');
+  });
+});
+
 describe('a tool `use` cannot reach may be one command away', () => {
   it('names the command instead of telling the model to give up', async () => {
     // MEASURED on a real run: told "use what you already have", the model

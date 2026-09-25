@@ -2233,6 +2233,8 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
      * can produce becomes a redirect instead — see the note on the option.
      */
     cliCommandForTool,
+    /* `tool_call` fired for `use`, not for the tool it runs — see admitToolCall. */
+    admit: (toolName, args) => admitToolCall({ toolName, input: args }, runtime.currentCtx)?.reason,
   });
 
   /*
@@ -2271,6 +2273,14 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
           if (target === undefined) {
             return { text: `${name}: not registered in this build.`, isError: true };
           }
+          /*
+           * …HELD TO THE SAME RULES AS THE TOOL CALL. pi's `tool_call` fired for
+           * the `bash` line, not for this tool, so its per-tool rules run here
+           * — see admitToolCall. A refusal is this command failing, and
+           * dispatchToolCli says any tool it names as a command.
+           */
+          const refused = admitToolCall({ toolName: name, input: args }, runtime.currentCtx);
+          if (refused !== undefined) return { text: refused.reason, isError: true };
           /*
            * THE CONTEXT IS AN ARGUMENT, and dropping it crashed real tools.
            *
@@ -3796,21 +3806,43 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     (postTurnTimer as { unref?: () => void }).unref?.();
   });
 
-  // Loop / no-progress breaking (fix #3), plus touched-file tracking for the
-  // verify syntax fallback. Feeds the per-turn detector the identical-call streak
-  // (before execution) and the consecutive-error streak (after execution).
-  pi.on('tool_call', (event, ctx) => {
-    runtime.currentCtx = ctx;
-    // Kept for the result hook: a repeat is only a repeat if the ARGUMENTS
-    // matched too, and the result event does not carry them.
-    lastCallInput = { tool: event.toolName, input: event.input };
+  /**
+   * THE PER-TOOL HALF OF `tool_call` — every rule keyed on the tool's own name,
+   * for a call however it arrived.
+   *
+   * pi fires `tool_call` for the call the MODEL made, and two dispatchers run a
+   * second tool inside that one by calling its `execute` directly: the bash-CLI
+   * host (`file write …` at the shell runs `write`) and `use`. The hook only
+   * ever saw `bash` or `use`, so everything below was skipped for the tool that
+   * actually ran. SEEN during VQ-10: a flow diagram typed as `file write --path
+   * flow.svg --content '<svg …>'` went straight to disk, while the same markup
+   * through the `write` tool was refused toward `diagram`. All three doors call
+   * this before `execute` now.
+   *
+   * What stays in the hook belongs to the OUTER call and is not redone for the
+   * one inside it: `currentCtx`; `lastCallInput`, which the result hook compares
+   * with the result it is holding (the bash result, for a command); `lastOpened`;
+   * and the loop detector, which has already counted the bash line — counting
+   * the tool inside it as well would double every streak.
+   *
+   * Returns the refusal, or undefined when the call may run — and an admitted
+   * call is recorded as the hook always recorded it (touched files, the
+   * checkpoint, delegation): a file a command writes needs `/harness restore` as
+   * much as one a tool call writes. `ctx` is null only for a command run before
+   * any session event.
+   */
+  function admitToolCall(
+    event: { readonly toolName: string; readonly input: unknown },
+    ctx: ExtensionContext | null,
+  ): { block: true; reason: string } | undefined {
     /*
      * A TOOL THIS RUN MAY NOT CALL, whatever it thinks.
      *
-     * FIRST, before anything else in this hook. Not advertising a tool is not a
-     * fence: `use` dispatches by name, the bash CLI dispatches by command, and a
+     * FIRST, before anything else here. Not advertising a tool is not a fence:
+     * `use` dispatches by name, the bash CLI dispatches by command, and a
      * capability activated mid-turn pulls a whole group in. Every one of those
-     * arrives here, so this is the only place a refusal actually holds.
+     * comes through here — the first two call this before they execute — so
+     * this is the only place a refusal actually holds.
      *
      * The case it exists for: an unattended scheduled run must not be able to
      * send a message on the user's behalf while they are asleep.
@@ -3818,7 +3850,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     if (forbidden.has(event.toolName)) {
       return { block: true, reason: forbiddenReason(event.toolName) };
     }
-    warnIfSmallModelForCapability(event.toolName, event.input, ctx);
+    if (ctx !== null) warnIfSmallModelForCapability(event.toolName, event.input, ctx);
     /*
      * A COMMAND THAT NEVER RETURNS TAKES THE WHOLE TURN WITH IT — in the ORDINARY
      * chat, not only inside a corporation.
@@ -3894,8 +3926,22 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
             : null;
           return { block: true, reason: diskWalkRefusal(walk, spotlight) };
         }
+        /*
+         * …BUT A LINE THAT IS A FILE WRITE IS READ AS THE WRITE IT IS. `file
+         * write --path plot.py --content '<script>'` carries the file on the
+         * command line, and the CLI host holds that write to the write/edit
+         * rules below — against the real path and body, with their one escape.
+         * Reading the same text here as well put a second refusal with a
+         * second escape in front of it: a plotting script the user really asked
+         * for took four identical tries, where `write` takes two.
+         */
+        const lineHead = cmd.trim().split(/\s+/, 2).join(' ');
+        const fileLine =
+          lineHead === cliCommandForTool?.('write') || lineHead === cliCommandForTool?.('edit');
         const officeAvailable = pi.getAllTools().some((t) => t.name === OFFICE_MAKE_TOOL);
-        const handmadeOffice = isHandmadeOffice({ content: cmd, officeAvailable });
+        const handmadeOffice = fileLine
+          ? null
+          : isHandmadeOffice({ content: cmd, officeAvailable });
         if (handmadeOffice !== null) {
           pi.appendEntry(HARNESS_LOOP_ENTRY, { action: 'block', cause: 'handmade-office' });
           return {
@@ -3910,7 +3956,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
          */
         if (chartScriptRefused === cmd) {
           chartScriptRefused = null;
-        } else {
+        } else if (!fileLine) {
           const chartAvailable = pi.getAllTools().some((t) => t.name === CHART_TOOL);
           const handmadeChart = isHandmadeChart({ content: cmd, chartAvailable });
           if (handmadeChart !== null) {
@@ -4034,16 +4080,22 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
        * wrote `make_video.py`, drew sixty frames with `ImageDraw`, and nothing
        * stopped it, because the SVG generator was not installed on that machine.
        * Each guard now asks its own question: the SVG ones about `generate_svg`,
-       * this one about whether a generator for THAT modality exists.
+       * this one about whether a generator for THAT modality exists — and the
+       * chart one about `chart`, which a `file write` line is left to (above).
        */
       const officeAvailable = tools.some((t) => t.name === OFFICE_MAKE_TOOL);
+      const chartAvailable = tools.some((t) => t.name === CHART_TOOL);
       if (
         typeof input.path === 'string' &&
-        (svgCommandAvailable || diagramAvailable || generators.size > 0 || officeAvailable)
+        (svgCommandAvailable ||
+          diagramAvailable ||
+          generators.size > 0 ||
+          officeAvailable ||
+          chartAvailable)
       ) {
         const abs = isAbsolute(input.path)
           ? input.path
-          : join(runtime.workspaceRoot ?? ctx.cwd, input.path);
+          : join(runtime.workspaceRoot ?? ctx?.cwd ?? process.cwd(), input.path);
         /*
          * A MEDIA FILE WRITTEN AS TEXT — a `.png` "placeholder" (SEEN, twelve
          * times in a row), an empty one, an HTML canvas saved as .png. Before
@@ -4093,7 +4145,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
           const handmadeChart = isHandmadeChart({
             path: input.path,
             content: body,
-            chartAvailable: pi.getAllTools().some((t) => t.name === CHART_TOOL),
+            chartAvailable,
           });
           if (handmadeChart !== null) {
             svgRefused.set(abs, body);
@@ -4220,6 +4272,19 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
         if (cp !== null) runtime.checkpoints.push(cp);
       }
     }
+    return undefined;
+  }
+
+  // Loop / no-progress breaking (fix #3), plus touched-file tracking for the
+  // verify syntax fallback. Feeds the per-turn detector the identical-call streak
+  // (before execution) and the consecutive-error streak (after execution).
+  pi.on('tool_call', (event, ctx) => {
+    runtime.currentCtx = ctx;
+    // Kept for the result hook: a repeat is only a repeat if the ARGUMENTS
+    // matched too, and the result event does not carry them.
+    lastCallInput = { tool: event.toolName, input: event.input };
+    const refused = admitToolCall(event, ctx);
+    if (refused !== undefined) return refused;
     /*
      * A command that OPENS something hands the work to a real Mac app, and the
      * model gets back an empty stdout and exit 0 — no way to tell a window now
