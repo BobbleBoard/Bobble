@@ -235,6 +235,9 @@ export interface MacSnapshot {
   /** Bounding box of every window in {@link windows} — the rect the COMPOSITE
    * screenshot covers, so a point read off that image maps onto the screen. */
   readonly union?: MacRect;
+  /** A look that named no app found Bobble itself in front, and the app took
+   * the one behind it instead (apps/desktop/…/mac/self-target.ts). */
+  readonly behindBobble?: boolean;
   /** Optional screenshot (present when requested). A composite of the app's
    * windows + sheets when the helper supports it (cropped to `rect`), else a
    * per-window capture, else a whole-screen fallback. */

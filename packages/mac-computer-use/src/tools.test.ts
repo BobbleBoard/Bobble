@@ -1109,10 +1109,12 @@ describe('what the tool descriptions promise', () => {
 
   it('does not describe index-less typing as safe when nothing is controlled', () => {
     // With an app under control the keystrokes are pid-delivered and really are
-    // background; with none there is nothing to aim at and they follow the
-    // SYSTEM focus into whatever the user is doing. Both facts, plainly.
+    // background; with none there is nothing to aim at, and the app aims them at
+    // whatever is in front — past this chat, never into it (mac-agent,
+    // self-target.ts), so no longer "the SYSTEM focus". Both facts, plainly.
     const d = desc('mac_type');
-    expect(d).toContain('SYSTEM focus');
+    expect(d).toContain('go to whatever app is in front (never this chat)');
+    expect(d).not.toContain('SYSTEM focus');
     expect(d).toContain('snapshot or launch something first');
   });
 
@@ -1883,5 +1885,113 @@ describe('chrome_* pass the same consent and policy gate as the mac acts', () =>
     const r = await run(tools, 'chrome_tab', { action: 'select', index: 2 });
     expect(textOf(r)).toContain(COMPUTER_USE_OFF_REASON);
     expect(bridge.countOf('tabSelect')).toBe(0);
+  });
+});
+
+/*
+ * The app a command NAMES is the app it acts on. The controlled app is the
+ * default for a command that names none — never an override of one that does.
+ */
+describe('a named app wins over the app under control', () => {
+  function browsers(consent: MacConsentGate = preConsented()) {
+    const bridge = new FakeBridge()
+      .on('snapshot', (p) => ({
+        ...SNAP([OK_BUTTON], p?.app === 'Google Chrome' ? 4321 : 555),
+        app: typeof p?.app === 'string' ? p.app : 'TextEdit',
+      }))
+      .on('tabs', (p) => ({
+        ok: true,
+        app: p?.app,
+        tabs: [{ index: 1, title: 'Docs', active: true }],
+      }))
+      .on('tabSelect', (p) => ({ ok: true, app: p?.app, selected: 'Docs', tabs: [] }))
+      .on('tabClose', (p) => ({ ok: true, app: p?.app, closed: 'Docs', tabs: [] }));
+    const { pi, tools } = piStub();
+    registerMacComputerUseTools(pi, { bridge, consent, readChromeTabs: async () => null });
+    return { bridge, tools };
+  }
+
+  it('chrome tabs --app Safari reads Safari, not the app under control', async () => {
+    const { bridge, tools } = browsers();
+    await run(tools, 'mac_snapshot', { app: 'TextEdit' }); // TextEdit (pid 555) under control
+    await run(tools, 'chrome_tabs', { app: 'Safari' });
+    expect(bridge.lastParams('tabs')).toEqual({ app: 'Safari' });
+  });
+
+  it('chrome tab --app Safari switches Safari’s tab', async () => {
+    const { bridge, tools } = browsers();
+    await run(tools, 'mac_snapshot', { app: 'TextEdit' });
+    await run(tools, 'chrome_tab', { action: 'select', index: 2, app: 'Safari' });
+    expect(bridge.lastParams('tabSelect')).toEqual({ app: 'Safari', index: 2 });
+  });
+
+  it('with no app named, both still act on the app under control', async () => {
+    const { bridge, tools } = browsers();
+    await run(tools, 'mac_snapshot', { app: 'TextEdit' });
+    await run(tools, 'chrome_tab', { action: 'select', index: 2 });
+    expect(bridge.lastParams('tabSelect')).toEqual({ pid: 555, app: 'TextEdit', index: 2 });
+  });
+
+  it('naming the app under control keeps its pid on the request', async () => {
+    const { bridge, tools } = browsers();
+    await run(tools, 'mac_snapshot', { app: 'Google Chrome' }); // pid 4321
+    await run(tools, 'chrome_tab', { action: 'select', index: 1, app: 'google chrome' });
+    expect(bridge.lastParams('tabSelect')).toMatchObject({ pid: 4321, index: 1 });
+  });
+
+  it('a named browser is asked about by name — another app’s grant does not cover it', async () => {
+    const { bridge, tools } = browsers(
+      createMacConsentGate({
+        policy: async () => ({
+          enabled: true,
+          apps: [{ id: 'com.apple.TextEdit', name: 'TextEdit' }],
+        }),
+      }),
+    );
+    await run(tools, 'mac_snapshot', { app: 'TextEdit' }, ctxStub(false)); // TextEdit: allowed
+    const r = await run(
+      tools,
+      'chrome_tab',
+      { action: 'close', index: 1, app: 'Safari' },
+      ctxStub(false),
+    );
+    expect(bridge.countOf('tabClose')).toBe(0);
+    expect(textOf(r)).toMatch(/consent/i);
+  });
+
+  it('mac snapshot "Safari" already looked at Safari while TextEdit was under control', async () => {
+    const { bridge, tools } = browsers();
+    await run(tools, 'mac_snapshot', { app: 'TextEdit' });
+    await run(tools, 'mac_snapshot', { app: 'Safari' });
+    expect(bridge.lastParams('snapshot')).toEqual({ app: 'Safari', cap: 60 });
+  });
+});
+
+/*
+ * A look that named no app, with Bobble in front: the app skips Bobble and
+ * answers with the app behind it (apps/desktop/…/mac/self-target.ts), marked
+ * `behindBobble`. That app is NOT the one the user has in front.
+ */
+describe('a look aimed past Bobble says where it landed', () => {
+  const pastBobble = () =>
+    new FakeBridge().on('snapshot', (p) => ({
+      ...SNAP([OK_BUTTON], 5200),
+      behindBobble: true,
+      ...(p?.screenshot === true
+        ? { screenshot: { path: '/tmp/t.png', base64: 'TTTT', rect: { x: 0, y: 0, w: 9, h: 9 } } }
+        : {}),
+    }));
+
+  it('the header names it as the app in front behind Bobble', async () => {
+    const r = await run(collectTools(pastBobble()), 'mac_snapshot', {});
+    expect(textOf(r)).toContain('the app in front behind Bobble');
+    expect(textOf(r)).not.toContain('the app the USER has in front');
+  });
+
+  it('and so does a --visual look', async () => {
+    const r = await run(collectTools(pastBobble()), 'mac_snapshot', { visual: true });
+    expect(r.content.find((c) => c.type === 'image')).toBeDefined();
+    expect(textOf(r)).toContain('the app in front behind Bobble');
+    expect(textOf(r)).not.toContain('the app the USER has in front');
   });
 });

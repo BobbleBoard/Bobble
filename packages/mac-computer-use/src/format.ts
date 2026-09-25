@@ -642,12 +642,18 @@ export interface MacSnapshotView {
  * look carries when it landed somewhere the model did not name.
  */
 export function whoseLookLines(snap: MacSnapshot, view: MacSnapshotView = {}): string[] {
+  /* With Bobble itself in front the look is aimed past it (snap.behindBobble),
+     and "the app the USER has in front" would be false — Bobble is. */
+  const where =
+    snap.behindBobble === true
+      ? 'the app in front behind Bobble (this chat, which computer use never looks at)'
+      : 'the app the USER has in front';
   return [
     `App: "${snap.app}"${snap.window ? ` — window "${snap.window}"` : ''}`,
     ...(view.frontmostFallback === true
       ? [
-          `(No app was named and none was under your control, so this is the app the USER has ` +
-            `in front. It is under your control now; if the task is in another app, name it: ` +
+          `(No app was named and none was under your control, so this is ${where}. It is ` +
+            `under your control now; if the task is in another app, name it: ` +
             `mac snapshot "<app>" — or launch it.)`,
         ]
       : []),
