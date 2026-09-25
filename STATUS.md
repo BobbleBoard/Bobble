@@ -13,6 +13,12 @@ Updated: 2026-09-24 · **PAUSED for the user's testing** · main `ea0ef232` · *
 
 Commits: `b493d344` (tokens + studio material), `bc44d674` (four hard-coded shadows; `fec48c2d` on the candidate), `9135cb54` (the studio probe `elevation-look.mjs`). Themes suite 27/27, token-hygiene + terminal-surface CSS tests pass.
 
+## 📌 PINNED HIGH PRIORITY — Visual quality (office, charts, HyperFrames) — the user, 2026-09-24
+Order of work:
+1. **Land Wave 1 on main, verified** — VQ-00 eval harness, VQ-01 office renderer correctness (`push/vq-office-w1`), VQ-02 chart hardening, VQ-03 palette checks, VQ-11L HyperFrames title card (`push/vq-kit-w1`). Today they exist only in the installed candidate, unverified. Before/after renders from the eval harness for every sample prompt, and the owed prefill/TTFT check on VQ-02's prompt delta (+~0.8k chars per mode).
+2. **Finish VQ-08 anti-fabrication** (invented numbers, quotes, URLs and attributions flagged; WIP on `push/vq-office-w1`).
+3. **Wave 2** — VQ-04 design kit, VQ-10 `diagram` tool, VQ-05 HTML → native emitters, WF-06 render-from-spec (deliverables/research/PLAN.md §10).
+
 ## Then (2026-09-24): the sidebar's hierarchy and the new-chat "Bobble" line
 | Where | Before (measured) | After |
 |---|---|---|
