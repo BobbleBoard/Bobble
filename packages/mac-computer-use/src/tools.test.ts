@@ -1294,3 +1294,36 @@ describe('the controlled app is remembered, and a fallback says what it is', () 
     expect(session.controlled()).toMatchObject({ app: 'Google Chrome', pid: 4321 });
   });
 });
+
+/*
+ * THE REVIEW OF THE 2026-09-23 WAVE (deliverables/review/wave-0923-findings.md,
+ * "computer-use"). Each case reproduces a finding against fakes — no real app,
+ * no real Chrome, no real screen.
+ */
+
+const OK_BUTTON = { index: 1, role: 'AXButton', name: 'OK' };
+
+describe('a --visual click maps the picture the helper actually sent', () => {
+  it('uses the image’s own size when the helper sent no inline copy', async () => {
+    const bridge = new FakeBridge()
+      .on('snapshot', () => ({
+        ...SNAP([OK_BUTTON]),
+        // The composite at native pixels: the inline encoding failed, so the full-size
+        // PNG went instead — 2000×1600 pixels of a 1000×800-point rect.
+        screenshot: {
+          path: '/tmp/x.png',
+          base64: 'PPPP',
+          mimeType: 'image/png',
+          rect: { x: 100, y: 100, w: 1000, h: 800 },
+          width: 2000,
+          height: 1600,
+        },
+      }))
+      .on('click', () => ({ found: true }));
+    const tools = collectTools(bridge);
+    await run(tools, 'mac_snapshot', { app: 'TextEdit', visual: true });
+    await run(tools, 'mac_click', { x: 1000, y: 800 });
+    // The middle of the picture is the middle of the rect.
+    expect(bridge.lastParams('click')).toMatchObject({ x: 600, y: 500 });
+  });
+});

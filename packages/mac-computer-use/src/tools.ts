@@ -842,20 +842,28 @@ export function registerMacComputerUseTools(
               { action: 'snapshot', ok: false, app: snapV.app, pid: snapV.pid },
             );
           }
-          const inline = shotV as { inlineWidth?: number; inlineHeight?: number };
+          /*
+           * THE SIZE OF THE PICTURE THAT WAS SENT. The inline copy is at points;
+           * when the helper could not make one it sends the full capture — at
+           * backing pixels, twice the points on a Retina display — with that
+           * size as width/height. Reading it as points put every click twice as
+           * far from the corner as the model aimed.
+           */
+          const sent = shotV as {
+            inlineWidth?: number;
+            inlineHeight?: number;
+            width?: number;
+            height?: number;
+          };
+          const sizeOf = (...sides: (number | undefined)[]): number | undefined =>
+            sides.find((s) => typeof s === 'number' && s > 0);
           visualFrame = {
             x: rect.x,
             y: rect.y,
             w: rect.w,
             h: rect.h,
-            iw:
-              typeof inline.inlineWidth === 'number' && inline.inlineWidth > 0
-                ? inline.inlineWidth
-                : rect.w,
-            ih:
-              typeof inline.inlineHeight === 'number' && inline.inlineHeight > 0
-                ? inline.inlineHeight
-                : rect.h,
+            iw: sizeOf(sent.inlineWidth, sent.width) ?? rect.w,
+            ih: sizeOf(sent.inlineHeight, sent.height) ?? rect.h,
           };
           return {
             content: [
