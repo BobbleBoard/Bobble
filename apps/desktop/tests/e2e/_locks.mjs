@@ -33,7 +33,8 @@
  * ## Extra conditions for a heavy job
  *
  * A heavy job also waits for (PLAN.md §4.3 and §4.5):
- *   - AC power. On battery nothing heavy starts.
+ *   - AC power. On battery nothing heavy starts, and a heavy job already
+ *     running under `scripts/with-lock.mjs` is paused until AC (paceHeavy).
  *   - the user's own Bobble to have no model loaded and no generation running (a
  *     model server or a Python worker descended from /Applications/Bobble.app,
  *     or from a dev `electron .` in the main checkout).
@@ -687,6 +688,93 @@ export function heavyBlockers(opts = {}) {
     });
   }
   return reasons;
+}
+
+// ── pacing a running heavy job ──────────────────────────────────────────────
+
+/** Whether pmset says the Mac is on battery (false off macOS, or unread). */
+export function onBattery(opts = {}) {
+  const run = opts.run ?? defaultRun;
+  if ((opts.platform ?? process.platform) !== 'darwin') return false;
+  try {
+    return !run('pmset', ['-g', 'batt']).includes("'AC Power'");
+  } catch {
+    return false;
+  }
+}
+
+/** `root` and every process descended from it, parents before children. */
+export function processTree(rows, root) {
+  const kids = new Map();
+  for (const r of rows) kids.set(r.ppid, [...(kids.get(r.ppid) ?? []), r.pid]);
+  const out = [];
+  const todo = [root];
+  while (todo.length > 0) {
+    const pid = todo.shift();
+    if (out.includes(pid)) continue;
+    out.push(pid);
+    todo.push(...(kids.get(pid) ?? []));
+  }
+  return out;
+}
+
+/**
+ * ON BATTERY NOTHING HEAVY RUNS — not only "starts". The AC gate above holds a
+ * heavy job's start; one that began on AC kept its model server and the GPU
+ * busy after the charger came out (2026-09-25: an OmniSVG comparison ran on
+ * into the battery, and an agent saw it at 2%). This checks the power every
+ * `intervalMs`: on battery it stops the job's whole process tree (SIGSTOP —
+ * nothing computes, nothing is lost), back on AC it lets it go on (SIGCONT).
+ * `stop()` lets a paused job go on (so a signal meant to end it lands) and
+ * stops watching; `tick()` is one check, for tests.
+ */
+export function paceHeavy(pid, opts = {}) {
+  const run = opts.run ?? defaultRun;
+  const kill = opts.kill ?? ((p, sig) => process.kill(p, sig));
+  const log = opts.log ?? ((m) => console.error(m));
+  let paused = [];
+  const signal = (pids, sig) => {
+    for (const p of pids) {
+      try {
+        kill(p, sig);
+      } catch {
+        /* already gone */
+      }
+    }
+  };
+  const resume = () => {
+    signal(paused, 'SIGCONT');
+    paused = [];
+  };
+  const tick = () => {
+    const battery = onBattery(opts);
+    if (battery && paused.length === 0) {
+      let rows;
+      try {
+        rows = parseProcessRows(run('ps', ['-axo', 'pid=,ppid=,command=']));
+      } catch {
+        return;
+      }
+      paused = processTree(rows, pid);
+      signal([...paused].reverse(), 'SIGSTOP');
+      log(`with-lock: on battery — the heavy job is paused (pid ${paused.join(' ')}) until AC`);
+    } else if (!battery && paused.length > 0) {
+      resume();
+      log('with-lock: on AC — the heavy job goes on');
+    }
+  };
+  const timer = setInterval(tick, opts.intervalMs ?? 20_000);
+  timer.unref?.();
+  return {
+    tick,
+    get paused() {
+      return paused.length > 0;
+    },
+    stop() {
+      clearInterval(timer);
+      if (paused.length > 0) resume();
+    },
+  };
 }
 
 /**

@@ -14,7 +14,8 @@
  *        a watchdog and orphan sweeps)
  *
  * Classes and caps: heavy 1, probe 3, build 2, test 6. While a HEAVY job runs,
- * probe and build drop to 1 slot each. A heavy job also waits for AC power,
+ * probe and build drop to 1 slot each. A heavy job also waits for AC power
+ * (and is paused — SIGSTOP, whole process tree — while on battery once running),
  * for the user's own Bobble to have no model loaded, for no orphaned model server,
  * and for at most one probe and one build already running.
  *
@@ -29,7 +30,12 @@
  * then gives up with exit code 75. The command's own exit code passes through.
  */
 import { spawn } from 'node:child_process';
-import { acquire, LOCK_CAPS, LockTimeoutError } from '../apps/desktop/tests/e2e/_locks.mjs';
+import {
+  acquire,
+  LOCK_CAPS,
+  LockTimeoutError,
+  paceHeavy,
+} from '../apps/desktop/tests/e2e/_locks.mjs';
 
 const [cls, sep, ...cmd] = process.argv.slice(2);
 if (!Object.hasOwn(LOCK_CAPS, cls ?? '') || sep !== '--' || cmd.length === 0) {
@@ -52,12 +58,16 @@ const child = spawn(cmd[0], cmd.slice(1), {
   stdio: 'inherit',
   env: { ...process.env, ...lease.env() },
 });
+// A heavy job is paused while the Mac is on battery and goes on at AC.
+const pace = cls === 'heavy' && child.pid !== undefined ? paceHeavy(child.pid) : null;
 for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
   process.on(sig, () => {
+    pace?.stop();
     child.kill(sig);
   });
 }
 child.on('exit', (code, signal) => {
+  pace?.stop();
   lease.release();
   process.exit(code ?? (signal !== null ? 1 : 0));
 });

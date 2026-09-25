@@ -318,6 +318,80 @@ describe('processes', () => {
   });
 });
 
+describe('pacing a running heavy job', () => {
+  const BATTERY = "Now drawing from 'Battery Power'\n\t38%; discharging;";
+  // The job (900) → its model client (910) → the model server (920); 930 is a
+  // sibling of the job's, never touched.
+  const TREE = [
+    '  900   1 bash run-all.sh',
+    '  910 900 node omni-run.mjs',
+    '  920 910 llama-server -m omni.gguf',
+    '  930   1 node something-else.mjs',
+  ].join('\n');
+
+  it('reads the power source from pmset, and only on macOS', () => {
+    expect(locks.onBattery({ platform: 'darwin', run: fakeRun({ batt: BATTERY }) })).toBe(true);
+    expect(locks.onBattery({ platform: 'darwin', run: noBlockers })).toBe(false);
+    expect(locks.onBattery({ platform: 'linux', run: fakeRun({ batt: BATTERY }) })).toBe(false);
+  });
+
+  it('finds a job and everything under it, parents first', () => {
+    expect(locks.processTree(locks.parseProcessRows(TREE), 900)).toEqual([900, 910, 920]);
+  });
+
+  it('pauses the whole tree on battery and lets it go on at AC', () => {
+    let batt = BATTERY;
+    const sent: string[] = [];
+    const pace = locks.paceHeavy(900, {
+      platform: 'darwin',
+      run: (cmd: string) => (cmd === 'pmset' ? batt : TREE),
+      kill: (pid: number, sig: string) => sent.push(`${sig} ${pid}`),
+      log: () => {},
+      intervalMs: 60_000,
+    });
+    try {
+      pace.tick();
+      expect(pace.paused).toBe(true);
+      expect(sent).toEqual(['SIGSTOP 920', 'SIGSTOP 910', 'SIGSTOP 900']);
+      pace.tick(); // still on battery: nothing new
+      expect(sent).toHaveLength(3);
+      batt = AC;
+      pace.tick();
+      expect(pace.paused).toBe(false);
+      expect(sent.slice(3)).toEqual(['SIGCONT 900', 'SIGCONT 910', 'SIGCONT 920']);
+    } finally {
+      pace.stop();
+    }
+  });
+
+  it('never pauses on AC, and stop() lets a paused job go on so it can be ended', () => {
+    const sent: string[] = [];
+    const onAc = locks.paceHeavy(900, {
+      platform: 'darwin',
+      run: fakeRun({ ps: TREE }),
+      kill: (pid: number, sig: string) => sent.push(`${sig} ${pid}`),
+      log: () => {},
+    });
+    onAc.tick();
+    onAc.stop();
+    expect(sent).toEqual([]);
+
+    const onBatt = locks.paceHeavy(900, {
+      platform: 'darwin',
+      run: fakeRun({ batt: BATTERY, ps: TREE }),
+      kill: (pid: number, sig: string) => sent.push(`${sig} ${pid}`),
+      log: () => {},
+    });
+    onBatt.tick();
+    onBatt.stop();
+    expect(sent.filter((x) => x.startsWith('SIGCONT'))).toEqual([
+      'SIGCONT 900',
+      'SIGCONT 910',
+      'SIGCONT 920',
+    ]);
+  });
+});
+
 describe('lockStatus', () => {
   it('reports every class, its cap now, and its holders', () => {
     plant('heavy', 0, process.pid);
