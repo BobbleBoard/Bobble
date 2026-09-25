@@ -47,6 +47,8 @@ export interface FrontApp {
   readonly ok?: boolean;
   readonly pid?: number;
   readonly app?: string;
+  /** Present when the app in front was excluded and this is the one behind it. */
+  readonly behind?: string;
 }
 
 export interface SelfTargetDeps {
@@ -57,7 +59,10 @@ export interface SelfTargetDeps {
   readonly frontmost: (excludePids: readonly number[]) => Promise<FrontApp>;
 }
 
-/** The request as it should go to the helper — or the refusal, thrown. */
+/** The request as it should go to the helper — or the refusal, thrown. A
+ *  request aimed PAST Bobble carries `behindBobble: true`, for mac-agent to
+ *  strip and hand back on the look's answer: "the app the user has in front"
+ *  is false then, and the header says what is true instead. */
 export async function aimAwayFromSelf(
   method: MacAgentMethod,
   params: Record<string, unknown>,
@@ -78,6 +83,7 @@ export async function aimAwayFromSelf(
     ...params,
     pid: front.pid,
     ...(typeof front.app === 'string' && front.app !== '' ? { app: front.app } : {}),
+    ...(typeof front.behind === 'string' ? { behindBobble: true } : {}),
   };
 }
 

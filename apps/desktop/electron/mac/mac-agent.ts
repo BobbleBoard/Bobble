@@ -625,7 +625,7 @@ async function dispatch(
   drivers.noteRequest(who, method);
   // A request that names no app goes to the front app that is NOT Bobble —
   // resolved and stamped here, before the helper can pick Bobble itself.
-  const params = await aimAwayFromSelf(method, requested, {
+  const { behindBobble, ...params } = await aimAwayFromSelf(method, requested, {
     ownPids: OWN_PIDS,
     frontmost: (excludePids) =>
       getHelper().request<FrontApp>('frontmost', { excludePids: [...excludePids] }),
@@ -633,8 +633,11 @@ async function dispatch(
   switch (method) {
     case 'check':
       return getHelper().request('check');
-    case 'snapshot':
-      return snapshotWithOverlay(params);
+    case 'snapshot': {
+      const snap = await snapshotWithOverlay(params);
+      // Bobble was in front and skipped: the look's header says so.
+      return behindBobble === true ? { ...snap, behindBobble: true } : snap;
+    }
     case 'click':
       return clickWithOverlay(params);
     case 'type':

@@ -1964,3 +1964,32 @@ describe('a named app wins over the app under control', () => {
     expect(bridge.lastParams('snapshot')).toEqual({ app: 'Safari', cap: 60 });
   });
 });
+
+/*
+ * A look that named no app, with Bobble in front: the app skips Bobble and
+ * answers with the app behind it (apps/desktop/…/mac/self-target.ts), marked
+ * `behindBobble`. That app is NOT the one the user has in front.
+ */
+describe('a look aimed past Bobble says where it landed', () => {
+  const pastBobble = () =>
+    new FakeBridge().on('snapshot', (p) => ({
+      ...SNAP([OK_BUTTON], 5200),
+      behindBobble: true,
+      ...(p?.screenshot === true
+        ? { screenshot: { path: '/tmp/t.png', base64: 'TTTT', rect: { x: 0, y: 0, w: 9, h: 9 } } }
+        : {}),
+    }));
+
+  it('the header names it as the app in front behind Bobble', async () => {
+    const r = await run(collectTools(pastBobble()), 'mac_snapshot', {});
+    expect(textOf(r)).toContain('the app in front behind Bobble');
+    expect(textOf(r)).not.toContain('the app the USER has in front');
+  });
+
+  it('and so does a --visual look', async () => {
+    const r = await run(collectTools(pastBobble()), 'mac_snapshot', { visual: true });
+    expect(r.content.find((c) => c.type === 'image')).toBeDefined();
+    expect(textOf(r)).toContain('the app in front behind Bobble');
+    expect(textOf(r)).not.toContain('the app the USER has in front');
+  });
+});

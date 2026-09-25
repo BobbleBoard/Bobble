@@ -25,12 +25,14 @@ function landsOn(params: Record<string, unknown>): number | undefined {
 }
 
 /** The helper's `frontmost`: one that skips `excludePids`, or an older one that cannot. */
-function frontmostOf(skips: boolean) {
+function frontmostOf(skips: boolean, zOrder: readonly number[] = Z_ORDER) {
   return vi.fn(async (exclude: readonly number[]): Promise<FrontApp> => {
-    const pid = skips ? Z_ORDER.find((p) => !exclude.includes(p)) : Z_ORDER[0];
+    const pid = skips ? zOrder.find((p) => !exclude.includes(p)) : zOrder[0];
     if (pid === undefined) return { ok: false };
     const app = Object.keys(NAMES).find((n) => NAMES[n] === pid && n !== 'Electron');
-    return { ok: true, pid, ...(app === undefined ? {} : { app }) };
+    // Serve.swift names the app it skipped past — only when it skipped one.
+    const skipped = pid === zOrder[0] ? {} : { behind: 'Bobble' };
+    return { ok: true, pid, ...(app === undefined ? {} : { app }), ...skipped };
   });
 }
 
@@ -115,5 +117,24 @@ describe('a look that resolved to Bobble by name is not kept', () => {
     expect(() => refuseSelf(BOBBLE, [BOBBLE])).toThrow(SELF_REFUSAL);
     expect(() => refuseSelf(TEXTEDIT, [BOBBLE])).not.toThrow();
     expect(() => refuseSelf(undefined, [BOBBLE])).not.toThrow();
+  });
+});
+
+/*
+ * The look's header says where a look that named no app landed. "The app the
+ * USER has in front" is false once Bobble was in front and skipped, so the aim
+ * marks it (mac-agent strips the mark and hands it back on the answer).
+ */
+describe('a look aimed past Bobble is marked, so its header can say so', () => {
+  it('is marked when Bobble was in front and skipped', async () => {
+    const aimed = await aimAwayFromSelf('snapshot', { cap: 60 }, deps());
+    expect(aimed.behindBobble).toBe(true);
+  });
+
+  it('is not marked when the app in front was not Bobble', async () => {
+    const d = { ownPids: [BOBBLE], frontmost: frontmostOf(true, [TEXTEDIT, BOBBLE]) };
+    const aimed = await aimAwayFromSelf('snapshot', { cap: 60 }, d);
+    expect(landsOn(aimed)).toBe(TEXTEDIT);
+    expect(aimed.behindBobble).toBeUndefined();
   });
 });
