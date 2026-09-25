@@ -2959,10 +2959,12 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
  * the right. Deliberately still CLICKABLE — the workspace shows its own gate
  * (blur + Download/View), so the row advertises the cost rather than blocking.
  */
-.pd-child-row[data-installed="false"] {
+.pd-child-row[data-installed="false"],
+.pd-sidebar-row[data-installed="false"] {
   opacity: 0.62;
 }
-.pd-child-row[data-installed="false"]:hover {
+.pd-child-row[data-installed="false"]:hover,
+.pd-sidebar-row[data-installed="false"]:hover {
   opacity: 1;
 }
 .pd-child-row-meta {
@@ -8786,7 +8788,9 @@ body[data-media-expanded="true"] .pd-studio-compose {
 .pd-home-lead {
   display: flex;
   align-items: center;
-  gap: 16px;
+  /* Tile edge to the B about half a capital (with the mark's own inset and the
+     B's side bearing), now that the mark is capital-high. */
+  gap: 10px;
   margin-bottom: 0;
   color: var(--pd-text-primary);
   font-size: 46px;
@@ -8798,6 +8802,19 @@ body[data-media-expanded="true"] .pd-studio-compose {
 
 .pd-home-lead-name {
   display: inline-block;
+}
+/*
+ * THE MARK SIZED TO THE WORD. At 48px the tiles stood 40px tall beside 32px
+ * capitals — 5px over the cap line, a pixel under the baseline — so the lockup
+ * read as a black block next to a word rather than one logo (the user 2026-09-24,
+ * "the bobble text on a new chat"). The tiles fill 26.5/32 of the mark's box, so
+ * a box of 1cap / 0.828 makes them exactly the capitals' height; the row centres
+ * the box on the line, whose middle is the capitals' middle in SF, so the tiles
+ * meet the cap line and the baseline together.
+ */
+.pd-home-lead > svg {
+  width: calc(1cap / 0.828);
+  height: calc(1cap / 0.828);
 }
 
 /* THE DRAWING, LIVE (chat/LiveSvgCard): the inline SVG card with the pending
