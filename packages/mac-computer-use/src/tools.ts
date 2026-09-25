@@ -688,8 +688,15 @@ export function registerMacComputerUseTools(
 
   /** Stamp the controlled app's pid onto an act so the helper resolves the
    * index in the right namespace AND delivers fallback events to that app only
-   * (background). */
+   * (background).
+   *
+   * A NAMED APP WINS. The stamp is the default for an act that names no app,
+   * not an override: it used to replace the name, and the helper resolves a pid
+   * before a name, so `chrome tabs --app Safari` while driving TextEdit read
+   * TextEdit. The pid rides along only when the name IS the controlled app. */
   function withTarget(params: Record<string, unknown>): Record<string, unknown> {
+    const named = typeof params.app === 'string' ? params.app.trim().toLowerCase() : '';
+    if (named !== '' && named !== session.controlled()?.app.trim().toLowerCase()) return params;
     return Object.assign(params, session.targetParams());
   }
 
@@ -1531,7 +1538,9 @@ export function registerMacComputerUseTools(
     }),
     async execute(_id, params, _signal, _upd, ctx): Promise<AgentToolResult<MacDetails>> {
       if (bridge === null) return unavailable('chrome_tab');
-      const blocked = await gate('chrome_tab', ctx);
+      // A named browser is the one acted on (withTarget), so it is the one asked
+      // about; no name acts on the app under control, which was.
+      const blocked = await gate('chrome_tab', ctx, params.app);
       if (blocked !== null) return blocked;
       const verb =
         params.action === 'new' ? 'tabNew' : params.action === 'close' ? 'tabClose' : 'tabSelect';
