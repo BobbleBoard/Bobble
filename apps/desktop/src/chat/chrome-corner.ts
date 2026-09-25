@@ -1,7 +1,8 @@
 /**
  * Publish the top-left corner cluster's real right edge as `--pd-chrome-corner`.
  *
- * The corner beside the traffic lights holds the sidebar toggle and Chat|Work.
+ * The corner beside the traffic lights holds the sidebar toggle and the task
+ * tray's slot (chat/TaskTray.tsx; Chat|Work lived there until 2026-09-21).
  * It is absolutely positioned (it has to be — with the sidebar open it sits over
  * the sidebar, not in the top bar's flow), so nothing in the top bar knows how
  * wide it is. The collapsed top bar used to state that width by hand as `124px`,

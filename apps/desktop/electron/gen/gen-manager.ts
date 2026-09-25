@@ -116,6 +116,16 @@ interface AgentSource {
   readonly agent?: string;
 }
 
+/**
+ * The studio request a job answers, echoed on every surface event it streams
+ * (GenSurfacePayload.requestId). Absent on the agents' path. Spread into each
+ * handler's payload, so a studio can follow its job while the room itself is
+ * not mounted — see src/state/studio-jobs.ts.
+ */
+function studioTag(requestId: string | undefined): { readonly requestId?: string } {
+  return requestId !== undefined && requestId !== '' ? { requestId } : {};
+}
+
 export interface GenManagerOptions {
   /** Yields the app window to stream surface updates to. */
   readonly getWindow: () => WebContents | null;
@@ -622,6 +632,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
   async function handleGenerate(
     raw: GenerateImageParams,
     from?: AgentSource,
+    requestId?: string,
   ): Promise<GenerateImageResult> {
     const model = getModel(raw.model ?? defaultImageModel().id);
     // An image model runs one of two ways: the mflux worker (its `mflux`
@@ -761,6 +772,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
       status,
       error,
       note,
+      ...studioTag(requestId),
     });
 
     send('gen:open', { tabId, payload: payload('generating') });
@@ -848,6 +860,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
   async function handleGenerateVideo(
     raw: GenerateVideoParams,
     from?: AgentSource,
+    requestId?: string,
   ): Promise<GenerateVideoResult> {
     const model = getModel(raw.model ?? defaultVideoModel().id);
     if (model === undefined || model.modality !== 'video') {
@@ -904,6 +917,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
       status,
       error,
       note,
+      ...studioTag(requestId),
     });
 
     send('gen:open', { tabId, payload: payload('generating') });
@@ -992,6 +1006,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
   async function handleGenerateAudio(
     raw: GenerateAudioParams,
     from?: AgentSource,
+    requestId?: string,
   ): Promise<GenerateAudioResult> {
     const kind = raw.kind ?? 'speech';
     const fallback = defaultAudioModel(kind, activeModels());
@@ -1067,6 +1082,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
       status,
       error,
       note,
+      ...studioTag(requestId),
     });
 
     /*
@@ -1303,7 +1319,8 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
    * agent bridge reaches, so a studio job and a chat job are the same job: one
    * queue, one cancel, one heavy gate, one asset prompt. Errors come back as a
    * field rather than a rejection so a studio can render the sentence instead of
-   * an unhandled promise.
+   * an unhandled promise. The studio's `requestId` rides on every event the job
+   * streams (studioTag), which is how the room follows a job it is not in.
    */
   ipcMain.handle(
     'gen:generate',
@@ -1313,32 +1330,40 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
     ): Promise<GenInvokeMap['gen:generate']['response']> => {
       try {
         if (req.kind === 'audio') {
-          const r = await handleGenerateAudio({
-            prompt: req.prompt,
-            kind: req.audioKind ?? 'speech',
-            ...(req.model !== undefined ? { model: req.model } : {}),
-            ...(req.seconds !== undefined ? { seconds: req.seconds } : {}),
-            ...(req.steps !== undefined ? { steps: req.steps } : {}),
-            ...(req.voice !== undefined ? { voice: req.voice } : {}),
-            ...(req.speed !== undefined ? { speed: req.speed } : {}),
-            ...(req.lang !== undefined ? { lang: req.lang } : {}),
-            ...(req.refAudio !== undefined ? { refAudio: req.refAudio } : {}),
-            ...(req.refText !== undefined ? { refText: req.refText } : {}),
-            ...(req.seed !== undefined ? { seed: req.seed } : {}),
-            ...(req.n !== undefined ? { count: req.n } : {}),
-          });
+          const r = await handleGenerateAudio(
+            {
+              prompt: req.prompt,
+              kind: req.audioKind ?? 'speech',
+              ...(req.model !== undefined ? { model: req.model } : {}),
+              ...(req.seconds !== undefined ? { seconds: req.seconds } : {}),
+              ...(req.steps !== undefined ? { steps: req.steps } : {}),
+              ...(req.voice !== undefined ? { voice: req.voice } : {}),
+              ...(req.speed !== undefined ? { speed: req.speed } : {}),
+              ...(req.lang !== undefined ? { lang: req.lang } : {}),
+              ...(req.refAudio !== undefined ? { refAudio: req.refAudio } : {}),
+              ...(req.refText !== undefined ? { refText: req.refText } : {}),
+              ...(req.seed !== undefined ? { seed: req.seed } : {}),
+              ...(req.n !== undefined ? { count: req.n } : {}),
+            },
+            undefined,
+            req.requestId,
+          );
           return { jobId: r.jobId, outputs: r.outputs };
         }
         if (req.kind === 'video') {
-          const r = await handleGenerateVideo({
-            prompt: req.prompt,
-            ...(req.model !== undefined ? { model: req.model } : {}),
-            ...(req.seconds !== undefined ? { seconds: req.seconds } : {}),
-            ...(req.size !== undefined ? { size: req.size } : {}),
-            ...(req.fps !== undefined ? { fps: req.fps } : {}),
-            ...(req.seed !== undefined ? { seed: req.seed } : {}),
-            ...(req.negativePrompt !== undefined ? { negativePrompt: req.negativePrompt } : {}),
-          });
+          const r = await handleGenerateVideo(
+            {
+              prompt: req.prompt,
+              ...(req.model !== undefined ? { model: req.model } : {}),
+              ...(req.seconds !== undefined ? { seconds: req.seconds } : {}),
+              ...(req.size !== undefined ? { size: req.size } : {}),
+              ...(req.fps !== undefined ? { fps: req.fps } : {}),
+              ...(req.seed !== undefined ? { seed: req.seed } : {}),
+              ...(req.negativePrompt !== undefined ? { negativePrompt: req.negativePrompt } : {}),
+            },
+            undefined,
+            req.requestId,
+          );
           return {
             jobId: r.jobId,
             outputs: r.outputs.map((o) => ({
@@ -1348,15 +1373,19 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
             })),
           };
         }
-        const r = await handleGenerate({
-          prompt: req.prompt,
-          ...(req.model !== undefined ? { model: req.model } : {}),
-          ...(req.size !== undefined ? { size: req.size } : {}),
-          ...(req.n !== undefined ? { n: req.n } : {}),
-          ...(req.steps !== undefined ? { steps: req.steps } : {}),
-          ...(req.seed !== undefined ? { seed: req.seed } : {}),
-          ...(req.negativePrompt !== undefined ? { negativePrompt: req.negativePrompt } : {}),
-        });
+        const r = await handleGenerate(
+          {
+            prompt: req.prompt,
+            ...(req.model !== undefined ? { model: req.model } : {}),
+            ...(req.size !== undefined ? { size: req.size } : {}),
+            ...(req.n !== undefined ? { n: req.n } : {}),
+            ...(req.steps !== undefined ? { steps: req.steps } : {}),
+            ...(req.seed !== undefined ? { seed: req.seed } : {}),
+            ...(req.negativePrompt !== undefined ? { negativePrompt: req.negativePrompt } : {}),
+          },
+          undefined,
+          req.requestId,
+        );
         return {
           jobId: r.jobId,
           outputs: r.outputs.map((o) => ({

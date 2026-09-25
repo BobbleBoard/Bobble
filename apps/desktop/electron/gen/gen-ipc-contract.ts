@@ -78,6 +78,18 @@ export interface GenSurfacePayload {
    * them on the floor. They are advisory: never parsed, only shown.
    */
   readonly note?: string;
+  /**
+   * THE STUDIO REQUEST THIS JOB ANSWERS — echoed from `gen:generate`, absent on
+   * an agent's job.
+   *
+   * A studio used to claim "the first stream to open after I pressed Generate"
+   * as its own, from inside the room's component — so the claim died when the
+   * room unmounted, and could be wrong the moment a chat's picture opened in
+   * the same second. With the id on every event the studio's job store
+   * (src/state/studio-jobs.ts) follows its job wherever the reader has gone,
+   * and the chat's inline card can tell a studio's job from its own.
+   */
+  readonly requestId?: string;
 }
 
 /** main→renderer events. Compose into AppEventMap. */
@@ -259,6 +271,13 @@ export type GenInvokeMap = {
        */
       inputImage?: string;
       strength?: number;
+      /**
+       * The studio's own id for this request, echoed on every `gen:open` /
+       * `gen:update` of the job it starts ({@link GenSurfacePayload.requestId}).
+       * The reply only arrives when the job is over; this is how the room knows
+       * which stream is its job before then.
+       */
+      requestId?: string;
     };
     response: {
       jobId: string;

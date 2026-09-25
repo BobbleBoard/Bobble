@@ -3157,6 +3157,239 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   flex: 1;
   min-width: 48px;
 }
+/* ── The task tray (beside the sidebar toggle) — chat/TaskTray.tsx ─────────
+ *
+ * the user's reference for this was a stack of flat task cards with oversized
+ * titles, a status pill AND the same status as text, and a blue "View" link.
+ * This is the opposite on each count: one firm sheet (the shared .pd-menu
+ * surface), a list-sized ink ladder, the status once, and the row itself as the
+ * way there. Compact on purpose — a two-line row is 40px.
+ */
+.pd-task-tray-slot {
+  /* Reserved whether or not the button is in it: the collapsed top bar's title
+     starts after this corner (chrome-corner.ts), and a slot that appeared with
+     the button would shove the title sideways. */
+  display: flex;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  margin-left: 2px;
+}
+.pd-task-tray-button {
+  position: relative;
+  display: flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  /* The collapse toggle's own shape and ink, so the pair reads as one cluster. */
+  border-radius: 6px;
+  background: transparent;
+  color: var(--pd-text-muted);
+  transition:
+    background-color var(--pd-duration-fast, 120ms) var(--pd-easing-standard, ease),
+    color var(--pd-duration-fast, 120ms) var(--pd-easing-standard, ease);
+  animation: pd-task-tray-in 200ms var(--pd-easing-standard, ease) both;
+}
+.pd-task-tray-button:hover,
+.pd-task-tray-button[data-state="open"] {
+  background: var(--pd-bg-hover);
+  color: var(--pd-text-primary);
+}
+@keyframes pd-task-tray-in {
+  from {
+    opacity: 0;
+    transform: scale(0.86);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+/* The button's one mark: the most urgent row's colour, the sidebar's own dot. */
+.pd-task-tray-dot {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+.pd-task-tray-dot,
+.pd-task-dot {
+  display: inline-block;
+  flex: none;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  animation: pd-chat-dot-pop 0.28s var(--pd-easing-standard) both;
+}
+.pd-task-tray-dot[data-tone="done"],
+.pd-task-dot[data-tone="done"] {
+  background: var(--pd-status-info-fg);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pd-status-info-fg) 22%, transparent);
+}
+.pd-task-tray-dot[data-tone="needs-input"],
+.pd-task-dot[data-tone="needs-input"] {
+  background: var(--pd-status-warning-fg);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pd-status-warning-fg) 22%, transparent);
+}
+.pd-task-tray-dot[data-tone="failed"],
+.pd-task-dot[data-tone="failed"] {
+  background: var(--pd-status-danger-fg);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pd-status-danger-fg) 22%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .pd-task-tray-button {
+    animation: none;
+  }
+}
+/* The card: the shared menu sheet, sized for a short list. (Two classes so the
+   menu family's own padding does not win on source order.) */
+.pd-menu.pd-task-tray {
+  width: 300px;
+  max-width: calc(100vw - 24px);
+  padding: 4px;
+}
+.pd-task-tray-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pd-task-row {
+  position: relative;
+}
+.pd-task-row-open {
+  display: flex;
+  width: 100%;
+  min-height: 40px;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px;
+  border: 0;
+  /* Concentric with the sheet: its radius less the 4px it is inset by. */
+  border-radius: calc(var(--pd-radius-popover, 14px) - 4px);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: default;
+  outline: none;
+}
+/* A finished row keeps room for its × so the title's ellipsis stops short of it. */
+.pd-task-row[data-state="done"] .pd-task-row-open,
+.pd-task-row[data-state="failed"] .pd-task-row-open {
+  padding-right: 30px;
+}
+/* Keyboard focus is the menu family's highlight, not a ring clipped by the
+   sheet — and only in keyboard mode (ui/focus-ring.ts): the card focuses its
+   first row as it opens, and a click-opened card must not arrive with a row
+   already lit. */
+.pd-task-row-open:hover,
+:root[data-focus-ring="on"] .pd-task-row-open:focus-visible {
+  background: var(--pd-bg-hover);
+}
+.pd-task-row-glyph {
+  display: flex;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+  color: var(--pd-text-muted);
+}
+.pd-task-row-text {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+.pd-task-row-title {
+  overflow: hidden;
+  font-size: var(--pd-font-size-footnote);
+  font-weight: var(--pd-font-weight-medium);
+  line-height: var(--pd-leading-footnote);
+  color: var(--pd-text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pd-task-row-meta {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+  color: var(--pd-text-secondary);
+  white-space: nowrap;
+}
+.pd-task-row-spinner {
+  flex: none;
+  color: var(--pd-text-secondary);
+}
+.pd-task-row-word,
+.pd-task-row-sep {
+  flex: none;
+}
+.pd-task-row-sep,
+.pd-task-row-time {
+  color: var(--pd-text-muted);
+}
+.pd-task-row-time {
+  min-width: 0;
+  overflow: hidden;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+}
+.pd-task-row-x {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  display: flex;
+  width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--pd-text-muted);
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: opacity var(--pd-duration-fast, 120ms) var(--pd-easing-standard, ease);
+}
+.pd-task-row:hover .pd-task-row-x,
+.pd-task-row-x:focus-visible {
+  opacity: 1;
+}
+.pd-task-row-x:hover {
+  background: var(--pd-bg-active);
+  color: var(--pd-text-primary);
+}
+.pd-task-tray-foot {
+  display: flex;
+  margin-top: 4px;
+  padding: 4px 0 0;
+  border-top: 1px solid var(--pd-border-subtle);
+}
+.pd-task-tray-clear {
+  /* Its words start on the titles' line (row padding 8 + glyph 16 + gap 10),
+     the way a menu's text column lines up past its icons. */
+  margin-left: 26px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: calc(var(--pd-radius-popover, 14px) - 4px);
+  background: transparent;
+  color: var(--pd-text-secondary);
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+}
+.pd-task-tray-clear:hover {
+  background: var(--pd-bg-hover);
+  color: var(--pd-text-primary);
+}
+
 /* ── The downloads tray (top-left) ──────────────────────────────────────── */
 .pd-tray-button {
   position: relative;

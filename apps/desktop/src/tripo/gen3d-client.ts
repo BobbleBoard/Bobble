@@ -18,6 +18,7 @@ import type {
   Gen3dResolution,
   Gen3dRole,
 } from '../../electron/gen3d/gen3d-contract';
+import { placeKey, useTaskTray } from '../state/task-tray';
 import { type TripoOp, useTripoStore } from './store';
 
 interface Gen3dState {
@@ -33,6 +34,15 @@ interface Gen3dState {
   downloads: Readonly<Record<string, Gen3dDownloadUpdate>>;
   /** The active generation/stage job (one at a time in the UI). */
   job: Gen3dJobUpdate | null;
+  /**
+   * When `job` first reported, wall clock ms.
+   *
+   * The elapsed clock under the bar kept its start in a ref inside GenStage, so
+   * leaving the studio and coming back restarted it from 0s over a job that had
+   * been running for minutes — the same "the UI resets" the user reported for the
+   * other studios. Kept with the job, it survives the room.
+   */
+  jobStartedAt: number | null;
   /** The job whose model is now ON SCREEN. Sticky for the life of the job: the
    * artifact only rides ONE update, but the generating UI has to stay in its
    * "model is visible, keep refining" phase for every update after it. */
@@ -140,6 +150,7 @@ export const useGen3dStore = create<Gen3dState>((set, get) => ({
   comfy: null,
   downloads: {},
   job: null,
+  jobStartedAt: null,
   modelReadyJobId: null,
   jobPlan: null,
   downloadPromptOpen: false,
@@ -190,6 +201,7 @@ export const useGen3dStore = create<Gen3dState>((set, get) => ({
     }
     if (res.jobId !== undefined) {
       set({ jobPlan: { jobId: res.jobId, stages: plannedStages(req) } });
+      noteStudioJob(res.jobId, generateTitle(req));
     }
     // Clear the viewport: this job builds a NEW model, so the previous one must
     // not sit there pretending to be it. the user: "the plane stays in the
@@ -215,6 +227,7 @@ export const useGen3dStore = create<Gen3dState>((set, get) => ({
     }
     if (res.jobId !== undefined) {
       set({ jobPlan: { jobId: res.jobId, stages: [op] } });
+      noteStudioJob(res.jobId, stageTitle(op, modelPath, extra?.prompt));
       if (origin !== undefined) stageOrigins.set(res.jobId, origin);
       // Only a probe run should raise the "humanoid?" question — the rig run
       // that follows emits the same measurement and must not re-ask.
@@ -244,11 +257,104 @@ export const useGen3dStore = create<Gen3dState>((set, get) => ({
   cancelJob: async () => {
     const job = get().job;
     if (job === null) return;
+    // Stopped by the person: not news for the task tray, however it ends.
+    if (studioJobs.delete(job.jobId)) useTaskTray.getState().untrack(STUDIO_3D_KEY);
     await window.piDesktop.invoke('gen3d:cancel', { jobId: job.jobId }).catch(() => null);
-    set({ job: null, modelReadyJobId: null, jobPlan: null });
+    set({ job: null, jobStartedAt: null, modelReadyJobId: null, jobPlan: null });
   },
-  clearJob: () => set({ job: null, modelReadyJobId: null, jobPlan: null }),
+  clearJob: () => set({ job: null, jobStartedAt: null, modelReadyJobId: null, jobPlan: null }),
 }));
+
+/*
+ * THE 3D STUDIO'S JOBS IN THE TASK TRAY (state/task-tray.ts).
+ *
+ * `gen3d:job` carries every job the engine runs — the ones a chat's 3D tools
+ * start too, and those belong to the chat that is waiting on them (its turn
+ * is the row). So a job is the STUDIO's only when the studio started it:
+ * `generate`/`runStage` above note the id the engine hands back.
+ */
+const STUDIO_3D_PLACE = { kind: 'studio', modality: '3d' } as const;
+const STUDIO_3D_KEY = placeKey(STUDIO_3D_PLACE);
+const studioJobs = new Map<string, { readonly title: string; readonly startedAt: number }>();
+
+function noteStudioJob(jobId: string, title: string): void {
+  const startedAt = Date.now();
+  studioJobs.set(jobId, { title, startedAt });
+  useTaskTray.getState().track({
+    key: STUDIO_3D_KEY,
+    place: STUDIO_3D_PLACE,
+    title,
+    state: 'running',
+    startedAt,
+  });
+}
+
+/** A studio job's update → its row: still going, or how it ended. */
+function trayFromUpdate(update: Gen3dJobUpdate): void {
+  const meta = studioJobs.get(update.jobId);
+  if (meta === undefined) return;
+  const tray = useTaskTray.getState();
+  const base = {
+    key: STUDIO_3D_KEY,
+    place: STUDIO_3D_PLACE,
+    title: meta.title,
+    startedAt: meta.startedAt,
+  };
+  if (!update.done) {
+    // Only the first update of a job changes anything; the rest are progress.
+    if (tray.live[STUDIO_3D_KEY]?.startedAt !== meta.startedAt) {
+      tray.track({ ...base, state: 'running' });
+    }
+    return;
+  }
+  studioJobs.delete(update.jobId);
+  if (update.error === 'cancelled') {
+    tray.untrack(STUDIO_3D_KEY);
+    return;
+  }
+  tray.settle({
+    ...base,
+    state: update.error !== undefined ? 'failed' : 'done',
+    endedAt: Date.now(),
+    ...(update.error !== undefined ? { error: update.error } : {}),
+  });
+}
+
+/** What a generate request makes, as the tray's row names it. */
+function generateTitle(req: {
+  readonly kind: 'text' | 'image';
+  readonly prompt?: string;
+  readonly imagePaths?: readonly string[];
+  readonly imageOnly?: boolean;
+}): string {
+  const prompt = req.prompt?.trim() ?? '';
+  if (prompt !== '') return prompt;
+  const n = req.imagePaths?.length ?? 0;
+  if (req.imageOnly === true) return 'A reference picture';
+  return n > 1 ? `A model from ${n} pictures` : 'A model from your picture';
+}
+
+const STAGE_NOUN: Record<'segment' | 'retopo' | 'texture' | 'rig' | 'motion', string> = {
+  segment: 'Parts',
+  retopo: 'Clean topology',
+  texture: 'Texture',
+  rig: 'Rig',
+  motion: 'Motion',
+};
+
+/** A stage job on a model, as the tray's row names it: "Rig · fox.glb". */
+function stageTitle(
+  op: 'segment' | 'retopo' | 'texture' | 'rig' | 'motion',
+  modelPath: string,
+  prompt: string | undefined,
+): string {
+  const name = modelPath.split('/').pop() ?? modelPath;
+  const what =
+    op === 'motion' && prompt !== undefined && prompt.trim() !== ''
+      ? prompt.trim()
+      : STAGE_NOUN[op];
+  return `${what} · ${name}`;
+}
 
 /** Which stages a generate request will really run, in pipeline order. */
 function plannedStages(req: {
@@ -445,7 +551,13 @@ export function ensureGen3dWired(): void {
     io.loadAssetTree();
   });
   window.piDesktop.onEvent('gen3d:job', (update) => {
-    useGen3dStore.setState({ job: update });
+    useGen3dStore.setState((s) => ({
+      job: update,
+      // A new job starts its clock; every later update of the same job keeps it.
+      jobStartedAt:
+        s.job?.jobId === update.jobId && s.jobStartedAt !== null ? s.jobStartedAt : Date.now(),
+    }));
+    trayFromUpdate(update);
     const origin = stageOrigins.get(update.jobId);
     // The rig stage measures the shape first — raise the "humanoid?" question
     // rather than deciding silently.
