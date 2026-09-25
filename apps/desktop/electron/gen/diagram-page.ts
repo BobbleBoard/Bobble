@@ -868,6 +868,8 @@ export const ROUND_GEOMETRY_JS = String.raw`(v) => v.replace(/-?(?:\d+\.?\d*|\.\
  *                      small jogs pulled straight — the corners are rounded by
  *                      roundCorners afterwards
  *   roundedRect        a box with its corners rounded (class and entity boxes)
+ *   carry              a point by an edge's end (a multiplicity) moved with
+ *                      that end when the edge is re-drawn
  */
 export const PATH_TOOLS_JS = String.raw`(() => {
   const NUM = /-?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?/g;
@@ -1189,7 +1191,20 @@ export const PATH_TOOLS_JS = String.raw`(() => {
       'V' + fmt(y + q) + a(x + q, y) + 'Z'
     );
   };
-  return { parse, write, trimEnd, trimStart, roundCorners, arrowTip, openChevron, arrowhead, elbow, roundedRect };
+  // A point that sat by an edge's end (a class edge's multiplicity), carried
+  // to where that end is now: as far along the line and as far to its side.
+  // An end is its point on the box and the way the line leaves it.
+  const carry = (q, was, now) => {
+    const unit = (v) => { const n = Math.hypot(v[0], v[1]) || 1; return [v[0] / n, v[1] / n]; };
+    const a = unit(was.dir);
+    const b = unit(now.dir);
+    const rx = q[0] - was.at[0];
+    const ry = q[1] - was.at[1];
+    const along = rx * a[0] + ry * a[1];
+    const side = a[0] * ry - a[1] * rx;
+    return [now.at[0] + along * b[0] - side * b[1], now.at[1] + along * b[1] + side * b[0]];
+  };
+  return { parse, write, trimEnd, trimStart, roundCorners, arrowTip, openChevron, arrowhead, elbow, roundedRect, carry };
 })()`;
 
 /**
@@ -1339,7 +1354,11 @@ export const PAGE_SCRIPT = String.raw`(() => {
     // untouched, so nothing else moves.
     const routed = new Set();
     // Flowcharts, and state diagrams (the same flow, with states for steps).
-    if (role.startsWith('flowchart') || /^statediagram/i.test(role)) {
+    // Class and ER diagrams too: Mermaid ran their lines from a box's centre,
+    // so a UML triangle or diamond, or a crow's foot, met its box aslant at a
+    // corner — square now, like every other line.
+    const uml = /^classdiagram/i.test(role) || role === 'er';
+    if (role.startsWith('flowchart') || /^statediagram/i.test(role) || uml) {
       const dirM = /^\s*(?:(?:flowchart|graph)\s+|direction\s+)(TB|TD|BT|RL|LR)\b/im.exec(req.source || '');
       const axis = dirM ? (dirM[1].toUpperCase() === 'TD' ? 'TB' : dirM[1].toUpperCase()) : 'TB';
       const radius = t.curve === 'step' ? 7 : t.curve === 'linear' ? 9 : 12;
@@ -1348,8 +1367,9 @@ export const PAGE_SCRIPT = String.raw`(() => {
       const allNodes = [...root.querySelectorAll('g.node')];
       for (const g of allNodes) {
         const own = (g.id || '').startsWith(prefix) ? g.id.slice(prefix.length) : g.id || '';
-        const m = /^flowchart-(.+)-\d+$/.exec(own);
+        const m = /^(?:flowchart|classId)-(.+)-\d+$/.exec(own);
         if (m) nodes.set(m[1], g);
+        else if (/^entity-/.test(own)) nodes.set(own, g);
       }
       // A box in the edges' coordinates — a node's SHAPE's, not its group's
       // (the words can overhang a decision by half a pixel, which put a kink
@@ -1396,9 +1416,9 @@ export const PAGE_SCRIPT = String.raw`(() => {
         const b = boxOf([g], [8, 5]);
         if (id && at && b) labels.set(id, { g, x: Number(at[1]), y: Number(at[2]), box: b });
       }
-      // An edge's two ends: named in a flowchart edge's id (L_<from>_<to>_<n>);
-      // otherwise (a state diagram's edge0, edge1…) the boxes its first and
-      // last points sit on.
+      // An edge's two ends: named in a flowchart edge's id (L_<from>_<to>_<n>;
+      // a class or ER edge's is id_<from>_<to>_<n>); otherwise (a state
+      // diagram's edge0, edge1…) the boxes its first and last points sit on.
       const nearest = (q) => {
         let best = null;
         let dist = 4;
@@ -1415,7 +1435,7 @@ export const PAGE_SCRIPT = String.raw`(() => {
         return best;
       };
       const ends = (id, pts) => {
-        const m = /^L_(.+)_\d+$/.exec(id || '');
+        const m = /^(?:L|id)_(.+)_\d+$/.exec(id || '');
         if (m) {
           const rest = m[1];
           for (let i = rest.indexOf('_'); i > 0; i = rest.indexOf('_', i + 1)) {
@@ -1428,6 +1448,23 @@ export const PAGE_SCRIPT = String.raw`(() => {
         const b = nearest(pts[pts.length - 1]);
         return a && b ? [a, b] : null;
       };
+      // A UML mark (a hollow triangle, a diamond, a lollipop) fills a gap
+      // Mermaid leaves at the line's end, its far point on the box: a
+      // re-drawn line leaves the same gap. (An arrowhead is Bobble's own, 2f,
+      // and its line ends on the box; a crow's foot has no gap.)
+      const gapAt = (path, which, end) => {
+        if (!/(?:extension|composition|aggregation|lollipop)/i.test(path.getAttribute(which) || '')) return 0;
+        const n = (path.getAttribute('d') || '').match(/-?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?/g) || [];
+        if (n.length < 4) return 0;
+        const q = which === 'marker-start' ? [Number(n[0]), Number(n[1])] : [Number(n[n.length - 2]), Number(n[n.length - 1])];
+        return Math.hypot(q[0] - end[0], q[1] - end[1]);
+      };
+      // A class edge's multiplicities ("1", "*") sit by its ends: each goes
+      // with the end it is nearest, when that end moves.
+      const terminals = [...root.querySelectorAll('g.edgeTerminals')].map((g) => {
+        const at = /translate\(\s*([-\d.e]+)[ ,]+([-\d.e]+)\s*\)/.exec(g.getAttribute('transform') || '');
+        return at ? { g, q: [Number(at[1]), Number(at[2])] } : null;
+      }).filter(Boolean);
       const along = (b) => (axis === 'LR' ? b.x + b.w / 2 : axis === 'RL' ? -(b.x + b.w / 2) : axis === 'BT' ? -(b.y + b.h / 2) : b.y + b.h / 2);
       const edges = [];
       for (const path of root.querySelectorAll('g.edgePaths > path')) {
@@ -1442,7 +1479,26 @@ export const PAGE_SCRIPT = String.raw`(() => {
         const from = boxes.get(pair[0]);
         const to = boxes.get(pair[1]);
         if (!from || !to) continue;
-        edges.push({ path, id, pair, from, to, pts, back: along(to) < along(from) });
+        edges.push({ path, id, pair, from, to, pts, back: along(to) < along(from), gaps: [gapAt(path, 'marker-start', pts[0]), gapAt(path, 'marker-end', pts[pts.length - 1])] });
+      }
+      // Each multiplicity belongs to the end it is nearest, of all the edges'.
+      const endOf = (q, i) => {
+        const [a, b] = i === 0 ? [q[0], q[1]] : [q[q.length - 1], q[q.length - 2]];
+        return { at: a, dir: [b[0] - a[0], b[1] - a[1]] };
+      };
+      for (const t of terminals) {
+        let best = 48;
+        for (const e of edges) {
+          for (const i of [0, 1]) {
+            const at = endOf(e.pts, i).at;
+            const dist = Math.hypot(t.q[0] - at[0], t.q[1] - at[1]);
+            if (dist < best) {
+              best = dist;
+              t.edge = e;
+              t.end = i;
+            }
+          }
+        }
       }
       // The edges that run with the flow first: a loop back finds its way round them.
       edges.sort((u, v) => Number(u.back) - Number(v.back));
@@ -1464,8 +1520,16 @@ export const PAGE_SCRIPT = String.raw`(() => {
         const route = P.elbow({ pts: e.pts, from: e.from, to: e.to, label: lab ? lab.box : null, obstacles, axis, r: radius });
         if (!route || route.pts.length < 2) continue;
         done.add(e);
-        e.path.setAttribute('d', P.roundCorners('M' + route.pts.map((q) => q[0] + ',' + q[1]).join('L'), radius));
+        let d = P.roundCorners('M' + route.pts.map((q) => q[0] + ',' + q[1]).join('L'), radius);
+        if (e.gaps[0] > 0.5) d = P.trimStart(d, e.gaps[0]);
+        if (e.gaps[1] > 0.5) d = P.trimEnd(d, e.gaps[1]);
+        e.path.setAttribute('d', d);
         e.path.setAttribute('data-pd-routed', '1');
+        for (const t of terminals) {
+          if (t.edge !== e) continue;
+          const q = P.carry(t.q, endOf(e.pts, t.end), endOf(route.pts, t.end));
+          t.g.setAttribute('transform', 'translate(' + q[0] + ', ' + q[1] + ')');
+        }
         routed.add(e.path);
         // Later edges keep off this one (a few pixels either side of each run).
         for (let i = 1; i < route.pts.length; i += 1) {

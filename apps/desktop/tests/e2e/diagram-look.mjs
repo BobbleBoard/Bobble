@@ -238,13 +238,38 @@ try {
         const card = document.querySelector('[data-testid="presented-diagram"]');
         const svg = card?.querySelector('.pd-inline-widget-box svg');
         const box = svg?.getBoundingClientRect();
+        // Each line's first and last 3 px: square to its box means level or upright.
+        const aslant = [];
+        for (const p of svg ? svg.querySelectorAll('g.edgePaths > path') : []) {
+          const len = p.getTotalLength();
+          if (!(len > 8)) continue;
+          for (const [a, b] of [
+            [0, 3],
+            [len, len - 3],
+          ]) {
+            const u = p.getPointAtLength(a);
+            const v = p.getPointAtLength(b);
+            if (Math.abs(u.x - v.x) > 0.3 && Math.abs(u.y - v.y) > 0.3) {
+              aslant.push(`${p.getAttribute('data-id')}@${Math.round(u.x)},${Math.round(u.y)}`);
+            }
+          }
+        }
         return {
           width: box ? Math.round(box.width) : 0,
           height: box ? Math.round(box.height) : 0,
           texts: svg ? svg.querySelectorAll('text').length : 0,
+          aslant,
         };
       });
       check(facts.texts > 0, `${d.kit}/${d.name} ${mode}: the card drew its words`);
+      // the user (2026-09-25): "clean and curved path eg. elbow arrows" — a class
+      // or ER line (its UML mark, its crow's foot) meets its box square too.
+      if (d.name === 'class' || d.name === 'er') {
+        check(
+          facts.aslant.length === 0,
+          `${d.kit}/${d.name} ${mode}: every line meets its boxes square (aslant: ${facts.aslant.join(' ') || 'none'})`,
+        );
+      }
       report.push({ kit: d.kit, name: d.name, mode, ...facts, notes: d.notes });
       await cardShot(`${d.kit}-${d.name}-${mode}.png`);
     }

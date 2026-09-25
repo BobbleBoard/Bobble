@@ -414,6 +414,11 @@ describe('PATH_TOOLS_JS — the look’s geometry, run as the page runs it', () 
       r?: number;
     }) => { pts: number[][]; label: number[] | null } | null;
     roundedRect: (x: number, y: number, w: number, h: number, r: number) => string;
+    carry: (
+      q: number[],
+      was: { at: number[]; dir: number[] },
+      now: { at: number[]; dir: number[] },
+    ) => number[];
   };
   const pts = (d: string) => (P.parse(d) ?? []).flatMap((s) => s.p);
 
@@ -632,6 +637,17 @@ describe('PATH_TOOLS_JS — the look’s geometry, run as the page runs it', () 
       });
       expect(out).toBeNull();
     });
+  });
+
+  it('carries a multiplicity with its end: as far along the line, on the same side of it', () => {
+    // 25 along a line leaving (0,0) downward, 10 to its right (screen-left)…
+    const was = { at: [0, 0], dir: [0, 10] };
+    // …the end now leaves (100,50) to the right: 25 along it, 10 to its right (below).
+    expect(P.carry([-10, 25], was, { at: [100, 50], dir: [20, 0] })).toEqual([125, 60]);
+    // An end that did not move keeps its point.
+    const same = P.carry([7, 3], { at: [1, 1], dir: [3, 4] }, { at: [1, 1], dir: [3, 4] });
+    expect(same[0]).toBeCloseTo(7, 9);
+    expect(same[1]).toBeCloseTo(3, 9);
   });
 
   it('rounds a box’s corners, never past half its side', () => {
