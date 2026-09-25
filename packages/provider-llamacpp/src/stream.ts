@@ -381,13 +381,15 @@ export function buildChatCompletionsRequest(
        * says where it came from, which every vision-capable chat template renders.
        */
       const images = msg.content.filter((c) => c.type === 'image');
-      if (images.length > 0 && !serverCanSeeImages()) {
-        // Text-only server: name the tool and explain, rather than shipping
-        // tokens it has no encoder for and letting the model guess why it saw
-        // nothing. This is the exact path a browser screenshot takes.
+      const vision = images.length > 0 ? visionState() : { canSee: true };
+      if (!vision.canSee) {
+        // Text-only server: name the tool and explain — with the REASON, as an
+        // attached image gets (contentToOAI) — rather than shipping tokens it
+        // has no encoder for and letting the model guess why it saw nothing.
+        // This is the exact path a browser screenshot takes.
         messages.push({
           role: 'user',
-          content: `[image returned by ${msg.toolName}] ${unviewableImageNote()}`,
+          content: `[image returned by ${msg.toolName}] ${unviewableImageNote(vision.reason)}`,
         });
       } else if (images.length > 0) {
         messages.push({

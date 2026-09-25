@@ -11,11 +11,14 @@
 import { execFile, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
+  closeSync,
   createReadStream,
   existsSync,
   mkdirSync,
+  openSync,
   readdirSync,
   readFileSync,
+  readSync,
   renameSync,
   rmSync,
   statfsSync,
@@ -1530,13 +1533,24 @@ function mlxTwinHasVision(dir: string): boolean {
     } else {
       const single = join(dir, 'model.safetensors');
       if (existsSync(single)) {
-        const buf = readFileSync(single);
-        const n = Number(buf.readBigUInt64LE(0));
-        const header = JSON.parse(buf.subarray(8, 8 + n).toString('utf8')) as Record<
-          string,
-          unknown
-        >;
-        names = Object.keys(header).filter((k) => k !== '__metadata__');
+        /* THE HEADER ONLY: a u64 length, then that much JSON. This read the
+           whole file — up to 2 GiB on this process's event loop at every start
+           and every menu open — and over 2 GiB readFileSync throws
+           (ERR_FS_FILE_TOO_LARGE), which read as "no vision tower". */
+        const fd = openSync(single, 'r');
+        try {
+          const len = Buffer.alloc(8);
+          readSync(fd, len, 0, 8, 0);
+          const n = Number(len.readBigUInt64LE(0));
+          // The format caps its header at 100 MB; anything larger is not one.
+          if (n > 100_000_000) return false;
+          const buf = Buffer.alloc(n);
+          if (readSync(fd, buf, 0, n, 8) !== n) return false;
+          const header = JSON.parse(buf.toString('utf8')) as Record<string, unknown>;
+          names = Object.keys(header).filter((k) => k !== '__metadata__');
+        } finally {
+          closeSync(fd);
+        }
       }
     }
     return mlxWeightsHaveVision(config, names);
@@ -2292,7 +2306,18 @@ async function calibrate(modelId?: string, quant?: string): Promise<LlmCalibrate
     writeRecord(record);
     const target = record.chosen ?? previous ?? defaultProfile(model);
     postCalibration({ stage: 'switching', chosen: target });
-    const up = await startServer(model.id, file.quant, 'fast-text', 1, target);
+    /* The winner is the VERDICT, not a row anyone clicked: it comes up the way
+       every later start of this model will (vision may hand a text-only winner
+       to llama.cpp with the projector), not blind until the next launch. */
+    const up = await startServer(
+      model.id,
+      file.quant,
+      'fast-text',
+      1,
+      target,
+      false,
+      record.chosen === null,
+    );
     if (!up.success) {
       const error = `calibrated, but the winner failed to start: ${up.error ?? 'unknown'}`;
       postCalibration({ stage: 'failed', error });
@@ -2357,9 +2382,18 @@ function listLocalGgufs(): Array<{
 
 /** Apply: the same model, mode and profile, launched again with the current flags. */
 async function relaunch(): Promise<{ success: boolean; error?: string }> {
+  /* A load still in flight (the Vision switch flipped mid-load) has not set
+     `current` yet, and captured the old flags: wait for it to land, then
+     relaunch what landed. */
+  await startInFlight;
   if (current === null) return { success: false, error: 'no model is running' };
   const c = current;
-  const res = await startServer(c.model.id, c.file.quant, c.launchMode, 1, undefined, true);
+  /* A MULTIMODAL launch exists to see (ensureVisionMode's relaunch). Vision
+     switched off since: relaunched multimodal it would force llama.cpp and
+     re-attach the projector behind the switch — and keep reading images with
+     the switch saying Off. It comes back as the text launch instead. */
+  const mode = c.launchMode === 'multimodal' && !loadVision ? 'fast-text' : c.launchMode;
+  const res = await startServer(c.model.id, c.file.quant, mode, 1, undefined, true);
   return { success: res.success, ...(res.error !== undefined ? { error: res.error } : {}) };
 }
 
@@ -2462,9 +2496,11 @@ function startServer(
   parallel?: number,
   profile?: LaunchProfile,
   force = false,
+  /** `profile` is honoured as asked (planVisionEngine `explicit`); false = a verdict vision may move. */
+  explicit = profile !== undefined,
 ): Promise<{ success: boolean; baseUrl?: string; error?: string }> {
   const run = (startInFlight ?? Promise.resolve()).then(() =>
-    startServerExclusive(modelId, quant, launchMode, parallel, profile, force),
+    startServerExclusive(modelId, quant, launchMode, parallel, profile, force, explicit),
   );
   // Keep the chain alive even when a start fails, so one failure cannot wedge
   // every later start behind a rejected promise.
@@ -2479,6 +2515,7 @@ async function startServerExclusive(
   parallel?: number,
   requestedProfile?: LaunchProfile,
   force = false,
+  explicit = requestedProfile !== undefined,
 ): Promise<{ success: boolean; baseUrl?: string; error?: string }> {
   const model = getModel(modelId);
   if (model === undefined) return { success: false, error: `unknown model: ${modelId}` };
@@ -2526,9 +2563,12 @@ async function startServerExclusive(
           {
             profile: wished,
             visionWanted,
-            explicit: requestedProfile !== undefined,
+            explicit,
             modelHasProjector: model.mmproj !== undefined,
-            ggufOnDisk: existsSync(modelPathFor(model, file)),
+            /* A GGUF llama.cpp can TAKE: a sharded model is refused below (its
+               shards are never joined), so handing it a vision fallback would
+               stop a model its calibrated MLX engine runs fine. */
+            ggufOnDisk: model.sharded !== true && existsSync(modelPathFor(model, file)),
             mlxTwinHasVision: twinDir !== undefined && mlxTwinHasVision(twinDir),
             rapidVisionReady: rapidVisionReady(),
           },
@@ -2618,8 +2658,10 @@ async function startServerExclusive(
     current.launchMode === launchMode &&
     sameProfile(current.profile, profile) &&
     current.launchConfigFingerprint === launchFingerprint('llamacpp', model.id) &&
-    // Vision switched on or off since: the projector is a launch argument.
-    (current.blindReason === 'off') === !visionWanted
+    // Vision switched on or off since: the projector is a launch argument —
+    // for a model that has one. A text-only model launches the same either way
+    // (its blindReason is 'model', never 'off'), so the switch changes nothing.
+    (model.mmproj === undefined || (current.blindReason === 'off') === !visionWanted)
   ) {
     return { success: true, baseUrl: current.baseUrl };
   }

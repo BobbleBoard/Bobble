@@ -633,6 +633,10 @@ export async function sendPrompt(
         visionUnavailable = !vision.ok;
         visionReason = vision.reason;
       }
+      // …and a server to send it to. With Vision OFF (or a server that can
+      // already see) nothing relaunches, so this is the only thing that brings
+      // a crashed or stopped chat server back — as the text branch below does.
+      if (!visionUnavailable) await ensureChatServerReady();
     } else {
       // Round-12 Auto router (W3): when the selection is Auto, classify this prompt and
       // switch the running model to the routed tier BEFORE dispatch. Awaited; no-op

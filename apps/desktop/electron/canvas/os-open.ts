@@ -145,6 +145,16 @@ function appLabel(app: string): string {
 export function describeOpenFailure(req: OpenRequest, detail: string): string {
   const text = detail.trim();
   const firstLine = text.split('\n')[0]?.trim() ?? '';
+  /* An .app PATH that no longer holds the app (moved, uninstalled, still in a
+     cached Open-with list): `open -a` answers "The application … cannot be
+     opened … no such file" (NSCocoaErrorDomain 260) — about the APP. Read as
+     the file below, it sent the user looking for a file that is fine. */
+  if (
+    req.kind === 'app' &&
+    /the application .+ cannot be opened.*(no such file|Code=260)/is.test(text)
+  ) {
+    return `${appLabel(req.app)} is not installed on this Mac.`;
+  }
   if (/does not exist|no such file/i.test(text)) {
     return 'It is not there any more — it may have been moved or deleted.';
   }
@@ -169,6 +179,18 @@ export function describeOpenFailure(req: OpenRequest, detail: string): string {
     return 'The app did not answer in time.';
   }
   return firstLine === '' ? 'The Mac did not say why.' : firstLine;
+}
+
+/**
+ * What a failed `open` said, for {@link describeOpenFailure}: its stderr — or,
+ * when execFile's timeout killed it, that it timed out. That kill is told only
+ * in `killed`/`signal`; the message is "Command failed: open -a … <file>" and
+ * stderr is empty, so a slow app read as an engineer's command line.
+ */
+export function openFailureDetail(error: unknown): string {
+  const e = error as { stderr?: string; killed?: boolean };
+  if (e.killed === true) return 'timed out';
+  return e.stderr?.trim() || String(error);
 }
 
 /**

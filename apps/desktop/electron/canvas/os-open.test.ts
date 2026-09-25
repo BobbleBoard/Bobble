@@ -1,8 +1,10 @@
+import { execFile } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 import {
   describeOpenFailure,
   isBundleId,
   openArgv,
+  openFailureDetail,
   openPolicy,
   openRequestsFor,
   resolveOpenTarget,
@@ -157,6 +159,50 @@ describe('describeOpenFailure — why, in words a person can act on', () => {
     expect(describeOpenFailure(doc, 'The file /w/level.gd does not exist.')).toBe(
       'It is not there any more — it may have been moved or deleted.',
     );
+    // With an app named, a missing FILE is still the file.
+    expect(
+      describeOpenFailure(
+        { kind: 'app', app: '/Applications/Preview.app', target: '/w/a.png' },
+        'The file /w/a.png does not exist.',
+      ),
+    ).toBe('It is not there any more — it may have been moved or deleted.');
+  });
+
+  /*
+   * AN .app PATH THAT IS GONE IS THE APP, NOT THE FILE. Real `open -a` on a
+   * path that no longer holds the app (an Open-with list cached before it was
+   * uninstalled or moved) answers with the app's own "no such file" — which
+   * read as the user's file having vanished while it sat there on disk.
+   */
+  it('an uninstalled app given as its .app path is named as the missing one', () => {
+    expect(
+      describeOpenFailure(
+        { kind: 'app', app: '/Applications/Foo.app', target: '/w/report.md' },
+        'The application /Applications/Foo.app cannot be opened for an unexpected reason, ' +
+          'error=Error Domain=NSCocoaErrorDomain Code=260 "The file “Foo.app” couldn’t be opened ' +
+          'because there is no such file." UserInfo={NSFilePath=/Applications/Foo.app}',
+      ),
+    ).toBe('Foo is not installed on this Mac.');
+  });
+
+  /*
+   * A TIMEOUT IS "DID NOT ANSWER", NOT A COMMAND LINE. execFile's timeout
+   * kills `open` with SIGTERM and says so only in `signal`/`killed`: the
+   * message is "Command failed: open -a … <file>" and stderr is empty. A real
+   * one, from `sleep`, through what canvas-main hands describeOpenFailure.
+   */
+  it('an `open` killed by its timeout reads as the app not answering', async () => {
+    const error = await new Promise<Error>((resolve) => {
+      execFile('sleep', ['5'], { timeout: 50 }, (e) => resolve(e as Error));
+    });
+    expect(
+      describeOpenFailure(
+        { kind: 'app', app: '/Applications/Slow.app', target: '/w/file.png' },
+        openFailureDetail(error),
+      ),
+    ).toBe('The app did not answer in time.');
+    // Anything else that failed still says what `open` said.
+    expect(openFailureDetail(Object.assign(new Error('x'), { stderr: ' nope \n' }))).toBe('nope');
   });
 
   it('passes anything else through, first line only', () => {
