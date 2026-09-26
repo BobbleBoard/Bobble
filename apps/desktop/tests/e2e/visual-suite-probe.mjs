@@ -289,23 +289,31 @@ try {
     await page.click('[data-testid="composer-input"]');
     // A figure that comes with the question: pasted as a file, never through the clipboard.
     if (task.attach !== undefined) {
-      const file = path.join(path.dirname(new URL(import.meta.url).pathname), task.attach);
-      const { root } = await cdp.send('DOM.getDocument', { depth: 1 });
-      const { nodeId } = await cdp.send('DOM.querySelector', {
-        nodeId: root.nodeId,
-        selector: '#probe-files',
-      });
-      await cdp.send('DOM.setFileInputFiles', { nodeId, files: [file] });
-      await page.evaluate(() => {
-        const data = new DataTransfer();
-        for (const f of document.getElementById('probe-files').files) data.items.add(f);
-        const target =
-          document.activeElement ?? document.querySelector('[data-testid="composer-input"]');
-        target.dispatchEvent(
-          new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }),
+      try {
+        const file = path.join(path.dirname(new URL(import.meta.url).pathname), task.attach);
+        const { root } = await cdp.send('DOM.getDocument', { depth: 1 });
+        const { nodeId } = await cdp.send('DOM.querySelector', {
+          nodeId: root.nodeId,
+          selector: '#probe-files',
+        });
+        await cdp.send('DOM.setFileInputFiles', { nodeId, files: [file] });
+        await page.evaluate(() => {
+          const data = new DataTransfer();
+          for (const f of document.getElementById('probe-files').files) data.items.add(f);
+          const target =
+            document.activeElement ?? document.querySelector('[data-testid="composer-input"]');
+          target.dispatchEvent(
+            new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }),
+          );
+        });
+        await sleep(1500);
+        const chips = await page.evaluate(
+          () => document.querySelectorAll('[data-testid="attach-chip"]').length,
         );
-      });
-      await sleep(1500);
+        log(`   attached ${task.attach} (${chips} chip${chips === 1 ? '' : 's'})`);
+      } catch (e) {
+        log(`   ATTACH FAILED ${task.attach}: ${e instanceof Error ? e.message : String(e)}`);
+      }
     }
     await page.keyboard.insertText(task.prompt);
     const t0 = Date.now();
