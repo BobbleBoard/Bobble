@@ -161,8 +161,11 @@ export type Shape = Item &
     | { readonly kind: 'label'; readonly at: Xy; readonly text: string }
     | {
         readonly kind: 'box3d';
+        /** The front face's lower-left corner. */
         readonly at: Xy;
-        readonly size: Num;
+        /** Width and height of the front face; depth recedes up and to the right. */
+        readonly w: Num;
+        readonly h: Num;
         readonly depth: Num;
         readonly shade: 'right' | 'top' | 'front' | 'none';
         /** Measures along the front-bottom, front-right and receding edges. */
@@ -189,6 +192,8 @@ export type Shape = Item &
 export interface FigureSpec {
   readonly x: readonly [number, number];
   readonly y: readonly [number, number];
+  /** The axes the spec gave no readable range for: renderMath fits them to the shapes. */
+  readonly fit?: readonly ('x' | 'y')[];
   readonly shapes: readonly Shape[];
 }
 
@@ -721,8 +726,25 @@ function shape(v: unknown, i: number, named: Map<string, Xy>, names: readonly st
       return { id, appear, kind: 'label', at: at('at'), text: label };
     case 'box3d':
     case 'cube':
+    case 'cuboid':
     case 'box': {
-      const size = numOrExpr(v.size ?? v.side ?? 4, `${id}.size`, names);
+      /* "size": 4 is a cube; [w, h, d] and {w, h, d} are a box — MEASURED (the
+         STEM suite, 4B): "size": [0.4, 0.4, 0.4] on four specs in a row, each
+         refused. The third size wins over a "depth" of its own. */
+      const sizeIn = v.size ?? v.side ?? v.dimensions ?? v.dims;
+      const dims: unknown[] = Array.isArray(sizeIn)
+        ? sizeIn
+        : isObj(sizeIn)
+          ? [
+              sizeIn.w ?? sizeIn.width ?? sizeIn.x,
+              sizeIn.h ?? sizeIn.height ?? sizeIn.y,
+              sizeIn.d ?? sizeIn.depth ?? sizeIn.z,
+            ]
+          : [sizeIn];
+      const size = numOrExpr(dims[0] ?? v.w ?? v.width ?? 4, `${id}.size`, names);
+      const height = numOrExpr(dims[1] ?? v.h ?? v.height ?? size, `${id}.size`, names);
+      // A size in three is the model thinking in x, y, z — its points use that depth too.
+      const depthIn = dims.length >= 3 && dims[2] !== undefined ? dims[2] : (v.depth ?? v.d);
       const shadeIn = str(v.shade ?? v.shaded)?.toLowerCase();
       const lab = isObj(v.labels) ? v.labels : {};
       const edge = str(
@@ -735,11 +757,12 @@ function shape(v: unknown, i: number, named: Map<string, Xy>, names: readonly st
         id,
         appear,
         kind: 'box3d',
-        at: 'at' in v ? at('at') : [0, 0],
-        size,
+        at: 'at' in v ? at('at') : 'corner' in v ? at('corner') : [0, 0],
+        w: size,
+        h: height,
         depth:
-          v.depth !== undefined
-            ? numOrExpr(v.depth, `${id}.depth`, names)
+          depthIn !== undefined
+            ? numOrExpr(depthIn, `${id}.depth`, names)
             : typeof size === 'number'
               ? size * 0.5
               : `(${size})*0.5`,
@@ -785,24 +808,62 @@ function shape(v: unknown, i: number, named: Map<string, Xy>, names: readonly st
   }
 }
 
-function figure(v: Loose, names: readonly string[]): FigureSpec {
-  const viewIn = isObj(v.view) ? v.view : v;
-  const x = range(viewIn.x ?? get(v, 'xRange') ?? [0, 10], 'figure x');
-  const y = range(viewIn.y ?? get(v, 'yRange') ?? [0, 10], 'figure y');
-  // A depth range widens the frame by what depth adds in the oblique view.
-  if (viewIn.z !== undefined) {
-    const z = range(viewIn.z, 'figure z');
-    x.max += 0.8 * Math.max(0, z.max);
-    x.min += 0.8 * Math.min(0, z.min);
-    y.max += 0.55 * Math.max(0, z.max);
-    y.min += 0.55 * Math.min(0, z.min);
+/**
+ * A view's range, or null: nothing given, or nothing a range can be read from.
+ * MEASURED (the STEM suite, 4B): `"view": {"x": -2, "y": -2, "z": -2}` —
+ * one number per axis, twice, each refused. A figure with no readable view is
+ * FITTED to its shapes instead (renderMath), across every slider setting and
+ * step, so no part leaves it; a view that reads is kept as written.
+ */
+function viewRange(v: unknown, what: string, notes: string[]): { min: number; max: number } | null {
+  if (v === undefined || v === null) return null;
+  const axis = what.replace(/^figure /, '');
+  if (typeof v === 'number') {
+    const n = Math.abs(v);
+    notes.push(
+      `the figure's ${axis} is one number (${v}), not a range, so the view fits the shapes — write "${axis}": "${n > 0 ? `${-n}..${n}` : '0..10'}" to choose it`,
+    );
+    return null;
+  }
+  try {
+    return range(v, what);
+  } catch (e) {
+    const why = e instanceof SpecError || e instanceof ExprError ? e.message : String(e);
+    notes.push(
+      `the figure's ${axis} (${JSON.stringify(v)}) is not a range (${why.replace(`${what}: `, '').replace(`${what} `, '')}), so the view fits the shapes — write a range like "0..10" to choose it`,
+    );
+    return null;
+  }
+}
+
+function figure(v: Loose, names: readonly string[], notes: string[]): FigureSpec {
+  const viewIn = isObj(v.view) ? v.view : isObj(v.window) ? v.window : v;
+  const x = viewRange(viewIn.x ?? get(v, 'xRange'), 'figure x', notes);
+  const y = viewRange(viewIn.y ?? get(v, 'yRange'), 'figure y', notes);
+  const fit: ('x' | 'y')[] = [
+    ...(x === null ? ['x' as const] : []),
+    ...(y === null ? ['y' as const] : []),
+  ];
+  // A depth range widens a written frame by what depth adds in the oblique view.
+  const z =
+    viewIn.z !== undefined && fit.length < 2 ? viewRange(viewIn.z, 'figure z', notes) : null;
+  if (z !== null) {
+    if (x !== null) {
+      x.max += 0.8 * Math.max(0, z.max);
+      x.min += 0.8 * Math.min(0, z.min);
+    }
+    if (y !== null) {
+      y.max += 0.55 * Math.max(0, z.max);
+      y.min += 0.55 * Math.min(0, z.min);
+    }
   }
   const shapesIn = list(v.shapes ?? v.elements ?? v.items ?? v.objects ?? v.parts);
   if (shapesIn.length === 0) throw new SpecError('a figure needs shapes');
   const named = new Map<string, Xy>();
   return {
-    x: [x.min, x.max],
-    y: [y.min, y.max],
+    x: x !== null ? [x.min, x.max] : [0, 10],
+    y: y !== null ? [y.min, y.max] : [0, 10],
+    ...(fit.length > 0 ? { fit } : {}),
     shapes: shapesIn.map((s, i) => shape(s, i, named, names)),
   };
 }
@@ -1023,13 +1084,18 @@ const AUTO_SLIDERS: Readonly<Record<string, { min: number; max: number }>> = {
   angle: { min: 0, max: 2 * Math.PI },
 };
 
+/** "cube_molecule" → "Cube molecule": a name written as an identifier, as a title. */
+function asTitle(s: string): string {
+  const t = /^[\w-]+$/.test(s) && /[_-]/.test(s) ? s.replace(/[_-]+/g, ' ').trim() : s;
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
 function normalizeParsed(v: Loose, found: { any: boolean }, auto: readonly string[]): MathSpec {
-  const title = str(v.title);
-  if (title === undefined) {
-    throw new SpecError(
-      'the spec needs a "title" — the smallest whole spec: {"title": "Sine", "plot": {"x": "-pi..pi", "curves": ["sin(x)"]}, "steps": [{"text": "…", "highlight": ["c1"]}]}',
-    );
-  }
+  /* A title is what the page is called, not what makes it draw — MEASURED (the
+     STEM suite, 4B): a spec with "name" and no "title" was refused for that
+     first, and the real problem (no shapes at all) said only on the next try. */
+  const named = str(v.title ?? v.name ?? v.heading ?? v.label);
+  const title = named !== undefined ? asTitle(named) : undefined;
   const plotIn = isObj(v.plot)
     ? v.plot
     : isObj(v.graph)
@@ -1050,9 +1116,14 @@ function normalizeParsed(v: Loose, found: { any: boolean }, auto: readonly strin
         ? v
         : undefined;
   if (plotIn === undefined && figIn === undefined) {
+    /* Both shapes of answer, not only the smallest — MEASURED (the STEM suite,
+       4B): asked for "an animation of a mass on a spring next to its graph",
+       it copied the one example here, a sine curve, and nothing moved. */
     throw new SpecError(
-      'the spec needs a "plot" (curves as expressions) or a "figure" (shapes), or both — the smallest: ' +
-        '{"title": "Sine", "plot": {"x": "-pi..pi", "curves": ["sin(x)"]}, "steps": [{"text": "…", "highlight": ["c1"]}]}. ' +
+      'the spec needs a "plot" (curves as expressions) or a "figure" (shapes), or both. ' +
+        'A graph: {"title": "Sine", "plot": {"x": "-pi..pi", "curves": ["sin(x)"]}, "steps": [{"text": "…", "highlight": ["c1"]}]}. ' +
+        'Something that moves — a slider t that Play runs, and shapes placed by it: ' +
+        '{"title": "Circling", "params": ["t = 0 in 0..10"], "play": "t", "figure": {"view": {"x": "-3..3", "y": "-3..3"}, "shapes": [{"id": "ball", "kind": "circle", "center": ["2*cos(t)", "2*sin(t)"], "r": 0.3}]}, "steps": [{"text": "…", "highlight": ["ball"]}]}. ' +
         'Steps with no curve or figure to point at are text: write them in your reply',
     );
   }
@@ -1093,7 +1164,8 @@ function normalizeParsed(v: Loose, found: { any: boolean }, auto: readonly strin
   const names = params.map((p) => p.name);
   const plotSpec = plotIn !== undefined ? plot(plotIn, names) : undefined;
   // A slider with the plot's own name is "now" on that axis (t for time): curves use the axis, points the slider.
-  const figSpec = figIn !== undefined ? figure(figIn, names) : undefined;
+  const viewNotes: string[] = [];
+  const figSpec = figIn !== undefined ? figure(figIn, names, viewNotes) : undefined;
   const stepsRaw = v.steps ?? v.explanation ?? v.explain;
   // {"1": …, "2": …} — steps numbered as keys — read in their order.
   const stepsIn = isObj(stepsRaw) ? Object.values(stepsRaw) : list(stepsRaw);
@@ -1118,7 +1190,13 @@ function normalizeParsed(v: Loose, found: { any: boolean }, auto: readonly strin
   const playIn = str(v.play ?? v.animate);
   const caption = str(v.caption ?? v.subtitle);
   return {
-    title,
+    title:
+      title ??
+      (figSpec !== undefined && plotSpec !== undefined
+        ? 'Graph and figure'
+        : figSpec !== undefined
+          ? 'Figure'
+          : 'Graph'),
     ...(caption !== undefined ? { caption } : {}),
     params,
     ...(plotSpec !== undefined ? { plot: plotSpec } : {}),
@@ -1127,6 +1205,10 @@ function normalizeParsed(v: Loose, found: { any: boolean }, auto: readonly strin
     ...(playIn !== undefined && names.includes(playIn) ? { play: playIn } : {}),
     notes: [
       ...(found.any ? ['emoji removed — the page carries none'] : []),
+      ...(title === undefined
+        ? ['the spec has no "title", so the page has a plain one — give it a "title"']
+        : []),
+      ...viewNotes,
       ...(() => {
         const hidden = params.filter((p) => p.hidden === true).map((p) => p.name);
         const slid = params

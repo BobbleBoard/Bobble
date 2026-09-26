@@ -17,7 +17,7 @@
  * CLI pi users can consume the pieces directly.
  */
 
-import { appendFileSync, readFileSync, realpathSync, statSync } from 'node:fs';
+import { appendFileSync, existsSync, realpathSync, statSync } from 'node:fs';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { basename, isAbsolute, join } from 'node:path';
@@ -133,6 +133,7 @@ import {
   countInlineDrawnSvgs,
   handwrittenDiagramRefusal,
   handwrittenInlineSvgRefusal,
+  handwrittenMathRefusal,
   handwrittenSvgRefusal,
   handwrittenSvgRoute,
   inlineSvgRoute,
@@ -140,7 +141,13 @@ import {
 import { wouldHang } from './tools/hang-guard.js';
 import { registerImageTools } from './tools/image-tools.js';
 import { applyBias, lastAssistantThought, planBias } from './tools/intent-bias.js';
-import { mathSpecWriteNote, projectMathKit, registerMathTool } from './tools/math-tool.js';
+import {
+  drawWrittenSpec,
+  MATH_TOOL,
+  type MathToolDeps,
+  projectMathKit,
+  registerMathTool,
+} from './tools/math-tool.js';
 import { registerModelTools } from './tools/model-tools.js';
 import {
   OFFICE_MAKE_TOOL,
@@ -2763,11 +2770,12 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
    * figures, steps tied to them, one standard page, checked (math-tool.ts,
    * @pi-desktop/mathviz). Pure TypeScript like the chart, so in every chat.
    */
-  registerMathTool(pi, {
+  const mathDeps: MathToolDeps = {
     bridge: readSubagentDepth(process.env) === 0 ? presentBridgeFromEnv() : null,
     root: (ctxCwd) => resolveWorkspaceRoot(ctxCwd),
     kit: (root) => projectMathKit(root),
-  });
+  };
+  registerMathTool(pi, mathDeps);
 
   /*
    * `diagram` — a flowchart, a sequence, an org chart… from Mermaid, drawn in
@@ -4251,6 +4259,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
          arrows and labels (handwritten-svg.ts, VQ-10) — so its presence alone
          is reason to look at an SVG write. */
       const diagramAvailable = tools.some((t) => t.name === DIAGRAM_TOOL);
+      const mathAvailable = tools.some((t) => t.name === MATH_TOOL);
       /* Which generators exist RIGHT NOW. With generation off there is nothing
          to redirect a script to, and the script is the only way the model has. */
       const generators = new Set<MediaKind>();
@@ -4353,6 +4362,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
                   exists,
                   svgCommandAvailable,
                   diagramAvailable,
+                  mathAvailable,
                   request: runtime.lastPrompt,
                 })
               : null;
@@ -4360,14 +4370,21 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
             svgRefused.set(abs, body);
             pi.appendEntry(HARNESS_LOOP_ENTRY, {
               action: 'block',
-              cause: svgRoute === 'diagram' ? 'handwritten-diagram' : 'handwritten-svg',
+              cause:
+                svgRoute === 'math'
+                  ? 'handwritten-math'
+                  : svgRoute === 'diagram'
+                    ? 'handwritten-diagram'
+                    : 'handwritten-svg',
             });
             return {
               block: true,
               reason:
-                svgRoute === 'diagram'
-                  ? handwrittenDiagramRefusal(input.path, { cli: toolCliMode })
-                  : handwrittenSvgRefusal(input.path),
+                svgRoute === 'math'
+                  ? handwrittenMathRefusal(input.path)
+                  : svgRoute === 'diagram'
+                    ? handwrittenDiagramRefusal(input.path, { cli: toolCliMode })
+                    : handwrittenSvgRefusal(input.path),
             };
           }
           /*
@@ -4407,6 +4424,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
             content: body,
             svgCommandAvailable,
             diagramAvailable,
+            mathAvailable,
             request: runtime.lastPrompt,
           });
           if (inlineRoute !== null) {
@@ -4414,22 +4432,31 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
             pi.appendEntry(HARNESS_LOOP_ENTRY, {
               action: 'block',
               cause:
-                inlineRoute === 'diagram' ? 'handwritten-inline-diagram' : 'handwritten-inline-svg',
+                inlineRoute === 'math'
+                  ? 'handwritten-inline-math'
+                  : inlineRoute === 'diagram'
+                    ? 'handwritten-inline-diagram'
+                    : 'handwritten-inline-svg',
             });
             return {
               block: true,
               reason:
-                inlineRoute === 'diagram'
-                  ? handwrittenDiagramRefusal(input.path, {
-                      cli: toolCliMode,
+                inlineRoute === 'math'
+                  ? handwrittenMathRefusal(input.path, {
                       inline: true,
                       edit: event.toolName === 'edit',
                     })
-                  : handwrittenInlineSvgRefusal(
-                      input.path,
-                      countInlineDrawnSvgs(body),
-                      event.toolName === 'edit',
-                    ),
+                  : inlineRoute === 'diagram'
+                    ? handwrittenDiagramRefusal(input.path, {
+                        cli: toolCliMode,
+                        inline: true,
+                        edit: event.toolName === 'edit',
+                      })
+                    : handwrittenInlineSvgRefusal(
+                        input.path,
+                        countInlineDrawnSvgs(body),
+                        event.toolName === 'edit',
+                      ),
             };
           }
         }
@@ -4560,7 +4587,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   /** The last plotting script refused at bash (handmade-chart.ts); the same
    * command again is the deliberate escape — the script may be the ask. */
   let chartScriptRefused: string | null = null;
-  pi.on('tool_result', (event) => {
+  pi.on('tool_result', async (event) => {
     /* In CLI mode every call is `bash`, so the real tool name is only known at
        the dispatch (see the CLI host's `call`); tally there instead, or the
        whole split reads as zero. */
@@ -4684,26 +4711,31 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
         };
       }
     }
-    /* A math spec just written: whether it draws, and the command (math-tool.ts). */
+    /* A math spec just written or edited is drawn there and then: the page, its capture and its checks (math-tool.ts drawWrittenSpec). */
     if ((event.toolName === 'write' || event.toolName === 'edit') && event.isError !== true) {
       const input = ((event as { input?: unknown }).input ?? lastCallInput?.input) as
         | { path?: unknown }
         | undefined;
       const rel = typeof input?.path === 'string' ? input.path : '';
       if (/\.math\.json$/i.test(rel)) {
-        const abs = isAbsolute(rel) ? rel : join(liveRoot(), rel);
-        let text: string | null = null;
-        try {
-          text = readFileSync(abs, 'utf8');
-        } catch {
-          text = null;
-        }
-        if (text !== null) {
-          const note = mathSpecWriteNote(text, rel);
+        const root = liveRoot();
+        const abs = isAbsolute(rel) ? rel : join(root, rel);
+        if (existsSync(abs)) {
+          const drawn = await drawWrittenSpec(abs, root, mathDeps);
+          const said = drawn.content
+            .map((c) => (c.type === 'text' ? c.text : ''))
+            .filter((t) => t !== '')
+            .join('\n');
+          const note = drawn.isError === true ? `It does not draw yet — ${said}` : said;
           return {
-            content: event.content.map((part, i) =>
-              i === 0 && part.type === 'text' ? { ...part, text: `${part.text}\n\n${note}` } : part,
-            ),
+            content: [
+              ...event.content.map((part, i) =>
+                i === 0 && part.type === 'text'
+                  ? { ...part, text: `${part.text}\n\n${note}` }
+                  : part,
+              ),
+              ...drawn.content.filter((c) => c.type === 'image'),
+            ],
           };
         }
       }

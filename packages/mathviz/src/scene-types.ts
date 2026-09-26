@@ -62,6 +62,8 @@ export type Drawable =
       readonly dim?: boolean;
       /** Placed by the layout (a curve's or a point's label) rather than fixed (a tick). */
       readonly placed?: boolean;
+      /** No clear spot was found: what the chosen one touches — boxes (labels, points, discs) and line points. */
+      readonly crowd?: { readonly boxes: number; readonly points: number };
     };
 
 export interface Panel {

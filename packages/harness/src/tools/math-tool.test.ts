@@ -209,14 +209,40 @@ describe('the title typed where the spec goes', () => {
 });
 
 describe('a spec just written', () => {
-  it('says whether it draws, and the command', async () => {
-    const { mathSpecWriteNote } = await import('./math-tool.js');
-    expect(mathSpecWriteNote(JSON.stringify(GOOD), 'lesson.math.json')).toBe(
-      'That is a math spec: run `math lesson.math.json` to draw it — the page opens beside the chat and its checks come back.',
+  it('is drawn there and then — the page, the controls it has, and what to fix', async () => {
+    const { drawWrittenSpec } = await import('./math-tool.js');
+    const deps = { bridge: null, root: () => root };
+    const good = path.join(root, 'written.math.json');
+    writeFileSync(good, JSON.stringify({ ...GOOD, title: 'Written' }));
+    const r = await drawWrittenSpec(good, root, deps);
+    expect(r.isError).toBeUndefined();
+    expect(text(r)).toMatch(/^Drew "Written": written\.html/);
+    expect(text(r)).toContain(
+      'On the page: Back and Next through its 2 steps; a slider for a, with Play.',
     );
-    expect(mathSpecWriteNote('{"plot": {"curves": ["x"]}}', 'l.math.json')).toMatch(
-      /^That math spec does not draw yet: the spec needs a "title".* Fix it in l\.math\.json, then run `math l\.math\.json`\.$/,
+    expect(existsSync(path.join(root, 'written.html'))).toBe(true);
+    const bad = path.join(root, 'bad.math.json');
+    writeFileSync(bad, '{"title": "Bad", "steps": []}');
+    const b = await drawWrittenSpec(bad, root, deps);
+    expect(b.isError).toBe(true);
+    expect(text(b)).toMatch(/needs a "plot".*Something that moves.*Fix it in bad\.math\.json/s);
+  });
+
+  it('says so when nothing on the page moves, so the reply does not offer sliders', async () => {
+    const { run } = setup();
+    const still = {
+      title: 'Still',
+      plot: { x: '0..5', curves: ['sin(x)'] },
+      steps: [
+        { text: 'A sine.', highlight: ['c1'] },
+        { text: 'Still a sine.', highlight: ['c1'] },
+      ],
+    };
+    const r = await run({ spec: JSON.stringify(still) });
+    expect(text(r)).toContain(
+      'On the page: Back and Next through its 2 steps. Nothing on it moves — it has no sliders.',
     );
+    expect(text(r)).toContain('with the controls it has, above, and no others');
   });
 
   it('is found by `@path`, and by a path that repeats the folder’s own name', async () => {

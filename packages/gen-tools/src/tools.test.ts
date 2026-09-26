@@ -11,6 +11,7 @@ import {
   GENERATE_IMAGE_TOOL,
   GENERATE_SVG_TOOL,
   GENERATE_VIDEO_TOOL,
+  mathFigurePrompt,
   parseSize,
   registerGenTools,
   saveOutputs,
@@ -666,5 +667,28 @@ describe('dataChartPrompt — a chart of numbers is not a picture', () => {
     expect(dataChartPrompt('a red fox in a forest, watercolour')).toBeNull();
     // Two numbers is a size, not a dataset.
     expect(dataChartPrompt('bar chart aesthetic wallpaper 1920x1080')).toBeNull();
+  });
+});
+
+describe('mathFigurePrompt — a maths figure is not a picture', () => {
+  it('sends the 4B’s own prompt to math', () => {
+    // MEASURED (the STEM suite): the prompt it gave image generation, trimmed.
+    const p =
+      'Mathematical visualization showing why d/dx(sin x) = cos x. Create a clean diagram with two panels: ' +
+      'Top panel: Unit circle showing a point at angle θ with coordinates (cos θ, sin θ). ' +
+      'Bottom panel: Graph with sin(x) in blue and cos(x) in green curves on the same axes.';
+    expect(mathFigurePrompt(p)).toMatch(/Draw it with the math command/);
+    expect(
+      mathFigurePrompt('a diagram proving the pythagorean theorem, a² + b² = c²'),
+    ).not.toBeNull();
+  });
+
+  it('still paints art that only touches maths', () => {
+    expect(mathFigurePrompt('a neon sine wave poster, synthwave')).toBeNull();
+    expect(mathFigurePrompt('Pythagoras teaching his students, renaissance fresco')).toBeNull();
+    expect(
+      mathFigurePrompt('a mathematician at a chalkboard full of equations, oil painting'),
+    ).toBeNull();
+    expect(mathFigurePrompt('a red fox in a forest, watercolour')).toBeNull();
   });
 });

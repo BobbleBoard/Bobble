@@ -31,6 +31,23 @@ export function handmadeMathVisual(text: string, kind: 'svg' | 'html'): boolean 
   return hits.size >= (kind === 'svg' ? 1 : 2);
 }
 
+/**
+ * Surer than {@link handmadeMathVisual}, for a REFUSAL rather than a note: an
+ * SVG whose labels name two maths or physics subjects, or one beside a maths
+ * mark (θ, π, √, ², Δ…). A logo that says "Force" is not a figure; a unit
+ * circle labelled "(cos θ, sin θ)" is.
+ */
+export function mathFigureMarkup(svg: string): boolean {
+  if (!/<svg[\s>]/i.test(svg) || /\bdata-mv-panel\b/.test(svg)) return false;
+  const visible = svg
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(/<[^>]+>/g, ' ');
+  const hits = new Set((visible.match(SUBJECT) ?? []).map((w) => w.toLowerCase()));
+  return hits.size >= 2 || (hits.size === 1 && /[πθωφ∫∑√²³ΔΣ]/.test(visible));
+}
+
 export const HANDMADE_MATH_NOTE =
   'This is a maths or physics visual made by hand. The math command makes this kind of visual in the ' +
   "app's own style — curves as expressions, sliders with Play, steps tied to the parts of the figure — " +

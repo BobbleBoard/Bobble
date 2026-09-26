@@ -3,6 +3,7 @@ import {
   countInlineDrawnSvgs,
   handwrittenDiagramRefusal,
   handwrittenInlineSvgRefusal,
+  handwrittenMathRefusal,
   handwrittenSvgRefusal,
   handwrittenSvgRoute,
   hasHandwrittenInlineSvg,
@@ -340,5 +341,67 @@ describe('a diagram drawn by hand routes to the diagram tool', () => {
     const inline = handwrittenDiagramRefusal('index.html', { cli: true, inline: true, edit: true });
     expect(inline).toMatch(/^Not edited: index\.html has a diagram drawn by hand inline/);
     expect(inline).toContain('<img src="assets/flow.svg"');
+  });
+});
+
+describe('a maths or physics figure drawn by hand routes to math', () => {
+  /* MEASURED (the STEM suite, 4B): "why d/dx sin x = cos x" hand-written as a
+     unit circle; the refusal sent it to Mermaid, and it made the figure with
+     image generation next. Its own markup, trimmed. */
+  const unitCircle = [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 700" font-family="Arial, sans-serif">',
+    '  <rect width="800" height="700" fill="#fafafa"/>',
+    '  <text x="400" y="40" text-anchor="middle" font-size="28">Why d/dx(sin x) = cos x</text>',
+    '  <circle cx="400" cy="350" r="120" fill="none" stroke="#666" stroke-width="2"/>',
+    '  <line x1="400" y1="350" x2="400" y2="190" stroke="#333" stroke-width="2"/>',
+    '  <text x="370" y="240" font-size="16">r = 1</text>',
+    '  <text x="385" y="210" font-size="20">θ</text>',
+    '  <line x1="400" y1="350" x2="480" y2="350" stroke="#27ae60" stroke-width="2"/>',
+    '  <text x="490" y="365" font-size="16">x = cos θ</text>',
+    '  <text x="385" y="255" font-size="16">y = sin θ</text>',
+    '</svg>',
+  ].join('\n');
+  const base = {
+    path: 'sin_derivative.svg',
+    content: unitCircle,
+    exists: false,
+    svgCommandAvailable: true,
+    diagramAvailable: true,
+    mathAvailable: true,
+    request: 'Why is the derivative of sin x equal to cos x? Explain it visually.',
+  };
+
+  it('is refused toward math, not Mermaid', () => {
+    expect(handwrittenSvgRoute(base)).toBe('math');
+    const why = handwrittenMathRefusal(base.path);
+    expect(why).toMatch(
+      /^Not written: sin_derivative\.svg is a maths or physics figure drawn by hand/,
+    );
+    expect(why).toContain('sin_derivative.math.json — it is drawn the moment it is written');
+    expect(why).toContain('write the same file again UNCHANGED');
+  });
+
+  it('a flow chart is still a diagram, and a logo with one such word is let through', () => {
+    expect(
+      handwrittenSvgRoute({ ...base, path: 'flow.svg', content: REAL_4B_FLOW, request: '' }),
+    ).toBe('diagram');
+    const logo =
+      '<svg viewBox="0 0 200 60"><rect width="200" height="60" rx="8" fill="#111"/><text x="20" y="38" fill="#fff">Force Fitness</text></svg>';
+    expect(
+      handwrittenSvgRoute({ ...base, path: 'logo.svg', content: logo, request: '' }),
+    ).toBeNull();
+  });
+
+  it('inline in a page too', () => {
+    const page = `<html><body><h1>Derivatives</h1>${unitCircle.replace(/^<\?xml[^>]*>\n/, '')}</body></html>`;
+    expect(
+      inlineSvgRoute({
+        path: 'index.html',
+        content: page,
+        svgCommandAvailable: true,
+        mathAvailable: true,
+      }),
+    ).toBe('math');
   });
 });

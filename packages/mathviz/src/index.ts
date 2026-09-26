@@ -8,7 +8,7 @@
  * so the model can fix the spec and draw again.
  */
 import { type Kit, kitOrDefault } from '@pi-desktop/design-kit';
-import { compileSpec, startValues, steadyYRange } from './build.js';
+import { compileSpec, fittedView, startValues, steadyYRange } from './build.js';
 import { checkMath, type Problem } from './checks.js';
 import { mathPage } from './page.js';
 import type { Values } from './runtime.js';
@@ -49,6 +49,19 @@ export function renderMath(input: unknown, opts: { readonly kit?: Kit } = {}): M
       notes.push(
         'a curve runs off towards infinity, so the y-range shows the rest of it — give "y" a range to choose',
       );
+  }
+  const fig = spec.figure;
+  if (fig?.fit !== undefined && fig.fit.length > 0) {
+    const view = fittedView(spec, compiled.E);
+    const { fit, ...rest } = fig;
+    spec = {
+      ...spec,
+      figure: {
+        ...rest,
+        x: fit.includes('x') ? view.x : fig.x,
+        y: fit.includes('y') ? view.y : fig.y,
+      },
+    };
   }
   const start = startValues(spec, compiled.E);
   const problems = [

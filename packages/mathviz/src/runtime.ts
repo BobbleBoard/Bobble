@@ -300,35 +300,43 @@ export function mvPlace(
   taken: readonly Box[],
   lines: readonly (readonly number[])[],
   bounds: Box,
-): { i: number; clear: boolean } {
+): { i: number; clear: boolean; crowd: { boxes: number; points: number } } {
   let best = 0;
   let bestCost = Number.POSITIVE_INFINITY;
+  let bestCrowd = { boxes: 0, points: 0 };
   for (let i = 0; i < cands.length; i += 1) {
     const c = cands[i];
     if (c === undefined) continue;
     const b = mvTextBox(c.x, c.y, text, c.anchor, size, key);
     let cost = mvInside(b, bounds) ? 0 : 1000;
+    let boxes = 0;
+    let points = 0;
     for (const t of taken) {
       if (mvHit(b, t, 2)) {
         const ox = Math.min(b.x + b.w, t.x + t.w) - Math.max(b.x, t.x);
         const oy = Math.min(b.y + b.h, t.y + t.h) - Math.max(b.y, t.y);
         cost += 100 + Math.max(0, ox) * Math.max(0, oy);
+        boxes += 1;
       }
     }
     for (const pts of lines) {
       for (let k = 0; k + 1 < pts.length; k += 2) {
         const px = pts[k] ?? 0;
         const py = pts[k + 1] ?? 0;
-        if (px > b.x - 3 && px < b.x + b.w + 3 && py > b.y - 3 && py < b.y + b.h + 3) cost += 4;
+        if (px > b.x - 3 && px < b.x + b.w + 3 && py > b.y - 3 && py < b.y + b.h + 3) {
+          cost += 4;
+          points += 1;
+        }
       }
     }
-    if (cost === 0) return { i, clear: true };
+    if (cost === 0) return { i, clear: true, crowd: { boxes: 0, points: 0 } };
     if (cost < bestCost) {
       bestCost = cost;
       best = i;
+      bestCrowd = { boxes, points };
     }
   }
-  return { i: best, clear: false };
+  return { i: best, clear: false, crowd: bestCrowd };
 }
 
 // ── the scene ───────────────────────────────────────────────────────────────
@@ -1207,6 +1215,9 @@ export function mvFigure(
             Y + R * Math.sin((q / 48) * 2 * Math.PI),
           );
         lines.push(ring);
+        // A solid disc (a mass, a molecule) is no ground for words: labels go beside it.
+        if (sh.fill !== 'none' && sh.fill !== 'tint' && sh.fill !== 'shade')
+          taken.push({ x: X - R * 0.8, y: Y - R * 0.8, w: R * 1.6, h: R * 1.6 });
         if (sh.label !== undefined) {
           const d = R * 0.72 + 8;
           pending.push({
@@ -1346,25 +1357,26 @@ export function mvFigure(
       }
       case 'box3d': {
         const [a, b] = pt(sh.at);
-        const size = mvEval(E, sh.size, s);
+        const w = mvEval(E, sh.w, s);
+        const h = mvEval(E, sh.h, s);
         const depth = mvEval(E, sh.depth, s);
-        if (!Number.isFinite(a) || !Number.isFinite(b) || !(size > 0)) {
+        if (!Number.isFinite(a) || !Number.isFinite(b) || !(w > 0) || !(h > 0)) {
           outside.push({ id: sh.id, what: 'its corner or size has no value' });
           break;
         }
         const dx = depth * 0.8;
         const dy = depth * 0.55;
         inView(sh.id, a, b);
-        inView(sh.id, a + size + dx, b + size + dy);
+        inView(sh.id, a + w + dx, b + h + dy);
         const V = (x: number, y: number): [number, number] => [fx(x), fy(y)];
         const A = V(a, b);
-        const Bv = V(a + size, b);
-        const C = V(a + size, b + size);
-        const D = V(a, b + size);
+        const Bv = V(a + w, b);
+        const C = V(a + w, b + h);
+        const D = V(a, b + h);
         const A2 = V(a + dx, b + dy);
-        const B2 = V(a + size + dx, b + dy);
-        const C2 = V(a + size + dx, b + size + dy);
-        const D2 = V(a + dx, b + size + dy);
+        const B2 = V(a + w + dx, b + dy);
+        const C2 = V(a + w + dx, b + h + dy);
+        const D2 = V(a + dx, b + h + dy);
         const poly = (ps: [number, number][]) =>
           `${ps.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`).join('')}Z`;
         if (sh.shade === 'right')
@@ -1543,6 +1555,7 @@ export function mvFigure(
       id: p.id,
       dim: p.dim,
       placed: true,
+      ...(pick.clear ? {} : { crowd: pick.crowd }),
     });
     taken.push(box);
   }

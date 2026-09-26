@@ -271,6 +271,8 @@ export function registerGenTools(pi: ExtensionAPI, options: GenToolsOptions): vo
       }
       const chart = dataChartPrompt(params.prompt);
       if (chart !== null) return errResult(chart);
+      const figure = mathFigurePrompt(params.prompt);
+      if (figure !== null) return errResult(figure);
       // Resolve + validate the model against the catalog.
       const modelId = params.model ?? defaultImageModel().id;
       const model = getModel(modelId);
@@ -713,6 +715,38 @@ export function dataChartPrompt(prompt: string | undefined): string | null {
     'on an axis. Draw it with the chart tool instead: chart with the type, title, labels and values ' +
     '(CLI: chart bar "Title" --labels "2021, 2022, 2023" --values "12, 19, 27"). It appears in the ' +
     'chat as an interactive card in a second, and writes an .svg into the project for a page or a deck.'
+  );
+}
+
+/**
+ * A MATHS OR PHYSICS FIGURE IS NOT A PICTURE EITHER. MEASURED (the STEM suite,
+ * 4B): asked why d/dx sin x = cos x "visually", after its hand-made SVG was
+ * refused it asked image generation for "a unit circle … Graph with sin(x) in
+ * blue and cos(x) in green … a tangent line", waited a minute and a half, and
+ * presented a painting with "sos(x)" on its axis and two waves that are
+ * neither. The math command draws the curves from their expressions. Narrow
+ * like the chart test: maths notation, AND a figure word or a second piece of
+ * notation — so "a neon sine-wave poster" and "Pythagoras teaching, fresco"
+ * still paint.
+ */
+export function mathFigurePrompt(prompt: string | undefined): string | null {
+  const text = prompt ?? '';
+  const notation = [
+    /\b(sin|cos|tan|sec|csc|cot|log|ln|sqrt)\s*\(?\s*(x|θ|theta|t|ωt|[a-z]\s*[+)])/i,
+    /\bd\s*\/\s*d[xtθ]\b|\bf\s*\(\s*x\s*\)|\by\s*=\s*[-\d(a-z]/i,
+    /\b(derivative|integral|unit circle|parabola|asymptote|hypotenuse|pythagorean theorem|free[- ]body|vector diagram|simple harmonic|projectile motion)\b/i,
+    /[a-c]\s*[²2]\s*\+\s*[a-c]\s*[²2]|[∫∑√θπ]/,
+  ].filter((re) => re.test(text)).length;
+  const figure =
+    /\b(graph|plot|axes|axis|diagram|figure|visuali[sz]\w*|label+ed|explain\w*|educational|lesson|proof|showing why)\b/i.test(
+      text,
+    );
+  if (notation === 0 || (notation === 1 && !figure)) return null;
+  return (
+    'A maths or physics figure is drawn from its equations, not painted — an image model bends the ' +
+    'curves and misspells the labels. Draw it with the math command: write the figure as a spec to ' +
+    'lesson.math.json (curves as expressions, shapes at coordinates, steps tied to the parts) — it is ' +
+    'drawn the moment it is written, in the app, with its labels checked. `math --help` shows a whole spec.'
   );
 }
 

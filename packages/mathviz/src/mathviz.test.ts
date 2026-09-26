@@ -437,3 +437,133 @@ describe('the physics words for shapes', () => {
     ]);
   });
 });
+
+describe('STEM run 3: what the 4B wrote, and what it could not see', () => {
+  const cube = (view: unknown, size: unknown, extra: Record<string, unknown> = {}) => ({
+    title: 'Molecule bouncing in a cube',
+    figure: {
+      view,
+      shapes: [
+        { id: 'cube', kind: 'box3d', at: [0, 0, 0], size, ...extra },
+        { id: 'molecule', kind: 'circle', at: [0.25, 0.25, 0.25], r: 0.08, fill: 'main' },
+        { id: 'u', kind: 'vector', from: [0.25, 0.25, 0.25], to: [0.75, 0.25, 0.25], label: 'u' },
+      ],
+    },
+    steps: [
+      { text: 'The cube has side L.', highlight: ['cube'] },
+      { text: 'A molecule moves at u.', highlight: ['molecule', 'u'] },
+    ],
+  });
+
+  it('one number for a view is no range: the view fits the shapes, and a note says how to choose it', () => {
+    const r = renderMath(cube({ x: -2, y: -2, z: -2 }, [1, 1, 1]));
+    const fig = r.spec.figure;
+    // The cube's far corner, in the oblique view: 1 + 0.8, 1 + 0.55.
+    expect(fig?.x[0]).toBeLessThan(0);
+    expect(fig?.x[1]).toBeGreaterThan(1.8);
+    expect(fig?.y[1]).toBeGreaterThan(1.55);
+    expect(fig?.x[1]).toBeLessThan(2.5);
+    expect(fig?.fit).toBeUndefined();
+    expect(r.problems.map((p) => p.text)).toContain(
+      'the figure\'s x is one number (-2), not a range, so the view fits the shapes — write "x": "-2..2" to choose it',
+    );
+    expect(r.problems.filter((p) => p.level === 'fix')).toEqual([]);
+  });
+
+  it('a box is sized [w, h, d] or {w, h, d}; a size of three wins over a "depth" of its own', () => {
+    const box = (shape: Record<string, unknown>) =>
+      normalizeMathSpec({ title: 'B', figure: { view: { x: '0..5', y: '0..5' }, shapes: [shape] } })
+        .figure?.shapes[0];
+    expect(box({ kind: 'box3d', size: [2, 1, 0.5] })).toMatchObject({ w: 2, h: 1, depth: 0.5 });
+    expect(box({ kind: 'box', size: { w: 3, h: 2, d: 1 } })).toMatchObject({
+      w: 3,
+      h: 2,
+      depth: 1,
+    });
+    expect(box({ kind: 'cube', size: 2 })).toMatchObject({ w: 2, h: 2, depth: 1 });
+    expect(box({ kind: 'box3d', size: [1, 1, 1], depth: 0.2 })).toMatchObject({ depth: 1 });
+    expect(box({ kind: 'box3d', size: 1, depth: 0.2 })).toMatchObject({ depth: 0.2 });
+  });
+
+  it('no title is a plain one, with a note — the real problem is said first', () => {
+    const s = normalizeMathSpec({
+      name: 'cube_molecule',
+      figure: cube({ x: '0..2', y: '0..2' }, 1).figure,
+    });
+    expect(s.title).toBe('Cube molecule');
+    const untitled = normalizeMathSpec({ plot: { x: '0..1', curves: ['x'] } });
+    expect(untitled.title).toBe('Graph');
+    expect(untitled.notes.join(' ')).toMatch(/no "title"/);
+    expect(() =>
+      normalizeMathSpec({ name: 'cube_molecule', parts: { cube: 'Cube of side L' } }),
+    ).toThrow(/needs a "plot".*Something that moves.*"play": "t"/);
+  });
+
+  it('two arrows on the same two ends are said: one hides the other', () => {
+    const spec = cube({ x: '-1..3', y: '-1..3' }, 1);
+    const shapes = [
+      ...spec.figure.shapes,
+      {
+        id: 'dp',
+        kind: 'vector',
+        from: [0.25, 0.25, 0.25],
+        to: [0.75, 0.25, 0.25],
+        label: 'Δp = 2mu',
+      },
+    ];
+    expect(fixes({ ...spec, figure: { ...spec.figure, shapes } }).map((p) => p.text)).toContain(
+      'u and dp are drawn in the same place, so one hides the other — give each its own position (or make them one part)',
+    );
+  });
+
+  it('labels with no clear spot are said once, as one list — and a smaller view spreads them', () => {
+    // MEASURED: the 4B's own unit circle, a view seven units wide.
+    const lesson = (view: string, axis: number) => ({
+      title: 'Why d/dx(sin x) = cos x',
+      figure: {
+        view: { x: view, y: view },
+        shapes: [
+          {
+            id: 'unitCircle',
+            kind: 'circle',
+            center: [0, 0],
+            r: 1,
+            fill: 'tint',
+            label: 'Unit circle',
+          },
+          { id: 'theta', kind: 'angle', at: [0.5, 0], from: [0, 0], to: [1, 0.87], label: 'θ' },
+          { id: 'point', kind: 'point', at: [1, 0.87], label: '(cos θ, sin θ)' },
+          { id: 'radius', kind: 'line', from: [0, 0], to: [1, 0.87], label: 'r = 1' },
+          { id: 'xProj', kind: 'point', at: [1, 0], label: 'x = cos θ' },
+          { id: 'yProj', kind: 'point', at: [0, 0.87], label: 'y = sin θ' },
+          { id: 'xLine', kind: 'line', from: [0, 0], to: [1, 0], label: 'x = cos θ' },
+          { id: 'yLine', kind: 'line', from: [0, 0], to: [0, 0.87], label: 'y = sin θ' },
+          {
+            id: 'tangent',
+            kind: 'line',
+            from: [0.9, 0.8],
+            to: [1.1, 1],
+            label: 'tangent direction',
+          },
+          { id: 'slope', kind: 'line', from: [0.5, 0.5], to: [1.2, 1.2], label: 'slope = cos θ' },
+          { id: 'xAxis', kind: 'line', from: [-axis, 0], to: [axis, 0], label: 'x-axis' },
+          { id: 'yAxis', kind: 'line', from: [0, -axis], to: [0, axis], label: 'y-axis' },
+          { id: 'thetaLabel', kind: 'label', at: [1.1, 0.9], text: 'θ' },
+        ],
+      },
+      steps: [
+        { text: 'A point at angle θ.', highlight: ['point', 'theta'] },
+        { text: 'Its coordinates.', highlight: ['xLine', 'yLine'] },
+      ],
+    });
+    const crowded = (spec: unknown) => fixes(spec).filter((p) => /crowded/.test(p.text));
+    const tight = crowded(lesson('-3.5..3.5', 3.5));
+    expect(tight.length).toBe(1);
+    expect(tight[0]?.text).toMatch(
+      /^labels are crowded in the figure: .*“y = sin θ”.* — the parts are too close together for their labels: make the view smaller/,
+    );
+    const named = (t: string | undefined) => (t?.match(/“[^”]+”/g) ?? []).length;
+    const zoomed = crowded(lesson('-1.6..1.6', 1.5));
+    expect(named(zoomed[0]?.text)).toBeLessThan(named(tight[0]?.text));
+  });
+});

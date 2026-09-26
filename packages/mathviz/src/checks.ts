@@ -14,7 +14,7 @@
  * `fix` is a problem the page shows; `warn` is weak; `note` is information.
  */
 import { valuesAtStep } from './build.js';
-import { type Evaluators, mvHit, mvPlain, mvScene, type Values } from './runtime.js';
+import { type Evaluators, mvEval, mvHit, mvPlain, mvScene, type Values } from './runtime.js';
 import type { Panel } from './scene-types.js';
 import type { MathSpec } from './spec.js';
 
@@ -69,6 +69,8 @@ export function checkMath(
       ? [{ step: 0, values: valuesAtStep(spec, E, 0) }]
       : spec.steps.map((_, i) => ({ step: i + 1, values: valuesAtStep(spec, E, i + 1) }));
   const layout = new Map<string, { level: Problem['level']; steps: number[]; tail: string }>();
+  /** Figure labels with no clear spot, in any state: on a point or a solid shape, or crossed by a line. */
+  const crowded = new Map<string, 'on' | 'crossed'>();
   const at = (level: Problem['level'], head: string, tail: string, stepNo: number) => {
     const e = layout.get(head) ?? { level, steps: [], tail };
     if (stepNo > 0 && !e.steps.includes(stepNo)) e.steps.push(stepNo);
@@ -95,22 +97,47 @@ export function checkMath(
             st.step,
           );
         }
-        for (let j = i + 1; j < texts.length; j += 1) {
+        let overlapped = false;
+        for (let j = 0; j < texts.length; j += 1) {
           const b = texts[j];
-          if (b === undefined || b.t !== 'text') continue;
+          if (j === i || b === undefined || b.t !== 'text') continue;
           if (!(a.placed === true || b.placed === true)) continue;
-          if (mvHit(a.box, b.box, -1)) {
-            at(
-              'fix',
-              `labels overlap in ${panelName(panel)}: ${q(mvPlain(a.text))} and ${q(mvPlain(b.text))}`,
-              ' — move one of the parts they name, or shorten a label',
-              st.step,
-            );
-          }
+          if (!mvHit(a.box, b.box, -1)) continue;
+          overlapped = true;
+          if (j < i) continue;
+          at(
+            'fix',
+            `labels overlap in ${panelName(panel)}: ${q(mvPlain(a.text))} and ${q(mvPlain(b.text))}`,
+            ' — move one of the parts they name, or shorten a label',
+            st.step,
+          );
+        }
+        /* A figure's label with no clear spot: on a point or a solid shape, or
+           crossed by a line — MEASURED (the STEM suite, 4B): a unit circle in
+           a view seven units wide, ten labels round it, "y = sin θ" struck
+           through by its own line; only one strict overlap was said. */
+        const crowd = a.crowd;
+        if (
+          panel.kind === 'figure' &&
+          !overlapped &&
+          crowd !== undefined &&
+          (crowd.boxes > 0 || crowd.points >= 3)
+        ) {
+          const name = mvPlain(a.text);
+          if (!crowded.has(name)) crowded.set(name, crowd.boxes > 0 ? 'on' : 'crossed');
         }
       }
       for (const o of panel.outside)
         at('fix', `${o.id} ${o.what.startsWith('(') ? 'at ' : '— '}${o.what}`, '', st.step);
+      if (panel.kind === 'figure') {
+        for (const [a, b] of samePlace(spec, E, st.values, st.step))
+          at(
+            'fix',
+            `${a} and ${b} are drawn in the same place, so one hides the other`,
+            ' — give each its own position (or make them one part)',
+            st.step,
+          );
+      }
       for (const h of panel.curveHealth) {
         const range =
           spec.plot !== undefined
@@ -142,6 +169,25 @@ export function checkMath(
         ? ` at step ${steps[0]}`
         : ` at steps ${steps.slice(0, -1).join(', ')} and ${steps[steps.length - 1]}`;
     say(e.level, `${head}${where}${e.tail}`);
+  }
+
+  if (crowded.size > 0) {
+    const on = [...crowded].filter(([, k]) => k === 'on').map(([t]) => q(t));
+    const crossed = [...crowded].filter(([, k]) => k === 'crossed').map(([t]) => q(t));
+    const list = (xs: string[]) =>
+      xs.length === 1 ? (xs[0] ?? '') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`;
+    const parts = [
+      ...(on.length > 0
+        ? [`${list(on)} ${on.length === 1 ? 'sits' : 'sit'} on a point or a solid shape`]
+        : []),
+      ...(crossed.length > 0
+        ? [`${list(crossed)} ${crossed.length === 1 ? 'is' : 'are'} crossed by a line`]
+        : []),
+    ];
+    say(
+      'fix',
+      `labels are crowded in the figure: ${parts.join('; ')} — the parts are too close together for their labels: make the view smaller (the parts get bigger), move a part, or shorten or drop a label`,
+    );
   }
 
   // Each slider's ends: a part that leaves the view while a slider is dragged.
@@ -247,6 +293,36 @@ export function checkMath(
       );
   }
   for (const note of spec.notes) say('note', note);
+  return out;
+}
+
+/**
+ * Two lines, arrows or springs with the same two ends — one drawn over the
+ * other. MEASURED (the STEM suite, 4B): "u" and "Δp = 2mu" as two arrows from
+ * the molecule to the same point, their labels stacked on one arrow.
+ */
+function samePlace(
+  spec: MathSpec,
+  E: Evaluators,
+  values: Values,
+  step: number,
+): [string, string][] {
+  const s: Record<string, number> = { ...values };
+  const ends: { id: string; key: string }[] = [];
+  for (const sh of spec.figure?.shapes ?? []) {
+    if (sh.appear > Math.max(1, step)) continue;
+    if (sh.kind !== 'segment' && sh.kind !== 'vector' && sh.kind !== 'spring') continue;
+    const pts = [sh.from, sh.to].map((p) => [mvEval(E, p[0], s), mvEval(E, p[1], s)]);
+    if (pts.flat().some((v) => !Number.isFinite(v))) continue;
+    const r = (v: number) => (Math.round(v * 1e4) / 1e4).toString();
+    const [p0, p1] = pts.map((p) => `${r(p[0] ?? 0)},${r(p[1] ?? 0)}`);
+    // Either direction: an arrow from A to B hides a segment from B to A.
+    ends.push({ id: sh.id, key: [p0, p1].sort().join(' ') });
+  }
+  const out: [string, string][] = [];
+  for (let i = 0; i < ends.length; i += 1)
+    for (let j = i + 1; j < ends.length; j += 1)
+      if (ends[i]?.key === ends[j]?.key) out.push([ends[i]?.id ?? '', ends[j]?.id ?? '']);
   return out;
 }
 

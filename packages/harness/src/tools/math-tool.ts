@@ -194,28 +194,6 @@ async function readSpec(
   };
 }
 
-/**
- * THE SPEC WAS JUST WRITTEN — the moment to say whether it draws, and how to
- * draw it. MEASURED (the STEM suite, 4B): it wrote lesson.math.json three
- * times and never ran math on it; another spec failed ten parses, each found
- * only when math was finally run. For a `.math.json` written or edited: the
- * spec is read here, and the note says what is wrong, or the command.
- */
-export function mathSpecWriteNote(text: string, rel: string): string {
-  try {
-    renderMath(text);
-    return `That is a math spec: run \`math ${rel}\` to draw it — the page opens beside the chat and its checks come back.`;
-  } catch (e) {
-    const why =
-      e instanceof SpecError || e instanceof ExprError
-        ? e.message
-        : e instanceof Error
-          ? e.message
-          : String(e);
-    return `That math spec does not draw yet: ${why}. Fix it in ${rel}, then run \`math ${rel}\`.`;
-  }
-}
-
 /** The same spec twice in a row for one file is said, not redrawn. */
 const lastDrawn = new Map<string, { hash: string; text: string }>();
 
@@ -236,8 +214,28 @@ function describe(r: MathResult): string {
   return bits.join(', ');
 }
 
+/**
+ * What the reader can do on the page, said as fact — MEASURED (the STEM
+ * suite, 4B): a page of one curve and no sliders came back, and the reply
+ * told the user to "use the Play/Step buttons to animate the mass on the
+ * spring" and "adjust the amplitude and period sliders". The old reply line
+ * suggested exactly those words ("drag a slider, press play").
+ */
+function controls(r: MathResult): string {
+  const n = r.spec.steps.length;
+  const sliders = r.spec.params.filter((p) => p.hidden !== true);
+  const bits: string[] = [];
+  if (n > 1) bits.push(`Back and Next through its ${n} steps`);
+  if (sliders.length > 0)
+    bits.push(
+      `${sliders.length === 1 ? 'a slider' : 'sliders'} for ${sliders.map((p) => p.name).join(', ')}, with Play`,
+    );
+  const still = sliders.length === 0 ? ' Nothing on it moves — it has no sliders.' : '';
+  return `On the page: ${bits.length > 0 ? bits.join('; ') : 'the visual alone'}.${still}`;
+}
+
 const REPLY =
-  'Then tell the user in a sentence or two what the visual shows and how to use it (drag a slider, press play, step through). The steps are on the page — do not repeat them in the chat.';
+  'Then tell the user in a sentence or two what the visual shows and how to use it — with the controls it has, above, and no others. The steps are on the page — do not repeat them in the chat.';
 
 const DESCRIPTION = [
   'Draw a maths or physics visual as an interactive page beside the chat: a graph of functions with sliders, a labelled figure (geometry, forces, a spring, a box of gas), or both — with the explanation as numbered steps beside it, each lighting the parts it talks about. Every function plot, equation graph, geometry or physics diagram and every animation in an explanation goes here — never hand-written HTML or SVG, never the chart command (that is for data), never image generation.',
@@ -301,103 +299,129 @@ export function registerMathTool(pi: ExtensionAPI, deps: MathToolDeps): void {
       steps: Type.Optional(Type.String({ description: '…and the steps as JSON.' })),
     }),
     async execute(_id, params, _signal, _onUpdate, ctx) {
-      const p = params as Record<string, unknown>;
-      const root = deps.root(ctx?.cwd);
-      const got = await readSpec(root, p);
-      if ('error' in got) return errorResult(got.error);
-      const kit = deps.kit !== undefined ? await deps.kit(root) : null;
-      let r: MathResult;
-      try {
-        r = renderMath(got.raw, kit !== null ? { kit } : {});
-      } catch (e) {
-        if (e instanceof SpecError || e instanceof ExprError) {
-          return errorResult(
-            `math: ${e.message}.${got.file !== undefined ? ` Fix it in ${pathForModel(got.file, root)} and run math on it again.` : ''} (\`math --help\` shows a whole spec.)`,
-          );
-        }
-        throw e;
-      }
-
-      // The files: the spec (as the model wrote it) and the page, side by side.
-      const specFile = got.file ?? path.join(root, `${mathSlug(r.spec.title)}${MATH_SPEC_SUFFIX}`);
-      const stem = specFile.endsWith(MATH_SPEC_SUFFIX)
-        ? specFile.slice(0, -MATH_SPEC_SUFFIX.length)
-        : specFile.replace(/\.json$/i, '');
-      const out =
-        typeof p.out === 'string' && p.out.trim() !== '' ? resolveAgainst(root, p.out) : undefined;
-      const page = out === undefined ? `${stem}.html` : /\.html?$/i.test(out) ? out : `${out}.html`;
-      try {
-        await mkdir(path.dirname(page), { recursive: true });
-        if (got.file === undefined)
-          await writeFile(specFile, `${JSON.stringify(got.raw, null, 2)}\n`, 'utf8');
-        await writeFile(page, r.html, 'utf8');
-      } catch (e) {
-        return errorResult(
-          `math could not write ${pathForModel(page, root)}: ${e instanceof Error ? e.message : String(e)}`,
-        );
-      }
-
-      const fixes = r.problems.filter((x) => x.level === 'fix');
-      const warns = r.problems.filter((x) => x.level === 'warn');
-      const notes = r.problems.filter((x) => x.level === 'note');
-      const specRel = pathForModel(specFile, root);
-      const lines = [
-        `Drew "${r.spec.title}": ${pathForModel(page, root)} — ${describe(r)}. The spec is ${specRel}.`,
-      ];
-
-      // A spec redrawn unchanged after problems were reported: say it, rather than redraw.
-      const hash = createHash('sha1').update(JSON.stringify(got.raw)).digest('hex');
-      const prev = lastDrawn.get(page);
-      if (prev !== undefined && prev.hash === hash && fixes.length > 0) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `${prev.text}\n\n(That is the same spec as last time, so nothing changed — the problems above still stand. Change the spec where they say, then run math again.)`,
-            },
-          ],
-          details: undefined,
-        };
-      }
-
-      let image: { data: string; mimeType: string } | undefined;
-      if (deps.bridge !== null) {
-        const shown = await deps.bridge.show({ path: page, note: r.spec.title });
-        lines[0] += shown.ok
-          ? ' It is open in the canvas beside the chat.'
-          : ` (the canvas could not open it: ${shown.error ?? 'unknown'})`;
-        if ((deps.canSeeImages ?? serverCanSeeImages)()) {
-          const preview = await deps.bridge.preview({ path: page, kind: 'render' });
-          if (preview.imageBase64 !== undefined) {
-            image = { data: preview.imageBase64, mimeType: preview.mimeType ?? 'image/png' };
-            lines.push('The capture below is what the user sees.');
-          }
-        }
-      }
-      if (fixes.length > 0) {
-        lines.push(`Checks — ${fixes.length} to fix:`, ...fixes.map((x) => `- ${x.text}`));
-        if (warns.length > 0) lines.push('Also:', ...warns.map((x) => `- ${x.text}`));
-        lines.push(
-          `Fix ${fixes.length === 1 ? 'it' : 'them'} in ${specRel} and run \`math ${specRel}\` again.`,
-        );
-      } else if (warns.length > 0) {
-        lines.push(
-          'Checks — nothing overlaps or leaves the view. To improve:',
-          ...warns.map((x) => `- ${x.text}`),
-        );
-        lines.push(`(Change ${specRel} and run \`math ${specRel}\` again, or leave it.)`, REPLY);
-      } else {
-        lines.push(
-          'Checks — clear: no labels on labels, every part in view, every curve drawn, every step points at the figure.',
-          REPLY,
-        );
-      }
-      if (notes.length > 0) lines.push(...notes.map((x) => `(${x.text})`));
-      const text = lines.join('\n');
-      lastDrawn.set(page, { hash, text });
-      const content: Content = [{ type: 'text', text }];
-      if (image !== undefined) content.push({ type: 'image', ...image });
-      return { content, details: undefined };
+      return drawMath(params as Record<string, unknown>, deps.root(ctx?.cwd), deps);
     },
   });
+}
+
+type MathToolResult = { content: Content; isError?: true; details: undefined };
+
+/**
+ * A .math.json just written or edited IS the page asked for, so it is drawn
+ * there and then: the write's result carries the page, its capture and its
+ * checks. MEASURED (the STEM suite, 4B, two runs): it wrote lesson.math.json
+ * three times and never ran math; then, with a note after every write naming
+ * the command, four times more, presented the JSON as text, and made the
+ * figure with image generation (a "sos(x)" axis). The spec was fine — it
+ * drew, with two things to fix.
+ */
+export async function drawWrittenSpec(
+  file: string,
+  root: string,
+  deps: MathToolDeps,
+): Promise<MathToolResult> {
+  return drawMath({ spec: file }, root, deps);
+}
+
+export async function drawMath(
+  p: Record<string, unknown>,
+  root: string,
+  deps: MathToolDeps,
+): Promise<MathToolResult> {
+  const got = await readSpec(root, p);
+  if ('error' in got) return errorResult(got.error);
+  const kit = deps.kit !== undefined ? await deps.kit(root) : null;
+  let r: MathResult;
+  try {
+    r = renderMath(got.raw, kit !== null ? { kit } : {});
+  } catch (e) {
+    if (e instanceof SpecError || e instanceof ExprError) {
+      return errorResult(
+        `math: ${e.message}.${got.file !== undefined ? ` Fix it in ${pathForModel(got.file, root)} and run math on it again.` : ''} (\`math --help\` shows a whole spec.)`,
+      );
+    }
+    throw e;
+  }
+
+  // The files: the spec (as the model wrote it) and the page, side by side.
+  const specFile = got.file ?? path.join(root, `${mathSlug(r.spec.title)}${MATH_SPEC_SUFFIX}`);
+  const stem = specFile.endsWith(MATH_SPEC_SUFFIX)
+    ? specFile.slice(0, -MATH_SPEC_SUFFIX.length)
+    : specFile.replace(/\.json$/i, '');
+  const out =
+    typeof p.out === 'string' && p.out.trim() !== '' ? resolveAgainst(root, p.out) : undefined;
+  const page = out === undefined ? `${stem}.html` : /\.html?$/i.test(out) ? out : `${out}.html`;
+  try {
+    await mkdir(path.dirname(page), { recursive: true });
+    if (got.file === undefined)
+      await writeFile(specFile, `${JSON.stringify(got.raw, null, 2)}\n`, 'utf8');
+    await writeFile(page, r.html, 'utf8');
+  } catch (e) {
+    return errorResult(
+      `math could not write ${pathForModel(page, root)}: ${e instanceof Error ? e.message : String(e)}`,
+    );
+  }
+
+  const fixes = r.problems.filter((x) => x.level === 'fix');
+  const warns = r.problems.filter((x) => x.level === 'warn');
+  const notes = r.problems.filter((x) => x.level === 'note');
+  const specRel = pathForModel(specFile, root);
+  const lines = [
+    `Drew "${r.spec.title}": ${pathForModel(page, root)} — ${describe(r)}. The spec is ${specRel}.`,
+    controls(r),
+  ];
+
+  // A spec redrawn unchanged after problems were reported: say it, rather than redraw.
+  const hash = createHash('sha1').update(JSON.stringify(got.raw)).digest('hex');
+  const prev = lastDrawn.get(page);
+  if (prev !== undefined && prev.hash === hash && fixes.length > 0) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `${prev.text}\n\n(That is the same spec as last time, so nothing changed — the problems above still stand. Change the spec where they say, then run math again.)`,
+        },
+      ],
+      details: undefined,
+    };
+  }
+
+  let image: { data: string; mimeType: string } | undefined;
+  if (deps.bridge !== null) {
+    const shown = await deps.bridge.show({ path: page, note: r.spec.title });
+    lines[0] += shown.ok
+      ? ' It is open in the canvas beside the chat.'
+      : ` (the canvas could not open it: ${shown.error ?? 'unknown'})`;
+    if ((deps.canSeeImages ?? serverCanSeeImages)()) {
+      const preview = await deps.bridge.preview({ path: page, kind: 'render' });
+      if (preview.imageBase64 !== undefined) {
+        image = { data: preview.imageBase64, mimeType: preview.mimeType ?? 'image/png' };
+        lines.push('The capture below is what the user sees.');
+      }
+    }
+  }
+  if (fixes.length > 0) {
+    lines.push(`Checks — ${fixes.length} to fix:`, ...fixes.map((x) => `- ${x.text}`));
+    if (warns.length > 0) lines.push('Also:', ...warns.map((x) => `- ${x.text}`));
+    lines.push(
+      `Fix ${fixes.length === 1 ? 'it' : 'them'} in ${specRel} and run \`math ${specRel}\` again.`,
+    );
+  } else if (warns.length > 0) {
+    lines.push(
+      'Checks — nothing overlaps or leaves the view. To improve:',
+      ...warns.map((x) => `- ${x.text}`),
+    );
+    lines.push(`(Change ${specRel} and run \`math ${specRel}\` again, or leave it.)`, REPLY);
+  } else {
+    lines.push(
+      'Checks — clear: no labels on labels, every part in view, every curve drawn, every step points at the figure.',
+      REPLY,
+    );
+  }
+  if (notes.length > 0) lines.push(...notes.map((x) => `(${x.text})`));
+  const text = lines.join('\n');
+  lastDrawn.set(page, { hash, text });
+  const content: Content = [{ type: 'text', text }];
+  if (image !== undefined) content.push({ type: 'image', ...image });
+  return { content, details: undefined };
 }

@@ -144,7 +144,8 @@ export function expressionsOf(spec: MathSpec): Map<string, Set<string>> {
         break;
       case 'box3d':
         xy(sh.at);
-        add(sh.size, P);
+        add(sh.w, P);
+        add(sh.h, P);
         add(sh.depth, P);
         break;
     }
@@ -227,6 +228,105 @@ function settings(spec: MathSpec): Values[] {
     out.push({ ...base, [p.name]: p.max });
   }
   return out;
+}
+
+/**
+ * Every state a reader can reach: each slider's own value, every step's, and
+ * each slider swept across its range with the rest at theirs (a motion's far
+ * point is inside a range, not at its ends: A·cos(πt) is at −A when t = 1).
+ */
+function reachable(spec: MathSpec, E: Evaluators): Values[] {
+  const out: Values[] = [...settings(spec)];
+  for (let k = 0; k <= spec.steps.length; k += 1) out.push(valuesAtStep(spec, E, k));
+  const base = valuesAtStep(spec, E, 0);
+  for (const p of spec.params) {
+    if (p.hidden === true || !(p.max > p.min)) continue;
+    for (let q = 0; q <= 48; q += 1)
+      out.push({ ...base, [p.name]: p.min + ((p.max - p.min) * q) / 48 });
+  }
+  return out;
+}
+
+/**
+ * A figure's view from its shapes, for the axes the spec gave no range for:
+ * every point any shape is drawn through, in every reachable state, padded so
+ * a label beside an edge part still fits. The frame then holds still while
+ * the sliders move, like the plot's y-range.
+ */
+export function fittedView(
+  spec: MathSpec,
+  E: Evaluators,
+): { x: [number, number]; y: [number, number] } {
+  const fig = spec.figure;
+  const xs: number[] = [];
+  const ys: number[] = [];
+  if (fig !== undefined) {
+    for (const v of reachable(spec, E)) {
+      const s: Record<string, number> = { ...v };
+      const put = (x: number, y: number) => {
+        if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+        xs.push(x);
+        ys.push(y);
+      };
+      const at = (p: readonly [Num, Num]) => put(mvEval(E, p[0], s), mvEval(E, p[1], s));
+      for (const sh of fig.shapes) {
+        switch (sh.kind) {
+          case 'point':
+          case 'label':
+          case 'angle':
+            at(sh.at);
+            break;
+          case 'segment':
+          case 'vector':
+          case 'spring':
+          case 'dimension':
+            at(sh.from);
+            at(sh.to);
+            break;
+          case 'polygon':
+          case 'polyline':
+            for (const p of sh.points) at(p);
+            break;
+          case 'circle': {
+            const cx = mvEval(E, sh.center[0], s);
+            const cy = mvEval(E, sh.center[1], s);
+            const r = Math.abs(mvEval(E, sh.r, s));
+            if (Number.isFinite(r)) {
+              put(cx - r, cy - r);
+              put(cx + r, cy + r);
+            }
+            break;
+          }
+          case 'box3d': {
+            const a = mvEval(E, sh.at[0], s);
+            const b = mvEval(E, sh.at[1], s);
+            const w = mvEval(E, sh.w, s);
+            const h = mvEval(E, sh.h, s);
+            const d = mvEval(E, sh.depth, s);
+            put(a, b);
+            put(a + w + 0.8 * Math.max(0, d), b + h + 0.55 * Math.max(0, d));
+            put(a + 0.8 * Math.min(0, d), b + 0.55 * Math.min(0, d));
+            break;
+          }
+        }
+      }
+    }
+  }
+  const span = (vals: number[], other: number): [number, number] => {
+    if (vals.length === 0) return [0, 10];
+    let lo = Math.min(...vals);
+    let hi = Math.max(...vals);
+    if (hi - lo < 1e-9) {
+      const half = other > 1e-9 ? other / 2 : 1;
+      lo -= half;
+      hi += half;
+    }
+    const pad = (hi - lo) * 0.12;
+    return [lo - pad, hi + pad];
+  };
+  const wx = xs.length > 0 ? Math.max(...xs) - Math.min(...xs) : 0;
+  const wy = ys.length > 0 ? Math.max(...ys) - Math.min(...ys) : 0;
+  return { x: span(xs, wy), y: span(ys, wx) };
 }
 
 /**

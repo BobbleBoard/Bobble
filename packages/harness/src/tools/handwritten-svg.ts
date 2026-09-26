@@ -70,6 +70,8 @@
  * question about SVG as a format, or an identical repeat lets it by.
  */
 
+import { mathFigureMarkup } from './handmade-math.js';
+
 const SVG_OPEN = /<svg[\s>]/i;
 /** An <svg> that draws something: at least one shape element inside it. */
 const INLINE_DRAWN_SVG =
@@ -177,17 +179,25 @@ export function isHandwrittenSvg(input: {
   return handwrittenSvgRoute(input) !== null;
 }
 
-/** Where a hand-made `.svg` should have come from: `diagram`, `svg`, or nowhere (null: let it through). */
+/** Where a hand-made `.svg` should have come from: `math`, `diagram`, `svg`, or nowhere (null: let it through). */
 export function handwrittenSvgRoute(input: {
   path: string;
   content: string;
   exists: boolean;
   svgCommandAvailable: boolean;
   diagramAvailable?: boolean;
+  mathAvailable?: boolean;
   request?: string;
-}): 'diagram' | 'svg' | null {
+}): 'math' | 'diagram' | 'svg' | null {
   if (!/\.svg$/i.test(input.path.trim())) return null;
   if (!SVG_OPEN.test(input.content)) return null;
+  /* A maths or physics figure before a diagram — MEASURED (the STEM suite,
+     4B): a unit circle with "(cos θ, sin θ)" and a tangent, hand-written, was
+     refused toward Mermaid ("boxes, arrows and labels"), which cannot draw a
+     circle; the model went to image generation next. */
+  if (input.mathAvailable === true && mathFigureMarkup(input.content)) {
+    return isMarkupTheDeliverable(input, { selfExplaining: false }) ? null : 'math';
+  }
   if (input.diagramAvailable === true && isDiagramShaped(input.content, input.request)) {
     return isMarkupTheDeliverable(input, { selfExplaining: false }) ? null : 'diagram';
   }
@@ -217,19 +227,21 @@ export function hasHandwrittenInlineSvg(input: {
   return inlineSvgRoute(input) !== null;
 }
 
-/** The inline case's route: a drawn diagram → `diagram`, a drawn graphic → `svg`. */
+/** The inline case's route: a drawn maths figure → `math`, a drawn diagram → `diagram`, a drawn graphic → `svg`. */
 export function inlineSvgRoute(input: {
   path: string;
   content: string;
   svgCommandAvailable: boolean;
   diagramAvailable?: boolean;
+  mathAvailable?: boolean;
   request?: string;
-}): 'diagram' | 'svg' | null {
+}): 'math' | 'diagram' | 'svg' | null {
   if (/\.svg$/i.test(input.path.trim())) return null;
   const drawn = [...input.content.matchAll(new RegExp(INLINE_DRAWN_SVG.source, 'gi'))].map(
     (m) => m[0],
   );
   if (drawn.length === 0) return null;
+  if (input.mathAvailable === true && drawn.some((d) => mathFigureMarkup(d))) return 'math';
   if (input.diagramAvailable === true && drawn.some((d) => isDiagramShaped(d, input.request))) {
     return 'diagram';
   }
@@ -274,6 +286,28 @@ export function handwrittenDiagramRefusal(
     opts.inline === true
       ? `The card appears in the chat; then reference the file in the page: <img src="${out}" alt="…">.`
       : 'The card appears in the chat.',
+    '',
+    `If this exact markup is truly wanted (a fixture, a sample), ${opts.edit === true ? 'apply the same edit' : 'write the same file'} again UNCHANGED.`,
+  ].join('\n');
+}
+
+/**
+ * The refusal for a maths or physics figure typed as SVG: the math command,
+ * and the file that draws it the moment it is written (math-tool.ts).
+ */
+export function handwrittenMathRefusal(
+  path: string,
+  opts: { readonly inline?: boolean; readonly edit?: boolean } = {},
+): string {
+  const stem = path.replace(/\.[^./\\]+$/, '').replace(/^.*[\\/]/, '') || 'figure';
+  const what =
+    opts.inline === true
+      ? `${path} has a maths or physics figure drawn by hand inline (<svg> lines, circles and labels)`
+      : `${path} is a maths or physics figure drawn by hand — lines, circles and labels placed one coordinate at a time`;
+  return [
+    `Not ${opts.edit === true ? 'edited' : 'written'}: ${what}. The math command draws it in the app's style: its labels placed so none overlap, the whole checked, and the explanation's steps tied to its parts, with sliders and Play if anything moves.`,
+    '',
+    `Write the figure as a spec to ${stem}.math.json — it is drawn the moment it is written, and its checks come back. \`math --help\` shows a whole spec; the shapes are points, segments, vectors, polygons, circles, angles, dimensions, labels, springs and boxes, at x, y coordinates.`,
     '',
     `If this exact markup is truly wanted (a fixture, a sample), ${opts.edit === true ? 'apply the same edit' : 'write the same file'} again UNCHANGED.`,
   ].join('\n');
