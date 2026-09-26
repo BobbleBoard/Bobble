@@ -363,6 +363,11 @@ export async function repairToolCallArguments(
       // If there was no schema we can only claim syntactic (rung 1) success.
       return { ok: true, value: syntactic, rung: schema === undefined ? 1 : 2 };
     }
+    // A string field given an object or a list: the text it meant, written out — no model call.
+    const written = writtenOutStrings(syntactic, schema);
+    if (written !== undefined && validateAgainstSchema(written, schema).valid) {
+      return { ok: true, value: written, rung: 2 };
+    }
     // Invalid → one fixer-model call.
     if (fixer !== undefined) {
       const fixed = await fixer({ raw, toolName, schema, error: validation.errors.join('; ') });
@@ -393,6 +398,35 @@ export async function repairToolCallArguments(
     value: syntactic,
     error: syntactic === undefined ? 'unrecoverable tool-call JSON' : 'schema validation failed',
   };
+}
+
+/**
+ * A STRING FIELD GIVEN STRUCTURE IS THE TEXT IT MEANT. MEASURED (the STEM
+ * suite, qwen3.5-4b, 2026-09-25): `write { path: "shm.math.json", content:
+ * { "title": …, "figure": … } }` — the JSON file's content as an object, not
+ * as text — failed pi's validation ("content: must be string") three times in
+ * one turn. For a field the schema types as a string, an object or a list is
+ * written out: a list of strings as its lines, anything else as indented JSON.
+ * Nothing else is touched, and the caller re-validates.
+ */
+export function writtenOutStrings(
+  value: Record<string, unknown>,
+  schema: unknown,
+): Record<string, unknown> | undefined {
+  const props = (schema as { properties?: Record<string, { type?: unknown }> } | undefined)
+    ?.properties;
+  if (props === undefined) return undefined;
+  let changed = false;
+  const out: Record<string, unknown> = { ...value };
+  for (const [k, v] of Object.entries(value)) {
+    if (v === null || typeof v !== 'object' || props[k]?.type !== 'string') continue;
+    out[k] =
+      Array.isArray(v) && v.every((x) => typeof x === 'string')
+        ? v.join('\n')
+        : `${JSON.stringify(v, null, 2)}\n`;
+    changed = true;
+  }
+  return changed ? out : undefined;
 }
 
 // --- Fuzzy tool-name matching ----------------------------------------------
@@ -572,7 +606,11 @@ export function resolveUnknownToolName(
  * parse of an unknown name — the thing being repaired — was nowhere. Never
  * throws.
  */
-function tapUnknownTool(name: string, argStr: string, hit: UnknownToolResolution | undefined): void {
+function tapUnknownTool(
+  name: string,
+  argStr: string,
+  hit: UnknownToolResolution | undefined,
+): void {
   const diag = process.env.PI_DIAG_PROMPTS;
   if (diag === undefined || !diag.includes('/')) return;
   try {

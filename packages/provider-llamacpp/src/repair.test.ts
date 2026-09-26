@@ -16,6 +16,7 @@ import {
   stripToolCallScaffolding,
   type ToolSchemaLike,
   validateAgainstSchema,
+  writtenOutStrings,
 } from './repair.js';
 
 describe('rung 1 — syntactic repair', () => {
@@ -645,5 +646,40 @@ describe("the XML template's closing tags, read back as arguments", () => {
       },
     );
     expect(seen).toEqual([{ path: 'cow.png' }]);
+  });
+});
+
+describe('a string field given structure', () => {
+  const writeSchema = {
+    type: 'object',
+    required: ['path', 'content'],
+    properties: { path: { type: 'string' }, content: { type: 'string' } },
+  };
+
+  it('is written out as the text it meant — no fixer model called (MEASURED: write of a .math.json)', async () => {
+    const fixer = vi.fn();
+    const raw = JSON.stringify({
+      path: 'shm.math.json',
+      content: { title: 'SHM', params: ['t = 0 in 0..4'] },
+    });
+    const r = await repairToolCallArguments(raw, { toolName: 'write', schema: writeSchema, fixer });
+    expect(r.ok).toBe(true);
+    expect(fixer).not.toHaveBeenCalled();
+    expect(JSON.parse(String(r.value?.content))).toEqual({
+      title: 'SHM',
+      params: ['t = 0 in 0..4'],
+    });
+    expect(String(r.value?.content)).toContain('\n  "title": "SHM"');
+  });
+
+  it('a list of lines becomes the lines; other fields are left alone', () => {
+    expect(writtenOutStrings({ path: 'a.txt', content: ['one', 'two'] }, writeSchema)).toEqual({
+      path: 'a.txt',
+      content: 'one\ntwo',
+    });
+    expect(writtenOutStrings({ path: 'a.txt', content: 'fine' }, writeSchema)).toBeUndefined();
+    expect(
+      writtenOutStrings({ n: { a: 1 } }, { properties: { n: { type: 'object' } } }),
+    ).toBeUndefined();
   });
 });
