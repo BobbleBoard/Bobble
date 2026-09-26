@@ -126,6 +126,17 @@ const DIAGRAM_REQUEST =
 
 const count = (content: string, re: RegExp): number => (content.match(re) ?? []).length;
 
+/*
+ * MARKUP THAT MOVES IS NOT A DIAGRAM. MEASURED (4B, the visual suite): asked
+ * for "a short animation that shows why the Pythagorean theorem is true by
+ * rearranging four triangles", it wrote an SVG of squares, triangles, side
+ * labels and four <animate>s — and was refused toward Mermaid, which draws
+ * still flowcharts and cannot place a triangle, let alone move one. The turn
+ * ended there. The diagram tool makes still diagrams, so an SVG that animates
+ * (SMIL or CSS keyframes) is the thing asked for, whatever its shapes count.
+ */
+const ANIMATES = /<(?:animate|animateTransform|animateMotion|set)[\s/>]|@keyframes\b/i;
+
 /**
  * Is this markup a DIAGRAM — steps in boxes, joined by lines, with words on
  * them — rather than a picture? Labels (three or more <text>), boxes (two or
@@ -135,6 +146,7 @@ const count = (content: string, re: RegExp): number => (content.match(re) ?? [])
  * (two words on one shape is a logo).
  */
 export function isDiagramShaped(content: string, request?: string): boolean {
+  if (ANIMATES.test(content)) return false;
   const labels = count(content, /<text[\s>]/gi);
   const boxes = count(content, /<(?:rect|ellipse|circle|polygon)[\s/>]/gi);
   const connectors =

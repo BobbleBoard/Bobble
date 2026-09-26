@@ -277,6 +277,27 @@ describe('a diagram drawn by hand routes to the diagram tool', () => {
     ).toBeNull();
   });
 
+  it('markup that moves is not a diagram — Mermaid cannot animate it', () => {
+    /* MEASURED (4B, the visual suite): the Pythagorean rearrangement — squares,
+       triangles, labels and four <animate>s — was refused toward Mermaid. */
+    const proof =
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 550">' +
+      '<text x="350" y="30">Pythagorean Theorem</text><text x="255" y="240">c²</text>' +
+      '<text x="50" y="80">Arrangement 2</text>' +
+      '<rect x="50" y="100" width="300" height="300"/><rect x="130" y="180" width="220" height="220"/>' +
+      '<polygon points="80,130 130,180 280,130"/><line x1="80" y1="130" x2="480" y2="320"/>' +
+      '<animate attributeName="opacity" values="0;1;1" dur="4s" fill="freeze"/></svg>';
+    expect(isDiagramShaped(proof.replace(/<animate[^>]*>/, ''))).toBe(true);
+    expect(isDiagramShaped(proof)).toBe(false);
+    expect(
+      handwrittenSvgRoute({ ...base, path: 'animation/02.svg', content: proof, request: '' }),
+    ).toBeNull();
+    // CSS keyframes are motion too.
+    const css = `<style>@keyframes a { to { opacity: 1 } }</style>${REAL_4B_FLOW}`;
+    expect(isDiagramShaped(REAL_4B_FLOW)).toBe(true);
+    expect(isDiagramShaped(css)).toBe(false);
+  });
+
   it('without the diagram tool nothing is refused', () => {
     const old = { ...base, diagramAvailable: false };
     expect(handwrittenSvgRoute(old)).toBeNull();
