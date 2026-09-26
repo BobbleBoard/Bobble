@@ -5,7 +5,7 @@ import { checkMath } from './checks';
 import { ALL, FOURIER, KINETIC, SHM } from './fixtures';
 import { renderMath } from './index';
 import { mvPiLabel, mvRuns, mvScene, mvTicks, runtimeSource } from './runtime';
-import { normalizeMathSpec, SpecError } from './spec';
+import { lenientJson, normalizeMathSpec, SpecError } from './spec';
 
 const problems = (input: unknown) => renderMath(input).problems;
 const fixes = (input: unknown) => problems(input).filter((p) => p.level === 'fix');
@@ -56,7 +56,6 @@ describe('the spec, as a small model writes it', () => {
     const bad = (spec: unknown) => () => normalizeMathSpec(spec);
     expect(bad({ title: 'x' })).toThrow(/needs a "plot".*or a "figure"/);
     expect(bad({ title: 'x', plot: { curves: ['sin(x'] } })).toThrow(SpecError);
-    expect(bad({ title: 'x', plot: { curves: ['sin(q)'] } })).toThrow(/q/);
     expect(bad({ title: 'x', params: ['x = 1 in 0..2'], plot: { curves: ['x'] } })).toThrow(
       /cannot be named x/,
     );
@@ -299,9 +298,11 @@ describe('a spec written like code', () => {
 });
 
 describe('more of what a small model writes', () => {
-  it('a name it did not declare comes back with how to declare it', () => {
-    expect(() => normalizeMathSpec({ title: 'k', plot: { curves: ['k*x'] } })).toThrow(
-      /if k is something to vary, add it to "params" as "k = 1 in 0..5"/,
+  it('a name it did not declare is drawn as 1, and the note says how to declare it', () => {
+    const s = normalizeMathSpec({ title: 'k', plot: { curves: ['k*x'] } });
+    expect(s.params.find((p) => p.name === 'k')).toMatchObject({ value: 1, hidden: true });
+    expect(s.notes.join(' ')).toMatch(
+      /k has no value in the spec, so it is drawn as 1 — give it a number, or make it a slider \("k = 2 in 1\.\.4"\)/,
     );
   });
 
@@ -348,5 +349,71 @@ describe('more of what a small model writes', () => {
       steps: { 1: 'First.', 2: 'Second.' },
     });
     expect(s.steps.map((x) => x.text)).toEqual(['First.', 'Second.']);
+  });
+});
+
+describe('JSON with bare values, as the 4B wrote it', () => {
+  it('quotes ranges and expressions it cannot read as JSON (MEASURED: ten parses of one SHM spec)', () => {
+    const raw = `{"title":"SHM","params":["A=1 in 0.5..2","t=0 in 0..12"],"figure":{"view":{"x":-2..2,"y":-3..3},"shapes":[{"id":"spring","kind":"spring","from":[0,2],"to":[0,A*cos(2*t)]}, {"id":"m","kind":"point","at":[max(0, 1), 0.5]}]}, // a comment
+      "steps": [{"text": "Play t.", "highlight": ["spring"], "set": {"t": 0}}], "play": None}`;
+    const v = lenientJson(raw) as {
+      figure: { view: { x: string }; shapes: Array<{ to?: unknown[]; at?: unknown[] }> };
+      play: unknown;
+    };
+    expect(v.figure.view.x).toBe('-2..2');
+    expect(v.figure.shapes[0]?.to).toEqual([0, 'A*cos(2*t)']);
+    expect(v.figure.shapes[1]?.at).toEqual(['max(0, 1)', 0.5]);
+    expect(v.play).toBeNull();
+    // And the spec it is draws.
+    expect(() => renderMath(raw)).not.toThrow();
+  });
+});
+
+describe('what the 4B wrote in the STEM suite, drawn', () => {
+  it('SHM with ω and φ, no sliders, "x(t) =": the plot is over t, a phase is a slider, the rest values', () => {
+    const r = renderMath({ title: 'SHM', equation: 'x(t) = A cos(ωt + φ)' });
+    expect(r.spec.plot?.v).toBe('t');
+    expect(r.spec.params.map((p) => [p.name, p.hidden === true])).toEqual([
+      ['A', true],
+      ['omega', true],
+      ['phi', false],
+    ]);
+    expect(r.problems.some((p) => p.level === 'fix')).toBe(false);
+  });
+
+  it('a cube in L, and points in x, y, z, drawn in the box3d view', () => {
+    const r = renderMath({
+      title: 'Molecule in a cube',
+      figure: {
+        view: { x: '0..L', y: '0..L', z: '0..L' },
+        shapes: [
+          { id: 'box', kind: 'box3d', at: [0, 0], size: 'L', depth: 'L', edge: 'L' },
+          { id: 'm', kind: 'point', at: ['L/2', 'L/2', 'L/2'], label: 'molecule' },
+          {
+            id: 'u',
+            kind: 'vector',
+            from: ['L/2', 'L/2', 'L/2'],
+            to: ['0.9*L', 'L/2', 'L/2'],
+            label: 'u',
+          },
+        ],
+      },
+      steps: [{ text: 'The {m} moves with speed {u}.', highlight: ['m', 'u'] }],
+    });
+    expect(r.spec.figure?.x[1]).toBeCloseTo(1.8);
+    expect(r.problems.filter((p) => p.level === 'fix')).toEqual([]);
+  });
+});
+
+describe('a value the spec never declared', () => {
+  it('is no slider on the page and no "moves nothing" warning', () => {
+    const r = renderMath({
+      title: 'Wave',
+      plot: { curves: ['A*sin(x)'] },
+      steps: [{ text: 'A wave.', highlight: ['c1'] }],
+    });
+    expect(r.html).not.toContain('data-mv-param="A"');
+    expect(r.problems.map((p) => p.text).join('\n')).not.toMatch(/slider A moves nothing/);
+    expect(r.problems.map((p) => p.text).join('\n')).toMatch(/A has no value in the spec/);
   });
 });

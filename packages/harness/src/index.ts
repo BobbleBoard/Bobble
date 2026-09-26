@@ -17,7 +17,7 @@
  * CLI pi users can consume the pieces directly.
  */
 
-import { appendFileSync, realpathSync, statSync } from 'node:fs';
+import { appendFileSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { basename, isAbsolute, join } from 'node:path';
@@ -140,7 +140,7 @@ import {
 import { wouldHang } from './tools/hang-guard.js';
 import { registerImageTools } from './tools/image-tools.js';
 import { applyBias, lastAssistantThought, planBias } from './tools/intent-bias.js';
-import { projectMathKit, registerMathTool } from './tools/math-tool.js';
+import { mathSpecWriteNote, projectMathKit, registerMathTool } from './tools/math-tool.js';
 import { registerModelTools } from './tools/model-tools.js';
 import {
   OFFICE_MAKE_TOOL,
@@ -4682,6 +4682,30 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
             i === 0 && part.type === 'text' ? { ...part, text: `${part.text}${note}` } : part,
           ),
         };
+      }
+    }
+    /* A math spec just written: whether it draws, and the command (math-tool.ts). */
+    if ((event.toolName === 'write' || event.toolName === 'edit') && event.isError !== true) {
+      const input = ((event as { input?: unknown }).input ?? lastCallInput?.input) as
+        | { path?: unknown }
+        | undefined;
+      const rel = typeof input?.path === 'string' ? input.path : '';
+      if (/\.math\.json$/i.test(rel)) {
+        const abs = isAbsolute(rel) ? rel : join(liveRoot(), rel);
+        let text: string | null = null;
+        try {
+          text = readFileSync(abs, 'utf8');
+        } catch {
+          text = null;
+        }
+        if (text !== null) {
+          const note = mathSpecWriteNote(text, rel);
+          return {
+            content: event.content.map((part, i) =>
+              i === 0 && part.type === 'text' ? { ...part, text: `${part.text}\n\n${note}` } : part,
+            ),
+          };
+        }
       }
     }
     /*

@@ -20,7 +20,7 @@
  * string, a step may be a bare string, snake_case is read. Colours are ROLES,
  * never hex: a model cannot pick an unreadable one.
  */
-import { ExprError, numberOf, parse } from './expr.js';
+import { compile, ExprError, fromLatex, numberOf, parse } from './expr.js';
 
 export type Role = 'main' | 'second' | 'third' | 'reference' | 'highlight';
 export type Fill = 'none' | 'tint' | 'main' | 'second' | 'third' | 'shade';
@@ -35,6 +35,8 @@ export interface Param {
   readonly max: number;
   readonly step: number;
   readonly value: number;
+  /** A name the spec used without declaring it: a value, not a slider on the page. */
+  readonly hidden?: boolean;
 }
 
 /** What every drawn thing carries: its id, and the step it first appears at (1 = from the start). */
@@ -232,10 +234,23 @@ function get(o: Loose, ...keys: string[]): unknown {
 }
 const list = (v: unknown): unknown[] => (v === undefined ? [] : Array.isArray(v) ? v : [v]);
 
+/**
+ * Names the spec used without declaring, drawn as 1 — for the numbers that are
+ * not expressions of the sliders (a view's range "0..L"). Set for the length of
+ * one normalization.
+ */
+let CONSTANTS: Readonly<Record<string, number>> = {};
+
 function num(v: unknown, what: string): number {
   if (typeof v === 'number' && Number.isFinite(v)) return v;
   if (typeof v === 'string' && v.trim() !== '') {
     try {
+      const known = Object.keys(CONSTANTS);
+      if (known.length > 0) {
+        const r = compile(v, known)(CONSTANTS);
+        if (!Number.isFinite(r)) throw new ExprError(`"${v}" is not a finite number`);
+        return r;
+      }
       return numberOf(v);
     } catch (e) {
       throw new SpecError(`${what}: ${e instanceof ExprError ? e.message : String(e)}`);
@@ -346,7 +361,7 @@ const RESERVED = new Set(['pi', 'e', 'tau', 'x', 'y', 't']);
 
 function curve(v: unknown, i: number, fallback: Role, pv: string, names: readonly string[]): Curve {
   if (typeof v === 'string') {
-    const expr = v.replace(/^\s*[yf]\s*(\(\s*\w+\s*\))?\s*=\s*/, '');
+    const expr = v.replace(/^\s*[A-Za-z]\w*\s*(\(\s*\w+\s*\))?\s*=\s*/, '');
     numOrExpr(expr, `curve ${i + 1}`, [pv, ...names]);
     return { id: `c${i + 1}`, appear: 1, expr, role: fallback, dashed: false };
   }
@@ -380,14 +395,51 @@ function curve(v: unknown, i: number, fallback: Role, pv: string, names: readonl
   );
   if (raw === undefined)
     throw new SpecError(`curve ${id} needs its expression as expr, like "sin(x)"`);
-  const expr = raw.replace(/^\s*[yf]\s*(\(\s*\w+\s*\))?\s*=\s*/, '');
+  const expr = raw.replace(/^\s*[A-Za-z]\w*\s*(\(\s*\w+\s*\))?\s*=\s*/, '');
   numOrExpr(expr, `curve ${id}`, [pv, ...names]);
   return { ...base, expr };
 }
 
+/** The text of every curve a plot was given, for reading which names they use. */
+function curveTexts(curvesIn: readonly unknown[]): string {
+  return curvesIn
+    .map((c) =>
+      typeof c === 'string'
+        ? c
+        : isObj(c)
+          ? (str(c.expr ?? c.expression ?? c.f ?? c.fn ?? c.function ?? c.equation ?? c.formula) ??
+            '')
+          : '',
+    )
+    .join(' ');
+}
+
 function plot(v: Loose, names: readonly string[]): PlotSpec {
-  const pv = str(get(v, 'var', 'variable'))?.replace(/[^a-zA-Z_]/g, '') || 'x';
-  const xIn = v.x ?? get(v, 'domain', 'xRange');
+  const curvesAll = list(
+    v.curves ??
+      v.functions ??
+      v.exprs ??
+      v.expr ??
+      v.equation ??
+      v.function ??
+      v.expression ??
+      v.formula,
+  );
+  const written = curveTexts(curvesAll);
+  // "x(t) = …" names its variable; the right-hand sides say which names are used.
+  const named = /^\s*[A-Za-z]\w*\s*\(\s*([A-Za-z_]\w*)\s*\)\s*=/.exec(written)?.[1];
+  const texts = fromLatex(written.replace(/(^|\s)[A-Za-z]\w*\s*(\(\s*\w+\s*\))?\s*=\s*/g, '$1'));
+  const names0 = new Set(texts.match(/[A-Za-z_]\w*/g) ?? []);
+  // A plot whose curves never use x but do use t (or θ …) is a plot over that.
+  const declared = str(get(v, 'var', 'variable'))?.replace(/[^a-zA-Z_]/g, '');
+  const pv =
+    declared ||
+    named ||
+    (names0.has('x')
+      ? 'x'
+      : (['t', 'theta', 's', 'u', 'r', 'n'].find((c) => names0.has(c)) ?? 'x'));
+  const trig = /\b(sin|cos|tan|sec|csc|cot)\b/.test(texts);
+  const xIn = v.x ?? get(v, 'domain', 'xRange') ?? (trig ? '-2pi..2pi' : undefined);
   const xObj = isObj(xIn) ? xIn : {};
   const x = range(isObj(xIn) && xIn.range !== undefined ? xIn.range : (xIn ?? [-10, 10]), 'x');
   const yIn = v.y ?? get(v, 'yRange');
@@ -398,7 +450,7 @@ function plot(v: Loose, names: readonly string[]): PlotSpec {
   const y = yHasRange
     ? range(isObj(yIn) && yIn.range !== undefined ? yIn.range : yIn, 'y')
     : undefined;
-  const curvesIn = list(v.curves ?? v.functions ?? v.exprs ?? v.expr);
+  const curvesIn = curvesAll;
   if (curvesIn.length === 0)
     throw new SpecError('a plot needs curves: [{"expr": "sin(x)", "label": "sin x"}]');
   // Unnamed colours go in order to the curves that are not references: the first real curve is `main`.
@@ -499,8 +551,22 @@ function shape(v: unknown, i: number, named: Map<string, Xy>, names: readonly st
   const label = str(v.label ?? v.text);
   const L = label !== undefined ? { label } : {};
   const appear = appearOf(v);
+  /* A point with a depth — the model drawing a cube thinks in 3D — is drawn in
+     the box3d's own oblique view: z goes right 0.8 and up 0.55 per unit. */
+  const depth3 = (px: unknown, py: unknown, pz: unknown, what: string): Xy => {
+    const [x, y, z] = [
+      numOrExpr(px, `${what} x`, names),
+      numOrExpr(py, `${what} y`, names),
+      numOrExpr(pz, `${what} z`, names),
+    ];
+    if (typeof x === 'number' && typeof y === 'number' && typeof z === 'number')
+      return [x + 0.8 * z, y + 0.55 * z];
+    return [`(${x})+0.8*(${z})`, `(${y})+0.55*(${z})`];
+  };
   const xy = (p: unknown, what: string): Xy => {
     if (typeof p === 'string' && named.has(p)) return named.get(p) as Xy;
+    if (Array.isArray(p) && p.length === 3) return depth3(p[0], p[1], p[2], what);
+    if (isObj(p) && 'x' in p && 'y' in p && 'z' in p) return depth3(p.x, p.y, p.z, what);
     if (Array.isArray(p) && p.length === 2)
       return [numOrExpr(p[0], `${what} x`, names), numOrExpr(p[1], `${what} y`, names)];
     if (isObj(p) && 'x' in p && 'y' in p)
@@ -713,6 +779,14 @@ function figure(v: Loose, names: readonly string[]): FigureSpec {
   const viewIn = isObj(v.view) ? v.view : v;
   const x = range(viewIn.x ?? get(v, 'xRange') ?? [0, 10], 'figure x');
   const y = range(viewIn.y ?? get(v, 'yRange') ?? [0, 10], 'figure y');
+  // A depth range widens the frame by what depth adds in the oblique view.
+  if (viewIn.z !== undefined) {
+    const z = range(viewIn.z, 'figure z');
+    x.max += 0.8 * Math.max(0, z.max);
+    x.min += 0.8 * Math.min(0, z.min);
+    y.max += 0.55 * Math.max(0, z.max);
+    y.min += 0.55 * Math.min(0, z.min);
+  }
   const shapesIn = list(v.shapes ?? v.elements ?? v.items ?? v.objects ?? v.parts);
   if (shapesIn.length === 0) throw new SpecError('a figure needs shapes');
   const named = new Map<string, Xy>();
@@ -780,48 +854,115 @@ export function lenientJson(text: string): unknown {
   try {
     return JSON.parse(src);
   } catch (strict) {
-    let out = '';
-    let i = 0;
-    while (i < src.length) {
-      const c = src[i] ?? '';
-      if (c === '"' || c === "'") {
-        // A string: copied through, single quotes becoming double.
-        let j = i + 1;
-        let body = '';
-        while (j < src.length && src[j] !== c) {
-          if (src[j] === '\\') {
-            body += (src[j] ?? '') + (src[j + 1] ?? '');
-            j += 2;
-            continue;
-          }
-          body += c === "'" && src[j] === '"' ? '\\"' : (src[j] ?? '');
-          j += 1;
-        }
-        out += `"${c === "'" ? body.replace(/\\'/g, "'") : body}"`;
-        i = j + 1;
-      } else if (c === '/' && src[i + 1] === '/') {
-        while (i < src.length && src[i] !== '\n') i += 1;
-      } else if (c === '/' && src[i + 1] === '*') {
-        const end = src.indexOf('*/', i + 2);
-        i = end < 0 ? src.length : end + 2;
-      } else if (/[A-Za-z_$]/.test(c) && /[{,]\s*$/.test(out)) {
-        // A bare key: quoted.
-        let j = i;
-        while (j < src.length && /[\w$]/.test(src[j] ?? '')) j += 1;
-        const word = src.slice(i, j);
-        out += /^\s*:/.test(src.slice(j)) ? `"${word}"` : word;
-        i = j;
-      } else {
-        out += c;
-        i += 1;
-      }
-    }
     try {
-      return JSON.parse(out.replace(/,(\s*[}\]])/g, '$1'));
+      return JSON.parse(relaxedJson(src));
     } catch {
       throw strict;
     }
   }
+}
+
+/**
+ * The relaxing pass: a scanner that knows whether it is at a key or a value.
+ * A bare key is quoted; a bare VALUE that is not a JSON literal is quoted too
+ * — MEASURED (the STEM suite, 4B): `"view": {"x": -2..2}`, `"at": [L/2, L/2]`,
+ * `"to": [0, A*cos(omega*t)]` failed ten parses in one turn ("Unterminated
+ * fractional number"). Brackets inside a bare value are counted, so `max(x,
+ * 0)` stays whole; Python's True / False / None are JSON's.
+ */
+export function relaxedJson(src: string): string {
+  const LITERAL = /^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$|^(?:true|false|null)$/;
+  const PYTHON: Readonly<Record<string, string>> = { True: 'true', False: 'false', None: 'null' };
+  const stack: Array<'o' | 'a'> = [];
+  let expectKey = false;
+  let out = '';
+  let i = 0;
+  const n = src.length;
+  while (i < n) {
+    const c = src[i] ?? '';
+    if (c === '/' && src[i + 1] === '/') {
+      while (i < n && src[i] !== '\n') i += 1;
+      continue;
+    }
+    if (c === '/' && src[i + 1] === '*') {
+      const end = src.indexOf('*/', i + 2);
+      i = end < 0 ? n : end + 2;
+      continue;
+    }
+    if (/\s/.test(c)) {
+      out += c;
+      i += 1;
+      continue;
+    }
+    if (c === '{' || c === '[') {
+      stack.push(c === '{' ? 'o' : 'a');
+      expectKey = c === '{';
+      out += c;
+      i += 1;
+      continue;
+    }
+    if (c === '}' || c === ']') {
+      stack.pop();
+      out = out.replace(/,\s*$/, '');
+      out += c;
+      expectKey = false;
+      i += 1;
+      continue;
+    }
+    if (c === ',' || c === ':') {
+      out += c;
+      expectKey = c === ',' && stack[stack.length - 1] === 'o';
+      i += 1;
+      continue;
+    }
+    if (c === '"' || c === "'") {
+      // A string, copied through; single quotes become double.
+      let j = i + 1;
+      let body = '';
+      while (j < n && src[j] !== c) {
+        if (src[j] === '\\') {
+          body += (src[j] ?? '') + (src[j + 1] ?? '');
+          j += 2;
+          continue;
+        }
+        body += c === "'" && src[j] === '"' ? '\\"' : (src[j] ?? '');
+        j += 1;
+      }
+      out += `"${c === "'" ? body.replace(/\\'/g, "'") : body}"`;
+      i = j + 1;
+      continue;
+    }
+    // A bare run: a key to its ':', a value to ',' '}' ']', a comment or the line's end.
+    let j = i;
+    let depth = 0;
+    while (j < n) {
+      const d = src[j] ?? '';
+      if (d === '(') depth += 1;
+      else if (d === ')') depth = Math.max(0, depth - 1);
+      else if (
+        depth === 0 &&
+        (d === ',' ||
+          d === '}' ||
+          d === ']' ||
+          d === '\n' ||
+          (d === '/' && src[j + 1] === '/') ||
+          (expectKey && d === ':'))
+      ) {
+        break;
+      }
+      j += 1;
+    }
+    if (j === i) {
+      out += c;
+      i += 1;
+      continue;
+    }
+    const run = src.slice(i, j).trim();
+    if (expectKey) out += JSON.stringify(run);
+    else out += LITERAL.test(run) ? run : (PYTHON[run] ?? JSON.stringify(run));
+    i = j;
+  }
+  return out;
 }
 
 /** The spec as the renderer reads it, from whatever the model wrote. */
@@ -838,13 +979,57 @@ export function normalizeMathSpec(input: unknown): MathSpec {
   const found = { any: false };
   v = scrub(v, found);
   if (!isObj(v)) throw new SpecError('the spec needs {"title", "plot" or "figure", "steps"}');
+  /*
+   * A NAME THE SPEC USES BUT NEVER DECLARES. MEASURED (the STEM suite, 4B): a
+   * cube of side L — `"view": {"x": "0..L"}`, a molecule at `[L/2, L/2]` — and
+   * `A*cos(omega*t)` with no sliders at all. Each such name is taken in turn,
+   * and the spec read again: a time or an angle becomes a slider (it is what
+   * an animation moves), anything else a value of 1 — the figure is drawn to
+   * scale, and a note says what to declare.
+   */
+  const auto: string[] = [];
+  for (let round = 0; ; round += 1) {
+    try {
+      return normalizeParsed(v, found, auto);
+    } catch (e) {
+      const name =
+        e instanceof SpecError
+          ? /"([A-Za-z_]\w*)" at \d+ is not a variable here/.exec(e.message)?.[1]
+          : undefined;
+      if (name === undefined || auto.includes(name) || round >= 8 || name === 'x' || name === 'y')
+        throw e;
+      auto.push(name);
+    } finally {
+      CONSTANTS = {};
+    }
+  }
+}
+
+const AUTO_SLIDERS: Readonly<Record<string, { min: number; max: number }>> = {
+  t: { min: 0, max: 10 },
+  time: { min: 0, max: 10 },
+  theta: { min: 0, max: 2 * Math.PI },
+  phi: { min: 0, max: 2 * Math.PI },
+  angle: { min: 0, max: 2 * Math.PI },
+};
+
+function normalizeParsed(v: Loose, found: { any: boolean }, auto: readonly string[]): MathSpec {
   const title = str(v.title);
-  if (title === undefined) throw new SpecError('the spec needs a title');
+  if (title === undefined) {
+    throw new SpecError(
+      'the spec needs a "title" — the smallest whole spec: {"title": "Sine", "plot": {"x": "-pi..pi", "curves": ["sin(x)"]}, "steps": [{"text": "…", "highlight": ["c1"]}]}',
+    );
+  }
   const plotIn = isObj(v.plot)
     ? v.plot
     : isObj(v.graph)
       ? v.graph
-      : v.curves !== undefined
+      : v.curves !== undefined ||
+          v.functions !== undefined ||
+          v.equation !== undefined ||
+          v.function !== undefined ||
+          v.expression !== undefined ||
+          v.expr !== undefined
         ? v
         : undefined;
   const figIn = isObj(v.figure)
@@ -856,18 +1041,39 @@ export function normalizeMathSpec(input: unknown): MathSpec {
         : undefined;
   if (plotIn === undefined && figIn === undefined) {
     throw new SpecError(
-      'the spec needs a "plot" (curves as expressions) or a "figure" (shapes), or both',
+      'the spec needs a "plot" (curves as expressions) or a "figure" (shapes), or both — the smallest: ' +
+        '{"title": "Sine", "plot": {"x": "-pi..pi", "curves": ["sin(x)"]}, "steps": [{"text": "…", "highlight": ["c1"]}]}. ' +
+        'Steps with no curve or figure to point at are text: write them in your reply',
     );
   }
   const paramsIn = [
     ...list(v.params ?? v.sliders),
     ...(plotIn !== undefined && plotIn !== v ? list(plotIn.params ?? plotIn.sliders) : []),
   ];
-  const params = paramsIn.map(param);
+  const declared = paramsIn.map(param);
+  const autoParams: Param[] = auto
+    .filter((name) => !declared.some((p) => p.name === name))
+    .map((name) => {
+      const slide = AUTO_SLIDERS[name];
+      return slide !== undefined
+        ? {
+            name,
+            label: name,
+            min: slide.min,
+            max: slide.max,
+            step: (slide.max - slide.min) / 400,
+            value: slide.min,
+          }
+        : { name, label: name, min: 1, max: 1, step: 1, value: 1, hidden: true };
+    });
+  CONSTANTS = Object.fromEntries(
+    autoParams.filter((p) => p.hidden === true).map((p) => [p.name, 1]),
+  );
+  const params = [...declared, ...autoParams];
   const seen = new Set<string>();
   for (const p of params) {
     if (seen.has(p.name)) throw new SpecError(`two sliders are named ${p.name}`);
-    if (RESERVED.has(p.name) && p.name !== 't') {
+    if (RESERVED.has(p.name) && p.name !== 't' && p.hidden !== true) {
       throw new SpecError(
         `a slider cannot be named ${p.name} — it means something already; call it ${p.name}0 or a`,
       );
@@ -876,9 +1082,7 @@ export function normalizeMathSpec(input: unknown): MathSpec {
   }
   const names = params.map((p) => p.name);
   const plotSpec = plotIn !== undefined ? plot(plotIn, names) : undefined;
-  if (plotSpec !== undefined && seen.has(plotSpec.v) && plotSpec.v !== 't') {
-    throw new SpecError(`the plot's variable ${plotSpec.v} is also a slider — rename the slider`);
-  }
+  // A slider with the plot's own name is "now" on that axis (t for time): curves use the axis, points the slider.
   const figSpec = figIn !== undefined ? figure(figIn, names) : undefined;
   const stepsRaw = v.steps ?? v.explanation ?? v.explain;
   // {"1": …, "2": …} — steps numbered as keys — read in their order.
@@ -911,6 +1115,25 @@ export function normalizeMathSpec(input: unknown): MathSpec {
     ...(figSpec !== undefined ? { figure: figSpec } : {}),
     steps,
     ...(playIn !== undefined && names.includes(playIn) ? { play: playIn } : {}),
-    notes: found.any ? ['emoji removed — the page carries none'] : [],
+    notes: [
+      ...(found.any ? ['emoji removed — the page carries none'] : []),
+      ...(() => {
+        const hidden = params.filter((p) => p.hidden === true).map((p) => p.name);
+        const slid = params
+          .filter((p) => auto.includes(p.name) && p.hidden !== true)
+          .map((p) => p.name);
+        const out: string[] = [];
+        if (hidden.length > 0) {
+          out.push(
+            `${hidden.join(', ')} ${hidden.length === 1 ? 'has' : 'have'} no value in the spec, so ${hidden.length === 1 ? 'it is' : 'each is'} drawn as 1 — give ${hidden.length === 1 ? 'it a number' : 'them numbers'}, or make ${hidden.length === 1 ? 'it a slider' : 'them sliders'} ("${hidden[0]} = 2 in 1..4")`,
+          );
+        }
+        if (slid.length > 0)
+          out.push(
+            `${slid.join(', ')} ${slid.length === 1 ? 'was' : 'were'} not declared, so ${slid.length === 1 ? 'it is a slider' : 'each is a slider'} (with Play)`,
+          );
+        return out;
+      })(),
+    ],
   };
 }

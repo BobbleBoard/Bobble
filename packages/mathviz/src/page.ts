@@ -292,7 +292,9 @@ export function mathPage({ spec, compiled, start, kit }: PageInput): string {
     )
     .join('');
   const parts = partsWithRoles(spec);
+  // A value the spec used without declaring is not a slider on the page.
   const sliders = spec.params
+    .filter((p) => p.hidden !== true)
     .map((p) => {
       const v = start[p.name] ?? p.value;
       return `<div class="mv-slider"><label class="mv-name" for="mv-${mvEsc(p.name)}">${paramLabel(p.label)}</label><input id="mv-${mvEsc(p.name)}" type="range" min="${p.min}" max="${p.max}" step="${p.step}" value="${v}" data-mv-param="${mvEsc(p.name)}"><output data-mv-value="${mvEsc(p.name)}">${mvEsc(String(Number(v.toPrecision(3))).replace('-', '−'))}</output><button type="button" class="mv-play" data-mv-play="${mvEsc(p.name)}" aria-pressed="false" aria-label="Play ${mvEsc(p.name)}">${PLAY_ICON}</button></div>`;

@@ -147,9 +147,16 @@ async function readSpec(
     }
   }
   if (s !== '') {
-    const candidates = [s, `${s}.json`, `${s}${MATH_SPEC_SUFFIX}`].map((c) =>
-      resolveAgainst(root, c),
-    );
+    // curl's `@file` habit; and a path from the parent that repeats the folder's own name.
+    const bare = s.replace(/^@/, '');
+    const own = path.basename(root);
+    const fromParent = bare.startsWith(`${own}/`) ? bare.slice(own.length + 1) : undefined;
+    const candidates = [
+      bare,
+      `${bare}.json`,
+      `${bare}${MATH_SPEC_SUFFIX}`,
+      ...(fromParent !== undefined ? [fromParent] : []),
+    ].map((c) => resolveAgainst(root, c));
     for (const c of candidates) {
       if (!(await exists(c))) continue;
       if (/\.html?$/i.test(c)) {
@@ -187,6 +194,28 @@ async function readSpec(
   };
 }
 
+/**
+ * THE SPEC WAS JUST WRITTEN — the moment to say whether it draws, and how to
+ * draw it. MEASURED (the STEM suite, 4B): it wrote lesson.math.json three
+ * times and never ran math on it; another spec failed ten parses, each found
+ * only when math was finally run. For a `.math.json` written or edited: the
+ * spec is read here, and the note says what is wrong, or the command.
+ */
+export function mathSpecWriteNote(text: string, rel: string): string {
+  try {
+    renderMath(text);
+    return `That is a math spec: run \`math ${rel}\` to draw it — the page opens beside the chat and its checks come back.`;
+  } catch (e) {
+    const why =
+      e instanceof SpecError || e instanceof ExprError
+        ? e.message
+        : e instanceof Error
+          ? e.message
+          : String(e);
+    return `That math spec does not draw yet: ${why}. Fix it in ${rel}, then run \`math ${rel}\`.`;
+  }
+}
+
 /** The same spec twice in a row for one file is said, not redrawn. */
 const lastDrawn = new Map<string, { hash: string; text: string }>();
 
@@ -200,10 +229,9 @@ function describe(r: MathResult): string {
     bits.push(
       `a plot of ${r.spec.plot.curves.length} curve${r.spec.plot.curves.length === 1 ? '' : 's'}`,
     );
-  if (r.spec.params.length > 0)
-    bits.push(
-      `slider${r.spec.params.length === 1 ? '' : 's'} ${r.spec.params.map((p) => p.name).join(', ')}`,
-    );
+  const sliders = r.spec.params.filter((p) => p.hidden !== true);
+  if (sliders.length > 0)
+    bits.push(`slider${sliders.length === 1 ? '' : 's'} ${sliders.map((p) => p.name).join(', ')}`);
   bits.push(`${r.spec.steps.length} step${r.spec.steps.length === 1 ? '' : 's'}`);
   return bits.join(', ');
 }

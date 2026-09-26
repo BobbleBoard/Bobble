@@ -207,3 +207,22 @@ describe('the title typed where the spec goes', () => {
     expect(text(bare)).toMatch(/reads as a title, not a spec/);
   });
 });
+
+describe('a spec just written', () => {
+  it('says whether it draws, and the command', async () => {
+    const { mathSpecWriteNote } = await import('./math-tool.js');
+    expect(mathSpecWriteNote(JSON.stringify(GOOD), 'lesson.math.json')).toBe(
+      'That is a math spec: run `math lesson.math.json` to draw it — the page opens beside the chat and its checks come back.',
+    );
+    expect(mathSpecWriteNote('{"plot": {"curves": ["x"]}}', 'l.math.json')).toMatch(
+      /^That math spec does not draw yet: the spec needs a "title".* Fix it in l\.math\.json, then run `math l\.math\.json`\.$/,
+    );
+  });
+
+  it('is found by `@path`, and by a path that repeats the folder’s own name', async () => {
+    const { run } = setup();
+    writeFileSync(path.join(root, 'at.math.json'), JSON.stringify({ ...GOOD, title: 'At' }));
+    expect(text(await run({ spec: '@at.math.json' }))).toMatch(/^Drew "At"/);
+    expect(text(await run({ spec: `${path.basename(root)}/at.math.json` }))).toMatch(/^Drew "At"/);
+  });
+});

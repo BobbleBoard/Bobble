@@ -55,8 +55,35 @@ const CONSTANTS: Readonly<Record<string, number>> = { pi: Math.PI, e: Math.E, ta
 const MAX_TERMS = 2000;
 
 /** LaTeX a model reaches for, as the plain form this parser reads. */
+/** Greek as a model types it straight into an expression: ωt is ω times t. */
+const GREEK: Readonly<Record<string, string>> = {
+  α: 'alpha',
+  β: 'beta',
+  γ: 'gamma',
+  δ: 'delta',
+  ε: 'epsilon',
+  θ: 'theta',
+  ϑ: 'theta',
+  λ: 'lambda',
+  μ: 'mu',
+  ν: 'nu',
+  ρ: 'rho',
+  σ: 'sigma',
+  τ: 'tau',
+  φ: 'phi',
+  ϕ: 'phi',
+  ω: 'omega',
+  Δ: 'Delta',
+  Ω: 'Omega',
+  Φ: 'Phi',
+  Θ: 'Theta',
+};
+
 export function fromLatex(src: string): string {
-  let s = src.replace(/\\left|\\right/g, '').replace(/\\cdot|\\times/g, '*');
+  let s = src
+    .replace(/[αβγδεθϑλμνρστφϕωΔΩΦΘ]/g, (g) => ` ${GREEK[g] ?? g} `)
+    .replace(/\\left|\\right/g, '')
+    .replace(/\\cdot|\\times/g, '*');
   // \frac{a}{b} → ((a)/(b)), innermost first.
   for (let guard = 0; guard < 20 && /\\frac\s*\{/.test(s); guard += 1) {
     s = s.replace(/\\frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g, '(($1)/($2))');

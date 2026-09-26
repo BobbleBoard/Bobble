@@ -145,7 +145,7 @@ export function checkMath(
   }
 
   // Each slider's ends: a part that leaves the view while a slider is dragged.
-  for (const p of spec.params) {
+  for (const p of spec.params.filter((q) => q.hidden !== true)) {
     for (const end of [p.min, p.max]) {
       const values = { ...valuesAtStep(spec, E, 0), [p.name]: end };
       for (const panel of mvScene(spec, E, values, 0).panels) {
@@ -162,7 +162,7 @@ export function checkMath(
   // Sliders that move nothing.
   const used = new Set<string>();
   for (const names of reads.values()) for (const nm of names) used.add(nm);
-  for (const p of spec.params) {
+  for (const p of spec.params.filter((q) => q.hidden !== true)) {
     if (!used.has(p.name))
       say('warn', `slider ${p.name} moves nothing — use it in an expression, or remove it`);
   }

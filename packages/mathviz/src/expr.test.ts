@@ -75,3 +75,12 @@ describe('the same tree, written out for the page', () => {
     expect(js).toBe('(Math.sin(s["x"])+s["a"])');
   });
 });
+
+describe('Greek typed straight in', () => {
+  it('reads ωt as omega times t, and φ, θ by name', () => {
+    expect(
+      compile('A cos(ωt + φ)', ['A', 'omega', 't', 'phi'])({ A: 2, omega: 1, t: 0, phi: 0 }),
+    ).toBe(2);
+    expect(compile('sin(θ)', ['theta'])({ theta: Math.PI / 2 })).toBeCloseTo(1);
+  });
+});
