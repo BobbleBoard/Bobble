@@ -339,11 +339,12 @@ export function mvScene(
   E: Evaluators,
   values: Values,
   step: number,
-  extra?: readonly string[],
+  focus?: readonly string[],
 ): Scene {
   const current = step > 0 ? spec.steps[step - 1] : undefined;
-  // A part the reader points at (hovering its name in the text) lights alone.
-  const hl = extra !== undefined && extra.length > 0 ? [...extra] : [...(current?.highlight ?? [])];
+  // `focus` replaces the step's highlight: a part the reader hovers lights
+  // alone; an empty focus (a slider playing) dims nothing — what moves is seen.
+  const hl = focus !== undefined ? [...focus] : [...(current?.highlight ?? [])];
   const panels: Panel[] = [];
   if (spec.figure !== undefined) panels.push(mvFigure(spec, E, values, step, hl));
   if (spec.plot !== undefined) panels.push(mvPlot(spec, E, values, step, hl));
@@ -1583,6 +1584,8 @@ export function mvMount(doc: PageDoc, win: PageWin, data: PageData, E: Evaluator
   const values: Values = { ...data.start };
   let step = spec.steps.length > 0 ? 1 : 0;
   let hover: string[] = [];
+  // The slider Play is running, if any.
+  let playing = '';
   const panes: PageEl[] = Array.from(doc.querySelectorAll('[data-mv-panel]'));
   const stepEls: PageEl[] = Array.from(doc.querySelectorAll('[data-mv-step]'));
   const count = doc.querySelector('[data-mv-count]');
@@ -1590,7 +1593,13 @@ export function mvMount(doc: PageDoc, win: PageWin, data: PageData, E: Evaluator
   let frame = 0;
   const draw = () => {
     frame = 0;
-    const scene = mvScene(spec, E, values, step, hover);
+    const scene = mvScene(
+      spec,
+      E,
+      values,
+      step,
+      hover.length > 0 ? hover : playing !== '' ? [] : undefined,
+    );
     scene.panels.forEach((p: Panel, i: number) => {
       const el = panes[i];
       if (el !== undefined) el.innerHTML = mvSvg(p, i, spec.title);
@@ -1655,7 +1664,6 @@ export function mvMount(doc: PageDoc, win: PageWin, data: PageData, E: Evaluator
     redraw();
   };
   // Play: the named slider runs from where it is to its end, and round again.
-  let playing = '';
   let playFrame = 0;
   let last = 0;
   const playBtns: PageEl[] = Array.from(doc.querySelectorAll('[data-mv-play]'));
