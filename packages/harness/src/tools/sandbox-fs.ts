@@ -537,6 +537,12 @@ export function guardDestructiveRewrite(
   }
 
   if (afterLines >= beforeLines * 0.5) return null;
+  /* THE SAME CONTENT ON FEWER LINES IS NOT A LOSS — MEASURED (the 4B, a math
+     spec): pretty JSON rewritten as one line, 160 lines → 1, 3,204 → 3,040
+     characters, refused three times; the model then deleted the file. What is
+     measured is what is written, without its layout. */
+  const dense = (t: string) => t.replace(/\s+/g, '').length;
+  if (dense(next) >= dense(before) * 0.5) return null;
   return (
     `Refusing this write: it would cut ${path.basename(absPath)} from ${beforeLines} lines to ` +
     `${afterLines}, deleting most of what is there. That is almost always a rewrite that ran ` +

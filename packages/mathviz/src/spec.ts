@@ -195,6 +195,18 @@ export type Shape = Item & {
         readonly label?: string;
       }
     | {
+        /** A curve drawn from a formula: x and y in `over`, as it runs `from` → `to` (each may use the sliders — "0..t" is the path so far). */
+        readonly kind: 'curve';
+        readonly x: string;
+        readonly y: string;
+        readonly over: string;
+        readonly from: Num;
+        readonly to: Num;
+        readonly label?: string;
+        readonly dashed: boolean;
+        readonly role: Role;
+      }
+    | {
         readonly kind: 'polyline';
         readonly points: readonly Xy[];
         readonly label?: string;
@@ -274,6 +286,8 @@ const list = (v: unknown): unknown[] => (v === undefined ? [] : Array.isArray(v)
  * one normalization.
  */
 let CONSTANTS: Readonly<Record<string, number>> = {};
+/** The sliders of the spec being read — a shape's slide/turn/scale runs over one of them. */
+let SLIDERS: readonly Param[] = [];
 
 function num(v: unknown, what: string): number {
   if (typeof v === 'number' && Number.isFinite(v)) return v;
@@ -327,6 +341,63 @@ function range(v: unknown, what: string): { min: number; max: number; pi: boolea
   return { min, max, pi: /pi|π/i.test(`${String(a)} ${String(b)}`) };
 }
 
+/** TeX commands a model types into a label, as the characters they draw. */
+const TEX_LABEL: Readonly<Record<string, string>> = {
+  alpha: 'α',
+  beta: 'β',
+  gamma: 'γ',
+  delta: 'δ',
+  epsilon: 'ε',
+  theta: 'θ',
+  lambda: 'λ',
+  mu: 'μ',
+  nu: 'ν',
+  pi: 'π',
+  rho: 'ρ',
+  sigma: 'σ',
+  tau: 'τ',
+  phi: 'φ',
+  omega: 'ω',
+  Delta: 'Δ',
+  Omega: 'Ω',
+  Sigma: 'Σ',
+  Theta: 'Θ',
+  Phi: 'Φ',
+  cdot: '·',
+  times: '×',
+  pm: '±',
+  le: '≤',
+  ge: '≥',
+  leq: '≤',
+  geq: '≥',
+  neq: '≠',
+  approx: '≈',
+  infty: '∞',
+  circ: '°',
+  degree: '°',
+  to: '→',
+  rightarrow: '→',
+};
+
+/**
+ * A figure's label is plain text with light TeX (x^2, v_0) — MEASURED (the
+ * 4B): "$h(t)$" and "$x(t)$" drawn with their dollar signs. The delimiters go,
+ * and the commands a model types become their characters; a {name} that
+ * fills in a value is left alone.
+ */
+export function texLabel(s: string | undefined): string | undefined {
+  if (s === undefined) return undefined;
+  if (!/[$\\]/.test(s)) return s;
+  return s
+    .replace(/\\frac\{([^{}]*)\}\{([^{}]*)\}/g, '$1/$2')
+    .replace(/\\sqrt\{([^{}]*)\}/g, '√$1')
+    .replace(/\\(?:vec|mathbf|mathrm|text|textbf|operatorname)\{([^{}]*)\}/g, '$1')
+    .replace(/\\([A-Za-z]+)/g, (_m, name: string) => TEX_LABEL[name] ?? name)
+    .replace(/\$/g, '')
+    .replace(/\\,|\\;|\\!|\\ /g, ' ')
+    .trim();
+}
+
 const ROLES: readonly Role[] = ['main', 'second', 'third', 'reference', 'highlight'];
 function role(v: unknown, fallback: Role): Role {
   const s = str(v)?.toLowerCase();
@@ -354,17 +425,56 @@ const appearOf = (v: Loose): number => {
 };
 
 /** A slider: {name, min, max, value}, or "n = 5 in 1..25". */
+/** A value the page uses but does not slide: "a = 3", {name: "g", value: 9.8}. */
+function constant(name: string, value: number): Param {
+  return { name, label: name, min: value, max: value, step: 1, value, hidden: true };
+}
+
 function param(v: unknown, i: number): Param {
   if (typeof v === 'string') {
     const m = /^\s*([a-zA-Z_]\w*)\s*=\s*(\S+)\s+(?:in|from|over)\s+(.+)$/.exec(v);
-    if (m === null) throw new SpecError(`slider ${i + 1}: write it as "n = 5 in 1..25"`);
+    if (m === null) {
+      // "a = 3" — a value, not a slider (MEASURED: the 4B's "a=3", "b=4", "c=5").
+      const k = /^\s*([a-zA-Z_]\w*)\s*=\s*([^=]+?)\s*$/.exec(v);
+      if (k?.[1] !== undefined && k[2] !== undefined) {
+        try {
+          return constant(k[1], num(k[2], `${k[1]}`));
+        } catch {
+          // not a number: said below
+        }
+      }
+      throw new SpecError(`slider ${i + 1}: write it as "n = 5 in 1..25"`);
+    }
     const r = range(m[3], `slider ${m[1]}`);
-    return param({ name: m[1], value: m[2], min: r.min, max: r.max }, i);
+    // "t = angle in 0..360": a start that is not a number starts at the low end.
+    let start: unknown = m[2];
+    try {
+      num(m[2], 'start');
+    } catch {
+      start = r.min;
+    }
+    return param({ name: m[1], value: start, min: r.min, max: r.max }, i);
   }
   if (!isObj(v)) throw new SpecError(`slider ${i + 1} needs {name, min, max, value}`);
-  const name = str(v.name ?? v.id ?? v.var);
-  if (name === undefined || !/^[a-zA-Z_]\w*$/.test(name)) {
+  const named = str(v.name ?? v.id ?? v.var ?? v.symbol);
+  /* "Slope (m)" — a caption with the name in brackets, or ending in it
+     (MEASURED: the 4B's sliders for y = mx + c). */
+  const inBrackets = named !== undefined ? /\(\s*([a-zA-Z_]\w*)\s*\)/.exec(named)?.[1] : undefined;
+  const trailing = named !== undefined ? /(?:^|\s)([a-zA-Z])\s*$/.exec(named)?.[1] : undefined;
+  const name =
+    named !== undefined && /^[a-zA-Z_]\w*$/.test(named) ? named : (inBrackets ?? trailing);
+  if (name === undefined) {
     throw new SpecError(`slider ${i + 1} needs a name made of letters (like n, a, omega)`);
+  }
+  const caption =
+    named !== undefined && named !== name
+      ? named.replace(/\(\s*[a-zA-Z_]\w*\s*\)/, '').trim() || undefined
+      : undefined;
+  const noRange =
+    v.min === undefined && v.from === undefined && v.max === undefined && v.range === undefined;
+  if (noRange) {
+    const val = v.value ?? v.default ?? v.initial ?? v.start;
+    if (val !== undefined) return constant(name, num(val, `${name}`));
   }
   let min: number;
   let max: number;
@@ -376,7 +486,7 @@ function param(v: unknown, i: number): Param {
   }
   if (!(max > min)) throw new SpecError(`slider ${name}: max must be above min`);
   // Whole numbers only for a count (n terms, k sides); a time or an amplitude slides smoothly even over 0…4.
-  const label = str(v.label) ?? name;
+  const label = str(v.label) ?? caption ?? name;
   const counts =
     /^(n|N|k|K|j|terms?|count|order|sides|steps|samples)$/.test(name) ||
     /\b(number of|terms|count|how many)\b/i.test(label);
@@ -405,7 +515,7 @@ function curve(v: unknown, i: number, fallback: Role, pv: string, names: readonl
   if (!isObj(v)) throw new SpecError(`curve ${i + 1} needs {expr, label}`);
   const id = str(v.id) ?? `c${i + 1}`;
   const r = role(v.role ?? v.color ?? v.colour, fallback);
-  const label = str(v.label ?? v.name);
+  const label = texLabel(str(v.label ?? v.name));
   const base = {
     id,
     appear: appearOf(v),
@@ -520,7 +630,7 @@ function plot(v: Loose, names: readonly string[]): PlotSpec {
       const id = str(p.id) ?? `p${i + 1}`;
       const at = p.at ?? p.xy;
       const [px, py] = Array.isArray(at) ? at : [p.x, p.y];
-      const label = str(p.label);
+      const label = texLabel(str(p.label));
       const yPart =
         py !== undefined && py !== null && str(py) !== undefined
           ? { y: numOrExpr(py, `point ${id} y`, names) }
@@ -537,7 +647,7 @@ function plot(v: Loose, names: readonly string[]): PlotSpec {
     areas: list(v.areas ?? v.area ?? v.shade).map((a, i) => {
       if (!isObj(a)) throw new SpecError(`area ${i + 1} needs {under, from, to}`);
       const id = str(a.id) ?? `a${i + 1}`;
-      const label = str(a.label);
+      const label = texLabel(str(a.label));
       return {
         id,
         appear: appearOf(a),
@@ -551,7 +661,7 @@ function plot(v: Loose, names: readonly string[]): PlotSpec {
     tangents: list(v.tangents ?? v.tangent).map((t, i) => {
       if (!isObj(t)) throw new SpecError(`tangent ${i + 1} needs {to, at}`);
       const id = str(t.id) ?? `t${i + 1}`;
-      const label = str(t.label);
+      const label = texLabel(str(t.label));
       return {
         id,
         appear: appearOf(t),
@@ -582,16 +692,183 @@ function plot(v: Loose, names: readonly string[]): PlotSpec {
 const ANCHORS: readonly Anchor[] = ['n', 'ne', 'e', 'se', 's', 'sw', 'w', 'nw'];
 
 function shape(v: unknown, i: number, named: Map<string, Xy>, names: readonly string[]): Shape {
-  const s = shapeBody(v, i, named, names);
-  const op = isObj(v) ? (v.opacity ?? v.alpha) : undefined;
+  // Where a thing is, in the words a model uses for it (MEASURED: the 4B's labels at "pos").
+  const w =
+    isObj(v) && v.at === undefined
+      ? { ...v, at: v.pos ?? v.position ?? v.xy ?? v.location ?? v.coords ?? v.at }
+      : v;
+  if (isObj(w) && w.at === undefined) delete w.at;
+  const s0 = shapeBody(w, i, named, names);
+  const s = isObj(w) ? moved(s0, w, names) : s0;
+  const op = isObj(w) ? (w.opacity ?? w.alpha) : undefined;
   return op === undefined ? s : { ...s, opacity: numOrExpr(op, `${s.id}.opacity`, names) };
+}
+
+/**
+ * SLIDE, TURN, SCALE — a part that moves as a slider runs, written as the move
+ * rather than as formulas for every corner: "slide": {"by": [1.5, -2.5], "t":
+ * "0..1"} moves it by (1.5, −2.5) as t goes 0 → 1, eased; "turn": {"by": 90,
+ * "about": [0, 0], "t": "1..2"} turns it 90° about a point; "scale": {"by": 2}
+ * grows it from its centre. The slider named is the key; without one, the
+ * first slider over its whole range. the user: "smooth move/scale/slide". The move
+ * is written into the coordinates, so everything that reads them — the page,
+ * the checks, the arrows that show a move — sees it.
+ */
+function moved(sh: Shape, v: Loose, names: readonly string[]): Shape {
+  const slideIn = v.slide ?? v.move ?? v.translate ?? v.shift;
+  const turnIn = v.turn ?? v.rotate ?? v.spin;
+  const scaleIn = v.scale ?? v.grow;
+  if (slideIn === undefined && turnIn === undefined && scaleIn === undefined) return sh;
+  const sliders = SLIDERS.filter((p) => p.hidden !== true);
+  const progress = (m: unknown): string => {
+    const o: Loose = isObj(m) ? m : {};
+    const key = Object.keys(o).find((k) => sliders.some((p) => p.name === k));
+    const withName = str(o.with ?? o.slider ?? o.over);
+    const p =
+      sliders.find((q) => q.name === (key ?? withName)) ??
+      sliders.find((q) => q.name === 't') ??
+      sliders[0];
+    if (p === undefined)
+      throw new SpecError(
+        `${sh.id} moves, but there is no slider to move it — add one to "params" ("t = 0 in 0..1")`,
+      );
+    let a: Num = p.min;
+    let b: Num = p.max;
+    const r = key !== undefined ? o[key] : (o.range ?? o.during ?? o.when);
+    if (r !== undefined) {
+      const ends =
+        Array.isArray(r) && r.length === 2
+          ? r
+          : typeof r === 'string'
+            ? r.split(/\s*(?:\.\.\.?|\bto\b)\s*/)
+            : [];
+      if (ends.length === 2) {
+        a = numOrExpr(ends[0], `${sh.id} move start`, names);
+        b = numOrExpr(ends[1], `${sh.id} move end`, names);
+      }
+    } else if (o.from !== undefined && o.to !== undefined) {
+      a = numOrExpr(o.from, `${sh.id} move start`, names);
+      b = numOrExpr(o.to, `${sh.id} move end`, names);
+    }
+    return `ease(between(${p.name}, ${a}, ${b}))`;
+  };
+  const pair = (m: unknown, what: string): [Num, Num] => {
+    const by = isObj(m) ? (m.by ?? m.to ?? m.d) : m;
+    if (Array.isArray(by) && by.length === 2)
+      return [
+        numOrExpr(by[0], `${sh.id} ${what} x`, names),
+        numOrExpr(by[1], `${sh.id} ${what} y`, names),
+      ];
+    throw new SpecError(`${sh.id}: "${what}" needs "by": [dx, dy]`);
+  };
+  const amount = (m: unknown, what: string): Num => {
+    const by = isObj(m) ? (m.by ?? m.angle ?? m.factor ?? m.to) : m;
+    return numOrExpr(by, `${sh.id} ${what}`, names);
+  };
+  const centre = centreOf(sh);
+  const about = (m: unknown): [Num, Num] => {
+    const c = isObj(m) ? (m.about ?? m.around ?? m.centre ?? m.center) : undefined;
+    if (Array.isArray(c) && c.length === 2)
+      return [
+        numOrExpr(c[0], `${sh.id} about x`, names),
+        numOrExpr(c[1], `${sh.id} about y`, names),
+      ];
+    return centre;
+  };
+  const e = (x: Num) => (typeof x === 'number' ? String(x) : `(${x})`);
+  let f = (x: Num, y: Num): [Num, Num] => [x, y];
+  let k: string | null = null;
+  if (scaleIn !== undefined) {
+    const [cx, cy] = about(scaleIn);
+    const by = amount(scaleIn, 'scale');
+    const u = progress(scaleIn);
+    const g = f;
+    k = `(1 + (${e(by)} - 1)*${u})`;
+    const kk = k;
+    f = (x, y) => {
+      const [a, b] = g(x, y);
+      return [`${e(cx)} + (${e(a)} - ${e(cx)})*${kk}`, `${e(cy)} + (${e(b)} - ${e(cy)})*${kk}`];
+    };
+  }
+  if (turnIn !== undefined) {
+    const [cx, cy] = about(turnIn);
+    const th = `(${e(amount(turnIn, 'turn'))}*pi/180*${progress(turnIn)})`;
+    const g = f;
+    f = (x, y) => {
+      const [a, b] = g(x, y);
+      const dx = `(${e(a)} - ${e(cx)})`;
+      const dy = `(${e(b)} - ${e(cy)})`;
+      return [
+        `${e(cx)} + ${dx}*cos${th} - ${dy}*sin${th}`,
+        `${e(cy)} + ${dx}*sin${th} + ${dy}*cos${th}`,
+      ];
+    };
+  }
+  if (slideIn !== undefined) {
+    const [dx, dy] = pair(slideIn, 'slide');
+    const u = progress(slideIn);
+    const g = f;
+    f = (x, y) => {
+      const [a, b] = g(x, y);
+      return [`${e(a)} + ${e(dx)}*${u}`, `${e(b)} + ${e(dy)}*${u}`];
+    };
+  }
+  const P = (p: Xy): Xy => f(p[0], p[1]);
+  const grow = (r: Num): Num => (k === null ? r : `${e(r)}*${k}`);
+  switch (sh.kind) {
+    case 'point':
+    case 'label':
+      return { ...sh, at: P(sh.at) };
+    case 'segment':
+    case 'vector':
+    case 'spring':
+    case 'dimension':
+      return { ...sh, from: P(sh.from), to: P(sh.to) };
+    case 'polygon':
+    case 'polyline':
+      return { ...sh, points: sh.points.map(P) };
+    case 'circle':
+      return { ...sh, center: P(sh.center), r: grow(sh.r) };
+    case 'angle':
+      return { ...sh, at: P(sh.at), from: P(sh.from), to: P(sh.to) };
+    case 'box3d':
+      return { ...sh, at: P(sh.at), w: grow(sh.w), h: grow(sh.h), depth: grow(sh.depth) };
+    case 'curve': {
+      const [x, y] = f(sh.x, sh.y);
+      return { ...sh, x: String(x), y: String(y) };
+    }
+  }
+}
+
+/** A shape's middle, for a turn or a scale with no point given: the mean of its numeric corners. */
+function centreOf(sh: Shape): [Num, Num] {
+  const pts: Xy[] =
+    sh.kind === 'point' || sh.kind === 'label' || sh.kind === 'angle'
+      ? [sh.at]
+      : sh.kind === 'circle'
+        ? [sh.center]
+        : sh.kind === 'polygon' || sh.kind === 'polyline'
+          ? [...sh.points]
+          : sh.kind === 'box3d'
+            ? [sh.at]
+            : sh.kind === 'curve'
+              ? []
+              : [sh.from, sh.to];
+  const nums = pts.filter(
+    (p): p is readonly [number, number] => typeof p[0] === 'number' && typeof p[1] === 'number',
+  );
+  if (nums.length === 0) return [0, 0];
+  return [
+    nums.reduce((a, p) => a + p[0], 0) / nums.length,
+    nums.reduce((a, p) => a + p[1], 0) / nums.length,
+  ];
 }
 
 function shapeBody(v: unknown, i: number, named: Map<string, Xy>, names: readonly string[]): Shape {
   if (!isObj(v)) throw new SpecError(`shape ${i + 1} needs {kind, …}`);
   const kind = str(v.kind ?? v.type ?? v.shape)?.toLowerCase();
   const id = str(v.id) ?? `s${i + 1}`;
-  const label = str(v.label ?? v.text);
+  const label = texLabel(str(v.label ?? v.text ?? v.label_text ?? v.name));
   const L = label !== undefined ? { label } : {};
   const appear = appearOf(v);
   /* A point with a depth — the model drawing a cube thinks in 3D — is drawn in
@@ -698,7 +975,13 @@ function shapeBody(v: unknown, i: number, named: Map<string, Xy>, names: readonl
     case 'path':
     case 'curve':
     case 'trajectory':
-    case 'track': {
+    case 'track':
+    case 'trail':
+    case 'parametric': {
+      if (v.points === undefined && v.vertices === undefined && v.through === undefined) {
+        const f = formulaCurve();
+        if (f !== null) return f;
+      }
       const ptsIn = v.points ?? v.vertices ?? v.through;
       if (!Array.isArray(ptsIn) || ptsIn.length < 2)
         throw new SpecError(`${id} needs 2 or more points`);
@@ -825,10 +1108,91 @@ function shapeBody(v: unknown, i: number, named: Map<string, Xy>, names: readonl
         coils: v.coils !== undefined ? Math.max(3, Math.round(num(v.coils, `${id}.coils`))) : 10,
         ...L,
       };
-    default:
+    default: {
+      /* A kind this reader does not name is read from what the shape carries —
+         MEASURED (the 4B): "right_triangle", "arc", "square_decomposition". */
+      const has = (k: string) => v[k] !== undefined;
+      const pts = v.points ?? v.vertices;
+      if ((kind === 'arc' || kind?.endsWith('_arc') === true) && has('from') && has('to'))
+        return shape({ ...v, kind: 'angle', at: v.at ?? v.center ?? v.vertex }, i, named, names);
+      if (Array.isArray(pts) && pts.length >= 3) return polygonShape();
+      if (Array.isArray(pts) && pts.length === 2)
+        return shape(
+          { ...v, kind: 'segment', from: pts[0], to: pts[1], points: undefined },
+          i,
+          named,
+          names,
+        );
+      if (has('center') && (has('r') || has('radius')))
+        return shape({ ...v, kind: 'circle' }, i, named, names);
+      if (has('from') && has('to')) return shape({ ...v, kind: 'segment' }, i, named, names);
+      if (typeof v.x === 'string' && typeof v.y === 'string') {
+        const f = formulaCurve();
+        if (f !== null) return f;
+      }
+      if (has('at') && (has('text') || has('label')) && !has('r'))
+        return shape({ ...v, kind: 'label' }, i, named, names);
+      if (has('at')) return shape({ ...v, kind: 'point' }, i, named, names);
       throw new SpecError(
-        `shape ${id}: kind "${kind ?? ''}" is not one of point, segment, vector, polygon, polyline, rect, circle, angle, dimension, label, box3d, spring`,
+        `shape ${id}: kind "${kind ?? ''}" is not one of point, segment, vector, polygon, polyline, curve, rect, circle, angle, dimension, label, box3d, spring`,
       );
+    }
+  }
+  /**
+   * A curve from a formula — MEASURED (the 4B): a projectile's path written as
+   * a Python list comprehension inside the JSON, twice. x and y are
+   * expressions in a variable of their own (s, u, …, named by "var" or found
+   * in them), over a range whose ends may use the sliders: "0..t" draws the
+   * path travelled so far.
+   */
+  function formulaCurve(): Shape | null {
+    const o = v as Loose;
+    const xs = typeof o.x === 'string' ? o.x : undefined;
+    const ys = typeof o.y === 'string' ? o.y : undefined;
+    if (xs === undefined || ys === undefined) return null;
+    const free = (src: string) =>
+      [...src.matchAll(/[A-Za-z_]\w*/g)]
+        .map((m) => m[0])
+        .filter(
+          (w) =>
+            !names.includes(w) &&
+            !/^(pi|e|tau|sin|cos|tan|sqrt|exp|ln|log|abs|min|max|pow|ease|lerp|between|clamp|atan2|asin|acos|atan|sinh|cosh|tanh|floor|ceil|round|sign|mod|sec|csc|cot|sum|prod|if|cbrt|log10|log2|sgn)$/.test(
+              w,
+            ),
+        );
+    const named = str(o.var ?? o.variable ?? o.param ?? o.over);
+    const over =
+      named !== undefined && /^[A-Za-z_]\w*$/.test(named)
+        ? named
+        : ([...free(xs), ...free(ys)][0] ?? (names.includes('t') ? 's' : 't'));
+    const rIn =
+      o.range ??
+      o[over] ??
+      o.span ??
+      (o.from !== undefined && o.to !== undefined ? [o.from, o.to] : undefined);
+    const ends =
+      Array.isArray(rIn) && rIn.length === 2
+        ? rIn
+        : typeof rIn === 'string'
+          ? rIn.split(/\s*(?:\.\.\.?|\bto\b)\s*/)
+          : [0, 1];
+    if (ends.length !== 2)
+      throw new SpecError(`${id} (a curve) needs a range for ${over}, like "0..t"`);
+    numOrExpr(xs, `${id}.x`, [...names, over]);
+    numOrExpr(ys, `${id}.y`, [...names, over]);
+    return {
+      id,
+      appear,
+      kind: 'curve',
+      x: xs,
+      y: ys,
+      over,
+      from: numOrExpr(ends[0], `${id} start`, names),
+      to: numOrExpr(ends[1], `${id} end`, names),
+      ...L,
+      dashed: o.dashed === true,
+      role: role(o.role ?? o.color, 'main'),
+    };
   }
   function polygonShape(): Shape {
     const ptsIn = (v as Loose).points ?? (v as Loose).vertices;
@@ -1037,8 +1401,56 @@ export function relaxedJson(src: string): string {
         body += c === "'" && src[j] === '"' ? '\\"' : (src[j] ?? '');
         j += 1;
       }
-      out += `"${c === "'" ? body.replace(/\\'/g, "'") : body}"`;
+      let text = c === "'" ? body.replace(/\\'/g, "'") : body;
       i = j + 1;
+      /* "m = " + m — a string and a value joined the way JavaScript joins them
+         (MEASURED: the 4B's label for y = mx + c). It becomes the label that
+         shows the value live: "m = {m}". */
+      let k = i;
+      while (k < n && /[ \t]/.test(src[k] ?? '')) k += 1;
+      if (!expectKey && src[k] === '+') {
+        for (;;) {
+          while (k < n && /[ \t+]/.test(src[k] ?? '')) k += 1;
+          const q = src[k];
+          if (q === '"' || q === "'") {
+            let m = k + 1;
+            let part = '';
+            while (m < n && src[m] !== q) {
+              if (src[m] === '\\') {
+                part += (src[m] ?? '') + (src[m + 1] ?? '');
+                m += 2;
+                continue;
+              }
+              part += q === "'" && src[m] === '"' ? '\\"' : (src[m] ?? '');
+              m += 1;
+            }
+            text += part;
+            k = m + 1;
+          } else {
+            let m = k;
+            let depth = 0;
+            while (m < n) {
+              const d = src[m] ?? '';
+              if (d === '(') depth += 1;
+              else if (d === ')') depth -= 1;
+              else if (depth <= 0 && /[+,}\]\n]/.test(d)) break;
+              m += 1;
+            }
+            const expr = src
+              .slice(k, m)
+              .trim()
+              .replace(/\.toFixed\(\d*\)|\.toPrecision\(\d*\)|\.toString\(\)/g, '');
+            if (expr !== '') text += `{${JSON.stringify(expr).slice(1, -1)}}`;
+            k = m;
+          }
+          let z = k;
+          while (z < n && /[ \t]/.test(src[z] ?? '')) z += 1;
+          if (src[z] !== '+') break;
+          k = z;
+        }
+        i = k;
+      }
+      out += `"${text}"`;
       continue;
     }
     // A bare run: a key to its ':', a value to ',' '}' ']', a comment or the line's end.
@@ -1110,6 +1522,7 @@ export function normalizeMathSpec(input: unknown): MathSpec {
       auto.push(name);
     } finally {
       CONSTANTS = {};
+      SLIDERS = [];
     }
   }
 }
@@ -1165,9 +1578,23 @@ function normalizeParsed(v: Loose, found: { any: boolean }, auto: readonly strin
         'Steps with no curve or figure to point at are text: write them in your reply',
     );
   }
+  /* {"t": {"min": 0, "max": 5}, "g": 9.8} — sliders as a dictionary, name → range or value
+     (MEASURED: the 4B's projectile). */
+  const asList = (x: unknown): unknown[] =>
+    isObj(x) && !('name' in x) && !('min' in x) && !('range' in x)
+      ? Object.entries(x).map(([k, val]) =>
+          isObj(val)
+            ? { name: k, ...val }
+            : typeof val === 'number'
+              ? `${k} = ${val}`
+              : typeof val === 'string' && /\.\.|\bto\b/.test(val)
+                ? { name: k, range: val }
+                : `${k} = ${String(val)}`,
+        )
+      : list(x);
   const paramsIn = [
-    ...list(v.params ?? v.sliders),
-    ...(plotIn !== undefined && plotIn !== v ? list(plotIn.params ?? plotIn.sliders) : []),
+    ...asList(v.params ?? v.sliders ?? v.parameters),
+    ...(plotIn !== undefined && plotIn !== v ? asList(plotIn.params ?? plotIn.sliders) : []),
   ];
   const declared = paramsIn.map(param);
   const autoParams: Param[] = auto
@@ -1200,6 +1627,7 @@ function normalizeParsed(v: Loose, found: { any: boolean }, auto: readonly strin
     seen.add(p.name);
   }
   const names = params.map((p) => p.name);
+  SLIDERS = params;
   const plotSpec = plotIn !== undefined ? plot(plotIn, names) : undefined;
   // A slider with the plot's own name is "now" on that axis (t for time): curves use the axis, points the slider.
   const viewNotes: string[] = [];

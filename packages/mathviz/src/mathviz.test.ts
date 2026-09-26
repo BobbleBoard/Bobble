@@ -59,7 +59,7 @@ describe('the spec, as a small model writes it', () => {
     expect(bad({ title: 'x', params: ['x = 1 in 0..2'], plot: { curves: ['x'] } })).toThrow(
       /cannot be named x/,
     );
-    expect(bad({ title: 'x', figure: { shapes: [{ kind: 'blob', at: [0, 0] }] } })).toThrow(
+    expect(bad({ title: 'x', figure: { shapes: [{ kind: 'blob', size: 3 }] } })).toThrow(
       /not one of point, segment/,
     );
     expect(bad({ title: 'x', plot: { curves: ['x'], areas: [{ under: 'nope' }] } })).toThrow(
@@ -274,7 +274,8 @@ describe('TeX typed into JSON with one backslash', () => {
     const json = String.raw`{"title": "Waves", "plot": {"curves": [{"id": "f", "expr": "\sin(x)", "label": "\theta"}]}, "steps": [{"text": "Half is $\frac{1}{2}$, and \\frac stays.\nThe end.", "highlight": ["f"]}]}`;
     const s = normalizeMathSpec(json);
     expect(s.plot?.curves[0]?.expr).toBe(String.raw`\sin(x)`);
-    expect(s.plot?.curves[0]?.label).toBe(String.raw`\theta`);
+    // A label is drawn text: its TeX command is the character it draws.
+    expect(s.plot?.curves[0]?.label).toBe('θ');
     expect(s.steps[0]?.text).toBe('Half is $\\frac{1}{2}$, and \\frac stays.\nThe end.');
   });
 });
@@ -378,7 +379,10 @@ describe('what the 4B wrote in the STEM suite, drawn', () => {
       ['omega', true],
       ['phi', false],
     ]);
-    expect(r.problems.some((p) => p.level === 'fix')).toBe(false);
+    // It draws; what is left to fix is that it explains nothing yet.
+    expect(r.problems.filter((p) => p.level === 'fix').map((p) => p.text)).toEqual([
+      expect.stringMatching(/^the page has no steps/),
+    ]);
   });
 
   it('a cube in L, and points in x, y, z, drawn in the box3d view', () => {
@@ -612,5 +616,181 @@ describe('motion: parts that slide, fade and take turns', () => {
     const r = renderMath(PYTHAGORAS);
     expect(r.problems.filter((p) => p.level !== 'note')).toEqual([]);
     expect(r.html).toContain('opacity=');
+  });
+});
+
+describe('the 4B, asked for maths that explains itself (2026-09-26)', () => {
+  const fig = (shapes: unknown[], extra: Record<string, unknown> = {}) =>
+    normalizeMathSpec({
+      title: 'F',
+      figure: { view: { x: '0..10', y: '0..10' }, shapes },
+      ...extra,
+    });
+
+  it('reads a shape kind it does not name from what the shape carries', () => {
+    const s = fig([
+      {
+        id: 'tri',
+        kind: 'right_triangle',
+        vertices: [
+          [0, 0],
+          [3, 0],
+          [0, 4],
+        ],
+      },
+      { id: 'arc', kind: 'arc', center: [0, 0], from: [3, 0], to: [0, 4], label: 'θ' },
+      { id: 'ball', kind: 'projectile', center: [1, 1], radius: 0.2 },
+      { id: 'name', kind: 'caption', pos: [5, 5], text: 'a = 3' },
+    ]);
+    expect(s.figure?.shapes.map((x) => x.kind)).toEqual(['polygon', 'angle', 'circle', 'label']);
+  });
+
+  it('reads sliders as "a = 3", "Slope (m)", and a dictionary of ranges and values', () => {
+    const a = normalizeMathSpec({
+      title: 'P',
+      params: ['a = 3', 't = angle in 0..360'],
+      plot: { x: '0..1', curves: ['a*x'] },
+    });
+    expect(a.params.find((p) => p.name === 'a')).toMatchObject({ value: 3, hidden: true });
+    expect(a.params.find((p) => p.name === 't')).toMatchObject({ min: 0, max: 360, value: 0 });
+    const m = normalizeMathSpec({
+      title: 'L',
+      sliders: [{ name: 'Slope (m)', min: -5, max: 5, value: 1 }],
+      plot: { x: '-5..5', curves: ['m*x'] },
+    });
+    expect(m.params[0]).toMatchObject({ name: 'm', label: 'Slope', value: 1 });
+    const d = normalizeMathSpec({
+      title: 'D',
+      params: { t: { min: 0, max: 3.5 }, g: 9.8, v: '10..30' },
+      plot: { x: '0..3', curves: ['v*x - g*x^2/2 + t'] },
+    });
+    expect(d.params.map((p) => [p.name, p.hidden === true])).toEqual([
+      ['t', false],
+      ['g', true],
+      ['v', false],
+    ]);
+  });
+
+  it('draws "$h(t)$" in a label as h(t), and \\theta as θ', () => {
+    const s = fig([{ id: 'p', kind: 'point', at: [1, 1], label: '$h(t)$ at \\theta' }]);
+    expect(s.figure?.shapes[0]).toMatchObject({ label: 'h(t) at θ' });
+  });
+
+  it('draws a curve from a formula, over a range the sliders can move: the path so far', () => {
+    const r = renderMath({
+      title: 'Thrown',
+      params: ['t = 1 in 0..2'],
+      figure: {
+        view: { x: '0..20', y: '0..6' },
+        shapes: [
+          {
+            id: 'path',
+            kind: 'trajectory',
+            x: '10*s',
+            y: '8*s - 4.9*s^2',
+            range: '0..t',
+            label: 'path',
+          },
+          { id: 'ball', kind: 'circle', center: ['10*t', '8*t - 4.9*t^2'], r: 0.3, fill: 'main' },
+        ],
+      },
+      steps: [
+        {
+          text: 'The {ball} leaves its path behind it.',
+          highlight: ['ball', 'path'],
+          set: { t: 0.5 },
+        },
+        { text: 'By t = 1.5 it is falling.', highlight: ['ball'], set: { t: 1.5 } },
+      ],
+    });
+    const sh = r.spec.figure?.shapes[0];
+    expect(sh).toMatchObject({ kind: 'curve', over: 's', from: 0, to: 't' });
+    const c = compileSpec(r.spec);
+    const len = (t: number) =>
+      (
+        mvScene(r.spec, c.E, { t }, 1).panels[0]?.items.find(
+          (it) => it.id === 'path' && it.t === 'path',
+        ) as { d: string } | undefined
+      )?.d.length ?? 0;
+    expect(len(1.5)).toBeGreaterThan(len(0.5) * 0.9);
+    expect(r.problems.filter((p) => p.level === 'fix')).toEqual([]);
+  });
+
+  it('slides, turns and scales a part as a slider runs — written as the move', () => {
+    const s = fig(
+      [
+        {
+          id: 'tri',
+          kind: 'polygon',
+          points: [
+            [0, 0],
+            [2, 0],
+            [0, 1],
+          ],
+          fill: 'main',
+          slide: { by: [3, 1], t: '0..1' },
+        },
+        {
+          id: 'sq',
+          kind: 'polygon',
+          points: [
+            [5, 5],
+            [6, 5],
+            [6, 6],
+            [5, 6],
+          ],
+          turn: { by: 90, t: '1..2' },
+        },
+        { id: 'c', kind: 'circle', center: [8, 8], r: 0.5, scale: 2 },
+      ],
+      { params: ['t = 0 in 0..2'] },
+    );
+    const c = compileSpec(s);
+    const P = (id: string, t: number) => {
+      const sh = s.figure?.shapes.find((x) => x.id === id);
+      if (sh?.kind !== 'polygon') return [];
+      return sh.points.map((p) => [mvEvalNum(c.E, p[0], t), mvEvalNum(c.E, p[1], t)]);
+    };
+    expect(P('tri', 0)[0]).toEqual([0, 0]);
+    expect(P('tri', 1)[0]?.map((v) => Math.round(v * 1e6) / 1e6)).toEqual([3, 1]);
+    // 90° about its own centre (5.5, 5.5): the corner (5, 5) goes to (6, 5).
+    expect(P('sq', 2)[0]?.map((v) => Math.round(v * 1e6) / 1e6)).toEqual([6, 5]);
+    const circ = s.figure?.shapes.find((x) => x.id === 'c');
+    expect(circ?.kind === 'circle' && mvEvalNum(c.E, circ.r, 2)).toBeCloseTo(1, 6);
+  });
+});
+
+function mvEvalNum(
+  E: Record<string, (s: Record<string, number>) => number>,
+  v: unknown,
+  t: number,
+): number {
+  return typeof v === 'number' ? v : (E[String(v)]?.({ t }) ?? Number.NaN);
+}
+
+describe('JavaScript a small model writes into JSON', () => {
+  it('joins "m = " + m into the label that shows m live', () => {
+    const s = normalizeMathSpec(
+      '{"title": "L", "params": ["m = 1 in -5..5"], "figure": {"view": {"x": "0..10", "y": "0..10"}, "shapes": [{"id": "lab", "kind": "label", "at": [5, 5], "text": "m = " + m.toFixed(2) + " (slope)"}]}, "steps": ["The slope.", "Steeper."]}',
+    );
+    expect(s.figure?.shapes[0]).toMatchObject({ kind: 'label', text: 'm = {m} (slope)' });
+  });
+
+  it('says so when no step moves anything on a page with sliders', () => {
+    const r = renderMath({
+      title: 'Still',
+      params: ['t = 0 in 0..2'],
+      figure: {
+        view: { x: '0..4', y: '0..4' },
+        shapes: [{ id: 'b', kind: 'circle', center: ['t', 1], r: 0.2 }],
+      },
+      steps: [
+        { text: 'A ball.', highlight: ['b'] },
+        { text: 'It moves.', highlight: ['b'] },
+      ],
+    });
+    expect(r.problems.map((p) => p.text)).toContain(
+      'none of the steps moves anything — the page plays its steps like a teacher, so give steps a "set" that moves t (the figure moves while the words appear), or a "nudge" that wiggles a slider to show what it changes',
+    );
   });
 });

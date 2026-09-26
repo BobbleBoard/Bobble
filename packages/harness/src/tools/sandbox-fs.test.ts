@@ -378,6 +378,26 @@ describe('guardDestructiveRewrite — a rewrite that ran out partway', () => {
   const big = Array.from({ length: 56 }, (_, i) => `line ${i}`).join('\n');
   const read = (body: string | null) => () => body;
 
+  it('lets the same content through on fewer lines — pretty JSON rewritten as one line', () => {
+    // MEASURED (the 4B): a 160-line math spec rewritten on one line was refused three times.
+    const pretty = JSON.stringify(
+      {
+        title: 'Slope',
+        params: ['m = 1 in -5..5'],
+        steps: Array.from({ length: 30 }, (_, i) => ({ text: `step ${i}` })),
+      },
+      null,
+      2,
+    );
+    expect(pretty.split('\n').length).toBeGreaterThan(90);
+    const oneLine = JSON.stringify(JSON.parse(pretty));
+    expect(guardDestructiveRewrite('/w/lesson.math.json', oneLine, read(pretty))).toBeNull();
+    // …but a one-line file with most of the content gone is still refused.
+    expect(
+      guardDestructiveRewrite('/w/lesson.math.json', '{"title": "Slope"}', read(pretty)),
+    ).not.toBeNull();
+  });
+
   it('refuses a write that deletes most of an existing file', () => {
     const out = guardDestructiveRewrite('/w/app.py', 'line 0\nline 1\nline 2', read(big));
     expect(out).not.toBeNull();

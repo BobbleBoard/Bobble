@@ -379,6 +379,18 @@ try {
     const dir = path.join(SHOT_DIR, task.id);
     mkdirSync(path.join(dir, 'files'), { recursive: true });
     log(`── ${task.id}: ${task.prompt.slice(0, 90)}…`);
+    /* A question the last turn left open — MEASURED: the 4B's `rm lesson.math.json`
+       raised the reviewer's "Run this command?" at the cap, and its overlay took
+       every click of the next task. It is answered no, and said. */
+    for (let d = 0; d < 3; d += 1) {
+      const open = await page.$('.pd-dialog-overlay[data-state="open"]');
+      if (open === null) break;
+      const deny = await page.$('[role="dialog"] button:has-text("Don\'t")');
+      if (deny !== null) await deny.click().catch(() => {});
+      else await page.keyboard.press('Escape');
+      log('   (a dialog the last task left open was answered no)');
+      await sleep(600);
+    }
     await page.click('[data-testid="new-chat"]').catch(() => {});
     await sleep(1500);
     const logFrom = existsSync(LOG) ? statSync(LOG).size : 0;

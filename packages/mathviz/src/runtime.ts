@@ -1219,6 +1219,61 @@ export function mvFigure(
         }
         break;
       }
+      case 'curve': {
+        // A formula's curve: sampled as its variable runs from `from` to `to` (a trail when `to` is t).
+        const a0 = mvEval(E, sh.from, s);
+        const a1 = mvEval(E, sh.to, s);
+        if (!Number.isFinite(a0) || !Number.isFinite(a1)) {
+          outside.push({ id: sh.id, what: 'its range has no value at these settings' });
+          break;
+        }
+        const N = 160;
+        const scope: Record<string, number> = { ...s };
+        const world: number[][] = [];
+        for (let q = 0; q <= N; q += 1) {
+          scope[sh.over] = a0 + ((a1 - a0) * q) / N;
+          const wx = mvEval(E, sh.x, scope);
+          const wy = mvEval(E, sh.y, scope);
+          if (Number.isFinite(wx) && Number.isFinite(wy)) world.push([wx, wy]);
+        }
+        if (world.length < 2) break;
+        for (const q of [0, Math.floor(world.length / 2), world.length - 1]) {
+          const w = world[q];
+          if (w !== undefined) inView(sh.id, w[0] ?? 0, w[1] ?? 0);
+        }
+        const pts = world.map((w) => [fx(w[0] ?? 0), fy(w[1] ?? 0)] as [number, number]);
+        const d = pts
+          .map(([a, b], i) => `${i === 0 ? 'M' : 'L'}${a.toFixed(2)},${b.toFixed(2)}`)
+          .join('');
+        items.push({
+          t: 'path',
+          d,
+          tone: sh.role === 'reference' ? 'ink' : sh.role,
+          width: sh.role === 'reference' ? 1.75 : 2.25,
+          dash: sh.dashed,
+          id: sh.id,
+          dim,
+        });
+        const along: number[] = [];
+        for (let i = 0; i + 1 < pts.length; i += 4) {
+          const [a, b] = pts[i] ?? [0, 0];
+          const [c, e] = pts[Math.min(pts.length - 1, i + 4)] ?? [0, 0];
+          along.push(...mvSampleLine(a, b, c, e));
+        }
+        lines.push(along);
+        if (sh.label !== undefined) {
+          const [ex, ey] = pts[pts.length - 1] ?? [0, 0];
+          const [mx, my] = pts[Math.floor(pts.length / 2)] ?? [ex, ey];
+          pending.push({
+            id: sh.id,
+            text: mvFill(E, sh.label, s),
+            cands: [...mvAround(mx, my, 12), ...mvAround(ex, ey, 10)],
+            dim,
+            size: 15,
+          });
+        }
+        break;
+      }
       case 'circle': {
         const [a, b] = pt(sh.center);
         const r = mvEval(E, sh.r, s);

@@ -131,6 +131,23 @@ async function exists(p: string): Promise<boolean> {
   return (await stat(p).catch(() => null))?.isFile() === true;
 }
 
+/** The page a spec file draws: `x.math.json` → `x.html`. */
+function pageOf(specFile: string): string {
+  return `${specFile.endsWith(MATH_SPEC_SUFFIX) ? specFile.slice(0, -MATH_SPEC_SUFFIX.length) : specFile.replace(/\.json$/i, '')}.html`;
+}
+
+/**
+ * When an edit breaks a spec that drew — MEASURED (the 4B): a working
+ * projectile page, then "let me add the graphs", then a spec that did not
+ * draw, and the turn ran out rewriting it — the page the user has is still the
+ * last one that drew. Said, so the model knows it has not lost it.
+ */
+async function stillShowing(specFile: string): Promise<string> {
+  return (await exists(pageOf(specFile)))
+    ? ` The page beside the chat still shows the last version that drew (${path.basename(pageOf(specFile))}); fix the spec to change it.`
+    : '';
+}
+
 /** Where the spec comes from: a file, JSON text, or flags — or why none. */
 async function readSpec(
   root: string,
@@ -142,7 +159,7 @@ async function readSpec(
       return { raw: looseJson(s) };
     } catch (e) {
       return {
-        error: `math: the spec is not valid JSON (${e instanceof Error ? e.message : String(e)}). For anything long, write it to a file (write lesson.math.json) and run \`math lesson.math.json\`.`,
+        error: `math: the spec is not valid JSON (${e instanceof Error ? e.message : String(e)}).${jsonHint(s)} For anything long, write it to a file (write lesson.math.json) and run \`math lesson.math.json\`.`,
       };
     }
   }
@@ -166,11 +183,12 @@ async function readSpec(
           error: `math: ${path.basename(c)} is a page, not a spec — run math on its .math.json.`,
         };
       }
+      const body = await readFile(c, 'utf8');
       try {
-        return { raw: looseJson(await readFile(c, 'utf8')), file: c };
+        return { raw: looseJson(body), file: c };
       } catch (e) {
         return {
-          error: `math: ${path.basename(c)} is not valid JSON (${e instanceof Error ? e.message : String(e)}) — fix it and run math on it again.`,
+          error: `math: ${path.basename(c)} is not valid JSON (${e instanceof Error ? e.message : String(e)}) — fix it and run math on it again.${jsonHint(body)}${await stillShowing(c)}`,
         };
       }
     }
@@ -192,6 +210,21 @@ async function readSpec(
     error:
       'math needs its spec: the JSON {"title", "params", "plot" or "figure", "steps"}, or the path of a .math.json file holding it. `math --help` shows a whole one.',
   };
+}
+
+/** Is this JSON a math spec (a figure with shapes, or a plot with curves) — not a package.json? */
+export function looksLikeMathSpec(text: string): boolean {
+  return (
+    /"(figure|plot|diagram|graph)"\s*:/.test(text) &&
+    /"(shapes|curves|elements|objects|functions)"\s*:/.test(text)
+  );
+}
+
+/** What a small model writes into JSON that no reader can take, and what to write instead. */
+function jsonHint(text: string): string {
+  if (/\bfor\s+\w+\s+in\s+range\s*\(/.test(text))
+    return ' A Python loop is not JSON: for a path through a formula write {"kind": "curve", "x": "20*s", "y": "15*s - 4.9*s^2", "range": "0..t"} — its x and y in a variable of its own (s), over a range that may use the sliders.';
+  return '';
 }
 
 /** The same spec twice in a row for one file is said, not redrawn. */
@@ -259,10 +292,10 @@ const DESCRIPTION = [
   '           {"text": "At the top it stops for an instant: the peak of the {h} curve.", "highlight": ["ball", "h", "now"], "set": {"t": 0.82}, "nudge": {"t": 0.12}}]}',
   '',
   'params — sliders, "name = value in min..max". Any number anywhere may be an expression of them ("2*A", "A*cos(pi*t)").',
-  'moving — a step\'s "set" slides its sliders there, eased. lerp(a, b, u) goes from a to b as u goes 0 to 1; one slider runs moves in turn with ease(between(t, 0, 1)) for the first and ease(between(t, 1, 2)) for the next. "opacity": "1 - t" on a part fades it as t grows.',
+  'moving — a step\'s "set" slides its sliders there, eased. On a part, "slide": {"by": [2, -1], "t": "0..1"} moves it by (2, −1) as t goes 0 to 1; "turn": {"by": 90, "about": [0, 0], "t": "1..2"} turns it; "scale": {"by": 2} grows it; "opacity": "1 - t" fades it. Any number may also use lerp(a, b, u), ease(u), between(t, 1, 2).',
   'nudge — "nudge": {"A": 0.5} on a step wiggles A up and down after the step\'s move, so the reader sees what A changes: cause and effect.',
   'plot — "x" range (write π as pi), optional "y" range, "label"s for the axes; "curves" (expr in x — or in "var"; or "x" and "y" in t with a "t" range, for a parametric curve), "points" {x, y — or "on": a curve id — label}, "areas" {under, from, to, label}, "tangents" {to, at — "{m}" in its label is the slope}, "riemann" {under, from, to, n}.',
-  'figure — "view" {"x": "0..10", "y": "0..8"} (y up) and "shapes", each {id, kind, …, label}: point {at}, segment and vector {from, to}, polygon {points}, polyline {points — an open path, a trajectory}, rect {at, w, h}, circle {center, r, fill}, angle {at, from, to}, dimension {from, to, label}, label {at, text}, box3d {at, size, depth, shade: right|top|front, edge: "L"}, spring {from, to, coils}.',
+  'figure — "view" {"x": "0..10", "y": "0..8"} (y up) and "shapes", each {id, kind, …, label}: point {at}, segment and vector {from, to}, polygon {points}, polyline {points — an open path}, curve {x, y in s, "range": "0..t" — a path from a formula, drawn up to t}, rect {at, w, h}, circle {center, r, fill}, angle {at, from, to}, dimension {from, to, label}, label {at, text}, box3d {at, size, depth, shade: right|top|front, edge: "L"}, spring {from, to, coils}.',
   'fill — main, second, third: solid, for an object (a mass, a triangle that moves); main-light, second-light: pale, for an area (a², the region under a curve); tint, shade, none. role (a line\'s colour) — main, second, third, reference (grey, dashed), highlight — never a hex. "step": 3 on any part shows it from step 3 on.',
   'steps — 2 to 6, each ONE short paragraph saying what moves and why; "highlight" the ids it talks about; "{id}" in its text names a part, with its colour key; $…$ is typeset. No bullet lists, no emoji.',
   'The page is checked — labels on labels, a part outside the view, a curve with no values, a slider that moves nothing, steps that point at nothing — and what it reports comes back to you: fix it in the spec and run math again.',
@@ -339,7 +372,7 @@ export async function drawMath(
   } catch (e) {
     if (e instanceof SpecError || e instanceof ExprError) {
       return errorResult(
-        `math: ${e.message}.${got.file !== undefined ? ` Fix it in ${pathForModel(got.file, root)} and run math on it again.` : ''} (\`math --help\` shows a whole spec.)`,
+        `math: ${e.message}.${got.file !== undefined ? ` Fix it in ${pathForModel(got.file, root)} and run math on it again.${await stillShowing(got.file)}` : ''} (\`math --help\` shows a whole spec.)`,
       );
     }
     throw e;

@@ -252,3 +252,30 @@ describe('a spec just written', () => {
     expect(text(await run({ spec: `${path.basename(root)}/at.math.json` }))).toMatch(/^Drew "At"/);
   });
 });
+
+describe('specs as a small model saves and breaks them', () => {
+  it('knows a math spec saved as plain .json, and leaves other JSON alone', async () => {
+    const { looksLikeMathSpec } = await import('./math-tool.js');
+    expect(looksLikeMathSpec('{"title": "P", "figure": {"shapes": []}}')).toBe(true);
+    expect(looksLikeMathSpec('{"name": "app", "dependencies": {"figure": "1.0"}}')).toBe(false);
+  });
+
+  it('says the page still shows the last version that drew, when an edit breaks the spec', async () => {
+    const { drawWrittenSpec } = await import('./math-tool.js');
+    const deps = { bridge: null, root: () => root };
+    const file = path.join(root, 'kept.math.json');
+    writeFileSync(file, JSON.stringify({ ...GOOD, title: 'Kept' }));
+    expect((await drawWrittenSpec(file, root, deps)).isError).toBeUndefined();
+    // The 4B's own shape of it: a path written as a Python list comprehension.
+    writeFileSync(
+      file,
+      '{"title": "Kept", "figure": {"shapes": [{"id": "p", "kind": "line", "path": [\n  [5 + 2 * i, 10 - i]\n  for i in range(0, 15)\n]}]}}',
+    );
+    const broken = await drawWrittenSpec(file, root, deps);
+    expect(broken.isError).toBe(true);
+    expect(text(broken)).toContain(
+      'The page beside the chat still shows the last version that drew (kept.html)',
+    );
+    expect(text(broken)).toContain('A Python loop is not JSON');
+  });
+});

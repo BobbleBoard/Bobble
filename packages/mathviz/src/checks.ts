@@ -215,9 +215,24 @@ export function checkMath(
 
   // Steps.
   if (n === 0) {
+    /* MEASURED (the 4B): a Pythagorean "proof" drawn as five static squares,
+       with no steps — a picture, not an explanation. */
     say(
-      'note',
-      'no steps — add 2 to 6, each one short paragraph that points at a part (its "highlight") or moves a slider ("set")',
+      'fix',
+      'the page has no steps, so it explains nothing — add 2 to 6 "steps", each one short paragraph that points at the parts it talks about ("highlight") and moves the figure ("set")',
+    );
+  }
+  const sliders = spec.params.filter((p) => p.hidden !== true);
+  const moving = spec.steps.some(
+    (st) => Object.keys(st.set).length > 0 || Object.keys(st.nudge ?? {}).length > 0,
+  );
+  if (n >= 2 && sliders.length > 0 && !moving) {
+    /* MEASURED (the 4B, projectile motion "with an animation"): sliders t,
+       angle and speed, and five steps that moved none of them — the page
+       played its words over a still figure. */
+    say(
+      'warn',
+      `none of the steps moves anything — the page plays its steps like a teacher, so give steps a "set" that moves ${sliders[0]?.name} (the figure moves while the words appear), or a "nudge" that wiggles a slider to show what it changes`,
     );
   }
   if (n > 8)

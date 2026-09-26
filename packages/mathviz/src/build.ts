@@ -149,6 +149,13 @@ export function expressionsOf(spec: MathSpec): Map<string, Set<string>> {
         add(sh.h, P);
         add(sh.depth, P);
         break;
+      case 'curve':
+        add(sh.x, [...P, sh.over]);
+        add(sh.y, [...P, sh.over]);
+        add(sh.from, P);
+        add(sh.to, P);
+        labels(sh.label, []);
+        break;
     }
   }
   for (const st of spec.steps) {
@@ -298,6 +305,16 @@ export function fittedView(
             if (Number.isFinite(r)) {
               put(cx - r, cy - r);
               put(cx + r, cy + r);
+            }
+            break;
+          }
+          case 'curve': {
+            const a0 = mvEval(E, sh.from, s);
+            const a1 = mvEval(E, sh.to, s);
+            if (!Number.isFinite(a0) || !Number.isFinite(a1)) break;
+            for (let q = 0; q <= 40; q += 1) {
+              const sc = { ...s, [sh.over]: a0 + ((a1 - a0) * q) / 40 };
+              put(mvEval(E, sh.x, sc), mvEval(E, sh.y, sc));
             }
             break;
           }

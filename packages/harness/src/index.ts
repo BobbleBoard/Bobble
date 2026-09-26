@@ -17,7 +17,7 @@
  * CLI pi users can consume the pieces directly.
  */
 
-import { appendFileSync, existsSync, realpathSync, statSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { basename, isAbsolute, join } from 'node:path';
@@ -144,6 +144,7 @@ import { registerImageTools } from './tools/image-tools.js';
 import { applyBias, lastAssistantThought, planBias } from './tools/intent-bias.js';
 import {
   drawWrittenSpec,
+  looksLikeMathSpec,
   MATH_TOOL,
   type MathToolDeps,
   projectMathKit,
@@ -4721,9 +4722,14 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
         | { path?: unknown }
         | undefined;
       const rel = typeof input?.path === 'string' ? input.path : '';
-      if (/\.math\.json$/i.test(rel)) {
-        const root = liveRoot();
-        const abs = isAbsolute(rel) ? rel : join(root, rel);
+      const root = liveRoot();
+      const abs = rel === '' ? '' : isAbsolute(rel) ? rel : join(root, rel);
+      /* A spec saved as plain .json is drawn too — MEASURED (the 4B): three
+         Pythagorean specs written as pythagorean_proof.json, none drawn. */
+      if (
+        /\.math\.json$/i.test(rel) ||
+        (/\.json$/i.test(rel) && existsSync(abs) && looksLikeMathSpec(readFileSync(abs, 'utf8')))
+      ) {
         if (existsSync(abs)) {
           const drawn = await drawWrittenSpec(abs, root, mathDeps);
           const said = drawn.content
