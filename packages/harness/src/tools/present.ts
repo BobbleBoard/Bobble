@@ -32,6 +32,7 @@ import { basename, dirname, isAbsolute, join } from 'node:path';
 import type { ExtensionAPI } from '@mariozechner/pi-coding-agent';
 import type { DiagramTheme } from '@pi-desktop/design-kit';
 import { Type } from '@sinclair/typebox';
+import { HANDMADE_MATH_NOTE, handmadeMathVisual } from './handmade-math.js';
 import { remotePictures, remotePicturesNote, unseenPictures } from './remote-pictures.js';
 import { pathForModel } from './workspace-relative.js';
 
@@ -472,6 +473,14 @@ export function registerPresentTool(pi: ExtensionAPI, deps: PresentToolDeps): vo
             ? ''
             : remotePicturesNote(unseenPictures(remotePictures(html), deps.chatText()));
         if (note !== '') content.push({ type: 'text', text: note.trim() });
+      }
+      /* A maths or physics visual made by hand: the moment it is looked at is
+         the moment to name the command that makes it (handmade-math.ts). */
+      if (/\.(html?|svg)$/i.test(resolved) && deps.readText !== undefined) {
+        const text = await deps.readText(resolved).catch(() => null);
+        if (text !== null && handmadeMathVisual(text, /\.svg$/i.test(resolved) ? 'svg' : 'html')) {
+          content.push({ type: 'text', text: HANDMADE_MATH_NOTE });
+        }
       }
       content.push({ type: 'text', text: reviewInstruction() });
       return { content, details: undefined } as never;
