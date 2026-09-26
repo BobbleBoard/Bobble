@@ -1,0 +1,127 @@
+{
+  "schema": 1,
+  "id": "paper-blue",
+  "name": "Paper & blue",
+  "about": "Ivory paper, warm ink and the app's own blue — calm and designed, and one with the app; the house default.",
+  "light": {
+    "paper": "#FBFAF7",
+    "surface": "#FFFFFF",
+    "ink": "#1E1C19",
+    "mute": "#5C5A55",
+    "line": "#D9D5CC",
+    "accent": "#0071E3",
+    "onAccent": "#FFFFFF",
+    "accentInk": "#0066CC",
+    "deep": "#0B2545",
+    "onDeep": "#F3F1EA",
+    "tint": "#E6F0FB",
+    "good": "#0066CC",
+    "bad": "#B4450E",
+    "warn": "#8A5A00",
+    "highlight": "#D0661C",
+    "series": ["#0071E3", "#D0661C", "#1B3A5C", "#6C6158", "#4A90D9", "#992641"]
+  },
+  "dark": {
+    "paper": "#191816",
+    "surface": "#23221F",
+    "ink": "#F2EFE8",
+    "mute": "#A6A198",
+    "line": "#3A3833",
+    "accent": "#0A84FF",
+    "onAccent": "#0B1220",
+    "accentInk": "#4DA3FF",
+    "deep": "#0B2545",
+    "onDeep": "#F3F1EA",
+    "tint": "#16263A",
+    "good": "#4DA3FF",
+    "bad": "#EE8A4E",
+    "warn": "#E0A93F",
+    "highlight": "#F09A57",
+    "series": ["#4DA3FF", "#F09A57", "#B7D3F5", "#8C857C", "#3A7CC4", "#CB4F73"]
+  },
+  "type": {
+    "display": {
+      "mac": "'Avenir Next', 'Helvetica Neue', Helvetica, Arial, sans-serif",
+      "windows": "'Segoe UI Variable Display', 'Segoe UI', Arial, sans-serif",
+      "linux": "'Noto Sans', Inter, 'DejaVu Sans', Arial, sans-serif"
+    },
+    "text": {
+      "mac": "-apple-system, 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif",
+      "windows": "'Segoe UI Variable Text', 'Segoe UI', Arial, sans-serif",
+      "linux": "Inter, 'Noto Sans', 'DejaVu Sans', Arial, sans-serif"
+    },
+    "mono": {
+      "mac": "'SF Mono', Menlo, monospace",
+      "windows": "'Cascadia Mono', Consolas, monospace",
+      "linux": "'DejaVu Sans Mono', 'Liberation Mono', monospace"
+    },
+    "weights": {
+      "regular": 400,
+      "medium": 500,
+      "bold": 600,
+      "display": 700
+    },
+    "slide": {
+      "caption": 17,
+      "body": 22,
+      "lead": 30,
+      "title": 52,
+      "display": 84,
+      "hero": 120
+    },
+    "page": {
+      "caption": 14,
+      "body": 18,
+      "lead": 21,
+      "h2": 40,
+      "h1": 72
+    },
+    "doc": {
+      "caption": 9,
+      "body": 10.5,
+      "h2": 14,
+      "h1": 22,
+      "title": 30
+    },
+    "lineHeight": {
+      "body": 1.5,
+      "heading": 1.08
+    },
+    "tracking": {
+      "display": -0.02,
+      "caps": 0.06
+    }
+  },
+  "space": {
+    "unit": 8,
+    "margin": 72,
+    "gutter": 24,
+    "radius": {
+      "small": 6,
+      "card": 14
+    },
+    "stroke": 1
+  },
+  "motion": {
+    "ease": "cubic-bezier(0.32, 0.72, 0, 1)",
+    "enter": 0.6,
+    "stagger": 0.08,
+    "hold": 1.2
+  },
+  "image": {
+    "style": "soft daylight, calm, natural materials, clear blue and warm neutral tones, generous negative space, no text, no logos"
+  },
+  "chart": {
+    "base": "clean",
+    "radius": 8,
+    "grid": "lines",
+    "line": "smooth",
+    "font": "system"
+  },
+  "diagram": {
+    "look": "clean",
+    "curve": "basis",
+    "fontSize": 16,
+    "radius": 8
+  }
+}

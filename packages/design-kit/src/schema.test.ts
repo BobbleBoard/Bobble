@@ -2,13 +2,13 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { currentPlatform, KitShapeError, normalizeKitHex, parseKit } from './schema.ts';
 
-const paperTeal = JSON.parse(
-  readFileSync(new URL('./kits/paper-teal.json', import.meta.url), 'utf8'),
+const paperBlue = JSON.parse(
+  readFileSync(new URL('./kits/paper-blue.json', import.meta.url), 'utf8'),
 ) as Record<string, unknown>;
 
 /** A copy of a real kit with one path changed. */
 function withChange(path: string[], value: unknown): unknown {
-  const copy = structuredClone(paperTeal) as Record<string, unknown>;
+  const copy = structuredClone(paperBlue) as Record<string, unknown>;
   let at = copy;
   for (const key of path.slice(0, -1)) at = at[key] as Record<string, unknown>;
   const last = path[path.length - 1] as string;
@@ -29,7 +29,7 @@ function problem(raw: unknown): string {
 
 describe('parseKit — a kit file that is not a kit says where', () => {
   it('reads a real kit', () => {
-    expect(parseKit(paperTeal).id).toBe('paper-teal');
+    expect(parseKit(paperBlue).id).toBe('paper-blue');
   });
 
   it('names a missing colour role, a lower-case hex and a colour that is not one', () => {
@@ -41,7 +41,7 @@ describe('parseKit — a kit file that is not a kit says where', () => {
   });
 
   it('refuses a field it does not know — a misspelt role would be silently ignored', () => {
-    expect(problem({ ...(paperTeal as object), colour: {} })).toBe(
+    expect(problem({ ...(paperBlue as object), colour: {} })).toBe(
       'kit.colour: is not a kit field',
     );
   });

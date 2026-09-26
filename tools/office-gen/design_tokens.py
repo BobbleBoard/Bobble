@@ -15,7 +15,7 @@ export-tokens` writes it, and a test on each side holds it to the kit files.
 
     import design_tokens as dt
     dt.kit("fog")["light"]["accent"]      # '#1B1C1E'
-    dt.kit_palette("paper-teal")          # a palette.Palette in the kit's colours
+    dt.kit_palette("paper-blue")          # a palette.Palette in the kit's colours
 """
 from __future__ import annotations
 
@@ -55,7 +55,7 @@ def _key(name: str) -> str:
 
 
 def kit(name: str | None = None) -> dict:
-    """A kit by id or name ("Paper & teal", "paper_teal"); the default when unknown or empty."""
+    """A kit by id or name ("Paper & blue", "paper_blue"); the default when unknown or empty."""
     data = load()
     kits = data["kits"]
     if name:

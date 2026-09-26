@@ -10,7 +10,7 @@
  * under test, not the turn.
  *
  *   SHOT_DIR=/tmp/diagram-look node apps/desktop/tests/e2e/diagram-look.mjs
- *   KITS=paper-teal,fog SAMPLES=flow,sequence …   a subset
+ *   KITS=paper-blue,fog SAMPLES=flow,sequence …   a subset
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -20,7 +20,7 @@ import { cropPng } from './png.mjs';
 
 const SHOT_DIR = process.env.SHOT_DIR ?? '/tmp/diagram-look';
 mkdirSync(SHOT_DIR, { recursive: true });
-const KITS = (process.env.KITS ?? 'paper-teal').split(',');
+const KITS = (process.env.KITS ?? 'paper-blue').split(',');
 
 /** One of each kind the task names, each with the parts a look must hold up in. */
 export const DIAGRAM_SAMPLES = {

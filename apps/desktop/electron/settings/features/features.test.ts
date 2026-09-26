@@ -89,7 +89,7 @@ describe('the design settings (VQ-04)', () => {
   it('default to the house kit, no pictures, check & fix, look when the model can see — and off', () => {
     expect(DEFAULT_DESIGN_SETTINGS).toEqual({
       enabled: false,
-      kit: 'paper-teal',
+      kit: 'paper-blue',
       images: 'off',
       lint: 'fix',
       look: 'auto',

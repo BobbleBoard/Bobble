@@ -95,8 +95,8 @@ describe('the kits', () => {
 describe('kitById', () => {
   it('finds a kit by id, by name, and forgivingly spelt', () => {
     expect(kitById('fog')?.id).toBe('fog');
-    expect(kitById('Paper & teal')?.id).toBe('paper-teal');
-    expect(kitById('paper_teal')?.id).toBe('paper-teal');
+    expect(kitById('Paper & blue')?.id).toBe('paper-blue');
+    expect(kitById('paper_blue')?.id).toBe('paper-blue');
     expect(kitById('  Slate Cobalt ')?.id).toBe('slate-cobalt');
     expect(kitById('neon')).toBeUndefined();
     expect(kitById(undefined)).toBeUndefined();

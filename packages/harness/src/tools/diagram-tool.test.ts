@@ -203,7 +203,7 @@ describe('diagram', () => {
     );
     expect(text).toContain('It is in the chat as a diagram card');
     expect(text).toContain('Steps: Order placed · Payment ok? ·');
-    expect(text).toContain('Kit: Paper & teal (the house default).');
+    expect(text).toContain('Kit: Paper & blue (the house default).');
     expect(text).toContain('do not present it again');
     // The kit's two themes went to the renderer.
     expect(calls[0]?.themes.light.paper).toBe('#FBFAF7');
@@ -221,7 +221,7 @@ describe('diagram', () => {
       schema: 1,
       title: 'Order fulfilment',
       kind: 'flowchart',
-      kit: 'paper-teal',
+      kit: 'paper-blue',
       look: 'clean',
       edges: 9,
     });

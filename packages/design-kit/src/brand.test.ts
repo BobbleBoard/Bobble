@@ -7,7 +7,7 @@ import { describeIssues, isLavender, isPurple } from './validate.ts';
 
 const TIDEWELL = `---
 name: Tidewell
-kit: paper-teal   # the base
+kit: paper-blue   # the base
 accent: "#0E7C7B"
 palette: ["#0E7C7B", '#E4572E', 2B5C8A]
 colours:
@@ -26,7 +26,7 @@ describe('parseBrandMd', () => {
     expect(f.problems).toEqual([]);
     expect(f.brand).toEqual({
       name: 'Tidewell',
-      kit: 'paper-teal',
+      kit: 'paper-blue',
       accent: '#0E7C7B',
       palette: ['#0E7C7B', '#E4572E', '#2B5C8A'],
       ink: '#1D1D1F',
@@ -152,7 +152,7 @@ describe('loadProjectKit — brand.md wins, then the setting, then the default',
     ).toBe('fog');
     const d = await loadProjectKit({ root: '/w/p', readFile: files({}) });
     expect(d.source).toBe('default');
-    expect(d.kit.id).toBe('paper-teal');
+    expect(d.kit.id).toBe('paper-blue');
     const unknown = await loadProjectKit({ kitName: 'neon' });
     expect(unknown.notes[0]).toMatch(/no kit called "neon"/);
   });

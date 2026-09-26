@@ -128,7 +128,7 @@ async function finishedPayload() {
       content: readFileSync(path.join(APP_ROOT, 'resources/mermaid/mermaid.min.js'), 'utf8'),
     });
     await page.addScriptTag({ content: dp.PAGE_SCRIPT });
-    const kit = dk.kitOrDefault('paper-teal');
+    const kit = dk.kitOrDefault('paper-blue');
     const reply = await dp.runDiagram(
       {
         parse: (s) => page.evaluate((x) => window.__pdParse(x), s),

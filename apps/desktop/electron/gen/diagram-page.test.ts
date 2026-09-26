@@ -32,7 +32,7 @@ import {
   stylesItself,
 } from './diagram-page';
 
-const kit = kitOrDefault('paper-teal');
+const kit = kitOrDefault('paper-blue');
 const themes = { light: diagramTheme(kit, 'light', 'mac'), dark: diagramTheme(kit, 'dark', 'mac') };
 
 /** The research's §2.2.3 flow, as Mermaid's parser hands it back. */

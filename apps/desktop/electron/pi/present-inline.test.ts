@@ -87,7 +87,7 @@ const DIAGRAM_SIDE = JSON.stringify({
   schema: 1,
   title: 'Order fulfilment',
   kind: 'flowchart',
-  kit: 'paper-teal',
+  kit: 'paper-blue',
   look: 'clean',
   source: 'flowchart LR\n  A --> B',
   nodes: ['A', 'B'],
@@ -114,7 +114,7 @@ describe('a presented diagram', () => {
     expect(payload.diagram).toMatchObject({
       title: 'Order fulfilment',
       kind: 'flowchart',
-      kit: 'paper-teal',
+      kit: 'paper-blue',
       source: 'flowchart LR\n  A --> B',
       light: { svg: DIAGRAM_LIGHT, width: 1332, height: 322, paper: '#FBFAF7' },
       dark: { width: 1332, height: 322, paper: '#191816' },

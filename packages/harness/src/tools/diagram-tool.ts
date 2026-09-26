@@ -352,7 +352,7 @@ export function registerDiagramTool(pi: ExtensionAPI, deps: DiagramToolDeps): vo
       kit: Type.Optional(
         Type.String({
           description:
-            'A design kit to wear instead of the project’s: paper-teal, fog, bone-oxblood, slate-cobalt, sage-moss, graphite-amber. Usually leave it out.',
+            'A design kit to wear instead of the project’s: paper-blue, fog, bone-oxblood, slate-cobalt, sage-moss, graphite-amber. Usually leave it out.',
         }),
       ),
       out: Type.Optional(

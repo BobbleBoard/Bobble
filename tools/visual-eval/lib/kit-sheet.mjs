@@ -121,7 +121,7 @@ export async function renderDiagramTool(
   mermaidJs,
   source,
   outStem,
-  { kit: kitId = 'paper-teal', title = '', subtitle = '' } = {},
+  { kit: kitId = 'paper-blue', title = '', subtitle = '' } = {},
 ) {
   const dp = await importTs('apps/desktop/electron/gen/diagram-page.ts');
   const dk = await importTs('packages/design-kit/src/index.ts');

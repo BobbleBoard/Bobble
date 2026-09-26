@@ -13,21 +13,23 @@
 import boneOxblood from './kits/bone-oxblood.json';
 import fog from './kits/fog.json';
 import graphiteAmber from './kits/graphite-amber.json';
-import paperTeal from './kits/paper-teal.json';
+import paperBlue from './kits/paper-blue.json';
 import sageMoss from './kits/sage-moss.json';
 import slateCobalt from './kits/slate-cobalt.json';
 import { type Kit, parseKit } from './schema.ts';
 
 /**
  * The house default: the research's own house theme (the flow-diagram and
- * pitch-deck prototypes, the Tidewell exemplars) — ivory, warm ink and the
- * mark's teal (memory `pi-desktop-design-palettes`: "Paper & teal … the only
- * one that stops the app reading as System Settings").
+ * pitch-deck prototypes, the Tidewell exemplars) — ivory and warm ink — in the
+ * app's own blue (#0071E3 / #0A84FF, the chrome's one accent). It was the
+ * mark's teal until the user (2026-09-26), on a maths page: "this greenish/pale
+ * blue isn't that great, we have a universal sort of blue style color across
+ * the app, keep using it".
  */
-export const DEFAULT_KIT_ID = 'paper-teal';
+export const DEFAULT_KIT_ID = 'paper-blue';
 
 export const KITS: readonly Kit[] = [
-  paperTeal,
+  paperBlue,
   fog,
   boneOxblood,
   slateCobalt,
@@ -37,7 +39,7 @@ export const KITS: readonly Kit[] = [
 
 export const KIT_IDS: readonly string[] = KITS.map((k) => k.id);
 
-/** "Paper & teal", "paper_teal", "paper teal" → the kit; unknown → undefined. */
+/** "Paper & blue", "paper_blue", "paper blue" → the kit; unknown → undefined. */
 export function kitById(name: string | undefined | null): Kit | undefined {
   if (typeof name !== 'string') return undefined;
   const key = name

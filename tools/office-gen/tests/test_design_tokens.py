@@ -30,7 +30,7 @@ KIT_FILES = sorted(KITS_DIR.glob("*.json"))
 def test_the_export_holds_every_kit_file_and_nothing_else():
     assert len(KIT_FILES) >= 6
     assert sorted(dt.kit_ids()) == sorted(p.stem for p in KIT_FILES)
-    assert dt.kit_ids()[0] == dt.load()["default"] == "paper-teal"
+    assert dt.kit_ids()[0] == dt.load()["default"] == "paper-blue"
 
 
 @pytest.mark.parametrize("path", KIT_FILES, ids=lambda p: p.stem)
@@ -57,9 +57,9 @@ def test_the_gates_hold_in_python_arithmetic_too(path):
 
 
 def test_lookup_is_forgiving_and_falls_back_to_the_default():
-    assert dt.kit("Paper & teal")["id"] == "paper-teal"
+    assert dt.kit("Paper & blue")["id"] == "paper-blue"
     assert dt.kit("slate_cobalt")["id"] == "slate-cobalt"
-    assert dt.kit("no-such-kit")["id"] == "paper-teal"
+    assert dt.kit("no-such-kit")["id"] == "paper-blue"
     assert dt.colours("fog", "dark")["paper"] == "#161718"
     with pytest.raises(ValueError):
         dt.colours("fog", "sepia")
@@ -81,8 +81,8 @@ def test_a_document_names_a_family_it_can_carry():
 def test_fonts_and_the_renderers_own_palette():
     assert dt.first_family(dt.font_stack("bone-oxblood", "display", "mac")) == "Iowan Old Style"
     assert dt.first_family(dt.font_stack("fog", "text", "mac")) == "Helvetica Neue"
-    p = dt.kit_palette("paper-teal")
-    assert (p.primary, p.accent, p.paper) == ("#00756E", "#D0661C", "#FBFAF7")
+    p = dt.kit_palette("paper-blue")
+    assert (p.primary, p.accent, p.paper) == ("#0066CC", "#D0661C", "#FBFAF7")
     assert p.on(p.deep) == p.paper
     # Every kit's primary reads as a heading — palette.build()'s own 4.5:1 rule.
     for kit_id in dt.kit_ids():

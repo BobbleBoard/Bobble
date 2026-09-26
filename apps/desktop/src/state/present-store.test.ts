@@ -340,7 +340,7 @@ describe('a chart, or a small SVG, is shown IN the thread', () => {
   const DIAGRAM = {
     title: 'Order fulfilment',
     kind: 'flowchart',
-    kit: 'paper-teal',
+    kit: 'paper-blue',
     source: 'flowchart LR\n  A --> B',
     light: { svg: '<svg>light</svg>', width: 1332, height: 322, paper: '#FBFAF7' },
     dark: { svg: '<svg>dark</svg>', width: 1332, height: 322, paper: '#191816' },

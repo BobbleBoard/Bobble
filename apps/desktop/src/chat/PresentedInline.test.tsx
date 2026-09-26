@@ -159,7 +159,7 @@ describe('PresentedInline', () => {
       diagram: {
         title: 'Order fulfilment',
         kind: 'flowchart',
-        kit: 'paper-teal',
+        kit: 'paper-blue',
         source: 'flowchart LR\n  A([Order placed]) --> B{Payment ok?}',
         light: {
           svg: '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="20"><text>light</text></svg>',

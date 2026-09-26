@@ -64,7 +64,7 @@ describe('createLiveQueue — one frame at a time, the newest per call', () => {
         width: 1,
         height: 1,
         kind: 'flowchart',
-        kit: 'paper-teal',
+        kit: 'paper-blue',
         paper: '#FFFFFF',
         source: r.source,
       };

@@ -4,7 +4,7 @@
  * The design kit documents, decks, charts and pages are made in
  * (deliverables/research/visual-quality.md §4.6, filled by VQ-04):
  *
- *   - `kit`    — which kit (`@pi-desktop/design-kit` ids: paper-teal, fog,
+ *   - `kit`    — which kit (`@pi-desktop/design-kit` ids: paper-blue, fog,
  *                bone-oxblood, slate-cobalt, sage-moss, graphite-amber). A
  *                project's own `.bobble/brand.md` wins over it.
  *   - `images` — pictures in documents and pages: off, draft (FLUX.2 klein,
@@ -49,7 +49,7 @@ export interface DesignSettings {
 }
 
 /** The house default kit — design-kit's DEFAULT_KIT_ID (kept literal: this file is renderer-safe and dependency-free). */
-export const DEFAULT_DESIGN_KIT = 'paper-teal';
+export const DEFAULT_DESIGN_KIT = 'paper-blue';
 
 export const DEFAULT_DESIGN_SETTINGS: DesignSettings = {
   enabled: false,
