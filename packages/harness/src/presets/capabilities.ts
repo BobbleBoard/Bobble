@@ -44,6 +44,7 @@ import { computerUse } from './capabilities/computer-use.js';
 import { connectors } from './capabilities/connectors.js';
 import { diagram } from './capabilities/diagram.js';
 import { generation } from './capabilities/generation.js';
+import { math } from './capabilities/math.js';
 import { memory } from './capabilities/memory.js';
 import { office } from './capabilities/office.js';
 import { personal } from './capabilities/personal.js';
@@ -83,6 +84,7 @@ export const CAPABILITIES: readonly Capability[] = [
   svg,
   diagram,
   chart,
+  math,
   office,
   threeD,
   memory,

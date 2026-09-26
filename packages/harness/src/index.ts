@@ -140,6 +140,7 @@ import {
 import { wouldHang } from './tools/hang-guard.js';
 import { registerImageTools } from './tools/image-tools.js';
 import { applyBias, lastAssistantThought, planBias } from './tools/intent-bias.js';
+import { projectMathKit, registerMathTool } from './tools/math-tool.js';
 import { registerModelTools } from './tools/model-tools.js';
 import {
   OFFICE_MAKE_TOOL,
@@ -2754,6 +2755,17 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     bridge: readSubagentDepth(process.env) === 0 ? presentBridgeFromEnv() : null,
     root: (ctxCwd) => resolveWorkspaceRoot(ctxCwd),
     kit: (root) => projectChartKit(root),
+  });
+
+  /*
+   * `math` — a maths or physics visual from a spec: plots with sliders,
+   * figures, steps tied to them, one standard page, checked (math-tool.ts,
+   * @pi-desktop/mathviz). Pure TypeScript like the chart, so in every chat.
+   */
+  registerMathTool(pi, {
+    bridge: readSubagentDepth(process.env) === 0 ? presentBridgeFromEnv() : null,
+    root: (ctxCwd) => resolveWorkspaceRoot(ctxCwd),
+    kit: (root) => projectMathKit(root),
   });
 
   /*

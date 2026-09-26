@@ -91,7 +91,9 @@ describe('the skill, attached once', () => {
       'Check',
       'practice problem',
       'animation',
-      'present',
+      // Figures, graphs and animations are the math command's, not hand-written SVG or HTML.
+      '`math`',
+      'name.math.json',
     ]) {
       expect(body).toContain(must);
     }

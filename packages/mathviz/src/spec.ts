@@ -1,0 +1,786 @@
+/**
+ * THE MATH VISUAL, AS A MODEL WRITES IT.
+ *
+ * the user (2026-09-25), on a 4B's hand-written Fourier page: "really low quality
+ * and generally bad feeling … emojis absolutely not, wall of text mixed with
+ * bullets neither with reference to what the visual / interactiveness is, not
+ * tied in … likely ideal to make a specialized extension for math stuffs like
+ * we have for dataviz". So the model writes WHAT to show — curves as
+ * expressions, a figure's shapes, sliders — and the explanation as steps that
+ * each point at part of it; this package decides how it looks, and checks it
+ * before anyone sees it.
+ *
+ * One set of sliders drives everything: a curve is an expression in the plot's
+ * variable and the sliders; a point, a shape's corner, a label's number may be
+ * an expression in the sliders. So a slider with a Play button moves the mass
+ * on the spring AND the dot on its x(t) graph — the animation is the maths.
+ *
+ * Forgiving on the way in (the chart spec's lesson): numbers may be expressions
+ * ("-pi", "2pi"), a point may be [x, y] or {x, y}, a curve may be a bare
+ * string, a step may be a bare string, snake_case is read. Colours are ROLES,
+ * never hex: a model cannot pick an unreadable one.
+ */
+import { ExprError, numberOf, parse } from './expr.js';
+
+export type Role = 'main' | 'second' | 'third' | 'reference' | 'highlight';
+export type Fill = 'none' | 'tint' | 'main' | 'second' | 'third' | 'shade';
+/** A number, or an expression in the sliders ("A*cos(w*t)"). */
+export type Num = number | string;
+export type Xy = readonly [Num, Num];
+
+export interface Param {
+  readonly name: string;
+  readonly label: string;
+  readonly min: number;
+  readonly max: number;
+  readonly step: number;
+  readonly value: number;
+}
+
+/** What every drawn thing carries: its id, and the step it first appears at (1 = from the start). */
+interface Item {
+  readonly id: string;
+  readonly appear: number;
+}
+
+export interface Curve extends Item {
+  /** y as an expression in the plot's variable; or, parametric, x and y in `t` over `t`'s range. */
+  readonly expr?: string;
+  readonly px?: string;
+  readonly py?: string;
+  readonly t?: readonly [Num, Num];
+  readonly label?: string;
+  readonly role: Role;
+  readonly dashed: boolean;
+}
+
+export interface PlotPoint extends Item {
+  readonly x: Num;
+  /** Its height; with none, the point sits on curve `on` at its x. */
+  readonly y?: Num;
+  readonly on?: string;
+  readonly label?: string;
+  readonly role: Role;
+}
+
+/** Shading between a curve and the axis, from one x to another. */
+export interface Area extends Item {
+  readonly under: string;
+  readonly from: Num;
+  readonly to: Num;
+  readonly label?: string;
+  readonly role: Role;
+}
+
+/** The tangent to a curve at an x — its slope worked out numerically. */
+export interface Tangent extends Item {
+  readonly to: string;
+  readonly at: Num;
+  readonly label?: string;
+  readonly role: Role;
+}
+
+/** n rectangles under a curve: the sum an integral is the limit of. */
+export interface Riemann extends Item {
+  readonly under: string;
+  readonly from: Num;
+  readonly to: Num;
+  readonly n: Num;
+  readonly rule: 'left' | 'mid' | 'right';
+  readonly role: Role;
+}
+
+export interface PlotSpec {
+  /** The plot's own variable — `x` unless the model named another. */
+  readonly v: string;
+  readonly x: {
+    readonly min: number;
+    readonly max: number;
+    readonly label?: string;
+    readonly pi: boolean;
+  };
+  readonly y: { readonly min?: number; readonly max?: number; readonly label?: string };
+  readonly curves: readonly Curve[];
+  readonly points: readonly PlotPoint[];
+  readonly areas: readonly Area[];
+  readonly tangents: readonly Tangent[];
+  readonly riemann: readonly Riemann[];
+}
+
+export type Anchor = 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw';
+
+export type Shape = Item &
+  (
+    | {
+        readonly kind: 'point';
+        readonly at: Xy;
+        readonly label?: string;
+        readonly place?: Anchor;
+        readonly role: Role;
+      }
+    | {
+        readonly kind: 'segment' | 'vector';
+        readonly from: Xy;
+        readonly to: Xy;
+        readonly label?: string;
+        readonly dashed: boolean;
+        readonly role: Role;
+      }
+    | {
+        readonly kind: 'polygon';
+        readonly points: readonly Xy[];
+        readonly fill: Fill;
+        readonly label?: string;
+        readonly dashed: boolean;
+      }
+    | {
+        readonly kind: 'circle';
+        readonly center: Xy;
+        readonly r: Num;
+        readonly fill: Fill;
+        readonly label?: string;
+        readonly role: Role;
+      }
+    | {
+        readonly kind: 'angle';
+        readonly at: Xy;
+        readonly from: Xy;
+        readonly to: Xy;
+        readonly label?: string;
+        readonly right: boolean;
+      }
+    | {
+        readonly kind: 'dimension';
+        readonly from: Xy;
+        readonly to: Xy;
+        readonly label: string;
+        readonly offset: number;
+      }
+    | { readonly kind: 'label'; readonly at: Xy; readonly text: string }
+    | {
+        readonly kind: 'box3d';
+        readonly at: Xy;
+        readonly size: Num;
+        readonly depth: Num;
+        readonly shade: 'right' | 'top' | 'front' | 'none';
+        /** Measures along the front-bottom, front-right and receding edges. */
+        readonly labels: { readonly w?: string; readonly h?: string; readonly d?: string };
+      }
+    | {
+        readonly kind: 'spring';
+        readonly from: Xy;
+        readonly to: Xy;
+        readonly coils: number;
+        readonly label?: string;
+      }
+  );
+
+export interface FigureSpec {
+  readonly x: readonly [number, number];
+  readonly y: readonly [number, number];
+  readonly shapes: readonly Shape[];
+}
+
+export interface Step {
+  readonly text: string;
+  /** Ids drawn at full strength while this step is read; the rest step back. */
+  readonly highlight: readonly string[];
+  /** Slider values this step moves to (animated). */
+  readonly set: Readonly<Record<string, Num>>;
+}
+
+export interface MathSpec {
+  readonly title: string;
+  readonly caption?: string;
+  readonly params: readonly Param[];
+  readonly plot?: PlotSpec;
+  readonly figure?: FigureSpec;
+  readonly steps: readonly Step[];
+  /** The slider the Play button runs, if any. */
+  readonly play?: string;
+  /** Notes about what was read differently than written ("emoji removed …"). */
+  readonly notes: readonly string[];
+}
+
+/** A problem with what was written, said so the next call can fix it. */
+export class SpecError extends Error {}
+
+type Loose = Record<string, unknown>;
+const isObj = (v: unknown): v is Loose => typeof v === 'object' && v !== null && !Array.isArray(v);
+const str = (v: unknown): string | undefined =>
+  typeof v === 'string' && v.trim() !== ''
+    ? v.trim()
+    : typeof v === 'number'
+      ? String(v)
+      : undefined;
+/** A field under any of its names, camelCase or snake_case. */
+function get(o: Loose, ...keys: string[]): unknown {
+  for (const key of keys) {
+    const v = o[key] ?? o[key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`)];
+    if (v !== undefined && v !== null) return v;
+  }
+  return undefined;
+}
+const list = (v: unknown): unknown[] => (v === undefined ? [] : Array.isArray(v) ? v : [v]);
+
+function num(v: unknown, what: string): number {
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  if (typeof v === 'string' && v.trim() !== '') {
+    try {
+      return numberOf(v);
+    } catch (e) {
+      throw new SpecError(`${what}: ${e instanceof ExprError ? e.message : String(e)}`);
+    }
+  }
+  throw new SpecError(`${what} needs a number`);
+}
+
+/** A number or an expression over the sliders — checked now, evaluated when drawn. */
+function numOrExpr(v: unknown, what: string, names: readonly string[]): Num {
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  const s = str(v);
+  if (s === undefined) throw new SpecError(`${what} needs a number or an expression`);
+  try {
+    parse(s, names);
+  } catch (e) {
+    throw new SpecError(`${what} "${s}": ${e instanceof ExprError ? e.message : String(e)}`);
+  }
+  return /^-?\d+(\.\d+)?$/.test(s) ? Number(s) : s;
+}
+
+/** "-pi..pi", "0 to 10", [a, b] or {min, max}. */
+function range(v: unknown, what: string): { min: number; max: number; pi: boolean } {
+  let a: unknown;
+  let b: unknown;
+  if (Array.isArray(v) && v.length === 2) [a, b] = v;
+  else if (isObj(v)) [a, b] = [v.min ?? v.from, v.max ?? v.to];
+  else if (typeof v === 'string') [a, b] = v.split(/\s*(?:\.\.\.?|\bto\b|,)\s*/);
+  else throw new SpecError(`${what} needs a range like "-pi..pi" or [0, 10]`);
+  const min = num(a, `${what} min`);
+  const max = num(b, `${what} max`);
+  if (!(max > min)) throw new SpecError(`${what}: its max (${max}) must be above its min (${min})`);
+  return { min, max, pi: /pi|π/i.test(`${String(a)} ${String(b)}`) };
+}
+
+const ROLES: readonly Role[] = ['main', 'second', 'third', 'reference', 'highlight'];
+function role(v: unknown, fallback: Role): Role {
+  const s = str(v)?.toLowerCase();
+  if (s === undefined) return fallback;
+  if ((ROLES as readonly string[]).includes(s)) return s as Role;
+  if (/target|ideal|exact|limit|reference|compare|guide|grey|gray/.test(s)) return 'reference';
+  if (/accent|primary|first/.test(s)) return 'main';
+  if (/secondary|other/.test(s)) return 'second';
+  if (/emph|attention|focus/.test(s)) return 'highlight';
+  return fallback;
+}
+function fill(v: unknown): Fill {
+  const s = str(v)?.toLowerCase();
+  if (s === undefined || s === 'false' || s === 'none') return 'none';
+  if (['tint', 'main', 'second', 'third', 'shade'].includes(s)) return s as Fill;
+  if (/grey|gray|shade|dark/.test(s)) return 'shade';
+  return 'tint';
+}
+const appearOf = (v: Loose): number => {
+  const a = get(v, 'appear', 'step', 'fromStep', 'showAt');
+  return a === undefined ? 1 : Math.max(1, Math.round(num(a, 'appear')));
+};
+
+/** A slider: {name, min, max, value}, or "n = 5 in 1..25". */
+function param(v: unknown, i: number): Param {
+  if (typeof v === 'string') {
+    const m = /^\s*([a-zA-Z_]\w*)\s*=\s*(\S+)\s+(?:in|from|over)\s+(.+)$/.exec(v);
+    if (m === null) throw new SpecError(`slider ${i + 1}: write it as "n = 5 in 1..25"`);
+    const r = range(m[3], `slider ${m[1]}`);
+    return param({ name: m[1], value: m[2], min: r.min, max: r.max }, i);
+  }
+  if (!isObj(v)) throw new SpecError(`slider ${i + 1} needs {name, min, max, value}`);
+  const name = str(v.name ?? v.id ?? v.var);
+  if (name === undefined || !/^[a-zA-Z_]\w*$/.test(name)) {
+    throw new SpecError(`slider ${i + 1} needs a name made of letters (like n, a, omega)`);
+  }
+  let min: number;
+  let max: number;
+  if (v.min === undefined && v.from === undefined && v.range !== undefined) {
+    ({ min, max } = range(v.range, `slider ${name}`));
+  } else {
+    min = num(v.min ?? v.from, `slider ${name} min`);
+    max = num(v.max ?? v.to, `slider ${name} max`);
+  }
+  if (!(max > min)) throw new SpecError(`slider ${name}: max must be above min`);
+  // Whole numbers only for a count (n terms, k sides); a time or an amplitude slides smoothly even over 0…4.
+  const label = str(v.label) ?? name;
+  const counts =
+    /^(n|N|k|K|j|terms?|count|order|sides|steps|samples)$/.test(name) ||
+    /\b(number of|terms|count|how many)\b/i.test(label);
+  const step =
+    v.step !== undefined
+      ? num(v.step, `slider ${name} step`)
+      : counts && Number.isInteger(min) && Number.isInteger(max)
+        ? 1
+        : (max - min) / 400;
+  const value = Math.min(
+    max,
+    Math.max(min, v.value !== undefined ? num(v.value, `slider ${name} value`) : min),
+  );
+  return { name, label, min, max, step, value };
+}
+
+const RESERVED = new Set(['pi', 'e', 'tau', 'x', 'y', 't']);
+
+function curve(v: unknown, i: number, fallback: Role, pv: string, names: readonly string[]): Curve {
+  if (typeof v === 'string') {
+    const expr = v.replace(/^\s*[yf]\s*(\(\s*\w+\s*\))?\s*=\s*/, '');
+    numOrExpr(expr, `curve ${i + 1}`, [pv, ...names]);
+    return { id: `c${i + 1}`, appear: 1, expr, role: fallback, dashed: false };
+  }
+  if (!isObj(v)) throw new SpecError(`curve ${i + 1} needs {expr, label}`);
+  const id = str(v.id) ?? `c${i + 1}`;
+  const r = role(v.role ?? v.color ?? v.colour, fallback);
+  const label = str(v.label ?? v.name);
+  const base = {
+    id,
+    appear: appearOf(v),
+    ...(label !== undefined ? { label } : {}),
+    role: r,
+    dashed: v.dashed === true || v.dash === true || r === 'reference',
+  };
+  const px = str(v.px ?? get(v, 'xExpr', 'xt'));
+  const py = str(v.py ?? get(v, 'yExpr', 'yt'));
+  const tIn = v.t ?? v.range ?? get(v, 'tRange');
+  if (
+    (px !== undefined && py !== undefined) ||
+    (typeof v.x === 'string' && typeof v.y === 'string' && tIn !== undefined)
+  ) {
+    const xs = px ?? (v.x as string);
+    const ys = py ?? (v.y as string);
+    const tr = range(tIn ?? [0, 2 * Math.PI], `curve ${id} t`);
+    numOrExpr(xs, `curve ${id} x`, ['t', ...names]);
+    numOrExpr(ys, `curve ${id} y`, ['t', ...names]);
+    return { ...base, px: xs, py: ys, t: [tr.min, tr.max] };
+  }
+  const raw = str(v.expr ?? v.f ?? v.y ?? v.fn ?? v.function ?? v.equation);
+  if (raw === undefined)
+    throw new SpecError(`curve ${id} needs its expression as expr, like "sin(x)"`);
+  const expr = raw.replace(/^\s*[yf]\s*(\(\s*\w+\s*\))?\s*=\s*/, '');
+  numOrExpr(expr, `curve ${id}`, [pv, ...names]);
+  return { ...base, expr };
+}
+
+function plot(v: Loose, names: readonly string[]): PlotSpec {
+  const pv = str(get(v, 'var', 'variable'))?.replace(/[^a-zA-Z_]/g, '') || 'x';
+  const xIn = v.x ?? get(v, 'domain', 'xRange');
+  const xObj = isObj(xIn) ? xIn : {};
+  const x = range(isObj(xIn) && xIn.range !== undefined ? xIn.range : (xIn ?? [-10, 10]), 'x');
+  const yIn = v.y ?? get(v, 'yRange');
+  const yObj = isObj(yIn) ? yIn : {};
+  const yHasRange =
+    yIn !== undefined &&
+    !(isObj(yIn) && yIn.min === undefined && yIn.max === undefined && yIn.range === undefined);
+  const y = yHasRange
+    ? range(isObj(yIn) && yIn.range !== undefined ? yIn.range : yIn, 'y')
+    : undefined;
+  const curvesIn = list(v.curves ?? v.functions ?? v.exprs ?? v.expr);
+  if (curvesIn.length === 0)
+    throw new SpecError('a plot needs curves: [{"expr": "sin(x)", "label": "sin x"}]');
+  // Unnamed colours go in order to the curves that are not references: the first real curve is `main`.
+  const used = new Set<Role>();
+  const curves = curvesIn.map((c, i) => {
+    const next = (['main', 'second', 'third'] as const).find((r) => !used.has(r)) ?? 'third';
+    const cv = curve(c, i, next, pv, names);
+    used.add(cv.role);
+    return cv;
+  });
+  const ids = new Set(curves.map((c) => c.id));
+  const curveRef = (r: unknown, what: string): string => {
+    const s = str(r) ?? curves[0]?.id ?? '';
+    if (!ids.has(s))
+      throw new SpecError(`${what} names curve "${s}" — the curves are ${[...ids].join(', ')}`);
+    return s;
+  };
+  const xLabel = str(xObj.label ?? get(v, 'xLabel'));
+  const yLabel = str(yObj.label ?? get(v, 'yLabel'));
+  return {
+    v: pv,
+    x: { min: x.min, max: x.max, pi: x.pi, ...(xLabel !== undefined ? { label: xLabel } : {}) },
+    y: {
+      ...(y !== undefined ? { min: y.min, max: y.max } : {}),
+      ...(yLabel !== undefined ? { label: yLabel } : {}),
+    },
+    curves,
+    points: list(v.points).map((p, i) => {
+      if (!isObj(p)) throw new SpecError(`point ${i + 1} needs {x, y, label}`);
+      const id = str(p.id) ?? `p${i + 1}`;
+      const at = p.at ?? p.xy;
+      const [px, py] = Array.isArray(at) ? at : [p.x, p.y];
+      const label = str(p.label);
+      const yPart =
+        py !== undefined && py !== null && str(py) !== undefined
+          ? { y: numOrExpr(py, `point ${id} y`, names) }
+          : { on: curveRef(p.on ?? p.curve, `point ${id}`) };
+      return {
+        id,
+        appear: appearOf(p),
+        x: numOrExpr(px, `point ${id} x`, names),
+        ...yPart,
+        ...(label !== undefined ? { label } : {}),
+        role: role(p.role ?? p.color, 'highlight'),
+      };
+    }),
+    areas: list(v.areas ?? v.area ?? v.shade).map((a, i) => {
+      if (!isObj(a)) throw new SpecError(`area ${i + 1} needs {under, from, to}`);
+      const id = str(a.id) ?? `a${i + 1}`;
+      const label = str(a.label);
+      return {
+        id,
+        appear: appearOf(a),
+        under: curveRef(a.under ?? a.curve, `area ${id}`),
+        from: numOrExpr(a.from ?? a.a ?? x.min, `area ${id} from`, names),
+        to: numOrExpr(a.to ?? a.b ?? x.max, `area ${id} to`, names),
+        ...(label !== undefined ? { label } : {}),
+        role: role(a.role ?? a.color, 'main'),
+      };
+    }),
+    tangents: list(v.tangents ?? v.tangent).map((t, i) => {
+      if (!isObj(t)) throw new SpecError(`tangent ${i + 1} needs {to, at}`);
+      const id = str(t.id) ?? `t${i + 1}`;
+      const label = str(t.label);
+      return {
+        id,
+        appear: appearOf(t),
+        to: curveRef(t.to ?? t.curve ?? t.of, `tangent ${id}`),
+        at: numOrExpr(t.at ?? t.x, `tangent ${id} at`, names),
+        ...(label !== undefined ? { label } : {}),
+        role: role(t.role ?? t.color, 'highlight'),
+      };
+    }),
+    riemann: list(v.riemann ?? v.rectangles).map((r, i) => {
+      if (!isObj(r)) throw new SpecError(`riemann ${i + 1} needs {under, from, to, n}`);
+      const id = str(r.id) ?? `r${i + 1}`;
+      const rule = str(r.rule ?? r.method)?.toLowerCase();
+      return {
+        id,
+        appear: appearOf(r),
+        under: curveRef(r.under ?? r.curve, `riemann ${id}`),
+        from: numOrExpr(r.from ?? x.min, `riemann ${id} from`, names),
+        to: numOrExpr(r.to ?? x.max, `riemann ${id} to`, names),
+        n: numOrExpr(r.n ?? 8, `riemann ${id} n`, names),
+        rule: rule === 'left' || rule === 'right' ? rule : 'mid',
+        role: role(r.role ?? r.color, 'main'),
+      };
+    }),
+  };
+}
+
+const ANCHORS: readonly Anchor[] = ['n', 'ne', 'e', 'se', 's', 'sw', 'w', 'nw'];
+
+function shape(v: unknown, i: number, named: Map<string, Xy>, names: readonly string[]): Shape {
+  if (!isObj(v)) throw new SpecError(`shape ${i + 1} needs {kind, …}`);
+  const kind = str(v.kind ?? v.type ?? v.shape)?.toLowerCase();
+  const id = str(v.id) ?? `s${i + 1}`;
+  const label = str(v.label ?? v.text);
+  const L = label !== undefined ? { label } : {};
+  const appear = appearOf(v);
+  const xy = (p: unknown, what: string): Xy => {
+    if (typeof p === 'string' && named.has(p)) return named.get(p) as Xy;
+    if (Array.isArray(p) && p.length === 2)
+      return [numOrExpr(p[0], `${what} x`, names), numOrExpr(p[1], `${what} y`, names)];
+    if (isObj(p) && 'x' in p && 'y' in p)
+      return [numOrExpr(p.x, `${what} x`, names), numOrExpr(p.y, `${what} y`, names)];
+    const known = named.size > 0 ? ` or a point's id (${[...named.keys()].join(', ')})` : '';
+    throw new SpecError(`${what} needs a point: [x, y]${known}`);
+  };
+  const at = (k: string) => xy(v[k], `${id}.${k}`);
+  switch (kind) {
+    case 'point':
+    case 'dot':
+    case 'particle':
+    case 'molecule': {
+      const p = at('at' in v ? 'at' : 'p' in v ? 'p' : 'center');
+      named.set(id, p);
+      const place = str(v.place ?? v.anchor)?.toLowerCase() as Anchor | undefined;
+      return {
+        id,
+        appear,
+        kind: 'point',
+        at: p,
+        ...L,
+        ...(place && ANCHORS.includes(place) ? { place } : {}),
+        role: role(v.role ?? v.color, 'main'),
+      };
+    }
+    case 'segment':
+    case 'line':
+    case 'vector':
+    case 'arrow':
+    case 'force': {
+      const isVec = kind !== 'segment' && kind !== 'line';
+      return {
+        id,
+        appear,
+        kind: isVec ? 'vector' : 'segment',
+        from: at('from'),
+        to: at('to'),
+        ...L,
+        dashed: v.dashed === true || v.hidden === true,
+        role: role(v.role ?? v.color, isVec ? 'main' : 'reference'),
+      };
+    }
+    case 'rect':
+    case 'rectangle': {
+      if (v.points === undefined && v.vertices === undefined) {
+        const [x0, y0] = at('at' in v ? 'at' : 'from');
+        const w = numOrExpr(v.w ?? v.width, `${id}.w`, names);
+        const h = numOrExpr(v.h ?? v.height, `${id}.h`, names);
+        const add = (a: Num, b: Num): Num =>
+          typeof a === 'number' && typeof b === 'number' ? a + b : `(${a})+(${b})`;
+        return {
+          id,
+          appear,
+          kind: 'polygon',
+          points: [
+            [x0, y0],
+            [add(x0, w), y0],
+            [add(x0, w), add(y0, h)],
+            [x0, add(y0, h)],
+          ],
+          fill: fill(v.fill),
+          ...L,
+          dashed: v.dashed === true,
+        };
+      }
+      return polygonShape();
+    }
+    case 'polygon':
+    case 'triangle':
+    case 'square':
+      return polygonShape();
+    case 'circle':
+    case 'ball':
+    case 'disc':
+      return {
+        id,
+        appear,
+        kind: 'circle',
+        center: at('center' in v ? 'center' : 'at'),
+        r: numOrExpr(v.r ?? v.radius ?? 0.5, `${id}.r`, names),
+        fill: fill(v.fill ?? (kind === 'ball' ? 'main' : undefined)),
+        ...L,
+        role: role(v.role ?? v.color, 'main'),
+      };
+    case 'angle':
+      return {
+        id,
+        appear,
+        kind: 'angle',
+        at: at('at' in v ? 'at' : 'vertex'),
+        from: at('from'),
+        to: at('to'),
+        ...L,
+        right: v.right === true,
+      };
+    case 'dimension':
+    case 'measure':
+    case 'length':
+      if (label === undefined) throw new SpecError(`${id} (a dimension) needs its label, like "L"`);
+      return {
+        id,
+        appear,
+        kind: 'dimension',
+        from: at('from'),
+        to: at('to'),
+        label,
+        offset: v.offset !== undefined ? num(v.offset, `${id}.offset`) : 0.5,
+      };
+    case 'label':
+    case 'text':
+      if (label === undefined) throw new SpecError(`${id} (a label) needs text`);
+      return { id, appear, kind: 'label', at: at('at'), text: label };
+    case 'box3d':
+    case 'cube':
+    case 'box': {
+      const size = numOrExpr(v.size ?? v.side ?? 4, `${id}.size`, names);
+      const shadeIn = str(v.shade ?? v.shaded)?.toLowerCase();
+      const lab = isObj(v.labels) ? v.labels : {};
+      const edge = str(
+        v.edge ?? v.side_label ?? (typeof v.label === 'string' ? v.label : undefined),
+      );
+      const w = str(lab.w ?? lab.width) ?? edge;
+      const h = str(lab.h ?? lab.height) ?? edge;
+      const d = str(lab.d ?? lab.depth) ?? edge;
+      return {
+        id,
+        appear,
+        kind: 'box3d',
+        at: 'at' in v ? at('at') : [0, 0],
+        size,
+        depth:
+          v.depth !== undefined
+            ? numOrExpr(v.depth, `${id}.depth`, names)
+            : typeof size === 'number'
+              ? size * 0.5
+              : `(${size})*0.5`,
+        shade:
+          shadeIn === 'top'
+            ? 'top'
+            : shadeIn === 'front'
+              ? 'front'
+              : shadeIn === 'none' || shadeIn === 'false'
+                ? 'none'
+                : 'right',
+        labels: { ...(w ? { w } : {}), ...(h ? { h } : {}), ...(d ? { d } : {}) },
+      };
+    }
+    case 'spring':
+      return {
+        id,
+        appear,
+        kind: 'spring',
+        from: at('from'),
+        to: at('to'),
+        coils: v.coils !== undefined ? Math.max(3, Math.round(num(v.coils, `${id}.coils`))) : 10,
+        ...L,
+      };
+    default:
+      throw new SpecError(
+        `shape ${id}: kind "${kind ?? ''}" is not one of point, segment, vector, polygon, rect, circle, angle, dimension, label, box3d, spring`,
+      );
+  }
+  function polygonShape(): Shape {
+    const ptsIn = (v as Loose).points ?? (v as Loose).vertices;
+    if (!Array.isArray(ptsIn) || ptsIn.length < 3)
+      throw new SpecError(`${id} needs 3 or more points`);
+    return {
+      id,
+      appear,
+      kind: 'polygon',
+      points: ptsIn.map((p, k) => xy(p, `${id} point ${k + 1}`)),
+      fill: fill((v as Loose).fill),
+      ...L,
+      dashed: (v as Loose).dashed === true,
+    };
+  }
+}
+
+function figure(v: Loose, names: readonly string[]): FigureSpec {
+  const viewIn = isObj(v.view) ? v.view : v;
+  const x = range(viewIn.x ?? get(v, 'xRange') ?? [0, 10], 'figure x');
+  const y = range(viewIn.y ?? get(v, 'yRange') ?? [0, 10], 'figure y');
+  const shapesIn = list(v.shapes ?? v.elements ?? v.items);
+  if (shapesIn.length === 0) throw new SpecError('a figure needs shapes');
+  const named = new Map<string, Xy>();
+  return {
+    x: [x.min, x.max],
+    y: [y.min, y.max],
+    shapes: shapesIn.map((s, i) => shape(s, i, named, names)),
+  };
+}
+
+const EMOJI = /\p{Extended_Pictographic}|\u{FE0F}|\u{20E3}|[\u{1F1E6}-\u{1F1FF}]/gu;
+
+/** Emoji out: the user — "emojis absolutely not". */
+export function withoutEmoji(s: string): string {
+  return s
+    .replace(EMOJI, '')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
+}
+
+/** Every string in a value, emoji removed; true when any were. */
+function scrub<T>(v: T, found: { any: boolean }): T {
+  if (typeof v === 'string') {
+    const clean = withoutEmoji(v);
+    if (clean !== v.trim()) found.any = true;
+    return clean as T;
+  }
+  if (Array.isArray(v)) return v.map((x) => scrub(x, found)) as T;
+  if (isObj(v))
+    return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, scrub(x, found)])) as T;
+  return v;
+}
+
+/** The spec as the renderer reads it, from whatever the model wrote. */
+export function normalizeMathSpec(input: unknown): MathSpec {
+  let v: unknown = input;
+  if (typeof v === 'string') {
+    try {
+      v = JSON.parse(v);
+    } catch (e) {
+      throw new SpecError(`the spec is not JSON (${e instanceof Error ? e.message : String(e)})`);
+    }
+  }
+  if (!isObj(v)) throw new SpecError('the spec needs {"title", "plot" or "figure", "steps"}');
+  const found = { any: false };
+  v = scrub(v, found);
+  if (!isObj(v)) throw new SpecError('the spec needs {"title", "plot" or "figure", "steps"}');
+  const title = str(v.title);
+  if (title === undefined) throw new SpecError('the spec needs a title');
+  const plotIn = isObj(v.plot)
+    ? v.plot
+    : isObj(v.graph)
+      ? v.graph
+      : v.curves !== undefined
+        ? v
+        : undefined;
+  const figIn = isObj(v.figure)
+    ? v.figure
+    : isObj(v.diagram)
+      ? v.diagram
+      : v.shapes !== undefined
+        ? v
+        : undefined;
+  if (plotIn === undefined && figIn === undefined) {
+    throw new SpecError(
+      'the spec needs a "plot" (curves as expressions) or a "figure" (shapes), or both',
+    );
+  }
+  const paramsIn = [
+    ...list(v.params ?? v.sliders),
+    ...(plotIn !== undefined && plotIn !== v ? list(plotIn.params ?? plotIn.sliders) : []),
+  ];
+  const params = paramsIn.map(param);
+  const seen = new Set<string>();
+  for (const p of params) {
+    if (seen.has(p.name)) throw new SpecError(`two sliders are named ${p.name}`);
+    if (RESERVED.has(p.name) && p.name !== 't') {
+      throw new SpecError(
+        `a slider cannot be named ${p.name} — it means something already; call it ${p.name}0 or a`,
+      );
+    }
+    seen.add(p.name);
+  }
+  const names = params.map((p) => p.name);
+  const plotSpec = plotIn !== undefined ? plot(plotIn, names) : undefined;
+  if (plotSpec !== undefined && seen.has(plotSpec.v) && plotSpec.v !== 't') {
+    throw new SpecError(`the plot's variable ${plotSpec.v} is also a slider — rename the slider`);
+  }
+  const figSpec = figIn !== undefined ? figure(figIn, names) : undefined;
+  const stepsIn = list(v.steps ?? v.explanation ?? v.explain);
+  const steps: Step[] = stepsIn.map((s, i) => {
+    if (typeof s === 'string') return { text: s, highlight: [], set: {} };
+    if (!isObj(s)) throw new SpecError(`step ${i + 1} needs {text, highlight}`);
+    const text = str(s.text ?? s.say ?? s.body ?? s.explanation);
+    if (text === undefined) throw new SpecError(`step ${i + 1} needs its text`);
+    const set: Record<string, Num> = {};
+    for (const [k, val] of Object.entries(isObj(s.set) ? s.set : {}))
+      set[k] = numOrExpr(val, `step ${i + 1} sets ${k}`, names);
+    return {
+      text,
+      highlight: list(s.highlight ?? s.show ?? s.focus ?? s.points_at ?? s.refs).map((h) =>
+        String(h),
+      ),
+      set,
+    };
+  });
+  const playIn = str(v.play ?? v.animate);
+  const caption = str(v.caption ?? v.subtitle);
+  return {
+    title,
+    ...(caption !== undefined ? { caption } : {}),
+    params,
+    ...(plotSpec !== undefined ? { plot: plotSpec } : {}),
+    ...(figSpec !== undefined ? { figure: figSpec } : {}),
+    steps,
+    ...(playIn !== undefined && names.includes(playIn) ? { play: playIn } : {}),
+    notes: found.any ? ['emoji removed — the page carries none'] : [],
+  };
+}

@@ -38,6 +38,7 @@
     "@pi-desktop/design-kit": "workspace:*",
     "@pi-desktop/mac-computer-use": "workspace:*",
     "@pi-desktop/mac-connectors": "workspace:*",
+    "@pi-desktop/mathviz": "workspace:*",
     "@pi-desktop/tool-bus": "workspace:*",
     "@sinclair/typebox": "^0.34.49"
   },

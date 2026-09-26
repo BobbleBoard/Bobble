@@ -1,0 +1,27 @@
+{
+  "name": "@pi-desktop/mathviz",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "GPL-3.0-or-later",
+  "description": "Math and physics visuals from a spec: plots with sliders, figures with steps, an explanation tied to the figure \u2014 one standard page, checked before it is shown. Pure, no DOM.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "biome check .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@pi-desktop/design-kit": "workspace:*",
+    "katex": "^0.17.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.2",
+    "@pi-desktop/shared": "workspace:*",
+    "@types/node": "^24.13.2",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.10"
+  }
+}

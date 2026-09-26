@@ -138,6 +138,8 @@ const COMMAND_PATH_OVERRIDES: Readonly<Record<string, readonly string[]>> = {
   /* …and `diagram "Order fulfilment" --source '<mermaid>'`; its sibling
      derives to `diagram edit`. */
   diagram: [],
+  /* …and `math lesson.math.json` — one command, the spec its argument. */
+  math: [],
   /* `3d generate` / `3d refine` — derived, `generate_3d` under `3d` would
      read "3d generate 3d" (the group name is a suffix here, not a prefix). */
   generate_3d: ['generate'],

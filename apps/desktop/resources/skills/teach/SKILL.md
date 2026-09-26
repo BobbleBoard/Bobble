@@ -1,6 +1,6 @@
 ---
 name: teach
-description: Explain, tutor and work practice problems — maths, physics, chemistry and anything else someone wants to understand. Use when the user asks to learn or understand something ("explain", "why does", "walk me through", "help me with this problem/homework", "practice problems", "quiz me", "step by step"), or sends a problem to solve. Worked solutions in small steps, a labelled diagram when the problem has a shape, an animation only when the idea is change over time, and a practice problem to finish.
+description: Explain, tutor and work practice problems — maths, physics, chemistry and anything else someone wants to understand. Use when the user asks to learn or understand something ("explain", "why does", "walk me through", "help me with this problem/homework", "practice problems", "quiz me", "step by step"), or sends a problem to solve. Worked solutions in small steps, a labelled figure or graph (the math command) when the problem has a shape, an animation only when the idea is change over time, and a practice problem to finish.
 license: MIT (© 2026 Pi Desktop contributors)
 ---
 
@@ -24,15 +24,14 @@ Ask one "why" or "what if" question now and then ("why does the pressure not dep
 ## Pictures that teach
 
 - **Only what the explanation needs.** No decoration; every mark on a figure is there because the text uses it.
-- **Words beside the picture.** Put a label on the arrow, not in a legend; refer to the figure by the same names ("the arrow $u$").
-- **One colour, one quantity.** If velocity is blue in the figure, it is blue in the equation that uses it.
-- **Build up.** A complicated figure is shown in stages: the setup, then what changes, then the result.
+- **Words beside the picture.** A label on the arrow, not a legend; the text names the parts the figure names ("the arrow $u$").
+- **Build up.** A complicated figure arrives in stages: the setup, then what changes, then the result.
+- **Tie each step to the picture.** A step lights the parts it talks about; nothing in the text is left for the reader to find.
 
 Which tool:
-- **A labelled figure** (a physics setup, a geometry proof, apparatus, a molecule): write it as SVG yourself — lines, arrows with arrowheads, `<text>` labels — save it, and `present` it; the preview shows you what you drew, so fix what is off. Not an image generator: it cannot put a label or a value where it belongs.
+- **A figure, a graph of a function, or an animation** — a physics setup, a geometry proof, $y = \sin x$ with a slider, a mass on a spring: the `math` command. Write the spec to `name.math.json` — sliders, a plot of curves and/or a figure of labelled points, vectors and shapes, and 2–6 short steps that each `highlight` the parts they talk about (a part can appear from a later step) — run `math name.math.json`, and fix in the file whatever it reports. An animation is a slider (a time `t` the parts move with) and its Play button — only when the idea *is* change. Not hand-written SVG or HTML, and not an image generator: neither puts a label where it belongs.
+- **Measured data** (a table of readings, results by year): the chart tool.
 - **Steps, a process, a cycle:** the diagram tool.
-- **Data or a function** (a graph of $p$ against $1/V$, a titration curve): the chart tool.
-- **An animation:** only when the idea *is* movement or change — a molecule bouncing between walls, a wave travelling, triangles rearranging, a titration filling. Write a small HTML page — SVG moved by CSS transitions or `requestAnimationFrame` — slow, few moving parts, with Play and Step buttons so it can be paused at each stage; `present` it and check the preview. When the point is to compare two states, two still frames side by side beat an animation.
 
 ## Getting it right
 
