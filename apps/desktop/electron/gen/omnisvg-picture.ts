@@ -2,14 +2,15 @@
  * A reference image for OmniSVG, decoded and encoded by Electron: the pixels
  * go through gen-service's `omniSvgPicture` (on white, square, 448 × 448 — the
  * authors' `preprocess_image_for_svg`) and come back as a PNG for llama-server.
- * A file `nativeImage` cannot read goes as it is.
+ * A file `nativeImage` cannot read goes as it is. With it, where the picture
+ * has ink — what the candidates are measured against (gen-service pickScore).
  */
-import { omniSvgPicture } from '@pi-desktop/gen-service';
+import { contentBox, type Extent, omniSvgPicture } from '@pi-desktop/gen-service';
 import { nativeImage } from 'electron';
 
-export function omniSvgPictureBase64(file: Buffer): string {
+export function omniSvgPictureBase64(file: Buffer): { base64: string; box: Extent | null } {
   const image = nativeImage.createFromBuffer(file);
-  if (image.isEmpty()) return file.toString('base64');
+  if (image.isEmpty()) return { base64: file.toString('base64'), box: null };
   const { width, height } = image.getSize();
   // toBitmap is BGRA with alpha premultiplied; omniSvgPicture takes straight RGBA.
   const bgra = image.toBitmap();
@@ -31,8 +32,9 @@ export function omniSvgPictureBase64(file: Buffer): string {
     out[i + 2] = ready.data[i] ?? 255;
     out[i + 3] = 255;
   }
-  return nativeImage
+  const base64 = nativeImage
     .createFromBitmap(out, { width: ready.width, height: ready.height })
     .toPNG()
     .toString('base64');
+  return { base64, box: contentBox(ready) };
 }

@@ -77,7 +77,7 @@ export { JobQueue } from './job-queue.js';
 // OmniSVG — text/image → SVG through the app's own llama-server. Pure halves:
 // the request/reply shape and the token → SVG decoder (checked byte-for-byte
 // against the authors' decoder). The process that runs the server is the app's.
-export type { DecodedPath } from './omnisvg-decode.js';
+export type { DecodedPath, Extent } from './omnisvg-decode.js';
 export {
   colorFromToken,
   decodeOmniSvg,
@@ -86,12 +86,14 @@ export {
   OMNISVG_4B,
   OMNISVG_8B,
   type OmniSvgVariant,
+  pathsExtent,
   pathsToSvg,
+  pickScore,
   tokensToXY,
   xyToPaths,
 } from './omnisvg-decode.js';
 export type { Pixels } from './omnisvg-picture.js';
-export { OMNISVG_PICTURE_SIDE, omniSvgPicture } from './omnisvg-picture.js';
+export { contentBox, OMNISVG_PICTURE_SIDE, omniSvgPicture } from './omnisvg-picture.js';
 export type { OmniSvgCompletion, OmniSvgRequest, OmniSvgSampling } from './omnisvg-request.js';
 export {
   buildOmniSvgRequest,

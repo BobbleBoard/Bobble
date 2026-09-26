@@ -26,9 +26,11 @@ import {
   buildOmniSvgRequest,
   decodeOmniSvg,
   decodeOmniSvgPartial,
+  type Extent,
   idsFromCompletion,
   loopStart,
   MEDIA_MARKER,
+  pickScore,
 } from '@pi-desktop/gen-service';
 import {
   cacheRoot,
@@ -69,7 +71,7 @@ export interface OmniSvgParams {
    * IPC wiring, because the decoder (`nativeImage`) exists only in main; without
    * it the file goes as it is.
    */
-  readonly picture?: (file: Buffer) => string;
+  readonly picture?: (file: Buffer) => { readonly base64: string; readonly box: Extent | null };
 }
 
 /**
@@ -337,17 +339,28 @@ export async function generateSvg(
     ]);
 
     const candidates = Math.max(1, Math.min(6, params.candidates ?? 3));
-    const jobs: Array<{ source: string; body: ReturnType<typeof buildOmniSvgRequest> }> = [];
-    if (prompt !== '') jobs.push({ source: 'prompt', body: buildOmniSvgRequest({ prompt }) });
+    const jobs: Array<{
+      source: string;
+      body: ReturnType<typeof buildOmniSvgRequest>;
+      /** Where the traced picture has ink — what a candidate is measured against. */
+      target: Extent | null;
+    }> = [];
+    if (prompt !== '') {
+      jobs.push({ source: 'prompt', body: buildOmniSvgRequest({ prompt }), target: null });
+    }
     for (const img of images) {
       const file = await readFile(img);
-      const imageBase64 = params.picture?.(file) ?? file.toString('base64');
-      jobs.push({ source: path.basename(img), body: buildOmniSvgRequest({ imageBase64 }) });
+      const ready = params.picture?.(file) ?? { base64: file.toString('base64'), box: null };
+      jobs.push({
+        source: path.basename(img),
+        body: buildOmniSvgRequest({ imageBase64: ready.base64 }),
+        target: ready.box,
+      });
     }
 
     let n = 0;
     for (const job of jobs) {
-      let best: (OmniSvgOutput & { svg: string }) | null = null;
+      let best: (OmniSvgOutput & { svg: string; score: number }) | null = null;
       // `k` counts the samples that ran their course; one cut at a loop is drawn again.
       for (
         let k = 0, attempt = 0;
@@ -418,15 +431,15 @@ export async function generateSvg(
           tokPerSec: run.tokPerSec,
           tokens: run.ids.length,
           svg: decoded.svg,
+          score: pickScore({ stop: run.stop, extent: decoded.extent }, job.target),
         };
-        /* Best = finished on eos first, then the most paths — a shape that ran
-           into the token limit, or was cut at a loop, is one the model never
-           completed. */
-        const finished = (c: { stop: string }): boolean => c.stop === 'eos';
+        /* Best = the one that covers the picture (or the canvas) best, finishing
+           on eos breaking near ties; then the most paths (gen-service pickScore). */
+        // Scores within 0.02 are the same drawing, told apart by its detail.
         const better =
           best === null ||
-          (finished(cand) && !finished(best)) ||
-          (finished(cand) === finished(best) && cand.paths > best.paths);
+          cand.score > best.score + 0.02 ||
+          (Math.abs(cand.score - best.score) <= 0.02 && cand.paths > best.paths);
         if (better) best = cand;
       }
       if (best === null) {
@@ -446,7 +459,7 @@ export async function generateSvg(
         await mkdir(path.dirname(outputPath), { recursive: true });
         await writeFile(outputPath, best.svg, 'utf8');
       }
-      const { svg: _svg, ...out } = best;
+      const { svg: _svg, score: _score, ...out } = best;
       outputs.push({ ...out, outputPath });
     }
   } finally {

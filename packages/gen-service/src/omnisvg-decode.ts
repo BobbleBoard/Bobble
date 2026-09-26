@@ -252,7 +252,7 @@ export function pathsToSvg(paths: readonly DecodedPath[], c: OmniSvgVariant = OM
 export function decodeOmniSvg(
   ids: readonly number[],
   c: OmniSvgVariant = OMNISVG_4B,
-): { svg: string; paths: number } | null {
+): { svg: string; paths: number; extent: Extent | null } | null {
   const body: number[] = [];
   for (const t of ids) {
     if (t === c.eos) break;
@@ -261,7 +261,96 @@ export function decodeOmniSvg(
   }
   const paths = xyToPaths(tokensToXY(body, c), c);
   if (paths.length === 0) return null;
-  return { svg: pathsToSvg(paths, c), paths: paths.length };
+  return { svg: pathsToSvg(paths, c), paths: paths.length, extent: pathsExtent(paths, c.bbox) };
+}
+
+/** Where a drawing lies on its canvas, each edge as a fraction of the side (0 = left/top). */
+export interface Extent {
+  readonly x0: number;
+  readonly y0: number;
+  readonly x1: number;
+  readonly y1: number;
+}
+
+/**
+ * The box every point of the paths falls in — ends and control points of
+ * lines, curves and arcs (an arc's radii and flags are not points).
+ */
+export function pathsExtent(paths: readonly DecodedPath[], side: number): Extent | null {
+  let x0 = Number.POSITIVE_INFINITY;
+  let y0 = Number.POSITIVE_INFINITY;
+  let x1 = Number.NEGATIVE_INFINITY;
+  let y1 = Number.NEGATIVE_INFINITY;
+  const see = (x: number, y: number) => {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    x0 = Math.min(x0, x);
+    y0 = Math.min(y0, y);
+    x1 = Math.max(x1, x);
+    y1 = Math.max(y1, y);
+  };
+  for (const p of paths) {
+    // A white shape on the white ground draws nothing a person sees — MEASURED,
+    // a one-path white square "covered" the robot it failed to draw.
+    if (nearWhite(p.fill)) continue;
+    for (const m of p.d.matchAll(/([MLCAZ])([^MLCAZ]*)/g)) {
+      const n = (m[2] ?? '')
+        .trim()
+        .split(/[\s,]+/)
+        .filter(Boolean)
+        .map(Number);
+      if (m[1] === 'A') {
+        for (let k = 0; k + 6 < n.length; k += 7)
+          see(n[k + 5] ?? Number.NaN, n[k + 6] ?? Number.NaN);
+      } else {
+        for (let k = 0; k + 1 < n.length; k += 2) see(n[k] ?? Number.NaN, n[k + 1] ?? Number.NaN);
+      }
+    }
+  }
+  if (!Number.isFinite(x0)) return null;
+  const f = (v: number) => Math.max(0, Math.min(1, v / side));
+  return { x0: f(x0), y0: f(y0), x1: f(x1), y1: f(y1) };
+}
+
+/** #rrggbb lighter than about 93% — invisible on white. */
+function nearWhite(fill: string): boolean {
+  const m = /^#?([0-9a-f]{6})$/i.exec(fill.trim());
+  if (m === null) return false;
+  const n = Number.parseInt(m[1] ?? '', 16);
+  return Math.min((n >> 16) & 255, (n >> 8) & 255, n & 255) >= 238;
+}
+
+const area = (e: Extent): number => Math.max(0, e.x1 - e.x0) * Math.max(0, e.y1 - e.y0);
+
+/**
+ * HOW GOOD A CANDIDATE LOOKS, BEFORE ANYONE SEES IT — higher is better.
+ *
+ * MEASURED (the authors' own examples, 4B, three candidates each): "finished
+ * first, then the most paths" kept a 24-path scrap in one corner over a clean
+ * crescent moon, and would keep a three-path blob that stopped on eos over a
+ * near-complete drawing cut at the limit. So a drawing is scored by how much
+ * of the picture it covers: for a traced picture, the overlap of its extent
+ * with where the picture has ink (`target`); for a prompt, how much of the
+ * canvas it fills (a third or more is a whole drawing). Finishing on eos is
+ * worth a quarter — it breaks near ties, it does not rescue a scrap.
+ */
+export function pickScore(
+  cand: { readonly stop: string; readonly extent: Extent | null },
+  target?: Extent | null,
+): number {
+  const e = cand.extent;
+  let fit = 0;
+  if (e !== null) {
+    if (target !== undefined && target !== null) {
+      const ix = Math.max(0, Math.min(e.x1, target.x1) - Math.max(e.x0, target.x0));
+      const iy = Math.max(0, Math.min(e.y1, target.y1) - Math.max(e.y0, target.y0));
+      const inter = ix * iy;
+      const union = area(e) + area(target) - inter;
+      fit = union > 0 ? inter / union : 0;
+    } else {
+      fit = Math.min(1, area(e) / 0.33);
+    }
+  }
+  return fit + (cand.stop === 'eos' ? 0.25 : 0);
 }
 
 /**

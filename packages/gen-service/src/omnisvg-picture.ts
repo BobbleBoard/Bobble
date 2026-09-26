@@ -190,3 +190,31 @@ export function omniSvgPicture(p: Pixels): Pixels {
     ? square
     : resized(square, OMNISVG_PICTURE_SIDE, OMNISVG_PICTURE_SIDE);
 }
+
+/** Where a prepared picture has ink — anything visibly darker than white — as fractions of its sides. */
+export function contentBox(
+  p: Pixels,
+  threshold = 245,
+): { x0: number; y0: number; x1: number; y1: number } | null {
+  let x0 = p.width;
+  let y0 = p.height;
+  let x1 = -1;
+  let y1 = -1;
+  for (let y = 0; y < p.height; y += 1) {
+    for (let x = 0; x < p.width; x += 1) {
+      const i = (y * p.width + x) * 4;
+      if (
+        at(p.data, i) < threshold ||
+        at(p.data, i + 1) < threshold ||
+        at(p.data, i + 2) < threshold
+      ) {
+        if (x < x0) x0 = x;
+        if (x > x1) x1 = x;
+        if (y < y0) y0 = y;
+        if (y > y1) y1 = y;
+      }
+    }
+  }
+  if (x1 < 0) return null;
+  return { x0: x0 / p.width, y0: y0 / p.height, x1: (x1 + 1) / p.width, y1: (y1 + 1) / p.height };
+}

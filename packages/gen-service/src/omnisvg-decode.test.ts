@@ -9,6 +9,8 @@ import {
   loopStart,
   OMNISVG_4B,
   OMNISVG_8B,
+  pathsExtent,
+  pickScore,
 } from './omnisvg-decode';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -125,5 +127,44 @@ describe('loopStart — a runaway repeat in the stream', () => {
     expect(loopStart([...drawing, ...shape, ...shape, ...shape])).toBe(-1);
     expect(loopStart(drawing)).toBe(-1);
     expect(loopStart([])).toBe(-1);
+  });
+});
+
+describe('which candidate is kept', () => {
+  const box = (x0: number, y0: number, x1: number, y1: number) => ({ x0, y0, x1, y1 });
+
+  it('reads a drawing’s extent off its paths — curve and arc ends included, radii not', () => {
+    const e = pathsExtent(
+      [
+        { d: 'M20.0 40.0 L60.0 40.0 C70.0 50.0 80.0 60.0 100.0 100.0 Z', fill: '#000' },
+        { d: 'M10.0 10.0 A90.0 90.0 0.0 0 1 50.0 20.0', fill: '#fff' },
+      ],
+      200,
+    );
+    expect(e).toEqual(box(0.05, 0.05, 0.5, 0.5));
+  });
+
+  it('keeps the drawing that covers the picture over a finished scrap (MEASURED: the moon row)', () => {
+    const target = box(0.1, 0.15, 0.9, 0.85);
+    const scrap = { stop: 'eos', extent: box(0.55, 0.6, 0.6, 0.7) };
+    const moon = { stop: 'loop', extent: box(0.12, 0.15, 0.88, 0.84) };
+    expect(pickScore(moon, target)).toBeGreaterThan(pickScore(scrap, target));
+    // Two whole drawings: finishing breaks the tie.
+    expect(pickScore({ ...moon, stop: 'eos' }, target)).toBeGreaterThan(pickScore(moon, target));
+  });
+
+  it('with no picture, prefers the fuller drawing, a third of the canvas being whole', () => {
+    expect(pickScore({ stop: 'limit', extent: box(0.1, 0.1, 0.9, 0.9) })).toBeCloseTo(1);
+    expect(pickScore({ stop: 'eos', extent: box(0.45, 0.45, 0.55, 0.55) })).toBeLessThan(0.3);
+    expect(pickScore({ stop: 'eos', extent: null })).toBe(0.25);
+  });
+});
+
+describe('a white shape on the white ground', () => {
+  it('is not counted in the extent — it draws nothing a person sees', () => {
+    const white = { d: 'M0.0 0.0 L200.0 0.0 L200.0 200.0 Z', fill: '#FFFFFF' };
+    const dot = { d: 'M90.0 90.0 L110.0 110.0', fill: '#223344' };
+    expect(pathsExtent([white], 200)).toBeNull();
+    expect(pathsExtent([white, dot], 200)).toEqual({ x0: 0.45, y0: 0.45, x1: 0.55, y1: 0.55 });
   });
 });

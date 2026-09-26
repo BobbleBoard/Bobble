@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  contentBox,
   OMNISVG_PICTURE_SIDE,
   omniSvgPicture,
   onWhite,
@@ -84,5 +85,15 @@ describe('a picture, as OmniSVG was trained to see it', () => {
     expect(pixel(out, 224, 224)).toEqual([220, 40, 40, 255]);
     const wide = omniSvgPicture(flat(520, 330, [255, 255, 255, 255]));
     expect([wide.width, wide.height]).toEqual([OMNISVG_PICTURE_SIDE, OMNISVG_PICTURE_SIDE]);
+  });
+});
+
+describe('where a picture has ink', () => {
+  it('is the box around everything darker than white', () => {
+    const p = flat(100, 50, [255, 255, 255, 255]);
+    for (let y = 10; y < 20; y += 1)
+      for (let x = 30; x < 60; x += 1) p.data.set([200, 30, 30, 255], (y * 100 + x) * 4);
+    expect(contentBox(p)).toEqual({ x0: 0.3, y0: 0.2, x1: 0.6, y1: 0.4 });
+    expect(contentBox(flat(10, 10, [255, 255, 255, 255]))).toBeNull();
   });
 });
