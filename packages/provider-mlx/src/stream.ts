@@ -34,13 +34,22 @@ import {
   buildRequestHeaders,
   createLiveTpsReporter,
   headersToRecord,
+  httpProgressProbe,
+  linkAbort,
   parseSSE,
   type RepairRung,
+  rapidMlxWorkCounter,
   reconstructToolCallFromContent,
   repairToolCallArguments,
   resolveUnknownToolName,
+  STALL_RETRIES,
+  StreamStalledError,
+  type StreamWatch,
   settleNote,
   settleReply,
+  stallErrorMessage,
+  stallLogLine,
+  stallPolicyFromEnv,
   streamErrorMessage,
   type ToolCallFixer,
   type ToolSchemaLike,
@@ -48,6 +57,7 @@ import {
   tapUsage,
   type UnknownToolResolver,
   validateAgainstSchema,
+  watchStream,
   withoutWrittenToolCall,
 } from '@pi-desktop/provider-llamacpp';
 import { fitPicturesToVisionBudget } from './picture-budget.js';
@@ -329,6 +339,8 @@ export function createMlxStream(deps: MlxStreamDeps = {}): MlxStreamFn {
       let textIndex: number | undefined;
       let thinkingIndex: number | undefined;
       const toolStates = new Map<number, ToolState>();
+      /** Tool calls that reached `toolcall_end` (by identity, for the error path). */
+      const finalizedTools = new Set<ToolCall>();
       let finishReason: 'stop' | 'length' | 'toolUse' = 'stop';
       // Client-side TPS timing: first content byte → stream end.
       let firstTokenAt: number | undefined;
@@ -340,58 +352,60 @@ export function createMlxStream(deps: MlxStreamDeps = {}): MlxStreamFn {
         return tool?.parameters as ToolSchemaLike | undefined;
       };
 
-      try {
-        stream.push({ type: 'start', partial: output });
+      /**
+       * Close the blocks this attempt opened. Called at the normal finish, before
+       * a stalled attempt starts over, and on the error path (after pruning).
+       * Idempotent per attempt, and it reads the indices live, so it quotes
+       * whatever is open at that moment (rung 0 below still reads `textIndex`).
+       */
+      let blocksClosed = false;
+      const closeOpenBlocks = (): void => {
+        if (blocksClosed) return;
+        blocksClosed = true;
+        if (thinkingIndex !== undefined) {
+          const block = output.content[thinkingIndex];
+          stream.push({
+            type: 'thinking_end',
+            contentIndex: thinkingIndex,
+            content: block?.type === 'thinking' ? block.thinking : '',
+            partial: output,
+          });
+        }
+        if (textIndex !== undefined) {
+          const block = output.content[textIndex];
+          stream.push({
+            type: 'text_end',
+            contentIndex: textIndex,
+            content: block?.type === 'text' ? block.text : '',
+            partial: output,
+          });
+        }
+      };
 
-        /*
-         * THE HOST'S HOOKS, which this provider was not calling.
-         *
-         * `onPayload` is pi's `before_provider_request` and `onResponse` its
-         * `after_provider_response`. Four mechanisms hang off them and were all
-         * silently inert on MLX while working on llama.cpp: the user's advanced
-         * sampling overrides, the prose loop detector, intent-bias tool
-         * activation, and the corp's hang watchdog — which is armed per call and
-         * DISARMED by `onResponse`, so on this engine it could arm and never
-         * disarm. A user switching engines lost four behaviours and was told
-         * nothing.
-         */
-        let body = buildChatCompletionsRequest(model, context, options);
-        const replaced = await options?.onPayload?.(body, model);
-        if (replaced !== null && replaced !== undefined && typeof replaced === 'object') {
-          body = replaced as typeof body;
-        }
-        // After the hooks, since it is the hooks' llama.cpp-isms this removes.
-        body = shapeForOpenAiServer(body, { engine: engineOf(model), maxTokens: model.maxTokens });
-        // rapid-mlx's vision lane: a conversation too long to carry its pictures
-        // gets their descriptions instead of a refusal or an out-of-memory crash.
-        if (engineOf(model) === 'rapid-mlx') {
-          const headers = buildRequestHeaders(model, options);
-          body = (await fitPicturesToVisionBudget(body, {
-            describe: (url) =>
-              describePicture(model.baseUrl, model.id, url, {
-                fetch: doFetch,
-                headers,
-                ...(options?.signal !== undefined ? { signal: options.signal } : {}),
-              }),
-          })) as typeof body;
-        }
-        tapRequest(body, engineOf(model));
-        const res = await doFetch(`${model.baseUrl}/chat/completions`, {
-          method: 'POST',
-          // models.json headers / apiKey arrive in `options`, not on the model.
-          headers: buildRequestHeaders(model, options),
-          body: JSON.stringify(body),
-          signal: options?.signal,
-        });
-        await options?.onResponse?.(
-          { status: res.status, headers: headersToRecord(res.headers) },
-          model,
-        );
-        if (!res.ok) {
-          const detail = await res.text().catch(() => '');
-          throw new Error(`mlx_lm.server HTTP ${res.status}: ${detail.slice(0, 500)}`);
-        }
+      /**
+       * A STALLED ATTEMPT'S OUTPUT DOES NOT SURVIVE IT. The request is sent again
+       * from the same prompt and the new reply is a new sample, so the message
+       * starts over: what the first attempt streamed is closed and dropped, and
+       * the next block starts at index 0 again — which is how the thread knows to
+       * clear what it showed (engine/renderer/event-router.ts).
+       */
+      const restart = (): void => {
+        closeOpenBlocks();
+        blocksClosed = false;
+        thinkingIndex = undefined;
+        textIndex = undefined;
+        output.content = [];
+        output.usage.input = 0;
+        output.usage.output = 0;
+        output.usage.cacheRead = 0;
+        toolStates.clear();
+        finishReason = 'stop';
+        firstTokenAt = undefined;
+        cutoffTail = false;
+      };
 
+      /** Read one attempt's SSE body into `output`, telling the watchdog what arrives. */
+      const consume = async (res: Response, watch: StreamWatch | undefined): Promise<void> => {
         // The live readout, read by the app off stderr (provider-llamacpp/live-tps).
         const liveTps = createLiveTpsReporter();
         try {
@@ -453,6 +467,13 @@ export function createMlxStream(deps: MlxStreamDeps = {}): MlxStreamFn {
               (delta?.tool_calls?.length ?? 0) > 0
             ) {
               liveTps.tick();
+            }
+            // Only a real delta tells the watchdog the stream is alive — never
+            // a keepalive (parseSSE drops those), a role or a usage chunk.
+            if ((delta?.tool_calls?.length ?? 0) > 0) watch?.delta('tool');
+            else if (contentDelta !== undefined) watch?.delta('content');
+            else if (reasoningDelta !== undefined || tailDelta !== undefined) {
+              watch?.delta('reasoning');
             }
 
             const thoughtDelta =
@@ -569,26 +590,108 @@ export function createMlxStream(deps: MlxStreamDeps = {}): MlxStreamFn {
         } finally {
           liveTps.end();
         }
+      };
+
+      try {
+        stream.push({ type: 'start', partial: output });
+
+        /*
+         * THE HOST'S HOOKS, which this provider was not calling.
+         *
+         * `onPayload` is pi's `before_provider_request` and `onResponse` its
+         * `after_provider_response`. Four mechanisms hang off them and were all
+         * silently inert on MLX while working on llama.cpp: the user's advanced
+         * sampling overrides, the prose loop detector, intent-bias tool
+         * activation, and the corp's hang watchdog — which is armed per call and
+         * DISARMED by `onResponse`, so on this engine it could arm and never
+         * disarm. A user switching engines lost four behaviours and was told
+         * nothing.
+         */
+        let body = buildChatCompletionsRequest(model, context, options);
+        const replaced = await options?.onPayload?.(body, model);
+        if (replaced !== null && replaced !== undefined && typeof replaced === 'object') {
+          body = replaced as typeof body;
+        }
+        // After the hooks, since it is the hooks' llama.cpp-isms this removes.
+        body = shapeForOpenAiServer(body, { engine: engineOf(model), maxTokens: model.maxTokens });
+        // rapid-mlx's vision lane: a conversation too long to carry its pictures
+        // gets their descriptions instead of a refusal or an out-of-memory crash.
+        if (engineOf(model) === 'rapid-mlx') {
+          const headers = buildRequestHeaders(model, options);
+          body = (await fitPicturesToVisionBudget(body, {
+            describe: (url) =>
+              describePicture(model.baseUrl, model.id, url, {
+                fetch: doFetch,
+                headers,
+                ...(options?.signal !== undefined ? { signal: options.signal } : {}),
+              }),
+          })) as typeof body;
+        }
+        /*
+         * A STREAM THAT STOPS IS SENT AGAIN, ONCE (provider-llamacpp/stall-watchdog.ts).
+         * rapid-mlx answers `/v1/status` with a step counter, which is how a
+         * tool call its parser is holding back (minutes of silence, measured) is
+         * told apart from an engine that stopped. Other MLX servers 404 there
+         * and get the watchdog's longer, blind window.
+         */
+        const stallPolicy = stallPolicyFromEnv();
+        const progressProbe =
+          stallPolicy === null
+            ? undefined
+            : httpProgressProbe(
+                `${model.baseUrl}/status`,
+                rapidMlxWorkCounter,
+                doFetch,
+                buildRequestHeaders(model, options),
+              );
+        for (let attempt = 1; ; attempt++) {
+          // The attempt's own abort: the person's Stop still reaches it, and the
+          // watchdog can cancel this request without touching pi's signal.
+          const attemptAbort = new AbortController();
+          const unlink = linkAbort(options?.signal, attemptAbort);
+          let watch: StreamWatch | undefined;
+          try {
+            tapRequest(body, engineOf(model));
+            const res = await doFetch(`${model.baseUrl}/chat/completions`, {
+              method: 'POST',
+              // models.json headers / apiKey arrive in `options`, not on the model.
+              headers: buildRequestHeaders(model, options),
+              body: JSON.stringify(body),
+              signal: attemptAbort.signal,
+            });
+            await options?.onResponse?.(
+              { status: res.status, headers: headersToRecord(res.headers) },
+              model,
+            );
+            if (!res.ok) {
+              const detail = await res.text().catch(() => '');
+              throw new Error(`mlx_lm.server HTTP ${res.status}: ${detail.slice(0, 500)}`);
+            }
+            if (stallPolicy !== null) {
+              watch = watchStream({
+                policy: stallPolicy,
+                probe: progressProbe,
+                // The HTTP request only — never the engine's process.
+                onStall: (info) => attemptAbort.abort(new StreamStalledError(info)),
+              });
+            }
+            await consume(res, watch);
+            break;
+          } catch (error) {
+            const stall = watch?.stalled;
+            if (stall === undefined || options?.signal?.aborted === true) throw error;
+            const retrying = attempt <= STALL_RETRIES;
+            process.stderr.write(`${stallLogLine(stall, attempt, retrying)}\n`);
+            if (!retrying) throw new Error(stallErrorMessage(stall, attempt));
+            restart();
+          } finally {
+            watch?.stop();
+            unlink();
+          }
+        }
 
         // --- finalize blocks ------------------------------------------------
-        if (thinkingIndex !== undefined) {
-          const block = output.content[thinkingIndex];
-          stream.push({
-            type: 'thinking_end',
-            contentIndex: thinkingIndex,
-            content: block?.type === 'thinking' ? block.thinking : '',
-            partial: output,
-          });
-        }
-        if (textIndex !== undefined) {
-          const block = output.content[textIndex];
-          stream.push({
-            type: 'text_end',
-            contentIndex: textIndex,
-            content: block?.type === 'text' ? block.text : '',
-            partial: output,
-          });
-        }
+        closeOpenBlocks();
 
         /*
          * RUNG 0 — a tool call WRITTEN INTO THE CONTENT, the same rung
@@ -705,6 +808,8 @@ export function createMlxStream(deps: MlxStreamDeps = {}): MlxStreamFn {
           }
           block.arguments = finalArgs;
           if (finishReason === 'stop') finishReason = 'toolUse';
+          // COMPLETE — an error later in this loop must not prune it.
+          finalizedTools.add(block);
           stream.push({
             type: 'toolcall_end',
             contentIndex: state.contentIndex,
@@ -737,6 +842,24 @@ export function createMlxStream(deps: MlxStreamDeps = {}): MlxStreamFn {
         stream.end();
       } catch (error) {
         const aborted = options?.signal?.aborted === true;
+        /*
+         * NO HALF A MESSAGE BEHIND — the rule provider-llamacpp's error path
+         * explains. A tool call still accumulating arguments would be replayed
+         * next turn as a `tool_calls` entry with no result after it; a stalled
+         * stream ends here mid-call more often than not (the call is exactly
+         * what rapid-mlx holds back). Prune what never completed, then close
+         * what stayed open.
+         */
+        for (let i = output.content.length - 1; i >= 0; i--) {
+          const block = output.content[i];
+          if (block === undefined || block.type !== 'toolCall' || finalizedTools.has(block)) {
+            continue;
+          }
+          output.content.splice(i, 1);
+          if (thinkingIndex !== undefined && i < thinkingIndex) thinkingIndex--;
+          if (textIndex !== undefined && i < textIndex) textIndex--;
+        }
+        closeOpenBlocks();
         output.stopReason = aborted ? 'aborted' : 'error';
         output.errorMessage = error instanceof Error ? error.message : String(error);
         stream.push({ type: 'error', reason: output.stopReason, error: output });

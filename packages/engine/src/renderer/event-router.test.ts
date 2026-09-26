@@ -1020,3 +1020,103 @@ describe('helpers', () => {
     expect(stripAnsi('\u001b[1;31mred\u001b[0m plain')).toBe('red plain');
   });
 });
+
+describe('event router — a message the provider started over (stalled request sent again)', () => {
+  const ev = (e: Record<string, unknown>): PiBridgeEvent => e as unknown as PiBridgeEvent;
+  const update = (assistantMessageEvent: Record<string, unknown>): PiBridgeEvent =>
+    ev({ type: 'message_update', assistantMessageEvent });
+  const begin = (route: (e: PiBridgeEvent) => void) => {
+    route({ type: 'agent_start' } as PiBridgeEvent);
+    route({ type: 'turn_start' } as PiBridgeEvent);
+    route(ev({ type: 'message_start', message: { role: 'assistant', content: [] } }));
+  };
+
+  it('a block starting again at index 0 clears the row, so the retry is not glued to the stall', () => {
+    const { sink, route } = makeRouter();
+    begin(route);
+    route(update({ type: 'thinking_start', contentIndex: 0 }));
+    route(update({ type: 'thinking_delta', contentIndex: 0, delta: 'The ball has two ' }));
+    route(update({ type: 'thinking_end', contentIndex: 0 }));
+    route(update({ type: 'text_start', contentIndex: 1 }));
+    route(update({ type: 'text_delta', contentIndex: 1, delta: '\n\n' }));
+    expect(sink.callsFor('resetAssistantBlocks')).toEqual([]);
+    // The provider cancels the stalled request and starts the message over.
+    route(update({ type: 'thinking_start', contentIndex: 0 }));
+    route(update({ type: 'thinking_delta', contentIndex: 0, delta: 'Horizontal and vertical.' }));
+    const names = sink.calls.map(([name]) => name);
+    const reset = names.indexOf('resetAssistantBlocks');
+    expect(reset).toBeGreaterThan(-1);
+    expect(sink.calls[reset]).toEqual(['resetAssistantBlocks', 'a-1']);
+    // The retry's delta lands AFTER the reset, onto an empty row.
+    expect(names.lastIndexOf('appendThinkingDelta')).toBeGreaterThan(reset);
+  });
+
+  it('forgets the dropped attempt\'s tool calls, so a retry reusing "call_0" still renders', () => {
+    const { sink, route } = makeRouter();
+    begin(route);
+    const call = { type: 'toolCall', id: 'call_0', name: 'write', arguments: {} };
+    route(update({ type: 'toolcall_start', contentIndex: 0, partial: { content: [call] } }));
+    route(update({ type: 'toolcall_start', contentIndex: 0, partial: { content: [call] } }));
+    expect(sink.callsFor('resetAssistantBlocks')).toHaveLength(1);
+    expect(sink.callsFor('beginToolCall')).toHaveLength(2);
+  });
+
+  it('never fires on an ordinary message: fresh indexes, and a new message starts from 0 again', () => {
+    const { sink, route } = makeRouter();
+    begin(route);
+    route(update({ type: 'thinking_start', contentIndex: 0 }));
+    route(update({ type: 'text_start', contentIndex: 1 }));
+    route(
+      update({
+        type: 'toolcall_start',
+        contentIndex: 2,
+        partial: { content: [{}, {}, { type: 'toolCall', id: 'c1', name: 'bash' }] },
+      }),
+    );
+    route(ev({ type: 'turn_end', message: { role: 'assistant', content: [] }, toolResults: [] }));
+    route({ type: 'turn_start' } as PiBridgeEvent);
+    route(ev({ type: 'message_start', message: { role: 'assistant', content: [] } }));
+    route(update({ type: 'thinking_start', contentIndex: 0 }));
+    // Legacy events without an index are never read as a restart.
+    route(update({ type: 'text_start' }));
+    route(update({ type: 'text_start' }));
+    expect(sink.callsFor('resetAssistantBlocks')).toEqual([]);
+  });
+
+  it('the stall line shows "Retrying (1/1)" until the retry starts producing', () => {
+    const { sink, route } = makeRouter();
+    begin(route);
+    route(update({ type: 'thinking_start', contentIndex: 0 }));
+    route({
+      type: '_stderr',
+      text:
+        '[pi-stall] no output for 90 s, and the engine reported no work in progress ' +
+        '(phase=writing, deltas=2) — cancelled attempt 1, sending it again (1 of 1)\n',
+    } as unknown as PiBridgeEvent);
+    expect(sink.callsFor('setAgentStatus').at(-1)).toEqual([
+      'setAgentStatus',
+      { retry: { attempt: 1, maxAttempts: 1, reason: 'stalled' } },
+    ]);
+    // A bracketed line is still log noise, not a message for the thread.
+    expect(sink.callsFor('stderrText')).toEqual([]);
+    route(update({ type: 'thinking_start', contentIndex: 0 }));
+    expect(sink.callsFor('setAgentStatus').at(-1)).toEqual(['setAgentStatus', { retry: null }]);
+  });
+
+  it("leaves pi's own auto-retry state alone", () => {
+    const { sink, route } = makeRouter();
+    begin(route);
+    route({
+      type: 'auto_retry_start',
+      attempt: 1,
+      maxAttempts: 3,
+      delayMs: 2000,
+      errorMessage: 'overloaded',
+    } as PiBridgeEvent);
+    route(ev({ type: 'turn_end', message: { role: 'assistant', content: [] }, toolResults: [] }));
+    expect(sink.callsFor('setAgentStatus').at(-1)).toEqual([
+      'setAgentStatus',
+      { retry: { attempt: 1, maxAttempts: 3 } },
+    ]);
+  });
+});

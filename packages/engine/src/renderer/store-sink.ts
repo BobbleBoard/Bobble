@@ -30,8 +30,12 @@ export interface AgentStatusPatch {
   isStreaming?: boolean;
   isCompacting?: boolean;
   pendingMessageCount?: number;
-  /** Auto-retry in progress; null clears. */
-  retry?: { attempt: number; maxAttempts: number } | null;
+  /**
+   * A retry in progress; null clears. `reason: 'stalled'` is the provider's own
+   * one retry of a request whose stream went silent with the engine idle
+   * (provider-llamacpp/stall-watchdog.ts); absent, it is pi's auto-retry.
+   */
+  retry?: { attempt: number; maxAttempts: number; reason?: 'stalled' } | null;
   /** Epoch ms when the current agent run started; null when idle. */
   agentStartedAt?: number | null;
   model?: { id: string; name: string; provider: string } | null;
@@ -99,6 +103,11 @@ export interface StoreSink {
   endTurn(id: string, stopReason?: StopReason, message?: AssistantMessage): void;
   appendTextDelta(id: string, delta: string): void;
   appendThinkingDelta(id: string, delta: string): void;
+  /**
+   * The provider started this message over (a stalled request sent again):
+   * drop the row's streamed blocks; the retry's deltas rebuild it.
+   */
+  resetAssistantBlocks?(id: string): void;
 
   // -- tool calls ------------------------------------------------------------
   /** Append a toolCall block (streamed start or router-synthesized). */

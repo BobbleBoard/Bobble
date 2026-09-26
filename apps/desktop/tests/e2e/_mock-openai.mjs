@@ -26,6 +26,9 @@
  *   POST /apply-template        the rendered prompt the cache simulation uses
  *   POST /tokenize, /detokenize
  *   GET  /props /slots /health /v1/models /models
+ *   GET  /v1/status             rapid-mlx's: `steps_executed` moves once per frame
+ *                               generated (and while a reply works silently) —
+ *                               what the stall watchdog asks when a stream is quiet
  *   GET  /__mock/log            the request log;  POST /__mock/reset, /__mock/rules
  *
  * ## Scripted replies
@@ -49,7 +52,14 @@
  *
  *   Reply = { content, reasoning, toolCalls: [{ name, arguments, id? }],
  *             finishReason, latencyMs, chunkDelayMs, chunkSize, status, error,
- *             hang, dropAfterChunks, usage, timings, probs }
+ *             hang, dropAfterChunks, usage, timings, probs,
+ *             stallAfterChunks, silentWorkMs, keepaliveMs }
+ *
+ * `stallAfterChunks: N` sends N frames and then nothing but `: keepalive`
+ * comments (every `keepaliveMs`, 20 s like rapid-mlx) until the client hangs up
+ * — the measured stall, with `/v1/status` frozen. Add `silentWorkMs` and it is
+ * the other case instead: the silence lasts that long while the engine keeps
+ * stepping (a tool call its parser holds back), and then the rest arrives.
  *
  * Nothing matched: `defaultReply` (default `{ content: 'OK.' }`), or HTTP 500
  * when `strict: true`, so an unscripted call is loud rather than quietly
@@ -250,6 +260,10 @@ export async function startMockOpenAI(opts = {}) {
     log: [],
     seq: 0,
     loading: opts.loading ?? false,
+    /** rapid-mlx's step counter: one per frame generated, frozen while stalled. */
+    steps: 0,
+    running: 0,
+    completionTokens: 0,
     slots: Array.from({ length: opts.slots ?? 1 }, (_, id) => ({
       id,
       processing: false,
@@ -306,6 +320,19 @@ export async function startMockOpenAI(opts = {}) {
     if (p === '/v1/models' || p === '/models') return sendJson(res, 200, modelsBody());
     if (p === '/props') return sendJson(res, 200, propsBody());
     if (p === '/slots') return sendJson(res, 200, slotsBody());
+    if (p === '/v1/status') {
+      if (opts.rapidStatus === false) {
+        return sendJson(res, 404, { error: { code: 404, message: 'Not Found' } });
+      }
+      return sendJson(res, 200, {
+        status: state.running > 0 ? 'generating' : 'idle',
+        model: config.model,
+        steps_executed: state.steps,
+        num_running: state.running,
+        num_waiting: 0,
+        total_completion_tokens: state.completionTokens,
+      });
+    }
     if (p === '/tokenize' && req.method === 'POST') {
       const n = tokensOf(String(body?.content ?? '').length);
       return sendJson(res, 200, { tokens: Array.from({ length: n }, (_, i) => 1000 + i) });
@@ -532,11 +559,24 @@ export async function startMockOpenAI(opts = {}) {
       'access-control-allow-origin': '*',
     });
     res.flushHeaders?.();
-    const outcome = await streamFrames(res, frames, {
-      delayMs: reply.chunkDelayMs ?? config.chunkDelayMs,
-      hang: reply.hang === true,
-      dropAfter: reply.dropAfterChunks,
-    });
+    state.running += 1;
+    let outcome;
+    try {
+      outcome = await streamFrames(res, frames, {
+        delayMs: reply.chunkDelayMs ?? config.chunkDelayMs,
+        hang: reply.hang === true,
+        dropAfter: reply.dropAfterChunks,
+        stallAfter: reply.stallAfterChunks,
+        silentWorkMs: reply.silentWorkMs,
+        keepaliveMs: reply.keepaliveMs ?? opts.keepaliveMs ?? 20_000,
+        onStep: () => {
+          state.steps += 1;
+        },
+      });
+    } finally {
+      state.running -= 1;
+    }
+    if (outcome.completed) state.completionTokens += predictedN;
     finishSlot(outcome.completed);
     entry.status = 200;
     entry.cancelled = outcome.cancelled;
@@ -818,13 +858,44 @@ function probabilities(content, n, given) {
  * Write SSE frames, honouring cancel-on-disconnect: the moment the client goes
  * away, stop — which is what frees a real llama-server's slot.
  */
-async function streamFrames(res, frames, { delayMs = 0, hang = false, dropAfter, done = true }) {
+async function streamFrames(
+  res,
+  frames,
+  {
+    delayMs = 0,
+    hang = false,
+    dropAfter,
+    done = true,
+    stallAfter,
+    silentWorkMs,
+    keepaliveMs = 20_000,
+    onStep = () => {},
+  },
+) {
   let cancelled = false;
   const onClose = () => {
     if (!res.writableEnded) cancelled = true;
   };
   res.on('close', onClose);
   let sent = 0;
+  /**
+   * Nothing on the wire but `: keepalive` comments — for `ms`, or until the
+   * client hangs up. `working` keeps the step counter moving (~30 a second, a
+   * held-back tool call); otherwise it is frozen (an engine that stopped).
+   */
+  const silence = async (ms, working) => {
+    const until = Date.now() + ms;
+    let nextKeepalive = Date.now() + keepaliveMs;
+    while (Date.now() < until && !cancelled && !res.destroyed) {
+      await sleep(Math.min(100, Math.max(1, until - Date.now())));
+      if (working) for (let k = 0; k < 3; k++) onStep();
+      if (Date.now() >= nextKeepalive && !cancelled && !res.destroyed) {
+        res.write(': keepalive\n\n');
+        nextKeepalive += keepaliveMs;
+      }
+    }
+    if (res.destroyed) cancelled = true;
+  };
   try {
     // A hang is headers and the first frame, then nothing: only the client can end it.
     const toSend = hang ? frames.slice(0, 1) : frames;
@@ -837,8 +908,18 @@ async function streamFrames(res, frames, { delayMs = 0, hang = false, dropAfter,
         res.destroy(); // a dirty hang-up: no [DONE], no end
         return { completed: false, cancelled: false, dropped: true, sent };
       }
+      if (stallAfter !== undefined && sent === stallAfter) {
+        if (silentWorkMs !== undefined) {
+          await silence(silentWorkMs, true);
+        } else {
+          await silence(Number.POSITIVE_INFINITY, false);
+          return { completed: false, cancelled: true, dropped: false, sent };
+        }
+        if (cancelled) break;
+      }
       res.write(`data: ${JSON.stringify(frame)}\n\n`);
       sent += 1;
+      onStep();
       await sleep(delayMs);
     }
     if (hang && !cancelled) {

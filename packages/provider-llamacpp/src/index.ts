@@ -100,5 +100,6 @@ export * from './request-headers.js';
 export * from './request-tap.js';
 export * from './settle-reply.js';
 export * from './sse.js';
+export * from './stall-watchdog.js';
 export * from './stream.js';
 export { headersToRecord } from './stream.js';

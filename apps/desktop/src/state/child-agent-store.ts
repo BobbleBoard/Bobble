@@ -200,6 +200,9 @@ export function makeChildSink(childId: string): StoreSink {
     appendTextDelta: (id, delta) => upd((msgs) => appendOrMergeBlock(msgs, id, 'text', delta)),
     appendThinkingDelta: (id, delta) =>
       upd((msgs) => appendOrMergeBlock(msgs, id, 'thinking', delta)),
+    // The provider started the message over (a stalled request sent again).
+    resetAssistantBlocks: (id) =>
+      upd((msgs) => mutateAssistant(msgs, id, (m) => ({ ...m, blocks: [] }))),
     beginToolCall: (id, call) =>
       upd((msgs) => mutateAssistant(msgs, id, (m) => ({ ...m, blocks: [...m.blocks, call] }))),
     appendToolCallArgs: (id, callId, argsDelta) =>

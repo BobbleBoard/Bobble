@@ -82,6 +82,15 @@ export function createEventRouter(sink: StoreSink, options: EventRouterOptions =
   const argsAccum = new Map<string, string>();
   /** contentIndex → callId for 0.68.1 deltas that omit the call id. */
   const callIdByIndex = new Map<number, string>();
+  /**
+   * Content indexes that have STARTED in the current assistant message. A block
+   * starts once, at a fresh index — so a `*_start` at an index already seen
+   * means the provider threw the message away and began it again (a stalled
+   * request sent a second time: provider-llamacpp/stall-watchdog.ts).
+   */
+  const startedIndices = new Set<number>();
+  /** The "retrying" status came from a stall line (not pi's own auto-retry). */
+  let stallRetryShown = false;
   /** Dialog request id → self-expiry timer (pi emits nothing on expiry). */
   const uiTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
@@ -93,8 +102,39 @@ export function createEventRouter(sink: StoreSink, options: EventRouterOptions =
     finalizedCalls.clear();
     argsAccum.clear();
     callIdByIndex.clear();
+    startedIndices.clear();
     for (const timer of uiTimers.values()) clearTimeout(timer);
     uiTimers.clear();
+  }
+
+  /** Take down the "retrying" a stall line put up — only that one. */
+  function clearStallRetry(): void {
+    if (!stallRetryShown) return;
+    stallRetryShown = false;
+    sink.setAgentStatus({ retry: null });
+  }
+
+  /**
+   * A block starts. At an index this message already used, the provider has
+   * started the message over (a stalled request sent again), so what the row
+   * shows is dropped with it — or the retry's thought would be glued onto the
+   * abandoned one — and the per-turn bookkeeping for its tool calls goes too:
+   * the retry may reuse a call id ('call_0'), which must render again.
+   */
+  function blockStarted(contentIndex: number | undefined): void {
+    if (currentAssistantId === null || typeof contentIndex !== 'number') return;
+    if (startedIndices.has(contentIndex)) {
+      startedIndices.clear();
+      callIdByIndex.clear();
+      knownToolCalls.clear();
+      callNames.clear();
+      pushedForCall.clear();
+      finalizedCalls.clear();
+      argsAccum.clear();
+      sink.resetAssistantBlocks?.(currentAssistantId);
+      clearStallRetry();
+    }
+    startedIndices.add(contentIndex);
   }
 
   function beginToolCallOnce(callId: string, name: string, args: Record<string, unknown>): boolean {
@@ -265,6 +305,7 @@ export function createEventRouter(sink: StoreSink, options: EventRouterOptions =
          * path does. A no-op when `turn_end` already fired (the id is null).
          */
         if (currentAssistantId !== null) sink.endTurn(currentAssistantId, 'aborted');
+        clearStallRetry();
         sink.agentEnd();
         sink.setAgentStatus({ isStreaming: false, agentStartedAt: null });
         reset();
@@ -276,6 +317,7 @@ export function createEventRouter(sink: StoreSink, options: EventRouterOptions =
         break;
 
       case 'turn_end': {
+        clearStallRetry();
         const message = e.message;
         // `!= null`: a JSON null message must be treated like an absent one — a
         // `=== undefined` guard lets null through and `message.role` then throws.
@@ -321,6 +363,7 @@ export function createEventRouter(sink: StoreSink, options: EventRouterOptions =
 
       case 'message_start':
         callIdByIndex.clear();
+        startedIndices.clear();
         break;
 
       case 'message_update': {
@@ -330,6 +373,10 @@ export function createEventRouter(sink: StoreSink, options: EventRouterOptions =
         if (ev == null || currentAssistantId === null) return;
         const legacy = ev as unknown as LegacyToolcallFields;
         switch (ev.type) {
+          case 'text_start':
+          case 'thinking_start':
+            blockStarted(ev.contentIndex);
+            break;
           case 'text_delta':
             sink.appendTextDelta(currentAssistantId, ev.delta ?? '');
             break;
@@ -337,6 +384,7 @@ export function createEventRouter(sink: StoreSink, options: EventRouterOptions =
             sink.appendThinkingDelta(currentAssistantId, ev.delta ?? '');
             break;
           case 'toolcall_start': {
+            blockStarted(ev.contentIndex);
             const block = toolCallAt(ev.partial, ev.contentIndex);
             // `||`, not `??`: index-as-id providers emit '' ids, which would
             // collapse every call in the run onto one row.
@@ -408,9 +456,8 @@ export function createEventRouter(sink: StoreSink, options: EventRouterOptions =
             break;
           }
           default:
-            // start/text_start/text_end/thinking_start/thinking_end are
-            // no-ops (first delta creates the block); done/error resolve at
-            // turn_end.
+            // start/text_end/thinking_end are no-ops (the first delta creates
+            // the block); done/error resolve at turn_end.
             break;
         }
         break;
@@ -563,8 +610,21 @@ export function createEventRouter(sink: StoreSink, options: EventRouterOptions =
         break;
 
       case '_stderr': {
-        // Surface non-trivial stderr but skip bracketed log noise.
         const text = e.text ?? '';
+        /*
+         * THE PROVIDER CANCELLED A STALLED REQUEST AND SENT IT AGAIN. Say so (the
+         * thread's status ring reads `reason: 'stalled'`) instead of a thought
+         * that vanishes and restarts unexplained. Taken down when the retry
+         * starts a block (blockStarted), or at turn end.
+         */
+        const stall = /\[pi-stall\][^\n]*sending it again \((\d+) of (\d+)\)/.exec(text);
+        if (stall !== null && currentAssistantId !== null) {
+          stallRetryShown = true;
+          sink.setAgentStatus({
+            retry: { attempt: Number(stall[1]), maxAttempts: Number(stall[2]), reason: 'stalled' },
+          });
+        }
+        // Surface non-trivial stderr but skip bracketed log noise.
         if (text.trim().length > 0 && !/^\s*\[/.test(text)) {
           sink.stderrText?.(text);
         }

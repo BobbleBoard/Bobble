@@ -291,6 +291,7 @@ export function createScheduledRunner(deps: ScheduledRunnerDeps): ScheduledRunne
         const e = event as {
           type?: string;
           assistantMessageEvent?: { type?: string; delta?: string; name?: string };
+          message?: { role?: string; content?: { type?: string; text?: string }[] };
           toolName?: string;
           isError?: boolean;
           result?: { content?: { type?: string; text?: string }[] };
@@ -319,6 +320,13 @@ export function createScheduledRunner(deps: ScheduledRunnerDeps): ScheduledRunne
           if (a?.type === 'text_delta' && typeof a.delta === 'string') summary += a.delta;
           else if (a?.type === 'toolcall_start' && typeof a.name === 'string')
             toolCalls.push(a.name);
+        } else if (e.type === 'message_end' && e.message?.role === 'assistant') {
+          // The finished message is the provider's last word on the text: a
+          // stalled request it cancelled and sent again streamed text that is
+          // not in it (provider-llamacpp/stall-watchdog.ts).
+          summary = (e.message.content ?? [])
+            .map((c) => (c?.type === 'text' ? (c.text ?? '') : ''))
+            .join('');
         }
         if (event.type === 'agent_end') finish('ok');
         else if (event.type === '_bridge_exit') {

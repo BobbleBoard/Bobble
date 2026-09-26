@@ -719,3 +719,58 @@ describe('a run that ends without a turn_end still closes its row', () => {
     expect(assistant.stopReason).toBe('stop');
   });
 });
+
+describe('a stalled request the provider sent again (provider-llamacpp/stall-watchdog.ts)', () => {
+  const update = (assistantMessageEvent: Record<string, unknown>): PiBridgeEvent =>
+    ({
+      type: 'message_update',
+      message: { role: 'assistant', content: [] },
+      assistantMessageEvent,
+    }) as unknown as PiBridgeEvent;
+
+  it('the thread ends up showing the retry alone — not the stall glued to it', () => {
+    const final = {
+      role: 'assistant',
+      stopReason: 'stop',
+      content: [
+        { type: 'thinking', thinking: 'Horizontal and vertical.' },
+        { type: 'text', text: 'Here is the idea.' },
+      ],
+    };
+    const router = createEventRouter(createPiSink(), { nextId: (p) => `${p}-test` });
+    const send = (e: PiBridgeEvent) => router.handleEvent(e);
+    send({ type: 'agent_start' } as PiBridgeEvent);
+    send({ type: 'turn_start' } as PiBridgeEvent);
+    send({ type: 'message_start', message: { role: 'assistant', content: [] } } as never);
+    send(update({ type: 'thinking_start', contentIndex: 0 }));
+    send(update({ type: 'thinking_delta', contentIndex: 0, delta: 'The ball has two ' }));
+    send(update({ type: 'thinking_end', contentIndex: 0 }));
+    send(update({ type: 'text_start', contentIndex: 1 }));
+    send(update({ type: 'text_delta', contentIndex: 1, delta: '\n\n' }));
+    send(update({ type: 'text_end', contentIndex: 1 }));
+    // Ninety quiet seconds later the provider cancels and sends the request again.
+    send({
+      type: '_stderr',
+      text: '[pi-stall] no output for 90 s, and the engine reported no work in progress (phase=writing, deltas=2) — cancelled attempt 1, sending it again (1 of 1)\n',
+    } as unknown as PiBridgeEvent);
+    expect(usePiStore.getState().agent.retry).toEqual({
+      attempt: 1,
+      maxAttempts: 1,
+      reason: 'stalled',
+    });
+    send(update({ type: 'thinking_start', contentIndex: 0 }));
+    expect(usePiStore.getState().agent.retry).toBeNull();
+    send(update({ type: 'thinking_delta', contentIndex: 0, delta: 'Horizontal and vertical.' }));
+    send(update({ type: 'text_start', contentIndex: 1 }));
+    send(update({ type: 'text_delta', contentIndex: 1, delta: 'Here is the idea.' }));
+    send({ type: 'message_end', message: final } as never);
+    send({ type: 'turn_end', message: final, toolResults: [] } as never);
+
+    const assistant = usePiStore.getState().messages[0];
+    if (assistant?.kind !== 'assistant') throw new Error('expected assistant');
+    expect(assistant.blocks).toEqual([
+      { type: 'thinking', thinking: 'Horizontal and vertical.' },
+      { type: 'text', text: 'Here is the idea.' },
+    ]);
+  });
+});

@@ -184,4 +184,38 @@ describe('specialist children', () => {
     });
     expect(seen[0]?.specialist).toBeUndefined();
   });
+
+  it("a child's answer is its finished message, not a stalled attempt's text glued to the retry", async () => {
+    let captured: ((e: PiBridgeEvent) => void) | null = null;
+    const bridge = fakeBridge((e) => captured?.(e));
+    const agents = createChildAgents({
+      createChildBridge: (_opts, onEvent) => {
+        captured = onEvent;
+        return bridge;
+      },
+      sendChildEvent: () => {},
+      log,
+    });
+    const done = agents.spawnAndWait(
+      sender,
+      { childId: 'c9', parentId: 'p1', title: 'Sub', goal: 'answer' },
+      5_000,
+    );
+    await new Promise((r) => setTimeout(r, 5));
+    const text = (delta: string) =>
+      ({
+        type: 'message_update',
+        assistantMessageEvent: { type: 'text_delta', delta },
+      }) as unknown as PiBridgeEvent;
+    bridge.emit({ type: 'message_start', message: { role: 'assistant', content: [] } } as never);
+    bridge.emit(text('The first attempt got as far as '));
+    // …stalled; the provider sent the request again and started the message over.
+    bridge.emit(text('The answer is 42.'));
+    bridge.emit({
+      type: 'message_end',
+      message: { role: 'assistant', content: [{ type: 'text', text: 'The answer is 42.' }] },
+    } as never);
+    bridge.emit({ type: 'agent_end', messages: [] } as never);
+    await expect(done).resolves.toMatchObject({ ok: true, summary: 'The answer is 42.' });
+  });
 });

@@ -286,6 +286,17 @@ export function ThreadStatusIndicator(): ReactElement | null {
   const isCompacting = usePiStore((s) => s.agent.isCompacting);
   /** The live "switching to <model>…" banner state — see below. */
   const switching = useModelSelectionStore((s) => s.switching);
+  /*
+   * A STALLED REQUEST, SENT AGAIN. The provider cancelled a stream that had gone
+   * silent while the engine did nothing (provider-llamacpp/stall-watchdog.ts)
+   * and sent the request again, so the thought on screen is about to be
+   * replaced. Said on the same ring, from the cancel until the retry's first
+   * block lands (the event router clears it then). pi's own auto-retry carries
+   * no reason and is left as it was.
+   */
+  const stallRetry = usePiStore((s) =>
+    s.agent.retry?.reason === 'stalled' ? s.agent.retry : null,
+  );
 
   // Snap to 100% then fade ONLY once the first token lands (processing → false).
   const [fading, setFading] = useState(false);
@@ -311,7 +322,7 @@ export function ThreadStatusIndicator(): ReactElement | null {
   // A model swap and a cold server load are timed too: they are the LONGEST
   // waits in the app (tens of seconds), and an unmoving indicator over one of
   // them is what "everything completely stops" looks like from the outside.
-  const timing = processing || switching !== null || serverStarting;
+  const timing = processing || switching !== null || serverStarting || stallRetry !== null;
   useEffect(() => {
     if (!timing) return undefined;
     procStart.current = performance.now();
@@ -361,6 +372,16 @@ export function ThreadStatusIndicator(): ReactElement | null {
    * swap — still belongs in the thread, because each of those IS about the turn
    * in front of you.
    */
+  if (stallRetry !== null) {
+    return (
+      <ProcessingRing
+        percent={null}
+        label="Retrying — the model stopped responding"
+        fading={false}
+        elapsedMs={elapsedMs}
+      />
+    );
+  }
   if (serverStarting && !processing) return null;
   /*
    * THE PANEL LINE IS GONE. the user, with a screenshot of it alone at the foot of

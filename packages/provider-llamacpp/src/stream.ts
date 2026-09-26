@@ -50,6 +50,19 @@ import { buildRequestHeaders } from './request-headers.js';
 import { tapRequest, tapUsage } from './request-tap.js';
 import { settleNote, settleReply } from './settle-reply.js';
 import { parseSSE } from './sse.js';
+import {
+  httpProgressProbe,
+  linkAbort,
+  llamaSlotsWorkCounter,
+  STALL_RETRIES,
+  StreamStalledError,
+  type StreamWatch,
+  serverRoot,
+  stallErrorMessage,
+  stallLogLine,
+  stallPolicyFromEnv,
+  watchStream,
+} from './stall-watchdog.js';
 
 /** llama.cpp per-response `timings` block (structurally == inference's). */
 export interface LlamaCppTimings {
@@ -631,105 +644,37 @@ export function createLlamaCppStream(deps: LlamaCppStreamDeps = {}): LlamaCppStr
         }
       };
 
-      // Resolve the live harness repair wiring once for this stream (fixer, rungs
-      // 3–5, telemetry, per-session relaxed schemas). Falls back to static deps.
-      const live = deps.repairProvider?.();
-      const registeredNames = context.tools?.map((t) => t.name) ?? [];
-
-      const schemaFor = (name: string): ToolSchemaLike | undefined => {
-        // A per-session RELAXED schema (rung-4) wins over the strict one so a tool
-        // the harness relaxed this session validates cleanly on subsequent calls.
-        const relaxed = live?.relaxedSchemaFor?.(name);
-        if (relaxed !== undefined) return relaxed;
-        const tool = context.tools?.find((t) => t.name === name);
-        return tool?.parameters as ToolSchemaLike | undefined;
+      /**
+       * A STALLED ATTEMPT'S OUTPUT DOES NOT SURVIVE IT. The request is sent again
+       * from the same prompt and the new reply is a new sample, so the message
+       * starts over: what the first attempt streamed is closed and dropped, and
+       * the next block starts at index 0 again — which is how the thread knows to
+       * clear what it showed (engine/renderer/event-router.ts).
+       */
+      const restart = (): void => {
+        closeOpenBlocks();
+        blocksClosed = false;
+        thinkingIndex = undefined;
+        textIndex = undefined;
+        toolStates.clear();
+        finalizedTools.clear();
+        lastTimings = undefined;
+        finishReason = 'stop';
+        output.content = [];
+        output.usage.input = 0;
+        output.usage.output = 0;
       };
 
-      try {
-        stream.push({ type: 'start', partial: output });
-
-        // Build the request body, then give the host a chance to inspect/replace it
-        // via pi's `onPayload` (the `before_provider_request` hook) — the SAME seam
-        // the built-in providers honor. The corp coordination harness relies on this
-        // to (a) merge its owner-tuned qwen sampling (temperature/top_p/top_k/min_p/
-        // penalties + max_tokens) onto the outgoing body and (b) ARM its per-call
-        // hang watchdog. `onPayload` returns the (possibly new) payload, or a value
-        // we ignore unless it is a fresh object; absent (normal chat) → unchanged.
-        // Context-overflow recovery loop. llama-server rejects a prompt bigger
-        // than its `n_ctx` with HTTP 400 `exceed_context_size_error`. Instead of
-        // throwing that raw blob into the chat (or letting pi's compaction hard-
-        // fail), we TRIM the oldest/largest tool results out of the request and
-        // retry — re-reading the fresh token counts the server reports on each
-        // pass — until the prompt fits or nothing is left to trim. This keeps the
-        // turn going transparently; pi never sees the overflow. See context-trim.ts.
-        /*
-         * Stale screenshots go before the request is built, every time — not
-         * only when the prompt overflows. An old screenshot is wrong as well as
-         * expensive: it shows a screen that has since been clicked and typed
-         * into. See dropStaleScreenshots for the measurement that found it.
-         */
-        const pruned = dropStaleScreenshots(context);
-        let sendContext = pruned.context;
-        let res: Response;
-        for (let attempt = 0; ; attempt++) {
-          let body = buildChatCompletionsRequest(model, sendContext, options);
-          const replaced = await options?.onPayload?.(body, model);
-          if (replaced !== null && typeof replaced === 'object') {
-            body = replaced as Record<string, unknown>;
-          }
-          tapRequest(body, 'llamacpp');
-          res = await fetchWhenBack(`${model.baseUrl}/chat/completions`, {
-            method: 'POST',
-            // models.json headers / apiKey arrive in `options`, not on the model.
-            headers: buildRequestHeaders(model, options),
-            body: JSON.stringify(body),
-            signal: options?.signal,
-          });
-          // A response arrived (headers received, before the body is consumed) → notify
-          // the host via pi's `onResponse` (`after_provider_response`), mirroring the
-          // built-in openai-completions handler. The corp uses this to DISARM its
-          // per-call watchdog: the server responded, so this request is not a hung
-          // socket and the (legitimately long) stream may run unbounded. No-op in
-          // normal chat (no handler). Fired on ANY status so an error response also
-          // clears the watchdog rather than tripping it. Re-fired on each retry so a
-          // recovered request re-arms/re-disarms the watchdog like a fresh call.
-          await options?.onResponse?.(
-            { status: res.status, headers: headersToRecord(res.headers) },
-            model,
-          );
-          if (res.ok) break;
-
-          const detail = await res.text().catch(() => '');
-          const overflow = parseContextOverflow(detail);
-          if (overflow !== undefined && attempt < MAX_OVERFLOW_RETRIES) {
-            // Free the overshoot plus a reply margin, shedding stale tool results.
-            const target = overflow.nPromptTokens - overflow.nCtx + REPLY_MARGIN_TOKENS;
-            const trim = trimContextForOverflow(sendContext, target);
-            if (trim.trimmedCount > 0) {
-              sendContext = trim.context;
-              // eslint-disable-next-line no-console
-              console.log(
-                `[pi-ctx] overflow ${overflow.nPromptTokens}/${overflow.nCtx} tok — trimmed ~${trim.removedTokens} tok from ${trim.trimmedCount} tool result(s), retrying (attempt ${attempt + 1}/${MAX_OVERFLOW_RETRIES})`,
-              );
-              continue;
-            }
-          }
-          // Unrecoverable: a non-overflow error, retries exhausted, or nothing
-          // left to trim (pathological). Surface a CLEAN short message — never the
-          // raw HTTP/JSON blob (log the detail for debugging only).
-          if (detail.length > 0) {
-            // eslint-disable-next-line no-console
-            console.error(`[pi-ctx] llama-server HTTP ${res.status}: ${detail.slice(0, 500)}`);
-          }
-          throw new Error(cleanProviderError(res.status, overflow));
-        }
-
+      /** Read one attempt's SSE body into `output`, telling the watchdog what arrives. */
+      const consume = async (res: Response, watch: StreamWatch | undefined): Promise<void> => {
         // KV-reuse visibility (the user): log ONCE per turn from the first prefill
         // frame — the whole context length, how much of it the server reused from
         // the KV cache (the stable prefix), and how many NEW tokens it had to
         // prefill (the latest message). A big `reused` + small `new` on a
         // follow-up means the cache is working and we're not re-prefilling.
         let kvLogged = false;
+        /** The last prefill frame's `processed` — a frame that moved it is progress. */
+        let lastProcessed = -1;
         // The live readout: counted here, read by the app off stderr (live-tps.ts).
         const liveTps = createLiveTpsReporter();
         try {
@@ -766,6 +711,11 @@ export function createLlamaCppStream(deps: LlamaCppStreamDeps = {}): LlamaCppStr
             // seam.
             if (chunk.prompt_progress !== undefined) {
               const pp = chunk.prompt_progress;
+              // A prefill that is still moving is alive, however long it takes.
+              if ((pp.processed ?? 0) > lastProcessed) {
+                lastProcessed = pp.processed ?? 0;
+                watch?.progress();
+              }
               if (!kvLogged && (pp.total ?? 0) > 0) {
                 kvLogged = true;
                 const total = pp.total ?? 0;
@@ -805,6 +755,13 @@ export function createLlamaCppStream(deps: LlamaCppStreamDeps = {}): LlamaCppStr
               (delta?.tool_calls?.length ?? 0) > 0
             ) {
               liveTps.tick();
+            }
+            // Only a real delta tells the watchdog the stream is alive — never
+            // a keepalive (parseSSE drops those), a role or a usage chunk.
+            if ((delta?.tool_calls?.length ?? 0) > 0) watch?.delta('tool');
+            else if (delta?.content != null && delta.content.length > 0) watch?.delta('content');
+            else if (delta?.reasoning_content != null && delta.reasoning_content.length > 0) {
+              watch?.delta('reasoning');
             }
 
             if (delta?.reasoning_content != null && delta.reasoning_content.length > 0) {
@@ -896,6 +853,173 @@ export function createLlamaCppStream(deps: LlamaCppStreamDeps = {}): LlamaCppStr
           }
         } finally {
           liveTps.end();
+        }
+      };
+
+      // Resolve the live harness repair wiring once for this stream (fixer, rungs
+      // 3–5, telemetry, per-session relaxed schemas). Falls back to static deps.
+      const live = deps.repairProvider?.();
+      const registeredNames = context.tools?.map((t) => t.name) ?? [];
+
+      const schemaFor = (name: string): ToolSchemaLike | undefined => {
+        // A per-session RELAXED schema (rung-4) wins over the strict one so a tool
+        // the harness relaxed this session validates cleanly on subsequent calls.
+        const relaxed = live?.relaxedSchemaFor?.(name);
+        if (relaxed !== undefined) return relaxed;
+        const tool = context.tools?.find((t) => t.name === name);
+        return tool?.parameters as ToolSchemaLike | undefined;
+      };
+
+      try {
+        stream.push({ type: 'start', partial: output });
+
+        // Build the request body, then give the host a chance to inspect/replace it
+        // via pi's `onPayload` (the `before_provider_request` hook) — the SAME seam
+        // the built-in providers honor. The corp coordination harness relies on this
+        // to (a) merge its owner-tuned qwen sampling (temperature/top_p/top_k/min_p/
+        // penalties + max_tokens) onto the outgoing body and (b) ARM its per-call
+        // hang watchdog. `onPayload` returns the (possibly new) payload, or a value
+        // we ignore unless it is a fresh object; absent (normal chat) → unchanged.
+        // Context-overflow recovery loop. llama-server rejects a prompt bigger
+        // than its `n_ctx` with HTTP 400 `exceed_context_size_error`. Instead of
+        // throwing that raw blob into the chat (or letting pi's compaction hard-
+        // fail), we TRIM the oldest/largest tool results out of the request and
+        // retry — re-reading the fresh token counts the server reports on each
+        // pass — until the prompt fits or nothing is left to trim. This keeps the
+        // turn going transparently; pi never sees the overflow. See context-trim.ts.
+        /*
+         * Stale screenshots go before the request is built, every time — not
+         * only when the prompt overflows. An old screenshot is wrong as well as
+         * expensive: it shows a screen that has since been clicked and typed
+         * into. See dropStaleScreenshots for the measurement that found it.
+         */
+        const pruned = dropStaleScreenshots(context);
+        let sendContext = pruned.context;
+        /** The body that got through (after any trimming) — what a stalled attempt sends again. */
+        let sentBody: Record<string, unknown> | undefined;
+        const open = async (signal: AbortSignal): Promise<Response> => {
+          if (sentBody !== undefined) {
+            // A stalled attempt, sent again as it was: the hooks already ran on it.
+            tapRequest(sentBody, 'llamacpp');
+            const again = await fetchWhenBack(`${model.baseUrl}/chat/completions`, {
+              method: 'POST',
+              headers: buildRequestHeaders(model, options),
+              body: JSON.stringify(sentBody),
+              signal,
+            });
+            await options?.onResponse?.(
+              { status: again.status, headers: headersToRecord(again.headers) },
+              model,
+            );
+            if (again.ok) return again;
+            const detail = await again.text().catch(() => '');
+            if (detail.length > 0) {
+              // eslint-disable-next-line no-console
+              console.error(`[pi-ctx] llama-server HTTP ${again.status}: ${detail.slice(0, 500)}`);
+            }
+            throw new Error(cleanProviderError(again.status, parseContextOverflow(detail)));
+          }
+          for (let attempt = 0; ; attempt++) {
+            let body = buildChatCompletionsRequest(model, sendContext, options);
+            const replaced = await options?.onPayload?.(body, model);
+            if (replaced !== null && typeof replaced === 'object') {
+              body = replaced as Record<string, unknown>;
+            }
+            tapRequest(body, 'llamacpp');
+            const res = await fetchWhenBack(`${model.baseUrl}/chat/completions`, {
+              method: 'POST',
+              // models.json headers / apiKey arrive in `options`, not on the model.
+              headers: buildRequestHeaders(model, options),
+              body: JSON.stringify(body),
+              signal,
+            });
+            // A response arrived (headers received, before the body is consumed) → notify
+            // the host via pi's `onResponse` (`after_provider_response`), mirroring the
+            // built-in openai-completions handler. The corp uses this to DISARM its
+            // per-call watchdog: the server responded, so this request is not a hung
+            // socket and the (legitimately long) stream may run unbounded. No-op in
+            // normal chat (no handler). Fired on ANY status so an error response also
+            // clears the watchdog rather than tripping it. Re-fired on each retry so a
+            // recovered request re-arms/re-disarms the watchdog like a fresh call.
+            await options?.onResponse?.(
+              { status: res.status, headers: headersToRecord(res.headers) },
+              model,
+            );
+            if (res.ok) {
+              sentBody = body;
+              return res;
+            }
+
+            const detail = await res.text().catch(() => '');
+            const overflow = parseContextOverflow(detail);
+            if (overflow !== undefined && attempt < MAX_OVERFLOW_RETRIES) {
+              // Free the overshoot plus a reply margin, shedding stale tool results.
+              const target = overflow.nPromptTokens - overflow.nCtx + REPLY_MARGIN_TOKENS;
+              const trim = trimContextForOverflow(sendContext, target);
+              if (trim.trimmedCount > 0) {
+                sendContext = trim.context;
+                // eslint-disable-next-line no-console
+                console.log(
+                  `[pi-ctx] overflow ${overflow.nPromptTokens}/${overflow.nCtx} tok — trimmed ~${trim.removedTokens} tok from ${trim.trimmedCount} tool result(s), retrying (attempt ${attempt + 1}/${MAX_OVERFLOW_RETRIES})`,
+                );
+                continue;
+              }
+            }
+            // Unrecoverable: a non-overflow error, retries exhausted, or nothing
+            // left to trim (pathological). Surface a CLEAN short message — never the
+            // raw HTTP/JSON blob (log the detail for debugging only).
+            if (detail.length > 0) {
+              // eslint-disable-next-line no-console
+              console.error(`[pi-ctx] llama-server HTTP ${res.status}: ${detail.slice(0, 500)}`);
+            }
+            throw new Error(cleanProviderError(res.status, overflow));
+          }
+        };
+
+        /*
+         * A STREAM THAT STOPS IS SENT AGAIN, ONCE (see stall-watchdog.ts). The
+         * engine's own counters are read from `/slots` once the stream goes quiet,
+         * so a long silence while the server is still decoding is left alone.
+         */
+        const stallPolicy = stallPolicyFromEnv();
+        const progressProbe =
+          stallPolicy === null
+            ? undefined
+            : httpProgressProbe(
+                `${serverRoot(model.baseUrl)}/slots`,
+                llamaSlotsWorkCounter,
+                doFetch,
+                buildRequestHeaders(model, options),
+              );
+        for (let attempt = 1; ; attempt++) {
+          // The attempt's own abort: the person's Stop still reaches it, and the
+          // watchdog can cancel this request without touching pi's signal.
+          const attemptAbort = new AbortController();
+          const unlink = linkAbort(options?.signal, attemptAbort);
+          let watch: StreamWatch | undefined;
+          try {
+            const res = await open(attemptAbort.signal);
+            if (stallPolicy !== null) {
+              watch = watchStream({
+                policy: stallPolicy,
+                probe: progressProbe,
+                // The HTTP request only — never the server's process.
+                onStall: (info) => attemptAbort.abort(new StreamStalledError(info)),
+              });
+            }
+            await consume(res, watch);
+            break;
+          } catch (error) {
+            const stall = watch?.stalled;
+            if (stall === undefined || options?.signal?.aborted === true) throw error;
+            const retrying = attempt <= STALL_RETRIES;
+            process.stderr.write(`${stallLogLine(stall, attempt, retrying)}\n`);
+            if (!retrying) throw new Error(stallErrorMessage(stall, attempt));
+            restart();
+          } finally {
+            watch?.stop();
+            unlink();
+          }
         }
 
         // --- finalize blocks ------------------------------------------------

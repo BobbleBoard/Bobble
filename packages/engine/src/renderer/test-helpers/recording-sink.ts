@@ -45,6 +45,8 @@ export class RecordingSink implements StoreSink {
     this.record('appendTextDelta', id, delta);
   appendThinkingDelta: StoreSink['appendThinkingDelta'] = (id, delta) =>
     this.record('appendThinkingDelta', id, delta);
+  resetAssistantBlocks: NonNullable<StoreSink['resetAssistantBlocks']> = (id) =>
+    this.record('resetAssistantBlocks', id);
   beginToolCall: StoreSink['beginToolCall'] = (id, call) => this.record('beginToolCall', id, call);
   appendToolCallArgs: StoreSink['appendToolCallArgs'] = (id, callId, argsDelta) =>
     this.record('appendToolCallArgs', id, callId, argsDelta);

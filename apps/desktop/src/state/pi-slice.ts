@@ -33,7 +33,7 @@ export interface PiAgentStatus {
   isStreaming: boolean;
   isCompacting: boolean;
   pendingMessageCount: number;
-  retry: { attempt: number; maxAttempts: number } | null;
+  retry: { attempt: number; maxAttempts: number; reason?: 'stalled' } | null;
   agentStartedAt: number | null;
   model: { id: string; name: string; provider: string } | null;
   thinkingLevel: ThinkingLevel;
@@ -600,6 +600,10 @@ export function createPiSink(
 
     appendThinkingDelta: (id, delta) =>
       threadSet((msgs) => appendOrMergeBlock(msgs, id, 'thinking', delta)),
+
+    // The provider started the message over (a stalled request sent again).
+    resetAssistantBlocks: (id) =>
+      threadSet((msgs) => mutateAssistant(msgs, id, (m) => ({ ...m, blocks: [] }))),
 
     beginToolCall: (id, call) =>
       threadSet((msgs) =>

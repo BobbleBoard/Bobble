@@ -193,6 +193,7 @@ export function createChildAgents<S extends SessionSender>(
         const e = event as {
           type?: string;
           assistantMessageEvent?: { type?: string; delta?: string };
+          message?: { role?: string; content?: { type?: string; text?: string }[] };
         };
         if (e.type === 'message_start') summary = '';
         else if (
@@ -201,6 +202,13 @@ export function createChildAgents<S extends SessionSender>(
           typeof e.assistantMessageEvent.delta === 'string'
         ) {
           summary += e.assistantMessageEvent.delta;
+        } else if (e.type === 'message_end' && e.message?.role === 'assistant') {
+          // The finished message is the provider's last word on the text: a
+          // stalled request it cancelled and sent again streamed text that is
+          // not in it (provider-llamacpp/stall-watchdog.ts).
+          summary = (e.message.content ?? [])
+            .map((c) => (c?.type === 'text' ? (c.text ?? '') : ''))
+            .join('');
         }
         // The child's top-level turn ended (or it crashed) → its final answer is ready.
         if (!ended && (event.type === 'agent_end' || event.type === '_bridge_exit')) {
