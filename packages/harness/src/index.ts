@@ -28,6 +28,7 @@ import type {
 } from '@mariozechner/pi-coding-agent';
 import { createBashToolDefinition } from '@mariozechner/pi-coding-agent';
 import { sharedTool, sharedToolNames } from '@pi-desktop/tool-bus';
+import { registerCompactionGate } from './compaction-gate.js';
 import { corpToolEnabled, registerCreateHierarchyTool } from './corp/promote-tool.js';
 import { CREATE_PRODUCTION_HIERARCHY } from './corp/promotion.js';
 import { effortKnobs, isEffortLevel } from './effort/effort.js';
@@ -2776,6 +2777,9 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     kit: (root) => projectMathKit(root),
   };
   registerMathTool(pi, mathDeps);
+
+  /* pi's auto-compaction, held to the window we run (compaction-gate.ts). */
+  registerCompactionGate(pi, (line) => console.error(line));
 
   /*
    * `diagram` — a flowchart, a sequence, an org chart… from Mermaid, drawn in

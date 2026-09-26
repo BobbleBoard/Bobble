@@ -19,6 +19,7 @@ import type {
   RpcSessionState,
   RpcSlashCommand,
 } from '@pi-desktop/engine';
+import { MANUAL_COMPACTION_FOCUS } from '@pi-desktop/harness/compaction-gate';
 
 import { takeVisionWant } from '../inference/vision-want';
 import type { PiInvokeMap } from './contract';
@@ -419,12 +420,11 @@ export function createPiSessions<S extends SessionSender>(deps: PiSessionsDeps<S
     'pi:compact': async (sender, req) => {
       const bridge = bridgeFor(sender);
       if (bridge === undefined) return { success: false, error: 'pi is not running' };
+      // Always a focus: it is how the harness's compaction gate knows a person asked.
       return ack(
         bridge.send({
           type: 'compact',
-          ...(req?.customInstructions !== undefined
-            ? { customInstructions: req.customInstructions }
-            : {}),
+          customInstructions: req?.customInstructions ?? MANUAL_COMPACTION_FOCUS,
         }),
       );
     },
