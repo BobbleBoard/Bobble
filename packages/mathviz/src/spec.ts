@@ -701,12 +701,35 @@ function scrub<T>(v: T, found: { any: boolean }): T {
   return v;
 }
 
+/** TeX commands a spec's text and expressions use — the names a lone backslash begins. */
+const TEX_COMMANDS =
+  'frac|dfrac|tfrac|sqrt|sin|cos|tan|sec|csc|cot|arcsin|arccos|arctan|sinh|cosh|tanh|ln|log|exp|lim|' +
+  'sum|prod|int|iint|oint|infty|partial|nabla|cdot|cdots|ldots|times|div|pm|mp|approx|neq|ne|leq|le|geq|ge|' +
+  'equiv|propto|sim|to|rightarrow|leftarrow|Rightarrow|implies|iff|in|notin|subset|cup|cap|forall|exists|' +
+  'alpha|beta|gamma|delta|epsilon|varepsilon|zeta|eta|theta|vartheta|iota|kappa|lambda|mu|nu|xi|pi|rho|' +
+  'sigma|tau|upsilon|phi|varphi|chi|psi|omega|Gamma|Delta|Theta|Lambda|Xi|Pi|Sigma|Phi|Psi|Omega|' +
+  'left|right|big|Big|text|mathrm|mathbf|mathit|mathcal|operatorname|vec|hat|bar|dot|ddot|overline|' +
+  'underline|quad|qquad|circ|degree|angle|triangle|perp|parallel|prime|boxed|displaystyle|over|binom';
+const LONE_TEX = new RegExp(`(?<!\\\\)\\\\(?=(?:${TEX_COMMANDS})(?![A-Za-z]))`, 'g');
+
+/**
+ * JSON WITH TeX IN IT, AS A MODEL TYPES IT. A spec's steps and labels carry
+ * TeX, and a model writes `"$\frac{a}{b}$"` with ONE backslash — which JSON
+ * reads as a form feed and "rac", as `\theta` → a tab and "heta", `\nu` → a
+ * newline and "u"; `\sin` and `\pi` do not parse at all. A lone backslash
+ * that begins a TeX command's name is taken as TeX (doubled before parsing);
+ * `\\frac`, and a real `\n` before ordinary words, are left as they are.
+ */
+export function texSafeJson(text: string): string {
+  return text.replace(LONE_TEX, '\\\\');
+}
+
 /** The spec as the renderer reads it, from whatever the model wrote. */
 export function normalizeMathSpec(input: unknown): MathSpec {
   let v: unknown = input;
   if (typeof v === 'string') {
     try {
-      v = JSON.parse(v);
+      v = JSON.parse(texSafeJson(v));
     } catch (e) {
       throw new SpecError(`the spec is not JSON (${e instanceof Error ? e.message : String(e)})`);
     }

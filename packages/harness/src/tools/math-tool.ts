@@ -27,7 +27,13 @@ import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { ExtensionAPI } from '@mariozechner/pi-coding-agent';
 import { type Kit, loadProjectKit } from '@pi-desktop/design-kit';
-import { ExprError, type MathResult, renderMath, SpecError } from '@pi-desktop/mathviz';
+import {
+  ExprError,
+  type MathResult,
+  renderMath,
+  SpecError,
+  texSafeJson,
+} from '@pi-desktop/mathviz';
 import { serverCanSeeImages } from '@pi-desktop/provider-llamacpp';
 import { Type } from '@sinclair/typebox';
 import type { PresentBridge } from './present.js';
@@ -90,10 +96,13 @@ function resolveAgainst(root: string, p: string): string {
 
 /** JSON as a model pastes it: inside a ``` fence, or with a trailing comma. */
 export function looseJson(text: string): unknown {
-  const t = text
-    .trim()
-    .replace(/^```(?:json)?\s*/i, '')
-    .replace(/\s*```$/, '');
+  // TeX typed with one backslash (`\frac`, `\theta`) is TeX, not a JSON escape.
+  const t = texSafeJson(
+    text
+      .trim()
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```$/, ''),
+  );
   try {
     return JSON.parse(t);
   } catch (first) {

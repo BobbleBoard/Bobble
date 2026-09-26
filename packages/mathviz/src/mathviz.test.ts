@@ -269,3 +269,13 @@ describe('the words a small model uses for the same things', () => {
     expect(s.steps[0]?.text).toBe('**Slope.** The slope is $a$.');
   });
 });
+
+describe('TeX typed into JSON with one backslash', () => {
+  it('is TeX — not a form feed, a tab or a parse error — and a real newline stays one', () => {
+    const json = String.raw`{"title": "Waves", "plot": {"curves": [{"id": "f", "expr": "\sin(x)", "label": "\theta"}]}, "steps": [{"text": "Half is $\frac{1}{2}$, and \\frac stays.\nThe end.", "highlight": ["f"]}]}`;
+    const s = normalizeMathSpec(json);
+    expect(s.plot?.curves[0]?.expr).toBe(String.raw`\sin(x)`);
+    expect(s.plot?.curves[0]?.label).toBe(String.raw`\theta`);
+    expect(s.steps[0]?.text).toBe('Half is $\\frac{1}{2}$, and \\frac stays.\nThe end.');
+  });
+});

@@ -177,3 +177,17 @@ describe('small things', () => {
     expect(mathSlug('Why $\\sin$ x is Cos x!')).toBe('why-x-is-cos-x');
   });
 });
+
+describe('a spec file with TeX typed the way a model types it', () => {
+  it('draws — `\\frac` in the file is a fraction, not a form feed', async () => {
+    const { run } = setup();
+    const file = path.join(root, 'tex.math.json');
+    writeFileSync(
+      file,
+      String.raw`{"title": "TeX", "plot": {"x": "0..1", "curves": [{"id": "f", "expr": "\sqrt{x}"}]}, "steps": [{"text": "It is $\frac{1}{2}$ at a quarter.", "highlight": ["f"]}, {"text": "Then \theta.", "highlight": ["f"]}]}`,
+    );
+    const r = await run({ spec: 'tex.math.json' });
+    expect(r.isError).toBeUndefined();
+    expect(readFileSync(path.join(root, 'tex.html'), 'utf8')).toContain('class="mfrac"');
+  });
+});

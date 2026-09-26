@@ -19,7 +19,7 @@ export { ExprError } from './expr.js';
 export type { Evaluators, Values } from './runtime.js';
 export { runtimeSource } from './runtime.js';
 export type { Panel, Scene } from './scene-types.js';
-export { type MathSpec, normalizeMathSpec, SpecError, withoutEmoji } from './spec.js';
+export { type MathSpec, normalizeMathSpec, SpecError, texSafeJson, withoutEmoji } from './spec.js';
 
 export interface MathResult {
   /** The spec as drawn — forgiving reads resolved, the plot's y-range fixed. */
