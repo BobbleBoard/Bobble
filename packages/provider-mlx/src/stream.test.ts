@@ -484,3 +484,89 @@ describe('the settled reply', () => {
     expect(final.content.map((b) => b.type)).toEqual(['thinking', 'toolCall']);
   });
 });
+
+describe('rapid-mlx: a picture in a conversation too long for its vision lane', () => {
+  /* MEASURED 2026-09-25 (visual suite, 4B): a presented page came back as a
+     picture in a 12,041-token conversation; rapid-mlx refused it and the turn
+     ended in "The local model server returned an error". */
+  it('sends the picture described, and the turn goes on', async () => {
+    const calls: Array<Record<string, unknown>> = [];
+    const fetchImpl = (async (_url: string, init: RequestInit) => {
+      const sent = JSON.parse(String(init.body)) as Record<string, unknown>;
+      calls.push(sent);
+      if (sent.stream === false) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            choices: [
+              { message: { content: 'A landing page titled "Kiln & Co" with a grey hero.' } },
+            ],
+          }),
+        } as unknown as Response;
+      }
+      async function* sse(): AsyncGenerator<Uint8Array> {
+        const enc = new TextEncoder();
+        yield enc.encode(
+          `data: ${JSON.stringify({ choices: [{ delta: { content: 'Looks right.' } }] })}\n\n`,
+        );
+        yield enc.encode(
+          `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }] })}\n\n`,
+        );
+        yield enc.encode('data: [DONE]\n\n');
+      }
+      return { ok: true, status: 200, body: sse() } as unknown as Response;
+    }) as unknown as typeof fetch;
+    const model = {
+      ...makeModel(),
+      id: 'qwen3.5-4b-mtp@rapid-mlx',
+      input: ['text', 'image'] as ('text' | 'image')[],
+    };
+    const context: Context = {
+      systemPrompt: 'x'.repeat(40_000),
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: 'Here is my page.' },
+            { type: 'image', data: 'AAAA', mimeType: 'image/png' },
+          ],
+          timestamp: 0,
+        },
+      ],
+    };
+    const { final } = await consume(createMlxStream({ fetchImpl })(model, context));
+    expect(final.stopReason).toBe('stop');
+    const [describe, turn] = calls;
+    expect(describe?.stream).toBe(false);
+    expect(JSON.stringify(turn)).not.toContain('image_url');
+    expect(JSON.stringify(turn)).toContain('Kiln & Co');
+  });
+
+  it('sends the picture itself when the conversation is short', async () => {
+    const { fetchImpl, calls } = sseFetch([
+      { choices: [{ delta: { content: 'ok' }, finish_reason: 'stop' }] },
+    ]);
+    const model = {
+      ...makeModel(),
+      id: 'qwen3.5-4b-mtp@rapid-mlx',
+      input: ['text', 'image'] as ('text' | 'image')[],
+    };
+    const context: Context = {
+      systemPrompt: 'short',
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: 'look' },
+            { type: 'image', data: 'AAAA', mimeType: 'image/png' },
+          ],
+          timestamp: 0,
+        },
+      ],
+    };
+    await consume(createMlxStream({ fetchImpl })(model, context));
+    expect(calls).toHaveLength(1);
+    expect(String(calls[0]?.body)).toContain('image_url');
+  });
+});

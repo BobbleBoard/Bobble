@@ -48,6 +48,7 @@ import {
   validateAgainstSchema,
   withoutWrittenToolCall,
 } from '@pi-desktop/provider-llamacpp';
+import { fitPicturesToVisionBudget } from './picture-budget.js';
 
 export interface MlxStreamDeps {
   /** Injectable fetch (tests / proxies). Defaults to global fetch. */
@@ -236,6 +237,56 @@ function engineOf(model: { id: string }): string {
   return model.id.includes('@') ? model.id.slice(model.id.lastIndexOf('@') + 1) : 'mlx';
 }
 
+/**
+ * One picture, described by the model on the same server — the stand-in for a
+ * picture in a conversation too long for rapid-mlx's vision lane (see
+ * picture-budget.ts). Thinking off and a short reply: this is a caption.
+ */
+async function describePicture(
+  baseUrl: string,
+  modelId: string,
+  url: string,
+  deps: { fetch: typeof fetch; headers: Record<string, string>; signal?: AbortSignal },
+): Promise<string | null> {
+  const res = await deps.fetch(`${baseUrl}/chat/completions`, {
+    method: 'POST',
+    headers: deps.headers,
+    body: JSON.stringify({
+      model: modelId,
+      stream: false,
+      max_tokens: 320,
+      temperature: 0,
+      chat_template_kwargs: { enable_thinking: false },
+      messages: [
+        {
+          role: 'system',
+          content: 'You describe pictures exactly, for someone who cannot see them.',
+        },
+        {
+          role: 'user',
+          content: [
+            { type: 'image_url', image_url: { url } },
+            {
+              type: 'text',
+              text:
+                'Describe this picture in 3 to 6 plain sentences: what it shows, its layout and ' +
+                'any text on it, and anything that looks blank, broken, cut off or wrong.',
+            },
+          ],
+        },
+      ],
+    }),
+    ...(deps.signal !== undefined ? { signal: deps.signal } : {}),
+  });
+  if (!res.ok) return null;
+  const j = (await res.json().catch(() => null)) as {
+    choices?: Array<{ message?: { content?: string | null } }>;
+  } | null;
+  const text = j?.choices?.[0]?.message?.content ?? '';
+  const clean = text.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+  return clean === '' ? null : clean;
+}
+
 /** Engines that cut a reply short when the request names no `max_tokens`. */
 function engineCapsByDefault(engine: string | undefined): boolean {
   return engine !== undefined && engine !== 'rapid-mlx' && engine !== 'vllm';
@@ -307,6 +358,19 @@ export function createMlxStream(deps: MlxStreamDeps = {}): MlxStreamFn {
         }
         // After the hooks, since it is the hooks' llama.cpp-isms this removes.
         body = shapeForOpenAiServer(body, { engine: engineOf(model), maxTokens: model.maxTokens });
+        // rapid-mlx's vision lane: a conversation too long to carry its pictures
+        // gets their descriptions instead of a refusal or an out-of-memory crash.
+        if (engineOf(model) === 'rapid-mlx') {
+          const headers = buildRequestHeaders(model, options);
+          body = (await fitPicturesToVisionBudget(body, {
+            describe: (url) =>
+              describePicture(model.baseUrl, model.id, url, {
+                fetch: doFetch,
+                headers,
+                ...(options?.signal !== undefined ? { signal: options.signal } : {}),
+              }),
+          })) as typeof body;
+        }
         tapRequest(body, engineOf(model));
         const res = await doFetch(`${model.baseUrl}/chat/completions`, {
           method: 'POST',
