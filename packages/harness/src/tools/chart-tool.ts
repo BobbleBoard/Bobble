@@ -193,6 +193,30 @@ const STYLE_KEYS = [
   'ink',
 ] as const;
 
+/**
+ * A JSON list of SERIES — `[{"name":"Organic","values":[12,14,…]}, …]`, the
+ * shape Chart.js calls datasets and the one a 4B reaches for first. MEASURED
+ * (visual suite, 2026-09-25): given as `--data` or as a bare argument it was
+ * read as a list of points, and "chart needs its data" came back twice before
+ * the model found "Organic: 12, 14; …".
+ */
+function looksLikeSeriesList(v: unknown): boolean {
+  return (
+    Array.isArray(v) &&
+    v.length > 0 &&
+    v.every((x) => {
+      if (x === null || typeof x !== 'object' || Array.isArray(x)) return false;
+      const o = x as Record<string, unknown>;
+      const nums = o.values ?? o.data;
+      return (
+        (typeof o.name === 'string' || typeof o.label === 'string') &&
+        Array.isArray(nums) &&
+        nums.length > 0
+      );
+    })
+  );
+}
+
 /** A JSON blob in the type/title slot, read as data (see chartInputFromParams). */
 function salvageJson(p: Record<string, unknown>): {
   type?: unknown;
@@ -232,7 +256,7 @@ function salvageJson(p: Record<string, unknown>): {
       } else if (parsed.every((x) => typeof x === 'string')) {
         out.labels = parsed;
       } else {
-        out.extra = { items: parsed };
+        out.extra = looksLikeSeriesList(parsed) ? { series: parsed } : { items: parsed };
       }
       out[key] = undefined;
     } else if (parsed !== null && typeof parsed === 'object') {
@@ -281,13 +305,17 @@ export function chartInputFromParams(input: Record<string, unknown>): Record<str
       if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
         base = parsed as Record<string, unknown>;
       } else if (Array.isArray(parsed)) {
-        base = { items: parsed };
+        base = looksLikeSeriesList(parsed) ? { series: parsed } : { items: parsed };
       }
     } catch {
       /* not JSON — the flat fields carry the chart */
     }
   } else if (p.data !== null && typeof p.data === 'object') {
-    base = Array.isArray(p.data) ? { items: p.data } : { ...(p.data as Record<string, unknown>) };
+    base = Array.isArray(p.data)
+      ? looksLikeSeriesList(p.data)
+        ? { series: p.data }
+        : { items: p.data }
+      : { ...(p.data as Record<string, unknown>) };
   }
   // A JSON blob that landed in the type or title slot — MEASURED, a 4B sent
   // its data as `["Units Sold (thousands)", [12, 19, 27, 35]]` under an

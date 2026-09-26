@@ -252,10 +252,12 @@ export function normalizeChartSpec(input: unknown, opts: NormalizeOptions = {}):
       if (s === null || typeof s !== 'object') continue;
       const so = s as Record<string, unknown>;
       let pts = pointsOf(so.points ?? so.items ?? so.data ?? so.values);
-      // `values` as a bare number list beside the spec's `labels`.
-      if (pts.length === 0 && Array.isArray(so.values) && Array.isArray(o.labels)) {
-        const labels = stringList(o.labels);
-        const vals = numberList(so.values, labels.length, strict).values;
+      // `values` (Chart.js: `data`) as a bare number list beside the spec's `labels`.
+      const bare = Array.isArray(so.values) ? so.values : Array.isArray(so.data) ? so.data : null;
+      // The labels as a list, or as the "April, May, June" string a CLI line gives.
+      const labels = stringList(o.labels);
+      if (pts.length === 0 && bare !== null && labels.length > 0) {
+        const vals = numberList(bare, labels.length, strict).values;
         pts = labels.map((label, i) => ({ label, value: vals[i] ?? 0 }));
       }
       if (pts.length > 0) series.push({ name: str(so.name ?? so.label ?? ''), points: pts });

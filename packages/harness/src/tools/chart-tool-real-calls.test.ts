@@ -222,6 +222,33 @@ describe.skipIf(!hasBash)('the 17 real calls of "demo all your dataviz skills"',
 });
 
 describe.skipIf(!hasBash)('values as a model writes them', () => {
+  /* The visual suite, 4B, bash-CLI mode (2026-09-25), verbatim: the series as a
+     JSON list of {name, values} — Chart.js's datasets — as a bare argument and
+     as --data, both refused "chart needs its data" before the model found the
+     "Organic: 12, 14; …" form on its fourth try. */
+  it('a JSON list of named series is read as series, bare or as --data', async () => {
+    const lines = [
+      'chart "--labels=[\\"April\\",\\"May\\",\\"June\\",\\"July\\",\\"August\\",\\"September\\"]" "[{\\"name\\":\\"Organic\\",\\"values\\":[12,14,15,17,21,24]},{\\"name\\":\\"Paid\\",\\"values\\":[8,9,7,10,12,11]},{\\"name\\":\\"Social\\",\\"values\\":[3,4,6,5,7,9]}]"',
+      'chart "--labels=April, May, June, July, August, September" "--data=[{\\"name\\":\\"Organic\\",\\"values\\":[12, 14, 15, 17, 21, 24]}, {\\"name\\":\\"Paid\\",\\"values\\":[8, 9, 7, 10, 12, 11]}, {\\"name\\":\\"Social\\",\\"values\\":[3, 4, 6, 5, 7, 9]}]"',
+    ];
+    for (const text of lines) {
+      const root = freshRoot();
+      const r = await toolAt(root).line(text);
+      expect(r.isError, r.text).toBe(false);
+      const spec = specAt(root, wrote(r.text) as string);
+      expect(spec.series.map((x) => x.name)).toEqual(['Organic', 'Paid', 'Social']);
+      expect(spec.series[0]?.points.map((p) => p.label)).toEqual([
+        'April',
+        'May',
+        'June',
+        'July',
+        'August',
+        'September',
+      ]);
+      expect(spec.series[2]?.points.map((p) => p.value)).toEqual([3, 4, 6, 5, 7, 9]);
+    }
+  });
+
   it('"22M, 3,100" is 22,000,000 and 3,100 (it drew Market 3, Today 100)', async () => {
     const root = freshRoot();
     const r = await toolAt(root).line(
