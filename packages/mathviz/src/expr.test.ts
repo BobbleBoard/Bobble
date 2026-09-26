@@ -43,7 +43,7 @@ describe('expressions as people and small models type them', () => {
 
   it('says what is wrong, and where', () => {
     expect(() => compile('sin(x) + y', ['x'])).toThrow(
-      /"y" at 10 is not a variable here \(these are: x, pi, e, tau, deg\)/,
+      /"y" at 10 is not a variable here \(these are: x, pi, e, tau\)/,
     );
     expect(() => compile('(x + 1', ['x'])).toThrow(ExprError);
     expect(() => compile('x $ 2', ['x'])).toThrow(/"\$" at 3/);

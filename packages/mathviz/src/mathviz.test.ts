@@ -1512,7 +1512,11 @@ describe('the 4B’s seventh round (2026-09-26)', () => {
     const r = renderMath({
       title: 'Throw',
       params: ['t = 0 in 0..2.5', 'v0 = 15 in 10..30', 'theta = 45 in 10..80'],
-      plot: { var: 't', x: '0..2.5', curves: [{ id: 'h', expr: 'v0*sin(theta*deg)*t - 4.9*t^2' }] },
+      plot: {
+        var: 't',
+        x: '0..2.5',
+        curves: [{ id: 'h', expr: 'v0*sin(theta*pi/180)*t - 4.9*t^2' }],
+      },
       steps: [
         { text: 'Up.', highlight: ['h'], set: { t: 0 } },
         { text: 'Down.', highlight: ['h'], set: { t: 2.5 } },
@@ -1558,11 +1562,31 @@ describe('the 4B’s seventh round (2026-09-26)', () => {
     expect(items.find((it) => it.id === 'v')?.dim).toBe(true);
   });
 
-  it('knows deg: 30*deg is thirty degrees', () => {
-    const c = compileSpec(
-      normalizeMathSpec({ title: 'D', plot: { curves: ['sin(30*deg) + 0*x'] }, steps: ['A.'] }),
+  it('says a deg it was never given, and still finds a curve’s own variable past it', () => {
+    const r = renderMath({
+      title: 'Throw',
+      params: ['v0 = 15 in 10..30', 'theta = 45 in 10..80', 't = 0 in 0..2'],
+      figure: {
+        view: { x: '0..30', y: '0..15' },
+        shapes: [
+          {
+            id: 'path',
+            kind: 'curve',
+            x: 'v0*cos(theta/deg)*s',
+            y: 'v0*sin(theta/deg)*s - 4.9*s^2',
+            range: '0..t',
+          },
+        ],
+      },
+      steps: [
+        { text: 'Kicked.', highlight: ['path'], set: { t: 0 } },
+        { text: 'Flying.', highlight: ['path'], set: { t: 2 } },
+      ],
+    });
+    expect(r.spec.figure?.shapes[0]).toMatchObject({ kind: 'curve', over: 's' });
+    expect(r.problems.filter((p) => p.level === 'fix').map((p) => p.text)[0]).toMatch(
+      /^deg has no value in the spec/,
     );
-    expect(c.E['sin(30*deg) + 0*x']?.({ x: 0 })).toBeCloseTo(0.5, 12);
   });
 });
 
