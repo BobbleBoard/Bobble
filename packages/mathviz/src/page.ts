@@ -222,6 +222,10 @@ body{font:17px/1.55 var(--mv-font);-webkit-font-smoothing:antialiased;text-rende
 .mv{padding:28px 20px 48px}
 .mv-body{grid-template-columns:1fr;grid-template-areas:"stage" "steps" "controls";row-gap:18px}
 .mv-steps li:not(.is-on){display:none}
+/* Narrow, the step being read is a caption held at the foot of the view — the words stay beside the
+   motion even when the figure and the graph together are taller than the window. */
+.mv-steps{position:sticky;bottom:0;z-index:2;background:var(--mv-paper);padding:10px 0 12px;box-shadow:0 -14px 18px -14px color-mix(in srgb,var(--mv-ink) 22%,transparent)}
+.mv-nav,.mv-tell{margin-top:10px}
 }
 .mv-panel{margin:0 auto}
 .mv-panel+.mv-panel{margin-top:24px}
@@ -238,9 +242,17 @@ body{font:17px/1.55 var(--mv-font);-webkit-font-smoothing:antialiased;text-rende
 .mv-play.is-playing .mv-pause{display:block}
 .mv-play.is-playing{background:var(--mv-accent);border-color:var(--mv-accent);color:var(--mv-on-accent)}
 .mv-steps ol{list-style:none;margin:0;padding:0;display:grid;gap:2px}
-.mv-steps li{display:grid;grid-template-columns:26px 1fr;gap:14px;padding:12px 14px 12px 12px;border-left:2px solid transparent;color:var(--mv-mute);cursor:pointer}
-.mv-steps li:hover{color:var(--mv-ink)}
-.mv-steps li.is-on{border-left-color:var(--mv-accent);color:var(--mv-ink)}
+.mv-steps li{display:grid;grid-template-columns:26px 1fr;gap:14px;padding:12px 14px 12px 12px;border-left:2px solid transparent;border-radius:0 10px 10px 0;color:var(--mv-ink);cursor:pointer;transition:background-color .3s ease,border-color .3s ease;animation:mv-in .6s ease both}
+.mv-steps li.is-ahead{display:none}
+@keyframes mv-in{from{opacity:0;transform:translateY(8px)}}
+.mv-controls{transition:opacity .6s ease}
+.mv-telling .mv-controls{opacity:0;pointer-events:none}
+.mv-telling .mv-nav{display:none}
+.mv-tell{display:none;align-items:center;gap:10px;margin:16px 0 0 14px}
+.mv-telling .mv-tell{display:flex}
+.mv-tell button{font:inherit;font-size:14px;color:var(--mv-mute);background:transparent;border:1px solid var(--mv-line);border-radius:8px;padding:5px 12px;cursor:pointer}
+.mv-tell button:hover{color:var(--mv-ink);border-color:var(--mv-mute)}
+.mv-steps li.is-on{border-left-color:var(--mv-accent);background:color-mix(in srgb,var(--mv-accent) 7%,transparent)}
 .mv-num{width:26px;height:26px;border-radius:50%;border:1px solid var(--mv-line);display:grid;place-items:center;font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--mv-mute);margin-top:-1px}
 .mv-steps li.is-on .mv-num{background:var(--mv-accent);border-color:var(--mv-accent);color:var(--mv-on-accent)}
 .mv-text p{margin:0}
@@ -258,6 +270,8 @@ body{font:17px/1.55 var(--mv-font);-webkit-font-smoothing:antialiased;text-rende
 .mv-s-reference{stroke:var(--mv-reference)}.mv-s-highlight{stroke:var(--mv-highlight)}.mv-s-none{stroke:none}
 .mv-f-main{fill:var(--mv-main)}.mv-f-second{fill:var(--mv-second)}.mv-f-third{fill:var(--mv-third)}
 .mv-f-reference{fill:var(--mv-reference)}.mv-f-highlight{fill:var(--mv-highlight)}.mv-f-tint{fill:var(--mv-tint)}
+.mv-f-main-light{fill:color-mix(in srgb,var(--mv-main) 18%,var(--mv-paper))}.mv-f-second-light{fill:color-mix(in srgb,var(--mv-second) 20%,var(--mv-paper))}.mv-f-third-light{fill:color-mix(in srgb,var(--mv-third) 16%,var(--mv-paper))}
+.mv-s-paper{stroke:var(--mv-paper)}
 .mv-f-shade{fill:var(--mv-shade)}.mv-f-axis{fill:var(--mv-axis)}.mv-f-mute{fill:var(--mv-mute)}.mv-f-ink{fill:var(--mv-ink)}
 .mv-nofill{fill:none}
 .mv-svg line,.mv-svg path{stroke-linecap:round;stroke-linejoin:round}
@@ -300,10 +314,12 @@ export function mathPage({ spec, compiled, start, kit }: PageInput): string {
       return `<div class="mv-slider"><label class="mv-name" for="mv-${mvEsc(p.name)}">${paramLabel(p.label)}</label><input id="mv-${mvEsc(p.name)}" type="range" min="${p.min}" max="${p.max}" step="${p.step}" value="${v}" data-mv-param="${mvEsc(p.name)}"><output data-mv-value="${mvEsc(p.name)}">${mvEsc(String(Number(v.toPrecision(3))).replace('-', '−'))}</output><button type="button" class="mv-play" data-mv-play="${mvEsc(p.name)}" aria-pressed="false" aria-label="Play ${mvEsc(p.name)}">${PLAY_ICON}</button></div>`;
     })
     .join('');
+  // It opens telling: the first step shown, the rest waiting to appear (mvMount plays them).
+  const tells = spec.tell !== false && spec.steps.length > 1;
   const steps = spec.steps
     .map(
       (s, i) =>
-        `<li data-mv-step${i === 0 ? ' class="is-on" aria-current="step"' : ''}><span class="mv-num">${i + 1}</span><div class="mv-text">${s.text
+        `<li data-mv-step${i === 0 ? ' class="is-on" aria-current="step"' : tells ? ' class="is-ahead"' : ''}><span class="mv-num">${i + 1}</span><div class="mv-text">${s.text
           .split(/\n{2,}/)
           .map((para) => `<p>${inline(para.trim(), parts)}</p>`)
           .join('')}</div></li>`,
@@ -311,7 +327,7 @@ export function mathPage({ spec, compiled, start, kit }: PageInput): string {
     .join('');
   const stepsHtml =
     spec.steps.length > 0
-      ? `<section class="mv-steps" aria-label="Explanation"><ol>${steps}</ol>${spec.steps.length > 1 ? `<nav class="mv-nav"><button type="button" data-mv-prev>Back</button><span data-mv-count>1 / ${spec.steps.length}</span><button type="button" data-mv-next>Next</button></nav>` : ''}</section>`
+      ? `<section class="mv-steps" aria-label="Explanation"><ol>${steps}</ol>${spec.steps.length > 1 ? `<nav class="mv-nav"><button type="button" data-mv-prev>Back</button><span data-mv-count>1 / ${spec.steps.length}</span><button type="button" data-mv-next>Next</button>${tells ? '<button type="button" class="mv-again" data-mv-replay>Play again</button>' : ''}</nav>${tells ? '<div class="mv-tell"><button type="button" data-mv-pause aria-pressed="false">Pause</button><button type="button" data-mv-skip>Show all</button></div>' : ''}` : ''}</section>`
       : '';
   const data = JSON.stringify({ spec, start }).replace(/</g, '\\u003c');
   const script = `${runtimeSource()}\nvar MV_DATA = ${data};\nvar MV_E = ${evaluatorsScript(compiled)};\nmvMount(document, window, MV_DATA, MV_E);`;
@@ -320,7 +336,7 @@ export function mathPage({ spec, compiled, start, kit }: PageInput): string {
 <title>${mvEsc(spec.title)}</title>
 <style>${inlineKatexCss()}</style>
 <style>${css(kit)}</style>
-</head><body><main class="mv">
+</head><body><main class="mv${spec.tell !== false && spec.steps.length > 1 ? ' mv-telling' : ''}">
 <header class="mv-head"><h1>${inline(spec.title, new Map())}</h1>${spec.caption !== undefined ? `<p class="mv-cap">${inline(spec.caption, parts)}</p>` : ''}</header>
 <div class="mv-body${stepsHtml === '' ? ' is-single' : ''}"><section class="mv-stage">${panels}</section>${stepsHtml}${sliders !== '' ? `<div class="mv-controls">${sliders}</div>` : ''}</div>
 </main>

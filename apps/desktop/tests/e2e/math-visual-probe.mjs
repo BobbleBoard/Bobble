@@ -171,7 +171,8 @@ try {
     await inPage(
       'document.querySelector("[data-mv-next]").click(); document.querySelector("[data-mv-next]").click();',
     );
-    await sleep(1200);
+    // A move takes 1.1 s and step 3's nudge 3.2 s more; a background window's frames come slower.
+    await sleep(6000);
     const s3 = await inPage(
       '({ step: document.querySelector("[data-mv-count]").textContent, A: document.querySelector(\'[data-mv-value="A"]\').textContent })',
     );

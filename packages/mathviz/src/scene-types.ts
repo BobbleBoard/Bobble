@@ -82,6 +82,15 @@ export interface Panel {
   readonly h: number;
   /** The drawing area (a plot's axes box; a figure's whole view). */
   readonly area: Box;
+  /** World → pixel: x ↦ ox + (x − x0)·kx, y ↦ oy + (y1 − y)·ky. */
+  readonly map?: {
+    readonly x0: number;
+    readonly y1: number;
+    readonly kx: number;
+    readonly ky: number;
+    readonly ox: number;
+    readonly oy: number;
+  };
   readonly items: readonly Drawable[];
   /** Items the spec positions that fell outside what is shown: id → where. */
   readonly outside: readonly { readonly id: string; readonly what: string }[];
@@ -125,6 +134,8 @@ export interface PageDoc {
 export interface PageWin {
   requestAnimationFrame(fn: (now: number) => void): number;
   cancelAnimationFrame(id: number): void;
+  setTimeout(fn: () => void, ms: number): number;
+  clearTimeout(id: number): void;
   matchMedia?(q: string): { readonly matches: boolean } | undefined;
   readonly performance: { now(): number };
 }

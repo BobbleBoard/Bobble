@@ -225,7 +225,11 @@ function controls(r: MathResult): string {
   const n = r.spec.steps.length;
   const sliders = r.spec.params.filter((p) => p.hidden !== true);
   const bits: string[] = [];
-  if (n > 1) bits.push(`Back and Next through its ${n} steps`);
+  if (n > 1 && r.spec.tell)
+    bits.push(
+      `it plays its ${n} steps on its own when it opens${sliders.length > 0 ? " (each step's words appear as the figure moves)" : ''}, then Back, Next and Play again`,
+    );
+  else if (n > 1) bits.push(`Back and Next through its ${n} steps`);
   if (sliders.length > 0)
     bits.push(
       `${sliders.length === 1 ? 'a slider' : 'sliders'} for ${sliders.map((p) => p.name).join(', ')}, with Play`,
@@ -238,31 +242,29 @@ const REPLY =
   'Then tell the user in a sentence or two what the visual shows and how to use it — with the controls it has, above, and no others. The steps are on the page — do not repeat them in the chat.';
 
 const DESCRIPTION = [
-  'Draw a maths or physics visual as an interactive page beside the chat: a graph of functions with sliders, a labelled figure (geometry, forces, a spring, a box of gas), or both — with the explanation as numbered steps beside it, each lighting the parts it talks about. Every function plot, equation graph, geometry or physics diagram and every animation in an explanation goes here — never hand-written HTML or SVG, never the chart command (that is for data), never image generation.',
+  "Draw a maths or physics explanation as a page beside the chat: a figure, a graph, or both, with 2 to 6 steps beside it. The page PLAYS the steps like a teacher at a whiteboard — each step's words appear while the figure moves to that step's slider values, an arrow showing which way each part moved — then gives the reader the sliders. Every function plot, geometry or physics diagram and every animation in an explanation goes here — never hand-written HTML or SVG, never the chart command (that is for data), never image generation.",
   '',
-  'Pass the spec as JSON, or write it to a file (name.math.json) and pass the path — then fix that file and run math on it again:',
-  '{"title": "Adding sine waves",',
-  ' "params": ["n = 1 in 1..25"],',
-  ' "plot": {"x": "-pi..pi",',
-  '   "curves": [{"id": "f", "expr": "4/pi*sum(k, 1, n, sin((2k-1)x)/(2k-1))", "label": "sum of {n} terms"},',
-  '              {"id": "sq", "expr": "sign(sin(x))", "label": "square wave", "role": "reference"}]},',
-  ' "steps": [{"text": "One term is the sine $\\\\frac{4}{\\\\pi}\\\\sin x$: the {f}.", "highlight": ["f"], "set": {"n": 1}},',
-  '           {"text": "Twenty-five terms hug the {sq}.", "highlight": ["f", "sq"], "set": {"n": 25}}]}',
-  'A figure is the same, with shapes:',
-  '{"title": "Forces on a block on a slope",',
-  ' "figure": {"view": {"x": "0..10", "y": "0..6"},',
-  '   "shapes": [{"id": "slope", "kind": "polygon", "points": [[1, 1], [9, 1], [9, 5]], "fill": "tint"},',
-  '              {"id": "angle", "kind": "angle", "at": [1, 1], "from": [9, 1], "to": [9, 5], "label": "θ"},',
-  '              {"id": "W", "kind": "vector", "from": [6, 3.5], "to": [6, 1.9], "label": "W = mg"},',
-  '              {"id": "N", "kind": "vector", "from": [6, 3.5], "to": [5.3, 4.9], "label": "N"}]},',
-  ' "steps": [{"text": "The weight {W} acts straight down.", "highlight": ["W"]},',
-  '           {"text": "The normal force {N} is at right angles to the {slope}.", "highlight": ["N", "slope"]}]}',
+  'Write the spec to name.math.json — it is drawn the moment it is written, and its checks come back — or pass the JSON itself:',
+  '{"title": "A ball thrown straight up",',
+  ' "params": ["t = 0 in 0..1.5"],',
+  ' "figure": {"view": {"x": "-2..2", "y": "0..3.6"},',
+  '   "shapes": [{"id": "ground", "kind": "segment", "from": [-2, 0], "to": [2, 0]},',
+  '              {"id": "ball", "kind": "circle", "center": [0, "8*t - 4.9*t^2"], "r": 0.15, "fill": "main", "label": "ball"},',
+  '              {"id": "v", "kind": "vector", "from": [0.4, "8*t - 4.9*t^2"], "to": [0.4, "8*t - 4.9*t^2 + 0.12*(8 - 9.8*t)"], "label": "v"}]},',
+  ' "plot": {"var": "t", "x": {"range": "0..1.5", "label": "time t (s)"}, "y": {"label": "height (m)"},',
+  '          "curves": [{"id": "h", "expr": "8*t - 4.9*t^2", "label": "height"}],',
+  '          "points": [{"id": "now", "x": "t", "on": "h"}]},',
+  ' "steps": [{"text": "Thrown up at 8 m/s, the {ball} leaves the ground fast: its speed {v} is long.", "highlight": ["ball", "v"], "set": {"t": 0}},',
+  '           {"text": "Gravity takes 9.8 m/s off its speed every second, so {v} shrinks as it rises.", "highlight": ["ball", "v", "now"], "set": {"t": 0.5}},',
+  '           {"text": "At the top it stops for an instant: the peak of the {h} curve.", "highlight": ["ball", "h", "now"], "set": {"t": 0.82}, "nudge": {"t": 0.12}}]}',
   '',
-  'params — sliders, "name = value in min..max". Any number anywhere may be an expression of them ("2*A", "A*cos(pi*t)"); every slider has a Play button, so a slider t animates the whole visual.',
-  'plot — "x" range (write π as pi), optional "y" range, "label"s for the axes; "curves" (expr in x; or "x" and "y" in t with a "t" range, for a parametric curve), "points" {x, y — or "on": a curve id — label}, "areas" {under, from, to, label}, "tangents" {to, at — "{m}" in its label is the slope}, "riemann" {under, from, to, n}.',
+  'params — sliders, "name = value in min..max". Any number anywhere may be an expression of them ("2*A", "A*cos(pi*t)").',
+  'moving — a step\'s "set" slides its sliders there, eased. lerp(a, b, u) goes from a to b as u goes 0 to 1; one slider runs moves in turn with ease(between(t, 0, 1)) for the first and ease(between(t, 1, 2)) for the next. "opacity": "1 - t" on a part fades it as t grows.',
+  'nudge — "nudge": {"A": 0.5} on a step wiggles A up and down after the step\'s move, so the reader sees what A changes: cause and effect.',
+  'plot — "x" range (write π as pi), optional "y" range, "label"s for the axes; "curves" (expr in x — or in "var"; or "x" and "y" in t with a "t" range, for a parametric curve), "points" {x, y — or "on": a curve id — label}, "areas" {under, from, to, label}, "tangents" {to, at — "{m}" in its label is the slope}, "riemann" {under, from, to, n}.',
   'figure — "view" {"x": "0..10", "y": "0..8"} (y up) and "shapes", each {id, kind, …, label}: point {at}, segment and vector {from, to}, polygon {points}, polyline {points — an open path, a trajectory}, rect {at, w, h}, circle {center, r, fill}, angle {at, from, to}, dimension {from, to, label}, label {at, text}, box3d {at, size, depth, shade: right|top|front, edge: "L"}, spring {from, to, coils}.',
-  'role (the colour) — main, second, third, reference (grey, dashed), highlight — never a hex. fill — none, tint, shade, main. "step": 3 on any part shows it from step 3 on.',
-  'steps — 2 to 6, each ONE short paragraph saying one thing; "highlight" the ids it talks about, "set" the slider values it shows; "{id}" in its text names a part, with its colour key; $…$ is typeset. No bullet lists, no emoji.',
+  'fill — main, second, third: solid, for an object (a mass, a triangle that moves); main-light, second-light: pale, for an area (a², the region under a curve); tint, shade, none. role (a line\'s colour) — main, second, third, reference (grey, dashed), highlight — never a hex. "step": 3 on any part shows it from step 3 on.',
+  'steps — 2 to 6, each ONE short paragraph saying what moves and why; "highlight" the ids it talks about; "{id}" in its text names a part, with its colour key; $…$ is typeset. No bullet lists, no emoji.',
   'The page is checked — labels on labels, a part outside the view, a curve with no values, a slider that moves nothing, steps that point at nothing — and what it reports comes back to you: fix it in the spec and run math again.',
 ].join('\n');
 

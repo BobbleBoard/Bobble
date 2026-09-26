@@ -880,6 +880,14 @@ export function mvPlot(
     w: W,
     h: H,
     area,
+    map: {
+      x0: xmin,
+      y1: ymax,
+      kx: area.w / (xmax - xmin),
+      ky: area.h / (ymax - ymin),
+      ox: L,
+      oy: T,
+    },
     items: [...items, ...labels],
     outside,
     curveHealth: health,
@@ -1104,13 +1112,17 @@ export function mvFigure(
           inView(sh.id, a, b);
         }
         const d = `${pts.map(([a, b], i) => `${i === 0 ? 'M' : 'L'}${a.toFixed(2)},${b.toFixed(2)}`).join('')}Z`;
+        // A role's colour is solid, its edge the paper (flat shapes that touch stay apart);
+        // a pale fill is edged in its colour; tint, shade and an outline are edged in ink.
+        const solid = sh.fill === 'main' || sh.fill === 'second' || sh.fill === 'third';
+        const light = sh.fill.endsWith('-light');
         items.push({
           t: 'path',
           d,
-          tone: 'ink',
-          width: 1.75,
+          tone: solid ? 'paper' : light ? sh.fill.replace('-light', '') : 'ink',
+          width: solid ? 2 : light ? 1.5 : 1.75,
           fill: sh.fill === 'none' ? undefined : sh.fill,
-          fillOpacity: sh.fill === 'tint' || sh.fill === 'shade' ? 1 : 0.22,
+          fillOpacity: 1,
           dash: sh.dashed,
           id: sh.id,
           dim,
@@ -1122,15 +1134,31 @@ export function mvFigure(
           edges.push(...mvSampleLine(a, b, c, e));
         }
         lines.push(edges);
+        const xs = pts.map((p) => p[0]);
+        const ys = pts.map((p) => p[1]);
+        const bx = { x: Math.min(...xs), y: Math.min(...ys), w: 0, h: 0 };
+        bx.w = Math.max(...xs) - bx.x;
+        bx.h = Math.max(...ys) - bx.y;
+        // Words do not sit on a solid shape: its label goes beside it, and others keep off it.
+        if (solid) taken.push(bx);
         if (sh.label !== undefined) {
           const cx = pts.reduce((acc, p) => acc + p[0], 0) / pts.length;
           const cy = pts.reduce((acc, p) => acc + p[1], 0) / pts.length;
+          // A big area's name is bigger — a² across a square, not a caption in its corner.
+          const size = Math.round(Math.min(24, Math.max(15, Math.sqrt(bx.w * bx.h) / 9)));
           pending.push({
             id: sh.id,
             text: mvFill(E, sh.label, s),
-            cands: [{ x: cx, y: cy + 5, anchor: 'middle' }, ...mvAround(cx, cy, 14)],
+            cands: solid
+              ? [
+                  { x: bx.x + bx.w / 2, y: bx.y - 8, anchor: 'middle' },
+                  { x: bx.x + bx.w / 2, y: bx.y + bx.h + 20, anchor: 'middle' },
+                  { x: bx.x + bx.w + 8, y: bx.y + bx.h / 2 + 5, anchor: 'start' },
+                  { x: bx.x - 8, y: bx.y + bx.h / 2 + 5, anchor: 'end' },
+                ]
+              : [{ x: cx, y: cy + size / 3, anchor: 'middle' }, ...mvAround(cx, cy, 14)],
             dim,
-            size: 15,
+            size: solid ? 15 : size,
           });
         }
         break;
@@ -1211,7 +1239,7 @@ export function mvFigure(
                 : sh.fill === 'shade'
                   ? 'shade'
                   : sh.role,
-          fillOpacity: sh.fill === 'tint' || sh.fill === 'shade' ? 1 : 0.9,
+          fillOpacity: 1,
           id: sh.id,
           dim,
         });
@@ -1223,7 +1251,7 @@ export function mvFigure(
           );
         lines.push(ring);
         // A solid disc (a mass, a molecule) is no ground for words: labels go beside it.
-        if (sh.fill !== 'none' && sh.fill !== 'tint' && sh.fill !== 'shade')
+        if (sh.fill === 'main' || sh.fill === 'second' || sh.fill === 'third')
           taken.push({ x: X - R * 0.8, y: Y - R * 0.8, w: R * 1.6, h: R * 1.6 });
         if (sh.label !== undefined) {
           const d = R * 0.72 + 8;
@@ -1580,6 +1608,7 @@ export function mvFigure(
     w: W,
     h: H,
     area,
+    map: { x0, y1, kx: k, ky: k, ox: P, oy: P },
     items: [...items, ...labels],
     outside,
     curveHealth: [],
@@ -1631,8 +1660,11 @@ export function mvSvg(panel: Panel, index: number, title: string): string {
   const a = panel.area;
   let body = '';
   for (const it of panel.items) {
-    // Dimmed parts step back to 38%; a part's own opacity and a fade multiply in.
-    const op = (it.alpha ?? 1) * (1 - 0.62 * (it.dimMix ?? (it.dim ? 1 : 0)));
+    /* Dimmed shapes step back to 45%; a part's own opacity and a fade multiply
+       in. Words never fade with dimming — the user: "there's some faded text" — a
+       dimmed label turns the muted grey, which still reads (6.9:1). */
+    const dimAmt = it.dimMix ?? (it.dim ? 1 : 0);
+    const op = (it.alpha ?? 1) * (it.t === 'text' ? 1 : 1 - 0.55 * dimAmt);
     const cls = (base: string) =>
       `class="${base}"${op < 0.999 ? ` opacity="${op.toFixed(3)}"` : ''}${it.id !== undefined ? ` data-id="${mvEsc(it.id)}"` : ''}`;
     if (it.t === 'line') {
@@ -1646,9 +1678,10 @@ export function mvSvg(panel: Panel, index: number, title: string): string {
     } else {
       if (it.key !== undefined) {
         const ky = it.box.y + it.box.h / 2;
-        body += `<line x1="${(it.box.x + 1).toFixed(2)}" y1="${ky.toFixed(2)}" x2="${(it.box.x + 13).toFixed(2)}" y2="${ky.toFixed(2)}" ${cls(`mv-s-${it.key} mv-key`)} stroke-width="3"/>`;
+        const kop = (it.alpha ?? 1) * (1 - 0.55 * dimAmt);
+        body += `<line x1="${(it.box.x + 1).toFixed(2)}" y1="${ky.toFixed(2)}" x2="${(it.box.x + 13).toFixed(2)}" y2="${ky.toFixed(2)}" class="mv-s-${it.key} mv-key"${kop < 0.999 ? ` opacity="${kop.toFixed(3)}"` : ''} stroke-width="3"/>`;
       }
-      body += `<text x="${it.x.toFixed(2)}" y="${it.y.toFixed(2)}" text-anchor="${it.anchor}" font-size="${it.size}" ${cls(`mv-t mv-t-${it.tone}`)}>${mvRichSvg(it.text, it.italic === true)}</text>`;
+      body += `<text x="${it.x.toFixed(2)}" y="${it.y.toFixed(2)}" text-anchor="${it.anchor}" font-size="${it.size}" ${cls(`mv-t mv-t-${dimAmt > 0.5 ? 'mute' : it.tone}`)}>${mvRichSvg(it.text, it.italic === true)}</text>`;
     }
   }
   return `<svg viewBox="0 0 ${panel.w} ${panel.h}" class="mv-svg" role="img" aria-label="${mvEsc(title)}"><defs><clipPath id="${clipId}"><rect x="${a.x}" y="${a.y}" width="${a.w}" height="${a.h}"/></clipPath></defs>${body}</svg>`;
@@ -1661,25 +1694,172 @@ export interface PageData {
   readonly start: Values;
 }
 
+/** A part's place in world units, for the arrow that shows which way it moved. */
+export interface MvAnchor {
+  readonly id: string;
+  readonly panel: 'figure' | 'plot';
+  readonly x: number;
+  readonly y: number;
+}
+
 /**
- * Wire the page: sliders redraw, Play runs its slider, a step highlights its
- * parts and moves the sliders it names (eased, unless the reader asked for
- * less motion), hovering a reference in the text lights its part.
+ * Where each OBJECT sits at these values — a point, a disc, a polygon's or a
+ * box's centre, a point on the plot. Lines, arrows and labels that ride on an
+ * object are left out: an arrow for the ball and another for the velocity
+ * drawn on it said the same move twice.
+ */
+export function mvAnchors(spec: MathSpec, E: Evaluators, values: Values, step: number): MvAnchor[] {
+  const s: Record<string, number> = { ...values };
+  const out: MvAnchor[] = [];
+  const at = (p: readonly [Num, Num]): number[] => [mvEval(E, p[0], s), mvEval(E, p[1], s)];
+  for (const sh of (spec.figure?.shapes ?? []) as readonly Shape[]) {
+    if (!mvVisible(sh.appear, step)) continue;
+    let pts: number[][] = [];
+    if (sh.kind === 'point') pts = [at(sh.at)];
+    else if (sh.kind === 'circle') pts = [at(sh.center)];
+    else if (sh.kind === 'polygon') pts = sh.points.map(at);
+    else if (sh.kind === 'box3d') {
+      const c = at(sh.at);
+      pts = [[(c[0] ?? 0) + mvEval(E, sh.w, s) / 2, (c[1] ?? 0) + mvEval(E, sh.h, s) / 2]];
+    }
+    const ok = pts.filter((q) => Number.isFinite(q[0]) && Number.isFinite(q[1]));
+    if (ok.length === 0) continue;
+    out.push({
+      id: sh.id,
+      panel: 'figure',
+      x: ok.reduce((acc, q) => acc + (q[0] ?? 0), 0) / ok.length,
+      y: ok.reduce((acc, q) => acc + (q[1] ?? 0), 0) / ok.length,
+    });
+  }
+  const plot = spec.plot;
+  if (plot !== undefined) {
+    for (const p of plot.points) {
+      if (!mvVisible(p.appear, step)) continue;
+      const x = mvEval(E, p.x, s);
+      let y = p.y !== undefined ? mvEval(E, p.y, s) : Number.NaN;
+      if (p.y === undefined && p.on !== undefined) {
+        const c = plot.curves.find((q) => q.id === p.on);
+        if (c?.expr !== undefined) y = mvEval(E, c.expr, { ...s, [plot.v]: x });
+      }
+      if (Number.isFinite(x) && Number.isFinite(y)) out.push({ id: p.id, panel: 'plot', x, y });
+    }
+  }
+  return out;
+}
+
+/** An arrow from where a part was to where it is going: the direction of a move. */
+export function mvArrow(x1: number, y1: number, x2: number, y2: number, alpha: number): Drawable[] {
+  const len = Math.hypot(x2 - x1, y2 - y1);
+  if (!(len > 16)) return [];
+  const ux = (x2 - x1) / len;
+  const uy = (y2 - y1) / len;
+  const sx = x1 + ux * 6;
+  const sy = y1 + uy * 6;
+  const ex = x2 - ux * 8;
+  const ey = y2 - uy * 8;
+  const hx = ex - ux * 11;
+  const hy = ey - uy * 11;
+  const nx = -uy * 6;
+  const ny = ux * 6;
+  return [
+    { t: 'line', x1: sx, y1: sy, x2: hx, y2: hy, tone: 'highlight', width: 2.5, alpha },
+    {
+      t: 'path',
+      d: `M${ex.toFixed(2)},${ey.toFixed(2)}L${(hx + nx).toFixed(2)},${(hy + ny).toFixed(2)}L${(hx - nx).toFixed(2)},${(hy - ny).toFixed(2)}Z`,
+      tone: 'highlight',
+      width: 0,
+      fill: 'highlight',
+      fillOpacity: 1,
+      alpha,
+    },
+  ];
+}
+
+/** A move being shown: where the parts were, where they go, and the scene they left. */
+export interface MvCue {
+  readonly from: readonly MvAnchor[];
+  readonly to: readonly MvAnchor[];
+  readonly ghost: Scene;
+  /** Arrows for a move; none for a nudge, whose parts swing both ways. */
+  readonly arrows: boolean;
+}
+
+/**
+ * What a move adds to a panel: under the parts, each moving part faint where
+ * it was; over them, an arrow from there to where it is going. Parts that do
+ * not move get neither.
+ */
+export function mvCueItems(
+  cue: MvCue,
+  panel: Panel,
+  index: number,
+  a: number,
+): { under: Drawable[]; over: Drawable[] } {
+  const under: Drawable[] = [];
+  const over: Drawable[] = [];
+  const map = panel.map;
+  if (map === undefined || !(a > 0)) return { under, over };
+  const X = (x: number) => map.ox + (x - map.x0) * map.kx;
+  const Y = (y: number) => map.oy + (map.y1 - y) * map.ky;
+  const moved = new Set<string>();
+  for (const f of cue.from) {
+    if (f.panel !== panel.kind) continue;
+    const t = cue.to.find((q) => q.id === f.id && q.panel === f.panel);
+    if (t === undefined) continue;
+    if (Math.hypot(X(t.x) - X(f.x), Y(t.y) - Y(f.y)) < 4) continue;
+    moved.add(f.id);
+    if (cue.arrows) over.push(...mvArrow(X(f.x), Y(f.y), X(t.x), Y(t.y), 0.9 * a));
+  }
+  const ghost = cue.ghost.panels[index];
+  if (ghost !== undefined && ghost.kind === panel.kind) {
+    for (const it of ghost.items) {
+      if (it.t === 'text' || it.id === undefined || !moved.has(it.id)) continue;
+      under.push(
+        it.t === 'dot'
+          ? { ...it, alpha: 0.24 * a, dim: false, dimMix: 0 }
+          : { ...it, alpha: 0.24 * a, dim: false, dimMix: 0, dash: true },
+      );
+    }
+  }
+  return { under, over };
+}
+
+/**
+ * Wire the page. A step lights its parts and moves the sliders it names —
+ * slowly enough to follow, with an arrow from where each moving part was and
+ * a faint copy left there — then wiggles the sliders it nudges, so what
+ * depends on them is seen to follow. The explanation first PLAYS itself: each
+ * step's words appear beside the figure as it moves, and when it is done the
+ * reader gets the sliders, Back and Next, and Play again (the user: "it should
+ * really feel like there's an explanation going on, after it plays once maybe
+ * you can expose sliders"). Any control the reader touches ends the telling.
+ * Less motion, if the reader asked for it: no telling, no tweens.
  */
 export function mvMount(doc: PageDoc, win: PageWin, data: PageData, E: Evaluators): void {
   const spec = data.spec;
   const values: Values = { ...data.start };
-  let step = spec.steps.length > 0 ? 1 : 0;
+  const n = spec.steps.length;
+  let step = n > 0 ? 1 : 0;
   let hover: string[] = [];
   // The slider Play is running, if any.
   let playing = '';
+  const root = doc.querySelector('.mv');
   const panes: PageEl[] = Array.from(doc.querySelectorAll('[data-mv-panel]'));
   const stepEls: PageEl[] = Array.from(doc.querySelectorAll('[data-mv-step]'));
   const count = doc.querySelector('[data-mv-count]');
   const reduce = win.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
+  // A move takes this long; a nudge swings twice in this long.
+  const MOVE_MS = 1100;
+  const NUDGE_MS = 3200;
+  let cue: (MvCue & { t0: number; dur: number }) | null = null;
+  let tweening = false;
   let frame = 0;
-  const draw = () => {
+  const redraw = () => {
+    if (frame === 0) frame = win.requestAnimationFrame(draw);
+  };
+  function draw(): void {
     frame = 0;
+    const now = win.performance.now();
     const scene = mvScene(
       spec,
       E,
@@ -1687,9 +1867,22 @@ export function mvMount(doc: PageDoc, win: PageWin, data: PageData, E: Evaluator
       step,
       hover.length > 0 ? hover : playing !== '' ? [] : undefined,
     );
+    let a = 0;
+    if (cue !== null) {
+      const age = now - cue.t0;
+      const hold = cue.dur + 700;
+      a = age < 160 ? age / 160 : age < hold ? 1 : Math.max(0, 1 - (age - hold) / 450);
+      if (age > hold + 450) cue = null;
+    }
     scene.panels.forEach((p: Panel, i: number) => {
       const el = panes[i];
-      if (el !== undefined) el.innerHTML = mvSvg(p, i, spec.title);
+      if (el === undefined) return;
+      let panel = p;
+      if (cue !== null && a > 0) {
+        const c = mvCueItems(cue, p, i, a);
+        panel = { ...p, items: [...c.under, ...p.items, ...c.over] };
+      }
+      el.innerHTML = mvSvg(panel, i, spec.title);
     });
     for (const p of spec.params) {
       const input = doc.querySelector(`[data-mv-param="${p.name}"]`);
@@ -1699,23 +1892,37 @@ export function mvMount(doc: PageDoc, win: PageWin, data: PageData, E: Evaluator
         input.value = String(v);
       if (out !== null) out.textContent = mvFmt(v);
     }
-  };
-  const redraw = () => {
-    if (frame === 0) frame = win.requestAnimationFrame(draw);
-  };
+    // The cue fades on its own once the move has landed.
+    if (cue !== null && !tweening) redraw();
+  }
   let tween = 0;
-  const moveTo = (target: Values) => {
+  const clampTo = (name: string, v: number): number => {
+    const p = spec.params.find((q) => q.name === name);
+    return p === undefined ? v : Math.max(p.min, Math.min(p.max, v));
+  };
+  const moveTo = (target: Values, after?: () => void) => {
     win.cancelAnimationFrame(tween);
+    tweening = false;
     const from: Values = { ...values };
-    const keys = Object.keys(target);
+    const keys = Object.keys(target).filter((k) => target[k] !== from[k]);
     if (keys.length === 0 || reduce) {
       Object.assign(values, target);
       redraw();
+      after?.();
       return;
     }
     const t0 = win.performance.now();
+    cue = {
+      t0,
+      dur: MOVE_MS,
+      from: mvAnchors(spec, E, from, step),
+      to: mvAnchors(spec, E, { ...from, ...target }, step),
+      ghost: mvScene(spec, E, from, step, []),
+      arrows: true,
+    };
+    tweening = true;
     const tick = (now: number) => {
-      const u = Math.min(1, (now - t0) / 700);
+      const u = Math.min(1, (now - t0) / MOVE_MS);
       const e = u < 0.5 ? 4 * u * u * u : 1 - (-2 * u + 2) ** 3 / 2;
       for (const k of keys) {
         const p = spec.params.find((q) => q.name === k);
@@ -1727,41 +1934,145 @@ export function mvMount(doc: PageDoc, win: PageWin, data: PageData, E: Evaluator
       }
       draw();
       if (u < 1) tween = win.requestAnimationFrame(tick);
+      else {
+        tweening = false;
+        redraw();
+        after?.();
+      }
     };
     tween = win.requestAnimationFrame(tick);
   };
-  const go = (k: number) => {
-    if (spec.steps.length === 0) return;
-    step = Math.max(1, Math.min(spec.steps.length, k));
+  // A nudge: each named slider swings up and down around where it is, twice, and settles.
+  const nudge = (amounts: Readonly<Record<string, number>>) => {
+    const names = Object.keys(amounts).filter((k) => (amounts[k] ?? 0) !== 0);
+    if (names.length === 0 || reduce) return;
+    win.cancelAnimationFrame(tween);
+    const base: Values = { ...values };
+    const probe: Values = { ...base };
+    for (const k of names) probe[k] = clampTo(k, (base[k] ?? 0) + (amounts[k] ?? 0));
+    const t0 = win.performance.now();
+    cue = {
+      t0,
+      dur: NUDGE_MS,
+      from: mvAnchors(spec, E, base, step),
+      to: mvAnchors(spec, E, probe, step),
+      ghost: mvScene(spec, E, base, step, []),
+      arrows: false,
+    };
+    tweening = true;
+    const tick = (now: number) => {
+      const u = Math.min(1, (now - t0) / NUDGE_MS);
+      const w = Math.sin(u * Math.PI * 4) * (1 - 0.3 * u);
+      for (const k of names) values[k] = clampTo(k, (base[k] ?? 0) + (amounts[k] ?? 0) * w);
+      draw();
+      if (u < 1) tween = win.requestAnimationFrame(tick);
+      else {
+        for (const k of names) values[k] = base[k] ?? 0;
+        tweening = false;
+        redraw();
+      }
+    };
+    tween = win.requestAnimationFrame(tick);
+  };
+
+  // The telling: the explanation plays itself once, then the reader has the controls.
+  let telling = false;
+  let paused = false;
+  let tellTimer = 0;
+  const pauseBtn = doc.querySelector('[data-mv-pause]');
+  const words = (k: number) =>
+    (spec.steps[k - 1]?.text ?? '').split(/\s+/).filter((w) => w !== '').length;
+  const dwell = (k: number): number => {
+    const st = spec.steps[k - 1];
+    const moves = st !== undefined && Object.keys(st.set).length > 0 ? MOVE_MS : 0;
+    const nudges = st?.nudge !== undefined && Object.keys(st.nudge).length > 0 ? NUDGE_MS : 0;
+    // About 210 words a minute, and never under two and a half seconds.
+    return moves + nudges + Math.max(2500, 700 + words(k) * 285);
+  };
+  const showSteps = () => {
     stepEls.forEach((el: PageEl, i: number) => {
       el.classList.toggle('is-on', i === step - 1);
+      el.classList.toggle('is-ahead', telling && i > step - 1);
       el.setAttribute('aria-current', i === step - 1 ? 'step' : 'false');
     });
-    if (count !== null) count.textContent = `${step} / ${spec.steps.length}`;
+    if (count !== null) count.textContent = `${step} / ${n}`;
+  };
+  const endTelling = () => {
+    telling = false;
+    paused = false;
+    win.clearTimeout(tellTimer);
+    root?.classList.remove('mv-telling');
+    showSteps();
+  };
+  const tellOn = () => {
+    win.clearTimeout(tellTimer);
+    if (!telling || paused) return;
+    tellTimer = win.setTimeout(() => {
+      if (!telling || paused) return;
+      if (step >= n) {
+        endTelling();
+        return;
+      }
+      go(step + 1, true);
+      tellOn();
+    }, dwell(step));
+  };
+  const setPause = (on: boolean) => {
+    paused = on;
+    if (pauseBtn !== null) {
+      pauseBtn.textContent = on ? 'Resume' : 'Pause';
+      pauseBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
+    if (!on) tellOn();
+    else win.clearTimeout(tellTimer);
+  };
+  const startTelling = () => {
+    if (n < 2 || reduce) {
+      endTelling();
+      return;
+    }
+    telling = true;
+    root?.classList.add('mv-telling');
+    Object.assign(values, data.start);
+    setPause(false);
+    go(1, true);
+    tellOn();
+  };
+
+  function go(k: number, byTelling = false): void {
+    if (n === 0) return;
+    // The reader took over — before the telling started, or during it.
+    if (!byTelling) endTelling();
+    step = Math.max(1, Math.min(n, k));
+    showSteps();
     const target: Values = {};
     const st = spec.steps[step - 1];
     for (const [name, v] of Object.entries(st?.set ?? {})) {
-      const p = spec.params.find((q) => q.name === name);
       const val = mvEval(E, v, values);
-      if (p !== undefined && Number.isFinite(val))
-        target[name] = Math.max(p.min, Math.min(p.max, val));
+      if (spec.params.some((q) => q.name === name) && Number.isFinite(val))
+        target[name] = clampTo(name, val);
+    }
+    const amounts: Record<string, number> = {};
+    for (const [name, v] of Object.entries(st?.nudge ?? {})) {
+      const val = mvEval(E, v, { ...values, ...target });
+      if (spec.params.some((q) => q.name === name) && Number.isFinite(val)) amounts[name] = val;
     }
     stopPlay();
-    moveTo(target);
+    moveTo(target, Object.keys(amounts).length > 0 ? () => nudge(amounts) : undefined);
     redraw();
-  };
+  }
   // Play: the named slider runs from where it is to its end, and round again.
   let playFrame = 0;
   let last = 0;
   const playBtns: PageEl[] = Array.from(doc.querySelectorAll('[data-mv-play]'));
-  const stopPlay = () => {
+  function stopPlay(): void {
     playing = '';
     win.cancelAnimationFrame(playFrame);
     for (const b of playBtns) {
       b.classList.remove('is-playing');
       b.setAttribute('aria-pressed', 'false');
     }
-  };
+  }
   let pos = 0;
   const run = (now: number) => {
     const p = spec.params.find((q) => q.name === playing);
@@ -1780,6 +2091,7 @@ export function mvMount(doc: PageDoc, win: PageWin, data: PageData, E: Evaluator
   for (const b of playBtns) {
     b.addEventListener('click', () => {
       const name = b.getAttribute('data-mv-play') ?? '';
+      endTelling();
       if (playing === name) {
         stopPlay();
         draw();
@@ -1787,6 +2099,7 @@ export function mvMount(doc: PageDoc, win: PageWin, data: PageData, E: Evaluator
       }
       stopPlay();
       win.cancelAnimationFrame(tween);
+      tweening = false;
       playing = name;
       last = 0;
       pos = values[name] ?? 0;
@@ -1798,8 +2111,10 @@ export function mvMount(doc: PageDoc, win: PageWin, data: PageData, E: Evaluator
   for (const p of spec.params) {
     const input = doc.querySelector(`[data-mv-param="${p.name}"]`);
     input?.addEventListener('input', () => {
+      endTelling();
       stopPlay();
       win.cancelAnimationFrame(tween);
+      tweening = false;
       values[p.name] = Number(input.value);
       redraw();
     });
@@ -1809,6 +2124,9 @@ export function mvMount(doc: PageDoc, win: PageWin, data: PageData, E: Evaluator
   });
   doc.querySelector('[data-mv-prev]')?.addEventListener('click', () => go(step - 1));
   doc.querySelector('[data-mv-next]')?.addEventListener('click', () => go(step + 1));
+  doc.querySelector('[data-mv-replay]')?.addEventListener('click', () => startTelling());
+  doc.querySelector('[data-mv-skip]')?.addEventListener('click', () => endTelling());
+  pauseBtn?.addEventListener('click', () => setPause(!paused));
   doc.addEventListener('keydown', (ev: PageEvent) => {
     if (ev.target?.tagName === 'INPUT') return;
     if (ev.key === 'ArrowRight' || ev.key === 'PageDown') go(step + 1);
@@ -1825,6 +2143,9 @@ export function mvMount(doc: PageDoc, win: PageWin, data: PageData, E: Evaluator
     });
   }
   draw();
+  // The page opens telling (its markup already hides what is ahead); a moment, then it plays.
+  if (spec.tell !== false && n > 1 && !reduce) tellTimer = win.setTimeout(startTelling, 900);
+  else endTelling();
 }
 
 /** Every function above, in the order the page needs them. */
@@ -1857,6 +2178,9 @@ export const RUNTIME_FUNCTIONS = [
   mvEsc,
   mvRichSvg,
   mvSvg,
+  mvAnchors,
+  mvArrow,
+  mvCueItems,
   mvMount,
 ] as const;
 

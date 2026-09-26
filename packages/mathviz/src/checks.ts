@@ -232,7 +232,7 @@ export function checkMath(
           `step ${k} highlights ${q(id)}, which is not a part — the parts are ${[...parts.keys()].join(', ')}`,
         );
     }
-    for (const name of Object.keys(st.set)) {
+    for (const name of [...Object.keys(st.set), ...Object.keys(st.nudge ?? {})]) {
       if (!spec.params.some((p) => p.name === name)) {
         say(
           'fix',

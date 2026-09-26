@@ -104,8 +104,9 @@ export const SHM = {
     },
     {
       text: 'The curve is $x = A\\cos(\\omega t)$. A bigger amplitude $A$ swings further, but the period stays the same.',
-      highlight: ['x'],
+      highlight: ['x', 'mass'],
       set: { A: 2 },
+      nudge: { A: -0.6 },
     },
   ],
 };
@@ -168,10 +169,10 @@ export const INTEGRAL = {
 /**
  * THE REARRANGEMENT PROOF — the user (2026-09-26): "if asked for pythagorean
  * theorem explanation visually, do you have text that appears side by side
- * as the triangles are rearranged within the square". One slider t runs the
- * three moves in turn (between), each eased (ease); the tilted c² fades as
- * the first triangle leaves and a², b² fade in as the last one lands
- * (opacity). Each step moves t, so Next slides the next triangle.
+ * as the triangles are rearranged within the square", then "triangles could
+ * be a solid color". One slider t runs the three moves in turn (between),
+ * each eased (ease), in an order where no triangle crosses another; the tilted
+ * c² fades as the first leaves and a², b² fade in as the last lands.
  */
 const move = (k: number) => `ease(between(t, ${k - 1}, ${k}))`;
 export const PYTHAGORAS = {
@@ -180,19 +181,8 @@ export const PYTHAGORAS = {
   params: ['t = 0 in 0..3'],
   play: 't',
   figure: {
-    view: { x: '-0.9..4.9', y: '-0.9..4.7' },
+    view: { x: '-0.6..4.6', y: '-0.9..4.4' },
     shapes: [
-      {
-        id: 'frame',
-        kind: 'polygon',
-        points: [
-          [0, 0],
-          [4, 0],
-          [4, 4],
-          [0, 4],
-        ],
-        fill: 'none',
-      },
       {
         id: 'c2',
         kind: 'polygon',
@@ -202,9 +192,9 @@ export const PYTHAGORAS = {
           [2.5, 4],
           [0, 2.5],
         ],
-        fill: 'second',
+        fill: 'second-light',
         label: 'c²',
-        opacity: '1 - ease(between(t, 0, 0.6))',
+        opacity: '1 - ease(between(t, 0, 0.5))',
       },
       {
         id: 'a2',
@@ -215,9 +205,9 @@ export const PYTHAGORAS = {
           [1.5, 1.5],
           [0, 1.5],
         ],
-        fill: 'second',
+        fill: 'second-light',
         label: 'a²',
-        opacity: 'ease(between(t, 2.4, 3))',
+        opacity: 'ease(between(t, 2.5, 3))',
       },
       {
         id: 'b2',
@@ -228,19 +218,9 @@ export const PYTHAGORAS = {
           [4, 4],
           [1.5, 4],
         ],
-        fill: 'second',
+        fill: 'second-light',
         label: 'b²',
-        opacity: 'ease(between(t, 2.4, 3))',
-      },
-      {
-        id: 'T1',
-        kind: 'polygon',
-        points: [
-          [0, `1.5*${move(1)}`],
-          [1.5, `1.5*${move(1)}`],
-          [0, `2.5 + 1.5*${move(1)}`],
-        ],
-        fill: 'main',
+        opacity: 'ease(between(t, 2.5, 3))',
       },
       {
         id: 'T2',
@@ -253,44 +233,65 @@ export const PYTHAGORAS = {
         fill: 'main',
       },
       {
-        id: 'T3',
+        id: 'T4',
         kind: 'polygon',
         points: [
-          [`4 - 2.5*${move(2)}`, 1.5],
-          [`4 - 2.5*${move(2)}`, 4],
-          [`2.5 - 2.5*${move(2)}`, 4],
+          [`2.5 + 1.5*${move(1)}`, `4 - 2.5*${move(1)}`],
+          [`1.5*${move(1)}`, `4 - 2.5*${move(1)}`],
+          [`1.5*${move(1)}`, `2.5 - 2.5*${move(1)}`],
         ],
         fill: 'main',
       },
       {
-        id: 'T4',
+        id: 'T1',
         kind: 'polygon',
         points: [
-          [`2.5 + 1.5*${move(3)}`, `4 - 2.5*${move(3)}`],
-          [`1.5*${move(3)}`, `4 - 2.5*${move(3)}`],
-          [`1.5*${move(3)}`, `2.5 - 2.5*${move(3)}`],
+          [0, `1.5*${move(2)}`],
+          [1.5, `1.5*${move(2)}`],
+          [0, `2.5 + 1.5*${move(2)}`],
         ],
         fill: 'main',
       },
-      { id: 'da', kind: 'dimension', from: [0, 0], to: [1.5, 0], label: 'a', offset: -0.45 },
-      { id: 'db', kind: 'dimension', from: [1.5, 0], to: [4, 0], label: 'b', offset: -0.45 },
+      {
+        id: 'T3',
+        kind: 'polygon',
+        points: [
+          [`4 - 2.5*${move(3)}`, 1.5],
+          [`4 - 2.5*${move(3)}`, 4],
+          [`2.5 - 2.5*${move(3)}`, 4],
+        ],
+        fill: 'main',
+      },
+      {
+        id: 'frame',
+        kind: 'polygon',
+        points: [
+          [0, 0],
+          [4, 0],
+          [4, 4],
+          [0, 4],
+        ],
+        fill: 'none',
+      },
+      { id: 'da', kind: 'dimension', from: [0, 0], to: [1.5, 0], label: 'a', offset: -0.4 },
+      { id: 'db', kind: 'dimension', from: [1.5, 0], to: [4, 0], label: 'b', offset: -0.4 },
     ],
   },
   steps: [
     {
-      text: 'Four copies of one right triangle — legs $a$ and $b$, hypotenuse $c$ — fit in a square of side $a+b$. The space they leave is a tilted square, of area $c^2$.',
+      text: 'Four copies of one right triangle — legs $a$ and $b$, hypotenuse $c$ — fit inside a square of side $a+b$. The space they leave is a tilted square, of area $c^2$.',
       highlight: ['c2', 'T1', 'T2', 'T3', 'T4'],
       set: { t: 0 },
     },
     {
-      text: 'Slide one triangle up by $a$. Nothing is added or taken away: the same square, the same four triangles.',
-      highlight: ['T1'],
+      text: 'Slide the top-left triangle down into the corner opposite. Nothing is added or taken away: the same square, the same four triangles.',
+      highlight: ['T4'],
       set: { t: 1 },
     },
-    { text: 'Slide a second one across by $b$…', highlight: ['T3'], set: { t: 2 } },
+    { text: 'Slide the bottom-left one up by $a$.', highlight: ['T1'], set: { t: 2 } },
     {
-      text: '…and the last one into the corner. The triangles now make two rectangles, and the space they leave is two squares, $a^2$ and $b^2$.',
-      highlight: ['T4', 'a2', 'b2'],
+      text: 'Slide the top-right one across by $b$. The triangles now make two rectangles, and the space they leave is two squares, $a^2$ and $b^2$.',
+      highlight: ['T3', 'a2', 'b2'],
       set: { t: 3 },
     },
     {

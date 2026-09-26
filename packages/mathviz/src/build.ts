@@ -151,7 +151,10 @@ export function expressionsOf(spec: MathSpec): Map<string, Set<string>> {
         break;
     }
   }
-  for (const st of spec.steps) for (const v of Object.values(st.set)) add(v, P);
+  for (const st of spec.steps) {
+    for (const v of Object.values(st.set)) add(v, P);
+    for (const v of Object.values(st.nudge ?? {})) add(v, P);
+  }
   return out;
 }
 

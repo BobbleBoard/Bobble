@@ -23,7 +23,21 @@
 import { compile, ExprError, fromLatex, numberOf, parse } from './expr.js';
 
 export type Role = 'main' | 'second' | 'third' | 'reference' | 'highlight';
-export type Fill = 'none' | 'tint' | 'main' | 'second' | 'third' | 'shade';
+/**
+ * How a closed shape is filled: a role's colour solid (an object — a mass, a
+ * triangle being moved), the same colour pale (an area — a², the region under
+ * a curve), the page's tint or shade, or nothing.
+ */
+export type Fill =
+  | 'none'
+  | 'tint'
+  | 'main'
+  | 'second'
+  | 'third'
+  | 'shade'
+  | 'main-light'
+  | 'second-light'
+  | 'third-light';
 /** A number, or an expression in the sliders ("A*cos(w*t)"). */
 export type Num = number | string;
 export type Xy = readonly [Num, Num];
@@ -205,6 +219,13 @@ export interface Step {
   readonly highlight: readonly string[];
   /** Slider values this step moves to (animated). */
   readonly set: Readonly<Record<string, Num>>;
+  /**
+   * Sliders this step wiggles, by how much, once it has moved: the value goes
+   * up and down around where it is while the parts that depend on it follow —
+   * cause and effect, shown (the user: "little nudges of different movements and
+   * how they affect other things").
+   */
+  readonly nudge?: Readonly<Record<string, Num>>;
 }
 
 export interface MathSpec {
@@ -216,6 +237,12 @@ export interface MathSpec {
   readonly steps: readonly Step[];
   /** The slider the Play button runs, if any. */
   readonly play?: string;
+  /**
+   * The explanation plays itself when the page opens — each step's words
+   * appearing as the figure moves — and then hands the reader the controls.
+   * False: the page opens still, at step 1.
+   */
+  readonly tell: boolean;
   /** Notes about what was read differently than written ("emoji removed …"). */
   readonly notes: readonly string[];
 }
@@ -312,9 +339,12 @@ function role(v: unknown, fallback: Role): Role {
   return fallback;
 }
 function fill(v: unknown): Fill {
-  const s = str(v)?.toLowerCase();
+  const s = str(v)?.toLowerCase().trim();
   if (s === undefined || s === 'false' || s === 'none') return 'none';
   if (['tint', 'main', 'second', 'third', 'shade'].includes(s)) return s as Fill;
+  // "main-light", "light main", "pale second", "second soft" — the role's colour, pale.
+  const role = /\b(main|second|third)\b/.exec(s)?.[1];
+  if (role !== undefined && /light|pale|soft/.test(s)) return `${role}-light` as Fill;
   if (/grey|gray|shade|dark/.test(s)) return 'shade';
   return 'tint';
 }
@@ -1187,12 +1217,23 @@ function normalizeParsed(v: Loose, found: { any: boolean }, auto: readonly strin
     const set: Record<string, Num> = {};
     for (const [k, val] of Object.entries(isObj(s.set) ? s.set : {}))
       set[k] = numOrExpr(val, `step ${i + 1} sets ${k}`, names);
+    const nudgeIn = s.nudge ?? s.wiggle ?? s.jiggle;
+    const nudge: Record<string, Num> = {};
+    if (typeof nudgeIn === 'string' && names.includes(nudgeIn.trim())) {
+      // "nudge": "A" — wiggle A by a tenth of its range.
+      const p = [...params].find((q) => q.name === nudgeIn.trim());
+      if (p !== undefined) nudge[p.name] = (p.max - p.min) / 10;
+    } else {
+      for (const [k, val] of Object.entries(isObj(nudgeIn) ? nudgeIn : {}))
+        nudge[k] = numOrExpr(val, `step ${i + 1} nudges ${k}`, names);
+    }
     return {
       text,
       highlight: list(s.highlight ?? s.show ?? s.focus ?? s.points_at ?? s.refs).map((h) =>
         String(h),
       ),
       set,
+      ...(Object.keys(nudge).length > 0 ? { nudge } : {}),
     };
   });
   const playIn = str(v.play ?? v.animate);
@@ -1211,6 +1252,7 @@ function normalizeParsed(v: Loose, found: { any: boolean }, auto: readonly strin
     ...(figSpec !== undefined ? { figure: figSpec } : {}),
     steps,
     ...(playIn !== undefined && names.includes(playIn) ? { play: playIn } : {}),
+    tell: v.tell !== false && v.autoplay !== false,
     notes: [
       ...(found.any ? ['emoji removed — the page carries none'] : []),
       ...(title === undefined

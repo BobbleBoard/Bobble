@@ -218,7 +218,7 @@ describe('a spec just written', () => {
     expect(r.isError).toBeUndefined();
     expect(text(r)).toMatch(/^Drew "Written": written\.html/);
     expect(text(r)).toContain(
-      'On the page: Back and Next through its 2 steps; a slider for a, with Play.',
+      "On the page: it plays its 2 steps on its own when it opens (each step's words appear as the figure moves), then Back, Next and Play again; a slider for a, with Play.",
     );
     expect(existsSync(path.join(root, 'written.html'))).toBe(true);
     const bad = path.join(root, 'bad.math.json');
@@ -240,7 +240,7 @@ describe('a spec just written', () => {
     };
     const r = await run({ spec: JSON.stringify(still) });
     expect(text(r)).toContain(
-      'On the page: Back and Next through its 2 steps. Nothing on it moves — it has no sliders.',
+      'On the page: it plays its 2 steps on its own when it opens, then Back, Next and Play again. Nothing on it moves — it has no sliders.',
     );
     expect(text(r)).toContain('with the controls it has, above, and no others');
   });
