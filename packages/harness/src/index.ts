@@ -2739,6 +2739,8 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     registerOfficeTools(pi, {
       bridge: readSubagentDepth(process.env) === 0 ? presentBridgeFromEnv() : null,
       root: (ctxCwd) => resolveWorkspaceRoot(ctxCwd),
+      chatText: () =>
+        runtime.currentCtx === null ? '' : chatTextOf(getEntries(runtime.currentCtx)),
     });
   }
 

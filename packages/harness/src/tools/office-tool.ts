@@ -37,6 +37,7 @@ import { serverCanSeeImages } from '@pi-desktop/provider-llamacpp';
 import { Type } from '@sinclair/typebox';
 import { utilityEndpointFromEnv } from '../model-call/call-model.js';
 import type { PresentBridge } from './present.js';
+import { unbackedSourcesNote } from './unbacked-sources.js';
 import { pathForModel } from './workspace-relative.js';
 
 export const OFFICE_MAKE_TOOL = 'office_make';
@@ -294,6 +295,8 @@ export interface OfficeToolDeps {
   readonly env?: Record<string, string | undefined>;
   /** Injected for tests. */
   readonly spawnImpl?: typeof spawn;
+  /** Everything the chat has read — to hold a brief's sources to (unbacked-sources.ts). */
+  readonly chatText?: () => string;
 }
 
 /** Kilobytes, as a person reads them. */
@@ -626,7 +629,9 @@ export function registerOfficeTools(pi: ExtensionAPI, deps: OfficeToolDeps): voi
                 ? `a ${r.chart ?? ''} chart (${r.items ?? '?'} points)`
                 : `a document (${r.items ?? '?'} blocks)`;
       const shown = await presentFile(deps.bridge, r.path, `${what} — made from your brief`);
-      const text = `Made ${what}: ${pathForModel(r.path, root)} (${kb(r.bytes)}, ${r.seconds ?? '?'}s).${shown.shown}${warningsLine(r)}\n\n${r.summary ?? ''}\n\n${CHECK_LINE}`;
+      // A brief's sources that nothing read in the chat backs, named (unbacked-sources.ts).
+      const loose = unbackedSourcesNote(brief, deps.chatText?.() ?? '');
+      const text = `Made ${what}: ${pathForModel(r.path, root)} (${kb(r.bytes)}, ${r.seconds ?? '?'}s).${shown.shown}${warningsLine(r)}\n\n${r.summary ?? ''}${loose === '' ? '' : `\n\n${loose}`}\n\n${CHECK_LINE}`;
       lastMade.set(memoKey, { brief, text });
       const content: Content = [{ type: 'text', text }];
       if (shown.image !== undefined) {

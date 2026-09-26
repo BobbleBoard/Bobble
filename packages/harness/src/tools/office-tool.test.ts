@@ -284,6 +284,35 @@ describe('office_make — what the model gets back', () => {
     expect(r.content.some((c) => c.type === 'image')).toBe(true);
   });
 
+  it('names a brief’s sources that nothing read in the chat backs', async () => {
+    /* MEASURED (4B, the visual suite): a brief "with sources" that searched
+       nothing, its References five titles made up. */
+    const { spawnImpl } = fakeSpawn({
+      ok: true,
+      kind: 'docx',
+      path: '/ws/brief.docx',
+      items: 14,
+      seconds: 26,
+      summary: '1. cover',
+    });
+    const { pi, tools } = collect();
+    registerOfficeTools(pi, {
+      bridge: null,
+      root: () => '/ws',
+      env: ENV,
+      spawnImpl,
+      chatText: () => 'where do solid-state batteries stand in 2026, with sources',
+    });
+    const make = tools.find((t) => t.name === OFFICE_MAKE_TOOL)?.execute as Exec;
+    const r = await make('t1', {
+      kind: 'docx',
+      brief:
+        'Solid-state batteries in 2026: who is closest to production, what is still hard, and why it matters for EVs.\n\nReferences\n- QuantumScape Investor Relations\n- Solid Power White Paper 2026',
+    });
+    expect(r.content[0]?.text).toContain('"QuantumScape Investor Relations"');
+    expect(r.content[0]?.text).toContain('come from nothing read in this chat');
+  });
+
   it('refuses a brief with nothing in it, before spending a minute of model time', async () => {
     const { pi, tools } = collect();
     registerOfficeTools(pi, { bridge: null, root: () => '/ws', env: ENV });
