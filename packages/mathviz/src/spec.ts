@@ -318,9 +318,10 @@ function param(v: unknown, i: number): Param {
       : counts && Number.isInteger(min) && Number.isInteger(max)
         ? 1
         : (max - min) / 400;
+  const start = v.value ?? v.default ?? v.initial ?? v.start ?? v.init;
   const value = Math.min(
     max,
-    Math.max(min, v.value !== undefined ? num(v.value, `slider ${name} value`) : min),
+    Math.max(min, start !== undefined ? num(start, `slider ${name} value`) : min),
   );
   return { name, label, min, max, step, value };
 }
@@ -358,7 +359,9 @@ function curve(v: unknown, i: number, fallback: Role, pv: string, names: readonl
     numOrExpr(ys, `curve ${id} y`, ['t', ...names]);
     return { ...base, px: xs, py: ys, t: [tr.min, tr.max] };
   }
-  const raw = str(v.expr ?? v.f ?? v.y ?? v.fn ?? v.function ?? v.equation);
+  const raw = str(
+    v.expr ?? v.expression ?? v.f ?? v.y ?? v.fn ?? v.function ?? v.equation ?? v.formula,
+  );
   if (raw === undefined)
     throw new SpecError(`curve ${id} needs its expression as expr, like "sin(x)"`);
   const expr = raw.replace(/^\s*[yf]\s*(\(\s*\w+\s*\))?\s*=\s*/, '');
@@ -665,7 +668,7 @@ function figure(v: Loose, names: readonly string[]): FigureSpec {
   const viewIn = isObj(v.view) ? v.view : v;
   const x = range(viewIn.x ?? get(v, 'xRange') ?? [0, 10], 'figure x');
   const y = range(viewIn.y ?? get(v, 'yRange') ?? [0, 10], 'figure y');
-  const shapesIn = list(v.shapes ?? v.elements ?? v.items);
+  const shapesIn = list(v.shapes ?? v.elements ?? v.items ?? v.objects ?? v.parts);
   if (shapesIn.length === 0) throw new SpecError('a figure needs shapes');
   const named = new Map<string, Xy>();
   return {
@@ -758,7 +761,9 @@ export function normalizeMathSpec(input: unknown): MathSpec {
   const steps: Step[] = stepsIn.map((s, i) => {
     if (typeof s === 'string') return { text: s, highlight: [], set: {} };
     if (!isObj(s)) throw new SpecError(`step ${i + 1} needs {text, highlight}`);
-    const text = str(s.text ?? s.say ?? s.body ?? s.explanation);
+    const body = str(s.text ?? s.say ?? s.body ?? s.explanation ?? s.content ?? s.description);
+    const head = str(s.title ?? s.heading);
+    const text = body !== undefined && head !== undefined ? `**${head}.** ${body}` : (body ?? head);
     if (text === undefined) throw new SpecError(`step ${i + 1} needs its text`);
     const set: Record<string, Num> = {};
     for (const [k, val] of Object.entries(isObj(s.set) ? s.set : {}))

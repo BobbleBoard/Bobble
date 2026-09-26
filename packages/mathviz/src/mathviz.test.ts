@@ -253,3 +253,19 @@ describe('the page', () => {
     expect(checkMath(spec, c.E, c.reads).filter((p) => p.level === 'fix')).toEqual([]);
   });
 });
+
+describe('the words a small model uses for the same things', () => {
+  it('reads default for a slider’s start, content for a step, expression for a curve, objects for shapes', () => {
+    const s = normalizeMathSpec({
+      title: 'Aliases',
+      params: [{ name: 'a', min: 0, max: 2, default: 1.5 }],
+      plot: { x: '0..1', curves: [{ id: 'f', expression: 'a*x' }] },
+      figure: { view: { x: '0..1', y: '0..1' }, objects: [{ type: 'dot', at: [0.5, 0.5] }] },
+      steps: [{ title: 'Slope', content: 'The slope is $a$.', highlight: ['f'] }],
+    });
+    expect(s.params[0]?.value).toBe(1.5);
+    expect(s.plot?.curves[0]?.expr).toBe('a*x');
+    expect(s.figure?.shapes[0]?.kind).toBe('point');
+    expect(s.steps[0]?.text).toBe('**Slope.** The slope is $a$.');
+  });
+});
