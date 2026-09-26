@@ -724,13 +724,23 @@ export function svgMarkupPrompt(prompt: string | undefined): string | null {
   if (!/^\s*(?:<\?xml\b[^>]*>\s*)?(?:<!--[\s\S]*?-->\s*)*<svg[\s>]/i.test(prompt ?? '')) {
     return null;
   }
-  return (
+  const saved =
     'That prompt is SVG markup, and svg draws from a description (OmniSVG): it would have ' +
     'drawn stray shapes, not your markup. Markup you wrote is saved as it is — write it to ' +
     'a .svg file, then present that file to see it rendered. To have OmniSVG draw instead, ' +
-    'describe the picture in one sentence.'
-  );
+    'describe the picture in one sentence.';
+  /* MEASURED (STEM suite, 4B): the kinetic-theory cube and "why d/dx sin x =
+     cos x" were each hand-written as markup and sent here — the cube a flat
+     rectangle with its labels on one another. A maths or physics figure has a
+     command that places and checks its labels; this is the moment to say so. */
+  return MATH_MARKUP.test(prompt ?? '')
+    ? `${saved} But this is a maths or physics figure: the math command draws it in the app's style, with its labels placed, checked, and steps tied to it — \`math --help\`.`
+    : saved;
 }
+
+/** Words and marks of a maths or physics figure, in markup a model wrote. */
+const MATH_MARKUP =
+  /\b(axis|axes|graph|plot|sin|cos|tan|slope|tangent|derivative|integral|velocity|acceleration|force|mass|spring|molecule|wave|parabola|vertex|equation|triangle|hypotenuse|vector|momentum|pressure|oscillat\w*|pendulum|projectile)\b|[πθω∫∑√²³Δ]/i;
 
 /** `generate_svg` — OmniSVG. Registered on its own so the connector can turn it
  *  on without the generation experiment. See the block below for the ask. */

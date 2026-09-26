@@ -8,13 +8,13 @@ import type { GenBridge } from './gen-bridge-client.ts';
 import type { GenBridgeMethod } from './gen-contract.ts';
 import {
   dataChartPrompt,
-  svgMarkupPrompt,
   GENERATE_IMAGE_TOOL,
   GENERATE_SVG_TOOL,
   GENERATE_VIDEO_TOOL,
   parseSize,
   registerGenTools,
   saveOutputs,
+  svgMarkupPrompt,
   videoResultText,
 } from './tools.ts';
 
@@ -631,6 +631,19 @@ describe('svgMarkupPrompt — markup is saved, not described', () => {
     ).toMatch(/write it to a \.svg file, then present/);
     expect(svgMarkupPrompt('<!-- a proof --> <svg viewBox="0 0 10 10"></svg>')).not.toBeNull();
     expect(svgMarkupPrompt('  <svg>')).not.toBeNull();
+  });
+
+  it('names the math command when the markup is a maths or physics figure (MEASURED: the cube, d/dx sin x)', () => {
+    const cube =
+      '<svg viewBox="0 0 400 300"><polygon points="50,200 350,200"/><text>molecule</text><text>u</text></svg>';
+    expect(svgMarkupPrompt(cube)).toMatch(/the math command draws it .* `math --help`/);
+    expect(svgMarkupPrompt('<svg><text>Why d/dx(sin x) = cos x</text></svg>')).toMatch(
+      /math --help/,
+    );
+    // An icon is not a maths figure.
+    expect(svgMarkupPrompt('<svg viewBox="0 0 24 24"><path d="M3 12h18"/></svg>')).not.toMatch(
+      /math/,
+    );
   });
 
   it('lets a description through, even one that mentions svg', () => {
