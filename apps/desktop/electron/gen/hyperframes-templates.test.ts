@@ -342,6 +342,50 @@ describe('how the title is set', () => {
   });
 });
 
+describe('a playful intro bounces in', () => {
+  /* REAL (the visual suite, 4B): "Make a 6-second animated intro for my
+     YouTube channel 'Byte Sized' — playful, with the title bouncing in". */
+  const intro =
+    "Make a 6-second animated intro for my YouTube channel 'Byte Sized' — playful, with the title bouncing in";
+
+  it('reads the bounce from how it should move, and the words from the quotes', () => {
+    const plan = planMotion(intro);
+    expect(plan.kind).toBe('title-card');
+    if (plan.kind !== 'title-card') return;
+    expect(plan.card.title).toBe('Byte Sized');
+    expect(plan.card.bounce).toBe(true);
+    const calm = planMotion("'Launch day' in yellow");
+    expect(calm.kind === 'title-card' && calm.card.bounce).toBe(false);
+  });
+
+  it('drops each letter in on its own beat, words kept whole, the text unchanged', () => {
+    const plan = planMotion(intro);
+    if (plan.kind !== 'title-card') throw new Error('not a card');
+    const doc = titleCardDocument(plan.card, { width: 1280, height: 720, seconds: 6 });
+    expect(doc).toContain('@keyframes hf-bounce');
+    expect(doc.match(/class="hf-l"/g)).toHaveLength('ByteSized'.length);
+    expect(doc.match(/class="hf-w"/g)).toHaveLength(2);
+    const h1 = /<h1 data-hf-title>(.*)<\/h1>/.exec(doc)?.[1] ?? '';
+    expect(h1.replace(/<[^>]+>/g, '')).toBe('Byte Sized');
+    // The rise is the calm entrance; a bouncing title does not also rise.
+    expect(/\.hf-card h1 \{[^}]*hf-rise/.test(doc)).toBe(false);
+    expect(doc).not.toMatch(/<script|requestAnimationFrame|setTimeout/);
+    // A long title still lands inside the clip's first two and a half seconds.
+    const long = titleCardDocument(
+      {
+        title: 'The Quick Brown Fox Jumps Over The Lazy Dog',
+        light: false,
+        pulse: false,
+        bold: false,
+        bounce: true,
+      },
+      { width: 1280, height: 720, seconds: 6 },
+    );
+    const delays = [...long.matchAll(/animation-delay: (\d+)ms/g)].map((m) => Number(m[1]));
+    expect(Math.max(...delays) + 1100).toBeLessThanOrEqual(2500);
+  });
+});
+
 describe('the card document', () => {
   it('escapes the words, sizes the stage, and animates only with seekable CSS', () => {
     const doc = titleCardDocument(

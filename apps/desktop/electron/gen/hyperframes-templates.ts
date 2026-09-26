@@ -52,6 +52,13 @@ export interface TitleCard {
   readonly pulse: boolean;
   /** Heavier letters ("bold"). */
   readonly bold: boolean;
+  /**
+   * The letters drop in one after another and land with a bounce ("bouncing
+   * in", "bouncy", "playful", "pop in"). The rise is the default entrance, and
+   * a playful intro asked for with a bounce that rose like a keynote slide
+   * would be the prompt ignored — the same bug as "bright yellow" ignored.
+   */
+  readonly bounce?: boolean;
 }
 
 export type MotionPlan =
@@ -499,6 +506,10 @@ export function planMotion(prompt: string): MotionPlan {
       !/\bdark\b/i.test(said),
     pulse: /\b(?:pulse|pulses|pulsing|breathe|breathing|glow|glowing|throb|beat)\b/i.test(said),
     bold: /\b(?:bold|heavy|chunky|thick)\b/i.test(said),
+    bounce:
+      /\b(?:bounc(?:e|es|ed|ing|y)|spring(?:y|s|ing)?|playful|pop(?:s|ping)?\s+in|jump(?:s|ing)?\s+in)\b/i.test(
+        said,
+      ),
   };
   return { kind: 'title-card', card };
 }
@@ -628,13 +639,36 @@ export function titleCardDocument(card: TitleCard, size: CardSize): string {
   const tagPx = Math.round(Math.max(14, Math.min(titlePx * 0.36, height * 0.06)));
   const weight = card.bold ? 800 : 700;
   const glow = card.ink !== undefined ? c.ink : c.tagline;
-  const hold = card.pulse
-    ? `hf-breathe 2.4s ease-in-out 1.2s infinite`
-    : `hf-settle 1s ease-out 1.2s both`;
   const tagline =
     card.tagline !== undefined
       ? `<div class="hf-tagline" data-hf-tagline>${escapeHtml(card.tagline)}</div>`
       : '';
+  // A bounce drops each letter in on its own beat; a word stays one unit so
+  // the balanced lines break between words, never inside one. The whole run
+  // lands inside ~1.5 s however long the title is.
+  const letters = [...card.title].filter((ch) => ch.trim() !== '').length;
+  const step = Math.round(Math.min(70, 900 / Math.max(1, letters)));
+  let at = 0;
+  const title = card.bounce
+    ? card.title
+        .split(/(\s+)/)
+        .map((part) =>
+          part.trim() === ''
+            ? part
+            : `<span class="hf-w">${[...part]
+                .map(
+                  (ch) =>
+                    `<span class="hf-l" style="animation-delay: ${at++ * step}ms">${escapeHtml(ch)}</span>`,
+                )
+                .join('')}</span>`,
+        )
+        .join('')
+    : escapeHtml(card.title);
+  const entrance = card.bounce ? '' : 'hf-rise 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both, ';
+  const settleAt = card.bounce ? (at * step + 1100) / 1000 : 1.2;
+  const hold = card.pulse
+    ? `hf-breathe 2.4s ease-in-out ${settleAt}s infinite`
+    : `hf-settle 1s ease-out ${settleAt}s both`;
   return `<!doctype html>
 <html><head><meta charset="utf-8"><style>
   *, *::before, *::after { box-sizing: border-box; }
@@ -649,7 +683,10 @@ export function titleCardDocument(card: TitleCard, size: CardSize): string {
     animation: hf-drift ${Math.max(4, size.seconds * 1.2).toFixed(1)}s ease-in-out infinite alternate; }
   .hf-card h1 { position: relative; margin: 0; color: ${c.ink}; font-size: ${titlePx}px; ${measure}
     font-weight: ${weight}; line-height: 1.04; letter-spacing: -0.025em; text-wrap: balance;
-    animation: hf-rise 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both, ${hold}; }
+    animation: ${entrance}${hold}; }
+  .hf-w { display: inline-block; white-space: nowrap; }
+  .hf-l { display: inline-block; transform-origin: 50% 100%;
+    animation: hf-bounce 1.1s linear both; }
   .hf-tagline { position: relative; margin-top: ${Math.round(titlePx * 0.28)}px; color: ${c.tagline};
     font-size: ${tagPx}px; font-weight: 500; letter-spacing: 0.01em; text-wrap: balance;
     animation: hf-wipe 0.8s cubic-bezier(0.6, 0, 0.2, 1) 0.45s both; }
@@ -661,6 +698,13 @@ export function titleCardDocument(card: TitleCard, size: CardSize): string {
     50% { transform: scale(1.03); text-shadow: 0 0 ${Math.round(titlePx * 0.35)}px ${glow}66; } }
   @keyframes hf-settle { from { text-shadow: 0 0 ${Math.round(titlePx * 0.3)}px ${glow}44; }
     to { text-shadow: 0 0 0 transparent; } }
+  @keyframes hf-bounce {
+    0% { opacity: 0; transform: translateY(-120%) scale(0.92, 1.12); animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5); }
+    38% { opacity: 1; transform: translateY(0) scale(1.14, 0.84); animation-timing-function: cubic-bezier(0.2, 0.6, 0.4, 1); }
+    58% { transform: translateY(-22%) scale(0.96, 1.05); animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5); }
+    74% { transform: translateY(0) scale(1.05, 0.95); animation-timing-function: cubic-bezier(0.2, 0.6, 0.4, 1); }
+    86% { transform: translateY(-6%) scale(1, 1); animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5); }
+    100% { opacity: 1; transform: none; } }
   @keyframes hf-drift { from { transform: translate(-6%, -3%); } to { transform: translate(6%, 3%); } }
-</style></head><body><div class="hf-card"><h1 data-hf-title>${escapeHtml(card.title)}</h1>${tagline}</div></body></html>`;
+</style></head><body><div class="hf-card"><h1 data-hf-title>${title}</h1>${tagline}</div></body></html>`;
 }
