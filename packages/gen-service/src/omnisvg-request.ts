@@ -131,8 +131,25 @@ export function textInstruction(prompt: string): string {
   );
 }
 
+/*
+ * THE PICTURE GOES INSIDE THE PROMPT. llama-server's `/completion` reads
+ * `multimodal_data` only from a prompt OBJECT — `{ prompt_string,
+ * multimodal_data }` (tools/server/server-common.cpp tokenize_input_subprompt)
+ * — and ignores the field at the top of the body. It sat at the top here, so
+ * every "trace this picture" was drawn from the image INSTRUCTION alone, with
+ * `<__media__>` read as plain text. MEASURED 2026-09-25 (the SVG bake-off):
+ * six different pictures, and OmniSVG answered each with ~60 tokens of the
+ * same kind of shape — the kinetic-theory figure came back as a circle.
+ */
+export interface OmniSvgPrompt {
+  readonly prompt_string: string;
+  /** Base64 images, one per MEDIA_MARKER in the prompt string. */
+  readonly multimodal_data: readonly string[];
+}
+
 export interface OmniSvgRequest {
-  readonly prompt: string;
+  /** A string for text-to-SVG; the prompt and its picture together for image-to-SVG. */
+  readonly prompt: string | OmniSvgPrompt;
   readonly n_predict: number;
   readonly temperature: number;
   readonly top_p: number;
@@ -144,8 +161,6 @@ export interface OmniSvgRequest {
   /** The ids are the output; the text is empty (the SVG tokens have no text form). */
   readonly return_tokens: true;
   readonly cache_prompt: false;
-  /** Base64 images, one per MEDIA_MARKER in the prompt. */
-  readonly multimodal_data?: readonly string[];
 }
 
 /** Their `MAX_MAX_LENGTH`-ish ceiling; config.yaml's `model.max_length` is 1536. */
@@ -186,13 +201,17 @@ export function buildOmniSvgRequest(input: {
   const n_predict = input.maxTokens ?? OMNISVG_MAX_TOKENS;
   if (input.imageBase64 !== undefined) {
     return {
-      prompt: chatml(`${MEDIA_MARKER}Generate SVG code that accurately represents this image:`),
+      prompt: {
+        prompt_string: chatml(
+          `${MEDIA_MARKER}Generate SVG code that accurately represents this image:`,
+        ),
+        multimodal_data: [input.imageBase64],
+      },
       n_predict,
       ...OMNISVG_SAMPLING.image,
       ...OMNISVG_SAMPLER_CHAIN,
       return_tokens: true,
       cache_prompt: false,
-      multimodal_data: [input.imageBase64],
     };
   }
   const prompt = input.prompt ?? '';

@@ -20,7 +20,8 @@
  *                               when the request asks for `return_progress`
  *   POST /completion            llama-server's raw completion: `prompt`,
  *                               `n_predict`, `stream`, `n_probs`
- *                               (`completion_probabilities`), `multimodal_data`
+ *                               (`completion_probabilities`), a prompt object's
+ *                               `multimodal_data` (never the body's)
  *   POST /v1/completions        the OpenAI raw completion, minimal
  *   POST /apply-template        the rendered prompt the cache simulation uses
  *   POST /tokenize, /detokenize
@@ -547,8 +548,14 @@ export async function startMockOpenAI(opts = {}) {
   }
 
   async function completion(res, p, body) {
+    // llama-server reads a picture only from a prompt OBJECT ({ prompt_string,
+    // multimodal_data }); a top-level multimodal_data is ignored — so is it here.
     const promptText =
-      typeof body.prompt === 'string' ? body.prompt : JSON.stringify(body.prompt ?? '');
+      typeof body.prompt === 'string'
+        ? body.prompt
+        : typeof body.prompt?.prompt_string === 'string'
+          ? body.prompt.prompt_string
+          : JSON.stringify(body.prompt ?? '');
     const ctx = { ...context(p, body), prompt: promptText, all: promptText };
     const seq = ++state.seq;
     const startedAt = Date.now();
@@ -559,7 +566,7 @@ export async function startMockOpenAI(opts = {}) {
       path: p,
       stream: ctx.stream,
       prompt: promptText.slice(0, 2000),
-      images: Array.isArray(body.multimodal_data) ? body.multimodal_data.length : 0,
+      images: Array.isArray(body.prompt?.multimodal_data) ? body.prompt.multimodal_data.length : 0,
       nProbs: body.n_probs ?? 0,
       rule: rule?.name ?? null,
       body,

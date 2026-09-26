@@ -10,21 +10,28 @@ import {
 describe('the prompt OmniSVG is sent', () => {
   it('is their text instruction, wrapped in ChatML', () => {
     const r = buildOmniSvgRequest({ prompt: 'a red heart' });
+    if (typeof r.prompt !== 'string') throw new Error('a text request sends a string prompt');
     expect(r.prompt).toContain(`<|im_start|>system\n${OMNISVG_SYSTEM_PROMPT}<|im_end|>`);
     expect(r.prompt).toContain('Generate an SVG illustration for: a red heart');
     expect(r.prompt).toContain('- Create complete SVG path commands');
     expect(r.prompt.endsWith('<|im_start|>assistant\n')).toBe(true);
     expect(r.return_tokens).toBe(true);
-    expect(r.multimodal_data).toBeUndefined();
+    expect(typeof r.prompt).toBe('string');
   });
 
   it('uses their image instruction and the media marker for an image', () => {
     const r = buildOmniSvgRequest({ prompt: 'ignored for images', imageBase64: 'AAAA' });
-    expect(r.prompt).toContain(
-      `${MEDIA_MARKER}Generate SVG code that accurately represents this image:`,
-    );
-    expect(r.prompt).not.toContain('ignored for images');
-    expect(r.multimodal_data).toEqual(['AAAA']);
+    /* The picture rides INSIDE the prompt object — the only place llama-server
+       reads it (MEASURED: at the top of the body it was ignored, and every
+       picture was drawn from the instruction alone). */
+    expect(r.prompt).toEqual({
+      prompt_string: expect.stringContaining(
+        `${MEDIA_MARKER}Generate SVG code that accurately represents this image:`,
+      ),
+      multimodal_data: ['AAAA'],
+    });
+    expect(JSON.stringify(r)).not.toContain('ignored for images');
+    expect(r).not.toHaveProperty('multimodal_data');
     expect(r.temperature).toBe(0.3);
   });
 
