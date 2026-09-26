@@ -120,6 +120,14 @@ export type {
 } from './protocol.js';
 export { isGenEvent, NdjsonParser, parseGenEventLine } from './protocol.js';
 export * from './stitch.js';
+export type { VfigInput, VfigMessage, VfigRequest } from './vfig-request.js';
+export {
+  buildVfigRequest,
+  svgFromText,
+  textLoopStart,
+  VFIG_FIGURE_PROMPT,
+  vfigEditText,
+} from './vfig-request.js';
 export type {
   EnvWarmOptions,
   MfluxSaveOptions,
