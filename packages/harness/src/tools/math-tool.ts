@@ -167,6 +167,14 @@ async function readSpec(
         };
       }
     }
+    // `math "Simple harmonic motion" --plot '{…}' --steps '[…]'`: the words are its title.
+    const parts = fromFlags(p);
+    if (parts !== null && parts.title === undefined) return { raw: { title: s, ...parts } };
+    if (/\s/.test(s) && !/[\\/]|\.json$/i.test(s)) {
+      return {
+        error: `math: "${s}" reads as a title, not a spec — pass the spec as JSON with it as its "title", or write it to a .math.json file and pass that. \`math --help\` shows a whole one.`,
+      };
+    }
     return {
       error: `math: there is no file at ${s}. Write the spec there first (write ${/\.json$/i.test(s) ? s : `${s}${MATH_SPEC_SUFFIX}`}), then run math on it — or pass the JSON itself.`,
     };

@@ -191,3 +191,19 @@ describe('a spec file with TeX typed the way a model types it', () => {
     expect(readFileSync(path.join(root, 'tex.html'), 'utf8')).toContain('class="mfrac"');
   });
 });
+
+describe('the title typed where the spec goes', () => {
+  it('is the title when the rest came as flags, and said so when nothing did', async () => {
+    const { run } = setup();
+    const r = await run({
+      spec: 'Titled by position',
+      plot: JSON.stringify(GOOD.plot),
+      params: JSON.stringify(GOOD.params),
+      steps: JSON.stringify(GOOD.steps),
+    });
+    expect(r.isError).toBeUndefined();
+    expect(text(r)).toMatch(/^Drew "Titled by position": titled-by-position\.html/);
+    const bare = await run({ spec: 'Simple harmonic motion' });
+    expect(text(bare)).toMatch(/reads as a title, not a spec/);
+  });
+});
