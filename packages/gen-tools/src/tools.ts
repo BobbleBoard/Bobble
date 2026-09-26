@@ -888,14 +888,24 @@ export async function saveOutputs(
    * gets ".png"; several pictures make it a folder.
    */
   const named = /\.(png|jpe?g|webp)$/i.test(target);
+  /*
+   * …AND A NAME WITH ANY OTHER EXTENSION IS A FILE TOO, never a folder named
+   * like one. FOUND by the visual suite (4B, 2026-09-25): asked for an SVG, the
+   * model generated a picture with `--save_to=lighthouse-sunset.svg`; that fell
+   * through to "a folder", a DIRECTORY named lighthouse-sunset.svg was made with
+   * the PNG inside, and every later `write lighthouse-sunset.svg` failed with
+   * EISDIR — the model flailed out of its working folder over it. The bytes are
+   * PNG, so the file takes .png below, as a .jpg name already does.
+   */
+  const otherExt = !named && /\.[a-z0-9]{1,5}$/i.test(path.basename(target));
   const asFile =
-    (named && !(await isDir(target))) ||
+    ((named || otherExt) && !trailingSlash && !(await isDir(target))) ||
     (!named &&
       !trailingSlash &&
       outputPaths.length === 1 &&
       path.extname(target) === '' &&
       !(await isDir(target)));
-  if (asFile && !named) target = `${target}.png`;
+  if (asFile && !named && !otherExt) target = `${target}.png`;
   /*
    * THE BYTES ARE PNG. A name ending in .jpg keeps its name and gets the
    * extension the file really has (SEEN: `--save-to fox-storybook.jpg`, 2.2 MB

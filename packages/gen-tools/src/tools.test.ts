@@ -549,6 +549,17 @@ describe('saveOutputs', () => {
     expect(existing.paths).toEqual(['/pics/book/title.png']);
   });
 
+  /* FOUND by the visual suite (4B): `--save_to=lighthouse-sunset.svg` made a
+     FOLDER of that name with the PNG inside, and every write of the .svg failed. */
+  it('reads a name with any other extension as the file, with the extension the bytes have', async () => {
+    const f = fake();
+    const one = await saveOutputs(['/g/a.png'], '/w/lighthouse-sunset.svg', 'a lighthouse', f.deps);
+    expect(one.paths).toEqual(['/w/lighthouse-sunset.png']);
+    expect(f.dirs).toEqual(['/w']);
+    const two = await saveOutputs(['/g/a.png', '/g/b.png'], '/w/hero.gif', 'hero', f.deps);
+    expect(two.paths).toEqual(['/w/hero.png', '/w/hero-2.png']);
+  });
+
   /* MEASURED: `--save_to=cow-on-the-moon.png` landed in pi's cwd, a level above
      the working folder the prompt had named, and `present cow-on-the-moon.png`
      found nothing there. */
