@@ -125,6 +125,42 @@ async function proveExtensionsLoad() {
 await proveExtensionsLoad();
 
 // ---------------------------------------------------------------------------
+// (a2) The math command's page renders inside the bundle. mathviz is
+//      TypeScript loaded the way pi loads its extensions (pi's jiti, from the
+//      asar), and it reads KaTeX's stylesheet and fonts out of the asar to
+//      inline them — a page without them is a page of boxes, and nothing but
+//      this reads a font file from inside the bundle.
+// ---------------------------------------------------------------------------
+async function proveMathRenders() {
+  const entry = path.join(asar, 'node_modules/@pi-desktop/mathviz/src/index.ts');
+  const pi = path.join(asar, 'node_modules/@mariozechner/pi-coding-agent');
+  const script = `
+    const { createJiti } = require(require.resolve('@mariozechner/jiti', { paths: [${JSON.stringify(pi)}] }));
+    createJiti(${JSON.stringify(entry)}).import(${JSON.stringify(entry)}).then((m) => {
+      const r = m.renderMath({ title: 'Check', plot: { curves: ['sin(x)'] }, steps: ['Half is $\\\\frac{1}{2}$.'] });
+      process.stdout.write(JSON.stringify({ size: r.html.length, fonts: (r.html.match(/data:font\\/woff2/g) || []).length, katex: r.html.includes('class="katex"') }));
+    }).catch((e) => { process.stderr.write(String((e && e.stack) || e)); process.exit(2); });`;
+  const child = spawn(executable, ['-e', script], {
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+  });
+  let out = '';
+  let err = '';
+  child.stdout.setEncoding('utf8');
+  child.stderr.setEncoding('utf8');
+  child.stdout.on('data', (d) => (out += d));
+  child.stderr.on('data', (d) => (err += d));
+  const code = await new Promise((resolve) => child.on('exit', resolve));
+  assert(code === 0, `the bundled mathviz did not render (exit ${code}):\n${err}`);
+  const r = JSON.parse(out);
+  assert(r.katex && r.fonts >= 8, `the math page lacks typeset maths or its fonts: ${out}`);
+  console.log(
+    `(a2) OK — a math page renders from the asar (${Math.round(r.size / 1024)} KB, ${r.fonts} fonts inlined)`,
+  );
+}
+
+await proveMathRenders();
+
+// ---------------------------------------------------------------------------
 // (b)/(c) Run the actual packaged app.
 // ---------------------------------------------------------------------------
 const MODEL_ID = 'gemma-4-e2b-it';
