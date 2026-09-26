@@ -118,6 +118,7 @@ export function expressionsOf(spec: MathSpec): Map<string, Set<string>> {
         labels(sh.label, []);
         break;
       case 'polygon':
+      case 'polyline':
         for (const p of sh.points) xy(p);
         labels(sh.label, []);
         break;

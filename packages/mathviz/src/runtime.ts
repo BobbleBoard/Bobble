@@ -1120,6 +1120,62 @@ export function mvFigure(
         }
         break;
       }
+      case 'polyline': {
+        const pts = sh.points.map(px);
+        if (pts.some(([a, b]) => !Number.isFinite(a) || !Number.isFinite(b))) {
+          outside.push({ id: sh.id, what: 'a point on it has no value at these settings' });
+          break;
+        }
+        for (const p of sh.points) {
+          const [a, b] = pt(p);
+          inView(sh.id, a, b);
+        }
+        let d = pts
+          .map(([a, b], i) => `${i === 0 ? 'M' : 'L'}${a.toFixed(2)},${b.toFixed(2)}`)
+          .join('');
+        if (sh.smooth && pts.length >= 3) {
+          // Catmull-Rom through the points, as cubic Béziers.
+          const P = (i: number) => pts[Math.max(0, Math.min(pts.length - 1, i))] ?? [0, 0];
+          d = `M${P(0)[0].toFixed(2)},${P(0)[1].toFixed(2)}`;
+          for (let i = 0; i + 1 < pts.length; i += 1) {
+            const [x0, y0] = P(i - 1);
+            const [x1, y1] = P(i);
+            const [x2, y2] = P(i + 1);
+            const [x3, y3] = P(i + 2);
+            const c1 = [x1 + (x2 - x0) / 6, y1 + (y2 - y0) / 6];
+            const c2 = [x2 - (x3 - x1) / 6, y2 - (y3 - y1) / 6];
+            d += `C${(c1[0] ?? 0).toFixed(2)},${(c1[1] ?? 0).toFixed(2)} ${(c2[0] ?? 0).toFixed(2)},${(c2[1] ?? 0).toFixed(2)} ${x2.toFixed(2)},${y2.toFixed(2)}`;
+          }
+        }
+        items.push({
+          t: 'path',
+          d,
+          tone: sh.role === 'reference' ? 'ink' : sh.role,
+          width: sh.role === 'reference' ? 1.75 : 2.25,
+          dash: sh.dashed,
+          id: sh.id,
+          dim,
+        });
+        const along: number[] = [];
+        for (let i = 0; i + 1 < pts.length; i += 1) {
+          const [a, b] = pts[i] ?? [0, 0];
+          const [c, e] = pts[i + 1] ?? [0, 0];
+          along.push(...mvSampleLine(a, b, c, e));
+        }
+        lines.push(along);
+        if (sh.label !== undefined) {
+          const [ex, ey] = pts[pts.length - 1] ?? [0, 0];
+          const [mx, my] = pts[Math.floor(pts.length / 2)] ?? [ex, ey];
+          pending.push({
+            id: sh.id,
+            text: mvFill(E, sh.label, s),
+            cands: [...mvAround(ex, ey, 10), ...mvAround(mx, my, 12)],
+            dim,
+            size: 15,
+          });
+        }
+        break;
+      }
       case 'circle': {
         const [a, b] = pt(sh.center);
         const r = mvEval(E, sh.r, s);

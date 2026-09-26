@@ -173,6 +173,15 @@ export type Shape = Item &
         readonly coils: number;
         readonly label?: string;
       }
+    | {
+        readonly kind: 'polyline';
+        readonly points: readonly Xy[];
+        readonly label?: string;
+        readonly dashed: boolean;
+        readonly role: Role;
+        /** Drawn as a smooth curve through the points (a trajectory), not straight pieces. */
+        readonly smooth: boolean;
+      }
   );
 
 export interface FigureSpec {
@@ -243,7 +252,14 @@ function numOrExpr(v: unknown, what: string, names: readonly string[]): Num {
   try {
     parse(s, names);
   } catch (e) {
-    throw new SpecError(`${what} "${s}": ${e instanceof ExprError ? e.message : String(e)}`);
+    const msg = e instanceof ExprError ? e.message : String(e);
+    // A name it does not know is most often a slider it forgot to declare.
+    const unknown = /^"([A-Za-z_]\w*)" at \d+ is not a variable here/.exec(msg)?.[1];
+    const hint =
+      unknown === undefined
+        ? ''
+        : ` — if ${unknown} is something to vary, add it to "params" as "${unknown} = 1 in 0..5"`;
+    throw new SpecError(`${what} "${s}": ${msg}${hint}`);
   }
   return /^-?\d+(\.\d+)?$/.test(s) ? Number(s) : s;
 }
@@ -511,12 +527,22 @@ function shape(v: unknown, i: number, named: Map<string, Xy>, names: readonly st
         role: role(v.role ?? v.color, 'main'),
       };
     }
-    case 'segment':
     case 'line':
+      // A line through points — a ground, a wall's edge — is drawn straight, in ink, like a segment.
+      if (Array.isArray(v.points)) {
+        return shape(
+          { ...v, kind: 'polyline', role: v.role ?? v.color ?? 'reference' },
+          i,
+          named,
+          names,
+        );
+      }
+      return shape({ ...v, kind: 'segment' }, i, named, names);
+    case 'segment':
     case 'vector':
     case 'arrow':
     case 'force': {
-      const isVec = kind !== 'segment' && kind !== 'line';
+      const isVec = kind !== 'segment';
       return {
         id,
         appear,
@@ -557,6 +583,25 @@ function shape(v: unknown, i: number, named: Map<string, Xy>, names: readonly st
     case 'triangle':
     case 'square':
       return polygonShape();
+    case 'polyline':
+    case 'path':
+    case 'curve':
+    case 'trajectory':
+    case 'track': {
+      const ptsIn = v.points ?? v.vertices ?? v.through;
+      if (!Array.isArray(ptsIn) || ptsIn.length < 2)
+        throw new SpecError(`${id} needs 2 or more points`);
+      return {
+        id,
+        appear,
+        kind: 'polyline',
+        points: ptsIn.map((p, k) => xy(p, `${id} point ${k + 1}`)),
+        ...L,
+        dashed: v.dashed === true,
+        role: role(v.role ?? v.color, 'main'),
+        smooth: v.smooth === true || (v.smooth !== false && kind !== 'polyline'),
+      };
+    }
     case 'circle':
     case 'ball':
     case 'disc':
@@ -645,7 +690,7 @@ function shape(v: unknown, i: number, named: Map<string, Xy>, names: readonly st
       };
     default:
       throw new SpecError(
-        `shape ${id}: kind "${kind ?? ''}" is not one of point, segment, vector, polygon, rect, circle, angle, dimension, label, box3d, spring`,
+        `shape ${id}: kind "${kind ?? ''}" is not one of point, segment, vector, polygon, polyline, rect, circle, angle, dimension, label, box3d, spring`,
       );
   }
   function polygonShape(): Shape {
@@ -835,7 +880,9 @@ export function normalizeMathSpec(input: unknown): MathSpec {
     throw new SpecError(`the plot's variable ${plotSpec.v} is also a slider — rename the slider`);
   }
   const figSpec = figIn !== undefined ? figure(figIn, names) : undefined;
-  const stepsIn = list(v.steps ?? v.explanation ?? v.explain);
+  const stepsRaw = v.steps ?? v.explanation ?? v.explain;
+  // {"1": …, "2": …} — steps numbered as keys — read in their order.
+  const stepsIn = isObj(stepsRaw) ? Object.values(stepsRaw) : list(stepsRaw);
   const steps: Step[] = stepsIn.map((s, i) => {
     if (typeof s === 'string') return { text: s, highlight: [], set: {} };
     if (!isObj(s)) throw new SpecError(`step ${i + 1} needs {text, highlight}`);

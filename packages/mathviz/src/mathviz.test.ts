@@ -297,3 +297,56 @@ describe('a spec written like code', () => {
     expect(() => normalizeMathSpec('{"title": "x", plot: {')).toThrow(/not JSON/);
   });
 });
+
+describe('more of what a small model writes', () => {
+  it('a name it did not declare comes back with how to declare it', () => {
+    expect(() => normalizeMathSpec({ title: 'k', plot: { curves: ['k*x'] } })).toThrow(
+      /if k is something to vary, add it to "params" as "k = 1 in 0..5"/,
+    );
+  });
+
+  it('an open line through points — a trajectory — and a "line" with points is one', () => {
+    const r = renderMath({
+      title: 'A throw',
+      figure: {
+        view: { x: '0..10', y: '0..6' },
+        shapes: [
+          {
+            id: 'path',
+            kind: 'trajectory',
+            points: [
+              [0, 0],
+              [2, 3],
+              [5, 4.5],
+              [8, 3],
+              [10, 0],
+            ],
+            label: 'path of the ball',
+            dashed: true,
+          },
+          {
+            id: 'ground',
+            type: 'line',
+            points: [
+              [0, 0],
+              [10, 0],
+            ],
+          },
+        ],
+      },
+      steps: [{ text: 'The ball follows a {path}.', highlight: ['path'] }],
+    });
+    expect(r.spec.figure?.shapes.map((sh) => sh.kind)).toEqual(['polyline', 'polyline']);
+    expect(r.problems.filter((p) => p.level === 'fix')).toEqual([]);
+    expect(r.html).toContain('data-id="path"');
+  });
+
+  it('steps written as numbered keys read in order', () => {
+    const s = normalizeMathSpec({
+      title: 's',
+      plot: { curves: ['x'] },
+      steps: { 1: 'First.', 2: 'Second.' },
+    });
+    expect(s.steps.map((x) => x.text)).toEqual(['First.', 'Second.']);
+  });
+});
