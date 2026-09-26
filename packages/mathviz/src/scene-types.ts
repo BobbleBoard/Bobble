@@ -73,6 +73,8 @@ export type Drawable = Fade &
         readonly placed?: boolean;
         /** No clear spot was found: what the chosen one touches — boxes (labels, points, discs) and line points. */
         readonly crowd?: { readonly boxes: number; readonly points: number };
+        /** No clear spot beside its part: placed farther out, with a leader line back to it. */
+        readonly led?: boolean;
       }
   );
 

@@ -249,6 +249,26 @@ describe('diagram', () => {
     expect(text).toContain('Mermaid could not read line 3: B -- no --> E[Email (the customer)]');
     expect(text).toContain('Fix: A label with ( ) [ ] or { } in it needs double quotes');
     expect(existsSync(path.join(root, 'broken.svg'))).toBe(false);
+    expect(text).not.toContain('math command');
+  });
+
+  it('a flowchart of a lever that will not parse points at math (MEASURED: three of them, then a painting)', async () => {
+    const render = vi.fn(
+      async (): Promise<DiagramRenderReply> => ({
+        ok: false,
+        error: 'Parse error on line 2:',
+        line: 2,
+        lineText: 'LWeight[Small Weight: 20N] --> LongArm[Long Arm: 2m]',
+        hint: 'Check the brackets and arrows on that line against Mermaid syntax.',
+      }),
+    );
+    const r = await rig({ render }).exec(DIAGRAM_TOOL)('1', {
+      title: 'Torque Balance Principle',
+      source:
+        'flowchart LR\n  LWeight[Small Weight: 20N] --> LongArm[Long Arm: 2m] --> Torque1[Torque: 20 × 2 = 40]\n  Fulcrum[Pivot]',
+    });
+    expect(r.isError).toBe(true);
+    expect(r.content[0]?.text).toContain('is not a flowchart: the math command draws it');
   });
 
   it('sends a maths or physics figure to math — the 4B passed its lever explanation here', async () => {

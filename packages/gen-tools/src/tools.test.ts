@@ -681,6 +681,13 @@ describe('mathFigurePrompt — a maths figure is not a picture', () => {
     expect(
       mathFigurePrompt('a diagram proving the pythagorean theorem, a² + b² = c²'),
     ).not.toBeNull();
+    // MEASURED (the maths suite): the lever, painted with its torques written wrong.
+    expect(
+      mathFigurePrompt(
+        'A physics diagram showing a seesaw with a small weight far from the pivot balancing a heavy weight close to the pivot.',
+      ),
+    ).toMatch(/Draw it with the math command/);
+    expect(mathFigurePrompt('a child on a seesaw in a sunny park, watercolor')).toBeNull();
   });
 
   it('still paints art that only touches maths', () => {

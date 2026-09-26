@@ -494,6 +494,7 @@ describe('svg — a group whose one tool IS the command', () => {
           image: { type: 'string' },
           candidates: { type: 'number' },
           out: { type: 'string' },
+          figure: { type: 'boolean' },
         },
       },
     },
@@ -553,6 +554,23 @@ describe('svg — a group whose one tool IS the command', () => {
     expect(call('svg bicycle.svg')).toMatchObject({
       kind: 'call',
       args: { prompt: 'bicycle.svg' },
+    });
+  });
+
+  it('reads a word after a switch as the command’s text, the switch on', () => {
+    /* MEASURED (4B, the maths suite's lever): `svg --figure "<svg …>"` — the
+       markup given to the switch, coerced to figure: false, the prompt gone. */
+    expect(resolveCli(svgCli, ['svg', '--figure', '<svg width="600"></svg>'])).toMatchObject({
+      kind: 'call',
+      args: { figure: true, prompt: '<svg width="600"></svg>' },
+    });
+    expect(call('svg a lever --figure yes')).toMatchObject({
+      kind: 'call',
+      args: { prompt: 'a lever', figure: true },
+    });
+    expect(call('svg a lever --figure false')).toMatchObject({
+      kind: 'call',
+      args: { prompt: 'a lever', figure: false },
     });
   });
 

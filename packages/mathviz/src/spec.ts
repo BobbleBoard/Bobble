@@ -222,6 +222,8 @@ export interface FigureSpec {
   readonly y: readonly [number, number];
   /** The axes the spec gave no readable range for: renderMath fits them to the shapes. */
   readonly fit?: readonly ('x' | 'y')[];
+  /** Solid areas that are ground to the rest, drawn in their pale tint (renderMath fills this in). */
+  readonly ground?: readonly string[];
   readonly shapes: readonly Shape[];
 }
 
@@ -249,6 +251,8 @@ export interface MathSpec {
   readonly steps: readonly Step[];
   /** The slider the Play button runs, if any. */
   readonly play?: string;
+  /** Names used with no value among declared ones — drawn as 1, and a check to fix. */
+  readonly unvalued?: readonly string[];
   /**
    * The explanation plays itself when the page opens — each step's words
    * appearing as the figure moves — and then hands the reader the controls.
@@ -1221,9 +1225,25 @@ function shapeBody(v: unknown, i: number, named: Map<string, Xy>, names: readonl
    */
   function formulaCurve(): Shape | null {
     const o = v as Loose;
-    const xs = typeof o.x === 'string' ? o.x : undefined;
-    const ys = typeof o.y === 'string' ? o.y : undefined;
+    let xs = typeof o.x === 'string' ? o.x : undefined;
+    let ys = typeof o.y === 'string' ? o.y : undefined;
     if (xs === undefined || ys === undefined) return null;
+    /* "x": "-10..10", "y": "m*x + c" — MEASURED (the 4B's y = mx + c): x
+       given as the range it runs over, y as a formula in it. The range names
+       the variable: x runs over it. (Read as a value, "-10..10" was −10 times
+       .10, and the line stood upright at x = −1.) */
+    const isRange = (t: string) => /\.\.|^\s*\S+\s+to\s+\S+\s*$/.test(t);
+    let axisRange: string | undefined;
+    let axis: 'x' | 'y' | undefined;
+    if (isRange(xs) && !isRange(ys)) {
+      axisRange = xs;
+      axis = 'x';
+      xs = 'x';
+    } else if (isRange(ys) && !isRange(xs)) {
+      axisRange = ys;
+      axis = 'y';
+      ys = 'y';
+    }
     const free = (src: string) =>
       [...src.matchAll(/[A-Za-z_]\w*/g)]
         .map((m) => m[0])
@@ -1236,11 +1256,13 @@ function shapeBody(v: unknown, i: number, named: Map<string, Xy>, names: readonl
         );
     const named = str(o.var ?? o.variable ?? o.param ?? o.over);
     const over =
-      named !== undefined && /^[A-Za-z_]\w*$/.test(named)
+      axis ??
+      (named !== undefined && /^[A-Za-z_]\w*$/.test(named)
         ? named
-        : ([...free(xs), ...free(ys)][0] ?? (names.includes('t') ? 's' : 't'));
+        : ([...free(xs), ...free(ys)][0] ?? (names.includes('t') ? 's' : 't')));
     const rIn =
       o.range ??
+      axisRange ??
       o[over] ??
       o.span ??
       (o.from !== undefined && o.to !== undefined ? [o.from, o.to] : undefined);
@@ -1764,9 +1786,20 @@ function normalizeParsed(v: Loose, found: { any: boolean }, auto: readonly strin
   }
   const names = params.map((p) => p.name);
   SLIDERS = params;
-  const plotSpec = plotIn !== undefined ? plot(plotIn, names) : undefined;
-  // A slider with the plot's own name is "now" on that axis (t for time): curves use the axis, points the slider.
   const viewNotes: string[] = [];
+  let plotSpec: PlotSpec | undefined;
+  try {
+    plotSpec = plotIn !== undefined ? plot(plotIn, names) : undefined;
+  } catch (e) {
+    /* "curves": [] beside a figure — MEASURED (the 4B, Pythagoras): told a
+       plot needs curves, it gave its empty one "t against t" ("stage
+       progression"), a line that showed nothing beside the figure that was
+       the whole lesson. An empty plot beside a figure is no plot. */
+    if (!(e instanceof SpecError && figIn !== undefined && /^a plot needs curves/.test(e.message)))
+      throw e;
+    viewNotes.push('the plot had no curves, so the page is the figure alone');
+  }
+  // A slider with the plot's own name is "now" on that axis (t for time): curves use the axis, points the slider.
   const figSpec = figIn !== undefined ? figure(figIn, names, viewNotes) : undefined;
   const stepsRaw = v.steps ?? v.explanation ?? v.explain;
   // {"1": …, "2": …} — steps numbered as keys — read in their order.
@@ -1841,6 +1874,9 @@ function normalizeParsed(v: Loose, found: { any: boolean }, auto: readonly strin
     steps,
     ...(playIn !== undefined && names.includes(playIn) ? { play: playIn } : {}),
     tell: v.tell !== false && v.autoplay !== false,
+    ...(declared.length > 0 && params.some((p) => p.hidden === true)
+      ? { unvalued: params.filter((p) => p.hidden === true).map((p) => p.name) }
+      : {}),
     notes: [
       ...(found.any ? ['emoji removed — the page carries none'] : []),
       ...(title === undefined
@@ -1848,16 +1884,15 @@ function normalizeParsed(v: Loose, found: { any: boolean }, auto: readonly strin
         : []),
       ...viewNotes,
       ...(() => {
+        /* A name with no value in a spec that declares none is symbolic — a
+           cube of side L, x(t) = A cos(ωt) — and 1 is its unit: a note. Among
+           declared values it is a slip, and a check to fix (checks.ts). */
         const hidden = params.filter((p) => p.hidden === true).map((p) => p.name);
         const slid = params
           .filter((p) => auto.includes(p.name) && p.hidden !== true)
           .map((p) => p.name);
         const out: string[] = [];
-        if (hidden.length > 0) {
-          out.push(
-            `${hidden.join(', ')} ${hidden.length === 1 ? 'has' : 'have'} no value in the spec, so ${hidden.length === 1 ? 'it is' : 'each is'} drawn as 1 — give ${hidden.length === 1 ? 'it a number' : 'them numbers'}, or make ${hidden.length === 1 ? 'it a slider' : 'them sliders'} ("${hidden[0]} = 2 in 1..4")`,
-          );
-        }
+        if (hidden.length > 0 && declared.length === 0) out.push(unvaluedText(hidden));
         if (slid.length > 0)
           out.push(
             `${slid.join(', ')} ${slid.length === 1 ? 'was' : 'were'} not declared, so ${slid.length === 1 ? 'it is a slider' : 'each is a slider'} (with Play)`,
@@ -1866,6 +1901,12 @@ function normalizeParsed(v: Loose, found: { any: boolean }, auto: readonly strin
       })(),
     ],
   };
+}
+
+/** What is said of names used with no value: each is drawn as 1, and how to give it one. */
+export function unvaluedText(names: readonly string[]): string {
+  const one = names.length === 1;
+  return `${names.join(', ')} ${one ? 'has' : 'have'} no value in the spec, so ${one ? 'it is' : 'each is'} drawn as 1 — give ${one ? 'it a number' : 'them numbers'}, or make ${one ? 'it a slider' : 'them sliders'} ("${names[0]} = 2 in 1..4")`;
 }
 
 /** A rectangle's four corners from two opposite ones: {"from": [x0, y0], "to": [x1, y1]}. */

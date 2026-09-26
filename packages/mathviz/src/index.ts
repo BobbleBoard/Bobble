@@ -8,7 +8,15 @@
  * so the model can fix the spec and draw again.
  */
 import { type Kit, kitOrDefault } from '@pi-desktop/design-kit';
-import { compileSpec, fittedView, startValues, steadyYRange } from './build.js';
+import {
+  compileSpec,
+  fittedView,
+  groundIds,
+  heldView,
+  startValues,
+  steadyYRange,
+  yRangeMisses,
+} from './build.js';
 import { checkMath, type Problem } from './checks.js';
 import { mathPage } from './page.js';
 import type { Values } from './runtime.js';
@@ -42,8 +50,21 @@ export function renderMath(input: unknown, opts: { readonly kit?: Kit } = {}): M
   let spec = normalizeMathSpec(input);
   const compiled = compileSpec(spec);
   const notes: string[] = [];
-  if (spec.plot !== undefined && (spec.plot.y.min === undefined || spec.plot.y.max === undefined)) {
+  // ASCII, as the model would write it back into the spec.
+  const num = (v: number) => String(Number(v.toPrecision(3)));
+  const range = (a: number, b: number) => `${num(a)}..${num(b)}`;
+  const some = (ids: readonly string[]) =>
+    ids.length <= 3 ? ids.join(', ') : `${ids.slice(0, 3).join(', ')} and ${ids.length - 3} more`;
+  const lost = yRangeMisses(spec, compiled.E);
+  if (
+    spec.plot !== undefined &&
+    (spec.plot.y.min === undefined || spec.plot.y.max === undefined || lost !== null)
+  ) {
     const r = steadyYRange(spec, compiled.E);
+    if (lost !== null)
+      notes.push(
+        `the plot's y-range ${range(spec.plot.y.min ?? 0, spec.plot.y.max ?? 0)} missed ${some(lost)} at the steps, so it shows ${range(r.min, r.max)} — give "y" a range that holds the curves`,
+      );
     spec = { ...spec, plot: { ...spec.plot, y: { ...spec.plot.y, min: r.min, max: r.max } } };
     if (r.clipped)
       notes.push(
@@ -62,6 +83,18 @@ export function renderMath(input: unknown, opts: { readonly kit?: Kit } = {}): M
         y: fit.includes('y') ? view.y : fig.y,
       },
     };
+  }
+  const held = heldView(spec, compiled.E);
+  if (held !== null && spec.figure !== undefined) {
+    const f = spec.figure;
+    notes.push(
+      `the view (x ${range(f.x[0], f.x[1])}, y ${range(f.y[0], f.y[1])}) left out ${some(held.left)} at the steps, so it was widened to x ${range(held.x[0], held.x[1])}, y ${range(held.y[0], held.y[1])} — give "view" ranges that hold the parts at every step`,
+    );
+    spec = { ...spec, figure: { ...f, x: held.x, y: held.y } };
+  }
+  if (spec.figure !== undefined) {
+    const ground = groundIds(spec, compiled.E);
+    if (ground.length > 0) spec = { ...spec, figure: { ...spec.figure, ground } };
   }
   const start = startValues(spec, compiled.E);
   const problems = [

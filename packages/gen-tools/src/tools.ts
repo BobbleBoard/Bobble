@@ -736,6 +736,11 @@ export function mathFigurePrompt(prompt: string | undefined): string | null {
     /\bd\s*\/\s*d[xtθ]\b|\bf\s*\(\s*x\s*\)|\by\s*=\s*[-\d(a-z]/i,
     /\b(derivative|integral|unit circle|parabola|asymptote|hypotenuse|pythagorean theorem|free[- ]body|vector diagram|simple harmonic|projectile motion)\b/i,
     /[a-c]\s*[²2]\s*\+\s*[a-c]\s*[²2]|[∫∑√θπ]/,
+    /* Mechanics: MEASURED (the maths suite, 4B) — "A physics diagram showing
+       a seesaw with a small weight far from the pivot…", painted, with its
+       torques written wrong on the picture ("20 × 2 = 40", "100 × 0.8 = 80",
+       "balanced"). */
+    /\b(torque|fulcrum|pivot|lever|see-?saw|moment arm|pulley|inclined plane|pendulum|physics (?:diagram|figure|illustration))\b/i,
   ].filter((re) => re.test(text)).length;
   const figure =
     /\b(graph|plot|axes|axis|diagram|figure|visuali[sz]\w*|label+ed|explain\w*|educational|lesson|proof|showing why)\b/i.test(

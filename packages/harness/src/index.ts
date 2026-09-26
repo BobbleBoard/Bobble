@@ -106,6 +106,7 @@ import {
   type TitleMessage,
 } from './title/conversation-title.js';
 import { registerAskUser } from './tools/ask-user.js';
+import { bashWrites } from './tools/bash-writes.js';
 import { registerCapabilityTool } from './tools/capability-tool.js';
 import { CHART_TOOL, projectChartKit, registerChartTool } from './tools/chart-tool.js';
 import {
@@ -123,6 +124,7 @@ import { diskWalkRefusal, wouldWalkDisk } from './tools/disk-walk.js';
 import { diagnoseEditFailure } from './tools/edit-diagnosis.js';
 import { withForegroundServerStop } from './tools/foreground-server.js';
 import { handmadeChartRefusal, isHandmadeChart } from './tools/handmade-chart.js';
+import { mathFigureMarkup } from './tools/handmade-math.js';
 import {
   handmadeMediaRefusal,
   isHandmadeMedia,
@@ -4190,6 +4192,25 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
           }
         }
         /*
+         * …AND A MATHS FIGURE TYPED AS SVG INTO A HEREDOC — see bash-writes.ts.
+         * Through `write` the same markup meets handwritten-svg's refusal;
+         * typed into bash it went round it (MEASURED: the 4B's derivative, a
+         * tangent on a parabola, `cat > derivative_tangent.svg << 'EOF'`). The
+         * identical command again is the exit, as the identical write is.
+         */
+        if (mathSvgRefused === cmd) {
+          mathSvgRefused = null;
+        } else if (!fileLine && pi.getAllTools().some((t) => t.name === MATH_TOOL)) {
+          const drawn = bashWrites(cmd).find(
+            (w) => /\.svg$/i.test(w.path) && mathFigureMarkup(w.body ?? cmd),
+          );
+          if (drawn !== undefined) {
+            mathSvgRefused = cmd;
+            pi.appendEntry(HARNESS_LOOP_ENTRY, { action: 'block', cause: 'handwritten-math' });
+            return { block: true, reason: handwrittenMathRefusal(drawn.path, { bash: true }) };
+          }
+        }
+        /*
          * …AND A PAGE READ WITH curl WHILE `web fetch` IS ONE COMMAND AWAY —
          * see raw-page-fetch.ts. MEASURED: four `curl … | grep height` calls
          * on the Eiffel Tower's Wikipedia page, kilobytes of markup each, and
@@ -4614,6 +4635,8 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   /** The last plotting script refused at bash (handmade-chart.ts); the same
    * command again is the deliberate escape — the script may be the ask. */
   let chartScriptRefused: string | null = null;
+  /** The last bash line refused for typing a maths figure as SVG; the same line again goes through. */
+  let mathSvgRefused: string | null = null;
   pi.on('tool_result', async (event) => {
     /* In CLI mode every call is `bash`, so the real tool name is only known at
        the dispatch (see the CLI host's `call`); tally there instead, or the
@@ -4739,6 +4762,30 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       }
     }
     /* A math spec just written or edited is drawn there and then: the page, its capture and its checks (math-tool.ts drawWrittenSpec). */
+    const isSpec = (abs: string) =>
+      existsSync(abs) &&
+      (/\.math\.json$/i.test(abs) ||
+        (/\.json$/i.test(abs) && looksLikeMathSpec(readFileSync(abs, 'utf8'))));
+    const withDrawing = async (abs: string, root: string) => {
+      const drawn = await drawWrittenSpec(abs, root, mathDeps);
+      const said = drawn.content
+        .map((c) => (c.type === 'text' ? c.text : ''))
+        .filter((t) => t !== '')
+        .join('\n');
+      const note = drawn.isError === true ? `It does not draw yet — ${said}` : said;
+      const first = event.content.findIndex((part) => part.type === 'text');
+      return {
+        content: [
+          ...(first < 0 ? [{ type: 'text' as const, text: note }] : []),
+          ...event.content.map((part, i) =>
+            i === first && part.type === 'text'
+              ? { ...part, text: part.text.trim() === '' ? note : `${part.text}\n\n${note}` }
+              : part,
+          ),
+          ...drawn.content.filter((c) => c.type === 'image'),
+        ],
+      };
+    };
     if ((event.toolName === 'write' || event.toolName === 'edit') && event.isError !== true) {
       const input = ((event as { input?: unknown }).input ?? lastCallInput?.input) as
         | { path?: unknown }
@@ -4748,29 +4795,21 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       const abs = rel === '' ? '' : isAbsolute(rel) ? rel : join(root, rel);
       /* A spec saved as plain .json is drawn too — MEASURED (the 4B): three
          Pythagorean specs written as pythagorean_proof.json, none drawn. */
-      if (
-        /\.math\.json$/i.test(rel) ||
-        (/\.json$/i.test(rel) && existsSync(abs) && looksLikeMathSpec(readFileSync(abs, 'utf8')))
-      ) {
-        if (existsSync(abs)) {
-          const drawn = await drawWrittenSpec(abs, root, mathDeps);
-          const said = drawn.content
-            .map((c) => (c.type === 'text' ? c.text : ''))
-            .filter((t) => t !== '')
-            .join('\n');
-          const note = drawn.isError === true ? `It does not draw yet — ${said}` : said;
-          return {
-            content: [
-              ...event.content.map((part, i) =>
-                i === 0 && part.type === 'text'
-                  ? { ...part, text: `${part.text}\n\n${note}` }
-                  : part,
-              ),
-              ...drawn.content.filter((c) => c.type === 'image'),
-            ],
-          };
-        }
-      }
+      if (rel !== '' && isSpec(abs)) return withDrawing(abs, root);
+    }
+    /* …and one typed into bash as a heredoc — MEASURED (the 4B's derivative):
+       `cat > tangent_deriv.json << 'ENDJSON'`, twice, never drawn (bash-writes.ts). */
+    if (event.toolName === 'bash' && event.isError !== true) {
+      const input = ((event as { input?: unknown }).input ?? lastCallInput?.input) as
+        | { command?: unknown }
+        | undefined;
+      const cmd = typeof input?.command === 'string' ? input.command : '';
+      const root = liveRoot();
+      const spec = bashWrites(cmd)
+        .map((w) => (isAbsolute(w.path) ? w.path : join(root, w.path)))
+        .filter(isSpec)
+        .pop();
+      if (spec !== undefined) return withDrawing(spec, root);
     }
     /*
      * `read --help` IS BASH'S OWN `read`, AND ALWAYS WILL BE.

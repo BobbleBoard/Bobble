@@ -297,7 +297,7 @@ export function handwrittenDiagramRefusal(
  */
 export function handwrittenMathRefusal(
   path: string,
-  opts: { readonly inline?: boolean; readonly edit?: boolean } = {},
+  opts: { readonly inline?: boolean; readonly edit?: boolean; readonly bash?: boolean } = {},
 ): string {
   const stem = path.replace(/\.[^./\\]+$/, '').replace(/^.*[\\/]/, '') || 'figure';
   const what =
@@ -309,7 +309,7 @@ export function handwrittenMathRefusal(
     '',
     `Write the figure as a spec to ${stem}.math.json — it is drawn the moment it is written, and its checks come back. \`math --help\` shows a whole spec; the shapes are points, segments, vectors, polygons, circles, angles, dimensions, labels, springs and boxes, at x, y coordinates.`,
     '',
-    `If this exact markup is truly wanted (a fixture, a sample), ${opts.edit === true ? 'apply the same edit' : 'write the same file'} again UNCHANGED.`,
+    `If this exact markup is truly wanted (a fixture, a sample), ${opts.edit === true ? 'apply the same edit' : opts.bash === true ? 'run the same command' : 'write the same file'} again UNCHANGED.`,
   ].join('\n');
 }
 

@@ -1172,6 +1172,52 @@ describe('the per-tool rules hold at every door', () => {
   });
 
   /*
+   * A HEREDOC IS A WRITE (bash-writes.ts). MEASURED (the maths suite, 4B, the
+   * derivative): its spec typed as `cat > tangent_deriv.json << 'ENDJSON'`,
+   * twice, never drawn; then a tangent line hand-drawn as SVG the same way,
+   * round the refusal a `write` of it meets.
+   */
+  it('draws a maths spec typed into a heredoc, and refuses a maths figure typed as SVG there', async () => {
+    const tools = ['read', 'write', 'edit', 'ls', 'bash', 'math'];
+    const { rig, cwd } = await session('cli', 'What does a derivative mean? Show me.', tools);
+    const heredoc = (file: string, body: string) => ({
+      type: 'tool_call' as const,
+      toolName: 'bash',
+      toolCallId: 'h1',
+      input: { command: `cat > ${file} << 'EOF'\n${body}\nEOF` },
+    });
+    const SVG =
+      '<svg viewBox="0 0 400 300"><circle cx="200" cy="150" r="100"/><text x="10" y="20">(cos θ, sin θ)</text><text x="30" y="40">tangent</text></svg>';
+    const svgCall = heredoc('derivative.svg', SVG);
+    expect(blockOf(await rig.fire('tool_call', svgCall))?.reason).toMatch(
+      /^Not written: derivative\.svg is a maths or physics figure drawn by hand[\s\S]*run the same command again UNCHANGED/,
+    );
+    expect(blockOf(await rig.fire('tool_call', svgCall))).toBeNull();
+
+    const spec = JSON.stringify({
+      title: 'The slope of x²',
+      params: ['a = 1 in -2..2'],
+      plot: { x: '-3..3', curves: [{ id: 'f', expr: 'x^2' }] },
+      steps: [{ text: 'The curve {f}.', highlight: ['f'], set: { a: 1 } }],
+    });
+    const file = path.join(cwd, 'tangent_deriv.json');
+    writeFileSync(file, spec);
+    const results = await rig.fire('tool_result', {
+      type: 'tool_result',
+      toolName: 'bash',
+      toolCallId: 'h2',
+      input: heredoc(file, spec).input,
+      content: [{ type: 'text', text: '' }],
+      isError: false,
+    });
+    const said = results
+      .map((r) => (r as { content?: { text?: string }[] } | undefined)?.content?.[0]?.text)
+      .find((t) => typeof t === 'string');
+    expect(said).toMatch(/^Drew "The slope of x²": \S*tangent_deriv\.html/);
+    expect(existsSync(path.join(cwd, 'tangent_deriv.html'))).toBe(true);
+  });
+
+  /*
    * What the move must NOT take with it: the bookkeeping that belongs to the
    * `bash` call. The result hook spots a verbatim repeat by comparing the
    * result with `lastCallInput` — the bash call, in CLI mode — so the write

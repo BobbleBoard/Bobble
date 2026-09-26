@@ -518,7 +518,29 @@ export function resolveCli(cli: CliModel, argv: readonly string[]): CliResolutio
 
   const schema = schemaOf(match.tool);
   const leftover = restWords.slice(match.path.length);
-  const args = coerceArgs(parsed.flags, schema);
+  /*
+   * A SWITCH TAKES NO VALUE. MEASURED (4B, the maths suite's lever): `svg
+   * --figure "<svg …>"` — a switch, then what the model meant as the
+   * command's text. The parser gave the markup to the switch, coercion made
+   * it `figure: false`, and svg answered "give a prompt" with the prompt
+   * gone. A boolean flag followed by a word that is not a yes or a no is the
+   * switch, on, and the word goes where a positional goes.
+   */
+  const flags: Record<string, string | boolean> = { ...parsed.flags };
+  const strayed: string[] = [];
+  const props = schema?.properties ?? {};
+  for (const [rawKey, value] of Object.entries(parsed.flags)) {
+    const prop = props[resolveFlagName(rawKey, props)] as Record<string, unknown> | undefined;
+    if (
+      prop?.type === 'boolean' &&
+      typeof value === 'string' &&
+      !/^(true|false|yes|no|on|off|1|0)$/i.test(value.trim())
+    ) {
+      flags[rawKey] = true;
+      strayed.push(value);
+    }
+  }
+  const args = coerceArgs(flags, schema);
 
   /*
    * `mac click x:500 y:400` AND `mac click menu:"File > New Tab"`.
@@ -533,10 +555,9 @@ export function resolveCli(cli: CliModel, argv: readonly string[]): CliResolutio
    * Gated on the key actually being an argument of THIS command, so a URL
    * (`https://…`), a Windows path or any other colon in a value stays a value.
    */
-  const props = schema?.properties ?? {};
   const keyed: Record<string, string> = {};
   const bare: string[] = [];
-  for (const word of [...leftover, ...parsed.positionals]) {
+  for (const word of [...leftover, ...strayed, ...parsed.positionals]) {
     const m = /^([A-Za-z][A-Za-z0-9_]*):(.*)$/.exec(word);
     const key = m?.[1];
     const value = m?.[2];

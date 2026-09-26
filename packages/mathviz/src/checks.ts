@@ -16,7 +16,7 @@
 import { valuesAtStep } from './build.js';
 import { type Evaluators, mvEval, mvHit, mvPlain, mvScene, type Values } from './runtime.js';
 import type { Panel } from './scene-types.js';
-import type { MathSpec } from './spec.js';
+import { type MathSpec, unvaluedText } from './spec.js';
 
 export interface Problem {
   readonly level: 'fix' | 'warn' | 'note';
@@ -62,6 +62,13 @@ export function checkMath(
   const parts = partsOf(spec);
   const n = spec.steps.length;
 
+  /* A name used with no value among declared ones is drawn as 1 — MEASURED
+     (the 4B, Pythagoras): "w": c for the square on the hypotenuse beside a and
+     b in 50..120, c never given, a square one unit wide in a view 400 wide.
+     Said as a note, it went unread. */
+  if (spec.unvalued !== undefined && spec.unvalued.length > 0)
+    say('fix', unvaluedText(spec.unvalued));
+
   // Layout, in the state each step leaves the sliders in. A problem seen at
   // several steps is said once, with the steps it is seen at.
   const states: { step: number; values: Values }[] =
@@ -71,6 +78,10 @@ export function checkMath(
   const layout = new Map<string, { level: Problem['level']; steps: number[]; tail: string }>();
   /** Figure labels with no clear spot, in any state: on a point or a solid shape, or crossed by a line. */
   const crowded = new Map<string, 'on' | 'crossed'>();
+  /** How many of the states each curve is flat in. */
+  const flatAt = new Map<string, number>();
+  /** Figure labels that found room only farther out, on a leader line. */
+  const led = new Set<string>();
   const at = (level: Problem['level'], head: string, tail: string, stepNo: number) => {
     const e = layout.get(head) ?? { level, steps: [], tail };
     if (stepNo > 0 && !e.steps.includes(stepNo)) e.steps.push(stepNo);
@@ -116,6 +127,7 @@ export function checkMath(
            crossed by a line — MEASURED (the STEM suite, 4B): a unit circle in
            a view seven units wide, ten labels round it, "y = sin θ" struck
            through by its own line; only one strict overlap was said. */
+        if (panel.kind === 'figure' && a.led === true) led.add(mvPlain(a.text));
         const crowd = a.crowd;
         if (
           panel.kind === 'figure' &&
@@ -154,11 +166,17 @@ export function checkMath(
             `curve ${h.id} has a value on only ${Math.round(h.finite * 100)}% of ${range}`,
           );
         } else if (h.flat && h.usesVar) {
-          say('warn', `curve ${h.id} is flat everywhere — is its expression what you meant?`);
+          flatAt.set(h.id, (flatAt.get(h.id) ?? 0) + 1);
         }
       }
     }
   }
+  /* Flat at every step, not at one: y = mx + c is flat where a step sets m = 0
+     and tilts at the next — MEASURED (the 4B's y = mx + c), where "flat
+     everywhere" was said of the line the page was about. */
+  for (const [id, count] of flatAt)
+    if (count === states.length)
+      say('warn', `curve ${id} is flat everywhere — is its expression what you meant?`);
 
   for (const [head, e] of layout) {
     const all = n === 0 || e.steps.length === n;
@@ -187,6 +205,17 @@ export function checkMath(
     say(
       'fix',
       `labels are crowded in the figure: ${parts.join('; ')} — the parts are too close together for their labels: make the view smaller (the parts get bigger), move a part, or shorten or drop a label`,
+    );
+  }
+
+  /* Labels the layout could place only farther out, each on a leader line:
+     the page reads, but the parts are close together for their words — the
+     4B's unit circle in a view seven units wide, ten labels round it. */
+  if (led.size >= 3) {
+    const names = [...led].map(q);
+    say(
+      'warn',
+      `${names.length} labels in the figure found room only farther out, on leader lines (${names.slice(0, 4).join(', ')}${names.length > 4 ? ', …' : ''}) — the parts are close together for their labels: a smaller view makes them bigger`,
     );
   }
 

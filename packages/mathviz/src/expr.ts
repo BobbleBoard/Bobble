@@ -116,6 +116,11 @@ function tokenize(src: string): Tok[] {
     if (/\s/.test(c)) {
       i += 1;
     } else if (/[0-9.]/.test(c)) {
+      // "-10..10" is a range, not the product of −10. and .10 it would otherwise read as.
+      if (/^\d*\.\./.test(src.slice(i)))
+        throw new ExprError(
+          `"${src.trim()}" is a range (a..b) — a value here is one number or formula`,
+        );
       const m = /^(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?/.exec(src.slice(i));
       if (m === null)
         throw new ExprError(`a number is malformed at ${i + 1}: "${src.slice(i, i + 6)}"`);

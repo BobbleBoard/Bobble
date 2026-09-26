@@ -24,7 +24,7 @@ import type {
   Panel,
   Scene,
 } from './scene-types.js';
-import type { MathSpec, Num, Role, Shape } from './spec.js';
+import type { Fill, MathSpec, Num, Role, Shape } from './spec.js';
 
 export type Evaluators = Readonly<Record<string, (s: Record<string, number>) => number>>;
 export type Values = Record<string, number>;
@@ -1128,14 +1128,18 @@ export function mvFigure(
         const d = `${pts.map(([a, b], i) => `${i === 0 ? 'M' : 'L'}${a.toFixed(2)},${b.toFixed(2)}`).join('')}Z`;
         // A role's colour is solid, its edge the paper (flat shapes that touch stay apart);
         // a pale fill is edged in its colour; tint, shade and an outline are edged in ink.
-        const solid = sh.fill === 'main' || sh.fill === 'second' || sh.fill === 'third';
-        const light = sh.fill.endsWith('-light');
+        // A solid area that is ground to the rest is drawn in its pale tint (build.ts groundIds).
+        const role = sh.fill === 'main' || sh.fill === 'second' || sh.fill === 'third';
+        const ground = role && (fig.ground ?? []).includes(sh.id);
+        const fill = ground ? (`${sh.fill}-light` as Fill) : sh.fill;
+        const solid = role && !ground;
+        const light = fill.endsWith('-light');
         items.push({
           t: 'path',
           d,
-          tone: solid ? 'paper' : light ? sh.fill.replace('-light', '') : 'ink',
+          tone: solid ? 'paper' : light ? fill.replace('-light', '') : 'ink',
           width: solid ? 2 : light ? 1.5 : 1.75,
-          fill: sh.fill === 'none' ? undefined : sh.fill,
+          fill: fill === 'none' ? undefined : fill,
           fillOpacity: 1,
           dash: sh.dashed,
           id: sh.id,
@@ -1158,11 +1162,15 @@ export function mvFigure(
         if (sh.label !== undefined) {
           const cx = pts.reduce((acc, p) => acc + p[0], 0) / pts.length;
           const cy = pts.reduce((acc, p) => acc + p[1], 0) / pts.length;
-          // A big area's name is bigger — a² across a square, not a caption in its corner.
-          const size = Math.round(Math.min(24, Math.max(15, Math.sqrt(bx.w * bx.h) / 9)));
+          // A big area's name is bigger — a² across a square, not a caption in its corner —
+          // but never wider than the area it names.
+          const text = mvFill(E, sh.label, s);
+          const fits = (z: number) => mvTextW(text, z) <= bx.w * 0.9;
+          let size = Math.round(Math.min(24, Math.max(15, Math.sqrt(bx.w * bx.h) / 9)));
+          while (size > 15 && !fits(size)) size -= 1;
           pending.push({
             id: sh.id,
-            text: mvFill(E, sh.label, s),
+            text,
             cands: solid
               ? [
                   { x: bx.x + bx.w / 2, y: bx.y - 8, anchor: 'middle' },
@@ -1656,10 +1664,50 @@ export function mvFigure(
   }
   const labels: Drawable[] = [];
   for (const p of pending) {
-    const pick = mvPlace(p.cands, p.text, p.size, false, taken, lines, area);
-    const c = p.cands[pick.i] ?? p.cands[0];
+    let pick = mvPlace(p.cands, p.text, p.size, false, taken, lines, area);
+    let c = p.cands[pick.i] ?? p.cands[0];
     if (c === undefined) continue;
+    /* No clear spot beside its part: farther out, with a thin leader back to
+       it — MEASURED (the 4B's lever): "Fulcrum", "2W" and "d₂" stacked on one
+       another at the pivot of a long thin figure. The part is the middle of
+       the spots it was offered. */
+    let leader: [number, number] | null = null;
+    if (!pick.clear) {
+      const ax = p.cands.reduce((acc, q) => acc + q.x, 0) / p.cands.length;
+      const ay = p.cands.reduce((acc, q) => acc + q.y, 0) / p.cands.length - 4;
+      const far = [...mvAround(ax, ay, 40), ...mvAround(ax, ay, 64)];
+      const farPick = mvPlace(far, p.text, p.size, false, taken, lines, area);
+      const fc = far[farPick.i];
+      if (farPick.clear && fc !== undefined) {
+        pick = farPick;
+        c = fc;
+        leader = [ax, ay];
+      }
+    }
     const box = mvTextBox(c.x, c.y, p.text, c.anchor, p.size, false);
+    if (leader !== null) {
+      // From the part to the nearest point of the label's box, stopping short of both.
+      const [lx, ly] = leader;
+      const bx = Math.max(box.x, Math.min(lx, box.x + box.w));
+      const by = Math.max(box.y, Math.min(ly, box.y + box.h));
+      const len = Math.hypot(bx - lx, by - ly);
+      if (len > 14) {
+        const ux = (bx - lx) / len;
+        const uy = (by - ly) / len;
+        labels.push({
+          t: 'line',
+          x1: lx + ux * 7,
+          y1: ly + uy * 7,
+          x2: bx - ux * 3,
+          y2: by - uy * 3,
+          tone: 'mute',
+          width: 1,
+          id: p.id,
+          dim: p.dim,
+          ...(p.alpha !== undefined ? { alpha: p.alpha } : {}),
+        });
+      }
+    }
     labels.push({
       t: 'text',
       x: c.x,
@@ -1673,6 +1721,7 @@ export function mvFigure(
       dim: p.dim,
       placed: true,
       ...(pick.clear ? {} : { crowd: pick.crowd }),
+      ...(leader !== null ? { led: true } : {}),
       ...(p.alpha !== undefined ? { alpha: p.alpha } : {}),
     });
     taken.push(box);
@@ -1771,9 +1820,19 @@ export function mvSvg(panel: Panel, index: number, title: string): string {
   for (const it of panel.items) {
     /* Dimmed shapes step back to 45%; a part's own opacity and a fade multiply
        in. Words never fade with dimming — the user: "there's some faded text" — a
-       dimmed label turns the muted grey, which still reads (6.9:1). */
+       dimmed label turns the muted grey, which still reads (6.9:1). Nor do
+       they rest part-faded with their part's opacity — MEASURED (the 4B's
+       Pythagoras): "a² = 6400" left at a fifth of its ink as its square faded
+       to 0.2. A label is there or it is not: whole from 0.15, gone under 0.1
+       (the ramp between is passed through only while a fade plays), and
+       muted grey while its part is a ghost (under 0.6). */
     const dimAmt = it.dimMix ?? (it.dim ? 1 : 0);
-    const op = (it.alpha ?? 1) * (it.t === 'text' ? 1 : 1 - 0.55 * dimAmt);
+    const alpha = it.alpha ?? 1;
+    const op =
+      it.t === 'text'
+        ? Math.min(1, Math.max(0, (alpha - 0.1) / 0.05))
+        : alpha * (1 - 0.55 * dimAmt);
+    const mute = dimAmt > 0.5 || alpha < 0.6;
     const cls = (base: string) =>
       `class="${base}"${op < 0.999 ? ` opacity="${op.toFixed(3)}"` : ''}${it.id !== undefined ? ` data-id="${mvEsc(it.id)}"` : ''}`;
     if (it.t === 'line') {
@@ -1787,10 +1846,10 @@ export function mvSvg(panel: Panel, index: number, title: string): string {
     } else {
       if (it.key !== undefined) {
         const ky = it.box.y + it.box.h / 2;
-        const kop = (it.alpha ?? 1) * (1 - 0.55 * dimAmt);
+        const kop = alpha * (1 - 0.55 * dimAmt);
         body += `<line x1="${(it.box.x + 1).toFixed(2)}" y1="${ky.toFixed(2)}" x2="${(it.box.x + 13).toFixed(2)}" y2="${ky.toFixed(2)}" class="mv-s-${it.key} mv-key"${kop < 0.999 ? ` opacity="${kop.toFixed(3)}"` : ''} stroke-width="3"/>`;
       }
-      body += `<text x="${it.x.toFixed(2)}" y="${it.y.toFixed(2)}" text-anchor="${it.anchor}" font-size="${it.size}" ${cls(`mv-t mv-t-${dimAmt > 0.5 ? 'mute' : it.tone}`)}>${mvRichSvg(it.text, it.italic === true)}</text>`;
+      body += `<text x="${it.x.toFixed(2)}" y="${it.y.toFixed(2)}" text-anchor="${it.anchor}" font-size="${it.size}" ${cls(`mv-t mv-t-${mute ? 'mute' : it.tone}`)}>${mvRichSvg(it.text, it.italic === true)}</text>`;
     }
   }
   return `<svg viewBox="0 0 ${panel.w} ${panel.h}" class="mv-svg" role="img" aria-label="${mvEsc(title)}"><defs><clipPath id="${clipId}"><rect x="${a.x}" y="${a.y}" width="${a.w}" height="${a.h}"/></clipPath></defs>${body}</svg>`;

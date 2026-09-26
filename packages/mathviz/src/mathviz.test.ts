@@ -4,7 +4,7 @@ import { compileSpec, evaluatorsScript, startValues, steadyYRange } from './buil
 import { checkMath } from './checks';
 import { ALL, FOURIER, KINETIC, PYTHAGORAS, SHM } from './fixtures';
 import { renderMath } from './index';
-import { mvPiLabel, mvRuns, mvScene, mvTicks, runtimeSource } from './runtime';
+import { mvPiLabel, mvRuns, mvScene, mvSvg, mvTicks, runtimeSource } from './runtime';
 import { lenientJson, normalizeMathSpec, SpecError } from './spec';
 
 const problems = (input: unknown) => renderMath(input).problems;
@@ -154,8 +154,8 @@ describe('the checks', () => {
       steps: [{ text: 'See {p0}.', highlight: ['p0'] }],
     };
     expect(fixes(room)).toEqual([]);
-    // Twelve: the eight spots around a point run out.
-    const crowd = { ...room, figure: { view: { x: '0..10', y: '0..10' }, shapes: three(12) } };
+    // Forty: the spots around a point, and the farther ones on leader lines, run out.
+    const crowd = { ...room, figure: { view: { x: '0..10', y: '0..10' }, shapes: three(40) } };
     expect(
       fixes(crowd)
         .map((x) => x.text)
@@ -163,12 +163,39 @@ describe('the checks', () => {
     ).toMatch(/labels overlap in the figure: “label number \d+” and “label number \d+” — move one/);
   });
 
-  it('catches a part off the view — the box that ran past the top, at every step, said once', () => {
-    const p = fixes({ ...KINETIC, figure: { ...KINETIC.figure, view: { x: '0..10', y: '0..7' } } });
-    expect(p).toHaveLength(1);
-    expect(p[0]?.text).toMatch(
-      /^box at \(8\.56, 7\.56\) is outside the figure \(x 0 to 10, y 0 to 7\)$/,
+  it('widens a view that loses a part at the steps — the box that ran past the top — and says so', () => {
+    const r = renderMath({
+      ...KINETIC,
+      figure: { ...KINETIC.figure, view: { x: '0..10', y: '0..7' } },
+    });
+    expect(r.problems.filter((p) => p.level === 'fix')).toEqual([]);
+    expect(r.spec.figure?.y[1]).toBeGreaterThan(7.56);
+    expect(r.problems.map((p) => p.text).join('\n')).toMatch(
+      /the view \(x 0\.\.10, y 0\.\.7\) left out box at the steps, so it was widened to x 0\.\.10, y 0\.\.[\d.]+ — give "view" ranges/,
     );
+  });
+
+  it('keeps a view that a long line runs out of, and one a far-off slip would shrink', () => {
+    const shapes = [
+      { id: 'p', kind: 'point', at: [1, 1], label: 'P' },
+      { id: 'tangent', kind: 'segment', from: [-1000, -999], to: [1000, 1001] },
+    ];
+    const kept = renderMath({
+      title: 'T',
+      figure: { view: { x: '0..4', y: '0..4' }, shapes },
+      steps: [{ text: 'See {p}.', highlight: ['p'] }],
+    });
+    expect(kept.spec.figure?.x).toEqual([0, 4]);
+    const slip = renderMath({
+      title: 'T',
+      figure: {
+        view: { x: '0..4', y: '0..4' },
+        shapes: [...shapes, { id: 'q', kind: 'point', at: [400, 1] }],
+      },
+      steps: [{ text: 'See {p}.', highlight: ['p'] }],
+    });
+    expect(slip.spec.figure?.x).toEqual([0, 4]);
+    expect(slip.problems.map((p) => p.text).join('\n')).toMatch(/q at \(400, 1\) is outside/);
   });
 
   it('warns of a slider that moves nothing, a step naming no part, and steps tied to nothing', () => {
@@ -520,7 +547,7 @@ describe('STEM run 3: what the 4B wrote, and what it could not see', () => {
     );
   });
 
-  it('labels with no clear spot are said once, as one list — and a smaller view spreads them', () => {
+  it('labels with no clear spot go farther out on leader lines — and a smaller view spreads them', () => {
     // MEASURED: the 4B's own unit circle, a view seven units wide.
     const lesson = (view: string, axis: number) => ({
       title: 'Why d/dx(sin x) = cos x',
@@ -560,15 +587,17 @@ describe('STEM run 3: what the 4B wrote, and what it could not see', () => {
         { text: 'Its coordinates.', highlight: ['xLine', 'yLine'] },
       ],
     });
-    const crowded = (spec: unknown) => fixes(spec).filter((p) => /crowded/.test(p.text));
-    const tight = crowded(lesson('-3.5..3.5', 3.5));
+    // Each label finds room, the ones with none beside their part farther out on a leader line.
+    const led = (spec: unknown) => problems(spec).filter((p) => /on leader lines/.test(p.text));
+    expect(fixes(lesson('-3.5..3.5', 3.5)).filter((p) => /crowded|overlap/.test(p.text))).toEqual(
+      [],
+    );
+    const tight = led(lesson('-3.5..3.5', 3.5));
     expect(tight.length).toBe(1);
     expect(tight[0]?.text).toMatch(
-      /^labels are crowded in the figure: .*“y = sin θ”.* — the parts are too close together for their labels: make the view smaller/,
+      /^5 labels in the figure found room only farther out, on leader lines \(.*“y = sin θ”.*\) — the parts are close together for their labels: a smaller view makes them bigger$/,
     );
-    const named = (t: string | undefined) => (t?.match(/“[^”]+”/g) ?? []).length;
-    const zoomed = crowded(lesson('-1.6..1.6', 1.5));
-    expect(named(zoomed[0]?.text)).toBeLessThan(named(tight[0]?.text));
+    expect(led(lesson('-1.6..1.6', 1.5))).toEqual([]);
   });
 });
 
@@ -981,5 +1010,186 @@ describe('the 4B’s third round (2026-09-26)', () => {
       steps: ['A.', 'B.'],
     });
     expect(s.plot?.x).toMatchObject({ min: 0, max: 4 });
+  });
+});
+
+describe('the 4B’s fourth round (2026-09-26): what its own pages lost', () => {
+  const line = {
+    title: 'How m and c change y = mx + c',
+    params: ['m = 0 in -5..5', 'c = 0 in -5..5'],
+    plot: { x: { range: '-10..10' }, curves: [{ id: 'line', expr: 'm*x + c' }] },
+    figure: {
+      view: { x: '-10..10', y: '-20..20' },
+      shapes: [{ id: 'fl', kind: 'curve', x: '-10..10', y: 'm*x + c', range: '-10..10' }],
+    },
+    steps: [
+      { text: 'Flat.', highlight: ['line'], set: { m: 0, c: 0 } },
+      { text: 'Up by c.', highlight: ['line'], set: { m: 0, c: 3 } },
+      { text: 'Steeper.', highlight: ['line'], set: { m: 3, c: 3 } },
+      { text: 'Both.', highlight: ['line'], set: { m: 2, c: -2 } },
+    ],
+  };
+
+  it('a figure curve with x given as its range: x runs over it (read as a value it stood upright at x = −1)', () => {
+    const s = normalizeMathSpec(line);
+    expect(s.figure?.shapes[0]).toMatchObject({ kind: 'curve', x: 'x', y: 'm*x + c', over: 'x' });
+    expect(() =>
+      normalizeMathSpec({ ...line, figure: undefined, plot: { curves: ['-10..10'] } }),
+    ).toThrow(/"-10\.\.10" is a range \(a\.\.b\) — a value here is one number or formula/);
+  });
+
+  it('frames the plot on the states the steps show, not the sliders’ far ends', () => {
+    const r = renderMath(line);
+    // m = 3, c = 3 at x = 10 is 33; the sliders’ ends would have been ±55.
+    expect(r.spec.plot?.y.min).toBeGreaterThanOrEqual(-40);
+    expect(r.spec.plot?.y.max).toBeLessThanOrEqual(40);
+    expect(r.spec.plot?.y.max).toBeGreaterThanOrEqual(33);
+    // Flat at step 1, tilted at step 3: not "flat everywhere".
+    expect(r.problems.map((p) => p.text).join('\n')).not.toMatch(/flat everywhere/);
+  });
+
+  it('refits a y-range its curve never enters, and keeps one that holds half a curve', () => {
+    const shm = renderMath({
+      title: 'SHM',
+      params: ['t = 0 in 0..15', 'A = 80 in 40..120'],
+      plot: {
+        var: 't',
+        x: '0..15',
+        y: { range: '-1.2..1.2' },
+        curves: [{ id: 'x', expr: 'A*cos(t)' }],
+      },
+      steps: [
+        { text: 'Released.', highlight: ['x'], set: { t: 0 } },
+        { text: 'Later.', highlight: ['x'], set: { t: 4 } },
+      ],
+    });
+    expect(shm.spec.plot?.y.max).toBeGreaterThanOrEqual(80);
+    expect(shm.problems.map((p) => p.text).join('\n')).toMatch(
+      /the plot's y-range -1\.2\.\.1\.2 missed x at the steps, so it shows -?\d+\.\.\d+ — give "y" a range that holds the curves/,
+    );
+    // A height that goes below the ground after it lands: the range holds the flight.
+    const ball = renderMath({
+      title: 'Throw',
+      params: ['t = 0 in 0..5'],
+      plot: {
+        var: 't',
+        x: '0..5',
+        y: { range: '0..30' },
+        curves: [{ id: 'h', expr: '14*t - 4.9*t^2' }],
+      },
+      steps: [
+        { text: 'Up.', highlight: ['h'], set: { t: 0 } },
+        { text: 'Down.', highlight: ['h'], set: { t: 2 } },
+      ],
+    });
+    expect(ball.spec.plot?.y).toMatchObject({ min: 0, max: 30 });
+  });
+
+  it('draws a solid area other parts stand on in its pale tint, for the whole page', () => {
+    const r = renderMath({
+      title: 'On the square',
+      params: ['t = 0 in 0..1'],
+      figure: {
+        view: { x: '-1..5', y: '-1..5' },
+        shapes: [
+          { id: 'big', kind: 'rect', at: [0, 0], w: 4, h: 4, fill: 'main' },
+          {
+            id: 'tri',
+            kind: 'polygon',
+            points: [
+              [0.5, 0.5],
+              [2, 0.5],
+              [0.5, 2],
+            ],
+            fill: 'second',
+            step: 2,
+          },
+          { id: 'small', kind: 'rect', at: [4.2, 4.2], w: 0.5, h: 0.5, fill: 'third' },
+        ],
+      },
+      steps: [
+        { text: 'The square.', highlight: ['big'] },
+        { text: 'A triangle on it.', highlight: ['tri'] },
+      ],
+    });
+    expect(r.spec.figure?.ground).toEqual(['big']);
+    // The fixture's triangles stay solid: the squares that fade in where they were are hidden then.
+    expect(renderMath(PYTHAGORAS).spec.figure?.ground ?? []).toEqual([]);
+  });
+
+  it('never leaves a label part-faded with its part: whole and muted, or gone', () => {
+    const spec = normalizeMathSpec({
+      title: 'Fade',
+      params: ['t = 0 in 0..5'],
+      figure: {
+        view: { x: '0..10', y: '0..10' },
+        shapes: [
+          {
+            id: 'sq',
+            kind: 'rect',
+            at: [2, 2],
+            w: 4,
+            h: 4,
+            fill: 'main-light',
+            opacity: '1 - t/5',
+            label: 'a² = 16',
+          },
+        ],
+      },
+      steps: [{ text: 'Fading.', highlight: ['sq'], set: { t: 4 } }],
+    });
+    const c = compileSpec(spec);
+    const label = (t: number) => {
+      const panel = mvScene(spec, c.E, { t }, 1).panels[0];
+      const svg = panel === undefined ? '' : mvSvg(panel, 0, 'Fade');
+      return /<text[^>]*data-id="sq"[^>]*>/.exec(svg)?.[0] ?? '';
+    };
+    // MEASURED (the 4B's Pythagoras): "a² = 6400" left at a fifth of its ink.
+    expect(label(4)).toMatch(/class="mv-t mv-t-mute"/);
+    expect(label(4)).not.toMatch(/opacity=/);
+    expect(label(0)).not.toMatch(/mv-t-mute|opacity=/);
+    // At 0 the part and its label are not drawn at all.
+    expect(label(5)).toBe('');
+  });
+
+  it('a name missing among declared values is a fix; in a spec that declares none, a note', () => {
+    const slip = renderMath({
+      title: 'Squares',
+      params: ['a = 3 in 1..5', 'b = 4 in 1..5'],
+      figure: {
+        view: { x: '0..10', y: '0..10' },
+        shapes: [{ id: 'sc', kind: 'rect', at: [0, 0], w: 'c', h: 'c', label: 'c²' }],
+      },
+      steps: [{ text: 'The square on c.', highlight: ['sc'] }],
+    });
+    expect(slip.problems.filter((p) => p.level === 'fix').map((p) => p.text)[0]).toMatch(
+      /^c has no value in the spec, so it is drawn as 1/,
+    );
+    const symbolic = renderMath({
+      title: 'Wave',
+      plot: { curves: ['A*sin(x)'] },
+      steps: [{ text: 'A wave.', highlight: ['c1'] }],
+    });
+    expect(symbolic.problems.find((p) => /A has no value/.test(p.text))?.level).toBe('note');
+  });
+
+  it('an empty plot beside a figure is no plot (MEASURED: it was given "t against t" to fill it)', () => {
+    const r = renderMath({
+      title: 'Figure',
+      params: ['t = 0 in 0..1'],
+      plot: { var: 't', x: { range: '0..4' }, curves: [] },
+      figure: {
+        view: { x: '0..4', y: '0..4' },
+        shapes: [{ id: 'p', kind: 'point', at: ['t', 1] }],
+      },
+      steps: [
+        { text: 'Here.', highlight: ['p'], set: { t: 0 } },
+        { text: 'There.', highlight: ['p'], set: { t: 1 } },
+      ],
+    });
+    expect(r.spec.plot).toBeUndefined();
+    expect(r.problems.map((p) => p.text)).toContain(
+      'the plot had no curves, so the page is the figure alone',
+    );
   });
 });

@@ -35,6 +35,11 @@ import type { ExtensionAPI } from '@mariozechner/pi-coding-agent';
 import { diagramTheme, type Kit, kitById, loadProjectKit } from '@pi-desktop/design-kit';
 import { Type } from '@sinclair/typebox';
 import { mathFigureWords } from './handmade-math.js';
+
+/** What diagram says of a maths or physics figure: the command that draws one. */
+const NOT_A_FLOWCHART =
+  'But a maths or physics figure — a lever and its weights, forces, a graph — is not a flowchart: the math command draws it, with steps that move it. Write the spec to name.math.json (`math --help` shows one).';
+
 import type { DiagramRenderReply, DiagramRenderRequest, PresentBridge } from './present.js';
 import { pathForModel } from './workspace-relative.js';
 
@@ -384,7 +389,7 @@ export function registerDiagramTool(pi: ExtensionAPI, deps: DiagramToolDeps): vo
            balance a heavy one"): it passed its whole explanation to diagram,
            was told to write Mermaid, and answered in Markdown with no figure. */
         const figure = mathFigureWords(`${title} ${String(p.subtitle ?? '')}`)
-          ? ' But a maths or physics figure — a lever and its weights, forces, a graph — is not a flowchart: the math command draws it, with steps that move it. Write the spec to name.math.json (`math --help` shows one).'
+          ? ` ${NOT_A_FLOWCHART}`
           : '';
         return errorResult(
           `diagram needs its Mermaid source: --source "flowchart TD\\n  A[Start] --> B{Paid?}\\n  B -- no --> C[Email]" (one statement per line).${figure}`,
@@ -409,7 +414,15 @@ export function registerDiagramTool(pi: ExtensionAPI, deps: DiagramToolDeps): vo
         ...(subtitle !== undefined ? { subtitle } : {}),
         themes,
       });
-      if (!reply.ok) return errorResult(renderFailure(reply));
+      if (!reply.ok) {
+        /* …and when Mermaid will not read it and its words are a maths or
+           physics figure — MEASURED (the maths suite, 4B, the lever): three
+           flowcharts of "Torque Balance" (weights, arms, a pivot), each a
+           parse error, then image generation. The pointer above met only an
+           empty source. */
+        const figure = mathFigureWords(`${title} ${source}`) ? ` ${NOT_A_FLOWCHART}` : '';
+        return errorResult(`${renderFailure(reply)}${figure}`);
+      }
       const target = svgPathFor(
         root,
         typeof p.out === 'string' ? p.out : undefined,
