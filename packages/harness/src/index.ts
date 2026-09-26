@@ -50,7 +50,11 @@ import {
 } from './permissions/modes.js';
 import { capabilityForTool } from './presets/capabilities.js';
 import { resolveBaseTools } from './presets/presets.js';
-import { augmentSystemPrompt, SHELL_CWD_TRUTH } from './prompt/capability-prompt.js';
+import {
+  augmentSystemPrompt,
+  notSetUpFromEnv,
+  SHELL_CWD_TRUTH,
+} from './prompt/capability-prompt.js';
 import { sameWording } from './prompt/same-wording.js';
 import { connectRepairBridge, type LiveRepairDeps } from './repair/bridge.js';
 import { createToolCallFixer, withRepairAttempts } from './repair/fixer.js';
@@ -112,6 +116,7 @@ import { degenerateCommandRefusal } from './tools/degenerate-command.js';
 import { DIAGRAM_TOOL, registerDiagramTool } from './tools/diagram-tool.js';
 import { diskWalkRefusal, wouldWalkDisk } from './tools/disk-walk.js';
 import { diagnoseEditFailure } from './tools/edit-diagnosis.js';
+import { withForegroundServerStop } from './tools/foreground-server.js';
 import { handmadeChartRefusal, isHandmadeChart } from './tools/handmade-chart.js';
 import {
   handmadeMediaRefusal,
@@ -293,11 +298,22 @@ export function withDefaultTimeout<T extends { execute: (...a: never[]) => unkno
         return await (base.execute as (...a: never[]) => Promise<unknown>)(...args);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        if (!/^timeout:/.test(msg)) throw e;
+        /* pi's bash rethrows its clock as the output so far and then "Command
+           timed out after N seconds" — never the bare `timeout:N` its exec
+           raises inside — so this explanation matched nothing and the model
+           read only the raw line (MEASURED: the visual suite's http.server
+           run). What it printed is kept; the why and the way out follow. */
+        const clocked = /\n*Command timed out after \d+ seconds\s*$/;
+        if (!/^timeout:/.test(msg) && !clocked.test(msg)) throw e;
+        const printed = msg
+          .replace(clocked, '')
+          .replace(/^timeout:\d+$/, '')
+          .trimEnd();
         throw new Error(
-          `That command did not finish within ${seconds}s, so it was stopped and control ` +
+          `${printed === '' ? '' : `${printed}\n\n`}` +
+            `That command did not finish within ${seconds}s, so it was stopped and control ` +
             'came back to you. Commands that open a window or start a server never return ' +
-            'on their own — run those in the background with `&`, or drive the thing ' +
+            'on their own — run those with `background: true`, or drive the thing ' +
             'headlessly instead. If this is a genuinely long build, run it again and pass ' +
             'a bigger `timeout`.',
         );
@@ -2229,19 +2245,24 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   pi.registerTool(
     withRepeatNotice(
       withDefaultTimeout(
-        withBackgroundOption(
-          createBashToolDefinition(process.cwd(), {
-            spawnHook: (c) => ({
-              ...c,
-              /* `$412,000` in an `office` brief must reach the pipeline as
+        /* A command that turns out to be a server is stopped once that is
+           certain (its own process listening, the command quiet), not when the
+           clock runs out — see foreground-server.ts. */
+        withForegroundServerStop(
+          withBackgroundOption(
+            createBashToolDefinition(process.cwd(), {
+              spawnHook: (c) => ({
+                ...c,
+                /* `$412,000` in an `office` brief must reach the pipeline as
                  written — see protectShimDollars. Only our own commands. */
-              command: toolCliMode
-                ? protectShimDollars(c.command, toolCliShimCommands(toolCliGroups()))
-                : c.command,
-              cwd: liveRoot(),
-              env: cleanChildEnv(c.env),
+                command: toolCliMode
+                  ? protectShimDollars(c.command, toolCliShimCommands(toolCliGroups()))
+                  : c.command,
+                cwd: liveRoot(),
+                env: cleanChildEnv(c.env),
+              }),
             }),
-          }),
+          ),
         ),
         bashClock,
       ),
@@ -2974,6 +2995,9 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       guidelines: { sources: guidelineSources(), active: advertisedNow() },
       /* The tools' root, not pi's boot directory — see the workspace command. */
       ...(runtime.workspaceRoot !== null ? { workingDirectory: runtime.workspaceRoot } : {}),
+      /* What the app could do but has not set up (the 3D engine, off) — named,
+         so the model says where to turn it on instead of denying it. */
+      notSetUp: notSetUpFromEnv(process.env),
     });
     /*
      * THE COMMAND LIST GOES FIRST.

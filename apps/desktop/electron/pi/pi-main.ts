@@ -162,6 +162,11 @@ const KILL_GRACE_MS = 1500;
  * from edits here: they land after the inherited environment and before the
  * app's own keys below, so a contributor can never change one of those.
  */
+/** The Bobble 3D connector can be honoured: an engine on disk AND the switch on. */
+function bobble3dOn(): boolean {
+  return model3dReady() && readSettings().moduleConnectors['3d'] === true;
+}
+
 function buildPiEnv(cwd: string | undefined): Record<string, string | undefined> {
   const utility = getInferenceUtility();
   // Whether the server this child will talk to can SEE. Read by the provider so
@@ -209,8 +214,13 @@ function buildPiEnv(cwd: string | undefined): Record<string, string | undefined>
        this machine AND the connector is on (Connectors → Bobble 3D). the user
        (2026-09-17): "3d should be a connector that gets recommended for
        install upon installing the 3d studio module". */
-    PI_BOBBLE_3D_READY:
-      model3dReady() && readSettings().moduleConnectors['3d'] === true ? '1' : '0',
+    PI_BOBBLE_3D_READY: bobble3dOn() ? '1' : '0',
+    /* …and when it is not, the model is told the ability exists and where it
+       is turned on, rather than denying it and writing geometry by hand
+       (capability-prompt notSetUpLine — MEASURED, a 4B with no engine). */
+    PI_DESKTOP_NOT_SET_UP: JSON.stringify(
+      bobble3dOn() ? [] : ['3D models — the user turns them on in Connectors → Bobble 3D'],
+    ),
     /* The document pipeline — where `office.py` is, a Python that has its
        libraries, and a scratch dir — so the harness's `office` tool registers
        and runs in every chat, not only inside a corp run. See office-gen-env.ts. */

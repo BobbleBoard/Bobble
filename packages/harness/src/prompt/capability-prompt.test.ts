@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   augmentSystemPrompt,
+  notSetUpFromEnv,
+  notSetUpLine,
   CAPABILITY_PROMPT,
   CAPABILITY_PROMPT_MARKER,
   CLI_MECHANISM_SWAPS,
@@ -300,5 +302,34 @@ describe('the working directory the model is told', () => {
     expect(out).toContain(`\n${SHELL_CWD_TRUTH}`);
     expect(SHELL_CWD_TRUTH).toMatch(/fresh shell/);
     expect(SHELL_CWD_TRUTH).toMatch(/never `cd <that folder> && <command>`/);
+  });
+});
+
+describe('what this Mac could do but has not set up', () => {
+  /* MEASURED (4B, the visual suite, no 3D engine): "I don't have access to 3D
+     modeling software" — and an offer to write vertex data in Python. */
+  const off = ['3D models — the user turns them on in Connectors → Bobble 3D'];
+
+  it('is one rule line in both interfaces, and nothing at all when everything is on', () => {
+    for (const toolInterface of ['schemas', 'bash-cli'] as const) {
+      const out = augmentSystemPrompt('base', { toolInterface, notSetUp: off });
+      expect(out).toContain(
+        '- NOT SET UP ON THIS MAC YET: 3D models — the user turns them on in Connectors → Bobble 3D.',
+      );
+      expect(out).toContain('never build it in code instead');
+      // It sits with the rules, before the verify section.
+      expect(out.indexOf('NOT SET UP')).toBeLessThan(out.indexOf('VERIFY BEFORE YOU SUBMIT'));
+      expect(augmentSystemPrompt('base', { toolInterface, notSetUp: [] })).toBe(
+        augmentSystemPrompt('base', { toolInterface }),
+      );
+    }
+    expect(notSetUpLine(['  ', ''])).toBe('');
+  });
+
+  it('reads the app’s list, and survives a missing or broken one', () => {
+    expect(notSetUpFromEnv({ PI_DESKTOP_NOT_SET_UP: JSON.stringify(off) })).toEqual(off);
+    expect(notSetUpFromEnv({})).toEqual([]);
+    expect(notSetUpFromEnv({ PI_DESKTOP_NOT_SET_UP: 'not json' })).toEqual([]);
+    expect(notSetUpFromEnv({ PI_DESKTOP_NOT_SET_UP: '[1, "x"]' })).toEqual(['x']);
   });
 });
