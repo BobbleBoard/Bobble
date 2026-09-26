@@ -215,13 +215,18 @@ body{font:17px/1.55 var(--mv-font);-webkit-font-smoothing:antialiased;text-rende
 .mv-head{max-width:70ch}
 .mv-head h1{font:650 30px/1.15 var(--mv-display-font);letter-spacing:-0.015em;margin:0}
 .mv-cap{margin:10px 0 0;color:var(--mv-mute);font-size:17px}
-.mv-body{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(300px,1fr);gap:48px;margin-top:32px;align-items:start}
-.mv-body.is-single{grid-template-columns:minmax(0,860px)}
-@media (max-width:900px){.mv{padding:28px 20px 48px}.mv-body{grid-template-columns:1fr;gap:28px}}
+.mv-body{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(300px,1fr);grid-template-areas:"stage steps" "controls steps";column-gap:48px;margin-top:32px;align-items:start}
+.mv-body.is-single{grid-template-columns:minmax(0,860px);grid-template-areas:"stage" "controls"}
+.mv-stage{grid-area:stage}.mv-controls{grid-area:controls}.mv-steps{grid-area:steps}
+@media (max-width:900px){
+.mv{padding:28px 20px 48px}
+.mv-body{grid-template-columns:1fr;grid-template-areas:"stage" "steps" "controls";row-gap:18px}
+.mv-steps li:not(.is-on){display:none}
+}
 .mv-panel{margin:0 auto}
 .mv-panel+.mv-panel{margin-top:24px}
 .mv-svg{display:block;width:100%;height:auto}
-.mv-controls{display:grid;gap:12px;margin-top:18px;padding-top:16px;border-top:1px solid var(--mv-line)}
+.mv-controls{display:grid;gap:12px;margin-top:18px;padding-top:16px;border-top:1px solid var(--mv-line);align-self:start}
 .mv-slider{display:grid;grid-template-columns:minmax(2.2em,auto) 1fr 3.6em 32px;align-items:center;gap:14px}
 .mv-slider .mv-name{color:var(--mv-ink);font-size:17px;white-space:nowrap}
 .mv-slider input{width:100%;accent-color:var(--mv-accent);margin:0}
@@ -315,7 +320,7 @@ export function mathPage({ spec, compiled, start, kit }: PageInput): string {
 <style>${css(kit)}</style>
 </head><body><main class="mv">
 <header class="mv-head"><h1>${inline(spec.title, new Map())}</h1>${spec.caption !== undefined ? `<p class="mv-cap">${inline(spec.caption, parts)}</p>` : ''}</header>
-<div class="mv-body${stepsHtml === '' ? ' is-single' : ''}"><section class="mv-stage">${panels}${sliders !== '' ? `<div class="mv-controls">${sliders}</div>` : ''}</section>${stepsHtml}</div>
+<div class="mv-body${stepsHtml === '' ? ' is-single' : ''}"><section class="mv-stage">${panels}</section>${stepsHtml}${sliders !== '' ? `<div class="mv-controls">${sliders}</div>` : ''}</div>
 </main>
 <script>${script.replace(/<\/script/gi, '<\\/script')}</script>
 </body></html>
