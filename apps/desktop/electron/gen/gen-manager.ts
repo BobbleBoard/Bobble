@@ -94,7 +94,8 @@ import { openStillWindow } from './hyperframes-window';
 import { buildComfyImageJob, isComfyImageModel } from './image-dispatch';
 import { createRoomKeeper, type RoomKeeper } from './make-room';
 import { generateSvg, omniSvgFiles } from './omnisvg';
-import { omniSvgPictureBase64 } from './omnisvg-picture';
+import { omniSvgPictureBase64, vfigFigureBase64 } from './omnisvg-picture';
+import { generateVfigSvg } from './vfig';
 import { PendingJobs, unlessStopped } from './pending-jobs';
 import { canEnhance, type EnhancerEndpoint, enhancePrompt } from './prompt-enhancer';
 import { parseTqdm } from './tqdm';
@@ -1261,10 +1262,13 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
            see omnisvg.ts. The folder is named after the ask like every other
            generation, so it sits beside the images in Generated. */
         const p = params as {
+          engine?: 'omnisvg' | 'vfig';
           prompt?: string;
           images?: string[];
           candidates?: number;
           outPath?: string;
+          /** VFIG: the SVG file to change (fenced to the working folder by the tool). */
+          edit?: string;
         };
         const name = slug(p.prompt ?? p.images?.[0] ?? 'svg', 'svg');
         const outputDir = path.join(outputRoot, uniqueName(outputRoot, name));
@@ -1278,12 +1282,27 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
         if (signal?.aborted === true) stop.abort();
         else signal?.addEventListener('abort', () => stop.abort(), { once: true });
         announceAgentJob(svgId, from);
-        let result: Awaited<ReturnType<typeof generateSvg>>;
+        let result: {
+          outputs: ReadonlyArray<{
+            outputPath: string;
+            paths: number;
+            source: string;
+            stop: string;
+          }>;
+        };
         try {
-          result = await generateSvg(
-            { ...p, outputDir, signal: stop.signal, picture: omniSvgPictureBase64 },
-            (partial) => send('gen:svg-live', { status: 'drawing', ...partial, ...prompt }),
-          );
+          /* VFIG writes figures as SVG code and edits SVGs; OmniSVG draws pictures
+             (gen-tools svgEngineFor decides). Both stream the drawing to the same card. */
+          result =
+            p.engine === 'vfig'
+              ? await generateVfigSvg(
+                  { ...p, outputDir, signal: stop.signal, figure: vfigFigureBase64 },
+                  (partial) => send('gen:svg-live', { status: 'drawing', ...partial, ...prompt }),
+                )
+              : await generateSvg(
+                  { ...p, outputDir, signal: stop.signal, picture: omniSvgPictureBase64 },
+                  (partial) => send('gen:svg-live', { status: 'drawing', ...partial, ...prompt }),
+                );
         } catch (err) {
           const message = stop.signal.aborted
             ? 'stopped — the chat that asked for this drawing stopped it, or was deleted'

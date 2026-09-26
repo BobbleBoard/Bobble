@@ -61,6 +61,53 @@ export interface GenToolsOptions {
   /** Register `generate_svg`. Default true; the app passes whether OmniSVG's
    *  model is on disk, so a command that can only fail is never advertised. */
   readonly svg?: boolean;
+  /** Which of `svg`'s engines are on disk. Default both (tests). */
+  readonly svgEngines?: SvgEngines;
+}
+
+/** The two models behind `svg`: OmniSVG draws pictures; VFIG writes figures as SVG code, and edits SVGs. */
+export interface SvgEngines {
+  readonly omnisvg: boolean;
+  readonly vfig: boolean;
+}
+
+/*
+ * A FIGURE IS VFIG'S. MEASURED 2026-09-25 (the SVG bake-off, and OmniSVG 1.1 on
+ * the authors' own examples once pictures reached it): OmniSVG traces an icon or
+ * an illustration well and cannot write a word — the kinetic-theory figure, a
+ * bar chart, a GAN diagram and a logo with its name came back as scraps. VFIG
+ * rebuilt each as SVG code with every label a <text> (the diagram at SSIM
+ * 0.83), and made 3.5 of 4 edits to an existing SVG right. So an edit, or a
+ * picture the model calls a figure, or one whose prompt names what only a
+ * figure has, goes to VFIG; everything else to OmniSVG.
+ */
+const FIGURE_WORDS =
+  /\b(figure|fig\.?|diagram|chart|graph|plot|axis|axes|label(?:l?ed|s)?|text|words?|equation|formula|table|schematic|circuit|flow ?chart|infographic|annotat\w*)\b/i;
+
+export function svgEngineFor(
+  req: {
+    readonly prompt?: string;
+    readonly images: readonly string[];
+    readonly edit?: string;
+    readonly figure?: boolean;
+  },
+  engines: SvgEngines,
+): { engine: 'omnisvg' | 'vfig' } | { error: string } {
+  const wantsVfig =
+    req.edit !== undefined ||
+    req.figure === true ||
+    (req.images.length > 0 && FIGURE_WORDS.test(`${req.prompt ?? ''} ${req.images.join(' ')}`));
+  if (wantsVfig) {
+    if (engines.vfig) return { engine: 'vfig' };
+    return {
+      error:
+        req.edit !== undefined
+          ? 'editing an SVG needs VFIG, which is not installed here — edit the file yourself (it is SVG text), then present it'
+          : 'turning a figure into SVG needs VFIG, which is not installed here — for a diagram use the diagram command; for a maths or physics figure, math',
+    };
+  }
+  if (engines.omnisvg) return { engine: 'omnisvg' };
+  return engines.vfig ? { engine: 'vfig' } : { error: 'no SVG model is installed' };
 }
 
 function messageOf(err: unknown): string {
@@ -158,7 +205,7 @@ export function registerGenTools(pi: ExtensionAPI, options: GenToolsOptions): vo
   const media = options.media ?? true;
   const svg = options.svg ?? true;
 
-  if (svg) registerSvgTool(pi, bridge);
+  if (svg) registerSvgTool(pi, bridge, options.svgEngines ?? { omnisvg: true, vfig: true });
   if (!media) return;
 
   shareTool(pi, {
@@ -687,19 +734,8 @@ export function svgMarkupPrompt(prompt: string | undefined): string | null {
 
 /** `generate_svg` — OmniSVG. Registered on its own so the connector can turn it
  *  on without the generation experiment. See the block below for the ask. */
-function registerSvgTool(pi: ExtensionAPI, bridge: GenBridge | null): void {
-  /*
-   * SVG — OmniSVG, through the app's own llama-server. the user: "a simple cli tool
-   * that essentially calls this as a subagent eg. svg <optional prompt> --image
-   * <optional reference image path(s)>". In CLI mode this IS the `svg` command
-   * (tool-cli.ts maps it to an empty path), and the prompt is its positional.
-   *
-   * The result is vector paths, not pixels, so nothing is attached back as an
-   * image: the file opens on the canvas, and the text names it and says how
-   * many paths it has — which is the one number that separates a real drawing
-   * from a stray blob.
-   */
-  shareTool(pi, {
+function registerSvgTool(pi: ExtensionAPI, bridge: GenBridge | null, engines: SvgEngines): void {
+  pi.registerTool({
     name: GENERATE_SVG_TOOL,
     label: 'Generate: SVG',
     description:
@@ -707,22 +743,21 @@ function registerSvgTool(pi: ExtensionAPI, bridge: GenBridge | null): void {
          maybe just how it's used" — every graphic was routed here, including
          icon sets and logos with names, which OmniSVG cannot make; the model
          now writes those itself and checks them with present. */
-      'Draw an organic, illustrative SVG on-device with OmniSVG — from a short description, ' +
-      'a reference image to trace into vector paths, or both. It cannot keep a set consistent: ' +
-      'icons, a logo with its name, patterns and exact shapes are better written as SVG ' +
-      'yourself and checked with present. One call per drawing, the prompt one caption-like ' +
-      'sentence — the subject, its colours and shapes, the style ("A red lighthouse on a green ' +
-      'cliff at sunset, flat colours, centered."); a bare name or a slug draws something else. ' +
-      '`out` puts the ' +
-      'file where a page references it (assets/hero.svg); otherwise it lands in Generated. ' +
-      'Photos and realistic pictures are not vectors — those are generation. ' +
-      // VQ-10: OmniSVG draws shapes, not words — REAL, asked for a graph "with
-      // equations displayed" it drew an abstract shape and a car, and a flow
-      // diagram came back as 52 wordless paths. Anything that must carry text
-      // has a tool that writes the text.
-      'Not for diagrams, charts or anything with words in it — OmniSVG cannot write text: a ' +
-      'flowchart, process or org chart is the diagram tool, numbers are the chart tool.',
-    promptSnippet: 'Draw an organic illustration, or trace a picture, as an SVG (on-device)',
+      'Make an SVG on-device. Two models, chosen by the job: OmniSVG draws an organic, ' +
+      'illustrative picture from a short description or traces a picture into vector paths; ' +
+      'VFIG turns a FIGURE — a diagram, a chart, a labelled drawing, anything with words — into ' +
+      'SVG code with its words as real text (--figure, with the picture), and changes an SVG that ' +
+      'exists (--edit file.svg, with what to change as the prompt). OmniSVG cannot keep a set ' +
+      'consistent or write a word: icons, a logo with its name, patterns and exact shapes are ' +
+      'better written as SVG yourself and checked with present. One call per drawing, a picture ' +
+      'prompt one caption-like sentence — the subject, its colours and shapes, the style ("A red ' +
+      'lighthouse on a green cliff at sunset, flat colours, centered."); a bare name or a slug ' +
+      'draws something else. `out` puts the file where a page references it (assets/hero.svg); ' +
+      'otherwise it lands in Generated. Photos and realistic pictures are not vectors — those ' +
+      'are generation. A new flowchart or process is the diagram command, numbers the chart ' +
+      'command, a maths or physics figure the math command.',
+    promptSnippet:
+      'Draw an illustration or trace a picture (OmniSVG); turn a figure into SVG code, or edit an SVG (VFIG)',
     parameters: Type.Object({
       prompt: Type.Optional(
         Type.String({
@@ -732,17 +767,30 @@ function registerSvgTool(pi: ExtensionAPI, bridge: GenBridge | null): void {
                steam curls, flat icon, centered." drew the cup. OmniSVG was
                trained on captions, and a caption is what it draws from. */
             'What to draw, as one caption-like sentence: the subject, its colours and shapes, ' +
-            'the style. Optional when an image is given.',
+            'the style. With --edit, what to change. Optional when an image is given.',
         }),
       ),
       image: Type.Optional(
         Type.Union([Type.String(), Type.Array(Type.String())], {
-          description: 'Reference image path(s) to trace into SVG. Each becomes its own file.',
+          description: 'Picture(s) to trace into SVG. Each becomes its own file.',
+        }),
+      ),
+      figure: Type.Optional(
+        Type.Boolean({
+          description:
+            'The picture is a figure — a diagram, chart, labelled drawing, anything with words: VFIG rebuilds it as SVG code, its words as text.',
+        }),
+      ),
+      edit: Type.Optional(
+        Type.String({
+          description:
+            'An SVG file to change (relative to the working folder); the prompt says what to change. The file is changed in place.',
         }),
       ),
       candidates: Type.Optional(
         Type.Number({
-          description: 'Samples per input; the best is kept. Default 3, max 6. More is slower.',
+          description:
+            'OmniSVG: samples per input; the best is kept. Default 3, max 6. More is slower.',
         }),
       ),
       out: Type.Optional(
@@ -766,8 +814,16 @@ function registerSvgTool(pi: ExtensionAPI, bridge: GenBridge | null): void {
           : Array.isArray(params.image)
             ? params.image
             : [params.image];
+      const edit =
+        typeof params.edit === 'string' && params.edit.trim() !== ''
+          ? params.edit.trim()
+          : undefined;
       if ((params.prompt ?? '').trim() === '' && images.length === 0) {
-        return svgErr('give a prompt, a reference image path, or both');
+        return svgErr(
+          edit !== undefined
+            ? 'say what to change in the prompt'
+            : 'give a prompt, a reference image path, or both',
+        );
       }
       /*
        * A PROMPT THAT IS ALREADY SVG IS THE MODEL'S OWN DRAWING. MEASURED (4B,
@@ -783,18 +839,39 @@ function registerSvgTool(pi: ExtensionAPI, bridge: GenBridge | null): void {
        * written by the app's main process, which can reach anywhere — so the
        * destination has to stay inside the working folder, the same rule the
        * write tool enforces, with the same shape of refusal (name the root,
-       * say what to pass instead).
+       * say what to pass instead). An edit's file is fenced the same way.
        */
       const root = path.resolve(process.env.PI_DESKTOP_WORKSPACE_ROOT ?? process.cwd());
+      const inside = (p: string) => p === root || p.startsWith(`${root}${path.sep}`);
       let outPath: string | undefined;
       if (params.out !== undefined && params.out.trim() !== '') {
         outPath = path.resolve(root, params.out.trim());
-        if (outPath !== root && !outPath.startsWith(`${root}${path.sep}`)) {
+        if (!inside(outPath)) {
           return svgErr(
             `out must be inside the working folder (${root}) — pass a relative path such as assets/logo.svg`,
           );
         }
       }
+      let editPath: string | undefined;
+      if (edit !== undefined) {
+        editPath = path.resolve(root, edit);
+        if (!inside(editPath) || !/\.svg$/i.test(editPath)) {
+          return svgErr(
+            `--edit takes an .svg file inside the working folder (${root}), such as assets/logo.svg`,
+          );
+        }
+      }
+      const route = svgEngineFor(
+        {
+          prompt: params.prompt,
+          images,
+          ...(edit !== undefined ? { edit } : {}),
+          ...(params.figure === true ? { figure: true } : {}),
+        },
+        engines,
+      );
+      if ('error' in route) return svgErr(route.error);
+      const model = route.engine === 'vfig' ? 'vfig-4b' : 'omnisvg-1.1-4b';
       try {
         const result = await bridge.request<{
           outputs: readonly {
@@ -802,24 +879,34 @@ function registerSvgTool(pi: ExtensionAPI, bridge: GenBridge | null): void {
             paths: number;
             source: string;
             stop: string;
+            complete?: boolean;
             tokPerSec: number | null;
             tokens: number;
           }[];
         }>(
           'generateSvg',
           {
+            engine: route.engine,
             prompt: params.prompt,
             images,
             candidates: params.candidates,
+            ...(editPath === undefined ? {} : { edit: editPath }),
             ...(outPath === undefined ? {} : { outPath }),
           },
           signal,
         );
+        const cutShort = (o: { stop: string; complete?: boolean }) =>
+          route.engine === 'vfig'
+            ? o.complete === false
+              ? ` — it stopped before the end (${o.stop === 'loop' ? 'it began repeating itself, and was cut there' : 'the context filled'}); the file is closed and valid, but may be missing its last parts`
+              : ''
+            : o.stop === 'eos'
+              ? ''
+              : ' — hit the length limit; may be incomplete';
         const lines = result.outputs.map(
           (o, i) =>
-            `  ${i + 1}. ${o.outputPath} — ${o.paths} path${o.paths === 1 ? '' : 's'}` +
-            `${o.source === 'prompt' ? '' : ` (from ${o.source})`}` +
-            `${o.stop === 'eos' ? '' : ' — hit the length limit; may be incomplete'}`,
+            `  ${i + 1}. ${o.outputPath} — ${o.paths} ${route.engine === 'vfig' ? 'element' : 'path'}${o.paths === 1 ? '' : 's'}` +
+            `${o.source === 'prompt' ? '' : ` (from ${o.source})`}${cutShort(o)}`,
         );
         /* Say how to USE it, in the reply the model reads next: a page references
            the file by its path; the markup is not pasted back in. */
@@ -829,27 +916,34 @@ function registerSvgTool(pi: ExtensionAPI, bridge: GenBridge | null): void {
             ? path.relative(root, first.outputPath)
             : undefined;
         const usage =
-          rel === undefined
-            ? 'Reference it by its path, or `cp` it into a project; never retype its markup.'
-            : `In a page: <img src="${rel}" alt="…">. Never retype its markup.`;
+          editPath !== undefined
+            ? 'The file is changed in place.'
+            : rel === undefined
+              ? 'Reference it by its path, or `cp` it into a project; never retype its markup.'
+              : `In a page: <img src="${rel}" alt="…">. Never retype its markup.`;
         /* What a call makes stays in the work until it is presented (the user,
            2026-09-24, turn-cards.ts) — and present renders the drawing back, the
-           one look the model gets at what OmniSVG made. */
+           one look the model gets at what was made. */
         const shown =
           'It is in your work; present it when it is what they asked for — present also shows you the drawing.';
-        const text =
-          `Made ${result.outputs.length} SVG${result.outputs.length === 1 ? '' : 's'}` +
-          `${outPath === undefined ? ' on the canvas' : ''}:\n` +
-          `${lines.join('\n')}\n${usage} ${shown}\nModel: OmniSVG 1.1 4B (omnisvg-1.1-4b, Apache-2.0)`;
+        const made =
+          editPath !== undefined
+            ? `Edited ${path.relative(root, editPath)}`
+            : `Made ${result.outputs.length} SVG${result.outputs.length === 1 ? '' : 's'}${outPath === undefined ? ' on the canvas' : ''}`;
+        const byline =
+          route.engine === 'vfig'
+            ? 'Model: VFIG 4B (vfig-4b) — SVG code, its words as text, so it can be edited'
+            : 'Model: OmniSVG 1.1 4B (omnisvg-1.1-4b, Apache-2.0)';
+        const text = `${made}:\n${lines.join('\n')}\n${usage} ${shown}\n${byline}`;
         return {
           content: [{ type: 'text', text }],
           details: {
             ok: true,
-            model: 'omnisvg-1.1-4b',
+            model,
             outputs: result.outputs.map((o) => ({
               outputPath: o.outputPath,
               modality: 'image' as const,
-              model: 'omnisvg-1.1-4b',
+              model,
             })),
           },
         };

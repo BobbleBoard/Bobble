@@ -27,9 +27,13 @@ export const svg: Capability = {
      fifteen minutes to it). The line now splits the work: OmniSVG for organic
      art and tracing; exact graphics are the model's own SVG, checked by
      presenting it (present renders it back). Same length as before. */
+  /* 2026-09-25: VFIG joins OmniSVG behind the command — a figure with words to
+     SVG code (--figure) and an SVG changed in place (--edit), the two jobs
+     OmniSVG cannot do (the SVG bake-off). Eleven words more on the line. */
   summary:
     'Draw an organic illustration, or trace a picture into vectors, as an SVG with OmniSVG ' +
-    '(--out puts it in the project). Icons, logos with a name, patterns and page glyphs you ' +
+    '(--out puts it in the project); turn a figure into SVG code with its words (--figure), or ' +
+    'change an SVG (--edit). Icons, logos with a name, patterns and page glyphs you ' +
     'write as SVG yourself, then present the file to see it.',
   guidance:
     'OmniSVG draws organic, illustrative vector art from a description, or traces a ' +
@@ -38,7 +42,10 @@ export const svg: Capability = {
     'page you are building: write those as SVG yourself — icons on a 24-unit viewBox, one ' +
     'stroke width, round caps and joins, currentColor so they take the page colour — and ' +
     'present the file: present shows you the drawing, so fix what looks wrong and present ' +
-    'again. A diagram (steps, arrows, labels) is diagram; a chart of numbers is chart; ' +
+    'again. VFIG, beside it, rebuilds a FIGURE — a diagram, chart or labelled drawing in a ' +
+    'picture — as SVG code whose words are text (`svg --figure --image fig.png`), and changes ' +
+    'an SVG that exists (`svg --edit logo.svg "make the flame gold"`). A new diagram (steps, ' +
+    'arrows, labels) is diagram; a chart of numbers is chart; a maths or physics figure is math; ' +
     'photos and realistic pictures are generation.',
   /* VQ-10: the guidance (read only when the capability is looked up, so it
      costs no prompt) sends anything with words to the tools that write them —

@@ -26,6 +26,7 @@ import { renderDiagram } from '../gen/diagram-render';
 import { guardRun } from '../gen/guardian-main';
 import { openStillWindow } from '../gen/hyperframes-window';
 import { omniSvgFiles } from '../gen/omnisvg';
+import { vfigFiles } from '../gen/vfig';
 import { registerGen3dBridge } from '../gen3d/gen3d-bridge';
 import { model3dReady, run3dJob, runImageJob, runStage3dJob } from '../gen3d/gen3d-main';
 import { detectHarnesses } from '../inference/harness-main';
@@ -213,6 +214,9 @@ function buildPiEnv(cwd: string | undefined): Record<string, string | undefined>
        connector install restarts pi so the change is live at once. */
     PI_DESKTOP_GEN_MEDIA: generationExperimentEnabled() ? '1' : '0',
     PI_OMNISVG_READY: omniSvgFiles().ready ? '1' : '0',
+    /* VFIG — figures to SVG code, and SVG edits — beside OmniSVG: `svg` is
+       there when either is on disk, and sends each job to the one that can do it. */
+    PI_VFIG_READY: vfigFiles().ready ? '1' : '0',
     /* The 3D connector's tools: only once an engine that can make a mesh is on
        this machine AND the connector is on (Connectors → Bobble 3D). the user
        (2026-09-17): "3d should be a connector that gets recommended for

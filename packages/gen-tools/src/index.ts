@@ -34,7 +34,11 @@ export default function activate(pi: ExtensionAPI): void {
    * the files at pi's spawn and says so here.
    */
   const media = process.env.PI_DESKTOP_GEN_MEDIA === '1';
-  const svg = process.env.PI_OMNISVG_READY === '1';
-  registerGenTools(pi, { bridge, media, svg });
+  // Two engines behind `svg`: OmniSVG draws pictures, VFIG writes figures and edits.
+  const svgEngines = {
+    omnisvg: process.env.PI_OMNISVG_READY === '1',
+    vfig: process.env.PI_VFIG_READY === '1',
+  };
+  registerGenTools(pi, { bridge, media, svg: svgEngines.omnisvg || svgEngines.vfig, svgEngines });
   if (media) registerAudioTools(pi, { bridge });
 }
