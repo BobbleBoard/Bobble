@@ -198,6 +198,15 @@ describe('a shell call running a media command IS the generation (bash-CLI mode)
     expect(effectiveToolName('bash', { command: 'chart edit units.svg --type line' })).toBe(
       'chart_edit',
     );
+    // present's own CLI form (the model's "this is the answer"), however it trails off.
+    expect(effectiveToolName('bash', { command: 'coordinate present --path=units.svg' })).toBe(
+      'present',
+    );
+    expect(presentingToolOfCommand('coordinate present --path=index.html "</parameter"')).toBe(
+      'present',
+    );
+    expect(presentingToolOfCommand('coordinate present --help')).toBeNull();
+    expect(presentingToolOfCommand('coordinate plan update')).toBeNull();
     expect(presentingToolOfCommand('diagram --help')).toBeNull();
     expect(presentingToolOfCommand('diagrams/make.sh')).toBeNull();
     expect(presentingToolOfCommand('cat chart.json')).toBeNull();

@@ -247,8 +247,18 @@ export function commandOfArgs(args: unknown): string | undefined {
  */
 export function presentingToolOfCommand(command: string | undefined): string | null {
   if (typeof command !== 'string') return null;
+  if (/\s(?:--help|-h)(?:\s|$)/.test(command)) return null;
+  /*
+   * …AND `present` ITSELF: `coordinate present --path=…` is its CLI form. Read
+   * as plain `bash`, the model's own "this is the answer" was filed INSIDE the
+   * collapsed chain — FOUND by the visual suite (4B, 2026-09-25): a chart the
+   * model drew and then presented showed nowhere at all (its chart call's card
+   * gave way to the newer present, which was a bash call), and a finished
+   * page's card sat inside "Worked for 3m".
+   */
+  if (/^\s*coordinate\s+present(?=\s|$)/.test(command)) return 'present';
   const m = /^\s*(chart|diagram)(?:\s+(edit)(?=\s|$)|(?=\s|$))/.exec(command);
-  if (m === null || /\s(?:--help|-h)(?:\s|$)/.test(command)) return null;
+  if (m === null) return null;
   return m[2] === 'edit' ? `${m[1]}_edit` : (m[1] ?? null);
 }
 

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { effectiveToolName } from './long-job';
 import {
   argsNamePath,
   attributeRecords,
@@ -89,6 +90,34 @@ describe('what the turn made is the work; what it presented is the answer', () =
 
   it('a card no call in the turn accounts for stays where it was drawn', () => {
     expect(placeTurnCards([], [card('x', V1)]).get(`x:${V1}`)).toBe('beneath');
+  });
+});
+
+describe('the CLI form of present is present', () => {
+  /* FOUND by the visual suite (4B, CLI mode, 2026-09-25): the model drew a chart
+     (`chart …` through bash) and then presented it (`coordinate present …`
+     through bash). The present was the newest call for the file, read as plain
+     bash, so its card went INSIDE the finished chain and the chart's own card
+     gave way to it — the chart showed nowhere. */
+  it('a chart drawn then presented through bash stands beneath the finished chain', () => {
+    const calls = [
+      {
+        id: 'c4',
+        chain: 0,
+        tool: effectiveToolName('bash', { command: 'chart --labels "A, B" --values "1, 2"' }),
+        args: {},
+      },
+      {
+        id: 'c5',
+        chain: 0,
+        tool: effectiveToolName('bash', { command: 'coordinate present --path=traffic.svg' }),
+        args: {},
+      },
+    ];
+    const placed = placeTurnCards(calls, [
+      { key: 'r:c5:/w/traffic.svg', callId: 'c5', path: '/w/traffic.svg', kind: 'record' },
+    ]);
+    expect(placed.get('r:c5:/w/traffic.svg')).toBe('beneath');
   });
 });
 
