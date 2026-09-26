@@ -335,8 +335,23 @@ function range(v: unknown, what: string): { min: number; max: number; pi: boolea
   else if (isObj(v)) [a, b] = [v.min ?? v.from, v.max ?? v.to];
   else if (typeof v === 'string') [a, b] = v.split(/\s*(?:\.\.\.?|\bto\b|,)\s*/);
   else throw new SpecError(`${what} needs a range like "-pi..pi" or [0, 10]`);
-  const min = num(a, `${what} min`);
-  const max = num(b, `${what} max`);
+  /* "0..t" — a range that uses a slider (MEASURED: the 4B's projectile, a plot
+     over time drawn "0..t"). A range holds still, so a slider in it is read at
+     its far end: the whole motion fits. */
+  const atEnds = (x: unknown, w: string): number => {
+    try {
+      return num(x, w);
+    } catch (e) {
+      const slid = SLIDERS.filter((p) => p.hidden !== true);
+      if (typeof x !== 'string' || slid.length === 0) throw e;
+      const scope = { ...CONSTANTS, ...Object.fromEntries(slid.map((p) => [p.name, p.max])) };
+      const r = compile(x, Object.keys(scope))(scope);
+      if (!Number.isFinite(r)) throw e;
+      return r;
+    }
+  };
+  const min = atEnds(a, `${what} min`);
+  const max = atEnds(b, `${what} max`);
   if (!(max > min)) throw new SpecError(`${what}: its max (${max}) must be above its min (${min})`);
   return { min, max, pi: /pi|π/i.test(`${String(a)} ${String(b)}`) };
 }
@@ -643,7 +658,8 @@ function plot(v: Loose, names: readonly string[]): PlotSpec {
       const label = texLabel(str(p.label));
       const yPart =
         py !== undefined && py !== null && str(py) !== undefined
-          ? { y: numOrExpr(py, `point ${id} y`, names) }
+          ? // Its y may use the plot's own variable, meaning its x: "x*m + c" puts it on that line.
+            { y: numOrExpr(py, `point ${id} y`, [...names, pv]) }
           : { on: curveRef(p.on ?? p.curve, `point ${id}`) };
       return {
         id,
@@ -1019,9 +1035,11 @@ function shapeBody(v: unknown, i: number, named: Map<string, Xy>, names: readonl
       }
       return polygonShape();
     }
+    case 'square':
+      if (v.points === undefined && v.vertices === undefined) return squareShape();
+      return polygonShape();
     case 'polygon':
     case 'triangle':
-    case 'square':
       return polygonShape();
     case 'polyline':
     case 'path':
@@ -1249,6 +1267,68 @@ function shapeBody(v: unknown, i: number, named: Map<string, Xy>, names: readonl
       dashed: o.dashed === true,
       role: role(o.role ?? o.color, 'main'),
     };
+  }
+  /**
+   * A SQUARE ON A SIDE — the construction behind the Pythagorean pictures:
+   * "on": [A, B] builds it on the segment A→B, on the side away from "away"
+   * (a point such as the triangle's third corner) or else to the right of A→B.
+   * Or by its centre and side. MEASURED (the 4B): squares meant to stand on a
+   * triangle's sides, placed by hand, stood beside them instead.
+   */
+  function squareShape(): Shape {
+    const o = v as Loose;
+    const onIn = o.on ?? o.side ?? o.edge ?? o.base;
+    if (Array.isArray(onIn) && onIn.length === 2) {
+      const A = xy(onIn[0], `${id} side start`);
+      const B = xy(onIn[1], `${id} side end`);
+      const e = (x: Num) => (typeof x === 'number' ? String(x) : `(${x})`);
+      const dx = `(${e(B[0])} - ${e(A[0])})`;
+      const dy = `(${e(B[1])} - ${e(A[1])})`;
+      // The right-hand normal of A→B is (dy, −dx); flipped when "away" lies on that side.
+      let sgn = '1';
+      const awayIn = o.away ?? o.away_from ?? o.opposite ?? o.outside_of;
+      if (Array.isArray(awayIn) && awayIn.length === 2) {
+        const P = xy(awayIn, `${id} away`);
+        sgn = `(0 - sign((${e(P[0])} - ${e(A[0])})*${dy} - (${e(P[1])} - ${e(A[1])})*${dx}))`;
+      }
+      const nx = `${sgn}*${dy}`;
+      const ny = `${sgn}*(0 - ${dx})`;
+      const pts: Xy[] = [
+        A,
+        B,
+        [`${e(B[0])} + ${nx}`, `${e(B[1])} + ${ny}`],
+        [`${e(A[0])} + ${nx}`, `${e(A[1])} + ${ny}`],
+      ];
+      return shape(
+        { ...o, kind: 'polygon', on: undefined, side: undefined, points: pts },
+        i,
+        named,
+        names,
+      );
+    }
+    const cIn = o.center ?? o.centre ?? o.at;
+    const sideIn = o.size ?? o.length ?? o.r ?? o.width;
+    if (Array.isArray(cIn) && sideIn !== undefined) {
+      const [cx, cy] = xy(cIn, `${id}.center`);
+      const sz = numOrExpr(sideIn, `${id}.size`, names);
+      const e = (x: Num) => (typeof x === 'number' ? String(x) : `(${x})`);
+      const h = `${e(sz)}/2`;
+      const pts: Xy[] = [
+        [`${e(cx)} - ${h}`, `${e(cy)} - ${h}`],
+        [`${e(cx)} + ${h}`, `${e(cy)} - ${h}`],
+        [`${e(cx)} + ${h}`, `${e(cy)} + ${h}`],
+        [`${e(cx)} - ${h}`, `${e(cy)} + ${h}`],
+      ];
+      return shape(
+        { ...o, kind: 'polygon', center: undefined, at: undefined, points: pts },
+        i,
+        named,
+        names,
+      );
+    }
+    throw new SpecError(
+      `${id} (a square) needs its side — "on": [[0, 0], [3, 0]] builds it on that segment (add "away": [x, y] to put it on the other side of a point) — or "center" and "size"`,
+    );
   }
   function polygonShape(): Shape {
     const ptsIn = (v as Loose).points ?? (v as Loose).vertices;

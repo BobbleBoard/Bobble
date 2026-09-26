@@ -82,7 +82,7 @@ export function expressionsOf(spec: MathSpec): Map<string, Set<string>> {
     }
     for (const p of plot.points) {
       add(p.x, P);
-      add(p.y, P);
+      add(p.y, [plot.v, ...P]);
       labels(p.label, []);
     }
     for (const a of plot.areas) {
@@ -386,7 +386,7 @@ export function steadyYRange(
     }
     for (const p of plot.points) {
       if (p.y === undefined) continue;
-      const y = mvEval(E, p.y, s);
+      const y = mvEval(E, p.y, { ...s, [plot.v]: mvEval(E, p.x, s) });
       if (Number.isFinite(y)) ys.push(y);
     }
   }

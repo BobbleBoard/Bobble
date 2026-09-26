@@ -786,7 +786,7 @@ export function mvPlot(
   for (const p of plot.points) {
     if (!mvVisible(p.appear, step)) continue;
     const x = mvEval(E, p.x, s);
-    const y = p.y !== undefined ? mvEval(E, p.y, s) : f(p.on ?? '', x);
+    const y = p.y !== undefined ? mvEval(E, p.y, { ...s, [pv]: x }) : f(p.on ?? '', x);
     if (!Number.isFinite(x) || !Number.isFinite(y)) {
       outside.push({ id: p.id, what: 'it has no value at these settings' });
       continue;
@@ -1845,7 +1845,7 @@ export function mvAnchors(spec: MathSpec, E: Evaluators, values: Values, step: n
     for (const p of plot.points) {
       if (!mvVisible(p.appear, step)) continue;
       const x = mvEval(E, p.x, s);
-      let y = p.y !== undefined ? mvEval(E, p.y, s) : Number.NaN;
+      let y = p.y !== undefined ? mvEval(E, p.y, { ...s, [plot.v]: x }) : Number.NaN;
       if (p.y === undefined && p.on !== undefined) {
         const c = plot.curves.find((q) => q.id === p.on);
         if (c?.expr !== undefined) y = mvEval(E, c.expr, { ...s, [plot.v]: x });

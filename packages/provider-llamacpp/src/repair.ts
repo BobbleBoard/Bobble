@@ -368,6 +368,11 @@ export async function repairToolCallArguments(
     if (written !== undefined && validateAgainstSchema(written, schema).valid) {
       return { ok: true, value: written, rung: 2 };
     }
+    // …and the other way round: a list or an object sent as its JSON text, parsed.
+    const parsed = parsedStructures(written ?? syntactic, schema);
+    if (parsed !== undefined && validateAgainstSchema(parsed, schema).valid) {
+      return { ok: true, value: parsed, rung: 2 };
+    }
     // Invalid → one fixer-model call.
     if (fixer !== undefined) {
       const fixed = await fixer({ raw, toolName, schema, error: validation.errors.join('; ') });
@@ -425,6 +430,43 @@ export function writtenOutStrings(
         ? v.join('\n')
         : `${JSON.stringify(v, null, 2)}\n`;
     changed = true;
+  }
+  return changed ? out : undefined;
+}
+
+/**
+ * A LIST SENT AS ITS JSON TEXT IS THE LIST. MEASURED (the maths suite,
+ * qwen3.5-4b, 2026-09-26): `edit { path, edits: "[{\"oldText\": …}]" }` — the
+ * edits array as a string — failed pi's validation ("edits: must be array")
+ * three times in one turn. For a field the schema types as an array or an
+ * object, a string that parses as JSON of that shape is parsed. Nothing else
+ * is touched, and the caller re-validates.
+ */
+export function parsedStructures(
+  value: Record<string, unknown>,
+  schema: unknown,
+): Record<string, unknown> | undefined {
+  const props = (schema as { properties?: Record<string, { type?: unknown }> } | undefined)
+    ?.properties;
+  if (props === undefined) return undefined;
+  let changed = false;
+  const out: Record<string, unknown> = { ...value };
+  for (const [k, v] of Object.entries(value)) {
+    const want = props[k]?.type;
+    if (typeof v !== 'string' || (want !== 'array' && want !== 'object')) continue;
+    try {
+      const parsed: unknown = JSON.parse(v);
+      const fits =
+        want === 'array'
+          ? Array.isArray(parsed)
+          : parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed);
+      if (fits) {
+        out[k] = parsed;
+        changed = true;
+      }
+    } catch {
+      // not JSON: left as it is, and validation says so
+    }
   }
   return changed ? out : undefined;
 }

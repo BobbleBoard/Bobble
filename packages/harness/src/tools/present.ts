@@ -433,6 +433,29 @@ export function registerPresentTool(pi: ExtensionAPI, deps: PresentToolDeps): vo
           } as never;
         }
       }
+      /*
+       * A MATH PAGE IS ALREADY OPEN, TOO — the math command opened it when it
+       * drew, with its capture and its checks. MEASURED (the 4B, Pythagoras):
+       * it presented its page fifteen times running, each answer ending "FIX
+       * IT and present again", and the repeat notes did not stop it. The
+       * answer is short and ends the loop.
+       */
+      if (!info.isDirectory && /\.html?$/i.test(resolved) && deps.readText !== undefined) {
+        const page = await deps.readText(resolved).catch(() => null);
+        if (page !== null && /\bdata-mv-panel\b/.test(page)) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text:
+                  `${pathForModel(resolved, deps.resolvePath?.('.'))} is the page the math command drew — it is already open beside the chat, playing its steps, so there was nothing more to present. ` +
+                  'Reply in a sentence or two saying what it shows and how to use it; a change is made in its .math.json, which redraws it.',
+              },
+            ],
+            details: undefined,
+          } as never;
+        }
+      }
       const preview = await deps.bridge.preview({ path: resolved, kind: plan.kind });
 
       const content: Array<Record<string, unknown>> = [];

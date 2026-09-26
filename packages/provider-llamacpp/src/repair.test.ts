@@ -6,6 +6,7 @@ import {
   findWrittenToolCallRegion,
   fuzzyMatchToolName,
   nameSimilarity,
+  parsedStructures,
   reconstructToolCallFromContent,
   relaxToolSchema,
   repairToolCallArguments,
@@ -681,5 +682,40 @@ describe('a string field given structure', () => {
     expect(
       writtenOutStrings({ n: { a: 1 } }, { properties: { n: { type: 'object' } } }),
     ).toBeUndefined();
+  });
+});
+
+describe('a list sent as its JSON text', () => {
+  const editSchema = {
+    type: 'object',
+    required: ['path', 'edits'],
+    properties: {
+      path: { type: 'string' },
+      edits: {
+        type: 'array',
+        items: {
+          type: 'object',
+          required: ['oldText', 'newText'],
+          properties: { oldText: { type: 'string' }, newText: { type: 'string' } },
+        },
+      },
+    },
+  };
+
+  it('is parsed — no fixer model called (MEASURED: edit with its edits as a string, three times)', async () => {
+    const fixer = vi.fn();
+    const raw = JSON.stringify({
+      path: 'lesson.math.json',
+      edits: JSON.stringify([{ oldText: '"t = 0 in 0..4"', newText: '"t = 0 in 0..6"' }]),
+    });
+    const r = await repairToolCallArguments(raw, { toolName: 'edit', schema: editSchema, fixer });
+    expect(r.ok).toBe(true);
+    expect(fixer).not.toHaveBeenCalled();
+    expect(r.value?.edits).toEqual([{ oldText: '"t = 0 in 0..4"', newText: '"t = 0 in 0..6"' }]);
+  });
+
+  it('leaves a string that is not JSON, and a string field, alone', () => {
+    expect(parsedStructures({ path: 'a', edits: 'change t' }, editSchema)).toBeUndefined();
+    expect(parsedStructures({ path: '[1]', edits: [] }, editSchema)).toBeUndefined();
   });
 });

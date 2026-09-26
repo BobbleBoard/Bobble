@@ -119,6 +119,27 @@ describe('registerPresentTool', () => {
     );
   });
 
+  /* MEASURED (the 4B, Pythagoras): it presented its math page fifteen times running. */
+  it('a page the math command drew is re-shown, with a short answer and no preview', async () => {
+    bridge.preview.mockClear();
+    bridge.show.mockClear();
+    const { pi, tools } = collect();
+    registerPresentTool(pi, {
+      bridge,
+      stat: async () => ({ isDirectory: false }),
+      readText: async () => '<main class="mv"><figure data-mv-panel></figure></main>',
+    });
+    const exec = tools[0]?.execute as (
+      id: string,
+      p: unknown,
+    ) => Promise<{ content: Array<{ type: string; text?: string }> }>;
+    const r = await exec('t1', { path: '/a/proof.html' });
+    expect(bridge.show).toHaveBeenCalledWith({ path: '/a/proof.html' });
+    expect(bridge.preview).not.toHaveBeenCalled();
+    expect(r.content).toHaveLength(1);
+    expect(r.content[0]?.text).toMatch(/is the page the math command drew — it is already open/);
+  });
+
   it('an .svg without a diagram sidecar is still previewed', async () => {
     bridge.preview.mockClear();
     const r = await run('/a/logo.svg', async (p) =>

@@ -875,3 +875,111 @@ describe('the 4B’s second round (2026-09-26): the forms it reached for next', 
     expect(said).toMatch(/far — lies entirely outside the figure/);
   });
 });
+
+describe('the 4B’s third round (2026-09-26)', () => {
+  it('a point on the graph whose y uses x sits on that line', () => {
+    const r = renderMath({
+      title: 'L',
+      params: ['m = 1 in -5..5', 'c = 2 in -5..5'],
+      plot: {
+        x: '-5..5',
+        curves: [{ id: 'line', expr: 'm*x + c' }],
+        points: [{ id: 'now', x: 2, y: 'x*m + c' }],
+      },
+      steps: [
+        { text: 'A line.', highlight: ['line'], set: { m: 1 } },
+        { text: 'Steeper.', highlight: ['line', 'now'], set: { m: 2 } },
+      ],
+    });
+    const c = compileSpec(r.spec);
+    const dot = mvScene(r.spec, c.E, { m: 2, c: 2 }, 2).panels[0]?.items.find(
+      (it) => it.id === 'now',
+    );
+    expect(dot?.t).toBe('dot');
+    expect(r.problems.filter((p) => p.level === 'fix')).toEqual([]);
+  });
+
+  it('builds a square on a side, away from a point — the squares of the Pythagorean picture', () => {
+    const s = normalizeMathSpec({
+      title: 'P',
+      figure: {
+        view: { x: '-5..8', y: '-5..8' },
+        shapes: [
+          {
+            id: 'tri',
+            kind: 'polygon',
+            points: [
+              [0, 0],
+              [3, 0],
+              [0, 4],
+            ],
+          },
+          {
+            id: 'sa',
+            kind: 'square',
+            on: [
+              [0, 0],
+              [3, 0],
+            ],
+            away: [0, 4],
+          },
+          {
+            id: 'sb',
+            kind: 'square',
+            on: [
+              [0, 0],
+              [0, 4],
+            ],
+            away: [3, 0],
+          },
+          { id: 'mid', kind: 'square', center: [5, 5], size: 2 },
+        ],
+      },
+      steps: ['The triangle.', 'Its squares.'],
+    });
+    const c = compileSpec(s);
+    const pts = (id: string) => {
+      const sh = s.figure?.shapes.find((x) => x.id === id);
+      return sh?.kind === 'polygon'
+        ? sh.points.map((p) =>
+            p.map(
+              (v) =>
+                Math.round(
+                  (typeof v === 'number' ? v : (c.E[String(v)]?.({}) ?? Number.NaN)) * 1e6,
+                ) / 1e6,
+            ),
+          )
+        : [];
+    };
+    // On the bottom side, away from (0, 4): below it.
+    expect(pts('sa')).toEqual([
+      [0, 0],
+      [3, 0],
+      [3, -3],
+      [0, -3],
+    ]);
+    // On the left side, away from (3, 0): to its left.
+    expect(pts('sb')).toEqual([
+      [0, 0],
+      [0, 4],
+      [-4, 4],
+      [-4, 0],
+    ]);
+    expect(pts('mid')).toEqual([
+      [4, 4],
+      [6, 4],
+      [6, 6],
+      [4, 6],
+    ]);
+  });
+
+  it('a range that uses a slider is read at the slider’s far end', () => {
+    const s = normalizeMathSpec({
+      title: 'T',
+      params: ['t = 0 in 0..4'],
+      plot: { x: '0..t', curves: ['x^2'] },
+      steps: ['A.', 'B.'],
+    });
+    expect(s.plot?.x).toMatchObject({ min: 0, max: 4 });
+  });
+});
