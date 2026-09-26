@@ -28,6 +28,7 @@ import {
   decodeOmniSvgPartial,
   idsFromCompletion,
   loopStart,
+  MEDIA_MARKER,
 } from '@pi-desktop/gen-service';
 import {
   cacheRoot,
@@ -291,7 +292,19 @@ export async function generateSvg(
     '1',
   ];
   log.info('omnisvg server starting', { port, image: images.length > 0 });
-  const child = spawn(serverPath, args, { stdio: ['ignore', 'ignore', 'pipe'] });
+  /*
+   * THE PICTURE'S MARKER, PINNED. This llama-server makes a random media marker
+   * per process (`<__media_<random>__>`, published in /props) unless
+   * LLAMA_MEDIA_MARKER pins one, and a raw /completion prompt must carry that
+   * exact marker. MEASURED 2026-09-25 (the SVG bake-off): with the picture sent
+   * where the server reads it, every image request failed "number of media
+   * markers in text (0) does not match number of bitmaps (1)"; pinned to the
+   * builder's MEDIA_MARKER, the kinetic-theory figure went in (258 prompt tokens).
+   */
+  const child = spawn(serverPath, args, {
+    stdio: ['ignore', 'ignore', 'pipe'],
+    env: { ...process.env, LLAMA_MEDIA_MARKER: MEDIA_MARKER },
+  });
   const stderr: string[] = [];
   child.stderr?.on('data', (d: Buffer) => {
     stderr.push(d.toString());
