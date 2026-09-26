@@ -218,3 +218,21 @@ export function contentBox(
   if (x1 < 0) return null;
   return { x0: x0 / p.width, y0: y0 / p.height, x1: (x1 + 1) / p.width, y1: (y1 + 1) / p.height };
 }
+
+/**
+ * A figure, ready for VFIG: on white (llama.cpp drops alpha — a transparent
+ * figure's ground would be black), at its own proportions, and no longer than
+ * `maxSide` — a figure's words must stay legible, so it is not shrunk to
+ * OmniSVG's 448, only kept from running to thousands of picture tokens.
+ */
+export function figurePicture(p: Pixels, maxSide = 1600): Pixels {
+  const white = onWhite(p);
+  const long = Math.max(p.width, p.height);
+  if (long <= maxSide) return white;
+  const k = maxSide / long;
+  return resized(
+    white,
+    Math.max(1, Math.round(p.width * k)),
+    Math.max(1, Math.round(p.height * k)),
+  );
+}

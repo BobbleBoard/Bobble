@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   contentBox,
+  figurePicture,
   OMNISVG_PICTURE_SIDE,
   omniSvgPicture,
   onWhite,
@@ -95,5 +96,15 @@ describe('where a picture has ink', () => {
       for (let x = 30; x < 60; x += 1) p.data.set([200, 30, 30, 255], (y * 100 + x) * 4);
     expect(contentBox(p)).toEqual({ x0: 0.3, y0: 0.2, x1: 0.6, y1: 0.4 });
     expect(contentBox(flat(10, 10, [255, 255, 255, 255]))).toBeNull();
+  });
+});
+
+describe('a figure, as VFIG is sent it', () => {
+  it('is put on white and kept at its own proportions — shrunk only past 1,600 px', () => {
+    const small = figurePicture(flat(520, 330, [0, 0, 0, 0]));
+    expect([small.width, small.height]).toEqual([520, 330]);
+    expect(pixel(small, 0, 0)).toEqual([255, 255, 255, 255]);
+    const big = figurePicture(flat(3200, 1000, [10, 10, 10, 255]));
+    expect([big.width, big.height]).toEqual([1600, 500]);
   });
 });

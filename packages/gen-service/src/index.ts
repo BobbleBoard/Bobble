@@ -93,7 +93,12 @@ export {
   xyToPaths,
 } from './omnisvg-decode.js';
 export type { Pixels } from './omnisvg-picture.js';
-export { contentBox, OMNISVG_PICTURE_SIDE, omniSvgPicture } from './omnisvg-picture.js';
+export {
+  contentBox,
+  figurePicture,
+  OMNISVG_PICTURE_SIDE,
+  omniSvgPicture,
+} from './omnisvg-picture.js';
 export type { OmniSvgCompletion, OmniSvgRequest, OmniSvgSampling } from './omnisvg-request.js';
 export {
   buildOmniSvgRequest,
