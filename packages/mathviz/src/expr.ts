@@ -59,7 +59,14 @@ const FUNCTIONS: Readonly<Record<string, (...a: number[]) => number>> = {
   between: (x, a, b) => Math.min(1, Math.max(0, (x - a) / (b - a))),
 };
 
-const CONSTANTS: Readonly<Record<string, number>> = { pi: Math.PI, e: Math.E, tau: 2 * Math.PI };
+/* deg: one degree in radians, so "30*deg" and "30°" are what they say (a
+   slider called deg is still the slider). */
+const CONSTANTS: Readonly<Record<string, number>> = {
+  pi: Math.PI,
+  e: Math.E,
+  tau: 2 * Math.PI,
+  deg: Math.PI / 180,
+};
 
 /** Series and products bind their own variable; at most this many terms. */
 const MAX_TERMS = 2000;

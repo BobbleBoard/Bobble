@@ -253,6 +253,8 @@ export interface MathSpec {
   readonly play?: string;
   /** Names used with no value among declared ones — drawn as 1, and a check to fix. */
   readonly unvalued?: readonly string[];
+  /** Top-level structures the spec held that nothing read. */
+  readonly unread?: readonly string[];
   /**
    * The explanation plays itself when the page opens — each step's words
    * appearing as the figure moves — and then hands the reader the controls.
@@ -638,6 +640,7 @@ function plot(v: Loose, names: readonly string[]): PlotSpec {
     const o = axes[a];
     if (isObj(o) && (o.min ?? o.from) !== undefined && (o.max ?? o.to) !== undefined)
       return [o.min ?? o.from, o.max ?? o.to];
+    if (isObj(o) && o.range !== undefined) return o.range;
     return undefined;
   };
   /* No range given, and a point or a tangent rides on a slider: the graph
@@ -1067,7 +1070,23 @@ function shapeBody(v: unknown, i: number, named: Map<string, Xy>, names: readonl
         const plus = (a: Num, b: Num): Num =>
           typeof a === 'number' && typeof b === 'number' ? a + b : `(${a})+(${b})`;
         to = [plus(from[0], d[0]), plus(from[1], d[1])];
-      } else throw new SpecError(`${id}.to needs a point: [x, y] — or give "direction": [dx, dy]`);
+      } else if (
+        (v.length ?? v.len ?? v.magnitude) !== undefined &&
+        (v.angle ?? v.direction) !== undefined
+      ) {
+        /* A start, an angle in degrees and a length — MEASURED (the 4B's
+           Pythagoras, round 7): {"center": [0, 0], "angle": 90, "length": 3}. */
+        const len = numOrExpr(v.length ?? v.len ?? v.magnitude, `${id}.length`, names);
+        const ang = numOrExpr(v.angle ?? v.direction, `${id}.angle`, names);
+        const e = (x: Num) => (typeof x === 'number' ? String(x) : `(${x})`);
+        to = [
+          `${e(from[0])} + ${e(len)}*cos(${e(ang)}*pi/180)`,
+          `${e(from[1])} + ${e(len)}*sin(${e(ang)}*pi/180)`,
+        ];
+      } else
+        throw new SpecError(
+          `${id}.to needs a point: [x, y] — or give "direction": [dx, dy], or "angle" (degrees) and "length"`,
+        );
       return {
         id,
         appear,
@@ -1098,8 +1117,10 @@ function shapeBody(v: unknown, i: number, named: Map<string, Xy>, names: readonl
             names,
           );
         }
-        const w = numOrExpr(v.w ?? v.width, `${id}.w`, names);
-        const h = numOrExpr(v.h ?? v.height, `${id}.h`, names);
+        // "size": 3 — a square's side (MEASURED: the 4B's Pythagoras, round 7, refused twice).
+        const side = v.size ?? v.side;
+        const w = numOrExpr(v.w ?? v.width ?? side, `${id}.w`, names);
+        const h = numOrExpr(v.h ?? v.height ?? side, `${id}.h`, names);
         const add = (a: Num, b: Num): Num =>
           typeof a === 'number' && typeof b === 'number' ? a + b : `(${a})+(${b})`;
         const half = (a: Num, d: Num): Num =>
@@ -1342,7 +1363,7 @@ function shapeBody(v: unknown, i: number, named: Map<string, Xy>, names: readonl
         .filter(
           (w) =>
             !names.includes(w) &&
-            !/^(pi|e|tau|sin|cos|tan|sqrt|exp|ln|log|abs|min|max|pow|ease|lerp|between|clamp|atan2|asin|acos|atan|sinh|cosh|tanh|floor|ceil|round|sign|mod|sec|csc|cot|sum|prod|if|cbrt|log10|log2|sgn)$/.test(
+            !/^(pi|e|tau|deg|sin|cos|tan|sqrt|exp|ln|log|abs|min|max|pow|ease|lerp|between|clamp|atan2|asin|acos|atan|sinh|cosh|tanh|floor|ceil|round|sign|mod|sec|csc|cot|sum|prod|if|cbrt|log10|log2|sgn)$/.test(
               w,
             ),
         );
@@ -1487,6 +1508,71 @@ function viewRange(v: unknown, what: string, notes: string[]): { min: number; ma
     return null;
   }
 }
+
+/** The keys a spec's top level is read for. */
+const TOP_KEYS = [
+  'title',
+  'name',
+  'heading',
+  'label',
+  'caption',
+  'subtitle',
+  'description',
+  'params',
+  'sliders',
+  'parameters',
+  'interactive',
+  'controls',
+  'inputs',
+  'plot',
+  'graph',
+  'figure',
+  'diagram',
+  'steps',
+  'explanation',
+  'explain',
+  'play',
+  'animate',
+  'tell',
+  'autoplay',
+  'elements',
+  'visual_elements',
+  'components',
+  'highlight',
+  'markers',
+];
+/** …and, when the graph is written at the top level, the graph's own. */
+const PLOT_KEYS = [
+  'curves',
+  'functions',
+  'exprs',
+  'expr',
+  'equation',
+  'function',
+  'expression',
+  'formula',
+  'x',
+  'y',
+  'domain',
+  'xRange',
+  'x_range',
+  'yRange',
+  'y_range',
+  'var',
+  'variable',
+  'axes',
+  'axis',
+  'points',
+  'tangents',
+  'tangent',
+  'areas',
+  'area',
+  'shade',
+  'riemann',
+  'rectangles',
+];
+/** …and, when the figure is, the figure's. */
+const FIGURE_KEYS = ['shapes', 'elements', 'items', 'objects', 'parts', 'view', 'window'];
 
 /**
  * Lists a figure may hold beside "shapes", and the kind each one's parts are —
@@ -1895,16 +1981,15 @@ function normalizeParsed(v: Loose, found: { any: boolean }, auto: readonly strin
   /* A slider under another heading — MEASURED (the 4B's derivative, round 6):
      "interactive": {"slider": {"min": -3, "max": 3, "value": 0}}. Only the
      entries that are ranges: the rest of such a block is settings. */
+  const isRange = (val: unknown): val is Loose =>
+    isObj(val) && (val.min !== undefined || val.max !== undefined || val.range !== undefined);
   const controls = [v.interactive, v.controls, v.inputs].flatMap((c) =>
     isObj(c)
       ? Object.entries(c)
-          .filter(
-            ([, val]) =>
-              isObj(val) &&
-              (val.min !== undefined || val.max !== undefined || val.range !== undefined),
-          )
+          .filter(([, val]) => isRange(val))
           .map(([k, val]) => ({ name: k, ...(val as Loose) }))
-      : [],
+      : // [{"name": "Slope (m)", "type": "slider", "min": -3, …}] (MEASURED: the 4B's y = mx + c, round 7)
+        list(c).filter(isRange),
   );
   const paramsIn = [
     ...asList(v.params ?? v.sliders ?? v.parameters),
@@ -1963,6 +2048,7 @@ function normalizeParsed(v: Loose, found: { any: boolean }, auto: readonly strin
   }
   // A slider with the plot's own name is "now" on that axis (t for time): curves use the axis, points the slider.
   const figSpec = figIn !== undefined ? figure(figIn, names, viewNotes) : undefined;
+  const stepNotes: string[] = [];
   const stepsRaw = v.steps ?? v.explanation ?? v.explain;
   // {"1": …, "2": …} — steps numbered as keys — read in their order.
   const stepsIn = isObj(stepsRaw) ? Object.values(stepsRaw) : list(stepsRaw);
@@ -1974,8 +2060,19 @@ function normalizeParsed(v: Loose, found: { any: boolean }, auto: readonly strin
     const text = body !== undefined && head !== undefined ? `**${head}.** ${body}` : (body ?? head);
     if (text === undefined) throw new SpecError(`step ${i + 1} needs its text`);
     const set: Record<string, Num> = {};
-    for (const [k, val] of Object.entries(isObj(s.set) ? s.set : {}))
+    for (const [k, val] of Object.entries(isObj(s.set) ? s.set : {})) {
+      /* A part "set" to a place — MEASURED (the 4B's projectile, round 7):
+         "set": {"ball": {…}}, refused twice, then every step's set deleted
+         and a ball that never moved. A step moves sliders; a part moves with
+         them. Left out, and said. */
+      if (!names.includes(k) && typeof val !== 'number' && typeof val !== 'string') {
+        stepNotes.push(
+          `step ${i + 1} set "${k}", which is a part, not a slider — a step's "set" moves sliders (${names.join(', ') || 'none yet'}), and the parts drawn from them move with them`,
+        );
+        continue;
+      }
       set[k] = numOrExpr(val, `step ${i + 1} sets ${k}`, names);
+    }
     const nudgeIn = s.nudge ?? s.wiggle ?? s.jiggle;
     const nudge: Record<string, Num> = {};
     /* "set": [{"type": "nudge", "element": "m", "value": 2.5}] — the moves as a
@@ -2049,12 +2146,13 @@ function normalizeParsed(v: Loose, found: { any: boolean }, auto: readonly strin
   const sliders = params.filter(
     (p) => p.hidden !== true && new RegExp(`\\b${p.name}\\b`).test(drawnText),
   );
+  // The story's time: the slider that plays, the one slider there is, or one called t.
   const player =
     playIn !== undefined && names.includes(playIn)
       ? sliders.find((p) => p.name === playIn)
       : sliders.length === 1
         ? sliders[0]
-        : undefined;
+        : sliders.find((p) => p.name === 't' || p.name === 'time');
   const still = steps.every(
     (st) => Object.keys(st.set).length === 0 && Object.keys(st.nudge ?? {}).length === 0,
   );
@@ -2065,6 +2163,7 @@ function normalizeParsed(v: Loose, found: { any: boolean }, auto: readonly strin
           set: { [player.name]: player.min + ((player.max - player.min) * k) / (steps.length - 1) },
         }))
       : steps;
+  viewNotes.push(...stepNotes);
   if (told !== steps && player !== undefined)
     viewNotes.push(
       `no step moved anything, so the steps take ${player.name} from ${player.min} to ${player.max}, one stretch each — give each step a "set" to choose what it shows`,
@@ -2087,6 +2186,22 @@ function normalizeParsed(v: Loose, found: { any: boolean }, auto: readonly strin
     ...(declared.length > 0 && params.some((p) => p.hidden === true)
       ? { unvalued: params.filter((p) => p.hidden === true).map((p) => p.name) }
       : {}),
+    ...(() => {
+      /* What the spec held that nothing read — MEASURED (the 4B's derivative,
+         round 7): its slider under "point": {"x": {"type": "slider", …}} and
+         its captions under "labels": a page of one curve, and a result that
+         never said the rest had gone nowhere. Structures only: a flag like
+         "grid": true is a setting. */
+      const read = new Set([
+        ...TOP_KEYS,
+        ...(plotIn === v ? PLOT_KEYS : []),
+        ...(figIn === v ? [...FIGURE_KEYS, ...Object.keys(SHAPES_BY_KEY)] : []),
+      ]);
+      const unread = Object.keys(v).filter(
+        (k) => !read.has(k) && (isObj(v[k]) || Array.isArray(v[k])),
+      );
+      return unread.length > 0 ? { unread } : {};
+    })(),
     notes: [
       ...(found.any ? ['emoji removed — the page carries none'] : []),
       ...(title === undefined
@@ -2131,6 +2246,9 @@ function withElements(plotIn: Loose, top: Loose, names: readonly string[]): Loos
       top.elements,
       top.visual_elements,
       top.components,
+      // "highlight": [{"type": "point", "x": 0, "y": "c"}] beside the graph (MEASURED: round 7).
+      Array.isArray(top.highlight) ? top.highlight : undefined,
+      top.markers,
     ]),
   ]
     .flatMap((e) => list(e))

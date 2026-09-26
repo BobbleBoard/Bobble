@@ -392,10 +392,29 @@ export function mvPlot(
   E: Evaluators,
   values: Values,
   step: number,
-  hl: readonly string[],
+  named: readonly string[],
 ): Panel {
   const plot = spec.plot;
   if (plot === undefined) throw new Error('no plot');
+  /* A highlighted point or tangent brings the curve it sits on: the step is
+     about that curve at that place — MEASURED (the 4B's SHM, round 6): "now"
+     highlighted on the graph, and its cosine dimmed at four steps of five. */
+  const hl = [...named];
+  for (const p of plot.points) {
+    if (!named.includes(p.id)) continue;
+    if (p.on !== undefined) {
+      hl.push(p.on);
+      continue;
+    }
+    const x = mvEval(E, p.x, values);
+    const y = p.y !== undefined ? mvEval(E, p.y, { ...values, [plot.v]: x }) : Number.NaN;
+    for (const c of plot.curves) {
+      if (c.expr === undefined) continue;
+      const cy = mvEval(E, c.expr, { ...values, [plot.v]: x });
+      if (Number.isFinite(cy) && Math.abs(cy - y) <= 1e-6 * (1 + Math.abs(cy))) hl.push(c.id);
+    }
+  }
+  for (const t of plot.tangents) if (named.includes(t.id)) hl.push(t.to);
   const W = 720;
   const H = 440;
   const xl = plot.x.label ?? plot.v;

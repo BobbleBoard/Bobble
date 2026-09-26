@@ -68,6 +68,13 @@ export function checkMath(
      Said as a note, it went unread. */
   if (spec.unvalued !== undefined && spec.unvalued.length > 0)
     say('fix', unvaluedText(spec.unvalued));
+  if (spec.unread !== undefined && spec.unread.length > 0) {
+    const keys = spec.unread.map((k) => `"${k}"`);
+    say(
+      'warn',
+      `${keys.join(', ')} ${keys.length === 1 ? 'was' : 'were'} not read, so nothing of ${keys.length === 1 ? 'it' : 'them'} is on the page — a slider is "params": ["a = 1 in -5..5"]; a point on a curve "points": [{"x": "a", "on": "c1"}] and its tangent "tangents": [{"to": "c1", "at": "a"}] in the "plot"; anything drawn goes in the "figure"'s "shapes"`,
+    );
+  }
 
   // Layout, in the state each step leaves the sliders in. A problem seen at
   // several steps is said once, with the steps it is seen at.

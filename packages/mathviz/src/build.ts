@@ -279,8 +279,8 @@ export function toldStates(spec: MathSpec, E: Evaluators): Values[] {
  * the telling takes it — MEASURED (the 4B's y = mx + c): m and c in −5..5
  * over x in −10..10 gave a frame of −60..100, and the lines the steps showed
  * (m = 3, then 2) lay nearly flat along it. A steep line leaving through the
- * top when the reader drags m to 5 is how graph paper behaves. A slider the
- * steps leave alone is the reader's, sampled across its range as before.
+ * top when the reader drags m to 5 is how graph paper behaves; so is a slider
+ * the steps leave alone, taken where they leave it.
  */
 function plotStates(spec: MathSpec, E: Evaluators): Values[] {
   const driven = new Set<string>();
@@ -289,10 +289,12 @@ function plotStates(spec: MathSpec, E: Evaluators): Values[] {
     for (const name of Object.keys(st.nudge ?? {})) driven.add(name);
   }
   if (driven.size === 0) return settings(spec.params);
-  const mixes = settings(spec.params.filter((p) => !driven.has(p.name)));
-  const out: Values[] = [];
-  for (const told of toldStates(spec, E)) for (const mix of mixes) out.push({ ...told, ...mix });
-  return out;
+  /* Where the telling goes, with the other sliders where it leaves them —
+     MEASURED (the 4B's projectile, round 7): the far ends of the reader's
+     speed and angle sliders put the frame at −75..25, and the flight the
+     steps told was a ripple along its top. A curve that runs off the frame
+     when the reader drags a slider to its end is graph paper's way. */
+  return toldStates(spec, E);
 }
 
 /**

@@ -808,6 +808,22 @@ describe('JavaScript a small model writes into JSON', () => {
   it('says so when no step moves anything on a page with sliders', () => {
     const r = renderMath({
       title: 'Still',
+      params: ['u = 0 in 0..2', 'r = 0.2 in 0.1..0.5'],
+      figure: {
+        view: { x: '0..4', y: '0..4' },
+        shapes: [{ id: 'b', kind: 'circle', center: ['u', 1], r: 'r' }],
+      },
+      steps: [
+        { text: 'A ball.', highlight: ['b'] },
+        { text: 'It moves.', highlight: ['b'] },
+      ],
+    });
+    expect(r.problems.map((p) => p.text)).toContain(
+      'none of the steps moves anything — the page plays its steps like a teacher, so give steps a "set" that moves u (the figure moves while the words appear), or a "nudge" that wiggles a slider to show what it changes',
+    );
+    // With several sliders, the one called t is the story's time.
+    const timed = renderMath({
+      title: 'Timed',
       params: ['t = 0 in 0..2', 'r = 0.2 in 0.1..0.5'],
       figure: {
         view: { x: '0..4', y: '0..4' },
@@ -818,9 +834,7 @@ describe('JavaScript a small model writes into JSON', () => {
         { text: 'It moves.', highlight: ['b'] },
       ],
     });
-    expect(r.problems.map((p) => p.text)).toContain(
-      'none of the steps moves anything — the page plays its steps like a teacher, so give steps a "set" that moves t (the figure moves while the words appear), or a "nudge" that wiggles a slider to show what it changes',
-    );
+    expect(timed.spec.steps.map((st) => st.set)).toEqual([{ t: 0 }, { t: 2 }]);
   });
 
   it('lets still steps take the one slider that plays through its range (MEASURED: a ball left at the launch point)', () => {
@@ -1431,3 +1445,127 @@ describe('the 4B’s sixth round (2026-09-26): what its own specs lost', () => {
     expect((drawn[0]?.t === 'path' ? drawn[0].d : '').match(/L/g)?.length ?? 0).toBeGreaterThan(8);
   });
 });
+
+describe('the 4B’s seventh round (2026-09-26)', () => {
+  it('reads a square by its "size" and a line by a start, an angle and a length (MEASURED: its Pythagoras, refused twice)', () => {
+    const s = normalizeMathSpec({
+      title: 'Squares',
+      figure: {
+        view: { x: '-6..6', y: '-6..6' },
+        shapes: [
+          { id: 'sq', kind: 'rect', center: [0, 0], size: 3 },
+          { id: 'leg', kind: 'line', center: [0, 0], angle: 90, length: 3 },
+        ],
+      },
+      steps: ['A square and a leg.'],
+    });
+    const c = compileSpec(s);
+    const leg = s.figure?.shapes[1];
+    expect(leg?.kind).toBe('segment');
+    const to = leg?.kind === 'segment' ? leg.to.map((v) => mvEvalFor(c, v)) : [];
+    expect(to[0]).toBeCloseTo(0, 9);
+    expect(to[1]).toBeCloseTo(3, 9);
+    const sq = s.figure?.shapes[0];
+    expect(sq?.kind === 'polygon' ? sq.points.length : 0).toBe(4);
+  });
+
+  it('reads sliders listed under "controls", a point listed under "highlight", and an axis "range"', () => {
+    const r = renderMath({
+      title: 'y = mx + c',
+      equation: 'y = m*x + c',
+      controls: [
+        { name: 'Slope (m)', type: 'slider', min: -3, max: 3, value: 1 },
+        { name: 'Y-Intercept (c)', type: 'slider', min: -5, max: 5, value: 1 },
+      ],
+      axes: { x: { range: [-10, 10] }, y: { range: [-10, 10] } },
+      highlight: [{ type: 'point', x: 0, y: 'c', label: 'Y-intercept (0, c)' }],
+      steps: [
+        { text: 'Steeper.', set: { m: 2 } },
+        { text: 'Higher.', set: { c: 3 } },
+      ],
+    });
+    expect(r.spec.params.map((p) => p.name)).toEqual(['m', 'c']);
+    expect(r.spec.plot?.points.map((p) => [p.x, p.y])).toEqual([[0, 'c']]);
+    expect(r.spec.plot?.y).toMatchObject({ min: -10, max: 10 });
+  });
+
+  it('leaves out a step’s "set" of a part, and says a step moves sliders (MEASURED: "set": {"ball": {…}})', () => {
+    const r = renderMath({
+      title: 'Ball',
+      params: ['t = 0 in 0..2'],
+      figure: {
+        view: { x: '0..4', y: '0..4' },
+        shapes: [{ id: 'ball', kind: 'circle', center: ['t', 1], r: 0.2 }],
+      },
+      steps: [
+        { text: 'Here.', highlight: ['ball'], set: { ball: { center: [0, 1] }, t: 0 } },
+        { text: 'There.', highlight: ['ball'], set: { t: 2 } },
+      ],
+    });
+    expect(r.spec.steps[0]?.set).toEqual({ t: 0 });
+    expect(r.problems.map((p) => p.text).join('\n')).toMatch(
+      /step 1 set "ball", which is a part, not a slider/,
+    );
+  });
+
+  it('frames a graph on what the steps show, the reader’s other sliders where the steps leave them', () => {
+    const r = renderMath({
+      title: 'Throw',
+      params: ['t = 0 in 0..2.5', 'v0 = 15 in 10..30', 'theta = 45 in 10..80'],
+      plot: { var: 't', x: '0..2.5', curves: [{ id: 'h', expr: 'v0*sin(theta*deg)*t - 4.9*t^2' }] },
+      steps: [
+        { text: 'Up.', highlight: ['h'], set: { t: 0 } },
+        { text: 'Down.', highlight: ['h'], set: { t: 2.5 } },
+      ],
+    });
+    // v0 = 15 at 45°: from 0 up to 5.7 and down to −4.1 by t = 2.5 — not the −75 of v0 = 10 at 10°.
+    expect(r.spec.plot?.y.min).toBeGreaterThanOrEqual(-10);
+    expect(r.spec.plot?.y.max).toBeLessThanOrEqual(10);
+  });
+
+  it('says what the spec held that nothing read (MEASURED: a slider under "point", captions under "labels")', () => {
+    const r = renderMath({
+      title: 'Derivative',
+      function: 'f(x) = x^3 - 2*x',
+      point: { x: { type: 'slider', min: -5, max: 5, default: 1 } },
+      labels: { title: 'The Derivative', slope_text: "f'(x) = 3x² - 2" },
+      grid: true,
+      steps: ['The curve.', 'Its slope.'],
+    });
+    expect(r.problems.find((p) => /were not read/.test(p.text))?.text).toMatch(
+      /^"point", "labels" were not read, so nothing of them is on the page — a slider is "params"/,
+    );
+  });
+
+  it('keeps a curve that a highlighted point sits on in focus (MEASURED: SHM’s cosine, dimmed at four steps)', () => {
+    const spec = normalizeMathSpec({
+      title: 'SHM',
+      params: ['t = 0 in 0..6'],
+      plot: {
+        var: 't',
+        x: '0..6',
+        curves: [
+          { id: 'x', expr: 'cos(t)' },
+          { id: 'v', expr: '-sin(t)' },
+        ],
+        points: [{ id: 'now', x: 't', y: 'cos(t)' }],
+      },
+      steps: [{ text: 'Now.', highlight: ['now'], set: { t: 1 } }],
+    });
+    const c = compileSpec(spec);
+    const items = mvScene(spec, c.E, { t: 1 }, 1).panels[0]?.items ?? [];
+    expect(items.find((it) => it.id === 'x')?.dim).toBe(false);
+    expect(items.find((it) => it.id === 'v')?.dim).toBe(true);
+  });
+
+  it('knows deg: 30*deg is thirty degrees', () => {
+    const c = compileSpec(
+      normalizeMathSpec({ title: 'D', plot: { curves: ['sin(30*deg) + 0*x'] }, steps: ['A.'] }),
+    );
+    expect(c.E['sin(30*deg) + 0*x']?.({ x: 0 })).toBeCloseTo(0.5, 12);
+  });
+});
+
+function mvEvalFor(c: ReturnType<typeof compileSpec>, v: unknown): number {
+  return typeof v === 'number' ? v : (c.E[String(v)]?.({}) ?? Number.NaN);
+}
