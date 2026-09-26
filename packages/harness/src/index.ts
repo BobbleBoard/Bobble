@@ -36,6 +36,7 @@ import { announcedNextStep, announcedStepNudge } from './loop/announced-step.js'
 import { HANDBACK_NUDGE, isChoiceHandback } from './loop/handback.js';
 import { createLoopDetector, type LoopDetector, loopDetectorConfig } from './loop/loop-detector.js';
 import { newSameCallState, noteRepeatedCall } from './loop/same-call.js';
+import { silentEnd, silentEndNudge } from './loop/silent-end.js';
 import { unfinishedPlan, unfinishedPlanNudge } from './loop/unfinished-plan.js';
 import { emptyTally, noteResult } from './modality';
 import { parseModelParams, smallModelCapabilityWarning } from './model/model-size.js';
@@ -445,6 +446,8 @@ interface HarnessRuntime {
   nudgedUnfinished: boolean;
   /** The announced-next-step nudge has fired this session (loop/announced-step.ts). */
   nudgedAnnounced: boolean;
+  /** The one "you ended without a word" steer this session has (loop/silent-end.ts). */
+  nudgedSilent: boolean;
   /** Remaining REAL-verify fix steers allowed in the active verify sequence. */
   verifyFixesRemaining: number;
   /** True while inside a self-triggered verify fix sequence (so the budget isn't reset). */
@@ -1212,6 +1215,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     nudgedOutputLimit: false,
     nudgedUnfinished: false,
     nudgedAnnounced: false,
+    nudgedSilent: false,
     verifyFixesRemaining: 0,
     verifyActive: false,
   };
@@ -3892,12 +3896,30 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     const steeredNow =
       [runtime.nudgedHandback, runtime.nudgedOutputLimit, runtime.nudgedUnfinished].join() !==
       steeredBefore;
+    let announcedNow = false;
     if (!steeredNow && !runtime.nudgedAnnounced && !endedAtOutputLimit(event.messages)) {
       const said = announcedNextStep(lastAssistantText(event.messages));
       if (said !== null) {
         runtime.nudgedAnnounced = true;
+        announcedNow = true;
         pi.appendEntry(HARNESS_LOOP_ENTRY, { action: 'steer', cause: 'announced-step' });
         pi.sendUserMessage?.(announcedStepNudge(said));
+      }
+    }
+    /* A TURN THAT ENDS WITHOUT A WORD — see loop/silent-end.ts: the 4B's SHM
+       turn ended on "1 command failed, thought for 23s" and nothing else. Once
+       per session; only when no other steer went out this turn. */
+    if (
+      !steeredNow &&
+      !announcedNow &&
+      !runtime.nudgedSilent &&
+      !endedAtOutputLimit(event.messages)
+    ) {
+      const end = silentEnd(event.messages);
+      if (end !== null) {
+        runtime.nudgedSilent = true;
+        pi.appendEntry(HARNESS_LOOP_ENTRY, { action: 'steer', cause: 'silent-end' });
+        pi.sendUserMessage?.(silentEndNudge(end));
       }
     }
     // THE USER OUTRANKS EVERYTHING BEHIND THEM. Naming and the reviewer both run
