@@ -84,6 +84,8 @@ export {
   decodeOmniSvgPartial,
   loopStart,
   OMNISVG_4B,
+  OMNISVG_8B,
+  type OmniSvgVariant,
   pathsToSvg,
   tokensToXY,
   xyToPaths,

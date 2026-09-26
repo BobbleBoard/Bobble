@@ -20,8 +20,31 @@
  * runtime, so a reader can check each number against the file.
  */
 
+/** One OmniSVG model's token layout (config.yaml's per-size block + the shared ones). */
+export interface OmniSvgVariant {
+  readonly baseOffset: number;
+  readonly numMaskAndEom: number;
+  readonly numSvgEnd: number;
+  readonly pixPad: number;
+  readonly coordPad: number;
+  readonly bbox: number;
+  readonly colorTokenStartRaw: number;
+  readonly maxColorTokens: number;
+  readonly arcParamOffset: number;
+  readonly arcParamRange: number;
+  readonly bos: number;
+  readonly eos: number;
+  readonly cmd: {
+    readonly move: number;
+    readonly line: number;
+    readonly curve: number;
+    readonly arc: number;
+    readonly close: number;
+  };
+}
+
 /** OmniSVG1.1_4B — every value from config.yaml's `4B` block + shared blocks. */
-export const OMNISVG_4B = {
+export const OMNISVG_4B: OmniSvgVariant = {
   baseOffset: 151_936, // tokens.base_offset
   numMaskAndEom: 151_938, // tokens.num_mask_and_eom
   numSvgEnd: 1, // tokens.svg_end
@@ -35,10 +58,23 @@ export const OMNISVG_4B = {
   bos: 196_998, // model.bos_token_id
   eos: 196_999, // model.eos_token_id
   cmd: { move: -5, line: -4, curve: -3, arc: -2, close: -1 }, // svg_commands
-} as const;
+};
+
+/**
+ * OmniSVG1.1_8B — config.yaml's `8B` block: the same grown vocabulary on Qwen
+ * 2.5-VL-7B's larger base (152,064), so every SVG token sits 128 ids higher.
+ * Decoding its output with the 4B's offsets reads every coordinate wrong.
+ */
+export const OMNISVG_8B: OmniSvgVariant = {
+  ...OMNISVG_4B,
+  baseOffset: 152_064, // tokens.base_offset
+  numMaskAndEom: 152_066, // tokens.num_mask_and_eom
+  pixPad: 152_071, // coordinates.pix_pad_offset
+  coordPad: 152_071, // coordinates.coord_pad_offset
+};
 
 /** The derived constants, exactly as `_load_config` computes them. */
-function derived(c: typeof OMNISVG_4B) {
+function derived(c: OmniSvgVariant) {
   const pixelOffset = c.numMaskAndEom - c.baseOffset + c.numSvgEnd - c.cmd.move; // 8
   return {
     pixelOffset,
@@ -51,10 +87,8 @@ function derived(c: typeof OMNISVG_4B) {
   };
 }
 
-const D = derived(OMNISVG_4B);
-
 /** A colour token → CSS colour, as `token_to_color`. 12-bit RGB, each nibble doubled. */
-export function colorFromToken(colorToken: number, c = OMNISVG_4B): string {
+export function colorFromToken(colorToken: number, c: OmniSvgVariant = OMNISVG_4B): string {
   if (colorToken === c.colorTokenStartRaw) return 'none';
   if (colorToken === c.colorTokenStartRaw + 1) return 'currentColor';
   const index = colorToken - (c.colorTokenStartRaw + 2);
@@ -70,7 +104,11 @@ export function colorFromToken(colorToken: number, c = OMNISVG_4B): string {
  * Step 1 — `process_generated_tokens`: each id becomes an (x, y) pair by which
  * range it falls in. Anything outside every range is dropped, as theirs does.
  */
-export function tokensToXY(ids: readonly number[], c = OMNISVG_4B): Array<[number, number]> {
+export function tokensToXY(
+  ids: readonly number[],
+  c: OmniSvgVariant = OMNISVG_4B,
+): Array<[number, number]> {
+  const D = derived(c);
   const out: Array<[number, number]> = [];
   for (const t of ids) {
     if (t >= D.cmdTokenStart && t < D.cmdTokenEnd) {
@@ -123,8 +161,9 @@ const f1 = (n: number): string => n.toFixed(1);
  */
 export function xyToPaths(
   pairs: ReadonlyArray<readonly [number, number]>,
-  c = OMNISVG_4B,
+  c: OmniSvgVariant = OMNISVG_4B,
 ): DecodedPath[] {
+  const D = derived(c);
   const px = pairs.map(([x, y]) => [x - D.pixelOffset, y - D.pixelOffset] as const);
   const paths: DecodedPath[] = [];
   /** Sub-paths finished (by a move or a close) since the last colour. */
@@ -197,7 +236,7 @@ export function xyToPaths(
 }
 
 /** The whole file, formatted the way their `SVG.to_str()` writes it. */
-export function pathsToSvg(paths: readonly DecodedPath[], c = OMNISVG_4B): string {
+export function pathsToSvg(paths: readonly DecodedPath[], c: OmniSvgVariant = OMNISVG_4B): string {
   const body = paths
     .map((p) => `<path fill="${p.fill}" fill-opacity="1.0"  filling="0" d="${p.d}"></path>`)
     .join('');
@@ -212,7 +251,7 @@ export function pathsToSvg(paths: readonly DecodedPath[], c = OMNISVG_4B): strin
  */
 export function decodeOmniSvg(
   ids: readonly number[],
-  c = OMNISVG_4B,
+  c: OmniSvgVariant = OMNISVG_4B,
 ): { svg: string; paths: number } | null {
   const body: number[] = [];
   for (const t of ids) {
@@ -267,7 +306,7 @@ export function loopStart(
  */
 export function decodeOmniSvgPartial(
   ids: readonly number[],
-  c = OMNISVG_4B,
+  c: OmniSvgVariant = OMNISVG_4B,
 ): { svg: string; paths: number; drawing: boolean } | null {
   const body: number[] = [];
   for (const t of ids) {

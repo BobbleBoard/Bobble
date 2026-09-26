@@ -8,6 +8,7 @@ import {
   decodeOmniSvgPartial,
   loopStart,
   OMNISVG_4B,
+  OMNISVG_8B,
 } from './omnisvg-decode';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -60,6 +61,26 @@ describe('OmniSVG token decoding — against their decoder', () => {
   it('returns null rather than an empty file when nothing decodes', () => {
     expect(decodeOmniSvg([OMNISVG_4B.bos, OMNISVG_4B.eos])).toBeNull();
     expect(decodeOmniSvg([1, 2, 3])).toBeNull();
+  });
+});
+
+describe('the 8B — the same drawing, 128 ids higher', () => {
+  /* config.yaml: the 8B grows Qwen 2.5-VL-7B's 152,064-id vocabulary where the
+     4B grew the 3B's 151,936, so every SVG token sits 128 higher — and the
+     4B's offsets read every one of them wrong. */
+  it('decodes an 8B sequence exactly as the 4B one it mirrors', () => {
+    const four = ids('omnisvg-fox.ids.json');
+    const shift = OMNISVG_8B.baseOffset - OMNISVG_4B.baseOffset;
+    expect(shift).toBe(128);
+    const eight = four.map((t) =>
+      t >= OMNISVG_4B.baseOffset && t < OMNISVG_4B.bos ? t + shift : t,
+    );
+    const a = decodeOmniSvg(four);
+    const b = decodeOmniSvg(eight, OMNISVG_8B);
+    expect(b?.svg).toBe(a?.svg);
+    expect(b?.paths).toBeGreaterThan(0);
+    // …and read with the 4B's offsets, it is not the drawing.
+    expect(decodeOmniSvg(eight)?.svg).not.toBe(a?.svg);
   });
 });
 
