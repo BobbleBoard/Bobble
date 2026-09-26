@@ -794,3 +794,84 @@ describe('JavaScript a small model writes into JSON', () => {
     );
   });
 });
+
+describe('the 4B’s second round (2026-09-26): the forms it reached for next', () => {
+  const fig = (shapes: unknown[], extra: Record<string, unknown> = {}) =>
+    normalizeMathSpec({
+      title: 'F',
+      figure: { view: { x: '0..10', y: '0..10' }, shapes },
+      ...extra,
+    });
+
+  it('reads sliders as a list of one-key dictionaries, and Math.PI in a range', () => {
+    const s = normalizeMathSpec({
+      title: 'P',
+      params: [{ t: { min: 0, max: 4, step: 0.1 } }, { g: 9.8 }],
+      plot: { x: '0..Math.PI', curves: ['sin(x)*t'] },
+    });
+    expect(s.params.map((p) => [p.name, p.hidden === true])).toEqual([
+      ['t', false],
+      ['g', true],
+    ]);
+    expect(s.plot?.x.max).toBeCloseTo(Math.PI, 12);
+  });
+
+  it('reads an arrow as a start and a direction, and a rectangle by its centre or two corners', () => {
+    const s = fig([
+      { id: 'v', kind: 'vector', center: [1, 1], direction: [2, 0] },
+      { id: 'ground', kind: 'rectangle', center: [5, 1], width: 10, height: 2 },
+      { id: 'sq', kind: 'rect', from: [0, 0], to: [2, 3] },
+    ]);
+    const [v, g, sq] = s.figure?.shapes ?? [];
+    expect(v).toMatchObject({ kind: 'vector', from: [1, 1], to: [3, 1] });
+    expect(g?.kind === 'polygon' && g.points[0]).toEqual([0, 0]);
+    expect(sq?.kind === 'polygon' && sq.points[2]).toEqual([2, 3]);
+  });
+
+  it('says exactly how to write a curve given as "x": [..], "y": [..]', () => {
+    expect(() => fig([{ id: 'path', kind: 'curve', x: [0, 300], y: ['a', 'b'] }])).toThrow(
+      /"x" and "y" are each ONE expression in a variable of their own/,
+    );
+  });
+
+  it('reads steps whose moves are a list of actions, and highlights given as objects', () => {
+    const s = normalizeMathSpec({
+      title: 'L',
+      params: ['m = 1 in -5..5'],
+      plot: { x: '-5..5', curves: [{ id: 'c1', expr: 'm*x' }] },
+      steps: [
+        {
+          title: 'What is m?',
+          explanation: 'm is the slope.',
+          highlight: [{ type: 'highlighter', text: 'c1' }],
+          set: [{ type: 'nudge', element: 'm', value: 2.5 }],
+        },
+        { text: 'Steeper.', highlight: ['c1'], set: [{ type: 'set', element: 'm', value: 4 }] },
+      ],
+    });
+    expect(s.steps[0]).toMatchObject({ highlight: ['c1'], set: { m: 2.5 }, nudge: { m: 1 } });
+    expect(s.steps[1]).toMatchObject({ set: { m: 4 } });
+    expect(s.steps[1]?.nudge).toBeUndefined();
+  });
+
+  it('cuts a long line at the edge and says nothing; a line with nothing in view is said', () => {
+    const r = renderMath({
+      title: 'T',
+      params: ['a = 1 in 0..3'],
+      figure: {
+        view: { x: '0..4', y: '-2..2' },
+        shapes: [
+          { id: 'tangent', kind: 'segment', from: ['a - 1000', -1], to: ['a + 1000', 1] },
+          { id: 'far', kind: 'segment', from: [50, 50], to: [60, 60] },
+        ],
+      },
+      steps: [
+        { text: 'A tangent.', highlight: ['tangent'], set: { a: 1 } },
+        { text: 'Moved.', highlight: ['tangent'], set: { a: 2 } },
+      ],
+    });
+    const said = r.problems.map((p) => p.text).join('\n');
+    expect(said).not.toMatch(/tangent/);
+    expect(said).toMatch(/far — lies entirely outside the figure/);
+  });
+});

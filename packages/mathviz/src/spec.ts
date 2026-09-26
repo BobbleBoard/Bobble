@@ -456,6 +456,16 @@ function param(v: unknown, i: number): Param {
     return param({ name: m[1], value: start, min: r.min, max: r.max }, i);
   }
   if (!isObj(v)) throw new SpecError(`slider ${i + 1} needs {name, min, max, value}`);
+  /* [{"t": {"min": 0, "max": 4}}] — one slider as a one-key dictionary (MEASURED: the 4B's projectile). */
+  const keys = Object.keys(v);
+  const only = keys.length === 1 ? keys[0] : undefined;
+  if (only !== undefined && /^[a-zA-Z_]\w*$/.test(only) && !['name', 'id', 'var'].includes(only)) {
+    const inner = v[only];
+    if (isObj(inner)) return param({ name: only, ...inner }, i);
+    if (typeof inner === 'number') return constant(only, inner);
+    if (typeof inner === 'string' && /\.\.|\bto\b/.test(inner))
+      return param({ name: only, range: inner }, i);
+  }
   const named = str(v.name ?? v.id ?? v.var ?? v.symbol);
   /* "Slope (m)" — a caption with the name in brackets, or ending in it
      (MEASURED: the 4B's sliders for y = mx + c). */
@@ -929,12 +939,29 @@ function shapeBody(v: unknown, i: number, named: Map<string, Xy>, names: readonl
     case 'arrow':
     case 'force': {
       const isVec = kind !== 'segment';
+      /* An arrow as its ends by other names, or as a start and a direction —
+         MEASURED (the 4B): {"center": [x, y], "direction": [dx, dy]}. */
+      const startKey = ['from', 'start', 'tail', 'origin', 'at', 'center', 'base'].find(
+        (k) => v[k] !== undefined,
+      );
+      const endKey = ['to', 'end', 'tip', 'head'].find((k) => v[k] !== undefined);
+      const dirIn = v.direction ?? v.dir ?? v.vector ?? v.components ?? v.delta;
+      if (startKey === undefined) throw new SpecError(`${id}.from needs a point: [x, y]`);
+      const from = at(startKey);
+      let to: Xy;
+      if (endKey !== undefined) to = at(endKey);
+      else if (Array.isArray(dirIn) && dirIn.length === 2) {
+        const d = xy(dirIn, `${id}.direction`);
+        const plus = (a: Num, b: Num): Num =>
+          typeof a === 'number' && typeof b === 'number' ? a + b : `(${a})+(${b})`;
+        to = [plus(from[0], d[0]), plus(from[1], d[1])];
+      } else throw new SpecError(`${id}.to needs a point: [x, y] — or give "direction": [dx, dy]`);
       return {
         id,
         appear,
         kind: isVec ? 'vector' : 'segment',
-        from: at('from'),
-        to: at('to'),
+        from,
+        to,
         ...L,
         dashed: v.dashed === true || v.hidden === true,
         role: role(v.role ?? v.color, isVec ? 'main' : 'reference'),
@@ -945,11 +972,36 @@ function shapeBody(v: unknown, i: number, named: Map<string, Xy>, names: readonl
     case 'block':
     case 'wall': {
       if (v.points === undefined && v.vertices === undefined) {
-        const [x0, y0] = at('at' in v ? 'at' : 'from');
+        if ((v.w ?? v.width) === undefined && ('from' in v || 'at' in v) && 'to' in v) {
+          // By two opposite corners (MEASURED: the 4B's "large-square", {"from": [0, 0], "to": [1, 1]}).
+          return shape(
+            {
+              ...v,
+              kind: 'polygon',
+              vertices: undefined,
+              ...cornersOf(v.from ?? v.at, v.to),
+            },
+            i,
+            named,
+            names,
+          );
+        }
         const w = numOrExpr(v.w ?? v.width, `${id}.w`, names);
         const h = numOrExpr(v.h ?? v.height, `${id}.h`, names);
         const add = (a: Num, b: Num): Num =>
           typeof a === 'number' && typeof b === 'number' ? a + b : `(${a})+(${b})`;
+        const half = (a: Num, d: Num): Num =>
+          typeof a === 'number' && typeof d === 'number' ? a - d / 2 : `(${a})-(${d})/2`;
+        // By its corner ("at"/"from"), or by its centre (MEASURED: the 4B's ground, {"center", "width", "height"}).
+        let x0: Num;
+        let y0: Num;
+        if ('at' in v || 'from' in v || 'corner' in v)
+          [x0, y0] = at('at' in v ? 'at' : 'from' in v ? 'from' : 'corner');
+        else if ('center' in v || 'centre' in v) {
+          const [cx, cy] = at('center' in v ? 'center' : 'centre');
+          x0 = half(cx, w);
+          y0 = half(cy, h);
+        } else [x0, y0] = at('at');
         return {
           id,
           appear,
@@ -983,6 +1035,10 @@ function shapeBody(v: unknown, i: number, named: Map<string, Xy>, names: readonl
         if (f !== null) return f;
       }
       const ptsIn = v.points ?? v.vertices ?? v.through;
+      if ((!Array.isArray(ptsIn) || ptsIn.length < 2) && (v.x !== undefined || v.y !== undefined))
+        throw new SpecError(
+          `${id} (a curve): "x" and "y" are each ONE expression in a variable of their own, over a "range" — e.g. "x": "v0*cos(a)*s", "y": "v0*sin(a)*s - 4.9*s^2", "range": "0..t" draws the path up to t`,
+        );
       if (!Array.isArray(ptsIn) || ptsIn.length < 2)
         throw new SpecError(`${id} needs 2 or more points`);
       return {
@@ -1647,6 +1703,25 @@ function normalizeParsed(v: Loose, found: { any: boolean }, auto: readonly strin
       set[k] = numOrExpr(val, `step ${i + 1} sets ${k}`, names);
     const nudgeIn = s.nudge ?? s.wiggle ?? s.jiggle;
     const nudge: Record<string, Num> = {};
+    /* "set": [{"type": "nudge", "element": "m", "value": 2.5}] — the moves as a
+       list of actions (MEASURED: the 4B's y = mx + c, every step). Each moves
+       its slider there; one called a nudge or a wiggle then wiggles it too. */
+    const acts = [
+      ...(Array.isArray(s.set) ? s.set : []),
+      ...(Array.isArray(s.actions) ? s.actions : []),
+      ...(Array.isArray(s.animate) ? s.animate : []),
+    ];
+    for (const a of acts) {
+      if (!isObj(a)) continue;
+      const name = str(a.element ?? a.slider ?? a.param ?? a.name ?? a.target ?? a.id);
+      const val = a.value ?? a.to ?? a.set;
+      if (name === undefined || !names.includes(name) || val === undefined) continue;
+      set[name] = numOrExpr(val, `step ${i + 1} sets ${name}`, names);
+      if (/nudge|wiggle|jiggle|vary|sweep/i.test(str(a.type ?? a.kind ?? a.action) ?? '')) {
+        const p = params.find((q) => q.name === name);
+        if (p !== undefined) nudge[name] = (p.max - p.min) / 10;
+      }
+    }
     if (typeof nudgeIn === 'string' && names.includes(nudgeIn.trim())) {
       // "nudge": "A" — wiggle A by a tenth of its range.
       const p = [...params].find((q) => q.name === nudgeIn.trim());
@@ -1657,9 +1732,14 @@ function normalizeParsed(v: Loose, found: { any: boolean }, auto: readonly strin
     }
     return {
       text,
-      highlight: list(s.highlight ?? s.show ?? s.focus ?? s.points_at ?? s.refs).map((h) =>
-        String(h),
-      ),
+      // A highlight given as {"type": "highlighter", "text": "c1"} names its part in one of its fields.
+      highlight: list(s.highlight ?? s.show ?? s.focus ?? s.points_at ?? s.refs)
+        .map((h) =>
+          isObj(h)
+            ? str(h.id ?? h.part ?? h.target ?? h.element ?? h.ref ?? h.text ?? h.name)
+            : String(h),
+        )
+        .filter((h): h is string => h !== undefined),
       set,
       ...(Object.keys(nudge).length > 0 ? { nudge } : {}),
     };
@@ -1704,6 +1784,20 @@ function normalizeParsed(v: Loose, found: { any: boolean }, auto: readonly strin
           );
         return out;
       })(),
+    ],
+  };
+}
+
+/** A rectangle's four corners from two opposite ones: {"from": [x0, y0], "to": [x1, y1]}. */
+function cornersOf(a: unknown, b: unknown): { points: unknown[] } {
+  const A = Array.isArray(a) ? a : [0, 0];
+  const B = Array.isArray(b) ? b : [1, 1];
+  return {
+    points: [
+      [A[0], A[1]],
+      [B[0], A[1]],
+      [B[0], B[1]],
+      [A[0], B[1]],
     ],
   };
 }

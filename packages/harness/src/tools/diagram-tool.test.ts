@@ -251,6 +251,22 @@ describe('diagram', () => {
     expect(existsSync(path.join(root, 'broken.svg'))).toBe(false);
   });
 
+  it('sends a maths or physics figure to math — the 4B passed its lever explanation here', async () => {
+    const said =
+      (
+        await rig().exec(DIAGRAM_TOOL)('1', {
+          title:
+            '# Torque Balance: Small Weight × Long Arm = Heavy Weight × Short Arm. Torque = Force × Distance from Pivot',
+        })
+      ).content[0]?.text ?? '';
+    expect(said).toMatch(/needs its Mermaid source/);
+    expect(said).toContain('the math command draws it');
+    // A flowchart's title does not get the note.
+    const plain =
+      (await rig().exec(DIAGRAM_TOOL)('1', { title: 'Order fulfilment' })).content[0]?.text ?? '';
+    expect(plain).not.toContain('math command');
+  });
+
   it('says what it needs: a source, and the app', async () => {
     expect(
       (await rig().exec(DIAGRAM_TOOL)('1', { title: 'x', source: '  ' })).content[0]?.text,

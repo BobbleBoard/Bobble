@@ -199,7 +199,12 @@ export type Node =
 /** Parse `src` into a tree over the variables in `names`. */
 export function parse(src: string, names: readonly string[]): Node {
   const known = new Set(names);
-  const raw = tokenize(fromLatex(src));
+  // JavaScript's names for the same things — MEASURED (the 4B): "Math.PI" in a range.
+  const js = src
+    .replace(/\bMath\.PI\b/g, 'pi')
+    .replace(/\bMath\.E\b/g, 'e')
+    .replace(/\bMath\.(\w+)\s*\(/g, '$1(');
+  const raw = tokenize(fromLatex(js));
   // Split glued names ("kx", "2pix") before implicit multiplication is inserted.
   const toks: Tok[] = [];
   for (const tk of raw) {

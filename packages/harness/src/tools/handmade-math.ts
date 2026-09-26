@@ -48,6 +48,19 @@ export function mathFigureMarkup(svg: string): boolean {
   return hits.size >= 2 || (hits.size === 1 && /[πθωφ∫∑√²³ΔΣ]/.test(visible));
 }
 
+/**
+ * Words that ask for a maths or physics figure — a lever, forces on a slope, a
+ * graph of a function — in a request or a brief (plain text, not markup).
+ * Two subjects, the same bar as a hand-drawn SVG.
+ */
+export function mathFigureWords(text: string): boolean {
+  const hits = new Set((text.match(SUBJECT) ?? []).map((w) => w.toLowerCase()));
+  const physics =
+    /\b(lever|pivot|fulcrum|torque|moment|weights?|balance|pulley|ramp|incline|friction|gravity|newton)\b/gi;
+  for (const w of text.match(physics) ?? []) hits.add(w.toLowerCase());
+  return hits.size >= 2;
+}
+
 export const HANDMADE_MATH_NOTE =
   'This is a maths or physics visual made by hand. The math command makes this kind of visual in the ' +
   "app's own style — curves as expressions, sliders with Play, steps tied to the parts of the figure — " +

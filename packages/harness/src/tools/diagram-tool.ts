@@ -28,11 +28,13 @@
  * full size. A source Mermaid cannot read comes back as the line and the fix,
  * never as a picture of something else.
  */
+
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { ExtensionAPI } from '@mariozechner/pi-coding-agent';
 import { diagramTheme, type Kit, kitById, loadProjectKit } from '@pi-desktop/design-kit';
 import { Type } from '@sinclair/typebox';
+import { mathFigureWords } from './handmade-math.js';
 import type { DiagramRenderReply, DiagramRenderRequest, PresentBridge } from './present.js';
 import { pathForModel } from './workspace-relative.js';
 
@@ -377,8 +379,15 @@ export function registerDiagramTool(pi: ExtensionAPI, deps: DiagramToolDeps): vo
         );
       }
       if (rawSource.trim() === '') {
+        /* A maths or physics figure is not a flowchart — MEASURED (the 4B,
+           "explain with a diagram why a small weight far from the pivot can
+           balance a heavy one"): it passed its whole explanation to diagram,
+           was told to write Mermaid, and answered in Markdown with no figure. */
+        const figure = mathFigureWords(`${title} ${String(p.subtitle ?? '')}`)
+          ? ' But a maths or physics figure — a lever and its weights, forces, a graph — is not a flowchart: the math command draws it, with steps that move it. Write the spec to name.math.json (`math --help` shows one).'
+          : '';
         return errorResult(
-          'diagram needs its Mermaid source: --source "flowchart TD\\n  A[Start] --> B{Paid?}\\n  B -- no --> C[Email]" (one statement per line).',
+          `diagram needs its Mermaid source: --source "flowchart TD\\n  A[Start] --> B{Paid?}\\n  B -- no --> C[Email]" (one statement per line).${figure}`,
         );
       }
       const subtitle =

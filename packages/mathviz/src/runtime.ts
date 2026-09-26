@@ -1033,8 +1033,22 @@ export function mvFigure(
       case 'vector': {
         const [ax, ay] = pt(sh.from);
         const [bx, by] = pt(sh.to);
-        inView(sh.id, ax, ay);
-        inView(sh.id, bx, by);
+        if (sh.kind === 'vector') {
+          inView(sh.id, ax, ay);
+          inView(sh.id, bx, by);
+        } else if (!mvCrosses(ax, ay, bx, by, x0, x1, y0, y1)) {
+          /* A line may run past the edge — a tangent drawn long, a ground wider
+             than the view — and is simply cut there. MEASURED (the 4B): thirty
+             "outside the figure" lines for tangents drawn to x = ±1500, and it
+             gave up fixing. Only a line with nothing in view is said. */
+          outside.push({
+            id: sh.id,
+            what: Number.isFinite(ax + ay + bx + by)
+              ? `lies entirely outside the figure (x ${mvFmt(fig.x[0])} to ${mvFmt(fig.x[1])}, y ${mvFmt(fig.y[0])} to ${mvFmt(fig.y[1])})`
+              : 'it has no value at these settings',
+          });
+          break;
+        }
         const [X1, Y1] = [fx(ax), fy(ay)];
         const [X2, Y2] = [fx(bx), fy(by)];
         const len = Math.hypot(X2 - X1, Y2 - Y1);
@@ -1237,9 +1251,14 @@ export function mvFigure(
           if (Number.isFinite(wx) && Number.isFinite(wy)) world.push([wx, wy]);
         }
         if (world.length < 2) break;
-        for (const q of [0, Math.floor(world.length / 2), world.length - 1]) {
-          const w = world[q];
-          if (w !== undefined) inView(sh.id, w[0] ?? 0, w[1] ?? 0);
+        // Like a line, a curve may run past the edge; only one with nothing in view is said.
+        if (
+          !world.some(
+            (w) => (w[0] ?? 0) >= x0 && (w[0] ?? 0) <= x1 && (w[1] ?? 0) >= y0 && (w[1] ?? 0) <= y1,
+          )
+        ) {
+          outside.push({ id: sh.id, what: 'lies entirely outside the figure' });
+          break;
         }
         const pts = world.map((w) => [fx(w[0] ?? 0), fy(w[1] ?? 0)] as [number, number]);
         const d = pts
@@ -1671,6 +1690,41 @@ export function mvFigure(
 }
 
 /** Points along a segment, a few pixels apart — what a label must keep clear of. */
+/** Does the segment from (ax, ay) to (bx, by) cross the box [x0, x1] × [y0, y1]? (Liang–Barsky.) */
+function mvCrosses(
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+  x0: number,
+  x1: number,
+  y0: number,
+  y1: number,
+): boolean {
+  if (!Number.isFinite(ax + ay + bx + by)) return false;
+  const dx = bx - ax;
+  const dy = by - ay;
+  let lo = 0;
+  let hi = 1;
+  const edges: [number, number][] = [
+    [-dx, ax - x0],
+    [dx, x1 - ax],
+    [-dy, ay - y0],
+    [dy, y1 - ay],
+  ];
+  for (const [p, q] of edges) {
+    if (p === 0) {
+      if (q < 0) return false;
+      continue;
+    }
+    const r = q / p;
+    if (p < 0) lo = Math.max(lo, r);
+    else hi = Math.min(hi, r);
+    if (lo > hi) return false;
+  }
+  return true;
+}
+
 function mvSampleLine(x1: number, y1: number, x2: number, y2: number): number[] {
   const n = Math.max(2, Math.ceil(Math.hypot(x2 - x1, y2 - y1) / 6));
   const out: number[] = [];
@@ -2229,6 +2283,7 @@ export const RUNTIME_FUNCTIONS = [
   mvAround,
   mvHead,
   mvFigure,
+  mvCrosses,
   mvSampleLine,
   mvEsc,
   mvRichSvg,

@@ -435,16 +435,27 @@ export async function drawMath(
       }
     }
   }
+  /* A few at a time — MEASURED (the 4B): thirty problems in one reply, and it
+     fixed none of them and answered the user. The first ones are the ones to do. */
+  const first = <T>(xs: readonly T[], n: number) => xs.slice(0, n);
+  const more = (n: number, of: number) =>
+    of > n ? [`- (and ${of - n} more like these — fix these first)`] : [];
   if (fixes.length > 0) {
-    lines.push(`Checks — ${fixes.length} to fix:`, ...fixes.map((x) => `- ${x.text}`));
-    if (warns.length > 0) lines.push('Also:', ...warns.map((x) => `- ${x.text}`));
+    lines.push(
+      `Checks — ${fixes.length} to fix:`,
+      ...first(fixes, 5).map((x) => `- ${x.text}`),
+      ...more(5, fixes.length),
+    );
+    if (warns.length > 0 && fixes.length <= 5)
+      lines.push('Also:', ...first(warns, 3).map((x) => `- ${x.text}`), ...more(3, warns.length));
     lines.push(
       `Fix ${fixes.length === 1 ? 'it' : 'them'} in ${specRel} and run \`math ${specRel}\` again.`,
     );
   } else if (warns.length > 0) {
     lines.push(
       'Checks — nothing overlaps or leaves the view. To improve:',
-      ...warns.map((x) => `- ${x.text}`),
+      ...first(warns, 4).map((x) => `- ${x.text}`),
+      ...more(4, warns.length),
     );
     lines.push(`(Change ${specRel} and run \`math ${specRel}\` again, or leave it.)`, REPLY);
   } else {
