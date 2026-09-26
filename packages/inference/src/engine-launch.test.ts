@@ -139,28 +139,4 @@ describe('rapid-mlx vision lane (the user 2026-09-23: vision on by default)', ()
     expect(l.args).not.toContain('--speculative-config');
     expect(l.args).not.toContain('--no-spec-decode');
   });
-
-  /* MEASURED 2026-09-25: a presented page came back as a picture in a
-     12,041-token conversation and rapid-mlx refused it — its vision budget
-     (8,192 by default) is for the whole prompt, not the picture. */
-  it('lets a picture ride in a conversation as long as the context the app runs', () => {
-    const vision = assembleEngineLaunch(
-      { engine: 'rapid-mlx', spec: 'none' },
-      { ...base, vision: true, contextWindow: 32_768 },
-    );
-    const at = vision.args.indexOf('--vision-prefill-token-budget');
-    expect(at).toBeGreaterThan(-1);
-    expect(vision.args[at + 1]).toBe('32768');
-    // The text lane has no such budget, and nothing is invented without a window.
-    const text = assembleEngineLaunch(
-      { engine: 'rapid-mlx', spec: 'none' },
-      { ...base, contextWindow: 32_768 },
-    );
-    expect(text.args).not.toContain('--vision-prefill-token-budget');
-    const unknown = assembleEngineLaunch(
-      { engine: 'rapid-mlx', spec: 'none' },
-      { ...base, vision: true },
-    );
-    expect(unknown.args).not.toContain('--vision-prefill-token-budget');
-  });
 });

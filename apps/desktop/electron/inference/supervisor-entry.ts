@@ -1797,7 +1797,6 @@ async function startExternalEngine(
           ...(draftDir !== undefined ? { draftDir } : {}),
           modelRoot: omlxModelRoot(),
           ...(laneVision ? { vision: true } : {}),
-          contextWindow,
         });
         servedModelId = launch.servedModelId;
         return [...launch.args, ...userArgsFor(engine)];

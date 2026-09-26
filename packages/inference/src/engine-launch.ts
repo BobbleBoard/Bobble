@@ -49,17 +49,6 @@ export interface EngineLaunchConfig {
    * vision launch carries no spec flags at all — see vision-launch.ts.
    */
   readonly vision?: boolean;
-  /**
-   * The context the app runs the model at (chooseContextCap). On rapid-mlx's
-   * vision lane it is also the most prompt a request carrying a picture may
-   * have: rapid-mlx's own default is 8,192 tokens for the WHOLE conversation,
-   * and MEASURED 2026-09-25 (the visual suite, 4B) a page the model had
-   * written and then `present`ed came back as a picture in a 12,041-token
-   * conversation — "Vision-request prompt tokens (12041) exceeds the
-   * per-batch cap (8192)", and the turn ended in "The local model server
-   * returned an error".
-   */
-  readonly contextWindow?: number;
 }
 
 export interface EngineLaunch {
@@ -150,12 +139,7 @@ export function assembleEngineLaunch(
           '--served-model-name',
           cfg.servedModelId,
           ...(cfg.vision === true
-            ? [
-                '--mllm',
-                ...(cfg.contextWindow !== undefined
-                  ? ['--vision-prefill-token-budget', String(cfg.contextWindow)]
-                  : []),
-              ]
+            ? ['--mllm']
             : rapidSpec(profile.spec, profile.spec === 'dflash' ? needsDraft() : cfg.draftDir)),
         ],
         healthPath: '/v1/models',
