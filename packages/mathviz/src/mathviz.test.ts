@@ -279,3 +279,21 @@ describe('TeX typed into JSON with one backslash', () => {
     expect(s.steps[0]?.text).toBe('Half is $\\frac{1}{2}$, and \\frac stays.\nThe end.');
   });
 });
+
+describe('a spec written like code', () => {
+  it('reads comments, single quotes, bare keys and trailing commas — and leaves strings alone', () => {
+    const js = `{
+      // the plot
+      title: 'Don\\'t "panic"', /* a block */
+      plot: { x: '0..1', curves: ['x^2',], },
+      steps: ['Look: // this is text, not a comment',],
+    }`;
+    const s = normalizeMathSpec(js);
+    expect(s.title).toBe('Don\'t "panic"');
+    expect(s.plot?.curves[0]?.expr).toBe('x^2');
+    expect(s.steps[0]?.text).toBe('Look: // this is text, not a comment');
+  });
+  it('still says where strict JSON broke when it is beyond saving', () => {
+    expect(() => normalizeMathSpec('{"title": "x", plot: {')).toThrow(/not JSON/);
+  });
+});

@@ -96,22 +96,14 @@ function resolveAgainst(root: string, p: string): string {
 
 /** JSON as a model pastes it: inside a ``` fence, or with a trailing comma. */
 export function looseJson(text: string): unknown {
-  // TeX typed with one backslash (`\frac`, `\theta`) is TeX, not a JSON escape.
-  const t = texSafeJson(
+  // Fenced or not; TeX with one backslash is TeX; comments, single quotes,
+  // bare keys and trailing commas read (mathviz lenientJson).
+  return lenientJson(
     text
       .trim()
       .replace(/^```(?:json)?\s*/i, '')
       .replace(/\s*```$/, ''),
   );
-  try {
-    return JSON.parse(t);
-  } catch (first) {
-    try {
-      return JSON.parse(t.replace(/,\s*([}\]])/g, '$1'));
-    } catch {
-      throw first;
-    }
-  }
 }
 
 /** The spec's parts passed as flags (`--title … --plot '{…}' --steps '[…]'`), put together. */

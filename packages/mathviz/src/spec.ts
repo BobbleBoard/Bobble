@@ -724,12 +724,67 @@ export function texSafeJson(text: string): string {
   return text.replace(LONE_TEX, '\\\\');
 }
 
+/**
+ * JSON AS A MODEL WRITES IT WHEN THE SPEC FEELS LIKE CODE: `// comments`,
+ * `/* blocks *\/`, 'single-quoted' strings, bare keys ({title: …}), trailing
+ * commas. Tried only after strict JSON fails; a string-aware pass, so nothing
+ * inside a string is touched.
+ */
+export function lenientJson(text: string): unknown {
+  const src = texSafeJson(text);
+  try {
+    return JSON.parse(src);
+  } catch (strict) {
+    let out = '';
+    let i = 0;
+    while (i < src.length) {
+      const c = src[i] ?? '';
+      if (c === '"' || c === "'") {
+        // A string: copied through, single quotes becoming double.
+        let j = i + 1;
+        let body = '';
+        while (j < src.length && src[j] !== c) {
+          if (src[j] === '\\') {
+            body += (src[j] ?? '') + (src[j + 1] ?? '');
+            j += 2;
+            continue;
+          }
+          body += c === "'" && src[j] === '"' ? '\\"' : (src[j] ?? '');
+          j += 1;
+        }
+        out += `"${c === "'" ? body.replace(/\\'/g, "'") : body}"`;
+        i = j + 1;
+      } else if (c === '/' && src[i + 1] === '/') {
+        while (i < src.length && src[i] !== '\n') i += 1;
+      } else if (c === '/' && src[i + 1] === '*') {
+        const end = src.indexOf('*/', i + 2);
+        i = end < 0 ? src.length : end + 2;
+      } else if (/[A-Za-z_$]/.test(c) && /[{,]\s*$/.test(out)) {
+        // A bare key: quoted.
+        let j = i;
+        while (j < src.length && /[\w$]/.test(src[j] ?? '')) j += 1;
+        const word = src.slice(i, j);
+        out += /^\s*:/.test(src.slice(j)) ? `"${word}"` : word;
+        i = j;
+      } else {
+        out += c;
+        i += 1;
+      }
+    }
+    try {
+      return JSON.parse(out.replace(/,(\s*[}\]])/g, '$1'));
+    } catch {
+      throw strict;
+    }
+  }
+}
+
 /** The spec as the renderer reads it, from whatever the model wrote. */
 export function normalizeMathSpec(input: unknown): MathSpec {
   let v: unknown = input;
   if (typeof v === 'string') {
     try {
-      v = JSON.parse(texSafeJson(v));
+      v = lenientJson(v);
     } catch (e) {
       throw new SpecError(`the spec is not JSON (${e instanceof Error ? e.message : String(e)})`);
     }
