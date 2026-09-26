@@ -95,10 +95,10 @@ import { buildComfyImageJob, isComfyImageModel } from './image-dispatch';
 import { createRoomKeeper, type RoomKeeper } from './make-room';
 import { generateSvg, omniSvgFiles } from './omnisvg';
 import { omniSvgPictureBase64, vfigFigureBase64 } from './omnisvg-picture';
-import { generateVfigSvg } from './vfig';
 import { PendingJobs, unlessStopped } from './pending-jobs';
 import { canEnhance, type EnhancerEndpoint, enhancePrompt } from './prompt-enhancer';
 import { parseTqdm } from './tqdm';
+import { generateVfigSvg } from './vfig';
 import {
   buildVideoJob,
   clipSeconds,
@@ -1270,7 +1270,13 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
           /** VFIG: the SVG file to change (fenced to the working folder by the tool). */
           edit?: string;
         };
-        const name = slug(p.prompt ?? p.images?.[0] ?? 'svg', 'svg');
+        // Named after the ask — or the picture or file's own name, never its whole path.
+        const source = p.images?.[0] ?? p.edit;
+        const name = slug(
+          p.prompt ??
+            (source !== undefined ? path.basename(source).replace(/\.[^.]+$/, '') : 'svg'),
+          'svg',
+        );
         const outputDir = path.join(outputRoot, uniqueName(outputRoot, name));
         const prompt = p.prompt === undefined ? {} : { prompt: p.prompt };
         /* A drawing is not a queue job, so it gets an id of its own that
