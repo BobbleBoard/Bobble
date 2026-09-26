@@ -745,7 +745,10 @@ const MATH_MARKUP =
 /** `generate_svg` — OmniSVG. Registered on its own so the connector can turn it
  *  on without the generation experiment. See the block below for the ask. */
 function registerSvgTool(pi: ExtensionAPI, bridge: GenBridge | null, engines: SvgEngines): void {
-  pi.registerTool({
+  /* SHARED, like every tool here: the CLI runs only tools on the bus. A plain
+     pi.registerTool left `svg` "no such command" in bash-CLI mode (MEASURED,
+     vfig-svg-probe, 2026-09-25) while pi itself still listed it. */
+  shareTool(pi, {
     name: GENERATE_SVG_TOOL,
     label: 'Generate: SVG',
     description:

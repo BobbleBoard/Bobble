@@ -82,3 +82,19 @@ describe('a picture to trace, named relative to the working folder', () => {
     }
   });
 });
+
+describe('on the tool bus', () => {
+  it('every command this extension registers is shared — the CLI runs nothing else', async () => {
+    const { resetToolBus, sharedToolNames } = await import('@pi-desktop/tool-bus');
+    const { registerGenTools } = await import('./tools');
+    resetToolBus();
+    const registered: string[] = [];
+    registerGenTools({ registerTool: (d: { name: string }) => registered.push(d.name) } as never, {
+      bridge: null,
+      media: true,
+      svgEngines: { omnisvg: true, vfig: true },
+    });
+    expect(registered).toContain('generate_svg');
+    expect(sharedToolNames().sort()).toEqual([...registered].sort());
+  });
+});
