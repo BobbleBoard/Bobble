@@ -38,7 +38,8 @@ import type {
   VideoJobSpec,
 } from '@pi-desktop/gen-service';
 import { readPngChunks, readPngHead, stillOfApng } from './apng.js';
-import { FRAMES_DIR, frameFileName } from './hyperframes-still.js';
+import { FRAMES_DIR, frameFileName, secondsFromPrompt } from './hyperframes-still.js';
+import { looksLikeScene } from './hyperframes-templates.js';
 
 /** Options a runner accepts (the {@link JobRunner} tail). */
 export interface VideoRunOptions {
@@ -207,6 +208,21 @@ export function buildVideoJob(
   }
 
   throw new Error(`video model "${model.id}" has unsupported backend "${model.backend}"`);
+}
+
+/**
+ * A clip's length: the caller's, else the one its prompt says ("a 6-second
+ * intro"), else 5 s — whole seconds, 1 to 60.
+ *
+ * MEASURED (the visual suite): "a 6-second animated intro" came out 5.0 s.
+ * The 5-s default was filled in before HyperFrames could read the prompt, so
+ * its own reading never applied. A scene's CSS durations ("animation: rise
+ * 0.9s") are not the clip's, so a prompt that IS a scene says nothing here.
+ */
+export function clipSeconds(seconds: number | undefined, prompt: string): number {
+  const said =
+    seconds === undefined && !looksLikeScene(prompt) ? secondsFromPrompt(prompt) : undefined;
+  return Math.max(1, Math.min(60, Math.round(seconds ?? said ?? 5)));
 }
 
 /** Extracts a still poster frame from a produced video, or `undefined` on failure. */

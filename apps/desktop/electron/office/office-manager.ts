@@ -485,6 +485,66 @@ function buildView(
   return view;
 }
 
+/**
+ * AN EDITOR NOBODY SEES, for the model's look at a whole document
+ * (office-look.ts). Built through the same seam as a tab's editor, on a
+ * hidden window of its own at the size asked for — never attached to the
+ * person's canvas, so paging through a deck here moves nothing they are
+ * looking at. Null when the editors are not in this build.
+ */
+export function openLookView(
+  kind: OfficeKind,
+  filePath: string,
+  size: { width: number; height: number },
+): { view: WebContentsView; close: () => void } | null {
+  const s = loadSeam();
+  if (s === null) return null;
+  const win = new BrowserWindow({
+    width: size.width,
+    height: size.height,
+    show: false,
+    frame: false,
+    paintWhenInitiallyHidden: true,
+    webPreferences: { backgroundThrottling: false },
+  });
+  let view: WebContentsView;
+  try {
+    view = makeView(s, kind, filePath);
+  } catch (err) {
+    log.warn('office look view failed', { kind, err: String(err) });
+    win.destroy();
+    return null;
+  }
+  const applyChrome = (): void => {
+    void view.webContents?.insertCSS(HIDE_AI_DOCK_CSS).catch(() => undefined);
+    applyToView(view.webContents);
+  };
+  view.webContents.on('dom-ready', applyChrome);
+  view.webContents.on('did-finish-load', applyChrome);
+  win.contentView.addChildView(view);
+  view.setBounds({ x: 0, y: 0, width: size.width, height: size.height });
+  return {
+    view,
+    close: () => {
+      try {
+        win.contentView.removeChildView(view);
+      } catch {
+        /* window already gone */
+      }
+      try {
+        const wc = view.webContents;
+        if (wc && !wc.isDestroyed()) {
+          if (kind === 'docs') seam?.teardownDocsRenderer(wc);
+          wc.close();
+        }
+      } catch (err) {
+        log.warn('office look view teardown', { err: String(err) });
+      }
+      if (!win.isDestroyed()) win.destroy();
+    },
+  };
+}
+
 /* ── live reload ─────────────────────────────────────────────────────────── */
 
 /**

@@ -443,3 +443,83 @@ export function stillOfApng(png: Uint8Array): Buffer | undefined {
     ...kept.flatMap((c) => chunkParts(c.type, [c.data])),
   ]);
 }
+
+/** An animation, as a few stills across it: when each is, and the whole length. */
+export interface ApngMoments {
+  /** Standalone PNGs, in time order. */
+  readonly frames: readonly Buffer[];
+  /** When each is shown, in seconds from the start. */
+  readonly at: readonly number[];
+  /** Frames in the animation, and its length in seconds. */
+  readonly total: number;
+  readonly seconds: number;
+}
+
+/**
+ * `count` moments of an animated PNG, evenly across it, as stills a vision
+ * model can read — its first and last frame included.
+ *
+ * WHY. A decoder that knows nothing of APNG shows the default image, which for
+ * every animation written here is frame 0. MEASURED (the visual suite's
+ * channel intro): frame 0 of a title that bounces in is an empty dark card —
+ * the model was handed that, and described "the title bouncing playfully".
+ * Undefined for a still, and for an APNG whose frames are not whole-canvas
+ * replacements (the only kind apng.ts writes), which would need compositing.
+ */
+export function apngMoments(png: Uint8Array, count: number): ApngMoments | undefined {
+  const chunks = readPngChunks(png);
+  const header = (chunks[0] as PngChunk).data;
+  if (!chunks.some((c) => c.type === 'acTL')) return undefined;
+  const width = header.readUInt32BE(0);
+  const height = header.readUInt32BE(4);
+  // Everything a still needs besides its data: IHDR's companions before the image.
+  const preamble = chunks.filter(
+    (c, i) =>
+      i > 0 &&
+      i < chunks.findIndex((x) => x.type === 'IDAT') &&
+      !['acTL', 'fcTL', 'fdAT', 'IDAT'].includes(c.type),
+  );
+  const frames: { data: Buffer[]; delay: number }[] = [];
+  for (const c of chunks) {
+    if (c.type === 'fcTL') {
+      const [w, h, x, y] = [0, 4, 8, 12].map((o) => c.data.readUInt32BE(4 + o));
+      if (w !== width || h !== height || x !== 0 || y !== 0) return undefined;
+      const num = c.data.readUInt16BE(20);
+      const den = c.data.readUInt16BE(22) || 100;
+      frames.push({ data: [], delay: num / den });
+    } else if (c.type === 'IDAT' && frames.length > 0) {
+      frames[frames.length - 1]?.data.push(Buffer.from(c.data));
+    } else if (c.type === 'fdAT' && frames.length > 0) {
+      frames[frames.length - 1]?.data.push(Buffer.from(c.data.subarray(4)));
+    }
+  }
+  if (frames.length === 0) return undefined;
+  const starts: number[] = [];
+  let t = 0;
+  for (const f of frames) {
+    starts.push(t);
+    t += f.delay;
+  }
+  const n = Math.max(1, Math.min(count, frames.length));
+  const picks = [
+    ...new Set(
+      Array.from({ length: n }, (_, i) =>
+        n === 1 ? 0 : Math.round((i * (frames.length - 1)) / (n - 1)),
+      ),
+    ),
+  ];
+  return {
+    frames: picks.map((k) =>
+      Buffer.concat([
+        SIGNATURE,
+        ...chunkParts('IHDR', [header]),
+        ...preamble.flatMap((c) => chunkParts(c.type, [c.data])),
+        ...chunkParts('IDAT', [Buffer.concat((frames[k] as { data: Buffer[] }).data)]),
+        ...chunkParts('IEND', []),
+      ]),
+    ),
+    at: picks.map((k) => starts[k] as number),
+    total: frames.length,
+    seconds: t,
+  };
+}

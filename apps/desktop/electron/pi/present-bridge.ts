@@ -28,11 +28,15 @@ import { promisify } from 'node:util';
 import type { DiagramRenderReply, DiagramRenderRequest } from '@pi-desktop/harness/tools/present';
 import { createIpcEventSender, createLogger } from '@pi-desktop/shared';
 import { nativeImage, type WebContents } from 'electron';
+import { apngMoments } from '../gen/apng';
 import { getInferenceVisionReady } from '../inference/llm-main';
 import { wantVision } from '../inference/vision-want';
 import type { AppEventMap } from '../ipc-contract';
+import { type Cell, composeGrid } from '../office/office-grid';
+import { officeLook } from '../office/office-look';
 import { captureViewForFile } from '../office/office-manager';
 import { presentInlinePayload } from './present-inline';
+import type { PageShot } from './render-page';
 
 const log = createLogger('desktop:present');
 /*
@@ -58,8 +62,11 @@ let server: net.Server | null = null;
 let socketPath = '';
 let token = '';
 let getWindow: (() => WebContents | null) | null = null;
-let renderPage: ((filePath: string) => Promise<string | null>) | null = null;
+let renderPage: ((filePath: string) => Promise<PageShot | null>) | null = null;
 let renderSvg: ((filePath: string) => Promise<string | null>) | null = null;
+let renderSheet:
+  | ((files: readonly string[]) => Promise<{ png: string; blank: readonly string[] } | null>)
+  | null = null;
 let renderDiagram: ((req: DiagramRenderRequest) => Promise<DiagramRenderReply>) | null = null;
 
 interface Request {
@@ -212,19 +219,117 @@ async function captureGodotFrame(dir: string): Promise<string | null> {
   }
 }
 
+/** An animated PNG as six moments on one strip, with when each is — or null for a still. */
+export function animationStrip(
+  png: Buffer,
+): { imageBase64: string; mimeType: string; text: string } | null {
+  let m: ReturnType<typeof apngMoments>;
+  try {
+    m = apngMoments(png, 6);
+  } catch {
+    return null;
+  }
+  if (m === undefined) return null;
+  const cells: Cell[] = [];
+  for (const frame of m.frames) {
+    const img = nativeImage.createFromBuffer(frame);
+    if (img.isEmpty()) return null;
+    const fit = img.getSize().width > 420 ? img.resize({ width: 420, quality: 'good' }) : img;
+    const { width, height } = fit.getSize();
+    cells.push({ data: fit.toBitmap(), width, height });
+  }
+  const sheet = composeGrid(cells, { cols: 3, gap: 8, background: [40, 40, 44] });
+  const strip = nativeImage.createFromBitmap(sheet.data, {
+    width: sheet.width,
+    height: sheet.height,
+  });
+  const when = m.at.map((t) => `${t.toFixed(1)} s`).join(', ');
+  return {
+    imageBase64: strip.toPNG().toString('base64'),
+    mimeType: 'image/png',
+    text:
+      `An animation: ${m.total} frames, ${m.seconds.toFixed(1)} s. The capture shows ` +
+      `${m.frames.length} moments of it — left to right, then down: ${when}.`,
+  };
+}
+
 /** Produce the preview for one artefact. Pure-ish; the renderer is injected. */
 /** How much of an SVG's source rides beside its picture. */
 const SVG_SOURCE_HEAD = 900;
+
+/*
+ * A FOLDER OF PICTURES IS SHOWN AS ITS PICTURES. MEASURED (4B, the visual
+ * suite's icon set): the model wrote six SVG icons into assets/icons and
+ * presented the folder — and was handed a listing, "contains 6 entries:
+ * difficulty.svg, favourite.svg, …". It could not see one of the icons it was
+ * asked to make match. A folder that is mostly pictures now comes back as one
+ * sheet of them, each captioned with its name, in name order.
+ */
+const PICTURE_EXT = /\.(?:svg|png|jpe?g|webp|gif)$/i;
+/** The most pictures one sheet shows; the text says when there are more. */
+export const MAX_SHEET_PICTURES = 12;
+
+/** The pictures a folder is made of, in name order — or null when it is not a folder of pictures. */
+export async function picturesOf(dir: string): Promise<string[] | null> {
+  const names = (await readdir(dir)).filter((n) => !n.startsWith('.')).sort();
+  const pictures = names.filter((n) => PICTURE_EXT.test(n));
+  if (pictures.length < 2 || pictures.length * 2 < names.length) return null;
+  return pictures.map((n) => path.join(dir, n));
+}
+
+/** The sheet as a page: each picture in a cell, its file name beneath it. */
+export function pictureSheetHtml(items: readonly { name: string; src: string }[]): {
+  html: string;
+  width: number;
+  height: number;
+  /** Where each picture is drawn, in page pixels, in the order given. */
+  boxes: { x: number; y: number; width: number; height: number }[];
+} {
+  const cols = items.length <= 4 ? items.length : items.length <= 9 ? 3 : 4;
+  const rows = Math.ceil(items.length / cols);
+  const cell = 264;
+  const gap = 20;
+  const caption = 22;
+  const width = cols * cell + (cols + 1) * gap;
+  const height = rows * (cell + caption) + (rows + 1) * gap;
+  const esc = (t: string): string =>
+    t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+  const cells = items
+    .map(
+      (it) =>
+        `<figure><div><img src="${it.src}"></div><figcaption>${esc(it.name)}</figcaption></figure>`,
+    )
+    .join('');
+  const side = Math.round(cell * 0.72);
+  const boxes = items.map((_, i) => ({
+    x: gap + (i % cols) * (cell + gap) + Math.round((cell - side) / 2),
+    y: gap + Math.floor(i / cols) * (cell + caption + gap) + Math.round((cell - side) / 2),
+    width: side,
+    height: side,
+  }));
+  const html = `<!doctype html><html><body style="margin:0;width:${width}px;height:${height}px;background:#f2f2f4;font:13px -apple-system,Helvetica,sans-serif;color:#3a3a3c"><style>
+  main { display: grid; grid-template-columns: repeat(${cols}, ${cell}px); gap: ${gap}px; padding: ${gap}px; }
+  figure { margin: 0; }
+  figure div { width: ${cell}px; height: ${cell}px; background: #fff; border-radius: 10px; display: grid; place-items: center; box-shadow: 0 0 0 1px #0000001a; }
+  img { width: ${side}px; height: ${side}px; object-fit: contain; }
+  figcaption { height: ${caption}px; line-height: ${caption}px; text-align: center; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+</style><main>${cells}</main></body></html>`;
+  return { html, width, height, boxes };
+}
 
 export async function buildPreview(
   target: string,
   kind: string,
   deps: {
-    renderPage?: ((p: string) => Promise<string | null>) | null;
+    renderPage?: ((p: string) => Promise<PageShot | null>) | null;
     /** Draw an SVG file to a PNG (base64) — how the model sees what it drew. */
     renderSvg?: ((p: string) => Promise<string | null>) | null;
     /** Injected for tests; default is the live office-manager capture. */
     captureOffice?: (p: string) => Promise<string | null>;
+    /** Draw a folder's pictures as one captioned sheet: the PNG (base64), and which drew nothing. */
+    renderSheet?:
+      | ((files: readonly string[]) => Promise<{ png: string; blank: readonly string[] } | null>)
+      | null;
   } = {},
 ): Promise<{ imageBase64?: string; mimeType?: string; text?: string; error?: string }> {
   try {
@@ -258,6 +363,14 @@ export async function buildPreview(
                 text: `The drawing above, on a light grey ground. Its source begins:\n${source}`,
               };
         }
+        /*
+         * AN ANIMATION IS SHOWN AS ITS MOMENTS. A decoder shows an APNG's frame
+         * 0 — MEASURED (the suite's channel intro): an empty card before the
+         * title bounced in, sent whole (14 MB), and described by the model as
+         * "the title bouncing playfully". Six moments across it, in one strip.
+         */
+        const moments = ext === '.png' ? animationStrip(buf) : null;
+        if (moments !== null) return moments;
         return { imageBase64: buf.toString('base64'), mimeType: mime };
       }
       case 'render': {
@@ -265,7 +378,18 @@ export async function buildPreview(
         if (shot === null || shot === undefined) {
           return { error: 'the page could not be rendered here' };
         }
-        return { imageBase64: shot, mimeType: 'image/png' };
+        // What the picture cannot show: a script that threw, a file that 404'd.
+        return {
+          imageBase64: shot.png,
+          mimeType: 'image/png',
+          ...(shot.problems.length > 0
+            ? {
+                text:
+                  'While it loaded, the page reported:\n' +
+                  shot.problems.map((p) => `- ${p}`).join('\n'),
+              }
+            : {}),
+        };
       }
       case 'run': {
         const ext = path.extname(target).toLowerCase();
@@ -300,6 +424,29 @@ export async function buildPreview(
         if (frame !== null) {
           return { imageBase64: frame, mimeType: 'image/png', text: described };
         }
+        const pictures = await picturesOf(target).catch(() => null);
+        if (pictures !== null && deps.renderSheet !== undefined && deps.renderSheet !== null) {
+          const shown = pictures.slice(0, MAX_SHEET_PICTURES);
+          const sheet = await deps.renderSheet(shown).catch(() => null);
+          if (sheet !== null) {
+            const more =
+              pictures.length > shown.length
+                ? ` (the first ${shown.length} of ${pictures.length})`
+                : '';
+            /* A picture that draws nothing, named — MEASURED: the suite's six
+               icons nested their shapes inside a <path>, which draws none of
+               them, and were handed over as "six matching line icons". */
+            const blank =
+              sheet.blank.length === 0
+                ? ''
+                : `\nDRAWN EMPTY — nothing shows in its cell: ${sheet.blank.join(', ')}. Open the file and see why before you hand it over.`;
+            return {
+              imageBase64: sheet.png,
+              mimeType: 'image/png',
+              text: `${described}\nThe capture shows its pictures${more}, each named beneath it, in name order — left to right, then down.${blank}`,
+            };
+          }
+        }
         return { text: described };
       }
       case 'office': {
@@ -310,8 +457,18 @@ export async function buildPreview(
          * capture, which is exactly what the user is looking at. Without it a
          * deck was "104 KB, .pptx" to the model that made it.
          */
+        /*
+         * …AND ALL OF IT, WIDE. The canvas photograph is only what a narrow
+         * pane shows — MEASURED, slide 1 of 8 at 29% zoom, a workbook's first
+         * three columns — so the look is taken on an editor of its own at a
+         * landscape size: every slide of a deck on one sheet, a workbook or
+         * document opened wide (office-look.ts). The canvas photograph is the
+         * fallback when that editor will not draw.
+         */
+        const look =
+          deps.captureOffice === undefined ? await officeLook(target).catch(() => null) : null;
         const capture = deps.captureOffice ?? captureViewForFile;
-        const dataUrl = await capture(target);
+        const dataUrl = look?.dataUrl ?? (await capture(target));
         const st = await stat(target);
         const size = `${target} — ${Math.max(1, Math.round(st.size / 1024))} KB.`;
         if (dataUrl === null) {
@@ -321,7 +478,7 @@ export async function buildPreview(
         return {
           imageBase64: dataUrl.slice(comma + 1),
           mimeType: 'image/png',
-          text: `${size} The capture is the first page/slide as the canvas shows it.`,
+          text: `${size} ${look?.note ?? 'The capture is the first page/slide as the canvas shows it.'}`,
         };
       }
       case 'text': {
@@ -398,6 +555,7 @@ async function handle(req: Request): Promise<Record<string, unknown>> {
     const preview = await buildPreview(target, req.params?.kind ?? 'describe', {
       renderPage,
       renderSvg,
+      renderSheet,
     });
     /*
      * A PREVIEW THE MODEL CANNOT SEE IS WORSE THAN NO PREVIEW.
@@ -476,14 +634,19 @@ function onConnection(socket: net.Socket): void {
 /** Start the bridge. `render` captures an HTML file and returns base64 PNG. */
 export function registerPresentBridge(deps: {
   getWindow: () => WebContents | null;
-  renderPage?: (filePath: string) => Promise<string | null>;
+  renderPage?: (filePath: string) => Promise<PageShot | null>;
   /** Draw an SVG file to a base64 PNG, for the model's look at a drawing. */
   renderSvg?: (filePath: string) => Promise<string | null>;
+  /** A folder's pictures on one captioned sheet (base64 PNG), and which drew nothing. */
+  renderSheet?: (
+    files: readonly string[],
+  ) => Promise<{ png: string; blank: readonly string[] } | null>;
   renderDiagram?: (req: DiagramRenderRequest) => Promise<DiagramRenderReply>;
 }): void {
   getWindow = deps.getWindow;
   renderPage = deps.renderPage ?? null;
   renderSvg = deps.renderSvg ?? null;
+  renderSheet = deps.renderSheet ?? null;
   renderDiagram = deps.renderDiagram ?? null;
   token = randomBytes(16).toString('hex');
   socketPath = path.join(

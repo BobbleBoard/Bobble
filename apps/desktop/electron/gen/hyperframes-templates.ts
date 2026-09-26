@@ -59,6 +59,13 @@ export interface TitleCard {
    * would be the prompt ignored — the same bug as "bright yellow" ignored.
    */
   readonly bounce?: boolean;
+  /**
+   * The letters take turns in a run of bright colours — asked for as colour
+   * with no one colour named ("colorful", "bright colors", "rainbow",
+   * "vibrant"). REAL (the visual suite): "colorful … bright colors" came out
+   * white on charcoal, because only a NAMED colour was read.
+   */
+  readonly colourful?: boolean;
 }
 
 export type MotionPlan =
@@ -510,6 +517,9 @@ export function planMotion(prompt: string): MotionPlan {
       /\b(?:bounc(?:e|es|ed|ing|y)|spring(?:y|s|ing)?|playful|pop(?:s|ping)?\s+in|jump(?:s|ing)?\s+in)\b/i.test(
         said,
       ),
+    colourful:
+      colours.ink === undefined &&
+      /\b(?:colou?rful|multi-?colou?r(?:ed)?|rainbow|vibrant|bright colou?rs)\b/i.test(said),
   };
   return { kind: 'title-card', card };
 }
@@ -537,6 +547,11 @@ function mix(a: string, b: string, t: number): string {
       .padStart(2, '0');
   return `#${ch(1)}${ch(3)}${ch(5)}`.toUpperCase();
 }
+
+/** A colourful title's run — bright, no purple, each at least 3:1 on the card's dark ground. */
+const BRIGHT_RUN_ON_DARK = ['#FF6B6B', '#FFC53D', '#2DD4BF', '#60A5FA'] as const;
+/** …and on a light one. */
+const BRIGHT_RUN_ON_LIGHT = ['#DC2626', '#B45309', '#0F766E', '#1D4ED8'] as const;
 
 /** The resolved colours of a card: ground, words, tagline, glow — readable by construction. */
 export function cardColours(card: TitleCard): {
@@ -645,25 +660,31 @@ export function titleCardDocument(card: TitleCard, size: CardSize): string {
       : '';
   // A bounce drops each letter in on its own beat; a word stays one unit so
   // the balanced lines break between words, never inside one. The whole run
-  // lands inside ~1.5 s however long the title is.
+  // lands inside ~1.5 s however long the title is. A colourful title gives
+  // each letter the next colour of the run.
   const letters = [...card.title].filter((ch) => ch.trim() !== '').length;
   const step = Math.round(Math.min(70, 900 / Math.max(1, letters)));
+  const run = card.light ? BRIGHT_RUN_ON_LIGHT : BRIGHT_RUN_ON_DARK;
   let at = 0;
-  const title = card.bounce
-    ? card.title
-        .split(/(\s+)/)
-        .map((part) =>
-          part.trim() === ''
-            ? part
-            : `<span class="hf-w">${[...part]
-                .map(
-                  (ch) =>
-                    `<span class="hf-l" style="animation-delay: ${at++ * step}ms">${escapeHtml(ch)}</span>`,
-                )
-                .join('')}</span>`,
-        )
-        .join('')
-    : escapeHtml(card.title);
+  const letter = (ch: string): string => {
+    const i = at++;
+    const style = [
+      ...(card.bounce === true ? [`animation-delay: ${i * step}ms`] : []),
+      ...(card.colourful === true ? [`color: ${run[i % run.length]}`] : []),
+    ].join('; ');
+    return `<span class="${card.bounce === true ? 'hf-l' : 'hf-c'}" style="${style}">${escapeHtml(ch)}</span>`;
+  };
+  const title =
+    card.bounce === true || card.colourful === true
+      ? card.title
+          .split(/(\s+)/)
+          .map((part) =>
+            part.trim() === ''
+              ? part
+              : `<span class="hf-w">${[...part].map(letter).join('')}</span>`,
+          )
+          .join('')
+      : escapeHtml(card.title);
   const entrance = card.bounce ? '' : 'hf-rise 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both, ';
   const settleAt = card.bounce ? (at * step + 1100) / 1000 : 1.2;
   const hold = card.pulse

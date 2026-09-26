@@ -8,6 +8,7 @@
  */
 
 import { readFileSync } from 'node:fs';
+import { basename } from 'node:path';
 import type { PiBridgeEvent } from '@pi-desktop/engine';
 import { PiBridge } from '@pi-desktop/engine/main';
 // The NAME-ONLY subpath, not the barrel. Importing `@pi-desktop/harness` here
@@ -37,6 +38,7 @@ import {
 import type { AppEventMap } from '../ipc-contract';
 import { releaseMacBrake } from '../mac/mac-agent';
 import { officeGenEnv, primeOfficeGen } from '../office/office-gen-env';
+import { regionIsBlank } from '../office/office-grid';
 import {
   activeProjectFullAccess,
   activeProjectPath,
@@ -49,6 +51,7 @@ import {
   generationExperimentEnabled,
   readSettings,
 } from '../settings/settings-main';
+import { bundledSkillsDir } from '../skills/skills-main';
 import { isTrustedIpcEvent } from '../trusted-senders';
 import { type ChildAgents, createChildAgents } from './child-agents';
 import type { PiInvokeMap } from './contract';
@@ -56,7 +59,7 @@ import { extensionPackageDirs, toolExtensionPackageDirs } from './extension-dirs
 import { piEnvContributions, registerPiEnvContributor } from './pi-env';
 import { createPiSessions, type PiSessionHandlers } from './pi-sessions';
 import { registerPrefillIpc } from './prefill-main';
-import { registerPresentBridge } from './present-bridge';
+import { pictureSheetHtml, registerPresentBridge } from './present-bridge';
 import { installPiQuitHold } from './quit-hold';
 import { renderPageFile } from './render-page';
 import { registerResumeIpc } from './resume-main';
@@ -213,14 +216,13 @@ function buildPiEnv(cwd: string | undefined): Record<string, string | undefined>
     /* The 3D connector's tools: only once an engine that can make a mesh is on
        this machine AND the connector is on (Connectors → Bobble 3D). the user
        (2026-09-17): "3d should be a connector that gets recommended for
-       install upon installing the 3d studio module". */
+       install upon installing the 3d studio module". '0' — the app has 3D but
+       it is off: `3d generate` is there and says how to turn it on (harness
+       model-tools registerNotSetUp3d; MEASURED, a 4B with no tool denied 3D). */
     PI_BOBBLE_3D_READY: bobble3dOn() ? '1' : '0',
-    /* …and when it is not, the model is told the ability exists and where it
-       is turned on, rather than denying it and writing geometry by hand
-       (capability-prompt notSetUpLine — MEASURED, a 4B with no engine). */
-    PI_DESKTOP_NOT_SET_UP: JSON.stringify(
-      bobble3dOn() ? [] : ['3D models — the user turns them on in Connectors → Bobble 3D'],
-    ),
+    /* The bundled skills, for the ones the harness attaches itself (teach —
+       packages/harness teach-skill.ts), installed or not. */
+    PI_DESKTOP_SKILLS_DIR: bundledSkillsDir(),
     /* The document pipeline — where `office.py` is, a Python that has its
        libraries, and a scratch dir — so the harness's `office` tool registers
        and runs in every chat, not only inside a corp run. See office-gen-env.ts. */
@@ -579,6 +581,40 @@ export function registerPiIpc(
             side,
           );
           return (await win.capture()).toString('base64');
+        } catch {
+          return null;
+        } finally {
+          await win.dispose().catch(() => {});
+        }
+      },
+      /* A folder of pictures as one sheet (present-bridge picturesOf): each
+         picture shrunk to a small data: URI — a raster through nativeImage, an
+         SVG as it is — so the one page stays well under a data: URL's limit. */
+      renderSheet: async (files) => {
+        const items = files.map((f) => {
+          const name = basename(f);
+          if (/\.svg$/i.test(f)) {
+            return { name, src: `data:image/svg+xml;base64,${readFileSync(f).toString('base64')}` };
+          }
+          const img = nativeImage.createFromPath(f);
+          const small = img.isEmpty() ? img : img.resize({ width: 380, quality: 'good' });
+          return { name, src: small.toDataURL() };
+        });
+        const { html, width, height, boxes } = pictureSheetHtml(items);
+        const win = await openStillWindow(width, height);
+        try {
+          await win.load(html, width, height);
+          const png = await win.capture();
+          // Which pictures drew nothing: their boxes on the capture are all white.
+          const pic = nativeImage.createFromBuffer(png);
+          const size = pic.getSize();
+          const cell = { data: pic.toBitmap(), width: size.width, height: size.height };
+          const blank = files
+            .filter((_, i) =>
+              regionIsBlank(cell, boxes[i] as (typeof boxes)[number], size.width / width),
+            )
+            .map((f) => basename(f));
+          return { png: png.toString('base64'), blank };
         } catch {
           return null;
         } finally {

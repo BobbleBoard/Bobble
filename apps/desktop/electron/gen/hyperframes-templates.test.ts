@@ -386,6 +386,30 @@ describe('a playful intro bounces in', () => {
   });
 });
 
+describe('a colourful title takes turns in bright colours', () => {
+  it('reads colour asked for with no one colour named, and runs it letter by letter', () => {
+    const p =
+      '6-second playful YouTube channel intro animation for "Byte Sized" - the title text bounces up and down with colorful digital/tech themed elements, bright colors';
+    const plan = planMotion(p);
+    if (plan.kind !== 'title-card') throw new Error('not a card');
+    expect(plan.card.colourful).toBe(true);
+    const doc = titleCardDocument(plan.card, { width: 1280, height: 720, seconds: 6 });
+    const colours = [...doc.matchAll(/class="hf-[lc]" style="[^"]*color: (#[0-9A-F]{6})/g)].map(
+      (m) => m[1],
+    );
+    expect(colours).toHaveLength('ByteSized'.length);
+    expect(new Set(colours).size).toBe(4);
+    // Every colour of the run is readable on the card's ground.
+    const ground = cardColours(plan.card).paper;
+    for (const c of new Set(colours)) {
+      expect(contrastRatio(c as string, ground)).toBeGreaterThanOrEqual(3);
+    }
+    // A named colour wins: "in yellow" is yellow, not a run.
+    const named = planMotion("'Launch day' in yellow, colorful");
+    expect(named.kind === 'title-card' && named.card.colourful).toBe(false);
+  });
+});
+
 describe('the card document', () => {
   it('escapes the words, sizes the stage, and animates only with seekable CSS', () => {
     const doc = titleCardDocument(

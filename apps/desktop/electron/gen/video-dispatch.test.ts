@@ -8,6 +8,7 @@ import { encodeApng, isApng, readPngFrame } from './apng';
 import { FRAMES_DIR, frameFileName } from './hyperframes-still';
 import {
   buildVideoJob,
+  clipSeconds,
   defaultExtractPosterFrame,
   HyperFramesRunner,
   hyperFramesRenderUnavailable,
@@ -272,5 +273,21 @@ describe('defaultExtractPosterFrame, for a PNG', () => {
     const broken = path.join(dir, 'broken.png');
     writeFileSync(broken, 'not a png');
     expect(await defaultExtractPosterFrame(broken, dir)).toBeUndefined();
+  });
+});
+
+describe('a clip is as long as it was asked to be', () => {
+  it('the prompt says the length when the caller did not', () => {
+    // MEASURED: "a 6-second animated intro" came out 5.0 s.
+    expect(clipSeconds(undefined, "a 6-second animated intro for 'Byte Sized'")).toBe(6);
+    expect(clipSeconds(undefined, 'a title card, 10 seconds, in yellow')).toBe(10);
+    expect(clipSeconds(8, 'a 6-second intro')).toBe(8);
+    expect(clipSeconds(undefined, 'a title card')).toBe(5);
+  });
+
+  it('a scene’s CSS durations are not the clip’s; lengths stay within 1–60 s', () => {
+    expect(clipSeconds(undefined, '<div style="animation: rise 0.9s">Hi</div>')).toBe(5);
+    expect(clipSeconds(500, 'x')).toBe(60);
+    expect(clipSeconds(0.2, 'x')).toBe(1);
   });
 });

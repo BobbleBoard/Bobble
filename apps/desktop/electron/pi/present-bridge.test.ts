@@ -3,7 +3,7 @@ import { mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { buildPreview, describeProject } from './present-bridge.js';
+import { buildPreview, describeProject, pictureSheetHtml, picturesOf } from './present-bridge.js';
 
 const dir = () => mkdtempSync(path.join(tmpdir(), 'present-'));
 
@@ -125,5 +125,54 @@ describe('an SVG is previewed as its drawing', () => {
     const text = await buildPreview(file, 'image', {});
     expect(text.imageBase64).toBeUndefined();
     expect(text.text).toContain('<svg');
+  });
+});
+
+describe('a folder of pictures is shown as its pictures', () => {
+  /* MEASURED (4B, the visual suite): six icons written into assets/icons and
+     presented as a folder came back as a listing — none of them seen. */
+  it('finds a folder that is mostly pictures, in name order; a project is not one', async () => {
+    const icons = dir();
+    for (const n of ['timer.svg', 'servings.svg', 'favourite.svg', 'README.md']) {
+      writeFileSync(path.join(icons, n), '<svg/>');
+    }
+    expect((await picturesOf(icons))?.map((f) => path.basename(f))).toEqual([
+      'favourite.svg',
+      'servings.svg',
+      'timer.svg',
+    ]);
+    const site = dir();
+    for (const n of ['index.html', 'style.css', 'app.js', 'logo.svg']) {
+      writeFileSync(path.join(site, n), 'x');
+    }
+    expect(await picturesOf(site)).toBeNull();
+  });
+
+  it('hands back one captioned sheet and says what it shows', async () => {
+    const icons = dir();
+    for (const n of ['a.svg', 'b.svg', 'c.png']) writeFileSync(path.join(icons, n), 'x');
+    let asked: readonly string[] = [];
+    const out = await buildPreview(icons, 'project', {
+      renderSheet: async (files) => {
+        asked = files;
+        return { png: 'UE5H', blank: ['b.svg'] };
+      },
+    });
+    expect(asked.map((f) => path.basename(f))).toEqual(['a.svg', 'b.svg', 'c.png']);
+    expect(out.imageBase64).toBe('UE5H');
+    expect(out.text).toContain('each named beneath it, in name order');
+    // MEASURED: six icons that drew nothing were handed over as "matching line icons".
+    expect(out.text).toContain('DRAWN EMPTY — nothing shows in its cell: b.svg');
+  });
+
+  it('lays the sheet out with every name beneath its picture', () => {
+    const sheet = pictureSheetHtml([
+      { name: 'timer.svg', src: 'data:a' },
+      { name: 'a<b>.svg', src: 'data:b' },
+    ]);
+    expect(sheet.html).toContain('<figcaption>timer.svg</figcaption>');
+    expect(sheet.html).toContain('a&lt;b>.svg');
+    expect(sheet.html).toContain('repeat(2, 264px)');
+    expect(sheet.width).toBe(2 * 264 + 3 * 20);
   });
 });

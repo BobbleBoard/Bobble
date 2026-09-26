@@ -99,6 +99,7 @@ import { canEnhance, type EnhancerEndpoint, enhancePrompt } from './prompt-enhan
 import { parseTqdm } from './tqdm';
 import {
   buildVideoJob,
+  clipSeconds,
   defaultExtractPosterFrame,
   type FrameExtractor,
   type HyperFramesRender,
@@ -918,7 +919,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
     const clamp = (n: number, lo: number, hi: number): number =>
       Math.max(lo, Math.min(hi, Math.round(n)));
     const { width, height } = parseSize(raw.size, VIDEO_DEFAULT_SIZE);
-    const seconds = clamp(raw.seconds ?? 5, 1, 60);
+    const seconds = clipSeconds(raw.seconds, raw.prompt);
     const fps = clamp(raw.fps ?? 24, 1, 60);
     const seed = raw.seed ?? randomInt(0, 1_000_000_000);
 

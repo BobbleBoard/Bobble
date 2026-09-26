@@ -15,8 +15,29 @@
  * photographed — and captures at the size asked for. The page is written by a
  * MODEL: the window is offscreen, sandboxed, with no node and isolated
  * context, exactly as the HyperFrames still window.
+ *
+ * AND WHAT WENT WRONG WHILE IT LOADED. A picture cannot show that a script
+ * threw: MEASURED (4B, the visual suite), a neural-network widget came back
+ * with its neurons and none of the connections its reply described, and a
+ * Fourier page with an empty canvas — both look like layout choices in a
+ * screenshot. The errors the page logs, its uncaught exceptions and the files
+ * it could not load are collected (its own session, so nothing is added to the
+ * app's) and handed back with the picture.
  */
+import { dirname } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { BrowserWindow } from 'electron';
+
+/** A page, photographed, and what it reported while it loaded. */
+export interface PageShot {
+  /** Base64 PNG. */
+  readonly png: string;
+  /** Errors it logged or threw, and loads that failed — at most a handful. */
+  readonly problems: readonly string[];
+}
+
+/** How many problems are worth handing back; the first ones are the cause. */
+const MAX_PROBLEMS = 6;
 
 export interface RenderPageOptions {
   /** CSS pixels. The capture is scaled to this size (offscreen renders at 2×). */
@@ -28,11 +49,11 @@ export interface RenderPageOptions {
   readonly settleMs?: number;
 }
 
-/** The page at `filePath` as a base64 PNG, or null when it could not be drawn. */
+/** The page at `filePath`, photographed, or null when it could not be drawn. */
 export async function renderPageFile(
   filePath: string,
   opts: RenderPageOptions = {},
-): Promise<string | null> {
+): Promise<PageShot | null> {
   const width = opts.width ?? 1280;
   const height = opts.height ?? 900;
   const waitMs = opts.waitMs ?? 6000;
@@ -47,7 +68,39 @@ export async function renderPageFile(
       contextIsolation: true,
       sandbox: true,
       backgroundThrottling: false,
+      // Its own, in memory: the request listeners below are this page's alone.
+      partition: 'pd-render-page',
     },
+  });
+  const problems: string[] = [];
+  // A file beside the page is named as the page names it, not as a file:// URL.
+  const here = `${pathToFileURL(dirname(filePath)).href}/`;
+  const note = (line: string): void => {
+    const text = line.split(here).join('').replace(/\s+/g, ' ').trim().slice(0, 240);
+    if (text !== '' && !problems.includes(text) && problems.length < MAX_PROBLEMS) {
+      problems.push(text);
+    }
+  };
+  // Both console-message shapes: (event with fields) and (event, level, message, line).
+  win.webContents.on('console-message', (...args: unknown[]) => {
+    const e = args[0] as { level?: unknown; message?: unknown; lineNumber?: unknown };
+    const level = typeof args[1] === 'number' ? args[1] : e?.level;
+    const message = typeof args[2] === 'string' ? args[2] : e?.message;
+    const line = typeof args[3] === 'number' ? args[3] : e?.lineNumber;
+    if ((level === 3 || level === 'error') && typeof message === 'string') {
+      note(typeof line === 'number' && line > 0 ? `${message} (line ${line})` : message);
+    }
+  });
+  const requests = win.webContents.session.webRequest;
+  requests.onCompleted((d) => {
+    if (d.statusCode >= 400 && d.resourceType !== 'mainFrame') {
+      note(`${d.resourceType} ${d.url.slice(0, 200)} failed to load (HTTP ${d.statusCode})`);
+    }
+  });
+  requests.onErrorOccurred((d) => {
+    if (d.error !== 'net::ERR_ABORTED') {
+      note(`${d.resourceType} ${d.url.slice(0, 200)} failed to load (${d.error})`);
+    }
   });
   const within = <T>(p: Promise<T>, ms: number): Promise<T | undefined> =>
     Promise.race([p, new Promise<undefined>((r) => setTimeout(() => r(undefined), ms))]);
@@ -80,10 +133,12 @@ export async function renderPageFile(
       size.width > width || size.height > height
         ? image.resize({ width, height, quality: 'best' }).toPNG()
         : image.toPNG();
-    return png.toString('base64');
+    return { png: png.toString('base64'), problems: [...problems] };
   } catch {
     return null;
   } finally {
+    win.webContents.session.webRequest.onCompleted(null);
+    win.webContents.session.webRequest.onErrorOccurred(null);
     if (!win.isDestroyed()) win.destroy();
   }
 }

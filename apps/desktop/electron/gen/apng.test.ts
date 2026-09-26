@@ -5,6 +5,7 @@ import zlib from 'node:zlib';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   ApngEncoder,
+  apngMoments,
   crc32,
   encodeApng,
   frameDelay,
@@ -613,5 +614,33 @@ describe('readPngHead', () => {
   it('refuses a file cut off inside its image data', async () => {
     const { png } = makePng({ width: 9, height: 9 });
     await expect(readPngHead(file('cut.png', png.subarray(0, 45)))).rejects.toThrow(/truncated/);
+  });
+});
+
+describe('an animation, as moments a vision model can read', () => {
+  /* MEASURED (the suite's channel intro): the model was handed frame 0 — an
+     empty card before the title bounced in — and described the bounce. */
+  const frames = Array.from({ length: 10 }, (_, i) => makePng({ width: 3, height: 2, seed: i }));
+  const apng = encodeApng(
+    frames.map((f) => f.png),
+    { fps: 5 },
+  );
+
+  it('takes evenly spaced whole frames, first and last included, each a valid still', () => {
+    const m = apngMoments(apng, 4);
+    expect(m?.total).toBe(10);
+    expect(m?.seconds).toBeCloseTo(2, 5);
+    expect(m?.at.map((t) => Math.round(t * 1000) / 1000)).toEqual([0, 0.6, 1.2, 1.8]);
+    for (const [i, k] of [0, 3, 6, 9].entries()) {
+      const still = m?.frames[i] as Buffer;
+      expect(isApng(still)).toBe(false);
+      // The pixels are that frame's, byte for byte.
+      expect(zlib.inflateSync(readPngFrame(still).data)).toEqual((frames[k] as TestPng).raw);
+    }
+  });
+
+  it('a still is not an animation; asking for more moments than frames gives each once', () => {
+    expect(apngMoments((frames[0] as TestPng).png, 4)).toBeUndefined();
+    expect(apngMoments(apng, 50)?.frames).toHaveLength(10);
   });
 });
