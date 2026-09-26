@@ -4,7 +4,7 @@ import { compileSpec, evaluatorsScript, startValues, steadyYRange } from './buil
 import { checkMath } from './checks';
 import { ALL, FOURIER, KINETIC, PYTHAGORAS, SHM } from './fixtures';
 import { renderMath } from './index';
-import { mvPiLabel, mvRuns, mvScene, mvSvg, mvTicks, runtimeSource } from './runtime';
+import { mvPathArrow, mvPiLabel, mvRuns, mvScene, mvSvg, mvTicks, runtimeSource } from './runtime';
 import { lenientJson, normalizeMathSpec, SpecError } from './spec';
 
 const problems = (input: unknown) => renderMath(input).problems;
@@ -1280,7 +1280,7 @@ describe('the 4B’s fifth round (2026-09-26)', () => {
       ],
     });
     expect(r.problems.filter((p) => p.level === 'fix').map((p) => p.text)).toContain(
-      'tangent has no length, so nothing of it shows — a tangent to the plot\'s curve is "tangents": [{"to": "curve", "at": "x0"}] in the plot, drawn at its true slope',
+      'tangent has no length at any step, so nothing of it shows — a tangent to the plot\'s curve is "tangents": [{"to": "curve", "at": "x0"}] in the plot, drawn at its true slope',
     );
   });
 
@@ -1299,5 +1299,135 @@ describe('the 4B’s fifth round (2026-09-26)', () => {
       .find((it) => it.t === 'path' && it.id === 'ball');
     const r = Number(/a([\d.]+),/.exec(disc?.t === 'path' ? disc.d : '')?.[1]);
     expect(r).toBeGreaterThanOrEqual(6);
+  });
+});
+
+describe('the 4B’s sixth round (2026-09-26): what its own specs lost', () => {
+  it('reads the unit circle it was refused for: "x in 0..6.28", a point at "x": [cos(x), sin(x)], lines by x1..y2', () => {
+    const r = renderMath({
+      title: 'Unit circle',
+      params: ['x in 0..6.28'],
+      play: 'x',
+      figure: {
+        view: { x: '-1.5..1.5', y: '-1.5..1.5' },
+        shapes: [
+          { id: 'point', kind: 'point', x: ['cos(x)', 'sin(x)'], label: '(cos x, sin x)' },
+          { id: 'cosine', kind: 'line', x1: 0, x2: 'cos(x)', y1: 0, y2: 0 },
+        ],
+        annotations: [{ text: 'A caption with no place.' }],
+      },
+      steps: [
+        { text: 'A point.', highlight: ['point'] },
+        { text: 'Its x.', highlight: ['cosine'] },
+      ],
+    });
+    expect(r.spec.params[0]).toMatchObject({ name: 'x', min: 0, max: 6.28, value: 0 });
+    expect(r.spec.figure?.shapes.map((s) => [s.id, s.kind])).toEqual([
+      ['point', 'point'],
+      ['cosine', 'segment'],
+    ]);
+    const said = r.problems.map((p) => p.text).join('\n');
+    expect(said).toMatch(/annotations\[0\] was left out: /);
+    // x is still the plot's own where there is a plot.
+    expect(() =>
+      normalizeMathSpec({
+        title: 'P',
+        params: ['x in 0..2'],
+        plot: { curves: ['x^2'] },
+        steps: ['A.'],
+      }),
+    ).toThrow(/a slider cannot be named x/);
+  });
+
+  it('reads a graph’s parts listed beside it, and a slider under "interactive" (MEASURED: the derivative’s tangent, dropped)', () => {
+    const r = renderMath({
+      title: 'Sliding tangent',
+      function: 'f(x) = x^2',
+      interactive: { slider: { label: 'Position (x)', min: -3, max: 3, value: 0 } },
+      steps: [{ text: 'The tangent.' }, { text: 'Sliding.' }],
+      elements: [
+        { type: 'curve', function: 'f(x)', id: 'curve' },
+        { type: 'point', x: 'slider', y: 'f(slider)', label: 'Point on curve', id: 'point' },
+        {
+          type: 'tangent_line',
+          x1: -3,
+          x2: 3,
+          y1: 'f(slider)',
+          y2: 'f(slider)',
+          id: 'tangent_line',
+        },
+        { type: 'slope_indicator', x: 'slider', slope: '2*slider', id: 'slope' },
+        { type: 'text', content: 'Slope changes', position: 'top-left', id: 'text1' },
+      ],
+    });
+    const plot = r.spec.plot;
+    expect(r.spec.params.map((p) => p.name)).toEqual(['slider']);
+    expect(plot?.points).toEqual([
+      expect.objectContaining({ id: 'point', x: 'slider', on: plot?.curves[0]?.id }),
+    ]);
+    expect(plot?.tangents).toEqual([
+      expect.objectContaining({ id: 'tangent_line', at: 'slider', label: 'slope {m}' }),
+    ]);
+    // Framed where the point rides (−3..3, a quarter either side), not −10..10.
+    expect(plot?.x).toMatchObject({ min: -4.5, max: 4.5 });
+    // Still steps take the one slider through its range.
+    expect(r.spec.steps.map((st) => st.set)).toEqual([{ slider: -3 }, { slider: 3 }]);
+  });
+
+  it('names unnamed curves by their expression when there are two or more', () => {
+    const s = normalizeMathSpec({
+      title: 'd/dx sin',
+      plot: { x: '-3.14..3.14', curves: ['sin(x)', { expr: 'cos(x)' }] },
+      steps: ['Both.'],
+    });
+    expect(s.plot?.curves.map((c) => c.label)).toEqual(['sin(x)', 'cos(x)']);
+    expect(
+      normalizeMathSpec({ title: 'one', plot: { curves: ['x^2'] }, steps: ['A.'] }).plot?.curves[0]
+        ?.label,
+    ).toBeUndefined();
+  });
+
+  it('reads "axes": {x_min, x_max, y_min, y_max} as the graph’s ranges', () => {
+    const s = normalizeMathSpec({
+      title: 'Axes',
+      equation: 'y = 2*x',
+      axes: { x_min: -5, x_max: 5, y_min: -20, y_max: 20 },
+      steps: ['A line.'],
+    });
+    expect(s.plot?.x).toMatchObject({ min: -5, max: 5 });
+    expect(s.plot?.y).toMatchObject({ min: -20, max: 20 });
+  });
+
+  it('dims only the panel a step points into (MEASURED: the one curve on the graph, dim at every step)', () => {
+    const spec = normalizeMathSpec({
+      title: 'Two panels',
+      params: ['t = 0 in 0..3'],
+      plot: { var: 't', x: '0..3', curves: [{ id: 'x', expr: 'cos(t)' }] },
+      figure: {
+        view: { x: '-2..2', y: '-2..2' },
+        shapes: [
+          { id: 'mass', kind: 'circle', center: [0, 'cos(t)'], r: 0.2, fill: 'main' },
+          { id: 'wall', kind: 'segment', from: [-2, 1.5], to: [2, 1.5] },
+        ],
+      },
+      steps: [{ text: 'The {mass}.', highlight: ['mass', 'nothing-by-this-name'] }],
+    });
+    const c = compileSpec(spec);
+    const scene = mvScene(spec, c.E, { t: 0 }, 1);
+    const curve = scene.panels[1]?.items.find((it) => it.id === 'x');
+    const wall = scene.panels[0]?.items.find((it) => it.id === 'wall');
+    expect(curve?.dim).toBe(false);
+    expect(wall?.dim).toBe(true);
+  });
+
+  it('draws a move along a curve as an arrow along it, a straight one as a chord', () => {
+    const arc = Array.from({ length: 17 }, (_, i) => {
+      const a = (Math.PI / 2) * (i / 16);
+      return [100 + 80 * Math.cos(a), 100 - 80 * Math.sin(a)];
+    });
+    const drawn = mvPathArrow(arc, 1);
+    expect(drawn).toHaveLength(2);
+    // The line follows the arc: many segments, not one.
+    expect((drawn[0]?.t === 'path' ? drawn[0].d : '').match(/L/g)?.length ?? 0).toBeGreaterThan(8);
   });
 });

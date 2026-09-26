@@ -78,6 +78,8 @@ export function checkMath(
   const layout = new Map<string, { level: Problem['level']; steps: number[]; tail: string }>();
   /** Figure labels with no clear spot, in any state: on a point or a solid shape, or crossed by a line. */
   const crowded = new Map<string, 'on' | 'crossed'>();
+  /** How many of the states each line has no length in. */
+  const zeroAt = new Map<string, { label: string | undefined; steps: number }>();
   /** How many of the states each curve is flat in. */
   const flatAt = new Map<string, number>();
   /** Figure labels that found room only farther out, on a leader line. */
@@ -150,14 +152,9 @@ export function checkMath(
             st.step,
           );
         for (const sh of pointLike(spec, E, st.values, st.step)) {
-          /* A line with both ends in one place — MEASURED (the 4B's derivative):
-             "tangent" from x0 + 4t(1 − t) to x0 − 4t(1 − t), no length while
-             t = 0, at the five steps that talked about it. */
-          const tangent =
-            spec.plot !== undefined && /tangent/i.test(`${sh.id} ${sh.label ?? ''}`)
-              ? ` — a tangent to the plot's curve is "tangents": [{"to": "${spec.plot.curves[0]?.id ?? 'c1'}", "at": "${spec.params.find((p) => p.hidden !== true)?.name ?? '1'}"}] in the plot, drawn at its true slope`
-              : ' — give its two ends different places';
-          at('fix', `${sh.id} has no length, so nothing of it shows`, tangent, st.step);
+          const z = zeroAt.get(sh.id) ?? { label: sh.label, steps: 0 };
+          z.steps += 1;
+          zeroAt.set(sh.id, z);
         }
       }
       for (const h of panel.curveHealth) {
@@ -180,6 +177,18 @@ export function checkMath(
         }
       }
     }
+  }
+  /* A line with both ends in one place at every step — MEASURED (the 4B's
+     derivative): "tangent" from x0 + 4t(1 − t) to x0 − 4t(1 − t), no length
+     while t = 0, at all five steps. At one step only it is a moment (sin x
+     at x = 0), not a mistake. */
+  for (const [id, z] of zeroAt) {
+    if (z.steps < states.length) continue;
+    const tangent =
+      spec.plot !== undefined && /tangent/i.test(`${id} ${z.label ?? ''}`)
+        ? ` — a tangent to the plot's curve is "tangents": [{"to": "${spec.plot.curves[0]?.id ?? 'c1'}", "at": "${spec.params.find((p) => p.hidden !== true)?.name ?? '1'}"}] in the plot, drawn at its true slope`
+        : ' — give its two ends different places';
+    say('fix', `${id} has no length at any step, so nothing of it shows${tangent}`);
   }
   /* Flat at every step, not at one: y = mx + c is flat where a step sets m = 0
      and tilts at the next — MEASURED (the 4B's y = mx + c), where "flat

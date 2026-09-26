@@ -352,10 +352,26 @@ export function mvScene(
   const current = step > 0 ? spec.steps[step - 1] : undefined;
   // `focus` replaces the step's highlight: a part the reader hovers lights
   // alone; an empty focus (a slider playing) dims nothing — what moves is seen.
-  const hl = focus !== undefined ? [...focus] : [...(current?.highlight ?? [])];
+  /* Per panel: a step dims the other parts of the panel it points into, and
+     leaves a panel it does not point into as it is — MEASURED (the 4B's SHM
+     and y = mx + c, round 6): steps that named the mass, or captions it had
+     written as "visual_elements", left the one curve on the graph dimmed at
+     every step. */
+  const plot = spec.plot;
+  const plotIds = new Set<string>([
+    ...(plot?.curves ?? []).map((c) => c.id),
+    ...(plot?.points ?? []).map((q) => q.id),
+    ...(plot?.areas ?? []).map((q) => q.id),
+    ...(plot?.tangents ?? []).map((q) => q.id),
+    ...(plot?.riemann ?? []).map((q) => q.id),
+  ]);
+  const figIds = new Set<string>((spec.figure?.shapes ?? []).map((q) => q.id));
+  const named = focus !== undefined ? [...focus] : [...(current?.highlight ?? [])];
+  const hlFig = named.filter((id) => figIds.has(id));
+  const hlPlot = named.filter((id) => plotIds.has(id));
   const panels: Panel[] = [];
-  if (spec.figure !== undefined) panels.push(mvFigure(spec, E, values, step, hl));
-  if (spec.plot !== undefined) panels.push(mvPlot(spec, E, values, step, hl));
+  if (spec.figure !== undefined) panels.push(mvFigure(spec, E, values, step, hlFig));
+  if (spec.plot !== undefined) panels.push(mvPlot(spec, E, values, step, hlPlot));
   return { panels };
 }
 
@@ -1946,10 +1962,71 @@ export function mvArrow(x1: number, y1: number, x2: number, y2: number, alpha: n
   ];
 }
 
+/** An arrow along a path of points (pixels), its head at the last. */
+export function mvPathArrow(pts: readonly (readonly number[])[], alpha: number): Drawable[] {
+  const cum: number[] = [0];
+  for (let i = 1; i < pts.length; i += 1)
+    cum.push(
+      (cum[i - 1] ?? 0) +
+        Math.hypot(
+          (pts[i]?.[0] ?? 0) - (pts[i - 1]?.[0] ?? 0),
+          (pts[i]?.[1] ?? 0) - (pts[i - 1]?.[1] ?? 0),
+        ),
+    );
+  const total = cum[cum.length - 1] ?? 0;
+  if (!(total > 24)) return [];
+  const at = (d: number): [number, number] => {
+    let i = 1;
+    while (i < pts.length - 1 && (cum[i] ?? 0) < d) i += 1;
+    const d0 = cum[i - 1] ?? 0;
+    const d1 = cum[i] ?? d0;
+    const f = d1 > d0 ? (d - d0) / (d1 - d0) : 0;
+    const a = pts[i - 1] ?? [0, 0];
+    const b = pts[i] ?? a;
+    return [
+      (a[0] ?? 0) + ((b[0] ?? 0) - (a[0] ?? 0)) * f,
+      (a[1] ?? 0) + ((b[1] ?? 0) - (a[1] ?? 0)) * f,
+    ];
+  };
+  const tip = at(total - 8);
+  const base = at(total - 19);
+  const line: [number, number][] = [at(6)];
+  for (let i = 1; i < pts.length - 1; i += 1) {
+    const d = cum[i] ?? 0;
+    if (d > 6 && d < total - 19) line.push([pts[i]?.[0] ?? 0, pts[i]?.[1] ?? 0]);
+  }
+  line.push(base);
+  const ux = tip[0] - base[0];
+  const uy = tip[1] - base[1];
+  const n = Math.hypot(ux, uy) || 1;
+  const nx = (-uy / n) * 6;
+  const ny = (ux / n) * 6;
+  return [
+    {
+      t: 'path',
+      d: line.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`).join(''),
+      tone: 'highlight',
+      width: 2.5,
+      alpha,
+    },
+    {
+      t: 'path',
+      d: `M${tip[0].toFixed(2)},${tip[1].toFixed(2)}L${(base[0] + nx).toFixed(2)},${(base[1] + ny).toFixed(2)}L${(base[0] - nx).toFixed(2)},${(base[1] - ny).toFixed(2)}Z`,
+      tone: 'highlight',
+      width: 0,
+      fill: 'highlight',
+      fillOpacity: 1,
+      alpha,
+    },
+  ];
+}
+
 /** A move being shown: where the parts were, where they go, and the scene they left. */
 export interface MvCue {
   readonly from: readonly MvAnchor[];
   readonly to: readonly MvAnchor[];
+  /** Where the parts are at points along the move, for a move that curves. */
+  readonly via?: readonly (readonly MvAnchor[])[];
   readonly ghost: Scene;
   /** Arrows for a move; none for a nudge, whose parts swing both ways. */
   readonly arrows: boolean;
@@ -1979,7 +2056,28 @@ export function mvCueItems(
     if (t === undefined) continue;
     if (Math.hypot(X(t.x) - X(f.x), Y(t.y) - Y(f.y)) < 4) continue;
     moved.add(f.id);
-    if (cue.arrows) over.push(...mvArrow(X(f.x), Y(f.y), X(t.x), Y(t.y), 0.9 * a));
+    if (!cue.arrows) continue;
+    /* Along the way it went — MEASURED (the 4B's projectile): the ball's arc
+       from t = 1 to t = 2 drawn as a straight chord under it. A path that
+       doubles back (an oscillation) keeps the chord: where it ended up. */
+    const pts: [number, number][] = [[X(f.x), Y(f.y)]];
+    for (const at of cue.via ?? []) {
+      const v = at.find((q) => q.id === f.id && q.panel === f.panel);
+      if (v !== undefined) pts.push([X(v.x), Y(v.y)]);
+    }
+    pts.push([X(t.x), Y(t.y)]);
+    let along = 0;
+    for (let i = 1; i < pts.length; i += 1)
+      along += Math.hypot(
+        (pts[i]?.[0] ?? 0) - (pts[i - 1]?.[0] ?? 0),
+        (pts[i]?.[1] ?? 0) - (pts[i - 1]?.[1] ?? 0),
+      );
+    const chord = Math.hypot(X(t.x) - X(f.x), Y(t.y) - Y(f.y));
+    over.push(
+      ...(along > 1.08 * chord && along < 2.5 * chord
+        ? mvPathArrow(pts, 0.9 * a)
+        : mvArrow(X(f.x), Y(f.y), X(t.x), Y(t.y), 0.9 * a)),
+    );
   }
   const ghost = cue.ghost.panels[index];
   if (ghost !== undefined && ghost.kind === panel.kind) {
@@ -2088,6 +2186,12 @@ export function mvMount(doc: PageDoc, win: PageWin, data: PageData, E: Evaluator
       dur: MOVE_MS,
       from: mvAnchors(spec, E, from, step),
       to: mvAnchors(spec, E, { ...from, ...target }, step),
+      via: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map((q) => {
+        const mid: Values = { ...from };
+        for (const k of keys)
+          mid[k] = (from[k] ?? 0) + ((target[k] ?? 0) - (from[k] ?? 0)) * (q / 16);
+        return mvAnchors(spec, E, mid, step);
+      }),
       ghost: mvScene(spec, E, from, step, []),
       arrows: true,
     };
@@ -2322,6 +2426,7 @@ export function mvMount(doc: PageDoc, win: PageWin, data: PageData, E: Evaluator
 /** Every function above, in the order the page needs them. */
 export const RUNTIME_FUNCTIONS = [
   mvEval,
+  mvPathArrow,
   mvFmt,
   mvGcd,
   mvPiLabel,

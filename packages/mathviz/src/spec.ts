@@ -452,6 +452,19 @@ function constant(name: string, value: number): Param {
 function param(v: unknown, i: number): Param {
   if (typeof v === 'string') {
     const m = /^\s*([a-zA-Z_]\w*)\s*=\s*(\S+)\s+(?:in|from|over)\s+(.+)$/.exec(v);
+    /* "x in 0..6.28" — a range with no start: it starts at its low end
+       (MEASURED: the 4B's unit circle, round 6, refused for this alone; it
+       fell back to two bare curves). */
+    const bare = /^\s*([a-zA-Z_]\w*)\s*(?:in|from|over|:|∈)\s*(.+)$/.exec(v);
+    if (
+      m === null &&
+      bare?.[1] !== undefined &&
+      bare[2] !== undefined &&
+      /\.\.|\bto\b/.test(bare[2])
+    ) {
+      const r = range(bare[2], `slider ${bare[1]}`);
+      return param({ name: bare[1], value: r.min, min: r.min, max: r.max }, i);
+    }
     if (m === null) {
       // "a = 3" — a value, not a slider (MEASURED: the 4B's "a=3", "b=4", "c=5").
       const k = /^\s*([a-zA-Z_]\w*)\s*=\s*([^=]+?)\s*$/.exec(v);
@@ -615,10 +628,40 @@ function plot(v: Loose, names: readonly string[]): PlotSpec {
       ? 'x'
       : (['t', 'theta', 's', 'u', 'r', 'n'].find((c) => names0.has(c)) ?? 'x'));
   const trig = /\b(sin|cos|tan|sec|csc|cot)\b/.test(texts);
-  const xIn = v.x ?? get(v, 'domain', 'xRange') ?? (trig ? '-2pi..2pi' : undefined);
+  /* "axes": {"x_min": -10, "x_max": 10, "y_min": -20, "y_max": 20}, or
+     {"x": {"from": -6, "to": 6}} — MEASURED (the 4B, round 6). */
+  const axes: Loose = isObj(v.axes) ? v.axes : isObj(v.axis) ? v.axis : {};
+  const axisEnds = (a: 'x' | 'y'): unknown => {
+    const lo = axes[`${a}_min`] ?? axes[`${a}min`] ?? axes[`${a}Min`];
+    const hi = axes[`${a}_max`] ?? axes[`${a}max`] ?? axes[`${a}Max`];
+    if (lo !== undefined && hi !== undefined) return [lo, hi];
+    const o = axes[a];
+    if (isObj(o) && (o.min ?? o.from) !== undefined && (o.max ?? o.to) !== undefined)
+      return [o.min ?? o.from, o.max ?? o.to];
+    return undefined;
+  };
+  /* No range given, and a point or a tangent rides on a slider: the graph
+     frames where it goes — MEASURED (the 4B's derivative): a tangent sliding
+     over −3..3 on a parabola drawn over −10..10, its slopes read off a curve
+     squashed to the bottom of the frame. */
+  const rider = [...list(v.points), ...list(v.tangents ?? v.tangent)]
+    .filter(isObj)
+    .map((q) => str(q.x ?? q.at))
+    .map((n) => SLIDERS.find((p) => p.name === n && p.hidden !== true))
+    .find((p) => p !== undefined && p.max > p.min);
+  const riding =
+    rider !== undefined
+      ? [rider.min - (rider.max - rider.min) / 4, rider.max + (rider.max - rider.min) / 4]
+      : undefined;
+  const xIn =
+    v.x ??
+    get(v, 'domain', 'xRange') ??
+    axisEnds('x') ??
+    riding ??
+    (trig ? '-2pi..2pi' : undefined);
   const xObj = isObj(xIn) ? xIn : {};
   const x = range(isObj(xIn) && xIn.range !== undefined ? xIn.range : (xIn ?? [-10, 10]), 'x');
-  const yIn = v.y ?? get(v, 'yRange');
+  const yIn = v.y ?? get(v, 'yRange') ?? axisEnds('y');
   const yObj = isObj(yIn) ? yIn : {};
   const yHasRange =
     yIn !== undefined &&
@@ -631,12 +674,21 @@ function plot(v: Loose, names: readonly string[]): PlotSpec {
     throw new SpecError('a plot needs curves: [{"expr": "sin(x)", "label": "sin x"}]');
   // Unnamed colours go in order to the curves that are not references: the first real curve is `main`.
   const used = new Set<Role>();
-  const curves = curvesIn.map((c, i) => {
+  const built = curvesIn.map((c, i) => {
     const next = (['main', 'second', 'third'] as const).find((r) => !used.has(r)) ?? 'third';
     const cv = curve(c, i, next, pv, names);
     used.add(cv.role);
     return cv;
   });
+  /* Two curves or more: one with no name is named by its expression, so the
+     reader can tell them apart — MEASURED (the 4B's sin x and cos x, round 6:
+     two unnamed curves, blue and orange, and steps that said "sin" and "cos"). */
+  const curves =
+    built.length >= 2
+      ? built.map((c) =>
+          c.label === undefined && c.expr !== undefined ? { ...c, label: c.expr } : c,
+        )
+      : built;
   const ids = new Set(curves.map((c) => c.id));
   const curveRef = (r: unknown, what: string): string => {
     const s = str(r) ?? curves[0]?.id ?? '';
@@ -723,9 +775,20 @@ const ANCHORS: readonly Anchor[] = ['n', 'ne', 'e', 'se', 's', 'sw', 'w', 'nw'];
 
 function shape(v: unknown, i: number, named: Map<string, Xy>, names: readonly string[]): Shape {
   // Where a thing is, in the words a model uses for it (MEASURED: the 4B's labels at "pos").
+  /* …or by "x": [a, b], or "x" and "y" — MEASURED (the 4B's unit circle):
+     {"kind": "point", "x": [cos(x), sin(x)]}. Only for things placed at one
+     spot; a curve's "x" and "y" are its formulas. */
+  const placed =
+    isObj(v) && ['point', 'dot', 'label', 'text', 'mass', 'ball'].includes(String(v.kind ?? v.type))
+      ? Array.isArray(v.x) && v.x.length === 2 && v.y === undefined
+        ? v.x
+        : v.x !== undefined && v.y !== undefined && !Array.isArray(v.x) && !Array.isArray(v.y)
+          ? [v.x, v.y]
+          : undefined
+      : undefined;
   const w =
     isObj(v) && v.at === undefined
-      ? { ...v, at: v.pos ?? v.position ?? v.xy ?? v.location ?? v.coords ?? v.at }
+      ? { ...v, at: v.pos ?? v.position ?? v.xy ?? v.location ?? v.coords ?? placed }
       : v;
   if (isObj(w) && w.at === undefined) delete w.at;
   const s0 = shapeBody(w, i, named, names);
@@ -960,7 +1023,18 @@ function shapeBody(v: unknown, i: number, named: Map<string, Xy>, names: readonl
     case 'force': {
       /* Its two ends as one list — MEASURED (the 4B's Pythagoras):
          "endpoints": [{"x": 50, "y": 250}, {"x": 450, "y": 250}]. */
-      const ends = v.endpoints ?? v.ends ?? v.between ?? v.points;
+      const ends =
+        v.endpoints ??
+        v.ends ??
+        v.between ??
+        v.points ??
+        // "x1", "y1", "x2", "y2" (MEASURED: the 4B's unit circle, its cos and sin lines)
+        (v.x1 !== undefined && v.y1 !== undefined && v.x2 !== undefined && v.y2 !== undefined
+          ? [
+              [v.x1, v.y1],
+              [v.x2, v.y2],
+            ]
+          : undefined);
       if (Array.isArray(ends) && ends.length === 2 && v.from === undefined && v.to === undefined)
         return shape(
           {
@@ -1466,18 +1540,33 @@ function figure(v: Loose, names: readonly string[], notes: string[]): FigureSpec
      none of them drawn, and eleven "step 1 highlights dim_a, which is not a
      part". A list named for a kind is shapes of that kind. */
   const byKind = Object.entries(SHAPES_BY_KEY).flatMap(([key, kind]) =>
-    list(v[key]).map((s) =>
-      isObj(s) && s.kind === undefined && s.type === undefined ? { ...s, kind } : s,
-    ),
+    list(v[key]).map((s, k) => ({
+      where: `${key}[${k}]`,
+      v: isObj(s) && s.kind === undefined && s.type === undefined ? { ...s, kind } : s,
+    })),
   );
-  const shapesIn = [...list(v.shapes ?? v.elements ?? v.items ?? v.objects ?? v.parts), ...byKind];
-  if (shapesIn.length === 0) throw new SpecError('a figure needs shapes');
+  const shapesIn = list(v.shapes ?? v.elements ?? v.items ?? v.objects ?? v.parts);
+  if (shapesIn.length === 0 && byKind.length === 0) throw new SpecError('a figure needs shapes');
   const named = new Map<string, Xy>();
   return {
     x: x !== null ? [x.min, x.max] : [0, 10],
     y: y !== null ? [y.min, y.max] : [0, 10],
     ...(fit.length > 0 ? { fit } : {}),
-    shapes: shapesIn.map((s, i) => shape(s, i, named, names)),
+    shapes: [
+      ...shapesIn.map((s, i) => shape(s, i, named, names)),
+      /* A list beside "shapes" is the model's own arrangement: a part in it
+         that cannot be drawn (an annotation with no place) is left out and
+         said, rather than refusing the whole figure. */
+      ...byKind.flatMap((b, k) => {
+        try {
+          return [shape(b.v, shapesIn.length + k, named, names)];
+        } catch (e) {
+          if (!(e instanceof SpecError || e instanceof ExprError)) throw e;
+          notes.push(`${b.where} was left out: ${e.message}`);
+          return [];
+        }
+      }),
+    ],
   };
 }
 
@@ -1803,9 +1892,24 @@ function normalizeParsed(v: Loose, found: { any: boolean }, auto: readonly strin
                 : `${k} = ${String(val)}`,
         )
       : list(x);
+  /* A slider under another heading — MEASURED (the 4B's derivative, round 6):
+     "interactive": {"slider": {"min": -3, "max": 3, "value": 0}}. Only the
+     entries that are ranges: the rest of such a block is settings. */
+  const controls = [v.interactive, v.controls, v.inputs].flatMap((c) =>
+    isObj(c)
+      ? Object.entries(c)
+          .filter(
+            ([, val]) =>
+              isObj(val) &&
+              (val.min !== undefined || val.max !== undefined || val.range !== undefined),
+          )
+          .map(([k, val]) => ({ name: k, ...(val as Loose) }))
+      : [],
+  );
   const paramsIn = [
     ...asList(v.params ?? v.sliders ?? v.parameters),
     ...(plotIn !== undefined && plotIn !== v ? asList(plotIn.params ?? plotIn.sliders) : []),
+    ...controls,
   ];
   const declared = paramsIn.map(param);
   const autoParams: Param[] = auto
@@ -1830,7 +1934,9 @@ function normalizeParsed(v: Loose, found: { any: boolean }, auto: readonly strin
   const seen = new Set<string>();
   for (const p of params) {
     if (seen.has(p.name)) throw new SpecError(`two sliders are named ${p.name}`);
-    if (RESERVED.has(p.name) && p.name !== 't' && p.hidden !== true) {
+    // x and y mean the plot's axes; a figure alone may slide them (the 4B's unit circle: "x in 0..6.28").
+    const free = p.name === 't' || (plotIn === undefined && (p.name === 'x' || p.name === 'y'));
+    if (RESERVED.has(p.name) && !free && p.hidden !== true) {
       throw new SpecError(
         `a slider cannot be named ${p.name} — it means something already; call it ${p.name}0 or a`,
       );
@@ -1842,7 +1948,10 @@ function normalizeParsed(v: Loose, found: { any: boolean }, auto: readonly strin
   const viewNotes: string[] = [];
   let plotSpec: PlotSpec | undefined;
   try {
-    plotSpec = plotIn !== undefined ? plot(plotIn, names) : undefined;
+    plotSpec =
+      plotIn !== undefined
+        ? plot(withElements(plotIn, figIn === undefined ? v : {}, names), names)
+        : undefined;
   } catch (e) {
     /* "curves": [] beside a figure — MEASURED (the 4B, Pythagoras): told a
        plot needs curves, it gave its empty one "t against t" ("stage
@@ -1918,7 +2027,25 @@ function normalizeParsed(v: Loose, found: { any: boolean }, auto: readonly strin
      time the steps tell is the slider's: they take it from its start to its
      end, one stretch each, and the note says so. */
   // A slider no part uses would move nothing: it is not the story's time.
-  const drawnText = JSON.stringify([v.figure ?? v.diagram ?? null, v.plot ?? v.graph ?? null]);
+  const drawnText = JSON.stringify([
+    figIn ?? null,
+    plotIn === v
+      ? Object.fromEntries(
+          Object.entries(v).filter(
+            ([k]) =>
+              ![
+                'params',
+                'sliders',
+                'parameters',
+                'interactive',
+                'controls',
+                'inputs',
+                'steps',
+              ].includes(k),
+          ),
+        )
+      : (plotIn ?? null),
+  ]);
   const sliders = params.filter(
     (p) => p.hidden !== true && new RegExp(`\\b${p.name}\\b`).test(drawnText),
   );
@@ -1984,6 +2111,75 @@ function normalizeParsed(v: Loose, found: { any: boolean }, auto: readonly strin
       })(),
     ],
   };
+}
+
+/**
+ * A graph's parts listed beside it, as its points and tangents — MEASURED (the
+ * 4B's derivative, round 6): "function": "f(x) = x^2" with "elements": [a
+ * point at ("slider", "f(slider)"), a "tangent_line", a "slope_indicator"] —
+ * the point and the tangent the steps were about, dropped, on a page of one
+ * curve that said "look at the blue tangent line". A point whose y calls a
+ * function of the model's own (f(…)) sits on the curve; a tangent is drawn at
+ * that point, "slope {m}" on it when a slope was to be shown.
+ */
+function withElements(plotIn: Loose, top: Loose, names: readonly string[]): Loose {
+  // Each list once: at the top level, the graph and the spec are one object.
+  const els = [
+    ...new Set([
+      plotIn.elements,
+      plotIn.visual_elements,
+      top.elements,
+      top.visual_elements,
+      top.components,
+    ]),
+  ]
+    .flatMap((e) => list(e))
+    .filter(isObj);
+  if (els.length === 0) return plotIn;
+  const kindOf = (e: Loose) => String(e.type ?? e.kind ?? '').toLowerCase();
+  const points: Loose[] = [];
+  for (const e of els) {
+    if (!/point|dot|marker/.test(kindOf(e)) || e.x === undefined || typeof e.x === 'object')
+      continue;
+    const y = e.y === undefined ? undefined : String(e.y);
+    const own = y !== undefined && /(^|[^a-zA-Z_])[a-zA-Z]\s*\(/.test(y);
+    const xs = String(e.x);
+    // Only a point placed by numbers and the sliders: "y = c (when x = 0)" is a sentence.
+    if (![xs, ...(y !== undefined && !own ? [y] : [])].every((t) => validExpr(t, names))) continue;
+    points.push({
+      id: str(e.id) ?? `e${points.length + 1}`,
+      x: e.x,
+      ...(y !== undefined && !own ? { y: e.y } : {}),
+      ...(str(e.label) !== undefined ? { label: e.label } : {}),
+    });
+  }
+  const slope = els.some((e) => /slope/.test(kindOf(e)));
+  const tangents: Loose[] = [];
+  for (const e of els) {
+    if (!/tangent/.test(kindOf(e))) continue;
+    const at = e.at ?? points[0]?.x ?? names[0];
+    if (at === undefined) continue;
+    tangents.push({
+      id: str(e.id) ?? `tangent${tangents.length + 1}`,
+      at,
+      ...(slope ? { label: 'slope {m}' } : str(e.label) !== undefined ? { label: e.label } : {}),
+    });
+  }
+  return {
+    ...plotIn,
+    points: [...list(plotIn.points), ...points],
+    tangents: [...list(plotIn.tangents ?? plotIn.tangent), ...tangents],
+  };
+}
+
+/** Does this read as an expression of these names? */
+function validExpr(t: string, names: readonly string[]): boolean {
+  try {
+    parse(t, [...names]);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** What is said of names used with no value: each is drawn as 1, and how to give it one. */
