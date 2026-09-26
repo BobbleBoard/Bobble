@@ -183,14 +183,8 @@ export function registerGenTools(pi: ExtensionAPI, options: GenToolsOptions): vo
      * a guideline that names the call, in the mode's own syntax (the harness
      * rewrites the tool name to the command in CLI mode).
      */
-    /*
-     * …AND A PAGE'S PHOTOS. MEASURED (4B, the visual suite, a ceramics
-     * studio's landing page): every picture was an images.unsplash.com URL
-     * with a photo id recalled from training — the hero came out a bathroom.
-     * A remembered id is a random picture; a generated one is the subject.
-     */
     promptGuidelines: [
-      'Every picture the user asks for is made with generate_image — one call per picture, the description as the prompt, and the folder or file they named as save_to. You can always make pictures; never say you cannot, and never draw one in code. A page’s photos too: make each one into the site’s folder (flux2-klein-4b takes seconds) — a stock-photo URL from memory shows whatever that photo happens to be.',
+      'Every picture the user asks for is made with generate_image — one call per picture, the description as the prompt, and the folder or file they named as save_to. You can always make pictures; never say you cannot, and never draw one in code.',
     ],
     parameters: Type.Object({
       prompt: Type.String({
