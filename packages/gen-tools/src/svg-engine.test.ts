@@ -44,3 +44,41 @@ describe('which model draws an svg', () => {
     });
   });
 });
+
+describe('a picture to trace, named relative to the working folder', () => {
+  it('reaches the app as the file in that folder, and a missing one is named', async () => {
+    const { mkdtempSync, writeFileSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const path = await import('node:path');
+    const { registerGenTools } = await import('./tools');
+    const root = mkdtempSync(path.join(tmpdir(), 'svg-pic-'));
+    writeFileSync(path.join(root, 'fig.png'), 'x');
+    const sent: unknown[] = [];
+    const tools: Array<{
+      name: string;
+      execute: (...a: unknown[]) => Promise<{ content: { text: string }[] }>;
+    }> = [];
+    const prev = process.env.PI_DESKTOP_WORKSPACE_ROOT;
+    process.env.PI_DESKTOP_WORKSPACE_ROOT = root;
+    try {
+      registerGenTools({ registerTool: (d: never) => tools.push(d) } as never, {
+        bridge: {
+          request: async (_m: string, p: unknown) => {
+            sent.push(p);
+            return { outputs: [] };
+          },
+        } as never,
+        media: false,
+        svgEngines: { omnisvg: true, vfig: true },
+      });
+      const svg = tools.find((t) => t.name === 'generate_svg');
+      await svg?.execute('id', { image: 'fig.png', figure: true });
+      expect(sent[0]).toMatchObject({ engine: 'vfig', images: [path.join(root, 'fig.png')] });
+      const missing = await svg?.execute('id', { image: 'nope.png' });
+      expect(missing?.content[0]?.text).toMatch(/there is no picture at nope\.png/);
+    } finally {
+      if (prev === undefined) delete process.env.PI_DESKTOP_WORKSPACE_ROOT;
+      else process.env.PI_DESKTOP_WORKSPACE_ROOT = prev;
+    }
+  });
+});

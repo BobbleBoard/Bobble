@@ -861,6 +861,26 @@ function registerSvgTool(pi: ExtensionAPI, bridge: GenBridge | null, engines: Sv
           );
         }
       }
+      /*
+       * A PICTURE'S PATH IS THE WORKING FOLDER'S. The main process reads the
+       * file, and its cwd is the app's own — so `svg --image photo.png` read
+       * nothing (ENOENT from the app bundle) unless the path was absolute. It
+       * is resolved the way `write` resolves, and one that is not there is named.
+       */
+      const pictures: string[] = [];
+      for (const img of images) {
+        const abs = path.resolve(root, img.trim().replace(/^~(?=\/)/, process.env.HOME ?? '~'));
+        if (
+          !(await stat(abs)
+            .then((st) => st.isFile())
+            .catch(() => false))
+        ) {
+          return svgErr(
+            `there is no picture at ${img} (in ${root}) — check the path, or save the picture there first`,
+          );
+        }
+        pictures.push(abs);
+      }
       const route = svgEngineFor(
         {
           prompt: params.prompt,
@@ -888,7 +908,7 @@ function registerSvgTool(pi: ExtensionAPI, bridge: GenBridge | null, engines: Sv
           {
             engine: route.engine,
             prompt: params.prompt,
-            images,
+            images: pictures,
             candidates: params.candidates,
             ...(editPath === undefined ? {} : { edit: editPath }),
             ...(outPath === undefined ? {} : { outPath }),
