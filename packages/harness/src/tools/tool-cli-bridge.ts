@@ -34,6 +34,7 @@ import {
   commandNameFor,
   pathFor,
   resolveCli,
+  unreadFlagsNote,
 } from './tool-cli.js';
 import { toolCliShimCommands } from './tool-cli-groups.js';
 
@@ -687,7 +688,8 @@ export async function dispatchToolCli(
   if (res.kind === 'error') return { text: speakCommands(res.text), isError: true };
   try {
     const r = await host.call(res.tool, res.args, signal);
-    return { ...r, text: speakCommands(r.text, res.tool) };
+    const note = res.unread === undefined ? '' : unreadFlagsNote(cli, res.tool, res.unread);
+    return { ...r, text: speakCommands(r.text, res.tool) + note };
   } catch (e) {
     return {
       text: speakCommands(`${res.tool}: ${e instanceof Error ? e.message : String(e)}`, res.tool),

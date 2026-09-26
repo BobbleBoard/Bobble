@@ -71,6 +71,24 @@ describe('dispatchToolCli', () => {
     expect(calls).toEqual([{ name: 'generate_image', args: { prompt: 'a red fox' } }]);
   });
 
+  it('runs a call with a flag the command lacks, and says the flag did nothing', async () => {
+    const calls: { name: string; args: Record<string, unknown> }[] = [];
+    const r = await dispatchToolCli(host(calls), [
+      'media',
+      'generate',
+      'image',
+      'a fox',
+      '--style',
+      'flat',
+    ]);
+    expect(calls).toEqual([{ name: 'generate_image', args: { prompt: 'a fox', style: 'flat' } }]);
+    expect(r.text).toBe(
+      '`media generate image` ran\n\nNote: --style is not an argument of ' +
+        '`media generate image`, so it did nothing. It takes --prompt, --n — ' +
+        '`media generate image --help` says what each does.',
+    );
+  });
+
   it('answers discovery without calling anything', async () => {
     const calls: { name: string; args: Record<string, unknown> }[] = [];
     const r = await dispatchToolCli(host(calls), ['tools']);

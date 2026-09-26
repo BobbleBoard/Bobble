@@ -13,6 +13,7 @@ import {
   renderRootHelp,
   resolveCli,
   searchCommands,
+  unreadFlagsNote,
 } from './tool-cli';
 
 const TOOLS: CliTool[] = [
@@ -123,6 +124,23 @@ describe('parseArgv', () => {
     const p = parseArgv(['generate', 'image', '--prompt', 'a fox', '--n=4', '--wide']);
     expect(p.words).toEqual(['generate', 'image']);
     expect(p.flags).toEqual({ prompt: 'a fox', n: '4', wide: true });
+  });
+
+  it('drops the tool template’s own tags — a word of their own, or glued to a word', () => {
+    // MEASURED (4B, rapid-mlx): `coordinate present --path=index.html "</parameter"`.
+    expect(parseArgv(['present', '--path=index.html', '</parameter'])).toEqual({
+      words: ['present'],
+      flags: { path: 'index.html' },
+      positionals: [],
+      wantsHelp: false,
+    });
+    expect(parseArgv(['svg', 'a', 'fox</parameter>', '</function>']).words).toEqual([
+      'svg',
+      'a',
+      'fox',
+    ]);
+    // A word that merely mentions a tag is left alone.
+    expect(parseArgv(['x', '--q=<parameter> tags']).flags).toEqual({ q: '<parameter> tags' });
   });
 
   it('treats --help anywhere as a request for help', () => {
@@ -536,6 +554,24 @@ describe('svg — a group whose one tool IS the command', () => {
       kind: 'call',
       args: { prompt: 'bicycle.svg' },
     });
+  });
+
+  it('names a flag the command does not have, and says so in the result', () => {
+    /* MEASURED (4B, the visual suite): `svg recipe-app-icons --icons timer,…`
+       — the icon list went into a flag svg does not have, and the answer was
+       one drawing with no word that the list had gone nowhere. */
+    const res = call('svg recipe-app-icons --icons timer,servings');
+    expect(res).toMatchObject({
+      kind: 'call',
+      args: { prompt: 'recipe-app-icons', icons: 'timer,servings' },
+      unread: ['icons'],
+    });
+    const note = res.kind === 'call' ? unreadFlagsNote(svgCli, res.tool, res.unread ?? []) : '';
+    expect(note).toContain('--icons is not an argument of `svg`, so it did nothing');
+    expect(note).toContain('--prompt');
+    expect(note).toContain('--out');
+    // A flag it does have is not named.
+    expect(call('svg a fox --out assets/fox.svg')).not.toHaveProperty('unread');
   });
 });
 

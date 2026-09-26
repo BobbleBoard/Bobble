@@ -37,6 +37,7 @@ export interface CliSchema {
   readonly type?: string;
   readonly properties?: Record<string, Record<string, unknown>>;
   readonly required?: readonly string[];
+  readonly additionalProperties?: unknown;
 }
 
 /** A tool as the registry knows it. */
@@ -188,6 +189,18 @@ export interface ParsedArgv {
  * writing the most natural form of the line, and refusing it on a technicality
  * would be measuring our parser rather than the model.
  */
+/*
+ * TEMPLATE DEBRIS IS NOT AN ARGUMENT. MEASURED (4B on rapid-mlx, the visual
+ * suite, 2 of 15 tasks): `coordinate present --path=index.html "</parameter"`
+ * — the XML tool template's closing tag, read back into the command as a word
+ * of its own. There it went nowhere; after `svg "a fox"` it would have joined
+ * the prompt. A word that is only a template tag, or a tag glued to the end of
+ * a word, was never typed as an argument (provider-llamacpp's
+ * scrubTemplateDebris is the same rule for a structured call's keys).
+ */
+const DEBRIS_WORD = /^<\/?(?:parameter|function|tool_call)\b[^>]*>?$/i;
+const DEBRIS_TAIL = /<\/(?:parameter|function|tool_call)>?$/i;
+
 export function parseArgv(argv: readonly string[]): ParsedArgv {
   const words: string[] = [];
   const positionals: string[] = [];
@@ -196,7 +209,9 @@ export function parseArgv(argv: readonly string[]): ParsedArgv {
   let seenFlag = false;
 
   for (let i = 0; i < argv.length; i += 1) {
-    const a = argv[i] ?? '';
+    const raw = (argv[i] ?? '').trim();
+    if (DEBRIS_WORD.test(raw)) continue;
+    const a = raw === '' ? (argv[i] ?? '') : (argv[i] ?? '').replace(DEBRIS_TAIL, '');
     if (a === '--help' || a === '-h' || a === 'help') {
       wantsHelp = true;
       continue;
@@ -395,7 +410,13 @@ function isNumeric(prop: unknown): boolean {
 
 export type CliResolution =
   | { kind: 'text'; text: string }
-  | { kind: 'call'; tool: string; args: Record<string, unknown> }
+  | {
+      kind: 'call';
+      tool: string;
+      args: Record<string, unknown>;
+      /** Flags given that are not arguments of this command (see resolveCli). */
+      unread?: readonly string[];
+    }
   | { kind: 'error'; text: string };
 
 /**
@@ -607,7 +628,39 @@ export function resolveCli(cli: CliModel, argv: readonly string[]): CliResolutio
     };
   }
 
-  return { kind: 'call', tool: match.tool.name, args };
+  /*
+   * A FLAG THE COMMAND DOES NOT HAVE IS SAID, NOT SWALLOWED. MEASURED (4B, the
+   * visual suite's icon set): `svg recipe-app-icons --icons timer,servings,…`
+   * — the six icons it was asked for went into a flag `svg` does not have. The
+   * flag passed through as an unknown key (coerceArgs), the tool read its own
+   * arguments and nothing else, and the answer was one drawing "— 3 paths",
+   * with no word that the list had gone nowhere. It ran the same line twice
+   * more. A tool's schema is its contract, so a key outside it was not read;
+   * the call still runs, and the result says which flags did nothing and what
+   * the command takes. A schema that declares it takes more is left alone.
+   */
+  const unread =
+    Object.keys(props).length > 0 && schema?.additionalProperties !== true
+      ? Object.keys(args).filter((k) => !(k in props))
+      : [];
+  return unread.length > 0
+    ? { kind: 'call', tool: match.tool.name, args, unread }
+    : { kind: 'call', tool: match.tool.name, args };
+}
+
+/** The line a result gets when some of its flags were not the command's. */
+export function unreadFlagsNote(cli: CliModel, tool: string, unread: readonly string[]): string {
+  let cmd: CliCommand | undefined;
+  for (const g of cli.groups) cmd ??= g.commands.find((c) => c.tool.name === tool);
+  if (cmd === undefined || unread.length === 0) return '';
+  const takes = Object.keys(schemaOf(cmd.tool)?.properties ?? {}).map((k) => `--${k}`);
+  const flags = unread.map((k) => `--${k}`).join(', ');
+  const [verb, it] =
+    unread.length === 1 ? ['is not an argument', 'it'] : ['are not arguments', 'they'];
+  return (
+    `\n\nNote: ${flags} ${verb} of \`${commandLine(cmd)}\`, so ${it} did nothing. ` +
+    `It takes ${takes.join(', ')} — \`${commandLine(cmd)} --help\` says what each does.`
+  );
 }
 
 // ── a call named like a command ──────────────────────────────────────────────
