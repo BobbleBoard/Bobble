@@ -1375,6 +1375,44 @@ describe('unfinished-plan steer', () => {
     expect(rig.sentUserMessages).toHaveLength(1);
     expect(rig.sentUserMessages[0]).toContain('Pick the option');
   });
+
+  /* The visual suite, 4B, verbatim: the icon set ended on a promise. */
+  const PROMISE =
+    'The svg command seems to have generated something, but I need to check what was actually created. Let me present the SVG file to see what was generated.';
+
+  it('pushes back when the turn ends on a next step it never took', async () => {
+    const rig = makeRig();
+    await startSession(rig);
+    await startTurn(rig);
+    await end(rig, PROMISE);
+    expect(rig.sentUserMessages).toHaveLength(1);
+    expect(rig.sentUserMessages[0]).toContain('Let me present the SVG file');
+    // Once per session.
+    await end(rig, PROMISE);
+    expect(rig.sentUserMessages).toHaveLength(1);
+  });
+
+  it('still fires after another steer went out in an EARLIER turn, never in the same one', async () => {
+    const rig = makeRig();
+    await startSession(rig);
+    await startTurn(rig);
+    await setPlan(rig, [
+      { id: '1', text: 'a', status: 'done' },
+      { id: '2', text: 'b', status: 'pending' },
+    ]);
+    // This turn: the plan nudge AND a promise — only one steer goes out.
+    await end(rig, PROMISE);
+    expect(rig.sentUserMessages).toHaveLength(1);
+    expect(rig.sentUserMessages[0]).toContain('b');
+    // A later turn ends on a promise again: now it is this nudge's turn.
+    await setPlan(rig, [
+      { id: '1', text: 'a', status: 'done' },
+      { id: '2', text: 'b', status: 'done' },
+    ]);
+    await end(rig, PROMISE);
+    expect(rig.sentUserMessages).toHaveLength(2);
+    expect(rig.sentUserMessages[1]).toContain('Let me present the SVG file');
+  });
 });
 
 /**

@@ -31,6 +31,7 @@ import { sharedTool, sharedToolNames } from '@pi-desktop/tool-bus';
 import { corpToolEnabled, registerCreateHierarchyTool } from './corp/promote-tool.js';
 import { CREATE_PRODUCTION_HIERARCHY } from './corp/promotion.js';
 import { effortKnobs, isEffortLevel } from './effort/effort.js';
+import { announcedNextStep, announcedStepNudge } from './loop/announced-step.js';
 import { HANDBACK_NUDGE, isChoiceHandback } from './loop/handback.js';
 import { createLoopDetector, type LoopDetector, loopDetectorConfig } from './loop/loop-detector.js';
 import { newSameCallState, noteRepeatedCall } from './loop/same-call.js';
@@ -413,6 +414,8 @@ interface HarnessRuntime {
   nudgedOutputLimit: boolean;
   /** One-shot: the model was told its own plan still had steps left in it. */
   nudgedUnfinished: boolean;
+  /** The announced-next-step nudge has fired this session (loop/announced-step.ts). */
+  nudgedAnnounced: boolean;
   /** Remaining REAL-verify fix steers allowed in the active verify sequence. */
   verifyFixesRemaining: number;
   /** True while inside a self-triggered verify fix sequence (so the budget isn't reset). */
@@ -1168,6 +1171,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     nudgedHandback: false,
     nudgedOutputLimit: false,
     nudgedUnfinished: false,
+    nudgedAnnounced: false,
     verifyFixesRemaining: 0,
     verifyActive: false,
   };
@@ -3732,6 +3736,13 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
      * stall. See handback.ts for why this is narrow — `ask_user` exists for a
      * genuine blocker, and using the tool is exactly what separates the two.
      */
+    // Which steers had fired before this turn ended — so the last nudge below
+    // can tell "another one fired just now" from "one fired turns ago".
+    const steeredBefore = [
+      runtime.nudgedHandback,
+      runtime.nudgedOutputLimit,
+      runtime.nudgedUnfinished,
+    ].join();
     if (!runtime.nudgedHandback) {
       const finalText = lastAssistantText(event.messages);
       if (isChoiceHandback(finalText)) {
@@ -3782,6 +3793,24 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
         runtime.nudgedUnfinished = true;
         pi.appendEntry(HARNESS_LOOP_ENTRY, { action: 'steer', cause: 'unfinished-plan' });
         pi.sendUserMessage?.(unfinishedPlanNudge(left));
+      }
+    }
+    /*
+     * A TURN THAT ENDS ON "LET ME PRESENT IT" — AND DOESN'T. See
+     * announced-step.ts: the 4B's icon set ended on a promise to present what it
+     * drew, and the person was left with nothing to see. Once per session; and
+     * only when no other steer went out THIS turn (theirs gate on each other's
+     * session flags, which would silence this one for good after any of them).
+     */
+    const steeredNow =
+      [runtime.nudgedHandback, runtime.nudgedOutputLimit, runtime.nudgedUnfinished].join() !==
+      steeredBefore;
+    if (!steeredNow && !runtime.nudgedAnnounced && !endedAtOutputLimit(event.messages)) {
+      const said = announcedNextStep(lastAssistantText(event.messages));
+      if (said !== null) {
+        runtime.nudgedAnnounced = true;
+        pi.appendEntry(HARNESS_LOOP_ENTRY, { action: 'steer', cause: 'announced-step' });
+        pi.sendUserMessage?.(announcedStepNudge(said));
       }
     }
     // THE USER OUTRANKS EVERYTHING BEHIND THEM. Naming and the reviewer both run
