@@ -165,4 +165,140 @@ export const INTEGRAL = {
   ],
 };
 
-export const ALL = { FOURIER, KINETIC, SHM, TANGENT, INTEGRAL } as const;
+/**
+ * THE REARRANGEMENT PROOF — the user (2026-09-26): "if asked for pythagorean
+ * theorem explanation visually, do you have text that appears side by side
+ * as the triangles are rearranged within the square". One slider t runs the
+ * three moves in turn (between), each eased (ease); the tilted c² fades as
+ * the first triangle leaves and a², b² fade in as the last one lands
+ * (opacity). Each step moves t, so Next slides the next triangle.
+ */
+const move = (k: number) => `ease(between(t, ${k - 1}, ${k}))`;
+export const PYTHAGORAS = {
+  title: 'Why a² + b² = c²',
+  caption: 'Four copies of one right triangle, moved inside the same square.',
+  params: ['t = 0 in 0..3'],
+  play: 't',
+  figure: {
+    view: { x: '-0.9..4.9', y: '-0.9..4.7' },
+    shapes: [
+      {
+        id: 'frame',
+        kind: 'polygon',
+        points: [
+          [0, 0],
+          [4, 0],
+          [4, 4],
+          [0, 4],
+        ],
+        fill: 'none',
+      },
+      {
+        id: 'c2',
+        kind: 'polygon',
+        points: [
+          [1.5, 0],
+          [4, 1.5],
+          [2.5, 4],
+          [0, 2.5],
+        ],
+        fill: 'second',
+        label: 'c²',
+        opacity: '1 - ease(between(t, 0, 0.6))',
+      },
+      {
+        id: 'a2',
+        kind: 'polygon',
+        points: [
+          [0, 0],
+          [1.5, 0],
+          [1.5, 1.5],
+          [0, 1.5],
+        ],
+        fill: 'second',
+        label: 'a²',
+        opacity: 'ease(between(t, 2.4, 3))',
+      },
+      {
+        id: 'b2',
+        kind: 'polygon',
+        points: [
+          [1.5, 1.5],
+          [4, 1.5],
+          [4, 4],
+          [1.5, 4],
+        ],
+        fill: 'second',
+        label: 'b²',
+        opacity: 'ease(between(t, 2.4, 3))',
+      },
+      {
+        id: 'T1',
+        kind: 'polygon',
+        points: [
+          [0, `1.5*${move(1)}`],
+          [1.5, `1.5*${move(1)}`],
+          [0, `2.5 + 1.5*${move(1)}`],
+        ],
+        fill: 'main',
+      },
+      {
+        id: 'T2',
+        kind: 'polygon',
+        points: [
+          [1.5, 0],
+          [4, 0],
+          [4, 1.5],
+        ],
+        fill: 'main',
+      },
+      {
+        id: 'T3',
+        kind: 'polygon',
+        points: [
+          [`4 - 2.5*${move(2)}`, 1.5],
+          [`4 - 2.5*${move(2)}`, 4],
+          [`2.5 - 2.5*${move(2)}`, 4],
+        ],
+        fill: 'main',
+      },
+      {
+        id: 'T4',
+        kind: 'polygon',
+        points: [
+          [`2.5 + 1.5*${move(3)}`, `4 - 2.5*${move(3)}`],
+          [`1.5*${move(3)}`, `4 - 2.5*${move(3)}`],
+          [`1.5*${move(3)}`, `2.5 - 2.5*${move(3)}`],
+        ],
+        fill: 'main',
+      },
+      { id: 'da', kind: 'dimension', from: [0, 0], to: [1.5, 0], label: 'a', offset: -0.45 },
+      { id: 'db', kind: 'dimension', from: [1.5, 0], to: [4, 0], label: 'b', offset: -0.45 },
+    ],
+  },
+  steps: [
+    {
+      text: 'Four copies of one right triangle — legs $a$ and $b$, hypotenuse $c$ — fit in a square of side $a+b$. The space they leave is a tilted square, of area $c^2$.',
+      highlight: ['c2', 'T1', 'T2', 'T3', 'T4'],
+      set: { t: 0 },
+    },
+    {
+      text: 'Slide one triangle up by $a$. Nothing is added or taken away: the same square, the same four triangles.',
+      highlight: ['T1'],
+      set: { t: 1 },
+    },
+    { text: 'Slide a second one across by $b$…', highlight: ['T3'], set: { t: 2 } },
+    {
+      text: '…and the last one into the corner. The triangles now make two rectangles, and the space they leave is two squares, $a^2$ and $b^2$.',
+      highlight: ['T4', 'a2', 'b2'],
+      set: { t: 3 },
+    },
+    {
+      text: 'The same square, less the same four triangles, left $c^2$ before and $a^2 + b^2$ after — so $a^2 + b^2 = c^2$.',
+      highlight: ['a2', 'b2'],
+      set: { t: 3 },
+    },
+  ],
+};
+
+export const ALL = { FOURIER, KINETIC, SHM, TANGENT, INTEGRAL, PYTHAGORAS } as const;

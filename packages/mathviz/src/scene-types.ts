@@ -10,61 +10,71 @@ export interface Box {
   readonly h: number;
 }
 
-export type Drawable =
-  | {
-      readonly t: 'line';
-      readonly x1: number;
-      readonly y1: number;
-      readonly x2: number;
-      readonly y2: number;
-      readonly tone: Tone;
-      readonly width: number;
-      readonly dash?: boolean;
-      readonly id?: string;
-      readonly dim?: boolean;
-      readonly clip?: boolean;
-    }
-  | {
-      readonly t: 'path';
-      readonly d: string;
-      readonly tone: Tone;
-      readonly width: number;
-      readonly fill?: Tone;
-      readonly fillOpacity?: number;
-      readonly dash?: boolean;
-      readonly id?: string;
-      readonly dim?: boolean;
-      readonly clip?: boolean;
-    }
-  | {
-      readonly t: 'dot';
-      readonly x: number;
-      readonly y: number;
-      readonly r: number;
-      readonly tone: Tone;
-      readonly id?: string;
-      readonly dim?: boolean;
-    }
-  | {
-      readonly t: 'text';
-      readonly x: number;
-      readonly y: number;
-      readonly text: string;
-      readonly anchor: 'start' | 'middle' | 'end';
-      readonly size: number;
-      readonly tone: Tone;
-      /** The measured box, for the overlap checks. */
-      readonly box: Box;
-      /** A short line in this tone before the text: the key that ties a label to its curve. */
-      readonly key?: Tone;
-      readonly italic?: boolean;
-      readonly id?: string;
-      readonly dim?: boolean;
-      /** Placed by the layout (a curve's or a point's label) rather than fixed (a tick). */
-      readonly placed?: boolean;
-      /** No clear spot was found: what the chosen one touches — boxes (labels, points, discs) and line points. */
-      readonly crowd?: { readonly boxes: number; readonly points: number };
-    };
+/** How much of a part shows: its own opacity (a spec's, or a fade in), and a dimming on its way in or out. */
+export interface Fade {
+  /** 0 … 1: the part's own opacity. */
+  readonly alpha?: number;
+  /** 0 … 1: how far dimmed, while a step's highlight changes (else `dim` says). */
+  readonly dimMix?: number;
+}
+
+export type Drawable = Fade &
+  (
+    | {
+        readonly t: 'line';
+        readonly x1: number;
+        readonly y1: number;
+        readonly x2: number;
+        readonly y2: number;
+        readonly tone: Tone;
+        readonly width: number;
+        readonly dash?: boolean;
+        readonly id?: string;
+        readonly dim?: boolean;
+        readonly clip?: boolean;
+      }
+    | {
+        readonly t: 'path';
+        readonly d: string;
+        readonly tone: Tone;
+        readonly width: number;
+        readonly fill?: Tone;
+        readonly fillOpacity?: number;
+        readonly dash?: boolean;
+        readonly id?: string;
+        readonly dim?: boolean;
+        readonly clip?: boolean;
+      }
+    | {
+        readonly t: 'dot';
+        readonly x: number;
+        readonly y: number;
+        readonly r: number;
+        readonly tone: Tone;
+        readonly id?: string;
+        readonly dim?: boolean;
+      }
+    | {
+        readonly t: 'text';
+        readonly x: number;
+        readonly y: number;
+        readonly text: string;
+        readonly anchor: 'start' | 'middle' | 'end';
+        readonly size: number;
+        readonly tone: Tone;
+        /** The measured box, for the overlap checks. */
+        readonly box: Box;
+        /** A short line in this tone before the text: the key that ties a label to its curve. */
+        readonly key?: Tone;
+        readonly italic?: boolean;
+        readonly id?: string;
+        readonly dim?: boolean;
+        /** Placed by the layout (a curve's or a point's label) rather than fixed (a tick). */
+        readonly placed?: boolean;
+        /** No clear spot was found: what the chosen one touches — boxes (labels, points, discs) and line points. */
+        readonly crowd?: { readonly boxes: number; readonly points: number };
+      }
+  );
 
 export interface Panel {
   readonly kind: 'plot' | 'figure';

@@ -47,6 +47,16 @@ const FUNCTIONS: Readonly<Record<string, (...a: number[]) => number>> = {
   sec: (a) => 1 / Math.cos(a),
   csc: (a) => 1 / Math.sin(a),
   cot: (a) => 1 / Math.tan(a),
+  /* Motion: a part slides from a to b as u runs 0 → 1 (lerp), eased at both
+     ends (ease), and one slider can run several moves in turn — between(t, 1,
+     2) is how far t is through 1 … 2, held at 0 before and 1 after. */
+  lerp: (a, b, u) => a + (b - a) * u,
+  clamp: (x, lo, hi) => Math.min(Math.max(x, lo), hi),
+  ease: (u) => {
+    const v = Math.min(1, Math.max(0, u));
+    return v * v * (3 - 2 * v);
+  },
+  between: (x, a, b) => Math.min(1, Math.max(0, (x - a) / (b - a))),
 };
 
 const CONSTANTS: Readonly<Record<string, number>> = { pi: Math.PI, e: Math.E, tau: 2 * Math.PI };
@@ -437,6 +447,10 @@ const JS_FN: Readonly<Record<string, string>> = {
   sec: '((a)=>1/Math.cos(a))',
   csc: '((a)=>1/Math.sin(a))',
   cot: '((a)=>1/Math.tan(a))',
+  lerp: '((a,b,u)=>a+(b-a)*u)',
+  clamp: '((x,l,h)=>Math.min(Math.max(x,l),h))',
+  ease: '((u)=>{const v=Math.min(1,Math.max(0,u));return v*v*(3-2*v);})',
+  between: '((x,a,b)=>Math.min(1,Math.max(0,(x-a)/(b-a))))',
 };
 
 /**

@@ -2,7 +2,7 @@ import vm from 'node:vm';
 import { describe, expect, it } from 'vitest';
 import { compileSpec, evaluatorsScript, startValues, steadyYRange } from './build';
 import { checkMath } from './checks';
-import { ALL, FOURIER, KINETIC, SHM } from './fixtures';
+import { ALL, FOURIER, KINETIC, PYTHAGORAS, SHM } from './fixtures';
 import { renderMath } from './index';
 import { mvPiLabel, mvRuns, mvScene, mvTicks, runtimeSource } from './runtime';
 import { lenientJson, normalizeMathSpec, SpecError } from './spec';
@@ -565,5 +565,52 @@ describe('STEM run 3: what the 4B wrote, and what it could not see', () => {
     const named = (t: string | undefined) => (t?.match(/“[^”]+”/g) ?? []).length;
     const zoomed = crowded(lesson('-1.6..1.6', 1.5));
     expect(named(zoomed[0]?.text)).toBeLessThan(named(tight[0]?.text));
+  });
+});
+
+describe('motion: parts that slide, fade and take turns', () => {
+  it('lerp, ease, between and clamp read the same in Node and on the page', () => {
+    const spec = normalizeMathSpec({
+      title: 'M',
+      params: ['t = 0 in 0..3'],
+      figure: {
+        view: { x: '0..4', y: '0..4' },
+        shapes: [
+          { id: 'p', kind: 'point', at: ['lerp(0, 4, ease(between(t, 1, 2)))', 'clamp(t, 0, 2)'] },
+        ],
+      },
+      steps: [],
+    });
+    const c = compileSpec(spec);
+    const page = vm.runInNewContext(`(${evaluatorsScript(c)})`, { Math }) as Record<
+      string,
+      (s: object) => number
+    >;
+    for (const t of [0, 1, 1.25, 1.5, 2, 3]) {
+      for (const src of ['lerp(0, 4, ease(between(t, 1, 2)))', 'clamp(t, 0, 2)']) {
+        expect(page[src]?.({ t })).toBeCloseTo(c.E[src]?.({ t }) ?? Number.NaN, 12);
+      }
+    }
+    expect(c.E['lerp(0, 4, ease(between(t, 1, 2)))']?.({ t: 1.5 })).toBeCloseTo(2, 12);
+    expect(c.E['lerp(0, 4, ease(between(t, 1, 2)))']?.({ t: 0.5 })).toBe(0);
+  });
+
+  it('a part at opacity 0 is not drawn; between, it is drawn at its opacity', () => {
+    const spec = normalizeMathSpec(PYTHAGORAS);
+    const c = compileSpec(spec);
+    const ids = (t: number) =>
+      mvScene(spec, c.E, { t }, 1)
+        .panels[0]?.items.filter((it) => it.id === 'c2' && it.t === 'path')
+        .map((it) => it.alpha ?? 1) ?? [];
+    expect(ids(0)).toEqual([1]);
+    expect(ids(0.3)[0]).toBeGreaterThan(0);
+    expect(ids(0.3)[0]).toBeLessThan(1);
+    expect(ids(1)).toEqual([]);
+  });
+
+  it('the rearrangement proof draws, and its checks are clear at every step', () => {
+    const r = renderMath(PYTHAGORAS);
+    expect(r.problems.filter((p) => p.level !== 'note')).toEqual([]);
+    expect(r.html).toContain('opacity=');
   });
 });

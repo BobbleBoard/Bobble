@@ -111,8 +111,10 @@ export interface PlotSpec {
 
 export type Anchor = 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw';
 
-export type Shape = Item &
-  (
+export type Shape = Item & {
+  /** 0 … 1, a number or an expression of the sliders: a part that fades as a slider moves. */
+  readonly opacity?: Num;
+} & (
     | {
         readonly kind: 'point';
         readonly at: Xy;
@@ -550,6 +552,12 @@ function plot(v: Loose, names: readonly string[]): PlotSpec {
 const ANCHORS: readonly Anchor[] = ['n', 'ne', 'e', 'se', 's', 'sw', 'w', 'nw'];
 
 function shape(v: unknown, i: number, named: Map<string, Xy>, names: readonly string[]): Shape {
+  const s = shapeBody(v, i, named, names);
+  const op = isObj(v) ? (v.opacity ?? v.alpha) : undefined;
+  return op === undefined ? s : { ...s, opacity: numOrExpr(op, `${s.id}.opacity`, names) };
+}
+
+function shapeBody(v: unknown, i: number, named: Map<string, Xy>, names: readonly string[]): Shape {
   if (!isObj(v)) throw new SpecError(`shape ${i + 1} needs {kind, …}`);
   const kind = str(v.kind ?? v.type ?? v.shape)?.toLowerCase();
   const id = str(v.id) ?? `s${i + 1}`;

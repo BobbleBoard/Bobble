@@ -966,6 +966,7 @@ export function mvFigure(
     cands: { x: number; y: number; anchor: 'start' | 'middle' | 'end' }[];
     dim: boolean;
     size: number;
+    alpha?: number;
   }[] = [];
   const taken: Box[] = [];
   const lines: number[][] = [];
@@ -992,6 +993,12 @@ export function mvFigure(
   for (const sh of fig.shapes as readonly Shape[]) {
     if (!mvVisible(sh.appear, step)) continue;
     const dim = mvDim(sh.id, hl);
+    // Its own opacity — an expression of the sliders, so a part can fade as one moves. Gone at 0.
+    const alphaIn = sh.opacity === undefined ? 1 : mvEval(E, sh.opacity, s);
+    const alpha = Number.isFinite(alphaIn) ? Math.min(1, Math.max(0, alphaIn)) : 1;
+    if (alpha <= 0.001) continue;
+    const drawnFrom = items.length;
+    const queuedFrom = pending.length;
     switch (sh.kind) {
       case 'point': {
         const [a, b] = pt(sh.at);
@@ -1536,6 +1543,14 @@ export function mvFigure(
         break;
       }
     }
+    if (alpha < 1) {
+      for (let q = drawnFrom; q < items.length; q += 1)
+        items[q] = { ...(items[q] as Drawable), alpha };
+      for (let q = queuedFrom; q < pending.length; q += 1) {
+        const pq = pending[q];
+        if (pq !== undefined) pq.alpha = alpha;
+      }
+    }
   }
   const labels: Drawable[] = [];
   for (const p of pending) {
@@ -1556,6 +1571,7 @@ export function mvFigure(
       dim: p.dim,
       placed: true,
       ...(pick.clear ? {} : { crowd: pick.crowd }),
+      ...(p.alpha !== undefined ? { alpha: p.alpha } : {}),
     });
     taken.push(box);
   }
@@ -1615,8 +1631,10 @@ export function mvSvg(panel: Panel, index: number, title: string): string {
   const a = panel.area;
   let body = '';
   for (const it of panel.items) {
+    // Dimmed parts step back to 38%; a part's own opacity and a fade multiply in.
+    const op = (it.alpha ?? 1) * (1 - 0.62 * (it.dimMix ?? (it.dim ? 1 : 0)));
     const cls = (base: string) =>
-      `class="${base}${it.dim ? ' mv-dim' : ''}"${it.id !== undefined ? ` data-id="${mvEsc(it.id)}"` : ''}`;
+      `class="${base}"${op < 0.999 ? ` opacity="${op.toFixed(3)}"` : ''}${it.id !== undefined ? ` data-id="${mvEsc(it.id)}"` : ''}`;
     if (it.t === 'line') {
       body += `<line x1="${it.x1.toFixed(2)}" y1="${it.y1.toFixed(2)}" x2="${it.x2.toFixed(2)}" y2="${it.y2.toFixed(2)}" ${cls(`mv-s-${it.tone}${it.dash ? ' mv-dash' : ''}`)} stroke-width="${it.width}"${it.clip ? ` clip-path="url(#${clipId})"` : ''}/>`;
     } else if (it.t === 'path') {

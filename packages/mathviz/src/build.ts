@@ -105,6 +105,7 @@ export function expressionsOf(spec: MathSpec): Map<string, Set<string>> {
       add(p[0], P);
       add(p[1], P);
     };
+    add(sh.opacity, P);
     switch (sh.kind) {
       case 'point':
         xy(sh.at);
