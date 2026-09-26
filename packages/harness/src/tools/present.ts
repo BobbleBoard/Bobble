@@ -28,7 +28,7 @@
  */
 
 import { homedir } from 'node:os';
-import { dirname, isAbsolute, join } from 'node:path';
+import { basename, dirname, isAbsolute, join } from 'node:path';
 import type { ExtensionAPI } from '@mariozechner/pi-coding-agent';
 import type { DiagramTheme } from '@pi-desktop/design-kit';
 import { Type } from '@sinclair/typebox';
@@ -250,6 +250,29 @@ export interface PresentToolDeps {
   readonly readText?: (p: string) => Promise<string | null>;
   /** Everything the chat has said to the model — its messages and tool results. */
   readonly chatText?: () => string;
+  /** The names in a folder, for a path given without its extension. */
+  readonly listDir?: (dir: string) => Promise<readonly string[]>;
+}
+
+/**
+ * THE NAME WITHOUT ITS EXTENSION. MEASURED (STEM visual suite, 4B): it wrote
+ * completing_the_square_practice.html and .md, then ran `present
+ * completing_the_square_practice` six times — "There is nothing at …" each
+ * time, and `ls` showing both files in between did not help. The files that
+ * are that name plus an extension: one is the file it meant; several are
+ * named back so the next call can pick.
+ */
+export async function sameNameFiles(
+  resolved: string,
+  listDir: (dir: string) => Promise<readonly string[]>,
+): Promise<string[]> {
+  const base = basename(resolved);
+  if (base === '' || /\.[A-Za-z0-9]{1,5}$/.test(base)) return [];
+  const names = await listDir(dirname(resolved)).catch(() => [] as readonly string[]);
+  return names
+    .filter((n) => n.startsWith(`${base}.`) && !n.slice(base.length + 1).includes('/'))
+    .sort()
+    .map((n) => join(dirname(resolved), n));
 }
 
 /**
@@ -339,6 +362,30 @@ export function registerPresentTool(pi: ExtensionAPI, deps: PresentToolDeps): vo
           }
         }
       }
+      let noExtension = '';
+      if (info === null && deps.listDir !== undefined) {
+        const same = await sameNameFiles(resolved, deps.listDir);
+        if (same.length === 1 && same[0] !== undefined) {
+          const info3 = await deps.stat(same[0]);
+          if (info3 !== null) {
+            resolved = same[0];
+            info = info3;
+            noExtension = ` (${p} has no extension; the file is ${basename(same[0])})`;
+          }
+        } else if (same.length > 1) {
+          const names = same.map((f) => basename(f));
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `There is nothing at ${p} — but there are ${names.slice(0, -1).join(', ')} and ${names.at(-1)}. Present the one you mean, with its extension.`,
+              },
+            ],
+            isError: true,
+            details: undefined,
+          };
+        }
+      }
       if (info === null) {
         return {
           content: [
@@ -389,7 +436,7 @@ export function registerPresentTool(pi: ExtensionAPI, deps: PresentToolDeps): vo
 
       const content: Array<Record<string, unknown>> = [];
       const head = [
-        `Presented ${pathForModel(resolved, deps.resolvePath?.('.'))} to the user${shown.ok ? '' : ` (the canvas could not open it: ${shown.error ?? 'unknown'})`}.`,
+        `Presented ${pathForModel(resolved, deps.resolvePath?.('.'))} to the user${noExtension}${shown.ok ? '' : ` (the canvas could not open it: ${shown.error ?? 'unknown'})`}.`,
         `Preview: ${plan.because}.`,
       ].join(' ');
       content.push({ type: 'text', text: head });

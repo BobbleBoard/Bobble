@@ -18,7 +18,7 @@
  */
 
 import { appendFileSync, realpathSync, statSync } from 'node:fs';
-import { readFile, stat } from 'node:fs/promises';
+import { readdir, readFile, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { basename, isAbsolute, join } from 'node:path';
 import type {
@@ -2717,6 +2717,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       readText: (p) => readFile(p, 'utf8').catch(() => null),
       chatText: () =>
         runtime.currentCtx === null ? '' : chatTextOf(getEntries(runtime.currentCtx)),
+      listDir: (dir) => readdir(dir),
       stat: async (target) => {
         try {
           return { isDirectory: (await stat(target)).isDirectory() };

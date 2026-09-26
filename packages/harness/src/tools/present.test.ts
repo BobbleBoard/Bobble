@@ -295,3 +295,62 @@ describe('present resolves ~ before touching the filesystem', () => {
     expect(seen.every((p) => p.endsWith('/proj/app.py'))).toBe(true);
   });
 });
+
+describe('a path named without its extension', () => {
+  /* MEASURED (STEM visual suite, 4B): `present completing_the_square_practice`
+     six times over a folder holding its .html and .md. */
+  const files = ['/ws/lesson.html', '/ws/notes.md', '/ws/notes.html', '/ws/other.txt'];
+  function setup() {
+    const shown: string[] = [];
+    const box: { tool: { execute: (id: string, p: unknown) => Promise<unknown> } | null } = {
+      tool: null,
+    };
+    registerPresentTool(
+      { registerTool: (d: never) => (box.tool = d) } as never,
+      {
+        resolvePath: (p: string) => `/ws/${p}`.replace(/\/\.$/, ''),
+        stat: async (p: string) => (files.includes(p) ? { isDirectory: false } : null),
+        listDir: async () => files.map((f) => f.slice('/ws/'.length)),
+        bridge: {
+          show: async ({ path }: { path: string }) => {
+            shown.push(path);
+            return { ok: true };
+          },
+          preview: async () => ({ text: 'ok' }),
+        },
+      } as never,
+    );
+    return {
+      shown,
+      run: (p: string) =>
+        box.tool?.execute('id', { path: p }) as Promise<{
+          content: { text: string }[];
+          isError?: boolean;
+        }>,
+    };
+  }
+
+  it('presents the one file of that name, and says which', async () => {
+    const { shown, run } = setup();
+    const r = await run('lesson');
+    expect(shown).toEqual(['/ws/lesson.html']);
+    expect(r.content[0]?.text).toContain('(lesson has no extension; the file is lesson.html)');
+  });
+
+  it('names them back when there are several', async () => {
+    const { shown, run } = setup();
+    const r = await run('notes');
+    expect(shown).toEqual([]);
+    expect(r.isError).toBe(true);
+    expect(r.content[0]?.text).toBe(
+      'There is nothing at notes — but there are notes.html and notes.md. Present the one you mean, with its extension.',
+    );
+  });
+
+  it('still says there is nothing when nothing shares the name', async () => {
+    const { run } = setup();
+    expect((await run('missing')).content[0]?.text).toMatch(
+      /^There is nothing at missing\. Presenting is the last step/,
+    );
+  });
+});
