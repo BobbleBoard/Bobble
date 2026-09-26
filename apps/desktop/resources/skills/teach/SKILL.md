@@ -29,7 +29,7 @@ Ask one "why" or "what if" question now and then ("why does the pressure not dep
 - **Tie each step to the picture.** A step lights the parts it talks about; nothing in the text is left for the reader to find.
 
 Which tool:
-- **A figure, a graph of a function, or an animation** — a physics setup, a geometry proof, $y = \sin x$ with a slider, a mass on a spring: the `math` command. Write the spec to `name.math.json` — sliders, a plot of curves and/or a figure of labelled points, vectors and shapes, and 2–6 short steps that each `highlight` the parts they talk about (a part can appear from a later step) — run `math name.math.json`, and fix in the file whatever it reports. An animation is a slider (a time `t` the parts move with) and its Play button — only when the idea *is* change. Not hand-written SVG or HTML, and not an image generator: neither puts a label where it belongs.
+- **A figure, a graph of a function, or an animation** — a physics setup, a geometry proof, $y = \sin x$ with a slider, a mass on a spring: the `math` command. Write the spec to `name.math.json` — it is drawn the moment it is written; fix in the file whatever it reports. The page plays its 2–6 short steps like a teacher at a whiteboard: each step's words appear while the figure moves, so give each step something to show — a `set` that moves a slider (a time `t`, an angle, a length), a part that appears, or a `nudge` that wiggles a value so the reader sees what it changes. Say in the step what moves and why. Not hand-written SVG or HTML, and not an image generator: neither puts a label where it belongs.
 - **Measured data** (a table of readings, results by year): the chart tool.
 - **Steps, a process, a cycle:** the diagram tool.
 
