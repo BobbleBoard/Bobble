@@ -11,7 +11,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./corp": "./src/corp/index.ts",
-    "./compaction-gate": "./src/compaction-gate.ts",
+    "./compaction-focus": "./src/compaction-focus.ts",
     "./permissions": "./src/permissions/rules.ts",
     "./tool-search": "./src/tools/tool-search.ts",
     "./tools/hang-guard": "./src/tools/hang-guard.ts",

@@ -23,12 +23,7 @@
  */
 import { type ExtensionAPI, estimateTokens } from '@mariozechner/pi-coding-agent';
 
-/**
- * What the app's Compact button sends as the summary's focus. Its presence is
- * how the gate knows a person asked (pi's auto-compaction sends none).
- */
-export const MANUAL_COMPACTION_FOCUS =
-  'The user asked for this compaction: keep what they asked for, the files made, and what is still to do.';
+export { MANUAL_COMPACTION_FOCUS } from './compaction-focus.js';
 
 /** Headroom for the turn about to happen — the corp roles' reserve (compaction-settings.ts). */
 export function compactionReserve(window: number): number {

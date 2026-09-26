@@ -19,7 +19,7 @@ import type {
   RpcSessionState,
   RpcSlashCommand,
 } from '@pi-desktop/engine';
-import { MANUAL_COMPACTION_FOCUS } from '@pi-desktop/harness/compaction-gate';
+import { MANUAL_COMPACTION_FOCUS } from '@pi-desktop/harness/compaction-focus';
 
 import { takeVisionWant } from '../inference/vision-want';
 import type { PiInvokeMap } from './contract';
