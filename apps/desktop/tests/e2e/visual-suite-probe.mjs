@@ -140,6 +140,77 @@ const TASKS = [
     prompt: 'Draft a quick email to my landlord asking when the heating repair is scheduled.',
   },
   /*
+   * THE SHOWCASE (the user, 2026-09-26): "for each type of item … get a random
+   * prompt that has never been run before and is realistic but will
+   * demonstrate the capability to a reasonably powerful extent".
+   */
+  {
+    id: 'sc-math',
+    kind: 'math',
+    prompt:
+      'Explain projectile motion to me with an animation: a ball kicked at an angle, its path, and how its height and distance change over time.',
+  },
+  {
+    id: 'sc-chart',
+    kind: 'dataviz',
+    prompt:
+      'Our café sold these per day last week — Mon 142, Tue 118, Wed 131, Thu 156, Fri 203, Sat 247, Sun 189 — and the week before: 130, 121, 125, 149, 198, 231, 176. Chart the two weeks so I can see which days grew.',
+  },
+  {
+    id: 'sc-diagram',
+    kind: 'diagram',
+    prompt:
+      'Draw a diagram of how a library book reservation works, from placing a hold to pickup — including what happens if nobody collects it in 7 days.',
+  },
+  {
+    id: 'sc-doc',
+    kind: 'docx',
+    prompt:
+      'Write a one-page tenancy checklist as a Word document for students renting their first flat: before signing, moving-in day, during the tenancy, and moving out.',
+  },
+  {
+    id: 'sc-sheet',
+    kind: 'xlsx',
+    prompt:
+      'Make a spreadsheet to plan a 4-day school trip to York for 28 students: coach, hostel, meals, museum tickets, the cost per student, and a chart of where the money goes.',
+  },
+  {
+    id: 'sc-deck',
+    kind: 'pptx',
+    prompt:
+      "Make a 6-slide deck for our school's parent evening proposing a 9:15 start time: the sleep research, what two other schools saw, the new timetable, the costs, and a vote.",
+  },
+  {
+    id: 'sc-site',
+    kind: 'website',
+    prompt:
+      "Build a one-page website for Tidy Paws, a mobile dog-grooming van in Leeds: services with prices, the van's weekly route, reviews, and a booking section. Show it to me.",
+  },
+  {
+    id: 'sc-site-deck',
+    kind: 'website+pptx',
+    prompt:
+      'For our charity 5k fun run in May, make a one-page website with the route, the day’s schedule and sign-up, and a matching 5-slide deck we can use to pitch local sponsors.',
+  },
+  {
+    id: 'sc-anim',
+    kind: 'animation',
+    prompt:
+      "Make a 5-second animated title card for my podcast 'Night Shift Stories' — dark and calm, the title fading up letter by letter.",
+  },
+  {
+    id: 'sc-image',
+    kind: 'image',
+    prompt:
+      'Generate a picture of a tiny tea shop on a rainy Tokyo side street at dusk, warm light in the window and a bicycle leaning outside.',
+  },
+  {
+    id: 'sc-svg',
+    kind: 'svg',
+    prompt:
+      'Make an SVG illustration of a hot-air balloon drifting over green hills, for my travel blog.',
+  },
+  /*
    * STEM PRACTICE PROBLEMS (the user, 2026-09-25): "test some math/physics/
    * chemistry... practice problem requests, this falls into visual aswell …
    * having diagrams/visuals and animating them cleanly to go along with an

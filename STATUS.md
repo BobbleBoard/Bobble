@@ -1,6 +1,71 @@
 # Bobble — status
 
-Updated: 2026-09-25 (night, on AC) · main `741d317d` · installed `c034085d` (16:15) — tonight's 18 commits are not installed yet · the user: "keep going on the list, bugs can go first, verify", then "make ggufs using unsloth dynamic … test that against the current 4b omnisvg", "test some math/physics/chemistry practice problem requests … add a teach skill.md" — the per-kind visual suite ran (4B) and every defect it showed has a fix; the SVG bake-off and the STEM run are in the heavy queue
+Updated: 2026-09-26 00:30 (hard stop, on AC) · main `db67f548` · dist rebuilt at `db67f548` · installed `c034085d` — tonight's 38 commits are NOT installed (`pnpm ship:local` next) · the user: the math extension, VFIG with no token limit, OmniSVG 1.1 at 4B/8B, the app's blue for generated pages, the Pythagorean question, then "45 minutes … wrap up … a fresh prompt per visual kind, screenshots, full status"
+
+## Report — 2026-09-26 00:30 (hard stop): the showcase, the math extension, OmniSVG 1.1, VFIG, the blue kit
+
+**the user's asks this round.** (1) the math extension: "a standard style and control such that we can deterministically have it iterate when things look off"; (2) "remove token limit on vfig"; (3) "are we using omnisvg 1.1? … check the 8b model @ q8"; (4) "this greenish/pale blue isn't that great … keep using [the app's blue]"; (5) "if asked for pythagorean theorem explanation visually, do you have text that appears side by side as the triangles are rearranged"; (6) wrap-up: one fresh prompt per visual kind, screenshots, this report.
+
+**State.** main `db67f548` (38 commits since `741d317d`), dist rebuilt at `db67f548` (headless launch checked) · installed build still `c034085d` — **not installed tonight** (hard stop; `pnpm ship:local` is the next step) · suites: harness 1,878 · mathviz 49 · gen-tools 64 · design-kit 41 · charts 130 · office-gen 184 (Python) · the desktop files touched 116 · top-level typecheck clean.
+
+### S. The showcase — eleven prompts never run before, the real 4B, headless (qwen3.5-4b-mtp, rapid-mlx, 160 s cap each)
+Sheet: `deliverables/visual-quality/showcase-2026-09-26.png` (the products, looked at). 8 of 11 gave the user a real product; 7 hit the 160 s cap, most after presenting.
+
+| Kind | Prompt (fresh) | Outcome | What is wrong in it |
+|---|---|---|---|
+| Math (the model) | projectile motion, animated | ❌ capped, no page: it sent a data dump (`"history": [{t, x, y}…]`) instead of a spec, got the new error, then thought out the turn | the 4B still does not reach a working spec unaided on a new physics prompt; the Pythagorean page in the sheet is the FIXTURE, not the model |
+| Chart | café sales, two weeks | ✅ 72 s, drawn | four one-week charts, not one grouped chart; its reply got Wed's change backwards (+6 said −6); inline charts wear their look's mauve, not the app's blue |
+| Diagram | library holds, 7-day expiry | ✅ 29 s | good: decisions, yes/no branches, the expiry path |
+| Word | first-flat tenancy checklist | ✅ presented (capped after) | the four section headings are missing; 4 pages for "one page" |
+| Excel | York trip for 28 students | ✅ 74 s | designed well; the numbers disagree (4,852 vs a grand total of 6,944; the pie is of quantities; percentages sum to 143) |
+| PowerPoint | 9:15 school start, 6 slides | ✅ 82 s | the strongest product; its statistics are invented, not sourced |
+| Website | Tidy Paws grooming van | ✅ presented (capped after) | good look; emoji dogs as the service icons |
+| Website + deck | charity 5k: page and sponsor deck | ⚠️ page made and shown; deck FAILED — `office make` flags in one quoted string ("--kind=pptx --brief=…"), then "no slide plan" | the CLI's quoted-flags case, and the office planner's empty reply |
+| HyperFrames | podcast title card | ✅ presented (capped after) | calm, dark; the whole title blurs in, not letter by letter as asked |
+| Image | Tokyo tea shop in rain | ✅ Qwen-Image 2.1, saved | excellent picture; the cap ended the turn before it was presented |
+| SVG | hot-air balloon over hills | ✅ OmniSVG 4B, presented | simple and a little crude (the basket's shape) |
+
+### H. The math extension (`math`, `@pi-desktop/mathviz`)
+| What | Commit | Verified by |
+|---|---|---|
+| A spec → one standard page (light/dark, KaTeX with fonts inlined, no cards, no coloured text); checks measured in every step's state; the checks come back with "fix it in X and run math again" | `66547d62` … `298e692a` | 49 tests; five lesson fixtures looked at |
+| STEM run 2 (4B): every visual task reached for `math`, no spec got through — bare ranges, `@path`, invented keys, undeclared names, 3D points | `a3533846`, `a325ad60`, `db72ab0e` | tests; in the app with the mock |
+| STEM run 3 (4B, 5 tasks): physics — 5 specs refused (a view as one number, a box sized `[0.4, 0.4, 0.4]`); SHM — copied the error's one example (a sine curve), nothing moved, then told the user to "adjust the amplitude and period sliders" (there were none); calculus — wrote the spec 5×, never ran math, presented the JSON, hand-drawn SVG refused toward Mermaid, then **image generation** ("sos(x)" on the axis) | `7edd1ce5` | the 4B's own specs re-drawn: all six physics specs draw; its unit circle's crowding and doubled arrows are now said |
+| …the fixes: an unreadable view is **fitted to the shapes** (every slider setting and step); `[w, h, d]` boxes; title optional; the no-plot error shows a moving example; the result says what the page has ("Nothing on it moves — it has no sliders"); **a written `.math.json` is drawn in the write's own result**; a hand-drawn maths SVG is refused toward math; a maths-figure image prompt is answered with math | `7edd1ce5` | 27 harness + 45 gen-tools + 5 mathviz tests |
+| New checks: labels with no clear spot (on a point or a solid disc, crossed by a line) said as one list; two arrows on the same ends; labels keep off solid discs | `7edd1ce5` | the five fixtures stay clear; the 4B's circle at a 3.2-wide view names fewer labels |
+| Motion: `lerp`, `ease`, `between`, `clamp`; any part's `opacity` as an expression; dimming drawn as opacity; the **Pythagorean rearrangement** fixture (Next slides each triangle; c² fades out, a² and b² fade in) | `8a120df6` | tests (Node = page JS); steps 1/3/5 looked at |
+| **Open — the user's brief (2026-09-26):** "like a 3b1b explanation … smooth move/scale/slide … show direction … little nudges … visual cause and effect … a real teacher" — steps that play themselves, fade-in on appear, direction nudges, sliders after one play | — | NOT BUILT (memory `user-math-explanation-brief`) |
+
+### I. OmniSVG 1.1 — "fails this badly" was our image path
+| Finding | Fix | Evidence |
+|---|---|---|
+| The picture never reached the model; the marker came before the instruction; no 448×448 on white (alpha dropped: RGBA inputs reached it on black) | `1ac2de2e`, `56ab06e5`, `bb451110` | server log; TS vs the authors' Python on 20 inputs |
+| The pick kept scraps | `8373ed8f` overlap with the picture's ink | re-pick of the 30-task run |
+| 4B vs 8B at Q8_0: the 8B GGUF's end token was Qwen's (151645), not OmniSVG's (196999) — every 8B sample ran to the cap | GGUF patched (`gguf_set_metadata`) | EOS-fixed re-run, 13 image tasks × 3 before it was stopped for the showcase: 9 of 39 samples end on their own, 19 hit 1,536 tokens, 11 loop — **the 8B at Q8_0 is not the showcase's quality either**; the disparity with the authors' gallery is not model size on our path |
+
+### J. VFIG behind `svg` — no token limit
+| What | Commit | Verified by |
+|---|---|---|
+| Model-card prompt, greedy, n_predict −1, a loop cut where it began, a cut reply closed into a valid file; its own llama-server (32k, q8_0 cache); `svg --figure / --edit` route to it | `a9fcaf6d`, `b17cbd43`, `fe5fa8c4` | 9 + 3 + routing tests |
+| A reply that has stopped drawing (defs with no shapes) is cut — lifting the limit had made the 48-icon grid a 17-minute failure, not a success | `86491bde` | 2 tests |
+| In the app, real model: Fig. 3.1 → SVG with 4 `<text>` in 38 s; "make the flame gold" edited logo.svg in place | — | vfig-svg-probe OK |
+| `svg` lost from the tool bus (bash-CLI "no such command") | `8959e23d` + a test for every gen command | found by that probe |
+
+### K. Harness and app bugs this round
+| Bug | Fix | Verified by |
+|---|---|---|
+| **27 s first token** on a new chat: pi's cloud compaction defaults fired at half our 32k window after a 23k task, summarised one message (1,532 tokens of thinking, 35 s), freed nothing; the next chat queued behind it | `43945a21` the corp roles' rule for chats: compact within an eighth of the window and only when it frees a tenth; a person's Compact always runs | 4 tests; live on the next heavy run |
+| **The app crashed at launch** after `43945a21` (main loaded pi, ESM, to read one string) — the crash dialogs the user saw were this and a llama-server I killed by its parent | `db67f548` the string alone, no imports | main.js has no top-level pi require; headless launch reaches the composer |
+| A string field given an object (write's content as JSON) failed validation 3× | `a325ad60` | 2 tests |
+| `present name` without its extension | `f2275fbc` | 3 tests |
+| A traced picture's folder named after its path (`var-folders-4h-…`) | `64b39427` | in dist now |
+
+### L. UI/UX
+| Item | State |
+|---|---|
+| The house kit's teal → the app's blue (#0071E3 / #0A84FF) for every generated page: maths, diagrams, charts, documents, decks | ✅ `5ca9bfef` Paper & blue, all gates (contrast, colour-blind pairs, no purple); maths pages looked at light and dark |
+| A reply linking an image that does not exist shows a broken-image glyph (SHM run: the model linked `…mass-on-a-spring.png`) | open |
+| The chat shows "compacting" for a frame when the gate holds a compaction | open (cosmetic) |
 
 ## Report — 2026-09-25 night: the per-kind visual suite, and the user's two new asks
 
