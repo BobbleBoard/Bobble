@@ -463,6 +463,17 @@ describe('generate_svg tool', () => {
     expect(text).toContain('<img');
   });
 
+  it('answers markup in its own name, never the picture tool’s', async () => {
+    // MEASURED: the icon set's refusals read "`media generate image` failed".
+    const bridge = new FakeBridge().on('generateSvg', okSvg);
+    const res = await runSvg(collectSvgTools(bridge), {
+      prompt: '<svg viewBox="0 0 24 24"></svg>',
+    });
+    const text = (res.content as Array<{ text?: string }>).map((c) => c.text ?? '').join('');
+    expect(text).toMatch(/^generate_svg failed: That prompt is SVG markup/);
+    expect(bridge.calls).toHaveLength(0);
+  });
+
   it('refuses an out path that climbs out of the working folder', async () => {
     const bridge = new FakeBridge().on('generateSvg', okSvg);
     const res = await runSvg(collectSvgTools(bridge), {

@@ -7,7 +7,7 @@
  * effort-gated reviewer pass — so they prove the bridge, not just the library.
  */
 
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import net from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -1498,5 +1498,49 @@ describe('CLI mode keeps one advertised tool', () => {
     expect(after).toContain('web_fetch');
     expect(after.length).toBeGreaterThanOrEqual(before.length);
     expect(after.slice(0, before.length)).toEqual(before);
+  });
+});
+
+describe('the teach skill rides beside a message that asks to learn', () => {
+  const skills = (): string => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'skills-'));
+    mkdirSync(path.join(dir, 'teach'));
+    writeFileSync(
+      path.join(dir, 'teach', 'SKILL.md'),
+      '---\nname: teach\n---\n\n# Teach\nSmall steps.\n',
+    );
+    return dir;
+  };
+
+  it('attaches it once, hidden, to a learning request — and never to anything else', async () => {
+    const prev = process.env.PI_DESKTOP_SKILLS_DIR;
+    process.env.PI_DESKTOP_SKILLS_DIR = skills();
+    try {
+      const rig = makeRig({ effort: 'medium' });
+      const turn = async (prompt: string) => {
+        const [res] = (await rig.fire('before_agent_start', {
+          type: 'before_agent_start',
+          prompt,
+          systemPrompt: 'sys',
+          images: [],
+        })) as Array<
+          { message?: { customType: string; content: string; details?: unknown } } | undefined
+        >;
+        // pi persists the note as a custom message; the rig keeps it the same way.
+        if (res?.message !== undefined)
+          rig.entries.push({ type: 'custom_message', ...res.message });
+        return res?.message;
+      };
+      expect(await turn('make me a landing page')).toBeUndefined();
+      const first = await turn('Show that the pressure of the gas is p = Nmu²/L³ — Fig. 3.1');
+      expect(first?.customType).toBe('harness-skill-note');
+      expect(first?.content).toContain('<skill_instructions name="teach">\n# Teach\nSmall steps.');
+      expect(first?.details).toEqual({ skill: 'teach' });
+      // Once per chat: the next learning request goes without it.
+      expect(await turn('give me three practice problems like that')).toBeUndefined();
+    } finally {
+      if (prev === undefined) delete process.env.PI_DESKTOP_SKILLS_DIR;
+      else process.env.PI_DESKTOP_SKILLS_DIR = prev;
+    }
   });
 });

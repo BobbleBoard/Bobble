@@ -18,7 +18,7 @@
  */
 
 import { appendFileSync, realpathSync, statSync } from 'node:fs';
-import { stat } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { basename, isAbsolute, join } from 'node:path';
 import type {
@@ -50,11 +50,7 @@ import {
 } from './permissions/modes.js';
 import { capabilityForTool } from './presets/capabilities.js';
 import { resolveBaseTools } from './presets/presets.js';
-import {
-  augmentSystemPrompt,
-  notSetUpFromEnv,
-  SHELL_CWD_TRUTH,
-} from './prompt/capability-prompt.js';
+import { augmentSystemPrompt, SHELL_CWD_TRUTH } from './prompt/capability-prompt.js';
 import { sameWording } from './prompt/same-wording.js';
 import { connectRepairBridge, type LiveRepairDeps } from './repair/bridge.js';
 import { createToolCallFixer, withRepairAttempts } from './repair/fixer.js';
@@ -67,6 +63,13 @@ import {
 import { adversarialCheck, reviewOutput } from './review/review.js';
 import { registerScheduledTaskTool } from './scheduled/schedule-tool.js';
 import { registerSkillInstructions } from './skills/skill-instructions.js';
+import {
+  HARNESS_SKILL_NOTE,
+  loadTeachSkill,
+  teachGiven,
+  teachNote,
+  wantsTeaching,
+} from './skills/teach-skill.js';
 import {
   DEFAULT_CONFIG,
   HARNESS_CONFIG_ENTRY,
@@ -492,6 +495,17 @@ export interface HarnessHandle {
 function getEntries(ctx: ExtensionContext): StoredEntryLike[] {
   const sm = ctx.sessionManager as unknown as { getEntries?: () => StoredEntryLike[] };
   return sm.getEntries?.() ?? [];
+}
+
+/** Everything the chat has said to the model: the person's messages and every tool result. */
+function chatTextOf(entries: readonly StoredEntryLike[]): string {
+  const parts: string[] = [];
+  for (const e of entries) {
+    if (e.type !== 'message') continue;
+    const msg = (e as { message?: { role?: unknown; content?: unknown } }).message;
+    if (msg?.role === 'user' || msg?.role === 'toolResult') parts.push(messageText(msg.content));
+  }
+  return parts.join('\n');
 }
 
 /**
@@ -2699,6 +2713,9 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       bridge: presentBridgeFromEnv(),
       // A relative path means the working folder — the one `write` just used.
       resolvePath: (p) => join(liveRoot(), p),
+      readText: (p) => readFile(p, 'utf8').catch(() => null),
+      chatText: () =>
+        runtime.currentCtx === null ? '' : chatTextOf(getEntries(runtime.currentCtx)),
       stat: async (target) => {
         try {
           return { isDirectory: (await stat(target)).isDirectory() };
@@ -2995,9 +3012,6 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       guidelines: { sources: guidelineSources(), active: advertisedNow() },
       /* The tools' root, not pi's boot directory — see the workspace command. */
       ...(runtime.workspaceRoot !== null ? { workingDirectory: runtime.workspaceRoot } : {}),
-      /* What the app could do but has not set up (the 3D engine, off) — named,
-         so the model says where to turn it on instead of denying it. */
-      notSetUp: notSetUpFromEnv(process.env),
     });
     /*
      * THE COMMAND LIST GOES FIRST.
@@ -3534,6 +3548,13 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   // Classify each task and load its preset before the agent loop runs. When a
   // utility model is configured, ambiguous heuristics escalate to a tier-2
   // double-check (classifyWithEscalation); otherwise the pure heuristic stands.
+  // The teach skill's text, read once from the app's bundled skills (or null).
+  let teachBody: string | null | undefined;
+  const teachSkillText = (): string | null => {
+    if (teachBody === undefined) teachBody = loadTeachSkill(process.env);
+    return teachBody;
+  };
+
   pi.on('before_agent_start', async (event, ctx) => {
     /* PI_ADV_DEBUG_TIMING=1: how long this hook holds the turn before the
        provider is even asked — the part of TTFT that is ours, not the model's. */
@@ -3619,6 +3640,15 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
      * tokens, persists in the conversation, and leaves the prefix alone.
      */
     const workspaceNote = workspaceMoveNote();
+    /* The teach skill beside a message that asks to learn — once per chat,
+       top-level only (skills/teach-skill.ts). */
+    const teach =
+      readSubagentDepth(process.env) === 0 &&
+      wantsTeaching(event.prompt) &&
+      !teachGiven(getEntries(ctx)) &&
+      teachSkillText() !== null
+        ? teachNote(teachSkillText() as string)
+        : null;
     // The prompt this turn froze, and what the model now knows of its folder.
     rememberForFork();
     // Classification REMOVED from the turn path (the user: "we seldom use it at all,
@@ -3653,14 +3683,19 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     // Replace the turn's system prompt with the capability-affirming version.
     return {
       systemPrompt: augmentedSystemPrompt,
-      ...(workspaceNote !== null
+      ...(workspaceNote !== null || teach !== null
         ? {
             message: {
-              customType: HARNESS_WORKSPACE_NOTE,
-              content: workspaceNote,
+              // One hidden note per turn: the folder's, the skill's, or both.
+              customType: workspaceNote !== null ? HARNESS_WORKSPACE_NOTE : HARNESS_SKILL_NOTE,
+              content: [workspaceNote, teach].filter((n) => n !== null).join('\n\n'),
               display: false,
-              // Which folder it announced — read back off a branch (session_start, fork).
-              details: { root: runtime.announcedWorkspace },
+              details: {
+                // Which folder it announced — read back off a branch (session_start, fork).
+                ...(workspaceNote !== null ? { root: runtime.announcedWorkspace } : {}),
+                // Given once per branch (teachGiven).
+                ...(teach !== null ? { skill: 'teach' } : {}),
+              },
             },
           }
         : {}),

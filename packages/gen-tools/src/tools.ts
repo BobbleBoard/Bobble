@@ -67,12 +67,21 @@ function messageOf(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
-function errResult(message: string): AgentToolResult<GenerateDetails> {
+function errResult(
+  message: string,
+  tool: string = GENERATE_IMAGE_TOOL,
+): AgentToolResult<GenerateDetails> {
   return {
-    content: [{ type: 'text', text: `generate_image failed: ${message}` }],
+    content: [{ type: 'text', text: `${tool} failed: ${message}` }],
     details: { ok: false, error: message },
   };
 }
+
+/* The svg tool's failures in its own name. MEASURED (the suite's icon set):
+   every refusal of the svg command read "`media generate image` failed" — the
+   picture tool's name, which the CLI then turned into the wrong command. */
+const svgErr = (message: string): AgentToolResult<GenerateDetails> =>
+  errResult(message, GENERATE_SVG_TOOL);
 
 function videoErrResult(message: string): AgentToolResult<GenerateDetails> {
   return {
@@ -753,7 +762,7 @@ function registerSvgTool(pi: ExtensionAPI, bridge: GenBridge | null): void {
     }),
     async execute(_id, params, signal): Promise<AgentToolResult<GenerateDetails>> {
       if (bridge === null) {
-        return errResult(
+        return svgErr(
           'generation bridge unavailable (the gen-tools extension must run inside Bobble)',
         );
       }
@@ -764,7 +773,7 @@ function registerSvgTool(pi: ExtensionAPI, bridge: GenBridge | null): void {
             ? params.image
             : [params.image];
       if ((params.prompt ?? '').trim() === '' && images.length === 0) {
-        return errResult('give a prompt, a reference image path, or both');
+        return svgErr('give a prompt, a reference image path, or both');
       }
       /*
        * A PROMPT THAT IS ALREADY SVG IS THE MODEL'S OWN DRAWING. MEASURED (4B,
@@ -774,7 +783,7 @@ function registerSvgTool(pi: ExtensionAPI, bridge: GenBridge | null): void {
        * model's drawing went nowhere. Markup is saved, not described.
        */
       const markup = svgMarkupPrompt(params.prompt);
-      if (markup !== null) return errResult(markup);
+      if (markup !== null) return svgErr(markup);
       /*
        * `out` IS FENCED THE WAY `write` IS. The model names a path; the file is
        * written by the app's main process, which can reach anywhere — so the
@@ -787,7 +796,7 @@ function registerSvgTool(pi: ExtensionAPI, bridge: GenBridge | null): void {
       if (params.out !== undefined && params.out.trim() !== '') {
         outPath = path.resolve(root, params.out.trim());
         if (outPath !== root && !outPath.startsWith(`${root}${path.sep}`)) {
-          return errResult(
+          return svgErr(
             `out must be inside the working folder (${root}) — pass a relative path such as assets/logo.svg`,
           );
         }

@@ -667,6 +667,7 @@ export const SKILL_CATEGORY_LABEL: Record<string, string> = {
   research: 'Research',
   documents: 'Documents',
   productivity: 'Productivity',
+  learning: 'Learning',
 };
 
 /** The category in the words the screen uses — the same words the search matches. */

@@ -52,11 +52,25 @@ describe('registerModelTools — only when the connector is on', () => {
     expect(tools.size).toBe(0);
   });
 
-  it('registers NOTHING when the app has not said the connector is ready', () => {
+  it('registers NOTHING when the app has said nothing about 3D', () => {
     const { pi, tools } = captureTools();
     registerModelTools(pi, okBridge('/m.glb').bridge, {});
-    registerModelTools(pi, okBridge('/m.glb').bridge, { [BOBBLE_3D_READY_ENV]: '0' });
     expect(tools.size).toBe(0);
+  });
+
+  it('with 3D in the app but off, generate_3d is there and says how to turn it on', async () => {
+    /* MEASURED (4B): with no tool it denied 3D; with a prompt line it made a
+       picture and called it a model. The command answers at the moment of asking. */
+    const { pi, tools, get } = captureTools();
+    const { bridge, call } = okBridge('/m.glb');
+    registerModelTools(pi, bridge, { [BOBBLE_3D_READY_ENV]: '0' });
+    expect([...tools.keys()]).toEqual([GENERATE_3D_TOOL]);
+    const res = await run(get(GENERATE_3D_TOOL), { prompt: 'a low-poly treasure chest' });
+    expect(res.details.ok).toBe(false);
+    const text = res.content.map((c) => (c as { text?: string }).text ?? '').join('');
+    expect(text).toContain('Connectors → Bobble 3D');
+    expect(text).toContain('Do not hand over a picture as if it were a model');
+    expect(call).not.toHaveBeenCalled();
   });
 
   it('registers both tools when the bridge exists and the connector is on', () => {

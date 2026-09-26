@@ -32,6 +32,7 @@ import { dirname, isAbsolute, join } from 'node:path';
 import type { ExtensionAPI } from '@mariozechner/pi-coding-agent';
 import type { DiagramTheme } from '@pi-desktop/design-kit';
 import { Type } from '@sinclair/typebox';
+import { remotePictures, remotePicturesNote, unseenPictures } from './remote-pictures.js';
 import { pathForModel } from './workspace-relative.js';
 
 export const PRESENT_TOOL_NAME = 'present';
@@ -245,6 +246,10 @@ export interface PresentToolDeps {
    * the same relative path it just wrote, and it means the same folder.
    */
   readonly resolvePath?: (p: string) => string;
+  /** A file's text, for what a page loads (see remote-pictures.ts). */
+  readonly readText?: (p: string) => Promise<string | null>;
+  /** Everything the chat has said to the model — its messages and tool results. */
+  readonly chatText?: () => string;
 }
 
 /**
@@ -406,6 +411,20 @@ export function registerPresentTool(pi: ExtensionAPI, deps: PresentToolDeps): vo
             'checking — if the artefact cannot be opened or run here, the user may hit the ' +
             'same thing.',
         });
+      }
+      /* A page's pictures from addresses nothing gave the model — said beside
+         the preview that shows them (remote-pictures.ts). */
+      if (
+        /\.html?$/i.test(resolved) &&
+        deps.readText !== undefined &&
+        deps.chatText !== undefined
+      ) {
+        const html = await deps.readText(resolved).catch(() => null);
+        const note =
+          html === null
+            ? ''
+            : remotePicturesNote(unseenPictures(remotePictures(html), deps.chatText()));
+        if (note !== '') content.push({ type: 'text', text: note.trim() });
       }
       content.push({ type: 'text', text: reviewInstruction() });
       return { content, details: undefined } as never;

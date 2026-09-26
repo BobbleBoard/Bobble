@@ -151,6 +151,43 @@ const RefineParams = Type.Object({
   ),
 });
 
+/** What `generate_3d` answers when the app has 3D but it is not set up. */
+export const NOT_SET_UP_3D =
+  '3D is not set up on this Mac yet, so no model was made. Bobble 3D makes 3D models ' +
+  'on-device; the user turns it on in Connectors → Bobble 3D (it downloads the engine ' +
+  'first). Tell them that, in a sentence or two. Do not hand over a picture as if it were a ' +
+  'model — if a concept picture would help meanwhile, make it only if they want one, and ' +
+  'call it a picture.';
+
+/*
+ * THE APP HAS 3D, BUT IT IS OFF: the command is there, and says so.
+ *
+ * With the tools absent the model does not know 3D exists. MEASURED (4B, the
+ * visual suite, "a stylized low-poly treasure chest 3D model for my game"),
+ * twice. With nothing: "I don't have access to 3D modeling software" and an
+ * offer to write vertex data in Python. With a rule line in the prompt ("not
+ * set up on this Mac — say where the user turns it on"): it generated a
+ * picture and opened with "I've created a stylized low-poly treasure chest
+ * with clean game-ready topology". A line is read and weighed; a command is
+ * reached for. So when the app has the connector but it is off
+ * (PI_BOBBLE_3D_READY=0), `3d generate` exists with the real arguments and
+ * answers what is true at the moment the model asks — how to turn it on.
+ */
+function registerNotSetUp3d(pi: ExtensionAPI): void {
+  pi.registerTool({
+    name: GENERATE_3D_TOOL,
+    label: 'Generate 3D model',
+    description:
+      'Make a 3D model (.glb) from a description or a picture, on-device — NOT SET UP on this ' +
+      'Mac yet: calling it says how the user turns it on.',
+    promptSnippet: 'generate_3d: 3D models (not set up yet — calling it says how to turn it on).',
+    parameters: GenerateParams,
+    async execute(): Promise<AgentToolResult<ModelToolDetails>> {
+      return errorResult(GENERATE_3D_TOOL, NOT_SET_UP_3D);
+    },
+  });
+}
+
 /**
  * Register the 3D tools onto `pi`.
  *
@@ -164,6 +201,10 @@ export function registerModelTools(
   env: Record<string, string | undefined> = process.env,
 ): void {
   if (bridge === null) return;
+  if (env[BOBBLE_3D_READY_ENV] === '0') {
+    registerNotSetUp3d(pi);
+    return;
+  }
   if (env[BOBBLE_3D_READY_ENV] !== '1') return;
   const root = (): string | undefined => {
     const r = env.PI_DESKTOP_WORKSPACE_ROOT;

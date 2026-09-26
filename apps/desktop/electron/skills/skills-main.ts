@@ -29,7 +29,7 @@ const PI_SKILLS_DIR = path.join(HOME, '.pi', 'agent', 'skills');
  * asar at `<Resources>/skills` (process.resourcesPath). Dev/E2E:
  * app.getAppPath() is apps/desktop, so the repo folder is resources/skills.
  */
-function bundledSkillsDir(): string {
+export function bundledSkillsDir(): string {
   return app.isPackaged
     ? path.join(process.resourcesPath, 'skills')
     : path.join(app.getAppPath(), 'resources', 'skills');

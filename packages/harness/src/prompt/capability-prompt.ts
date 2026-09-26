@@ -427,37 +427,6 @@ export function retargetToolNames(text: string, commandFor: ReadonlyMap<string, 
   return out.replace(/``+/g, '`');
 }
 
-/**
- * WHAT THIS MAC COULD DO, BUT IS NOT SET UP TO — said, so it is not denied.
- *
- * A connector's tools register only when it can be honoured (the 3D engine on
- * disk and the connector on), which keeps a dead command out of the prompt —
- * and also keeps the model from knowing the ability exists at all. MEASURED
- * (4B, the visual suite, a HOME with no 3D engine): asked for "a stylized
- * low-poly treasure chest 3D model for my game", it answered "I don't have
- * access to 3D modeling software" and offered to write a Python script that
- * outputs vertex data — the hand-built geometry the 3D line exists to stop.
- * The truthful answer is one sentence: it needs Bobble 3D, turned on in
- * Connectors. The app names what is off; this is the one line that says so.
- * Fixed for the session (pi respawns when a connector changes), so it never
- * moves the cached prefix.
- */
-export function notSetUpLine(items: readonly string[]): string {
-  const said = items.map((i) => i.trim()).filter((i) => i !== '');
-  if (said.length === 0) return '';
-  return `- NOT SET UP ON THIS MAC YET: ${said.join('; ')}. Asked for one, say it is not set up and where the user turns it on — never build it in code instead.`;
-}
-
-/** The app's list of what is not set up (`PI_DESKTOP_NOT_SET_UP`, a JSON array of strings). */
-export function notSetUpFromEnv(env: Record<string, string | undefined>): string[] {
-  try {
-    const v: unknown = JSON.parse(env.PI_DESKTOP_NOT_SET_UP ?? '[]');
-    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
-  } catch {
-    return [];
-  }
-}
-
 export function augmentSystemPrompt(
   base: string | undefined,
   opts: {
@@ -478,8 +447,6 @@ export function augmentSystemPrompt(
      * model must be told the folder, not the launch dir.
      */
     workingDirectory?: string;
-    /** Abilities this Mac has but has not set up — see {@link notSetUpLine}. */
-    notSetUp?: readonly string[];
   } = {},
 ): string {
   let trimmed = stripPiIdentity(stripToolCatalog((base ?? '').trim()));
@@ -532,12 +499,10 @@ export function augmentSystemPrompt(
    * section still applies — how to check your work is interface-independent —
    * so only the capability half is dropped.
    */
-  const offLine = notSetUpLine(opts.notSetUp ?? []);
-  const rules =
-    (opts.toolInterface === 'bash-cli'
-      ? capabilityPromptForCli(opts.commandFor)
-      : CAPABILITY_PROMPT) + (offLine === '' ? '' : `\n${offLine}`);
-  const section = `${rules}\n\n${VERIFY_PROMPT}`;
+  const section =
+    opts.toolInterface === 'bash-cli'
+      ? `${capabilityPromptForCli(opts.commandFor)}\n\n${VERIFY_PROMPT}`
+      : `${CAPABILITY_PROMPT}\n\n${VERIFY_PROMPT}`;
   if (trimmed.includes(CAPABILITY_PROMPT_MARKER)) return trimmed;
   if (trimmed.length === 0) return section;
   return `${trimmed}\n\n${section}`;

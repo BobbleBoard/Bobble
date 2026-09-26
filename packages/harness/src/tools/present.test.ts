@@ -197,6 +197,45 @@ describe('registerPresentTool', () => {
   });
 });
 
+describe('a page’s pictures from addresses nothing gave the model', () => {
+  /* MEASURED (4B, the visual suite, twice): a landing page's photos were all
+     images.unsplash.com ids recalled from training — the hero, a bathroom. */
+  const page =
+    '<img src="https://images.unsplash.com/photo-1610701596007-11502861dcfa?w=1920">' +
+    '<img src="https://cdn.example.com/given.jpg"><img src="assets/local.png">';
+  const present = async (chat: string) => {
+    const tools: Array<Record<string, unknown>> = [];
+    const pi = { registerTool: (d: never) => tools.push(d) } as never;
+    registerPresentTool(pi, {
+      bridge: {
+        show: async () => ({ ok: true }),
+        preview: async () => ({ imageBase64: 'QUJD', mimeType: 'image/png' }),
+      },
+      stat: async () => ({ isDirectory: false }),
+      readText: async () => page,
+      chatText: () => chat,
+    });
+    const exec = tools[0]?.execute as (
+      id: string,
+      p: unknown,
+    ) => Promise<{ content: Array<{ type: string; text?: string }> }>;
+    const r = await exec('t1', { path: '/site/index.html' });
+    return r.content.map((c) => c.text ?? '').join('\n');
+  };
+
+  it('says so beside the preview, naming the host — not for one the chat gave it', async () => {
+    const text = await present('search result: https://cdn.example.com/given.jpg');
+    expect(text).toContain('Its picture loads from images.unsplash.com');
+    expect(text).toContain('nothing in this chat gave you');
+    expect(text).not.toContain('cdn.example.com,');
+    // Every picture given (or local): nothing to say.
+    const quiet = await present(
+      'use https://images.unsplash.com/photo-1610701596007-11502861dcfa and https://cdn.example.com/given.jpg',
+    );
+    expect(quiet).not.toContain('nothing in this chat gave you');
+  });
+});
+
 describe('reviewInstruction', () => {
   it('frames the check as the user, not as the author', () => {
     expect(reviewInstruction()).toMatch(/as them/);

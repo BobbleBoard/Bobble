@@ -31,7 +31,8 @@ export type SkillCategory =
   | 'data'
   | 'research'
   | 'documents'
-  | 'productivity';
+  | 'productivity'
+  | 'learning';
 
 /** One skill Bobble ships and can install into the agent skills dir. */
 export interface BundledSkill {
@@ -98,6 +99,20 @@ export const BUNDLED_SKILLS: readonly BundledSkill[] = [
   },
 
   // ── MIT, authored in-house for Bobble ───────────────────────────────────
+  {
+    /* the user (2026-09-25): "test some math/physics/chemistry... practice problem
+       requests … find some teaching guidelines somewhere and add a teach
+       skill.md". The harness also attaches it to a chat that asks to learn
+       something (packages/harness teach-skill.ts), installed or not. */
+    id: 'teach',
+    name: 'Teach',
+    description:
+      'Explain and tutor: worked problems in small steps, labelled diagrams, animations only for change, practice to finish.',
+    category: 'learning',
+    license: 'MIT',
+    source: 'pi-desktop',
+    recommended: true,
+  },
   {
     id: 'code-review',
     name: 'Code review',
