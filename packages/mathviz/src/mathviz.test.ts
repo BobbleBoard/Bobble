@@ -417,3 +417,23 @@ describe('a value the spec never declared', () => {
     expect(r.problems.map((p) => p.text).join('\n')).toMatch(/A has no value in the spec/);
   });
 });
+
+describe('the physics words for shapes', () => {
+  it('reads a sphere, a mass and a bob as filled circles, and a block or a wall as a rectangle', () => {
+    const s = normalizeMathSpec({
+      title: 'Kinds',
+      figure: {
+        shapes: [
+          { id: 'a', kind: 'sphere', center: [2, 2], r: 0.5 },
+          { id: 'b', kind: 'mass', center: [4, 2], r: 0.5 },
+          { id: 'c', kind: 'block', at: [6, 1], w: 2, h: 1 },
+        ],
+      },
+    });
+    expect(s.figure?.shapes.map((sh) => [sh.kind, 'fill' in sh ? sh.fill : undefined])).toEqual([
+      ['circle', 'main'],
+      ['circle', 'main'],
+      ['polygon', 'none'],
+    ]);
+  });
+});

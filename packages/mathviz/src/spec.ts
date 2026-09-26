@@ -621,7 +621,9 @@ function shape(v: unknown, i: number, named: Map<string, Xy>, names: readonly st
       };
     }
     case 'rect':
-    case 'rectangle': {
+    case 'rectangle':
+    case 'block':
+    case 'wall': {
       if (v.points === undefined && v.vertices === undefined) {
         const [x0, y0] = at('at' in v ? 'at' : 'from');
         const w = numOrExpr(v.w ?? v.width, `${id}.w`, names);
@@ -670,6 +672,9 @@ function shape(v: unknown, i: number, named: Map<string, Xy>, names: readonly st
     }
     case 'circle':
     case 'ball':
+    case 'sphere':
+    case 'mass':
+    case 'bob':
     case 'disc':
       return {
         id,
@@ -677,7 +682,12 @@ function shape(v: unknown, i: number, named: Map<string, Xy>, names: readonly st
         kind: 'circle',
         center: at('center' in v ? 'center' : 'at'),
         r: numOrExpr(v.r ?? v.radius ?? 0.5, `${id}.r`, names),
-        fill: fill(v.fill ?? (kind === 'ball' ? 'main' : undefined)),
+        fill: fill(
+          v.fill ??
+            (kind === 'ball' || kind === 'sphere' || kind === 'mass' || kind === 'bob'
+              ? 'main'
+              : undefined),
+        ),
         ...L,
         role: role(v.role ?? v.color, 'main'),
       };
