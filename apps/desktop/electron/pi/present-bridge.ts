@@ -20,7 +20,7 @@
 
 import { execFile } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { readdir, readFile, stat } from 'node:fs/promises';
+import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import net from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -418,9 +418,28 @@ async function handle(req: Request): Promise<Record<string, unknown>> {
     if (preview.imageBase64 !== undefined && !getInferenceVisionReady()) {
       wantVision();
     }
+    diagSavePreview(target, preview);
     return preview;
   }
   return { error: `unknown method: ${req.method}` };
+}
+
+/**
+ * PD_DIAG_PRESENT_DIR=<dir>: every look `present` hands the model is also
+ * written there, so a probe can show what the MODEL saw — not what the canvas
+ * shows the person. (The blank-page capture was invisible from both ends.)
+ */
+function diagSavePreview(
+  target: string,
+  preview: { imageBase64?: string; mimeType?: string },
+): void {
+  const dir = process.env.PD_DIAG_PRESENT_DIR;
+  if (dir === undefined || dir === '' || preview.imageBase64 === undefined) return;
+  const ext = preview.mimeType === 'image/jpeg' ? 'jpg' : 'png';
+  const name = `${Date.now()}-${path.basename(target).replace(/[^\w.-]/g, '_')}.${ext}`;
+  void mkdir(dir, { recursive: true })
+    .then(() => writeFile(path.join(dir, name), Buffer.from(preview.imageBase64 ?? '', 'base64')))
+    .catch(() => {});
 }
 
 function onConnection(socket: net.Socket): void {

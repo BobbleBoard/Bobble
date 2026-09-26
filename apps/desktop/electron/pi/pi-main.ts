@@ -58,6 +58,7 @@ import { createPiSessions, type PiSessionHandlers } from './pi-sessions';
 import { registerPrefillIpc } from './prefill-main';
 import { registerPresentBridge } from './present-bridge';
 import { installPiQuitHold } from './quit-hold';
+import { renderPageFile } from './render-page';
 import { registerResumeIpc } from './resume-main';
 import { type ScopedPiBridgeOptions, scopedPiBridgeOptions } from './scoped-bridge';
 import { registerSubagentBridge } from './subagent-bridge';
@@ -574,22 +575,9 @@ export function registerPiIpc(
           await win.dispose().catch(() => {});
         }
       },
-      renderPage: async (filePath) => {
-        const win = await openStillWindow(1280, 900);
-        try {
-          await win.load(
-            `<meta http-equiv="refresh" content="0; url=file://${filePath}">`,
-            1280,
-            900,
-          );
-          await new Promise((r) => setTimeout(r, 600));
-          return (await win.capture()).toString('base64');
-        } catch {
-          return null;
-        } finally {
-          await win.dispose().catch(() => {});
-        }
-      },
+      // The page itself, loaded and photographed — see render-page.ts for why
+      // the old data: stub was blank every time.
+      renderPage: (filePath) => renderPageFile(filePath),
     });
   }
   // The chat's image tools (`generate_image` / `edit_image`) reach the gen3d
