@@ -29,10 +29,10 @@ import type { ExtensionAPI } from '@mariozechner/pi-coding-agent';
 import { type Kit, loadProjectKit } from '@pi-desktop/design-kit';
 import {
   ExprError,
+  lenientJson,
   type MathResult,
   renderMath,
   SpecError,
-  texSafeJson,
 } from '@pi-desktop/mathviz';
 import { serverCanSeeImages } from '@pi-desktop/provider-llamacpp';
 import { Type } from '@sinclair/typebox';
