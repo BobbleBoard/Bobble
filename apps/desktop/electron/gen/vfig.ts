@@ -23,6 +23,7 @@ import {
   buildVfigRequest,
   svgFromText,
   textLoopStart,
+  textStallStart,
   type VfigInput,
 } from '@pi-desktop/gen-service';
 import { cacheRoot, ensureLlamaCpp, libraryRoot } from '@pi-desktop/inference';
@@ -66,7 +67,7 @@ export interface VfigOutput {
   readonly outputPath: string;
   readonly paths: number;
   readonly source: string;
-  /** eos, loop (cut where it began repeating), or length (the context ran out). */
+  /** eos, loop (cut where it began repeating), stall (cut where it stopped drawing), or length. */
   readonly stop: string;
   readonly complete: boolean;
   readonly tokPerSec: number | null;
@@ -157,6 +158,7 @@ export async function streamVfig(
   let tokens = 0;
   let tokPerSec: number | null = null;
   let looped = -1;
+  let cutKind: 'loop' | 'stall' = 'loop';
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
@@ -179,9 +181,12 @@ export async function streamVfig(
       tokens += 1;
       if (text.length - checked >= LOOP_CHECK_CHARS) {
         checked = text.length;
+        // Repeating itself, or writing on without drawing anything: cut where it began.
         const at = textLoopStart(text);
-        if (at >= 0) {
-          looped = at;
+        const stalled = at >= 0 ? -1 : textStallStart(text);
+        if (at >= 0 || stalled >= 0) {
+          looped = at >= 0 ? at : stalled;
+          cutKind = at >= 0 ? 'loop' : 'stall';
           cut.abort();
           return;
         }
@@ -217,7 +222,7 @@ export async function streamVfig(
   } finally {
     signal?.removeEventListener('abort', stopAll);
   }
-  if (looped >= 0) return { text: text.slice(0, looped), stop: 'loop', tokens, tokPerSec };
+  if (looped >= 0) return { text: text.slice(0, looped), stop: cutKind, tokens, tokPerSec };
   if (buffer.trim() !== '') take(buffer.trim());
   return { text, stop, tokens, tokPerSec };
 }

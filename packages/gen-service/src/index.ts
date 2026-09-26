@@ -130,6 +130,7 @@ export {
   buildVfigRequest,
   svgFromText,
   textLoopStart,
+  textStallStart,
   VFIG_FIGURE_PROMPT,
   vfigEditText,
 } from './vfig-request.js';

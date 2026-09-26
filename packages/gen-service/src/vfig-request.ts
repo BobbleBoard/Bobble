@@ -114,6 +114,37 @@ export function textLoopStart(
   return -1;
 }
 
+const DRAWS = /<(?:path|rect|circle|ellipse|line|polyline|polygon|text|image|use)\b/g;
+
+/**
+ * A REPLY THAT HAS STOPPED DRAWING — where it stalled, or -1. MEASURED
+ * (2026-09-25, VFIG with no token limit, a 48-icon grid): 32,400 tokens and
+ * 17 minutes, most of it unique <linearGradient> definitions — no exact
+ * repetition for textLoopStart to find — and three icons drawn at the end.
+ * The tail is stalled when it holds many tags and not one that draws; a long
+ * run of path data has few tags, so it is never taken for a stall. The answer
+ * is where the stalled stretch begins.
+ */
+export function textStallStart(
+  text: string,
+  { window = 8000, minTags = 24 }: { window?: number; minTags?: number } = {},
+): number {
+  if (text.length < window) return -1;
+  const tail = text.slice(text.length - window);
+  const tags = (tail.match(/<[A-Za-z][\w:-]*/g) ?? []).length;
+  if (tags < minTags || DRAWS.test(tail)) {
+    DRAWS.lastIndex = 0;
+    return -1;
+  }
+  DRAWS.lastIndex = 0;
+  // Back to the last element that drew anything (or the start of the stalled stretch).
+  let last = -1;
+  for (const m of text.slice(0, text.length - window).matchAll(DRAWS)) last = m.index ?? last;
+  if (last < 0) return text.length - window;
+  const end = text.indexOf('>', last);
+  return end < 0 ? text.length - window : end + 1;
+}
+
 const VOID = new Set([
   'path',
   'rect',

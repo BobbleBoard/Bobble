@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { buildVfigRequest, svgFromText, textLoopStart, VFIG_FIGURE_PROMPT } from './vfig-request';
+import {
+  buildVfigRequest,
+  svgFromText,
+  textLoopStart,
+  textStallStart,
+  VFIG_FIGURE_PROMPT,
+} from './vfig-request';
 
 describe('what VFIG is sent', () => {
   it('a figure: the picture, then the model card’s own instruction', () => {
@@ -71,5 +77,25 @@ describe('the SVG out of a reply', () => {
 
   it('is nothing when there is no SVG', () => {
     expect(svgFromText('I cannot do that.')).toEqual({ svg: null, complete: false });
+  });
+});
+
+describe('a reply that has stopped drawing', () => {
+  const gradient = (i: number) =>
+    `<linearGradient id="g${i}" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#${(i * 7919).toString(16).padStart(6, '0').slice(0, 6)}"/><stop offset="100%" style="stop-color:#FFFFFF"/></linearGradient>\n`;
+
+  it('is found in a run of definitions that draws nothing (MEASURED: 32,400 tokens of gradients)', () => {
+    const head = '<svg viewBox="0 0 100 100"><rect x="1" y="1" width="9" height="9"/>';
+    const text = `${head}<defs>${Array.from({ length: 80 }, (_, i) => gradient(i)).join('')}`;
+    const at = textStallStart(text);
+    expect(at).toBe(head.length);
+    expect(svgFromText(text.slice(0, at)).svg).toBe(`${head}</svg>`);
+  });
+
+  it('is not a long run of path data, nor a drawing that keeps drawing', () => {
+    const path = `<svg><path d="M0 0 ${Array.from({ length: 2000 }, (_, i) => `L${i % 97} ${(i * 13) % 89}`).join(' ')}`;
+    expect(textStallStart(path)).toBe(-1);
+    const rects = `<svg>${Array.from({ length: 400 }, (_, i) => `<rect x="${i}" y="0" width="1" height="${i % 50}"/>`).join('')}`;
+    expect(textStallStart(rects)).toBe(-1);
   });
 });

@@ -931,7 +931,7 @@ function registerSvgTool(pi: ExtensionAPI, bridge: GenBridge | null, engines: Sv
         const cutShort = (o: { stop: string; complete?: boolean }) =>
           route.engine === 'vfig'
             ? o.complete === false
-              ? ` — it stopped before the end (${o.stop === 'loop' ? 'it began repeating itself, and was cut there' : 'the context filled'}); the file is closed and valid, but may be missing its last parts`
+              ? ` — it stopped before the end (${o.stop === 'loop' ? 'it began repeating itself, and was cut there' : o.stop === 'stall' ? 'it went on writing definitions without drawing anything, and was cut there' : 'the context filled'}); the file is closed and valid, but may be missing its last parts`
               : ''
             : o.stop === 'eos'
               ? ''
