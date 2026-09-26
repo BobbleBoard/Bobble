@@ -8,6 +8,7 @@ import type { GenBridge } from './gen-bridge-client.ts';
 import type { GenBridgeMethod } from './gen-contract.ts';
 import {
   dataChartPrompt,
+  svgMarkupPrompt,
   GENERATE_IMAGE_TOOL,
   GENERATE_SVG_TOOL,
   GENERATE_VIDEO_TOOL,
@@ -608,6 +609,23 @@ describe('saveOutputs', () => {
     expect(f.dirs[0]?.endsWith('/Pictures')).toBe(true);
     expect(r.error).toContain('EACCES');
     expect(r.paths).toEqual([]);
+  });
+});
+
+describe('svgMarkupPrompt — markup is saved, not described', () => {
+  it('answers a prompt that is SVG markup, with or without its XML line and comments', () => {
+    // MEASURED (4B): six thousand characters of its own markup sent as the prompt.
+    expect(
+      svgMarkupPrompt('<?xml version="1.0" encoding="UTF-8"?> <svg xmlns="x"><rect/></svg>'),
+    ).toMatch(/write it to a \.svg file, then present/);
+    expect(svgMarkupPrompt('<!-- a proof --> <svg viewBox="0 0 10 10"></svg>')).not.toBeNull();
+    expect(svgMarkupPrompt('  <svg>')).not.toBeNull();
+  });
+
+  it('lets a description through, even one that mentions svg', () => {
+    expect(svgMarkupPrompt('a red lighthouse on a green cliff, flat, centered')).toBeNull();
+    expect(svgMarkupPrompt('an <svg> style heart icon')).toBeNull();
+    expect(svgMarkupPrompt(undefined)).toBeNull();
   });
 });
 

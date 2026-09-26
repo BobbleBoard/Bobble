@@ -174,8 +174,14 @@ export function registerGenTools(pi: ExtensionAPI, options: GenToolsOptions): vo
      * a guideline that names the call, in the mode's own syntax (the harness
      * rewrites the tool name to the command in CLI mode).
      */
+    /*
+     * …AND A PAGE'S PHOTOS. MEASURED (4B, the visual suite, a ceramics
+     * studio's landing page): every picture was an images.unsplash.com URL
+     * with a photo id recalled from training — the hero came out a bathroom.
+     * A remembered id is a random picture; a generated one is the subject.
+     */
     promptGuidelines: [
-      'Every picture the user asks for is made with generate_image — one call per picture, the description as the prompt, and the folder or file they named as save_to. You can always make pictures; never say you cannot, and never draw one in code.',
+      'Every picture the user asks for is made with generate_image — one call per picture, the description as the prompt, and the folder or file they named as save_to. You can always make pictures; never say you cannot, and never draw one in code. A page’s photos too: make each one into the site’s folder (flux2-klein-4b takes seconds) — a stock-photo URL from memory shows whatever that photo happens to be.',
     ],
     parameters: Type.Object({
       prompt: Type.String({
@@ -314,6 +320,18 @@ export function registerGenTools(pi: ExtensionAPI, options: GenToolsOptions): vo
       'HyperFrames and any other prompt uses the default photoreal model. Use size like "768x512"; ' +
       'longer clips and higher resolutions are much slower.',
     promptSnippet: 'Generate a short video from a text prompt (on-device)',
+    /*
+     * THE SAME LINE THE PICTURE TOOL HAS, FOR THE SAME REASON. MEASURED (4B,
+     * CLI, the visual suite): asked for "a 6-second animated intro for my
+     * YouTube channel 'Byte Sized'", it ran `media generate image
+     * --save_to=byte_sized_intro.mp4`, then three more stills of "frames" —
+     * eight minutes, no animation. The only generation call its guidelines
+     * named was the picture one. Titles in motion are HyperFrames: a diffusion
+     * video model cannot spell the channel's name.
+     */
+    promptGuidelines: [
+      'Every animation or clip the user asks for is made with generate_video — never answered with still pictures. Words, titles and logos that move are motion graphics: model hyperframes, with the words to show in quotes. Real-world footage uses the default model.',
+    ],
     parameters: Type.Object({
       prompt: Type.String({
         description: 'What to animate. Be specific about subject, motion, style, camera.',
@@ -648,6 +666,22 @@ export function dataChartPrompt(prompt: string | undefined): string | null {
   );
 }
 
+/**
+ * The answer when an svg prompt is SVG markup rather than a description of a
+ * drawing, or null when it is a description.
+ */
+export function svgMarkupPrompt(prompt: string | undefined): string | null {
+  if (!/^\s*(?:<\?xml\b[^>]*>\s*)?(?:<!--[\s\S]*?-->\s*)*<svg[\s>]/i.test(prompt ?? '')) {
+    return null;
+  }
+  return (
+    'That prompt is SVG markup, and svg draws from a description (OmniSVG): it would have ' +
+    'drawn stray shapes, not your markup. Markup you wrote is saved as it is — write it to ' +
+    'a .svg file, then present that file to see it rendered. To have OmniSVG draw instead, ' +
+    'describe the picture in one sentence.'
+  );
+}
+
 /** `generate_svg` — OmniSVG. Registered on its own so the connector can turn it
  *  on without the generation experiment. See the block below for the ask. */
 function registerSvgTool(pi: ExtensionAPI, bridge: GenBridge | null): void {
@@ -673,8 +707,10 @@ function registerSvgTool(pi: ExtensionAPI, bridge: GenBridge | null): void {
       'Draw an organic, illustrative SVG on-device with OmniSVG — from a short description, ' +
       'a reference image to trace into vector paths, or both. It cannot keep a set consistent: ' +
       'icons, a logo with its name, patterns and exact shapes are better written as SVG ' +
-      'yourself and checked with present. One call per drawing; describe the subject, shape ' +
-      'and colour plainly ("a lighthouse on a cliff at sunset, flat, warm"). `out` puts the ' +
+      'yourself and checked with present. One call per drawing, the prompt one caption-like ' +
+      'sentence — the subject, its colours and shapes, the style ("A red lighthouse on a green ' +
+      'cliff at sunset, flat colours, centered."); a bare name or a slug draws something else. ' +
+      '`out` puts the ' +
       'file where a page references it (assets/hero.svg); otherwise it lands in Generated. ' +
       'Photos and realistic pictures are not vectors — those are generation. ' +
       // VQ-10: OmniSVG draws shapes, not words — REAL, asked for a graph "with
@@ -688,7 +724,12 @@ function registerSvgTool(pi: ExtensionAPI, bridge: GenBridge | null): void {
       prompt: Type.Optional(
         Type.String({
           description:
-            'What to draw, plainly: subject, shape, colour. Optional when an image is given.',
+            /* MEASURED 2026-09-25 (the app's pipeline, Q8): "a coffee cup icon"
+               drew stacked bowls; "A brown coffee cup on a saucer with white
+               steam curls, flat icon, centered." drew the cup. OmniSVG was
+               trained on captions, and a caption is what it draws from. */
+            'What to draw, as one caption-like sentence: the subject, its colours and shapes, ' +
+            'the style. Optional when an image is given.',
         }),
       ),
       image: Type.Optional(
@@ -725,6 +766,15 @@ function registerSvgTool(pi: ExtensionAPI, bridge: GenBridge | null): void {
       if ((params.prompt ?? '').trim() === '' && images.length === 0) {
         return errResult('give a prompt, a reference image path, or both');
       }
+      /*
+       * A PROMPT THAT IS ALREADY SVG IS THE MODEL'S OWN DRAWING. MEASURED (4B,
+       * the visual suite's Pythagorean animation): `svg --out=animation "<?xml
+       * …><svg …>"` — six thousand characters of markup it had written, sent
+       * to OmniSVG as a description. OmniSVG drew five stray paths, and the
+       * model's drawing went nowhere. Markup is saved, not described.
+       */
+      const markup = svgMarkupPrompt(params.prompt);
+      if (markup !== null) return errResult(markup);
       /*
        * `out` IS FENCED THE WAY `write` IS. The model names a path; the file is
        * written by the app's main process, which can reach anywhere — so the
