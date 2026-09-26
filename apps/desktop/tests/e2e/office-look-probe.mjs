@@ -10,7 +10,7 @@
  *   FILES=deck.pptx,budget.xlsx,report.docx OUT=/tmp/office-look \
  *     node apps/desktop/tests/e2e/office-look-probe.mjs
  */
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { launchApp, probeHome } from './harness.mjs';
 
@@ -24,6 +24,10 @@ const { app, page, check, finish } = await launchApp('office-look', {
   env: { HOME: home },
   timeout: 120_000,
 });
+// The app's own log beside the looks — office-look.ts says where it found each slide.
+for (const s of [app.process().stderr, app.process().stdout]) {
+  s?.on('data', (c) => appendFileSync(path.join(OUT, 'app.log'), c));
+}
 try {
   await page.waitForFunction(() => typeof window.__pi_store === 'function', { timeout: 90_000 });
   for (const file of FILES) {

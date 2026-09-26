@@ -15,10 +15,13 @@
  * workbook, document or PDF is photographed wide. When any of that fails, the
  * caller falls back to the canvas photograph — a small look beats none.
  */
+import { createLogger } from '@pi-desktop/shared';
 import { type NativeImage, nativeImage, type WebContents } from 'electron';
 import { officeKindForExt } from './office-contract';
 import { type Cell, composeGrid, sheetColumns } from './office-grid';
 import { openLookView } from './office-manager';
+
+const log = createLogger('desktop:office-look');
 
 /** The most slides a contact sheet shows; the note says when there are more. */
 export const MAX_SHEET_SLIDES = 12;
@@ -35,16 +38,39 @@ async function loaded(wc: WebContents, ms: number): Promise<void> {
   });
 }
 
-/** The page's largest canvas, where an editor draws the slide itself. */
+/**
+ * Where the slide itself is drawn. The slides editor draws each slide on a
+ * Konva stage that is the slide plus a 160-px bleed all round
+ * (vendor/genoffice …/SlideCanvas.tsx CANVAS_BLEED), scaled by a CSS transform
+ * — so the stage's box is bigger than the view, and the slide is that box
+ * inset by the bleed at the stage's scale. MEASURED: the stage's box was
+ * 1764×1146 at (−21, −68) in a 1600×1000 view; the slide inside it,
+ * 1411×794 at (155, 108). Else the page's largest canvas; null when neither.
+ */
 const STAGE_RECT = `(() => {
-  let best = null;
-  for (const c of document.querySelectorAll('canvas')) {
-    const r = c.getBoundingClientRect();
-    if (r.width < 40 || r.height < 40) continue;
-    if (!best || r.width * r.height > best.width * best.height) best = r;
+  const BLEED = 160;
+  const clamp = (r) => {
+    const x = Math.max(0, Math.round(r.x)), y = Math.max(0, Math.round(r.y));
+    const w = Math.min(innerWidth - x, Math.round(r.x + r.width) - x);
+    const h = Math.min(innerHeight - y, Math.round(r.y + r.height) - y);
+    return w >= 80 && h >= 60 ? { x, y, width: w, height: h } : null;
+  };
+  let stage = null;
+  for (const el of document.querySelectorAll('.konvajs-content')) {
+    if (!stage || el.offsetWidth * el.offsetHeight > stage.offsetWidth * stage.offsetHeight) stage = el;
   }
-  return best && { x: Math.round(best.x), y: Math.round(best.y),
-    width: Math.round(best.width), height: Math.round(best.height) };
+  if (stage && stage.offsetWidth > 2 * BLEED && stage.offsetHeight > 2 * BLEED) {
+    const r = stage.getBoundingClientRect();
+    const k = r.width / stage.offsetWidth;
+    return clamp({ x: r.x + BLEED * k, y: r.y + BLEED * k,
+      width: (stage.offsetWidth - 2 * BLEED) * k, height: (stage.offsetHeight - 2 * BLEED) * k });
+  }
+  let best = null;
+  for (const el of document.querySelectorAll('canvas')) {
+    const b = clamp(el.getBoundingClientRect());
+    if (b && (!best || b.width * b.height > best.width * best.height)) best = b;
+  }
+  return best;
 })()`;
 
 /** How many slides the editor says the deck has ("Slide 1 of 8"). */
@@ -111,6 +137,7 @@ export async function officeLook(filePath: string): Promise<OfficeLook | null> {
         .catch(() => undefined);
       await sleep(i === 0 ? 400 : 300);
       const rect = await wc.executeJavaScript(STAGE_RECT, true).catch(() => null);
+      if (i === 0) log.info('office look: slide box', { rect, count });
       const img = await shoot(wc, rect ?? undefined);
       if (img === null) continue;
       const fit = img.resize({ width: Math.min(cellW, img.getSize().width), quality: 'best' });

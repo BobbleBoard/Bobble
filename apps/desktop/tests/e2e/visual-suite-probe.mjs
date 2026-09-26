@@ -139,6 +139,44 @@ const TASKS = [
     kind: 'control',
     prompt: 'Draft a quick email to my landlord asking when the heating repair is scheduled.',
   },
+  /*
+   * STEM PRACTICE PROBLEMS (the user, 2026-09-25): "test some math/physics/
+   * chemistry... practice problem requests, this falls into visual aswell …
+   * having diagrams/visuals and animating them cleanly to go along with an
+   * explanation when informative". The figure is a stand-in drawn after the
+   * kinetic-theory "Fig. 3.1" he sent (fixtures/stem/fig31.png), attached the
+   * way a paste attaches it.
+   */
+  {
+    id: 'physics-fig',
+    kind: 'stem',
+    attach: 'fixtures/stem/fig31.png',
+    prompt:
+      'This is from my A-level physics practice paper (Fig. 3.1). A molecule of mass m moves with speed u inside a cube of side L, at right angles to the shaded face. Show that the average force it exerts on the shaded face is mu²/L, then help me understand how that leads to pV = ⅓Nm<c²>.',
+  },
+  {
+    id: 'chem-stoich',
+    kind: 'stem',
+    prompt:
+      "I'm revising for chemistry: 2.4 g of magnesium reacts with excess hydrochloric acid. Calculate the volume of hydrogen gas produced at room temperature and pressure, and explain each step.",
+  },
+  {
+    id: 'math-practice',
+    kind: 'stem',
+    prompt:
+      'Give me 3 practice problems on completing the square, with worked solutions I can check after I have tried them.',
+  },
+  {
+    id: 'shm-anim',
+    kind: 'stem',
+    prompt:
+      'Explain simple harmonic motion to me, with an animation of a mass on a spring next to its displacement–time graph.',
+  },
+  {
+    id: 'calc-visual',
+    kind: 'stem',
+    prompt: 'Why is the derivative of sin x equal to cos x? Explain it visually.',
+  },
 ];
 const WANT = new Set((process.env.TASKS ?? TASKS.map((t) => t.id).join(',')).split(','));
 
@@ -226,6 +264,15 @@ try {
     MODEL,
     { timeout: 180_000 },
   );
+  // A hidden file input the attach step fills through CDP (attach-anything-probe's way).
+  const cdp = await page.context().newCDPSession(page);
+  await page.evaluate(() => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.id = 'probe-files';
+    input.style.display = 'none';
+    document.body.appendChild(input);
+  });
   const profile = await page.evaluate(() => window.__llm_store().getState().status.profile);
   log(`model up: ${MODEL} on ${JSON.stringify(profile)}`);
   await sleep(8000);
@@ -240,6 +287,26 @@ try {
     const logFrom = existsSync(LOG) ? statSync(LOG).size : 0;
     const n = await page.evaluate(() => window.__pi_store().getState().messages.length);
     await page.click('[data-testid="composer-input"]');
+    // A figure that comes with the question: pasted as a file, never through the clipboard.
+    if (task.attach !== undefined) {
+      const file = path.join(path.dirname(new URL(import.meta.url).pathname), task.attach);
+      const { root } = await cdp.send('DOM.getDocument', { depth: 1 });
+      const { nodeId } = await cdp.send('DOM.querySelector', {
+        nodeId: root.nodeId,
+        selector: '#probe-files',
+      });
+      await cdp.send('DOM.setFileInputFiles', { nodeId, files: [file] });
+      await page.evaluate(() => {
+        const data = new DataTransfer();
+        for (const f of document.getElementById('probe-files').files) data.items.add(f);
+        const target =
+          document.activeElement ?? document.querySelector('[data-testid="composer-input"]');
+        target.dispatchEvent(
+          new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }),
+        );
+      });
+      await sleep(1500);
+    }
     await page.keyboard.insertText(task.prompt);
     const t0 = Date.now();
     await page.keyboard.press('Enter');
