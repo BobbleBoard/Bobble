@@ -63,6 +63,13 @@ export interface OmniSvgParams {
    * the drawing is on the canvas and in the gallery either way.
    */
   readonly outPath?: string;
+  /**
+   * A reference image as OmniSVG was fine-tuned to see it — on white, square,
+   * 448 × 448 (gen-service `omniSvgPicture`) — as base64 PNG. Handed in by the
+   * IPC wiring, because the decoder (`nativeImage`) exists only in main; without
+   * it the file goes as it is.
+   */
+  readonly picture?: (file: Buffer) => string;
 }
 
 /**
@@ -333,7 +340,8 @@ export async function generateSvg(
     const jobs: Array<{ source: string; body: ReturnType<typeof buildOmniSvgRequest> }> = [];
     if (prompt !== '') jobs.push({ source: 'prompt', body: buildOmniSvgRequest({ prompt }) });
     for (const img of images) {
-      const imageBase64 = (await readFile(img)).toString('base64');
+      const file = await readFile(img);
+      const imageBase64 = params.picture?.(file) ?? file.toString('base64');
       jobs.push({ source: path.basename(img), body: buildOmniSvgRequest({ imageBase64 }) });
     }
 

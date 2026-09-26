@@ -141,6 +141,13 @@ export function textInstruction(prompt: string): string {
  * six different pictures, and OmniSVG answered each with ~60 tokens of the
  * same kind of shape — the kinetic-theory figure came back as a circle.
  */
+/*
+ * THE WORDS, THEN THE PICTURE. Their `prepare_inputs` lists the instruction
+ * first and the image second, and Qwen 2.5-VL's template renders a message's
+ * parts in that order: "…represents this image:<|vision_start|>…<|vision_end|>".
+ * The marker led here, so every picture reached the model before the sentence
+ * that says what to do with it — an order it was never fine-tuned on.
+ */
 export interface OmniSvgPrompt {
   readonly prompt_string: string;
   /** Base64 images, one per MEDIA_MARKER in the prompt string. */
@@ -203,7 +210,7 @@ export function buildOmniSvgRequest(input: {
     return {
       prompt: {
         prompt_string: chatml(
-          `${MEDIA_MARKER}Generate SVG code that accurately represents this image:`,
+          `Generate SVG code that accurately represents this image:${MEDIA_MARKER}`,
         ),
         multimodal_data: [input.imageBase64],
       },

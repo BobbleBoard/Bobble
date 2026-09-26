@@ -26,7 +26,7 @@ describe('the prompt OmniSVG is sent', () => {
        picture was drawn from the instruction alone). */
     expect(r.prompt).toEqual({
       prompt_string: expect.stringContaining(
-        `${MEDIA_MARKER}Generate SVG code that accurately represents this image:`,
+        `Generate SVG code that accurately represents this image:${MEDIA_MARKER}<|im_end|>`,
       ),
       multimodal_data: ['AAAA'],
     });

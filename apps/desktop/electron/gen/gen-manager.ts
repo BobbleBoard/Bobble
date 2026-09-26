@@ -94,6 +94,7 @@ import { openStillWindow } from './hyperframes-window';
 import { buildComfyImageJob, isComfyImageModel } from './image-dispatch';
 import { createRoomKeeper, type RoomKeeper } from './make-room';
 import { generateSvg, omniSvgFiles } from './omnisvg';
+import { omniSvgPictureBase64 } from './omnisvg-picture';
 import { PendingJobs, unlessStopped } from './pending-jobs';
 import { canEnhance, type EnhancerEndpoint, enhancePrompt } from './prompt-enhancer';
 import { parseTqdm } from './tqdm';
@@ -1279,8 +1280,9 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
         announceAgentJob(svgId, from);
         let result: Awaited<ReturnType<typeof generateSvg>>;
         try {
-          result = await generateSvg({ ...p, outputDir, signal: stop.signal }, (partial) =>
-            send('gen:svg-live', { status: 'drawing', ...partial, ...prompt }),
+          result = await generateSvg(
+            { ...p, outputDir, signal: stop.signal, picture: omniSvgPictureBase64 },
+            (partial) => send('gen:svg-live', { status: 'drawing', ...partial, ...prompt }),
           );
         } catch (err) {
           const message = stop.signal.aborted
