@@ -1307,7 +1307,10 @@ export function mvFigure(
         if (!inView(sh.id, a, b) || !(r > 0)) break;
         const X = fx(a);
         const Y = fy(b);
-        const R = r * k;
+        /* Never smaller than a thing you can see — MEASURED (the 4B's
+           projectile, round 5): a ball of radius 0.5 in a view 100 wide, a
+           three-pixel dot at the launch point. */
+        const R = Math.max(r * k, 6);
         items.push({
           t: 'path',
           d: `M${(X - R).toFixed(2)},${Y.toFixed(2)}a${R.toFixed(2)},${R.toFixed(2)} 0 1,0 ${(2 * R).toFixed(2)},0a${R.toFixed(2)},${R.toFixed(2)} 0 1,0 ${(-2 * R).toFixed(2)},0Z`,

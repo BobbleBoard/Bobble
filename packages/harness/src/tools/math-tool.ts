@@ -22,6 +22,7 @@
  * (`<name>.math.json`): the model fixes what the checks report in it and runs
  * `math <name>.math.json` again.
  */
+
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -36,6 +37,7 @@ import {
 } from '@pi-desktop/mathviz';
 import { serverCanSeeImages } from '@pi-desktop/provider-llamacpp';
 import { Type } from '@sinclair/typebox';
+import { noteDrawn } from './math-open-fixes.js';
 import type { PresentBridge } from './present.js';
 import { pathForModel } from './workspace-relative.js';
 
@@ -467,6 +469,11 @@ export async function drawMath(
   if (notes.length > 0) lines.push(...notes.map((x) => `(${x.text})`));
   const text = lines.join('\n');
   lastDrawn.set(page, { hash, text });
+  noteDrawn(
+    page,
+    specRel,
+    fixes.map((x) => x.text),
+  );
   const content: Content = [{ type: 'text', text }];
   if (image !== undefined) content.push({ type: 'image', ...image });
   return { content, details: undefined };

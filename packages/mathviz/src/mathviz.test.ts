@@ -808,10 +808,10 @@ describe('JavaScript a small model writes into JSON', () => {
   it('says so when no step moves anything on a page with sliders', () => {
     const r = renderMath({
       title: 'Still',
-      params: ['t = 0 in 0..2'],
+      params: ['t = 0 in 0..2', 'r = 0.2 in 0.1..0.5'],
       figure: {
         view: { x: '0..4', y: '0..4' },
-        shapes: [{ id: 'b', kind: 'circle', center: ['t', 1], r: 0.2 }],
+        shapes: [{ id: 'b', kind: 'circle', center: ['t', 1], r: 'r' }],
       },
       steps: [
         { text: 'A ball.', highlight: ['b'] },
@@ -821,6 +821,30 @@ describe('JavaScript a small model writes into JSON', () => {
     expect(r.problems.map((p) => p.text)).toContain(
       'none of the steps moves anything — the page plays its steps like a teacher, so give steps a "set" that moves t (the figure moves while the words appear), or a "nudge" that wiggles a slider to show what it changes',
     );
+  });
+
+  it('lets still steps take the one slider that plays through its range (MEASURED: a ball left at the launch point)', () => {
+    const spec = {
+      title: 'Still',
+      params: ['t = 0 in 0..2'],
+      figure: {
+        view: { x: '0..4', y: '0..4' },
+        shapes: [{ id: 'b', kind: 'circle', center: ['t', 1], r: 0.2 }],
+      },
+      steps: [
+        { text: 'A ball.', highlight: ['b'] },
+        { text: 'It moves.', highlight: ['b'] },
+        { text: 'There.', highlight: ['b'] },
+      ],
+    };
+    const r = renderMath(spec);
+    expect(r.spec.steps.map((st) => st.set)).toEqual([{ t: 0 }, { t: 1 }, { t: 2 }]);
+    expect(r.problems.map((p) => p.text)).toContain(
+      'no step moved anything, so the steps take t from 0 to 2, one stretch each — give each step a "set" to choose what it shows',
+    );
+    // A slider no part uses is left where it is.
+    const unused = renderMath({ ...spec, params: ['t = 0 in 0..2', 'k = 1 in 0..3'], play: 'k' });
+    expect(unused.spec.steps.map((st) => st.set)).toEqual([{}, {}, {}]);
   });
 });
 
@@ -1191,5 +1215,89 @@ describe('the 4B’s fourth round (2026-09-26): what its own pages lost', () => 
     expect(r.problems.map((p) => p.text)).toContain(
       'the plot had no curves, so the page is the figure alone',
     );
+  });
+});
+
+describe('the 4B’s fifth round (2026-09-26)', () => {
+  it('reads a line’s two ends given as one list (MEASURED: "endpoints": [{x, y}, {x, y}])', () => {
+    const s = normalizeMathSpec({
+      title: 'E',
+      figure: {
+        view: { x: '0..500', y: '0..500' },
+        shapes: [
+          {
+            id: 'h',
+            kind: 'line',
+            endpoints: [
+              { x: 50, y: 250 },
+              { x: 450, y: 250 },
+            ],
+          },
+        ],
+      },
+      steps: ['A line.'],
+    });
+    expect(s.figure?.shapes[0]).toMatchObject({ kind: 'segment', from: [50, 250], to: [450, 250] });
+  });
+
+  it('reads parts listed by kind beside "shapes" (MEASURED: its dimensions and captions, never drawn)', () => {
+    const s = normalizeMathSpec({
+      title: 'K',
+      figure: {
+        view: { x: '0..10', y: '0..10' },
+        shapes: [{ id: 'p', kind: 'point', at: [1, 1] }],
+        dimensions: [{ id: 'da', from: [0, 0], to: [4, 0], label: 'a' }],
+        labels: [{ id: 'cap', position: { x: 5, y: 8 }, text: 'Area = a² + b²' }],
+      },
+      steps: [{ text: 'See {da}.', highlight: ['da', 'cap'] }],
+    });
+    expect(s.figure?.shapes.map((sh) => [sh.id, sh.kind])).toEqual([
+      ['p', 'point'],
+      ['da', 'dimension'],
+      ['cap', 'label'],
+    ]);
+  });
+
+  it('says a line with no length, and where a tangent belongs', () => {
+    const r = renderMath({
+      title: 'D',
+      params: ['x0 = 0 in -4..4', 't = 0 in 0..1'],
+      plot: { x: '-4..4', curves: [{ id: 'curve', expr: 'x^2' }] },
+      figure: {
+        view: { x: '-6..6', y: '-2..20' },
+        shapes: [
+          {
+            id: 'tangent',
+            kind: 'segment',
+            from: ['x0 + 4*t*(1 - t)', '(x0 + 4*t*(1 - t))^2'],
+            to: ['x0 - 4*t*(1 - t)', '(x0 - 4*t*(1 - t))^2'],
+          },
+        ],
+      },
+      steps: [
+        { text: 'The tangent.', highlight: ['tangent'], set: { x0: 1, t: 0 } },
+        { text: 'Moved.', highlight: ['tangent'], set: { x0: 2, t: 0 } },
+      ],
+    });
+    expect(r.problems.filter((p) => p.level === 'fix').map((p) => p.text)).toContain(
+      'tangent has no length, so nothing of it shows — a tangent to the plot\'s curve is "tangents": [{"to": "curve", "at": "x0"}] in the plot, drawn at its true slope',
+    );
+  });
+
+  it('never draws a disc smaller than can be seen (MEASURED: a ball r = 0.5 in a view 100 wide)', () => {
+    const spec = normalizeMathSpec({
+      title: 'B',
+      figure: {
+        view: { x: '0..100', y: '0..60' },
+        shapes: [{ id: 'ball', kind: 'circle', center: [10, 10], r: 0.5, fill: 'main' }],
+      },
+      steps: ['A ball.'],
+    });
+    const c = compileSpec(spec);
+    const disc = mvScene(spec, c.E, {}, 1)
+      .panels.flatMap((p) => p.items)
+      .find((it) => it.t === 'path' && it.id === 'ball');
+    const r = Number(/a([\d.]+),/.exec(disc?.t === 'path' ? disc.d : '')?.[1]);
+    expect(r).toBeGreaterThanOrEqual(6);
   });
 });

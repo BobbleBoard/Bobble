@@ -33,6 +33,7 @@ import type { ExtensionAPI } from '@mariozechner/pi-coding-agent';
 import type { DiagramTheme } from '@pi-desktop/design-kit';
 import { Type } from '@sinclair/typebox';
 import { HANDMADE_MATH_NOTE, handmadeMathVisual } from './handmade-math.js';
+import { fixesToPush } from './math-open-fixes.js';
 import { remotePictures, remotePicturesNote, unseenPictures } from './remote-pictures.js';
 import { pathForModel } from './workspace-relative.js';
 
@@ -443,6 +444,24 @@ export function registerPresentTool(pi: ExtensionAPI, deps: PresentToolDeps): vo
       if (!info.isDirectory && /\.html?$/i.test(resolved) && deps.readText !== undefined) {
         const page = await deps.readText(resolved).catch(() => null);
         if (page !== null && /\bdata-mv-panel\b/.test(page)) {
+          const open = fixesToPush(resolved);
+          if (open !== null) {
+            const n = open.fixes.length;
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: [
+                    `${pathForModel(resolved, deps.resolvePath?.('.'))} is open beside the chat, but it was drawn with ${n === 1 ? 'a problem' : `${n} problems`} the user will see:`,
+                    ...open.fixes.slice(0, 5).map((f) => `- ${f}`),
+                    ...(n > 5 ? [`- (and ${n - 5} more)`] : []),
+                    `Fix ${n === 1 ? 'it' : 'them'} in ${open.spec} and run \`math ${open.spec}\` again, then answer. (To leave the page as it is, present it again.)`,
+                  ].join('\n'),
+                },
+              ],
+              details: undefined,
+            } as never;
+          }
           return {
             content: [
               {

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { noteDrawn } from './math-open-fixes.js';
 import {
   entryPointIn,
   extensionOf,
@@ -138,6 +139,36 @@ describe('registerPresentTool', () => {
     expect(bridge.preview).not.toHaveBeenCalled();
     expect(r.content).toHaveLength(1);
     expect(r.content[0]?.text).toMatch(/is the page the math command drew — it is already open/);
+  });
+
+  /* MEASURED (the 4B, round 4): simple harmonic motion drawn with thirteen
+     problems, then presented at once — and "it is already open … reply"
+     ended the turn on a page that showed neither the mass nor the curve. */
+  it('names a math page’s open problems at its first present after the draw, then lets it through', async () => {
+    noteDrawn('/a/shm.html', 'shm.math.json', [
+      'mass at (40, -60) is outside the figure',
+      'labels overlap in the figure: “A” and “x(t)”',
+    ]);
+    const { pi, tools } = collect();
+    registerPresentTool(pi, {
+      bridge,
+      stat: async () => ({ isDirectory: false }),
+      readText: async () => '<main class="mv"><figure data-mv-panel></figure></main>',
+    });
+    const exec = tools[0]?.execute as (
+      id: string,
+      p: unknown,
+    ) => Promise<{ content: Array<{ type: string; text?: string }> }>;
+    const first = (await exec('t1', { path: '/a/shm.html' })).content[0]?.text ?? '';
+    expect(first).toMatch(
+      /is open beside the chat, but it was drawn with 2 problems the user will see:/,
+    );
+    expect(first).toContain('- mass at (40, -60) is outside the figure');
+    expect(first).toContain(
+      'Fix them in shm.math.json and run `math shm.math.json` again, then answer.',
+    );
+    const second = (await exec('t2', { path: '/a/shm.html' })).content[0]?.text ?? '';
+    expect(second).toMatch(/is the page the math command drew — it is already open/);
   });
 
   it('an .svg without a diagram sidecar is still previewed', async () => {

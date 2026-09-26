@@ -149,6 +149,16 @@ export function checkMath(
             ' — give each its own position (or make them one part)',
             st.step,
           );
+        for (const sh of pointLike(spec, E, st.values, st.step)) {
+          /* A line with both ends in one place — MEASURED (the 4B's derivative):
+             "tangent" from x0 + 4t(1 − t) to x0 − 4t(1 − t), no length while
+             t = 0, at the five steps that talked about it. */
+          const tangent =
+            spec.plot !== undefined && /tangent/i.test(`${sh.id} ${sh.label ?? ''}`)
+              ? ` — a tangent to the plot's curve is "tangents": [{"to": "${spec.plot.curves[0]?.id ?? 'c1'}", "at": "${spec.params.find((p) => p.hidden !== true)?.name ?? '1'}"}] in the plot, drawn at its true slope`
+              : ' — give its two ends different places';
+          at('fix', `${sh.id} has no length, so nothing of it shows`, tangent, st.step);
+        }
       }
       for (const h of panel.curveHealth) {
         const range =
@@ -367,6 +377,29 @@ function samePlace(
   for (let i = 0; i < ends.length; i += 1)
     for (let j = i + 1; j < ends.length; j += 1)
       if (ends[i]?.key === ends[j]?.key) out.push([ends[i]?.id ?? '', ends[j]?.id ?? '']);
+  return out;
+}
+
+/** Segments and arrows with both ends in one place, in this state. */
+function pointLike(
+  spec: MathSpec,
+  E: Evaluators,
+  values: Values,
+  step: number,
+): { id: string; label?: string }[] {
+  const fig = spec.figure;
+  if (fig === undefined) return [];
+  const s: Record<string, number> = { ...values };
+  const tiny = Math.hypot(fig.x[1] - fig.x[0], fig.y[1] - fig.y[0]) * 1e-6;
+  const out: { id: string; label?: string }[] = [];
+  for (const sh of fig.shapes) {
+    if (sh.appear > Math.max(1, step)) continue;
+    if (sh.kind !== 'segment' && sh.kind !== 'vector') continue;
+    const [a, b, c, d] = [sh.from[0], sh.from[1], sh.to[0], sh.to[1]].map((p) => mvEval(E, p, s));
+    if ([a, b, c, d].some((v) => !Number.isFinite(v))) continue;
+    if (Math.hypot((c ?? 0) - (a ?? 0), (d ?? 0) - (b ?? 0)) <= tiny)
+      out.push({ id: sh.id, ...(sh.label !== undefined ? { label: sh.label } : {}) });
+  }
   return out;
 }
 

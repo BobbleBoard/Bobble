@@ -958,6 +958,24 @@ function shapeBody(v: unknown, i: number, named: Map<string, Xy>, names: readonl
     case 'vector':
     case 'arrow':
     case 'force': {
+      /* Its two ends as one list — MEASURED (the 4B's Pythagoras):
+         "endpoints": [{"x": 50, "y": 250}, {"x": 450, "y": 250}]. */
+      const ends = v.endpoints ?? v.ends ?? v.between ?? v.points;
+      if (Array.isArray(ends) && ends.length === 2 && v.from === undefined && v.to === undefined)
+        return shape(
+          {
+            ...v,
+            endpoints: undefined,
+            ends: undefined,
+            between: undefined,
+            points: undefined,
+            from: ends[0],
+            to: ends[1],
+          },
+          i,
+          named,
+          names,
+        );
       const isVec = kind !== 'segment';
       /* An arrow as its ends by other names, or as a start and a direction —
          MEASURED (the 4B): {"center": [x, y], "direction": [dx, dy]}. */
@@ -1396,6 +1414,32 @@ function viewRange(v: unknown, what: string, notes: string[]): { min: number; ma
   }
 }
 
+/**
+ * Lists a figure may hold beside "shapes", and the kind each one's parts are —
+ * areas first and words last, so what is written is drawn on top.
+ */
+const SHAPES_BY_KEY: Readonly<Record<string, string>> = {
+  polygons: 'polygon',
+  triangles: 'polygon',
+  rects: 'rect',
+  rectangles: 'rect',
+  squares: 'square',
+  circles: 'circle',
+  curves: 'curve',
+  segments: 'segment',
+  lines: 'segment',
+  arrows: 'vector',
+  vectors: 'vector',
+  forces: 'vector',
+  springs: 'spring',
+  angles: 'angle',
+  dimensions: 'dimension',
+  points: 'point',
+  labels: 'label',
+  texts: 'label',
+  annotations: 'label',
+};
+
 function figure(v: Loose, names: readonly string[], notes: string[]): FigureSpec {
   const viewIn = isObj(v.view) ? v.view : isObj(v.window) ? v.window : v;
   const x = viewRange(viewIn.x ?? get(v, 'xRange'), 'figure x', notes);
@@ -1417,7 +1461,16 @@ function figure(v: Loose, names: readonly string[], notes: string[]): FigureSpec
       y.min += 0.55 * Math.min(0, z.min);
     }
   }
-  const shapesIn = list(v.shapes ?? v.elements ?? v.items ?? v.objects ?? v.parts);
+  /* Parts listed by kind beside "shapes" — MEASURED (the 4B's Pythagoras):
+     "dimensions": [a, b, c] and "labels": [two captions] next to its shapes,
+     none of them drawn, and eleven "step 1 highlights dim_a, which is not a
+     part". A list named for a kind is shapes of that kind. */
+  const byKind = Object.entries(SHAPES_BY_KEY).flatMap(([key, kind]) =>
+    list(v[key]).map((s) =>
+      isObj(s) && s.kind === undefined && s.type === undefined ? { ...s, kind } : s,
+    ),
+  );
+  const shapesIn = [...list(v.shapes ?? v.elements ?? v.items ?? v.objects ?? v.parts), ...byKind];
   if (shapesIn.length === 0) throw new SpecError('a figure needs shapes');
   const named = new Map<string, Xy>();
   return {
@@ -1859,6 +1912,36 @@ function normalizeParsed(v: Loose, found: { any: boolean }, auto: readonly strin
   });
   const playIn = str(v.play ?? v.animate);
   const caption = str(v.caption ?? v.subtitle);
+  /* Steps that move nothing, beside a slider that plays — MEASURED (the 4B,
+     projectile motion, round 5): "play": "t" and four steps without a "set",
+     so the page told its story over a ball sitting at the launch point. The
+     time the steps tell is the slider's: they take it from its start to its
+     end, one stretch each, and the note says so. */
+  // A slider no part uses would move nothing: it is not the story's time.
+  const drawnText = JSON.stringify([v.figure ?? v.diagram ?? null, v.plot ?? v.graph ?? null]);
+  const sliders = params.filter(
+    (p) => p.hidden !== true && new RegExp(`\\b${p.name}\\b`).test(drawnText),
+  );
+  const player =
+    playIn !== undefined && names.includes(playIn)
+      ? sliders.find((p) => p.name === playIn)
+      : sliders.length === 1
+        ? sliders[0]
+        : undefined;
+  const still = steps.every(
+    (st) => Object.keys(st.set).length === 0 && Object.keys(st.nudge ?? {}).length === 0,
+  );
+  const told =
+    steps.length >= 2 && still && player !== undefined && player.max > player.min
+      ? steps.map((st, k) => ({
+          ...st,
+          set: { [player.name]: player.min + ((player.max - player.min) * k) / (steps.length - 1) },
+        }))
+      : steps;
+  if (told !== steps && player !== undefined)
+    viewNotes.push(
+      `no step moved anything, so the steps take ${player.name} from ${player.min} to ${player.max}, one stretch each — give each step a "set" to choose what it shows`,
+    );
   return {
     title:
       title ??
@@ -1871,7 +1954,7 @@ function normalizeParsed(v: Loose, found: { any: boolean }, auto: readonly strin
     params,
     ...(plotSpec !== undefined ? { plot: plotSpec } : {}),
     ...(figSpec !== undefined ? { figure: figSpec } : {}),
-    steps,
+    steps: told,
     ...(playIn !== undefined && names.includes(playIn) ? { play: playIn } : {}),
     tell: v.tell !== false && v.autoplay !== false,
     ...(declared.length > 0 && params.some((p) => p.hidden === true)
