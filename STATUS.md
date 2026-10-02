@@ -1,6 +1,16 @@
 # Bobble — status
 
-Updated: 2026-10-01 22:00 (on AC) · main `9c72996b` · dist rebuilt and **installed** (packaged smoke OK) · the user: "drive bobble visually as a user and go and ask for some explanation of some math problem … see if you think bobble does better"
+Updated: 2026-10-02 (on battery) · main `5e12867f` · dist rebuilt and **installed** (packaged smoke OK) · the user: "drive bobble visually as a user and go and ask for some explanation of some math problem … see if you think bobble does better"
+
+## Addendum — 2026-10-02: Qwen3.8 27B thinks at medium effort (the user: "it's xhigh by default, set it to medium")
+
+| What | How | Verified by |
+|---|---|---|
+| The 27B's thinking effort pinned to **medium** | `CatalogModel.chatTemplateKwargs: { reasoning_effort: 'medium' }`, merged into the one `--chat-template-kwargs` the launch carries (`{"preserved_thinking":true,"reasoning_effort":"medium"}`); the MLX twin's template default set to medium; a request that names an effort still wins — `61ede173` | unit tests (launch args, catalog, template patch); llama.cpp b10603's own `/apply-template` on Qwen's template, froggeric v22 and v22.5: **xhigh → medium on the first two**, medium on v22.5 (which had already changed its default) |
+| A prefill trap the pin closes | the warm-up prime renders with thinking off, which drops xhigh's "Reasoning effort is set to xhigh…" line from the system turn — so under an xhigh template the primed prefix never matched the turn | same render: prime ≠ turn before, prime = turn after |
+| Live check on the 27B (TTFT, /slots prefill reuse, thought length, two turns) | `apps/desktop/tests/e2e/effort-prefill-probe.mjs` (`5e12867f`) | **queued under the heavy lock — the Mac is on battery**; it runs when it is plugged in |
+
+Installed (`pnpm ship:local`, packaged smoke OK); the installed bundle carries the pin.
 
 ## Report — 2026-10-01: a visual-learner student, Bobble × five local models vs ChatGPT (logged out)
 
