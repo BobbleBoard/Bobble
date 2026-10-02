@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import {
   cleanProviderError,
   dropStaleScreenshots,
+  elidedArgument,
   estimateTokens,
+  OVERFLOW_THOUGHT_PLACEHOLDER,
   OVERFLOW_TRIM_PLACEHOLDER,
   parseContextOverflow,
   STALE_SHOT_PLACEHOLDER,
@@ -113,6 +115,61 @@ describe('trimContextForOverflow', () => {
     const input = ctx(messages);
     trimContextForOverflow(input, 1_000);
     expect(textAt(input, 0)).toHaveLength(8_000);
+  });
+
+  it('elides the long arguments of older calls when tool output was not the bulk (MEASURED: Ling 3.0 Tiny)', () => {
+    const svg = `<svg>${'<circle r="1"/>'.repeat(1_000)}</svg>`;
+    const write = (id: string): Message => ({
+      role: 'assistant',
+      content: [
+        { type: 'thinking', thinking: 'Let me try again. '.repeat(100) },
+        { type: 'toolCall', id, name: 'write', arguments: { path: 'a.svg', content: svg } },
+      ],
+      api: 'openai-completions',
+      provider: 'llamacpp',
+      model: 'm',
+      usage: {
+        input: 0,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+        totalTokens: 0,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+      },
+      stopReason: 'toolUse',
+      timestamp: 0,
+    });
+    const refused = (id: string) => toolResult(id, 120);
+    const messages = [
+      user('why is the area of a circle πr²?'),
+      write('w1'),
+      refused('w1'),
+      write('w2'),
+      refused('w2'),
+      write('w3'),
+      refused('w3'),
+    ];
+    const { context, removedTokens } = trimContextForOverflow(ctx(messages), 6_000);
+    expect(removedTokens).toBeGreaterThanOrEqual(6_000);
+    const argsAt = (i: number) => {
+      const m = context.messages[i];
+      if (m?.role !== 'assistant') throw new Error('not assistant');
+      const call = m.content.find((b) => b.type === 'toolCall');
+      return call?.type === 'toolCall' ? call.arguments : {};
+    };
+    // The oldest write's bulk is gone, its path kept and its size said.
+    expect(argsAt(1)).toEqual({ path: 'a.svg', content: elidedArgument(svg.length) });
+    // The step the model is on stays whole; the person's words are never touched.
+    expect(argsAt(5)).toEqual({ path: 'a.svg', content: svg });
+    expect(context.messages[0]).toEqual(messages[0]);
+    // A second pass with nothing left to reclaim but thoughts takes the thoughts.
+    const again = trimContextForOverflow(context, 50_000);
+    const first = again.context.messages[1];
+    expect(
+      first?.role === 'assistant' && first.content[0]?.type === 'thinking'
+        ? first.content[0].thinking
+        : '',
+    ).toBe(OVERFLOW_THOUGHT_PLACEHOLDER);
   });
 });
 

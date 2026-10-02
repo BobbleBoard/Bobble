@@ -200,16 +200,66 @@ export function dropStaleScreenshots(context: Context, keep = KEEP_RECENT_SHOTS)
   };
 }
 
+/** What a tool call's long argument becomes: its size, so the model knows what it wrote. */
+export function elidedArgument(chars: number): string {
+  return `[${chars} chars elided to fit context]`;
+}
+const ELIDED = /^\[\d+ chars elided to fit context\]$/;
+
+/** What an older thought becomes once tool output alone could not make room. */
+export const OVERFLOW_THOUGHT_PLACEHOLDER = '[earlier thinking trimmed to fit context]';
+
+/** An argument shorter than this is the call's meaning (a path, a command), not its bulk. */
+const ARG_KEEP_CHARS = 400;
+
+/** A tool call's arguments with every long string (at any depth) elided; null when none was. */
+function elideArguments(
+  value: unknown,
+  depth = 0,
+): { value: unknown; freed: number; count: number } | null {
+  if (typeof value === 'string') {
+    if (value.length <= ARG_KEEP_CHARS || ELIDED.test(value)) return null;
+    const placeholder = elidedArgument(value.length);
+    return {
+      value: placeholder,
+      freed: estimateTokens(value) - estimateTokens(placeholder),
+      count: 1,
+    };
+  }
+  if (depth >= 3 || value === null || typeof value !== 'object') return null;
+  const entries = Array.isArray(value)
+    ? value.map((v, i) => [i, v] as const)
+    : Object.entries(value as Record<string, unknown>);
+  let out: unknown[] | Record<string, unknown> | null = null;
+  let freed = 0;
+  let count = 0;
+  for (const [key, v] of entries) {
+    const r = elideArguments(v, depth + 1);
+    if (r === null) continue;
+    out ??= Array.isArray(value) ? value.slice() : { ...(value as Record<string, unknown>) };
+    (out as Record<string | number, unknown>)[key] = r.value;
+    freed += r.freed;
+    count += r.count;
+  }
+  return out === null ? null : { value: out, freed, count };
+}
+
 /**
- * Free ~`tokensToRemove` tokens from `context` by replacing the OLDEST not-yet-
- * trimmed tool results with {@link OVERFLOW_TRIM_PLACEHOLDER}, stopping as soon
- * as the target is met. User + assistant messages are never touched, so the
- * conversation's intent and the model's own reasoning survive; only stale tool
- * output (the bulk) is shed. Pure — returns a fresh context, never mutates.
+ * Free ~`tokensToRemove` tokens from `context`, oldest first, stopping as soon
+ * as the target is met. First the OLDEST not-yet-trimmed tool results become
+ * {@link OVERFLOW_TRIM_PLACEHOLDER} — stale tool output is usually the bulk.
  *
- * Idempotent across passes: an already-placeholdered result is skipped, so a
- * caller can loop (trim → retry → trim more) and each pass makes real progress
- * until every trimmable tool result is gone.
+ * When it is not — MEASURED (Ling 3.0 Tiny, 32k window, 2026-10-01): three
+ * attempts at writing a hand-drawn SVG, each ~4k tokens of ARGUMENTS, each
+ * refused in two lines, and the chat could never send again ("too long … even
+ * after trimming older tool output") — the long arguments of older tool calls
+ * are elided (their size kept, so the model knows what it wrote), then older
+ * thoughts. User messages are never touched, nor the last assistant message
+ * (the step the model is on). Pure — returns a fresh context, never mutates.
+ *
+ * Idempotent across passes: what was already replaced is skipped, so a caller
+ * can loop (trim → retry → trim more) and each pass makes real progress until
+ * nothing trimmable is left.
  */
 export function trimContextForOverflow(context: Context, tokensToRemove: number): TrimResult {
   if (tokensToRemove <= 0) return { context, removedTokens: 0, trimmedCount: 0 };
@@ -231,6 +281,43 @@ export function trimContextForOverflow(context: Context, tokensToRemove: number)
     out[i] = replaceToolResultText(msg, OVERFLOW_TRIM_PLACEHOLDER);
     removed += cost - placeholderTokens;
     trimmedCount++;
+  }
+
+  // Then what the model itself carried: older calls' long arguments, older thoughts.
+  let lastAssistant = -1;
+  for (let i = out.length - 1; i >= 0; i--) {
+    if (out[i]?.role === 'assistant') {
+      lastAssistant = i;
+      break;
+    }
+  }
+  for (let i = 0; i < out.length && removed < tokensToRemove; i++) {
+    const msg = out[i];
+    if (msg === undefined || msg.role !== 'assistant' || i === lastAssistant) continue;
+    let changed = false;
+    const content = msg.content.map((block) => {
+      if (removed >= tokensToRemove) return block;
+      if (block.type === 'toolCall') {
+        const r = elideArguments(block.arguments);
+        if (r === null) return block;
+        removed += r.freed;
+        trimmedCount += r.count;
+        changed = true;
+        return { ...block, arguments: r.value as Record<string, unknown> };
+      }
+      if (
+        block.type === 'thinking' &&
+        block.thinking.length > ARG_KEEP_CHARS &&
+        block.thinking !== OVERFLOW_THOUGHT_PLACEHOLDER
+      ) {
+        removed += estimateTokens(block.thinking) - estimateTokens(OVERFLOW_THOUGHT_PLACEHOLDER);
+        trimmedCount += 1;
+        changed = true;
+        return { ...block, thinking: OVERFLOW_THOUGHT_PLACEHOLDER };
+      }
+      return block;
+    });
+    if (changed) out[i] = { ...msg, content };
   }
 
   if (trimmedCount === 0) return { context, removedTokens: 0, trimmedCount: 0 };
