@@ -47,7 +47,7 @@ import {
 } from './repair.js';
 import { buildRequestHeaders } from './request-headers.js';
 import { tapRequest, tapUsage } from './request-tap.js';
-import { settleReply } from './settle-reply.js';
+import { settleNote, settleReply } from './settle-reply.js';
 import { parseSSE } from './sse.js';
 
 /** llama.cpp per-response `timings` block (structurally == inference's). */
@@ -1049,7 +1049,11 @@ export function createLlamaCppStream(deps: LlamaCppStreamDeps = {}): LlamaCppStr
         // The final message is what the thread shows and the next prompt
         // carries: settle it (see settle-reply.ts — a reply that is only a
         // thought the model ended itself is the reply).
-        output.content = settleReply(output.content, finishReason);
+        const settled = settleReply(output.content, finishReason);
+        const settling = settleNote(output.content, settled, output.usage.output, finishReason);
+        // eslint-disable-next-line no-console
+        if (settling !== null) console.log(`[pi-ctx] ${settling}`);
+        output.content = settled;
         output.stopReason = finishReason;
         stream.push({ type: 'done', reason: finishReason, message: output });
         stream.end();

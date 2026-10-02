@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { settleReply } from './settle-reply.js';
+import { type ReplyBlock, settleNote, settleReply } from './settle-reply.js';
 
 const thought = { type: 'thinking' as const, thinking: 'Let me look.' };
 const call = { type: 'toolCall' as const, id: 'c1', name: 'bash', arguments: { command: 'ls' } };
@@ -71,5 +71,37 @@ describe("settleReply — the reply as llama.cpp's parser would hand it over", (
     expect(settleReply([{ type: 'thinking', thinking: '  ' }], 'stop')).toEqual([
       { type: 'thinking', thinking: '  ' },
     ]);
+  });
+});
+
+describe('settleNote — what settling took, said out loud', () => {
+  it('names a reply that settled to nothing though tokens came out (MEASURED: Gemma 4 12B, 548 tokens)', () => {
+    const before: ReplyBlock[] = [
+      { type: 'text', text: '<tool_call>{"name": "bash", "arguments": {"command": "media gen' },
+    ];
+    const after = settleReply(before, 'stop');
+    expect(after).toEqual([]);
+    expect(settleNote(before, after, 548, 'stop')).toBe(
+      `548 tokens out and an empty reply (finish stop) — cut: ${JSON.stringify(before[0]?.type === 'text' ? before[0].text : '')}`,
+    );
+  });
+
+  it('names text cut at an unfinished written call, with what was cut', () => {
+    const before: ReplyBlock[] = [
+      { type: 'text', text: 'Here is the picture.\n<tool_call>{"name": "bash", "argum' },
+    ];
+    const after = settleReply(before, 'stop');
+    const note = settleNote(before, after, 40, 'stop');
+    expect(note).toMatch(/^cut \d+ chars from the reply \(finish stop\) — cut: "<tool_call>/);
+  });
+
+  it('says nothing when settling only trimmed whitespace or took nothing', () => {
+    const plain: ReplyBlock[] = [{ type: 'text', text: 'All done.' }];
+    expect(settleNote(plain, settleReply(plain, 'stop'), 3, 'stop')).toBeNull();
+    const spaced: ReplyBlock[] = [
+      { type: 'thinking', thinking: 'ok' },
+      { type: 'text', text: '\n\nAll done.' },
+    ];
+    expect(settleNote(spaced, settleReply(spaced, 'stop'), 5, 'stop')).toBeNull();
   });
 });

@@ -72,3 +72,33 @@ export function settleReply(
   }
   return out;
 }
+
+function textOfBlocks(blocks: readonly ReplyBlock[]): string {
+  return blocks.map((b) => (b.type === 'text' ? b.text : '')).join('');
+}
+
+/**
+ * WHAT SETTLING TOOK, said out loud — a log line, or null when it took nothing
+ * worth saying. MEASURED (Gemma 4 12B, 2026-10-01): a reply of 548 tokens
+ * settled to nothing at all and the thread showed an empty turn, with no line
+ * anywhere saying what the tokens had been. Two cases are named: a reply that
+ * ended EMPTY though tokens came out, and text cut at an unfinished written
+ * tool call (with the start of what was cut, so the next one can be read).
+ */
+export function settleNote(
+  before: readonly ReplyBlock[],
+  after: readonly ReplyBlock[],
+  outputTokens: number,
+  finishReason: string,
+): string | null {
+  const was = textOfBlocks(before);
+  const now = textOfBlocks(after);
+  const cutText = was.trim().length > now.trim().length ? was.slice(now.length).trim() : '';
+  const cut = cutText.length > 0 ? ` — cut: ${JSON.stringify(cutText.slice(0, 160))}` : '';
+  if (after.length === 0 && outputTokens > 0) {
+    return `${outputTokens} tokens out and an empty reply (finish ${finishReason})${cut}`;
+  }
+  if (cutText.length > 0)
+    return `cut ${cutText.length} chars from the reply (finish ${finishReason})${cut}`;
+  return null;
+}

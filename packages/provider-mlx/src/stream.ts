@@ -39,6 +39,7 @@ import {
   reconstructToolCallFromContent,
   repairToolCallArguments,
   resolveUnknownToolName,
+  settleNote,
   settleReply,
   type ToolCallFixer,
   type ToolSchemaLike,
@@ -716,7 +717,11 @@ export function createMlxStream(deps: MlxStreamDeps = {}): MlxStreamFn {
         // carries: settle it (provider-llamacpp/settle-reply.ts — the newlines
         // after </think>, a flushed call fragment, a reply that is only a
         // thought the model ended itself).
-        output.content = settleReply(output.content, finishReason);
+        const settled = settleReply(output.content, finishReason);
+        const settling = settleNote(output.content, settled, output.usage.output, finishReason);
+        // eslint-disable-next-line no-console
+        if (settling !== null) console.log(`[pi-ctx] ${settling}`);
+        output.content = settled;
         output.stopReason = finishReason;
         stream.push({ type: 'done', reason: finishReason, message: output });
         stream.end();
