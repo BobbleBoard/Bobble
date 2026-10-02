@@ -497,6 +497,10 @@ describe('loop detector — live wiring through tool_call / tool_execution_end',
       cause: 'error',
       reason: expect.any(String),
     });
+    // The person still gets an answer (MEASURED: Ling 3.0 Tiny, "Done" over nothing).
+    expect(rig.sentUserMessages.at(-1)).toMatch(
+      /^You were stopped: .+Answer what the user asked now/s,
+    );
   });
 
   it('resets per turn — a fresh before_agent_start re-arms the detector', async () => {

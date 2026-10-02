@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { silentEnd, silentEndNudge } from './silent-end.js';
+import { loopAbortNudge, silentEnd, silentEndNudge } from './silent-end.js';
 
 const user = { role: 'user', content: 'Explain SHM with an animation.' };
 const failed = {
@@ -69,5 +69,13 @@ describe('a turn that ends without a word', () => {
     const turn = [{ role: 'user', content: steer }, thought];
     expect(silentEnd(turn, (t) => t === steer)).toBeNull();
     expect(silentEnd(turn)).toEqual({ failed: '', ran: false });
+  });
+});
+
+describe('after the loop guard stops a turn', () => {
+  it('names why, and asks for the answer in words (MEASURED: Ling 3.0 Tiny, 53 reads, "Done" over nothing)', () => {
+    const nudge = loopAbortNudge('stuck cycling between 3 tool calls for minutes without progress');
+    expect(nudge).toMatch(/^You were stopped: stuck cycling between 3 tool calls/);
+    expect(nudge).toContain('Do not run another tool for this. Answer what the user asked now');
   });
 });

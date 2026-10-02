@@ -36,7 +36,7 @@ import { announcedNextStep, announcedStepNudge } from './loop/announced-step.js'
 import { HANDBACK_NUDGE, isChoiceHandback } from './loop/handback.js';
 import { createLoopDetector, type LoopDetector, loopDetectorConfig } from './loop/loop-detector.js';
 import { newSameCallState, noteRepeatedCall } from './loop/same-call.js';
-import { silentEnd, silentEndNudge } from './loop/silent-end.js';
+import { loopAbortNudge, silentEnd, silentEndNudge } from './loop/silent-end.js';
 import { unfinishedPlan, unfinishedPlanNudge } from './loop/unfinished-plan.js';
 import { emptyTally, noteResult } from './modality';
 import { parseModelParams, smallModelCapabilityWarning } from './model/model-size.js';
@@ -450,6 +450,8 @@ interface HarnessRuntime {
   nudgedAnnounced: boolean;
   /** The one "you ended without a word" steer this session has (loop/silent-end.ts). */
   nudgedSilent: boolean;
+  /** The one "you were stopped — answer in words" steer after a loop-guard abort. */
+  nudgedLoopAbort: boolean;
   /** Agent runs started this session — a steer waiting for idle is dropped when this moves. */
   runs: number;
   /** The harness's private steers (checks it asks to be fixed silently), by their text. */
@@ -1222,6 +1224,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     nudgedUnfinished: false,
     nudgedAnnounced: false,
     nudgedSilent: false,
+    nudgedLoopAbort: false,
     runs: 0,
     privateSteers: new Set<string>(),
     verifyFixesRemaining: 0,
@@ -2200,6 +2203,18 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     if (ctx?.hasUI === true)
       ctx.ui.notify(`Loop guard aborted the turn: ${signal.reason}.`, 'error');
     ctx?.abort();
+    /*
+     * …AND THE PERSON STILL GETS AN ANSWER. MEASURED (Ling 3.0 Tiny, a
+     * student's circle-area question): the guard stopped 53 reads of one file,
+     * the turn ended "aborted", and the chat showed "Done" over nothing. The
+     * abort was the harness's choice, not the person's, so it is not their
+     * silence to keep. Once per session, when the agent is idle: answer in
+     * words, no more tools for this.
+     */
+    if (ctx !== null && !runtime.nudgedLoopAbort) {
+      runtime.nudgedLoopAbort = true;
+      steerWhenIdle(ctx, loopAbortNudge(signal.reason));
+    }
     return true;
   }
 

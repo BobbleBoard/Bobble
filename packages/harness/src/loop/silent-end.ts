@@ -102,3 +102,15 @@ export function silentEndNudge(end: SilentEnd): string {
     'you made — or, if you cannot, say plainly what went wrong.'
   );
 }
+
+/**
+ * After the loop guard stops a turn: the person asked something and the chat
+ * shows "Done" over nothing. What the model is told once it is idle — the
+ * reason it was stopped, and to answer in words without the tool it was stuck on.
+ */
+export function loopAbortNudge(reason: string): string {
+  return (
+    `You were stopped: ${reason}. Do not run another tool for this. Answer what the user ` +
+    'asked now, in plain words — and if something you tried did not work, say so in one sentence.'
+  );
+}
