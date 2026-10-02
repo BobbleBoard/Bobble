@@ -121,6 +121,19 @@ describe('summarizeActivity', () => {
     expect(summarizeActivity(steps)).toBe('Worked for 1h 20m');
   });
 
+  it('"Worked for" is the chain\'s wall-clock span when that is longer (MEASURED: "52s" over sixteen minutes)', () => {
+    const steps: ActivityStepData[] = [
+      { kind: 'thinking', label: 't', durationMs: 30_000 },
+      { kind: 'bash', label: 'c' },
+      { kind: 'read', label: 'r' },
+      { kind: 'edit', label: 'e' },
+    ];
+    expect(summarizeActivity(steps)).toBe('Worked for 30s');
+    expect(summarizeActivity(steps, { wallMs: 16 * 60_000 })).toBe('Worked for 16m');
+    // Never shorter than what the steps themselves account for.
+    expect(summarizeActivity(steps, { wallMs: 5_000 })).toBe('Worked for 30s');
+  });
+
   it('returns an empty string for no steps', () => {
     expect(summarizeActivity([])).toBe('');
   });

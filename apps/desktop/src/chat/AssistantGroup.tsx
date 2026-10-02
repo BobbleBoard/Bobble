@@ -468,6 +468,9 @@ export function AssistantGroup({
    * taking over from its live one does not move.
    */
   const foot: ReactNode[] = [];
+  // When each block's request was sent (its message's timestamp): a chain's start.
+  const sentAt = new Map<unknown, number>();
+  for (const m of group) for (const b of m.blocks) sentAt.set(b, m.timestamp);
   const body = (
     /*
      * min-w-0 so this flex child can shrink below its content's intrinsic width
@@ -731,6 +734,9 @@ export function AssistantGroup({
               // this segment still being the last one — see `turnStreaming`.
               turnStreaming={streaming}
               turnStartedAt={group[0]?.timestamp}
+              {...(seg.blocks[0] !== undefined && sentAt.has(seg.blocks[0])
+                ? { chainStartedAt: sentAt.get(seg.blocks[0]) }
+                : {})}
               tps={tps}
               {...(onOpenFile !== undefined ? { onOpenFile } : {})}
               {...(inside.size > 0 ? { attachments: inside } : {})}

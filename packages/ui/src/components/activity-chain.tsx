@@ -526,7 +526,18 @@ export function chainIsDone(input: {
   return input.complete !== undefined ? input.complete && input.quiet : input.settledGuess;
 }
 
-export function summarizeActivity(steps: ActivityStepData[]): string {
+export function summarizeActivity(
+  steps: ActivityStepData[],
+  opts: {
+    /**
+     * The chain's wall-clock span, when the host knows it. MEASURED (Ling 3.0
+     * Tiny): "Worked for 52s" over a sixteen-minute turn — the steps' own
+     * durations leave out the prefills, the waits between calls and the
+     * guardian's pauses, which is most of a long turn.
+     */
+    readonly wallMs?: number;
+  } = {},
+): string {
   const agg = new Map<
     ActivityStepKind,
     { count: number; durationMs: number; failed: number; stopped: number }
@@ -567,7 +578,8 @@ export function summarizeActivity(steps: ActivityStepData[]): string {
      */
     const anyDone = steps.some((s) => s.failed !== true && s.status !== 'stopped');
     if (anyDone) {
-      const total = steps.reduce((sum, s) => sum + (s.durationMs ?? 0), 0);
+      const summed = steps.reduce((sum, s) => sum + (s.durationMs ?? 0), 0);
+      const total = Math.max(summed, opts.wallMs ?? 0);
       const d = formatDuration(total);
       return d !== '' ? `Worked for ${d}` : 'Worked';
     }
@@ -619,10 +631,13 @@ const RUNNING_PHRASE: Record<ActivityStepKind, string> = {
  * live chain never claims past-tense completion; once every step is done it
  * flips to the past-tense {@link summarizeActivity} roll-up. Pure + unit-tested.
  */
-export function activitySummary(steps: ActivityStepData[]): string {
+export function activitySummary(
+  steps: ActivityStepData[],
+  opts: { readonly wallMs?: number } = {},
+): string {
   if (steps.length === 0) return 'Working…';
   const running = steps.some((s) => s.status === 'running');
-  if (!running) return summarizeActivity(steps);
+  if (!running) return summarizeActivity(steps, opts);
   const current = [...steps].reverse().find((s) => s.status === 'running');
   if (current === undefined) return 'Working…';
   /*
@@ -1809,6 +1824,8 @@ export interface ActivityChainProps extends Omit<HTMLAttributes<HTMLDivElement>,
   defaultOpenStep?: number;
   /** Override the derived past-tense summary line. */
   summary?: ReactNode;
+  /** The chain's wall-clock span (first call's request to last result), for "Worked for". */
+  wallMs?: number;
   /** Activated for a step whose `opensInCanvas` is set. */
   onOpenCanvas?: (step: ActivityStepData, index: number) => void;
   /** Activated for a file-op step (read/edit/skill) to open its file in the canvas. */
@@ -1924,6 +1941,7 @@ export const ActivityChain = forwardRef<HTMLDivElement, ActivityChainProps>(func
     defaultOpenStep,
     resolveAppIcon,
     summary,
+    wallMs,
     onOpenCanvas,
     onOpenFile,
     prefill,
@@ -2073,7 +2091,7 @@ export const ActivityChain = forwardRef<HTMLDivElement, ActivityChainProps>(func
   const latest = useRef({ steps, onOpenCanvas, onOpenFile });
   latest.current = { steps, onOpenCanvas, onOpenFile };
 
-  const summaryText = summary ?? activitySummary(steps);
+  const summaryText = summary ?? activitySummary(steps, wallMs !== undefined ? { wallMs } : {});
 
   // Stable, index-free keys (dedupe repeated content with an occurrence suffix).
   const seen = new Map<string, number>();

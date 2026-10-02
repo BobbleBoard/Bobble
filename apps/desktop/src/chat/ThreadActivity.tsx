@@ -98,6 +98,7 @@ export function ThreadActivityChain({
   onOpenFile,
   chainKey,
   attachments,
+  chainStartedAt,
 }: {
   blocks: ActivityBlock[];
   /** Tool result keyed by tool-call id (owner-scoped by the caller). */
@@ -150,6 +151,8 @@ export function ThreadActivityChain({
    * call (turn-cards.ts); this only puts them in their rows.
    */
   attachments?: ReadonlyMap<string, ReactNode>;
+  /** When the request that began this chain was sent — its first block's message. */
+  chainStartedAt?: number;
 }): ReactNode {
   const canvas = useCanvasTabs();
   // The folder the TOOLS resolve a relative path against (the chat's working
@@ -180,6 +183,17 @@ export function ThreadActivityChain({
     return min === undefined ? ts : Math.min(min, ts);
   }, undefined);
   const hasTools = blocks.some((b) => b.type === 'toolCall');
+  // The chain's span: its first request to its last result — "Worked for" is that long.
+  const lastToolResultTs = blocks.reduce<number | undefined>((max, b) => {
+    if (b.type !== 'toolCall') return max;
+    const ts = resultForBlock.get(b.id)?.timestamp;
+    if (ts === undefined) return max;
+    return max === undefined ? ts : Math.max(max, ts);
+  }, undefined);
+  const wallMs =
+    !streaming && chainStartedAt !== undefined && lastToolResultTs !== undefined
+      ? Math.max(0, lastToolResultTs - chainStartedAt)
+      : undefined;
   // Thinking-only run: no tool result to bound the window, so estimate from the
   // thought length + live throughput (round-6 unify — same estimate the old
   // standalone-thought path used, now feeding the chain summary "Thought for X").
@@ -419,6 +433,7 @@ export function ThreadActivityChain({
       /* Real app icons: subscribing to the cache is what re-renders the row
          when the picture arrives, since it is fetched after the first paint. */
       resolveAppIcon={resolveAppIcon}
+      {...(wallMs !== undefined ? { wallMs } : {})}
       {...(streaming &&
       !runningFlags.some(Boolean) &&
       (prefillPct === null ? blocks.at(-1)?.type === 'toolCall' : prefillPct < 100)
