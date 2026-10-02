@@ -10,6 +10,7 @@ import {
   DIAGRAM_TOOL,
   diagramSlug,
   looksLikeMermaid,
+  plainTexLabels,
   registerDiagramTool,
   renderFailure,
   svgPathFor,
@@ -420,5 +421,43 @@ describe('the pure parts', () => {
     expect(text).toMatch(/the app could not draw it — the source is not the problem/);
     expect(text).toMatch(/Try the same call once more/);
     expect(text).not.toMatch(/simplify|could not read/);
+  });
+});
+
+describe('plainTexLabels — a diagram’s TeX, as characters', () => {
+  it('reads the labels Gemma 4 12B wrote (MEASURED, 2026-10-01)', () => {
+    const source = [
+      'flowchart TD',
+      '  E[Height of rectangle = Radius (r)] --> G[Area = Height $\\times$ Width]',
+      '  F[Width of rectangle = Half the Circumference ($\\pi r$)] --> G',
+      '  G --> H((Area = \\times \\pi r = \\pi r^2$))',
+    ].join('\n');
+    expect(plainTexLabels(source)).toBe(
+      [
+        'flowchart TD',
+        '  E[Height of rectangle = Radius (r)] --> G[Area = Height × Width]',
+        '  F[Width of rectangle = Half the Circumference (πr)] --> G',
+        '  G --> H((Area = × πr = πr²))',
+      ].join('\n'),
+    );
+  });
+
+  it('never touches a node id, an indent or a comment', () => {
+    const source = [
+      'mindmap',
+      '  root((Circles))',
+      '    step_1[Area $\\pi r^2$]',
+      '      leaf_2',
+      '%% $\\pi$ in a comment stays',
+    ].join('\n');
+    expect(plainTexLabels(source)).toBe(
+      [
+        'mindmap',
+        '  root((Circles))',
+        '    step_1[Area πr²]',
+        '      leaf_2',
+        '%% $\\pi$ in a comment stays',
+      ].join('\n'),
+    );
   });
 });

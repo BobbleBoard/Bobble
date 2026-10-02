@@ -33,6 +33,7 @@ import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { ExtensionAPI } from '@mariozechner/pi-coding-agent';
 import { diagramTheme, type Kit, kitById, loadProjectKit } from '@pi-desktop/design-kit';
+import { texPlain } from '@pi-desktop/mathviz';
 import { Type } from '@sinclair/typebox';
 import { mathFigureWords } from './handmade-math.js';
 
@@ -301,6 +302,26 @@ function sourceParam() {
   });
 }
 
+/**
+ * A DIAGRAM'S TeX, AS CHARACTERS. Mermaid draws a label's text as written, so a
+ * model's "$\\pi r$" came out with its dollar signs and backslash — MEASURED
+ * (Gemma 4 12B, 2026-10-01): "Area = \\times \\pi r = \\pi r^2$" in a node, and
+ * "$\\pi r^2$" in the title. A $…$ pair on a line is a formula and reads whole;
+ * outside one, only what can never be part of a node's id is read (commands,
+ * powers, a stray $), since an id may hold an underscore.
+ */
+export function plainTexLabels(source: string): string {
+  if (!/[$\\^]/.test(source)) return source;
+  return source
+    .split('\n')
+    .map((line) => {
+      if (!/[$\\^]/.test(line) || /^\s*%%/.test(line)) return line;
+      const paired = line.replace(/\$([^$]+)\$/g, (_m, inner: string) => texPlain(`$${inner}$`));
+      return /[$\\^]/.test(paired) ? texPlain(paired, { subscripts: false }) : paired;
+    })
+    .join('\n');
+}
+
 /** The words a Mermaid source can open with (after any %% comment lines). */
 const MERMAID_OPENING =
   /^\s*(?:```\s*(?:mermaid|mmd)?\s*\n\s*)?(?:%%[^\n]*\n\s*)*(?:flowchart|graph|sequenceDiagram|classDiagram|stateDiagram(?:-v2)?|erDiagram|journey|gantt|pie|mindmap|timeline|quadrantChart|gitGraph|sankey(?:-beta)?|requirementDiagram|C4\w+|block(?:-beta)?|architecture-beta|xychart-beta|packet-beta|kanban|radar-beta|treemap-beta)\b/;
@@ -374,7 +395,7 @@ export function registerDiagramTool(pi: ExtensionAPI, deps: DiagramToolDeps): vo
       const p = params as Record<string, unknown>;
       const root = deps.root(ctx?.cwd);
       let rawSource = typeof p.source === 'string' ? p.source : '';
-      let title = typeof p.title === 'string' ? p.title.trim() : '';
+      let title = typeof p.title === 'string' ? texPlain(p.title.trim()) : '';
       const sourceNotes: string[] = [];
       if (rawSource.trim() === '' && looksLikeMermaid(title)) {
         rawSource = title;
@@ -396,8 +417,10 @@ export function registerDiagramTool(pi: ExtensionAPI, deps: DiagramToolDeps): vo
         );
       }
       const subtitle =
-        typeof p.subtitle === 'string' && p.subtitle.trim() !== '' ? p.subtitle.trim() : undefined;
-      const source = await sourceFrom(rawSource, root, read);
+        typeof p.subtitle === 'string' && p.subtitle.trim() !== ''
+          ? texPlain(p.subtitle.trim())
+          : undefined;
+      const source = plainTexLabels(await sourceFrom(rawSource, root, read));
       const {
         kit,
         said,
@@ -502,7 +525,7 @@ export function registerDiagramTool(pi: ExtensionAPI, deps: DiagramToolDeps): vo
       const changed: string[] = [];
       let source = sidecar.source;
       if (typeof p.source === 'string' && p.source.trim() !== '') {
-        source = await sourceFrom(p.source, root, read);
+        source = plainTexLabels(await sourceFrom(p.source, root, read));
         changed.push('the source');
       }
       if (typeof p.direction === 'string' && p.direction.trim() !== '') {
@@ -513,10 +536,12 @@ export function registerDiagramTool(pi: ExtensionAPI, deps: DiagramToolDeps): vo
         }
         changed.push(`the direction (${p.direction.trim().toUpperCase()})`);
       }
-      const title = typeof p.title === 'string' ? p.title.trim() : sidecar.title;
+      const title = typeof p.title === 'string' ? texPlain(p.title.trim()) : sidecar.title;
       if (title !== sidecar.title) changed.push('the title');
       const subtitle =
-        typeof p.subtitle === 'string' ? p.subtitle.trim() || undefined : sidecar.subtitle;
+        typeof p.subtitle === 'string'
+          ? texPlain(p.subtitle.trim()) || undefined
+          : sidecar.subtitle;
       if (subtitle !== sidecar.subtitle) changed.push('the subtitle');
       const kitName = typeof p.kit === 'string' && p.kit.trim() !== '' ? p.kit : sidecar.kit;
       const { kit, said, notes: kitNotes } = await kitFor(deps, root, kitName);

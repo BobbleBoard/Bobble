@@ -26,7 +26,7 @@ import {
   runtimeSource,
   type Values,
 } from './runtime.js';
-import type { MathSpec, Role } from './spec.js';
+import { type MathSpec, type Role, texPlain } from './spec.js';
 
 /** KaTeX's stylesheet with the fonts a page actually uses, as data URIs. */
 let katexCss: string | undefined;
@@ -333,7 +333,7 @@ export function mathPage({ spec, compiled, start, kit }: PageInput): string {
   const script = `${runtimeSource()}\nvar MV_DATA = ${data};\nvar MV_E = ${evaluatorsScript(compiled)};\nmvMount(document, window, MV_DATA, MV_E);`;
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${mvEsc(spec.title)}</title>
+<title>${mvEsc(texPlain(spec.title))}</title>
 <style>${inlineKatexCss()}</style>
 <style>${css(kit)}</style>
 </head><body><main class="mv${spec.tell !== false && spec.steps.length > 1 ? ' mv-telling' : ''}">

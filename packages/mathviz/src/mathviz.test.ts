@@ -5,7 +5,7 @@ import { checkMath } from './checks';
 import { ALL, FOURIER, KINETIC, PYTHAGORAS, SHM } from './fixtures';
 import { renderMath } from './index';
 import { mvPathArrow, mvPiLabel, mvRuns, mvScene, mvSvg, mvTicks, runtimeSource } from './runtime';
-import { lenientJson, normalizeMathSpec, SpecError } from './spec';
+import { lenientJson, normalizeMathSpec, SpecError, texPlain } from './spec';
 
 const problems = (input: unknown) => renderMath(input).problems;
 const fixes = (input: unknown) => problems(input).filter((p) => p.level === 'fix');
@@ -1593,3 +1593,30 @@ describe('the 4B’s seventh round (2026-09-26)', () => {
 function mvEvalFor(c: ReturnType<typeof compileSpec>, v: unknown): number {
   return typeof v === 'number' ? v : (c.E[String(v)]?.({}) ?? Number.NaN);
 }
+
+describe('texPlain — TeX as the characters it draws, for text that is never typeset', () => {
+  it('reads the labels Gemma 4 12B wrote into a flowchart and a page title (MEASURED)', () => {
+    expect(texPlain('Why the Area of a Circle is $\\pi r^2$')).toBe(
+      'Why the Area of a Circle is πr²',
+    );
+    expect(texPlain('Area = Height $\\times$ Width')).toBe('Area = Height × Width');
+    expect(texPlain('Area = \\times \\pi r = \\pi r^2$')).toBe('Area = × πr = πr²');
+    expect(texPlain('Width = Half the Circumference ($\\pi r$)')).toBe(
+      'Width = Half the Circumference (πr)',
+    );
+    expect(texPlain('The outermost ring has length $2\\pi r$')).toBe(
+      'The outermost ring has length 2πr',
+    );
+  });
+
+  it('writes powers and subscripts that have a character, and leaves the rest', () => {
+    expect(texPlain('$x_0$ and $v^{2}$, $x^{-1}$')).toBe('x₀ and v², x⁻¹');
+    expect(texPlain('$e^{i\\pi}$')).toBe('e^{iπ}');
+  });
+
+  it('leaves a backslash word it does not know, and plain text, as written', () => {
+    expect(texPlain('Line one\\nLine two')).toBe('Line one\\nLine two');
+    expect(texPlain('Start with a circle')).toBe('Start with a circle');
+    expect(texPlain('$\\theta \\cdot r$')).toBe('θ · r');
+  });
+});

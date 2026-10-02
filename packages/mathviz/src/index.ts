@@ -32,6 +32,7 @@ export {
   type MathSpec,
   normalizeMathSpec,
   SpecError,
+  texPlain,
   texSafeJson,
   withoutEmoji,
 } from './spec.js';

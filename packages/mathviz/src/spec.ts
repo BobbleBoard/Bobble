@@ -419,6 +419,85 @@ export function texLabel(s: string | undefined): string | undefined {
     .trim();
 }
 
+const SUPERSCRIPT: Readonly<Record<string, string>> = {
+  '0': '⁰',
+  '1': '¹',
+  '2': '²',
+  '3': '³',
+  '4': '⁴',
+  '5': '⁵',
+  '6': '⁶',
+  '7': '⁷',
+  '8': '⁸',
+  '9': '⁹',
+  n: 'ⁿ',
+  i: 'ⁱ',
+  '+': '⁺',
+  '-': '⁻',
+  '(': '⁽',
+  ')': '⁾',
+};
+const SUBSCRIPT: Readonly<Record<string, string>> = {
+  '0': '₀',
+  '1': '₁',
+  '2': '₂',
+  '3': '₃',
+  '4': '₄',
+  '5': '₅',
+  '6': '₆',
+  '7': '₇',
+  '8': '₈',
+  '9': '₉',
+};
+const scriptOf = (map: Readonly<Record<string, string>>, body: string): string | null => {
+  let out = '';
+  for (const ch of body) {
+    const c = map[ch];
+    if (c === undefined) return null;
+    out += c;
+  }
+  return out;
+};
+
+/**
+ * TeX as the plain characters it draws, for text that is never typeset — a
+ * page's <title> (the card that names it in the chat), a diagram's labels.
+ * MEASURED (Gemma 4 12B, 2026-10-01): a flowchart node read "Area = \times
+ * \pi r = \pi r^2$" and the page's card "Why the Area of a Circle is
+ * $\pi r^2$". Unlike {@link texLabel}, a backslash word it does not know is
+ * left as written (a diagram's text may hold a \n), and powers and
+ * subscripts with a character for them become it: r^2 → r², x_0 → x₀.
+ */
+export function texPlain(s: string, opts: { readonly subscripts?: boolean } = {}): string {
+  if (!/[$\\^_]/.test(s)) return s;
+  const subscripts = opts.subscripts !== false;
+  return (
+    s
+      .replace(/\\frac\{([^{}]*)\}\{([^{}]*)\}/g, '$1/$2')
+      .replace(/\\sqrt\{([^{}]*)\}/g, '√$1')
+      .replace(/\\(?:vec|mathbf|mathrm|text|textbf|operatorname)\{([^{}]*)\}/g, '$1')
+      // TeX drops the space after a letter's command: \pi r is πr; × and → keep theirs.
+      .replace(
+        /\\([A-Za-z]+)(?![A-Za-z])( +(?=[A-Za-z0-9(]))?/g,
+        (m, name: string, gap?: string) => {
+          const ch = TEX_LABEL[name];
+          if (ch === undefined) return m;
+          return /\p{L}/u.test(ch) ? ch : `${ch}${gap ?? ''}`;
+        },
+      )
+      .replace(/\^\{([^{}]{1,6})\}|\^([+-]?[0-9]|n)/g, (m, braced?: string, bare?: string) => {
+        return scriptOf(SUPERSCRIPT, braced ?? bare ?? '') ?? m;
+      })
+      .replace(/_\{([0-9]{1,3})\}|_([0-9])(?![0-9A-Za-z])/g, (m, braced?: string, bare?: string) =>
+        subscripts ? (scriptOf(SUBSCRIPT, braced ?? bare ?? '') ?? m) : m,
+      )
+      .replace(/\$/g, '')
+      .replace(/\\,|\\;|\\!/g, ' ')
+      // Runs of spaces inside the text only: a line's indent may be its meaning (a mind map).
+      .replace(/(\S)[ \t]{2,}/g, '$1 ')
+  );
+}
+
 const ROLES: readonly Role[] = ['main', 'second', 'third', 'reference', 'highlight'];
 function role(v: unknown, fallback: Role): Role {
   const s = str(v)?.toLowerCase();
