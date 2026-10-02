@@ -16,13 +16,17 @@ export interface FrameGate {
 /**
  * Host-side patch dispatcher. Buffers the latest HTML until the harness reports
  * `ready`, coalesces bursts to the newest snapshot, and stamps a monotonic seq.
- * Pure and framework-free so the buffer/ready/seq contract is unit-tested
- * without a real iframe (which jsdom cannot script).
+ * A frame that reports `ready` again has started over (the harness restarts
+ * itself when a page's scripts would not survive a patch) and is empty, so it
+ * gets the newest snapshot again. Pure and framework-free so the
+ * buffer/ready/seq contract is unit-tested without a real iframe (which jsdom
+ * cannot script).
  */
 export class HtmlSurfaceController {
   #seq = 0;
   #ready = false;
   #pending: string | null = null;
+  #latest: string | null = null;
   readonly #gate: FrameGate;
 
   constructor(gate: FrameGate) {
@@ -35,6 +39,7 @@ export class HtmlSurfaceController {
     const message: FrameToHostMessage = data;
     if (message.type === 'ready') {
       this.#ready = true;
+      if (this.#pending === null) this.#pending = this.#latest;
       this.#flush();
     }
   }
@@ -42,11 +47,13 @@ export class HtmlSurfaceController {
   /** Set the current HTML snapshot; sends immediately if the frame is ready. */
   setHtml(html: string): void {
     this.#pending = html;
+    this.#latest = html;
     this.#flush();
   }
 
   reset(): void {
     this.#pending = null;
+    this.#latest = null;
     this.#gate.postToFrame({ channel: PD_CANVAS_CHANNEL, type: 'reset' });
   }
 

@@ -51,25 +51,71 @@ function preserveLiveValue(fromEl: Element, toEl: Element): void {
 }
 
 /** Re-create a `<script>` so it executes (innerHTML-inserted scripts are inert). */
-function reviveScript(script: HTMLScriptElement): void {
+function reviveScript(
+  script: HTMLScriptElement,
+  onRun?: (script: HTMLScriptElement) => void,
+): void {
   const revived = script.ownerDocument.createElement('script');
   for (const attr of Array.from(script.attributes)) {
     revived.setAttribute(attr.name, attr.value);
   }
   revived.textContent = script.textContent;
   script.replaceWith(revived);
+  onRun?.(revived);
 }
 
-function reviveScriptsIn(node: Node): void {
+function reviveScriptsIn(node: Node, onRun?: (script: HTMLScriptElement) => void): void {
   if (node instanceof HTMLScriptElement) {
-    reviveScript(node);
+    reviveScript(node, onRun);
     return;
   }
   if (node instanceof Element) {
     for (const script of Array.from(node.querySelectorAll('script'))) {
-      reviveScript(script);
+      reviveScript(script, onRun);
     }
   }
+}
+
+/** A script as it stands: what it would run (its attributes and its text). */
+export function scriptKey(script: Element): string {
+  const attrs = Array.from(script.attributes, (a) => `${a.name}=${a.value}`).join(' ');
+  return `${attrs}\n${script.textContent ?? ''}`;
+}
+
+/** What a form field holds is the reader's (the patch keeps it), not the page's markup. */
+const FORM_STATE = new Set(['value', 'checked', 'selected']);
+const FORM_FIELDS = new Set(['INPUT', 'TEXTAREA', 'SELECT', 'OPTION']);
+
+/**
+ * Whether two lists of nodes are the same markup — tags, attributes, text — leaving
+ * out what a reader typed or ticked into a form field. Used to tell whether a page's
+ * own scripts have changed what its snapshot drew.
+ */
+export function sameMarkup(a: NodeListOf<ChildNode>, b: NodeListOf<ChildNode>): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    const x = a[i];
+    const y = b[i];
+    if (x === undefined || y === undefined) return false;
+    if (x.nodeType !== y.nodeType || x.nodeName !== y.nodeName) return false;
+    if (x.nodeType !== 1) {
+      if (x.nodeValue !== y.nodeValue) return false;
+      continue;
+    }
+    const ex = x as Element;
+    const ey = y as Element;
+    const field = FORM_FIELDS.has(ex.tagName);
+    const attrs = (el: Element) =>
+      Array.from(el.attributes)
+        .filter((at) => !(field && FORM_STATE.has(at.name)))
+        .map((at) => `${at.name}=${at.value}`)
+        .sort()
+        .join('\u0000');
+    if (attrs(ex) !== attrs(ey)) return false;
+    if (ex.tagName === 'TEXTAREA') continue;
+    if (!sameMarkup(ex.childNodes, ey.childNodes)) return false;
+  }
+  return true;
 }
 
 /**
@@ -88,6 +134,20 @@ function normalizeToBodyMarkup(html: string): string {
 export interface ApplyHtmlPatchOptions {
   /** Execute `<script>` elements that appear in the patch. Default: true. */
   runScripts?: boolean;
+  /** Called with each script the patch ran, once it has run. */
+  onScriptRun?: (script: HTMLScriptElement) => void;
+  /** The snapshot already parsed by {@link parseSnapshot} — consumed by the morph. */
+  template?: HTMLElement;
+}
+
+/**
+ * The snapshot as markup alone — what the page is before any of its scripts
+ * run — built as a detached mirror of `root` (same tag), ready to morph toward.
+ */
+export function parseSnapshot(root: HTMLElement, html: string): HTMLElement {
+  const template = root.ownerDocument.createElement(root.tagName);
+  template.innerHTML = normalizeToBodyMarkup(html);
+  return template;
 }
 
 /**
@@ -117,8 +177,7 @@ export function applyHtmlPatch(
 
   // Build the target as a detached mirror of `root` so childrenOnly morphs only
   // the content and leaves `root` itself (its scroll, listeners) untouched.
-  const template = doc.createElement(root.tagName);
-  template.innerHTML = normalizeToBodyMarkup(html);
+  const template = options.template ?? parseSnapshot(root, html);
 
   morphdom(root, template, {
     childrenOnly: true,
@@ -133,7 +192,7 @@ export function applyHtmlPatch(
       return true;
     },
     onNodeAdded(node) {
-      if (runScripts) reviveScriptsIn(node);
+      if (runScripts) reviveScriptsIn(node, options.onScriptRun);
       return node;
     },
   });

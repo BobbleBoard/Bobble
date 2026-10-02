@@ -1,10 +1,17 @@
-import { applyHtmlPatch } from './patcher.ts';
+import { applyHtmlPatch, parseSnapshot, sameMarkup, scriptKey } from './patcher.ts';
 import { type FrameToHostMessage, isHostToFrameMessage, PD_CANVAS_CHANNEL } from './protocol.ts';
 
 export interface StartHarnessOptions {
   /** Where patched content is mounted. Defaults to `win.document.body`. */
   root?: HTMLElement;
+  /** Start the frame over, in a fresh realm. Defaults to reloading the frame's page. */
+  restart?: () => void;
+  /** How long patches must pause (a write still streaming) before a restart. */
+  settleMs?: number;
 }
+
+/** A write streams a patch every few hundred ms at most; past this it has settled. */
+const SETTLE_MS = 600;
 
 /**
  * Boot the in-iframe harness runtime against a window. Wires the `pd-canvas`
@@ -19,6 +26,16 @@ export interface StartHarnessOptions {
  */
 export function startHarness(win: Window, options: StartHarnessOptions = {}): () => void {
   const root = options.root ?? win.document.body;
+  const restart =
+    options.restart ??
+    ((): void => {
+      try {
+        win.location.reload();
+      } catch {
+        // A frame that cannot reload keeps the page it has.
+      }
+    });
+  const settleMs = options.settleMs ?? SETTLE_MS;
 
   const post = (message: FrameToHostMessage): void => {
     win.parent.postMessage(message, '*');
@@ -86,6 +103,52 @@ export function startHarness(win: Window, options: StartHarnessOptions = {}): ()
   }
   win.addEventListener('load', schedule);
 
+  /*
+   * A PAGE WHOSE SCRIPTS HAVE RUN cannot always be patched in place. The morph
+   * brings the markup back to the snapshot, and a script never runs twice: what
+   * the script built — a figure it drew, the step it moved to — is undone and
+   * nothing builds it again. (A maths page sent again after it had played sat on
+   * its first step for good.) So once scripts have run, a patch that lands on
+   * markup the page itself changed, or that changes or drops a script that ran,
+   * marks the frame stale: its scripts stop running in this realm, and when the
+   * patches settle the frame starts over — the host sends the newest snapshot
+   * to the fresh one. The same snapshot again changes nothing.
+   */
+  let lastHtml: string | null = null;
+  let pristine: HTMLElement | null = null;
+  const ran: string[] = [];
+  let stale = false;
+  let settle: number | undefined;
+  const startOver = (): void => {
+    win.clearTimeout(settle);
+    settle = win.setTimeout(restart, settleMs);
+  };
+  const applySnapshot = (html: string): void => {
+    if (lastHtml !== null && html.trim() === lastHtml.trim()) return;
+    const template = parseSnapshot(root, html);
+    if (ran.length > 0) {
+      // What the page changed itself is about to be undone.
+      if (pristine !== null && !sameMarkup(root.childNodes, pristine.childNodes)) stale = true;
+      // A script that ran and is no longer in the page, as it ran.
+      const next = Array.from(template.querySelectorAll('script'), scriptKey);
+      for (const key of ran) {
+        const at = next.indexOf(key);
+        if (at === -1) stale = true;
+        else next.splice(at, 1);
+      }
+    }
+    pristine = template.cloneNode(true) as HTMLElement;
+    applyHtmlPatch(root, html, {
+      template,
+      runScripts: !stale,
+      onScriptRun: (script) => {
+        ran.push(scriptKey(script));
+      },
+    });
+    lastHtml = html;
+    if (stale) startOver();
+  };
+
   const onMessage = (event: MessageEvent): void => {
     if (event.source !== win.parent) return;
     const data: unknown = event.data;
@@ -98,11 +161,19 @@ export function startHarness(win: Window, options: StartHarnessOptions = {}): ()
     if (data.type === 'reset') {
       root.replaceChildren();
       post({ channel: PD_CANVAS_CHANNEL, type: 'applied', seq: -1 });
+      lastHtml = null;
+      pristine = null;
+      // What ran is still running; an empty page starts in a fresh realm.
+      if (ran.length > 0) {
+        stale = true;
+        win.clearTimeout(settle);
+        restart();
+      }
       return;
     }
     // data.type === 'patch'
     try {
-      applyHtmlPatch(root, data.html);
+      applySnapshot(data.html);
       post({ channel: PD_CANVAS_CHANNEL, type: 'applied', seq: data.seq });
       watch();
       schedule();

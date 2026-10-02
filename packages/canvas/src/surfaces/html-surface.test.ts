@@ -49,4 +49,26 @@ describe('HtmlSurfaceController', () => {
     controller.setHtml('x');
     expect(posted).toHaveLength(0);
   });
+
+  it('sends the newest snapshot again to a frame that started over (ready again)', () => {
+    const { posted, controller } = collector();
+    controller.handleFrameMessage({ channel: 'pd-canvas', type: 'ready' });
+    controller.setHtml('one');
+    controller.setHtml('two');
+    controller.handleFrameMessage({ channel: 'pd-canvas', type: 'ready' });
+    expect(posted.filter((m) => m.type === 'patch')).toMatchObject([
+      { html: 'one', seq: 1 },
+      { html: 'two', seq: 2 },
+      { html: 'two', seq: 3 },
+    ]);
+  });
+
+  it('a frame ready again after a reset gets nothing', () => {
+    const { posted, controller } = collector();
+    controller.handleFrameMessage({ channel: 'pd-canvas', type: 'ready' });
+    controller.setHtml('one');
+    controller.reset();
+    controller.handleFrameMessage({ channel: 'pd-canvas', type: 'ready' });
+    expect(posted.filter((m) => m.type === 'patch')).toHaveLength(1);
+  });
 });
