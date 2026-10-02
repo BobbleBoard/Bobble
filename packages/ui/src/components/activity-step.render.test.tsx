@@ -474,3 +474,17 @@ describe('ActivityStep — reveals for the rows that used to be dead', () => {
     expect(html).toContain('&quot;hi&quot;');
   });
 });
+
+describe('a collapsed row carries no details (MEASURED: a 183-step turn, 11.7k nodes)', () => {
+  it('makes its output only when it is opened', () => {
+    const bash: ActivityStepData = {
+      kind: 'bash',
+      label: 'Ran a command',
+      detail: 'pytest -q',
+      command: 'pytest -q',
+      output: '2 passed in 0.10s',
+    };
+    expect(render(bash, false)).not.toContain('2 passed in 0.10s');
+    expect(render(bash, true)).toContain('2 passed in 0.10s');
+  });
+});

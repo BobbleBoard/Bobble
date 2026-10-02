@@ -1,6 +1,6 @@
 import { clsx } from 'clsx';
 import type { HTMLAttributes, ReactNode } from 'react';
-import { forwardRef, useEffect, useRef, useState } from 'react';
+import { forwardRef, memo, useEffect, useRef, useState } from 'react';
 import { DiffStat } from './activity.tsx';
 import { writeClipboardText } from './copy-button.tsx';
 import { type DiffFileData, DiffView } from './diff-view.tsx';
@@ -1483,6 +1483,14 @@ export const ActivityStep = forwardRef<HTMLDivElement, ActivityStepProps>(functi
   // the WHOLE row into a disclosure control (the user round-2 #2): click to reveal the
   // full arg + the result/output.
   const disclosable = !canvas && !inline && hasInlineContent(data);
+  /*
+   * A ROW'S DETAILS ARE MADE WHEN IT IS FIRST OPENED, not with the row — then
+   * kept, so closing it still rolls shut. MEASURED (MiniCPM 5 2B, a 183-step
+   * turn): every collapsed row carried its whole output, ~64 nodes a step, 11.7k
+   * for the turn, all re-laid-out on every streamed token.
+   */
+  const [opened, setOpened] = useState(expanded);
+  if (expanded && !opened) setOpened(true);
   const canvasTag = data.tag ?? (data.filename ? basename(data.filename) : undefined);
   // The edit step carries its ±stat right beside the label (round-5 #12).
   const editStat = data.kind === 'edit' ? editTotals(data) : null;
@@ -1729,14 +1737,16 @@ export const ActivityStep = forwardRef<HTMLDivElement, ActivityStepProps>(functi
       {disclosable ? (
         <div className="pd-chain-reveal" data-open={expanded}>
           <div className="pd-chain-reveal-inner">
-            <div className="pd-chain-step-content pd-scroll">
-              {argHeader ? (
-                <div className="pd-chain-arg" title={detail}>
-                  {detail}
-                </div>
-              ) : null}
-              <StepContent step={data} />
-            </div>
+            {opened ? (
+              <div className="pd-chain-step-content pd-scroll">
+                {argHeader ? (
+                  <div className="pd-chain-arg" title={detail}>
+                    {detail}
+                  </div>
+                ) : null}
+                <StepContent step={data} />
+              </div>
+            ) : null}
           </div>
         </div>
       ) : null}
@@ -1751,6 +1761,24 @@ export const ActivityStep = forwardRef<HTMLDivElement, ActivityStepProps>(functi
     </div>
   );
 });
+
+/**
+ * A ROW RE-RENDERS ONLY WHEN WHAT IT SHOWS CHANGED. MEASURED (MiniCPM 5 2B, a
+ * 26-minute turn of 183 steps): every streamed token re-rendered every row —
+ * 130 ms an update at 183 steps, growing with the turn — until the window
+ * stopped painting at all. A settled step keeps its data object across renders
+ * (the host's job), so a row is skipped unless its data, its open state, the
+ * chain's liveness or the icon resolver moved; its handlers read the chain's
+ * latest props, so a skipped row never acts on stale ones.
+ */
+const ChainRow = memo(
+  ActivityStep,
+  (a, b) =>
+    a.data === b.data &&
+    a.expanded === b.expanded &&
+    a.live === b.live &&
+    a.resolveAppIcon === b.resolveAppIcon,
+);
 
 /* ------------------------------------------------------------------ */
 /* ActivityChain                                                       */
@@ -2041,6 +2069,9 @@ export const ActivityChain = forwardRef<HTMLDivElement, ActivityChainProps>(func
     onExpandedChange?.(next);
   };
   const toggleStep = (index: number) => setOpenStep((cur) => (cur === index ? null : index));
+  /* What a row's handlers act on: always this render's props (see ChainRow). */
+  const latest = useRef({ steps, onOpenCanvas, onOpenFile });
+  latest.current = { steps, onOpenCanvas, onOpenFile };
 
   const summaryText = summary ?? activitySummary(steps);
 
@@ -2081,15 +2112,22 @@ export const ActivityChain = forwardRef<HTMLDivElement, ActivityChainProps>(func
         <div className="pd-chain-reveal-inner">
           <div className="pd-chain-steps">
             {renderSteps.map(({ step, index, key }) => (
-              <ActivityStep
+              <ChainRow
                 key={key}
                 data={step}
                 expanded={openStep === index}
                 live={active}
                 onToggle={() => toggleStep(index)}
-                onOpenCanvas={() => onOpenCanvas?.(step, index)}
+                onOpenCanvas={() =>
+                  latest.current.onOpenCanvas?.(latest.current.steps[index] ?? step, index)
+                }
                 {...(resolveAppIcon === undefined ? {} : { resolveAppIcon })}
-                {...(onOpenFile !== undefined ? { onOpenFile: () => onOpenFile(step, index) } : {})}
+                {...(onOpenFile !== undefined
+                  ? {
+                      onOpenFile: () =>
+                        latest.current.onOpenFile?.(latest.current.steps[index] ?? step, index),
+                    }
+                  : {})}
               />
             ))}
             {/* PREFILL, as the chain's last step. Same ring the thread indicator

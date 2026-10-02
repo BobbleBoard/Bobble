@@ -17,7 +17,7 @@
 import { useCanvasTabs } from '@pi-desktop/canvas';
 import type { ToolResultMsg } from '@pi-desktop/engine';
 import { ActivityChain } from '@pi-desktop/ui';
-import { type ReactNode, useRef } from 'react';
+import { type ReactNode, useMemo, useRef } from 'react';
 import { useCanvasStore } from '../state/canvas-store';
 import { useLlmStore } from '../state/llm-store';
 import { usePiStore } from '../state/pi-slice';
@@ -232,8 +232,11 @@ export function ThreadActivityChain({
   const harness = useHarnessStatus();
   /* "Starting up" belongs to the FIRST reply of a conversation — after that the
      model is resident and the wait is something else. */
-  // Subscribe so a newly-arrived icon repaints the rows that wanted it.
-  useAppIconStore((st) => st.icons);
+  // Subscribe so a newly-arrived icon repaints the rows that wanted it: a new
+  // resolver identity is what tells a memoized row (ActivityChain) to look again.
+  const icons = useAppIconStore((st) => st.icons);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the icons are the resolver's identity.
+  const resolveAppIcon = useMemo(() => (app: string) => appIconSrc(app), [icons]);
   const firstAssistantTurn = usePiStore(
     (st) => st.messages.filter((m) => m.kind === 'assistant').length <= 1,
   );
@@ -258,8 +261,37 @@ export function ThreadActivityChain({
   /* A thinking block that is only a chat-template marker renders as a "Thought"
    * row with nothing under it — the user saw three in a row. Drop them before they
    * become steps, so they also stop inflating the collapsed summary's count. */
+  /*
+   * A SETTLED STEP KEEPS ITS DATA OBJECT across renders, so its row (memoized
+   * in ActivityChain) is skipped while the turn streams on below it — MEASURED
+   * (MiniCPM 5 2B, 183 steps): every token re-mapped and re-rendered every row,
+   * 130 ms an update, until the window stopped painting. A step is mapped again
+   * only when something it is made from moved.
+   */
+  const stepCache = useRef(new Map<string, { inputs: readonly unknown[]; step: MappedStep }>());
   const steps: MappedStep[] = blocks.map((block, i) => {
     const running = runningFlags[i] ?? false;
+    const id = block.type === 'thinking' ? `${chainScope}:thinking:${i}` : block.id;
+    const attachment = block.type === 'toolCall' ? attachments?.get(block.id) : undefined;
+    const inputs: readonly unknown[] =
+      block.type === 'thinking'
+        ? [block, running, !streaming && i === firstThinkingIdx ? thinkingMs : undefined]
+        : [
+            block,
+            resultForBlock.get(block.id),
+            running,
+            running ? partials[block.id] : undefined,
+            runningToolCalls.includes(block.id),
+            attachment,
+          ];
+    const hit = stepCache.current.get(id);
+    if (
+      hit !== undefined &&
+      hit.inputs.length === inputs.length &&
+      hit.inputs.every((v, k) => Object.is(v, inputs[k]))
+    ) {
+      return hit.step;
+    }
     const mapped =
       block.type === 'thinking'
         ? mapThinkingStep(
@@ -315,12 +347,12 @@ export function ThreadActivityChain({
     // same-kind row settled, remounting a row that was still RUNNING and
     // restarting its spinner mid-turn. A tool call's id never moves; a thinking
     // block has none, so its slot in the append-only block list stands in.
-    const id = block.type === 'thinking' ? `${chainScope}:thinking:${i}` : block.id;
-    const attachment = block.type === 'toolCall' ? attachments?.get(block.id) : undefined;
-    return {
+    const step: MappedStep = {
       ...mapped,
       data: { ...mapped.data, id, ...(attachment !== undefined ? { attachment } : {}) },
     };
+    stepCache.current.set(id, { inputs, step });
+    return step;
   });
 
   return (
@@ -386,7 +418,7 @@ export function ThreadActivityChain({
        */
       /* Real app icons: subscribing to the cache is what re-renders the row
          when the picture arrives, since it is fetched after the first paint. */
-      resolveAppIcon={appIconSrc}
+      resolveAppIcon={resolveAppIcon}
       {...(streaming &&
       !runningFlags.some(Boolean) &&
       (prefillPct === null ? blocks.at(-1)?.type === 'toolCall' : prefillPct < 100)

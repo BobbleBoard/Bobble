@@ -379,6 +379,14 @@ describe('a subagent’s tool shows its RESULT, exactly as the chat does', () =>
       ]),
     );
     expect(container.textContent).toContain('pytest -q');
+    // A row's output is made when the row is opened (activity-chain ChainRow) — open it, as a person would.
+    const row = [...container.querySelectorAll<HTMLButtonElement>('button[aria-expanded]')].find(
+      (b) => b.textContent?.includes('pytest -q'),
+    );
+    expect(row).toBeDefined();
+    await act(async () => {
+      row?.click();
+    });
     expect(container.textContent).toContain('2 passed in 0.10s');
     await unmount();
   });
