@@ -1,3 +1,4 @@
+import { normalizeMathSpec } from '@pi-desktop/mathviz';
 import { describe, expect, it } from 'vitest';
 import {
   countInlineDrawnSvgs,
@@ -10,6 +11,7 @@ import {
   inlineSvgRoute,
   isDiagramShaped,
   isHandwrittenSvg,
+  MATH_SPEC_SHAPE,
 } from './handwritten-svg.js';
 
 const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M1 1"/></svg>';
@@ -380,6 +382,13 @@ describe('a maths or physics figure drawn by hand routes to math', () => {
     );
     expect(why).toContain('sin_derivative.math.json — it is drawn the moment it is written');
     expect(why).toContain('write the same file again UNCHANGED');
+    // The shape of a spec rides in the refusal itself (MEASURED: Ling never ran --help).
+    expect(why).toContain(MATH_SPEC_SHAPE);
+  });
+
+  it('hands over a spec shape that is a real spec — math draws it', () => {
+    const spec = JSON.parse(MATH_SPEC_SHAPE.replaceAll('…', 'a circle')) as Record<string, unknown>;
+    expect(() => normalizeMathSpec(spec)).not.toThrow();
   });
 
   it('a flow chart is still a diagram, and a logo with one such word is let through', () => {

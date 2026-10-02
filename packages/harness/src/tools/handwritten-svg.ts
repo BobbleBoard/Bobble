@@ -292,6 +292,23 @@ export function handwrittenDiagramRefusal(
 }
 
 /**
+ * A whole spec, small — the shape a refusal hands over AT the refusal.
+ * MEASURED (Ling 3.0 Tiny, 2026-10-01): told "`math --help` shows a whole
+ * spec", it never ran it; it read the refusal as a bug in the write tool and
+ * spent the rest of its window trying to get the same SVG past it. The 4B's
+ * lesson (a tool result at the call moves it where a guideline did not) is
+ * that the example belongs in the result.
+ */
+export const MATH_SPEC_SHAPE = [
+  '{"title": "…",',
+  ' "figure": {"view": {"x": "-2..2", "y": "-1.5..1.5"},',
+  '   "shapes": [{"id": "disc", "kind": "circle", "center": [0, 0], "r": 1, "fill": "main-light", "label": "…"},',
+  '              {"id": "r", "kind": "segment", "from": [0, 0], "to": [1, 0], "label": "r"}]},',
+  ' "steps": [{"text": "… the {disc} …", "highlight": ["disc"]},',
+  '           {"text": "… its radius {r} …", "highlight": ["r"]}]}',
+].join('\n');
+
+/**
  * The refusal for a maths or physics figure typed as SVG: the math command,
  * and the file that draws it the moment it is written (math-tool.ts).
  */
@@ -307,7 +324,9 @@ export function handwrittenMathRefusal(
   return [
     `Not ${opts.edit === true ? 'edited' : 'written'}: ${what}. The math command draws it in the app's style: its labels placed so none overlap, the whole checked, and the explanation's steps tied to its parts, with sliders and Play if anything moves.`,
     '',
-    `Write the figure as a spec to ${stem}.math.json — it is drawn the moment it is written, and its checks come back. \`math --help\` shows a whole spec; the shapes are points, segments, vectors, polygons, circles, angles, dimensions, labels, springs and boxes, at x, y coordinates.`,
+    `Write the figure as a spec to ${stem}.math.json — it is drawn the moment it is written, and its checks come back. The shape of one, for a figure and two steps (your own shapes, words and numbers go in it):`,
+    MATH_SPEC_SHAPE,
+    'The shapes are points, segments, vectors, polygons, circles, rects, angles, dimensions, labels, springs and boxes, at x, y coordinates; `math --help` shows the rest (sliders, curves, moving parts).',
     '',
     `If this exact markup is truly wanted (a fixture, a sample), ${opts.edit === true ? 'apply the same edit' : opts.bash === true ? 'run the same command' : 'write the same file'} again UNCHANGED.`,
   ].join('\n');
