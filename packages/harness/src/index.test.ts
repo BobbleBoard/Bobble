@@ -87,6 +87,7 @@ function makeFakePi(toolNames: string[]) {
     appendEntry: (customType: string, data: unknown) => {
       entries.push({ type: 'custom', customType, data });
     },
+    sendUserMessage: vi.fn(),
   } as unknown as ExtensionAPI;
 
   return {
@@ -99,6 +100,7 @@ function makeFakePi(toolNames: string[]) {
     getPlanTool: () => planTool,
     getActiveTools: () => activeTools,
     setActiveTools: pi.setActiveTools as unknown as ReturnType<typeof vi.fn>,
+    sendUserMessage: pi.sendUserMessage as unknown as ReturnType<typeof vi.fn>,
   };
 }
 
@@ -256,6 +258,46 @@ describe('wireHarness', () => {
     // Post-turn work still runs, detached: the naming pass fires on this turn
     // (no title yet) and shares the same never-resolving callModel.
     expect(reviewCalled).toBe(true);
+  });
+
+  it('an empty reply is nudged once the agent is idle — never while pi still counts it streaming', async () => {
+    // MEASURED: sent from agent_end while pi still counted the agent as
+    // streaming, the nudge threw "Agent is already processing" and reached the
+    // person as an error toast instead of reaching the model.
+    const f = makeFakePi(['read']);
+    wireHarness(f.pi, { postTurnDelayMs: 60_000 });
+    const { ctx } = makeCtx(f.entries);
+    let idle = false;
+    (ctx as unknown as { isIdle: () => boolean }).isIdle = () => idle;
+    await f.fire('session_start', { type: 'session_start', reason: 'startup' }, ctx);
+    await f.fire('agent_start', { type: 'agent_start' }, ctx);
+    const asked = { role: 'user', content: [{ type: 'text', text: 'why only half?' }] };
+    const empty = { role: 'assistant', stopReason: 'stop', content: [] };
+    await f.fire('agent_end', { type: 'agent_end', messages: [asked, empty] }, ctx);
+    expect(f.sendUserMessage).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(100);
+    expect(f.sendUserMessage).not.toHaveBeenCalled();
+    idle = true;
+    await vi.advanceTimersByTimeAsync(30);
+    expect(f.sendUserMessage).toHaveBeenCalledTimes(1);
+    expect(String(f.sendUserMessage.mock.calls[0]?.[0])).toMatch(/Answer them now\.$/);
+  });
+
+  it('a nudge waiting for idle is dropped when the person starts a run of their own', async () => {
+    const f = makeFakePi(['read']);
+    wireHarness(f.pi, { postTurnDelayMs: 60_000 });
+    const { ctx } = makeCtx(f.entries);
+    let idle = false;
+    (ctx as unknown as { isIdle: () => boolean }).isIdle = () => idle;
+    await f.fire('session_start', { type: 'session_start', reason: 'startup' }, ctx);
+    await f.fire('agent_start', { type: 'agent_start' }, ctx);
+    const asked = { role: 'user', content: [{ type: 'text', text: 'why only half?' }] };
+    const empty = { role: 'assistant', stopReason: 'stop', content: [] };
+    await f.fire('agent_end', { type: 'agent_end', messages: [asked, empty] }, ctx);
+    await f.fire('agent_start', { type: 'agent_start' }, ctx);
+    idle = true;
+    await vi.advanceTimersByTimeAsync(100);
+    expect(f.sendUserMessage).not.toHaveBeenCalled();
   });
 
   it('publishes a status JSON under the "harness" key', async () => {

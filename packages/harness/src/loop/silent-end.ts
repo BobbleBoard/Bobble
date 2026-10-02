@@ -13,6 +13,14 @@
  * None sees the plainest failure: an empty reply. Stop (an aborted turn) is
  * the person choosing silence, and is left alone. Once per session, like its
  * neighbours.
+ *
+ * NOT ONLY AFTER A TOOL. MEASURED (Gemma 4 12B, a student's third question
+ * about the area of a circle, 2026-10-01): no tool ran, the server counted 548
+ * tokens out and none of them reached the reply — the chat showed the question
+ * with nothing under it. A question the person asked is something to answer
+ * for, whatever the turn ran. What the turn answered for is the last message
+ * that asked: when that was the harness's own private steer (a check it runs
+ * and asks to be fixed silently), the silence was asked for.
  */
 
 interface MessageLike {
@@ -34,38 +42,59 @@ function textOf(content: unknown): string {
     .join('\n');
 }
 
+/** How a turn ended without a word: after which failure, and whether any tool ran. */
+export interface SilentEnd {
+  /** The last tool result that failed (its tool and first line), or ''. */
+  readonly failed: string;
+  /** Whether the turn ran anything at all — a turn that only thought did not. */
+  readonly ran: boolean;
+}
+
 /**
- * The turn's end, if it said nothing to the person: the last tool result that
- * failed (its tool and first line), or an empty string when none did. Null
- * when the turn said something, was stopped, or did nothing at all.
+ * The turn's end, if it said nothing to the person. Null when the turn said
+ * something, was stopped, ended in an error the person already sees, answered
+ * the harness's own private steer (`isPrivateSteer`), or had nothing to answer
+ * for at all (no question and no tool).
  */
-export function silentEnd(messages: readonly unknown[]): { failed: string } | null {
+export function silentEnd(
+  messages: readonly unknown[],
+  isPrivateSteer: (text: string) => boolean = () => false,
+): SilentEnd | null {
   let lastAssistant: MessageLike | undefined;
+  let asked: MessageLike | undefined;
   for (let i = messages.length - 1; i >= 0; i -= 1) {
     const m = messages[i] as MessageLike;
-    if (m?.role === 'assistant') {
-      lastAssistant = m;
+    if (m?.role === 'assistant' && lastAssistant === undefined) lastAssistant = m;
+    if (m?.role === 'user') {
+      asked = m;
       break;
     }
   }
   if (lastAssistant === undefined) return null;
   if (lastAssistant.stopReason === 'aborted' || lastAssistant.stopReason === 'error') return null;
   if (textOf(lastAssistant.content).trim() !== '') return null;
-  // Something was done this turn — a tool ran — or there is nothing to answer for.
+  if (asked !== undefined && isPrivateSteer(textOf(asked.content).trim())) return null;
   const results = (messages as MessageLike[]).filter((m) => m?.role === 'toolResult');
-  if (results.length === 0) return null;
+  // Nothing ran: an empty reply to a question is still an empty reply.
+  if (results.length === 0) return asked !== undefined ? { failed: '', ran: false } : null;
   const failedResult = [...results].reverse().find((m) => m.isError === true);
-  if (failedResult === undefined) return { failed: '' };
+  if (failedResult === undefined) return { failed: '', ran: true };
   const tool =
     typeof failedResult.toolName === 'string' ? failedResult.toolName : 'the last command';
   const first = textOf(failedResult.content)
     .split('\n')
     .map((l) => l.trim())
     .find((l) => l !== '');
-  return { failed: `${tool} failed: ${(first ?? '').slice(0, 240)}` };
+  return { failed: `${tool} failed: ${(first ?? '').slice(0, 240)}`, ran: true };
 }
 
-export function silentEndNudge(end: { failed: string }): string {
+export function silentEndNudge(end: SilentEnd): string {
+  if (!end.ran) {
+    return (
+      'Your turn ended without a word to the user. They are looking at an empty reply to ' +
+      'what they just asked. Answer them now.'
+    );
+  }
   const after = end.failed !== '' ? `, after ${end.failed}` : '';
   return (
     `Your turn ended without a word to the user${after}. They are looking at an empty reply. ` +

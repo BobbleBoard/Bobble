@@ -25,13 +25,14 @@ describe('a turn that ends without a word', () => {
     expect(end).toEqual({
       failed:
         'bash failed: math: the spec needs a "plot" (curves as expressions) or a "figure" (shapes), or both.',
+      ran: true,
     });
-    expect(silentEndNudge(end ?? { failed: '' })).toMatch(
+    expect(silentEndNudge(end ?? { failed: '', ran: true })).toMatch(
       /^Your turn ended without a word to the user, after bash failed: math: the spec needs/,
     );
   });
 
-  it('is left alone when it said something, was stopped, or ran nothing', () => {
+  it('is left alone when it said something, was stopped, or had nothing to answer for', () => {
     const said = {
       role: 'assistant',
       stopReason: 'stop',
@@ -39,14 +40,34 @@ describe('a turn that ends without a word', () => {
     };
     expect(silentEnd([user, failed, said])).toBeNull();
     expect(silentEnd([user, failed, { ...thought, stopReason: 'aborted' }])).toBeNull();
-    expect(silentEnd([user, thought])).toBeNull();
+    expect(silentEnd([thought])).toBeNull();
   });
 
   it('with no failure, says only that nothing was said', () => {
     const ok = { role: 'toolResult', toolName: 'write', isError: false, content: 'Wrote it.' };
-    expect(silentEnd([user, ok, thought])).toEqual({ failed: '' });
-    expect(silentEndNudge({ failed: '' })).toMatch(
+    expect(silentEnd([user, ok, thought])).toEqual({ failed: '', ran: true });
+    expect(silentEndNudge({ failed: '', ran: true })).toMatch(
       /^Your turn ended without a word to the user\. /,
     );
+  });
+
+  it('is caught when nothing ran at all (MEASURED: Gemma 4 12B, 548 tokens out, an empty reply)', () => {
+    const question = {
+      role: 'user',
+      content: [{ type: 'text', text: 'why is the width only half the circumference?' }],
+    };
+    const empty = { role: 'assistant', stopReason: 'stop', content: [] };
+    const end = silentEnd([question, empty]);
+    expect(end).toEqual({ failed: '', ran: false });
+    expect(silentEndNudge(end ?? { failed: '', ran: false })).toMatch(
+      /empty reply to what they just asked\. Answer them now\.$/,
+    );
+  });
+
+  it("is left alone when the turn answered the harness's own private steer", () => {
+    const steer = 'A check failed after your last change: … fix it silently.';
+    const turn = [{ role: 'user', content: steer }, thought];
+    expect(silentEnd(turn, (t) => t === steer)).toBeNull();
+    expect(silentEnd(turn)).toEqual({ failed: '', ran: false });
   });
 });

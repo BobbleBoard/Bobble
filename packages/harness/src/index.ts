@@ -450,6 +450,10 @@ interface HarnessRuntime {
   nudgedAnnounced: boolean;
   /** The one "you ended without a word" steer this session has (loop/silent-end.ts). */
   nudgedSilent: boolean;
+  /** Agent runs started this session — a steer waiting for idle is dropped when this moves. */
+  runs: number;
+  /** The harness's private steers (checks it asks to be fixed silently), by their text. */
+  privateSteers: Set<string>;
   /** Remaining REAL-verify fix steers allowed in the active verify sequence. */
   verifyFixesRemaining: number;
   /** True while inside a self-triggered verify fix sequence (so the budget isn't reset). */
@@ -1218,6 +1222,8 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     nudgedUnfinished: false,
     nudgedAnnounced: false,
     nudgedSilent: false,
+    runs: 0,
+    privateSteers: new Set<string>(),
     verifyFixesRemaining: 0,
     verifyActive: false,
   };
@@ -1973,10 +1979,9 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     // model might parrot into its user-facing reply (blind-test item 5). The last
     // clause tells the model to keep this instruction to itself and just deliver
     // the improved result.
-    pi.sendUserMessage?.(
-      `Before you finish, tighten your last result — fix these points:\n- ${issues.join('\n- ')}\n\nApply the fixes and deliver the improved result directly. This note is internal: do not mention it, a "revision", or these points in your reply.`,
-      { deliverAs: 'followUp' },
-    );
+    const tighten = `Before you finish, tighten your last result — fix these points:\n- ${issues.join('\n- ')}\n\nApply the fixes and deliver the improved result directly. This note is internal: do not mention it, a "revision", or these points in your reply.`;
+    runtime.privateSteers.add(tighten.trim());
+    pi.sendUserMessage?.(tighten, { deliverAs: 'followUp' });
     return true;
   }
 
@@ -2102,12 +2107,9 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
         setStage('revising', ctx);
         // Same private-followUp mechanism the failing-check branch uses, so the
         // steer never surfaces as meta narration in the user-facing reply.
-        pi.sendUserMessage?.(
-          `${unexercised}\n\nDo that now, then stop. This is an internal check — act on it silently and don't mention it in your reply.`,
-          {
-            deliverAs: 'followUp',
-          },
-        );
+        const exercise = `${unexercised}\n\nDo that now, then stop. This is an internal check — act on it silently and don't mention it in your reply.`;
+        runtime.privateSteers.add(exercise.trim());
+        pi.sendUserMessage?.(exercise, { deliverAs: 'followUp' });
         return true;
       }
       runtime.verifyActive = false;
@@ -2132,10 +2134,9 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       // Private steer (blind-test item 5): a plain check-output steer with an
       // explicit "keep this internal" clause so the fix loop never surfaces as
       // meta narration in the user-facing reply.
-      pi.sendUserMessage?.(
-        `A check failed after your last change:\n\n$ ${pass.outcome.command}\n${pass.outcome.output}\n\nFix the code so this check passes, then stop. This is an internal check — fix it silently and don't mention it in your reply.`,
-        { deliverAs: 'followUp' },
-      );
+      const fix = `A check failed after your last change:\n\n$ ${pass.outcome.command}\n${pass.outcome.output}\n\nFix the code so this check passes, then stop. This is an internal check — fix it silently and don't mention it in your reply.`;
+      runtime.privateSteers.add(fix.trim());
+      pi.sendUserMessage?.(fix, { deliverAs: 'followUp' });
       return true;
     }
 
@@ -3773,10 +3774,34 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   // Running-task timer.
   pi.on('agent_start', (_event, ctx) => {
     runtime.currentCtx = ctx;
+    runtime.runs += 1;
     runtime.taskStart = Date.now();
     setStage('working', ctx);
     publishStatus(ctx);
   });
+  /*
+   * A STEER FROM agent_end GOES OUT WHEN THE AGENT IS IDLE. pi hands agent_end
+   * to extensions from its event queue, and the agent can still count as
+   * streaming when it arrives: sendUserMessage then throws "Agent is already
+   * processing" — MEASURED, the 4B's circle-area turn, where the silent-end
+   * nudge reached the person as an error toast and never reached the model. So
+   * the steer waits for idle (milliseconds, polled), and is dropped when the
+   * person has started a run of their own meanwhile: they outrank it.
+   */
+  const steerWhenIdle = (ctx: ExtensionContext, text: string): void => {
+    const run = runtime.runs;
+    let tries = 0;
+    const attempt = (): void => {
+      if (runtime.runs !== run) return;
+      if (typeof ctx.isIdle !== 'function' || ctx.isIdle()) {
+        pi.sendUserMessage?.(text);
+        return;
+      }
+      tries += 1;
+      if (tries <= 400) setTimeout(attempt, 25);
+    };
+    attempt();
+  };
   // NOT async by design — see the comment on setStage(settled) below: anything
   // awaited here delays the turn-complete signal reaching the UI.
   pi.on('agent_end', (event, ctx) => {
@@ -3841,7 +3866,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       if (isChoiceHandback(finalText)) {
         runtime.nudgedHandback = true;
         pi.appendEntry(HARNESS_LOOP_ENTRY, { action: 'steer', cause: 'handback' });
-        pi.sendUserMessage?.(HANDBACK_NUDGE);
+        steerWhenIdle(ctx, HANDBACK_NUDGE);
       }
     }
     /*
@@ -3859,7 +3884,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       if (endedAtOutputLimit(event.messages)) {
         runtime.nudgedOutputLimit = true;
         pi.appendEntry(HARNESS_LOOP_ENTRY, { action: 'steer', cause: 'output-limit' });
-        pi.sendUserMessage?.(OUTPUT_LIMIT_NUDGE);
+        steerWhenIdle(ctx, OUTPUT_LIMIT_NUDGE);
       }
     }
     /*
@@ -3885,7 +3910,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       if (left !== null) {
         runtime.nudgedUnfinished = true;
         pi.appendEntry(HARNESS_LOOP_ENTRY, { action: 'steer', cause: 'unfinished-plan' });
-        pi.sendUserMessage?.(unfinishedPlanNudge(left));
+        steerWhenIdle(ctx, unfinishedPlanNudge(left));
       }
     }
     /*
@@ -3905,7 +3930,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
         runtime.nudgedAnnounced = true;
         announcedNow = true;
         pi.appendEntry(HARNESS_LOOP_ENTRY, { action: 'steer', cause: 'announced-step' });
-        pi.sendUserMessage?.(announcedStepNudge(said));
+        steerWhenIdle(ctx, announcedStepNudge(said));
       }
     }
     /* A TURN THAT ENDS WITHOUT A WORD — see loop/silent-end.ts: the 4B's SHM
@@ -3917,11 +3942,11 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       !runtime.nudgedSilent &&
       !endedAtOutputLimit(event.messages)
     ) {
-      const end = silentEnd(event.messages);
+      const end = silentEnd(event.messages, (text) => runtime.privateSteers.has(text));
       if (end !== null) {
         runtime.nudgedSilent = true;
         pi.appendEntry(HARNESS_LOOP_ENTRY, { action: 'steer', cause: 'silent-end' });
-        pi.sendUserMessage?.(silentEndNudge(end));
+        steerWhenIdle(ctx, silentEndNudge(end));
       }
     }
     // THE USER OUTRANKS EVERYTHING BEHIND THEM. Naming and the reviewer both run
