@@ -1,6 +1,6 @@
 # Bobble — status
 
-Updated: 2026-10-01 22:00 (on AC) · main `9c72996b` · dist rebuilt · the user: "drive bobble visually as a user and go and ask for some explanation of some math problem … see if you think bobble does better"
+Updated: 2026-10-01 22:00 (on AC) · main `9c72996b` · dist rebuilt and **installed** (packaged smoke OK) · the user: "drive bobble visually as a user and go and ask for some explanation of some math problem … see if you think bobble does better"
 
 ## Report — 2026-10-01: a visual-learner student, Bobble × five local models vs ChatGPT (logged out)
 
@@ -8,7 +8,7 @@ Updated: 2026-10-01 22:00 (on AC) · main `9c72996b` · dist rebuilt · the user
 
 **How it was run.** One student, the same opening for every system: *"hi! im a really visual learner and i never got why the area of a circle is πr². like where does the r squared even come from?? can you show me so it actually makes sense"*, then follow-ups a confused student would really send, adapted to what each answer showed. Bobble was driven headless (`apps/desktop/tests/e2e/drive-server.mjs`) by clicks, typing and full-window screenshots only — the one thing read from the page is whether Stop is showing. ChatGPT in the built-in browser, logged out, no account.
 
-**State.** main `9c72996b` (14 commits today, `e0d414d1` … `9c72996b`) · dist rebuilt · suites: desktop 3,565 · ui 431 · harness 1,901 · canvas 392 · mathviz 93 · provider-llamacpp 208 · provider-mlx 31 · top-level typecheck clean · e2e: permission, round9-harness, tasklist, notif-redesign, dialog-focus, turn-cards, ask-card-look all OK · no change to any system prompt or tool schema (tool-result text and nudges only), so the prompt prefix — and prefill — are untouched.
+**State.** main `9c72996b` (14 commits today, `e0d414d1` … `9c72996b`) · **installed** (`pnpm ship:local`, packaged smoke OK: 3 extensions, pi from the bundle, a maths page from the asar, pd-preview) · suites: desktop 3,565 · ui 431 · harness 1,901 · canvas 392 · mathviz 93 · provider-llamacpp 208 · provider-mlx 31 · top-level typecheck clean · e2e: permission, round9-harness, tasklist, notif-redesign, dialog-focus, turn-cards, ask-card-look all OK · no change to any system prompt or tool schema (tool-result text and nudges only), so the prompt prefix — and prefill — are untouched.
 
 **Images:** `deliverables/student-comparison-2026-10-01/` — `chatgpt-*`, `bobble-<model>-*`, `ui-ask-card-*`.
 
