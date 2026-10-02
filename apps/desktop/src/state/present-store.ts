@@ -64,7 +64,7 @@ export interface PresentedRecord {
    */
   svg?: { width: number; height: number; bytes: number; text?: string };
   /** An interactive widget's page (present-inline.ts `htmlWidget`): the thread runs it. */
-  html?: { text: string; title?: string };
+  html?: { text: string; title?: string; explanation?: true; spec?: string };
   /**
    * When it was handed over, in THIS run of the app (wall clock) — absent for
    * a card brought back from a transcript. A card that has only just arrived
@@ -176,7 +176,7 @@ interface PresentState {
     chart?: Record<string, unknown>;
     diagram?: DiagramCardPayload;
     svg?: { width: number; height: number; bytes: number; text?: string };
-    html?: { text: string; title?: string };
+    html?: { text: string; title?: string; explanation?: true; spec?: string };
     /** Handed over just now, in this run (see PresentedRecord.shownAt). */
     shownAt?: number;
   }) => PresentedRecord;
@@ -761,7 +761,7 @@ export function presentFromMain({
   chart?: Record<string, unknown>;
   diagram?: DiagramCardPayload;
   svg?: { width: number; height: number; bytes: number; text?: string };
-  html?: { text: string; title?: string };
+  html?: { text: string; title?: string; explanation?: true; spec?: string };
 }): void {
   // Anchor it to the turn that produced it — see `afterMessageId` — in the
   // chat that is RUNNING: the one in the background if a turn is going there,

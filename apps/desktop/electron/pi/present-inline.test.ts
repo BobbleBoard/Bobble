@@ -195,6 +195,36 @@ describe('htmlWidget — an interactive widget in the chat, a site in the canvas
     expect(htmlWidget(widget + ' '.repeat(INLINE_HTML_MAX_BYTES))).toBeNull();
   });
 
+  it('keeps an explanation the math command drew inline — heavy with KaTeX fonts, steps in a nav', () => {
+    // the user (2026-10-01): "explanation should be inline".
+    const page = `<!doctype html><html><head><title>Why the Area of a Circle is πr²</title><style>${'@font-face{}'.repeat(30_000)}</style></head><body><main class="mv"><figure class="mv-panel" data-mv-panel><svg></svg></figure><nav class="mv-nav"><button>Next</button></nav></main><script>mvMount()</script></body></html>`;
+    expect(page.length).toBeGreaterThan(INLINE_HTML_MAX_BYTES);
+    const w = htmlWidget(page);
+    expect(w?.explanation).toBe(true);
+    expect(w?.title).toBe('Why the Area of a Circle is πr²');
+  });
+
+  it('carries the explanation’s spec as its raw view, when it sits beside the page', async () => {
+    const page = '<figure data-mv-panel><svg></svg></figure><script></script>';
+    const files: Record<string, string> = {
+      '/w/circle.html': page,
+      '/w/circle.math.json': '{"title":"Circle"}',
+    };
+    const out = await presentInlinePayload('/w/circle.html', async (p) => {
+      const f = files[p];
+      if (f === undefined) throw new Error('ENOENT');
+      return f;
+    });
+    expect(out.html?.explanation).toBe(true);
+    expect(out.html?.spec).toBe('{"title":"Circle"}');
+    const alone = await presentInlinePayload('/w/other.html', async (p) => {
+      if (p.endsWith('.html')) return page;
+      throw new Error('ENOENT');
+    });
+    expect(alone.html?.explanation).toBe(true);
+    expect(alone.html?.spec).toBeUndefined();
+  });
+
   it('comes through presentInlinePayload for a presented .html', async () => {
     const out = await presentInlinePayload('/w/grad.html', async () => widget);
     expect(out.html?.title).toBe('Gradient descent');

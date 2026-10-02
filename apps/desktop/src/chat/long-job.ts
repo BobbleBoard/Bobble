@@ -257,6 +257,8 @@ export function presentingToolOfCommand(command: string | undefined): string | n
    * page's card sat inside "Worked for 3m".
    */
   if (/^\s*coordinate\s+present(?=\s|$)/.test(command)) return 'present';
+  // `math circle.math.json` — the explanation it draws is the answer, like a chart.
+  if (/^\s*math(?=\s|$)/.test(command)) return 'math';
   const m = /^\s*(chart|diagram)(?:\s+(edit)(?=\s|$)|(?=\s|$))/.exec(command);
   if (m === null) return null;
   return m[2] === 'edit' ? `${m[1]}_edit` : (m[1] ?? null);

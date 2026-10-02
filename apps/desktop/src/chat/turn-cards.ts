@@ -120,6 +120,8 @@ const PRESENTING: ReadonlySet<string> = new Set([
   'chart_edit',
   'diagram',
   'diagram_edit',
+  // The explanation the math command drew is the answer (the user: "explanation should be inline").
+  'math',
 ]);
 
 /**

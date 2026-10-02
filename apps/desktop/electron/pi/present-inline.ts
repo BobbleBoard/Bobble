@@ -106,6 +106,17 @@ export async function presentInlinePayload(
     } catch {
       /* unreadable: the card describes it and the canvas opens it */
     }
+    if (out.html?.explanation === true) {
+      // Its raw view is the spec it was drawn from, not 330 KB of page.
+      try {
+        out.html = {
+          ...out.html,
+          spec: await read(`${target.replace(/\.html?$/i, '')}.math.json`),
+        };
+      } catch {
+        /* drawn from a spec passed inline: the page alone */
+      }
+    }
     return out;
   }
   if (ext === '.json' && target.endsWith(CHART_SIDECAR_SUFFIX)) {

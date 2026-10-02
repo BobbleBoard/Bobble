@@ -157,7 +157,7 @@ describe('showing', () => {
     expect(b.show).toHaveBeenCalledWith({ path: path.join(root, 'shown.html'), note: 'Shown' });
     expect(b.preview).toHaveBeenCalledWith({ path: path.join(root, 'shown.html'), kind: 'render' });
     expect(r.content.find((c) => c.type === 'image')?.data).toBe('iVBOR');
-    expect(text(r)).toContain('It is open in the canvas beside the chat.');
+    expect(text(r)).toContain('It is in the chat, playing its steps');
   });
 
   it('sends no capture to a model that cannot see one', async () => {
@@ -274,7 +274,7 @@ describe('specs as a small model saves and breaks them', () => {
     const broken = await drawWrittenSpec(file, root, deps);
     expect(broken.isError).toBe(true);
     expect(text(broken)).toContain(
-      'The page beside the chat still shows the last version that drew (kept.html)',
+      'The page in the chat still shows the last version that drew (kept.html)',
     );
     expect(text(broken)).toContain('A Python loop is not JSON');
   });

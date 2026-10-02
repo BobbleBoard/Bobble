@@ -206,6 +206,10 @@ describe('a shell call running a media command IS the generation (bash-CLI mode)
       'present',
     );
     expect(presentingToolOfCommand('coordinate present --help')).toBeNull();
+    // The math command's explanation is the answer too (the user: "explanation should be inline").
+    expect(effectiveToolName('bash', { command: 'math circle_area.math.json' })).toBe('math');
+    expect(presentingToolOfCommand('math --help')).toBeNull();
+    expect(presentingToolOfCommand('mathviz-notes.sh')).toBeNull();
     expect(presentingToolOfCommand('coordinate plan update')).toBeNull();
     expect(presentingToolOfCommand('diagram --help')).toBeNull();
     expect(presentingToolOfCommand('diagrams/make.sh')).toBeNull();

@@ -51,6 +51,8 @@ import { DIAGRAM_CARD_MAX_HEIGHT, kindLabel } from './PendingDiagramCard';
 
 /** How tall a widget grows in the chat before its page scrolls inside. */
 const WIDGET_CARD_MAX_HEIGHT = 560;
+/** An explanation (a page the math command drew): its figure, its steps and its sliders, whole. */
+const EXPLANATION_CARD_MAX_HEIGHT = 780;
 
 import { drawIn } from './svg-draw-in';
 
@@ -232,6 +234,39 @@ export function PresentedInline({ item }: { item: PresentedRecord }) {
    * it; the raw view is its HTML; the corner opens it in the canvas, where a
    * page has room.
    */
+  if (item.html !== undefined && item.html.explanation === true) {
+    /*
+     * AN EXPLANATION, IN THE CHAT — the user (2026-10-01): "explanation should be
+     * inline". The page the math command drew plays its steps right here, at
+     * its own height; the raw view is the spec it was drawn from; the corner
+     * opens it in the canvas, larger.
+     */
+    return (
+      <div className="flex flex-col gap-1" data-testid="presented-explanation" style={transition}>
+        <InlineWidget
+          artifact={{
+            id: key,
+            title: item.html.title ?? name,
+            filename: baseName(item.path),
+            content: { kind: 'html', text: item.html.text },
+          }}
+          label="Explanation"
+          {...(item.html.spec !== undefined
+            ? { source: { text: item.html.spec, language: 'json' } }
+            : {})}
+          maxHeight={EXPLANATION_CARD_MAX_HEIGHT + 64}
+          onMoveToCanvas={moveToCanvas}
+        >
+          <HtmlSurface
+            content={{ kind: 'html', text: item.html.text }}
+            streaming={false}
+            fitMax={EXPLANATION_CARD_MAX_HEIGHT}
+          />
+        </InlineWidget>
+      </div>
+    );
+  }
+
   if (item.html !== undefined) {
     return (
       <div className="flex flex-col gap-1" data-testid="presented-widget" style={transition}>

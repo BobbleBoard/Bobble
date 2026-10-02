@@ -146,7 +146,7 @@ function pageOf(specFile: string): string {
  */
 async function stillShowing(specFile: string): Promise<string> {
   return (await exists(pageOf(specFile)))
-    ? ` The page beside the chat still shows the last version that drew (${path.basename(pageOf(specFile))}); fix the spec to change it.`
+    ? ` The page in the chat still shows the last version that drew (${path.basename(pageOf(specFile))}); fix the spec to change it.`
     : '';
 }
 
@@ -427,7 +427,7 @@ export async function drawMath(
   if (deps.bridge !== null) {
     const shown = await deps.bridge.show({ path: page, note: r.spec.title });
     lines[0] += shown.ok
-      ? ' It is open in the canvas beside the chat.'
+      ? ' It is in the chat, playing its steps (the person can open it larger in the canvas).'
       : ` (the canvas could not open it: ${shown.error ?? 'unknown'})`;
     if ((deps.canSeeImages ?? serverCanSeeImages)()) {
       const preview = await deps.bridge.preview({ path: page, kind: 'render' });

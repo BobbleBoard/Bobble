@@ -74,6 +74,12 @@ describe('what the turn made is the work; what it presented is the answer', () =
     expect(place.get(`d:${flow}`)).toBe('beneath');
   });
 
+  it('the math command presents its explanation — the answer, not a step of the work', () => {
+    const page = '/w/circle_area.html';
+    const place = placeTurnCards([call('m', 0, 'math')], [card('m', page, 'record')]);
+    expect(place.get(`m:${page}`)).toBe('beneath');
+  });
+
   it('…but while its chain works on, it files in with the work and comes out when done', () => {
     const chart = '/w/units.svg';
     const calls2 = [call('c', 0, 'chart'), call('w', 0, 'write', { path: 'summary.md' })];

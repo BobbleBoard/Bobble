@@ -1398,7 +1398,7 @@ export type AppEventMap = {
      * interactive file and not a web page — the thread runs it in a sandboxed
      * frame. See electron/pi/present-inline.ts `htmlWidget`.
      */
-    html?: { text: string; title?: string };
+    html?: { text: string; title?: string; explanation?: true; spec?: string };
   };
   /**
    * Download progress. `received`/`total`/`fraction` are THIS FILE's; the

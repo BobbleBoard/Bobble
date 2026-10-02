@@ -15,6 +15,13 @@ export interface PresentedHtmlWidget {
   readonly text: string;
   /** Its <title>, when it has one. */
   readonly title?: string;
+  /**
+   * A page the math command drew — an explanation that plays its steps. It
+   * stands in the chat at its own height, and its raw view is its spec.
+   */
+  readonly explanation?: true;
+  /** The explanation's spec (the .math.json beside it), when it could be read. */
+  readonly spec?: string;
 }
 
 /** A widget travels inline up to this many bytes of page. */
@@ -32,6 +39,16 @@ function namesALocalFile(v: string): boolean {
  * the canvas should open (a site, a long page, a file with files beside it).
  */
 export function htmlWidget(markup: string): PresentedHtmlWidget | null {
+  const title = /<title[^>]*>([^<]*)<\/title>/i.exec(markup)?.[1]?.trim();
+  /*
+   * AN EXPLANATION THE MATH COMMAND DREW belongs in the chat — the user
+   * (2026-10-01): "explanation should be inline". It fails the rules below
+   * for reasons that make it no less a widget: KaTeX's fonts ride inside it
+   * (~330 KB) and its steps are a <nav>. It runs in the same sandboxed frame.
+   */
+  if (/\bdata-mv-panel\b/.test(markup)) {
+    return { text: markup, explanation: true, ...(title ? { title } : {}) };
+  }
   if (new TextEncoder().encode(markup).length > INLINE_HTML_MAX_BYTES) return null;
   // One file: nothing of its own loaded by a relative path.
   for (const m of markup.matchAll(/\b(?:src|href)\s*=\s*["']([^"']*)["']/gi)) {
@@ -46,6 +63,5 @@ export function htmlWidget(markup: string): PresentedHtmlWidget | null {
   if (/<nav\b/i.test(markup)) return null;
   if (/<header\b/i.test(markup) && /<footer\b/i.test(markup)) return null;
   if ((markup.match(/<section\b/gi) ?? []).length >= 3) return null;
-  const title = /<title[^>]*>([^<]*)<\/title>/i.exec(markup)?.[1]?.trim();
   return { text: markup, ...(title ? { title } : {}) };
 }
