@@ -852,6 +852,7 @@ function registerAppIpc(): void {
       guardEnabled: () => readSettings().memoryGuard !== false,
       // At the wall with nothing else to end, the chat model is what goes.
       parkChatModel: () => parkChatModel(),
+      resumeChatModel: () => resumeChatModel(),
       announce: (event) => {
         const wc = mainWindow?.webContents ?? null;
         if (wc !== null && !wc.isDestroyed()) events.send(wc, 'gen:guardian', event);

@@ -611,6 +611,20 @@ export function ensureChatServerReady(): Promise<void> {
     new URLSearchParams(window.location.search).has('piNoServer')
   )
     return Promise.resolve();
+  /*
+   * PARKED IS NOT READY. The status reports a parked server as running (its
+   * port is kept), so this read "ready" and the send went to a stopped
+   * process — MEASURED (Qwen 3.8 27B): "fetch failed", twice, with the model
+   * parked by the memory guardian and 79% of memory free. Wake it first.
+   */
+  if (useLlmStore.getState().status.parked !== undefined) {
+    diag('ensureChatServerReady: the model is parked — resuming it before the send');
+    return window.piDesktop
+      .invoke('llm:resume-server', undefined)
+      .then(() => useLlmStore.getState().refreshStatus())
+      .then(() => undefined)
+      .catch(() => undefined);
+  }
   if (serverIsReady() && !switchInProgress()) {
     diag('ensureChatServerReady: server already ready — no-op');
     return Promise.resolve();

@@ -74,6 +74,14 @@ export interface GuardianMainOptions {
    * error is better than a Mac that stops answering the trackpad.
    */
   readonly parkChatModel?: (reason: string) => Promise<unknown>;
+  /**
+   * Bring back the chat model the guardian parked, once the machine is calm
+   * and nothing heavy is running. MEASURED (Qwen 3.8 27B, 2026-10-01): parked
+   * three seconds after it loaded — the load's own page-in read as a stall at
+   * 11% free — and never brought back: every message after it answered "fetch
+   * failed" against a stopped server, with 79% of memory free.
+   */
+  readonly resumeChatModel?: () => Promise<unknown>;
   /** Tell the app. Every change of verdict, and every shed. */
   readonly announce: (event: {
     verdict: GuardianVerdict;
@@ -116,6 +124,8 @@ export function startGuardian(opts: GuardianMainOptions): GuardianMain {
 
   let lastVerdict: GuardianVerdict = 'calm';
   let lastReason = '';
+  /** The chat model is parked because THIS parked it (not a generation making room). */
+  let parkedChat = false;
 
   const guardian: Guardian = createGuardian({
     sample: () => samplePressure(guardianProbes(host)),
@@ -178,7 +188,9 @@ export function startGuardian(opts: GuardianMainOptions): GuardianMain {
             // chat model is the load, and it goes rather than the Mac.
             if (stopped.length === 0 && ended.length === 0 && opts.parkChatModel !== undefined) {
               log(`PARK the chat model: ${reason}`);
-              void opts.parkChatModel(why);
+              void opts.parkChatModel(why).then((r) => {
+                if ((r as { ok?: boolean } | undefined)?.ok === true) parkedChat = true;
+              });
             }
           });
         }
@@ -237,6 +249,12 @@ export function startGuardian(opts: GuardianMainOptions): GuardianMain {
       // Breathing again: a job held at admission should not wait for the next
       // unrelated queue event to find out.
       if (verdict === 'calm') q?.reconsider();
+      // …and the chat model this parked comes back, unless a generation runs.
+      if (verdict === 'calm' && parkedChat && q?.running() !== true && !pausables.active()) {
+        parkedChat = false;
+        log(`RESUME the chat model: ${reason}`);
+        void opts.resumeChatModel?.();
+      }
     },
   });
 

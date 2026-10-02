@@ -667,6 +667,8 @@ export type LlmInvokeMap = {
     response: { success: boolean; baseUrl?: string; error?: string };
   };
   'llm:stop-server': { request: undefined; response: { success: boolean } };
+  /** Bring back a chat model the app parked (its process stopped, its port kept). */
+  'llm:resume-server': { request: undefined; response: { ok: boolean; reason?: string } };
   /**
    * Measure every engine + speculative method that can run the model from
    * what is on disk, keep the verdict, and come back up on the winner.
@@ -911,6 +913,7 @@ export const LLM_INVOKE_CHANNELS = [
   'llm:verify-model',
   'llm:start-server',
   'llm:stop-server',
+  'llm:resume-server',
   'llm:calibrate',
   'llm:calibrate-cancel',
   'llm:calibration-record',

@@ -160,4 +160,66 @@ describe('the memory guard in main', () => {
     g.stop();
     kill.mockRestore();
   });
+
+  it('brings back the chat model it parked once the machine is calm (MEASURED: Qwen 3.8 27B, parked for good)', async () => {
+    let parks = 0;
+    let resumes = 0;
+    let generating = false;
+    const g = startGuardian({
+      queue: () =>
+        ({
+          running: () => generating,
+          queued: () => 0,
+          shedRunning: () => [],
+          reconsider: () => {},
+        }) as never,
+      mode: () => 'auto',
+      reserveGB: () => undefined,
+      parkChatModel: async () => {
+        parks += 1;
+        return { ok: true };
+      },
+      resumeChatModel: async () => {
+        resumes += 1;
+      },
+      announce: () => {},
+      log: () => {},
+    });
+    await new Promise((r) => setTimeout(r, 20));
+    const toTheWall = async () => {
+      readings.push(
+        { memoryFree: 0.5 },
+        { memoryFree: 0.5 },
+        { memoryFree: 0.5 },
+        { memoryFree: 0.5 },
+      );
+      for (let i = 0; i < 4; i += 1) await g.refresh();
+      readings.push({ memory: 'critical' });
+      expect(await g.refresh()).toBe('shed');
+      await new Promise((r) => setTimeout(r, 500));
+    };
+    const toCalm = async () => {
+      let v = await g.refresh();
+      for (let i = 0; i < 12 && v !== 'calm'; i += 1) {
+        readings.push({ memoryFree: 0.8 });
+        v = await g.refresh();
+      }
+      return v;
+    };
+    await toTheWall();
+    expect(parks).toBe(1);
+    expect(resumes).toBe(0);
+    expect(await toCalm()).toBe('calm');
+    expect(resumes).toBe(1);
+    // Never while a generation runs: what it made room for is still using it.
+    await toTheWall();
+    generating = true;
+    expect(await toCalm()).toBe('calm');
+    expect(resumes).toBe(1);
+    generating = false;
+    readings.push({ memoryFree: 0.8 });
+    await g.refresh();
+    expect(resumes).toBe(2);
+    g.stop();
+  });
 });

@@ -596,6 +596,7 @@ const handlers: IpcHandlers<LlmInvokeMap> = {
     });
   },
   'llm:stop-server': () => request({ type: 'stop-server' }),
+  'llm:resume-server': () => resumeChatModel(),
   'llm:calibrate': (req) => {
     log.info('llm:calibrate requested', { modelId: req.modelId, quant: req.quant });
     return request<LlmCalibrateReply>({
