@@ -173,8 +173,8 @@ export function AssistantGroup({
    * The cards this turn PRESENTED (a chart, a drawing, a `present`ed file), by
    * the call that handed each one over (turn-cards.ts `attributeRecords`). They
    * are placed exactly like the media the turn generated — in the chain while
-   * the work goes on, beneath it once it is an answer — instead of after the
-   * whole reply, where they sat at the foot of a turn that was still working.
+   * the work goes on (never at the foot of a turn still working), and at the
+   * foot of the reply, after its words, once each is an answer (`foot`).
    */
   recordsByCall?: ReadonlyMap<string, readonly PresentedRecord[]>;
   /** Draws one presented card; the thread owns the canvas handlers it needs. */
@@ -457,6 +457,17 @@ export function AssistantGroup({
    * leaves out the card, which is a widget.
    */
   const answered = segments.some((s) => s.kind === 'text');
+  /*
+   * THE CARDS AT THE FOOT OF THE REPLY. the user (2026-10-01, a student's circle
+   * reply with the page's card ABOVE the words that explained it): "inline card
+   * should be at the bottom also!" A finished result — a presented file, a
+   * chart, a drawing, a generated picture — stands after ALL of the reply's
+   * words, in the order the calls made them. What is still being made (a
+   * generating card, a chart or diagram building) stays under its chain; while
+   * that chain is the last thing in the reply, under it IS the foot, so a card
+   * taking over from its live one does not move.
+   */
+  const foot: ReactNode[] = [];
   const body = (
     /*
      * min-w-0 so this flex child can shrink below its content's intrinsic width
@@ -697,13 +708,13 @@ export function AssistantGroup({
           }
           const mediaOut = media.filter((item) => placeOf('m', b.id, item.path) === 'beneath');
           if (mediaOut.length > 0) {
-            beneath.push(<ThreadMedia key={`media:${b.id}`} items={mediaOut} />);
+            foot.push(<ThreadMedia key={`media:${b.id}`} items={mediaOut} />);
           }
           for (const record of records) {
             if (renderRecord === undefined) break;
             if (placeOf('r', b.id, record.path) !== 'beneath') continue;
             // The card itself is drawn once, below, into this home.
-            beneath.push(
+            foot.push(
               <CardSlot key={`rec:${record.path}`} home={homeFor(`r:${b.id}:${record.path}`)} />,
             );
           }
@@ -739,6 +750,11 @@ export function AssistantGroup({
           </div>
         );
       })}
+      {/* The foot: always mounted and box-less, like the chains' card lists,
+          so a card arriving never remounts its neighbours. */}
+      <div className="contents" data-testid="turn-foot">
+        {foot}
+      </div>
       {errorText !== '' ? (
         // Defense-in-depth: never render a raw provider blob (an HTTP/JSON error)
         // in the chat — collapse it to a short human message. The provider already
