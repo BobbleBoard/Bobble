@@ -346,7 +346,7 @@ export const usePiStore = create<PiSliceState>((set) => ({
       toolOutputPartials: {},
       // Keep session-TAGGED dialog requests across a switch — a background chat's
       // ask_user must survive until the user swaps in to answer it (it's gated to
-      // its own chat by UiRequestDialogs). Untagged stragglers are dropped. A
+      // its own chat by AskCard). Untagged stragglers are dropped. A
       // finished/aborted turn's request is cleared by agentEnd / bridgeExit instead.
       uiRequests: s.uiRequests.filter((r) => r.sessionFile !== undefined),
       bridgeExited: null,
@@ -756,7 +756,7 @@ export function createPiSink(
       // ask_user blocks pi mid-turn, so `bgRun.streaming` is true iff the bg chat
       // asked (same invariant threadSet uses). A bg request is NOT shown as a
       // dialog over the viewed chat; instead its chat gets a needs-input dot +
-      // the top banner picks it up (UiRequestDialogs gates on this tag).
+      // the top banner picks it up (AskCard gates on this tag).
       const bgAsking = s.bgRun?.streaming;
       const sessionFile = bgAsking ? s.bgRun?.sessionFile : (s.session?.sessionFile ?? undefined);
       /*

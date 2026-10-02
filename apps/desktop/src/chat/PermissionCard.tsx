@@ -14,17 +14,8 @@
  * The three answers, and the preview, are the whole point of this file.
  */
 
-import {
-  Button,
-  Dialog,
-  DialogBody,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@pi-desktop/ui';
-import type { JSX } from 'react';
+import { Button } from '@pi-desktop/ui';
+import { type JSX, useId } from 'react';
 
 /** What the model wants to do, decoded from the harness's sentinel. */
 export interface PermissionRequest {
@@ -96,7 +87,15 @@ export function previewFor(toolName: string, args: Record<string, unknown>): Pre
   return { kind: 'none', ...(path !== undefined ? { path } : {}), body: clip(rest) };
 }
 
-export function PermissionDialog({
+/**
+ * THE ASK, AS A CARD ABOVE THE COMPOSER — not a modal over a blurred app.
+ * the user (2026-10-01): "let's put this sort of permission popup just as a little
+ * card same width as the input bar floating directly above it (not on top of)".
+ * It stands where the person is already looking, the conversation stays
+ * readable above it, and Escape inside it is "Don't" (dismissing is not
+ * permission). The test ids are the dialog's, so every probe still finds it.
+ */
+export function PermissionCard({
   request,
   onAnswer,
 }: {
@@ -105,49 +104,51 @@ export function PermissionDialog({
   onAnswer: (answer: 'once' | 'session' | 'deny') => void;
 }): JSX.Element {
   const preview = previewFor(request.toolName, request.args);
+  const titleId = useId();
   return (
-    <Dialog
-      open
-      onOpenChange={(open) => {
-        // Dismissing is not permission. The harness defaults the same way, so a
-        // closed dialog can never become a yes.
-        if (!open) onAnswer('deny');
+    <section
+      role="dialog"
+      aria-modal="false"
+      aria-labelledby={titleId}
+      className="pd-ask-card"
+      data-testid="permission-dialog"
+      onKeyDown={(e) => {
+        if (e.key !== 'Escape') return;
+        e.preventDefault();
+        e.stopPropagation();
+        onAnswer('deny');
       }}
     >
-      <DialogContent data-testid="permission-dialog" className="max-w-[620px]">
-        <DialogHeader>
-          <div className="min-w-0">
-            <DialogTitle>{titleFor(request.toolName)}</DialogTitle>
-            <DialogDescription>{request.reason}</DialogDescription>
-          </div>
-        </DialogHeader>
-        <DialogBody className="gap-2">
-          {preview.path !== undefined ? (
-            <p className="pd-field-label" data-testid="permission-path">
-              {preview.path}
-            </p>
-          ) : null}
-          <pre className="pd-permission-preview" data-testid="permission-preview">
-            {preview.body}
-          </pre>
-        </DialogBody>
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => onAnswer('deny')} data-testid="permission-deny">
-            Don't
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={() => onAnswer('session')}
-            data-testid="permission-session"
-          >
-            Allow in this chat
-          </Button>
-          <Button variant="primary" onClick={() => onAnswer('once')} data-testid="permission-once">
-            Allow once
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      <div className="pd-ask-card-head">
+        <h2 id={titleId} className="pd-ask-card-title">
+          {titleFor(request.toolName)}
+        </h2>
+        {request.reason !== '' ? <p className="pd-ask-card-reason">{request.reason}</p> : null}
+      </div>
+      {preview.path !== undefined ? (
+        <p className="pd-field-label" data-testid="permission-path">
+          {preview.path}
+        </p>
+      ) : null}
+      <pre className="pd-permission-preview" data-testid="permission-preview">
+        {preview.body}
+      </pre>
+      <div className="pd-ask-card-actions">
+        <Button variant="ghost" onClick={() => onAnswer('deny')} data-testid="permission-deny">
+          Don't
+        </Button>
+        <Button
+          variant="secondary"
+          onClick={() => onAnswer('session')}
+          data-testid="permission-session"
+        >
+          Allow in this chat
+        </Button>
+        <Button variant="primary" onClick={() => onAnswer('once')} data-testid="permission-once">
+          Allow once
+        </Button>
+      </div>
+    </section>
   );
 }
 

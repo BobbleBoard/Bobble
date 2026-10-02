@@ -1,7 +1,7 @@
 /**
  * Top-bar notice shown when a chat running in the BACKGROUND needs the user's
  * input (its ask_user is deferred rather than popped over the chat you're viewing —
- * see UiRequestDialogs + the sink's request tagging). Clicking it swaps to that chat,
+ * see AskCard + the sink's request tagging). Clicking it swaps to that chat,
  * where the dialog then shows. The chat's sidebar row also carries an orange dot.
  */
 import type { ReactNode } from 'react';

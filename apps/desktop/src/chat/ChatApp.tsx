@@ -58,6 +58,7 @@ import { applySavedHarnessConfig, useUserMode } from '../state/settings-store';
 import { useTaskTray } from '../state/task-tray';
 import { useStudioUiStore } from '../studio/studio-ui-store';
 import { AdvancedParamsPanel } from './AdvancedParamsPanel';
+import { AskCard } from './AskCard';
 import { preloadFastestModel } from './auto-router';
 import { BobbleMark } from './BobbleMark';
 import { ChatComposer } from './ChatComposer';
@@ -80,7 +81,6 @@ import { useSiteIcon } from './site-icons';
 import { TaskTray } from './TaskTray';
 import { ToastHost } from './ToastHost';
 import { TopBarStatus } from './TopBarStatus';
-import { UiRequestDialogs } from './UiRequestDialogs';
 import { WhyQueuedModal } from './WhyQueuedModal';
 import { WindowDropOverlay } from './WindowDropOverlay';
 
@@ -893,6 +893,9 @@ export function ChatApp({
                     {/* A generation the model asked for that this Mac cannot make
                   yet: the Download button, right where the reply is waited for. */}
                     <ModuleNotice />
+                    {/* Every question to the person — a permission, a yes/no, the
+                  model's ask_user — as one card just above the composer. */}
+                    <AskCard />
                     {/* Round-12 W2: the project (working-folder) chip moved OFF the
                   top of the composer into the sticking-out ComposerBar below the
                   input (mounted inside ChatComposer). */}
@@ -989,7 +992,11 @@ export function ChatApp({
               <CanvasTabsPanel suppressed={contentOverride !== undefined} />
             </CanvasErrorBoundary>
 
-            <UiRequestDialogs />
+            {/* No composer on screen (a studio, the hub, a subagent): the same
+                card floats at the window's foot instead. */}
+            {contentOverride !== undefined || viewedChildId !== null ? (
+              <AskCard placement="floating" />
+            ) : null}
             <WhyQueuedModal />
             <ToastHost />
             <WindowDropOverlay />

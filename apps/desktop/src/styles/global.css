@@ -6702,6 +6702,80 @@ body[data-media-expanded="true"] .pd-studio-compose {
   }
 }
 
+/*
+ * THE ASK CARD — every question to the person, just above the composer
+ * (chat/AskCard.tsx). the user (2026-10-01): "a little card same width as the input
+ * bar floating directly above it (not on top of)". The composer's own surface —
+ * raised, hairline + md shadow, the surface radius — in the flow, so it never
+ * covers the composer and the conversation above it stays readable.
+ */
+.pd-ask-slot {
+  margin-bottom: 10px;
+}
+
+.pd-ask-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: var(--pd-radius-surface);
+  background: var(--pd-bg-raised);
+  box-shadow: var(--pd-shadow-hairline), var(--pd-shadow-md);
+  color: var(--pd-text-primary);
+  animation: pd-ask-in var(--pd-duration-base) var(--pd-easing-enter);
+}
+
+@keyframes pd-ask-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pd-ask-card {
+    animation: none;
+  }
+}
+
+.pd-ask-card-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.pd-ask-card-title {
+  margin: 0;
+  font-size: var(--pd-font-size-heading);
+  line-height: var(--pd-leading-heading);
+  font-weight: var(--pd-font-weight-semibold);
+}
+
+.pd-ask-card-reason {
+  margin: 0;
+  color: var(--pd-text-secondary);
+  font-size: var(--pd-font-size-footnote);
+  line-height: var(--pd-leading-footnote);
+}
+
+/* A little card: the command or the change scrolls inside it. */
+.pd-ask-card .pd-permission-preview {
+  max-height: 9.5rem;
+}
+
+.pd-ask-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* The question card takes the composer's width here, not its own 30rem. */
+.pd-ask-slot .pd-question {
+  max-width: none;
+}
+
 .pd-composer-pill {
   position: absolute;
   bottom: calc(100% + 8px);

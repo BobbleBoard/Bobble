@@ -6,7 +6,7 @@
  * when the decision matters.
  */
 import { describe, expect, it } from 'vitest';
-import { previewFor } from './PermissionDialog';
+import { previewFor } from './PermissionCard';
 
 describe('previewFor', () => {
   it('shows a bash call as its command', () => {

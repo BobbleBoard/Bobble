@@ -17,6 +17,7 @@
 import { Spinner } from '@pi-desktop/ui';
 import { useLlmStore } from '../state/llm-store';
 import { usePiStore } from '../state/pi-slice';
+import { useViewedAsk } from './AskCard';
 import { typicalBootSeconds } from './boot-history';
 import { composerPill, pickPill } from './composer-pill';
 import { modelReadyStage, PREFIX_WARM_STATUS } from './harness-status';
@@ -37,6 +38,8 @@ export function ComposerPill({
    * over 16k context." It publishes into the slot below like anything else.
    */
   useRePrefillWarning();
+  // A question to the person stands where the pill would float: the pill steps aside.
+  const asking = useViewedAsk() !== null;
   const prefixWarm = usePiStore((s) => s.extensionStatus[PREFIX_WARM_STATUS]);
   const readyStage = useLlmStore((s) => modelReadyStage(s.status.phase, prefixWarm));
   const elapsedMs = useWaitClock(readyStage);
@@ -85,7 +88,7 @@ export function ComposerPill({
           },
         ]),
   ]);
-  if (view === null) return null;
+  if (view === null || asking) return null;
 
   return (
     <div
