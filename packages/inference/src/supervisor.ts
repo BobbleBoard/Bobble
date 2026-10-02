@@ -120,6 +120,12 @@ export interface LaunchConfig {
    * mid-token.
    */
   readonly reasoningBudgetMessage?: string;
+  /**
+   * The model's own template variables (CatalogModel.chatTemplateKwargs), merged
+   * into the one `--chat-template-kwargs` the launch carries — llama.cpp keeps
+   * only the last copy of a repeated flag.
+   */
+  readonly chatTemplateKwargs?: Readonly<Record<string, string | number | boolean>>;
   readonly extraArgs?: readonly string[];
 }
 
@@ -266,13 +272,20 @@ export function assembleServerArgs(cfg: LaunchConfig): string[] {
   // A no-op on templates without support, so it's safe to send unconditionally.
   // The client side of this is buildChatCompletionsRequest carrying each
   // assistant turn's reasoning_content back (see provider-llamacpp/stream.ts).
+  const templateKwargs: Record<string, string | number | boolean> = {};
   if (cfg.reasoningPreserve !== false) {
     args.push('--reasoning-preserve');
     // `--reasoning-preserve` sets `preserve_thinking` (and clear/drop/
     // truncate_history_thinking) for the template; Ling's template spells the
     // same switch `preserved_thinking`. One more variable costs nothing on
     // templates that never read it.
-    args.push('--chat-template-kwargs', '{"preserved_thinking":true}');
+    templateKwargs.preserved_thinking = true;
+  }
+  // The model's own (Qwen3.8's reasoning_effort): the request's own kwargs still
+  // win over these — llama.cpp merges the request's into the launch's.
+  Object.assign(templateKwargs, cfg.chatTemplateKwargs ?? {});
+  if (Object.keys(templateKwargs).length > 0) {
+    args.push('--chat-template-kwargs', JSON.stringify(templateKwargs));
   }
 
   // Thinking-budget guardrail (llama.cpp `--reasoning-budget`, env
@@ -373,6 +386,8 @@ export interface SupervisorOptions {
   readonly draftPath?: string;
   readonly eagle3Supported?: boolean;
   readonly specDraftNMax?: number;
+  /** The model's own chat-template variables — see {@link LaunchConfig.chatTemplateKwargs}. */
+  readonly chatTemplateKwargs?: Readonly<Record<string, string | number | boolean>>;
   readonly extraArgs?: readonly string[];
   readonly env?: Record<string, string | undefined>;
 
@@ -564,6 +579,9 @@ export class LlamaServerSupervisor {
       draftPath: this.opts.draftPath,
       eagle3Supported: this.opts.eagle3Supported,
       specDraftNMax: this.opts.specDraftNMax,
+      ...(this.opts.chatTemplateKwargs !== undefined
+        ? { chatTemplateKwargs: this.opts.chatTemplateKwargs }
+        : {}),
       extraArgs: this.opts.extraArgs,
     });
   }

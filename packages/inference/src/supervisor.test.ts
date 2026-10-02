@@ -168,6 +168,29 @@ describe('assembleServerArgs', () => {
     expect(off).not.toContain('--chat-template-kwargs');
   });
 
+  it("merges the model's own template variables into the ONE --chat-template-kwargs (the user: Qwen3.8 at medium)", () => {
+    const args = assembleServerArgs({
+      ...base,
+      launchMode: 'fast-text',
+      chatTemplateKwargs: { reasoning_effort: 'medium' },
+    });
+    // llama.cpp keeps only the last copy of a repeated flag: one, carrying both.
+    expect(args.filter((a) => a === '--chat-template-kwargs')).toHaveLength(1);
+    expect(JSON.parse(args[args.indexOf('--chat-template-kwargs') + 1] ?? '{}')).toEqual({
+      preserved_thinking: true,
+      reasoning_effort: 'medium',
+    });
+    const alone = assembleServerArgs({
+      ...base,
+      launchMode: 'fast-text',
+      reasoningPreserve: false,
+      chatTemplateKwargs: { reasoning_effort: 'medium' },
+    });
+    expect(alone[alone.indexOf('--chat-template-kwargs') + 1]).toBe(
+      '{"reasoning_effort":"medium"}',
+    );
+  });
+
   it('defaults reasoning budget to unrestricted (-1) with the wrap-up message', () => {
     const args = assembleServerArgs({ ...base, launchMode: 'fast-text' });
     expect(args[args.indexOf('--reasoning-budget') + 1]).toBe('-1');

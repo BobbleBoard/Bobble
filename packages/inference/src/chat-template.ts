@@ -303,18 +303,43 @@ async function patchCachedTemplate(tplPath: string): Promise<void> {
 }
 
 /**
+ * A TEMPLATE'S DEFAULT REASONING EFFORT, SET. The MLX engines render from the
+ * model directory and are never handed the launch's kwargs, so a model's
+ * pinned `reasoning_effort` (CatalogModel.chatTemplateKwargs — the user: Qwen3.8
+ * 27B at medium, not its xhigh default) reaches them as the template's own
+ * default: Qwen's `reasoning_effort|default('xhigh')`, froggeric's
+ * `set _default_reasoning_effort = '…'`. A request that names an effort still
+ * wins. Idempotent; a template with neither form passes unchanged.
+ */
+export function patchReasoningEffortDefault(content: string, effort: string): string {
+  return content
+    .replace(/(reasoning_effort\s*\|\s*default\(\s*)(['"])[a-z]+\2(\s*\))/g, `$1'${effort}'$3`)
+    .replace(/(\{%-?\s*set\s+_default_reasoning_effort\s*=\s*)(['"])[a-z]+\2/g, `$1'${effort}'`);
+}
+
+/**
  * Patch the chat template INSIDE a model directory (an MLX twin in the app's
  * own store): `chat_template.jinja` and the `chat_template` field of
  * `tokenizer_config.json`, whichever the engine reads. The MLX engines render
  * from the model directory, so this is the only place the preserved-thinking
- * gate can reach them. Idempotent; returns whether anything changed.
+ * gate — and a pinned reasoning effort — can reach them. Idempotent; returns
+ * whether anything changed.
  */
-export async function patchModelDirTemplate(dir: string): Promise<boolean> {
+export async function patchModelDirTemplate(
+  dir: string,
+  opts: { readonly reasoningEffort?: string } = {},
+): Promise<boolean> {
   let changed = false;
+  const patch = (body: string): string => {
+    const base = patchChatTemplate(body);
+    return opts.reasoningEffort !== undefined
+      ? patchReasoningEffortDefault(base, opts.reasoningEffort)
+      : base;
+  };
   const jinja = join(dir, TEMPLATE_FILE);
   try {
     const body = await readFile(jinja, 'utf8');
-    const patched = patchChatTemplate(body);
+    const patched = patch(body);
     if (patched !== body) {
       await writeFile(jinja, patched, 'utf8');
       changed = true;
@@ -327,7 +352,7 @@ export async function patchModelDirTemplate(dir: string): Promise<boolean> {
     const raw = await readFile(cfg, 'utf8');
     const parsed = JSON.parse(raw) as { chat_template?: unknown };
     if (typeof parsed.chat_template === 'string') {
-      const patched = patchChatTemplate(parsed.chat_template);
+      const patched = patch(parsed.chat_template);
       if (patched !== parsed.chat_template) {
         parsed.chat_template = patched;
         await writeFile(cfg, `${JSON.stringify(parsed, null, 2)}\n`, 'utf8');

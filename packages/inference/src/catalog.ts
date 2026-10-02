@@ -280,6 +280,13 @@ export interface CatalogModel {
    */
   readonly specDisabled?: boolean;
   /**
+   * Variables the model's chat template reads, fixed for every request it
+   * renders — the launch's `--chat-template-kwargs` (merged with the app's
+   * own), and the default the MLX twin's template is given. One value for
+   * every turn, so the warm-up prime and the turn render the same prefix.
+   */
+  readonly chatTemplateKwargs?: Readonly<Record<string, string | number | boolean>>;
+  /**
    * The DEFAULT speed method used by the current launch path for a fast-text
    * launch (`--spec-type draft-<spec>`). See {@link variants} for the full set of
    * speed options a model supports (what the manager's variant dropdown offers).
@@ -1073,6 +1080,20 @@ const QWEN38_27B_MTP: CatalogModel = {
   ],
   hfRepo: 'unsloth/Qwen3.8-27B-GGUF',
   baseRepo: 'froggeric/Qwen-Fixed-Chat-Templates',
+  /*
+   * THINKING EFFORT: MEDIUM. the user (2026-10-02): "qwen3.8-27b comes with a built
+   * in settable thinking effort, it's xhigh by default, set it to medium".
+   * Qwen's own template reads `reasoning_effort` (xhigh — the default — medium,
+   * low); xhigh writes "Reasoning effort is set to xhigh. Please think
+   * carefully…" into the system turn, medium writes nothing and leaves the
+   * model at its natural depth. MEASURED the day before (the circle-area
+   * student): three thoughts of 20k, 6k and 19k characters, each cut off at the
+   * output limit, and no answer. froggeric's v22.5 happens to default to medium,
+   * v22 and Qwen's own to xhigh — pinned here so a template refresh cannot move
+   * it. Medium also keeps the warm-up prime (rendered with thinking off, so
+   * without xhigh's line) byte-identical to the turn.
+   */
+  chatTemplateKwargs: { reasoning_effort: 'medium' },
   files: [
     {
       name: 'Qwen3.8-27B-UD-Q3_K_XL.gguf',

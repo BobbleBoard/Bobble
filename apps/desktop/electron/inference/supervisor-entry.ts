@@ -1770,7 +1770,13 @@ async function startExternalEngine(
     // The MLX engines render from the model directory: give its template the
     // preserved-thinking gate (idempotent) so the history renders the bytes it
     // was generated as and the engine's prefix cache holds across turns.
-    if (await patchModelDirTemplate(modelDirPath).catch(() => false)) {
+    const pinnedEffort = model.chatTemplateKwargs?.reasoning_effort;
+    if (
+      await patchModelDirTemplate(
+        modelDirPath,
+        typeof pinnedEffort === 'string' ? { reasoningEffort: pinnedEffort } : {},
+      ).catch(() => false)
+    ) {
       console.log(
         `[chat-template] ${model.id}: patched the MLX twin's template for preserved thinking`,
       );
@@ -2982,6 +2988,10 @@ async function startServerExclusive(
       specType: launchSpec.specType,
       eagle3Supported: features.eagle3,
       draftPath: draftPath !== undefined && existsSync(draftPath) ? draftPath : undefined,
+      // The model's own template variables (Qwen3.8's reasoning_effort: medium).
+      ...(model.chatTemplateKwargs !== undefined
+        ? { chatTemplateKwargs: model.chatTemplateKwargs }
+        : {}),
       extraArgs: launchExtraArgs.length > 0 ? launchExtraArgs : undefined,
       // The parent-death watchdog (a modtest-only addition; the working repo has
       // none) was SIGKILLing the healthy llama-server a few seconds after it came

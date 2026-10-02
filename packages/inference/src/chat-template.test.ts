@@ -7,6 +7,8 @@ import {
   chatTemplateSupported,
   ensureChatTemplate,
   extractChatTemplate,
+  patchModelDirTemplate,
+  patchReasoningEffortDefault,
   repoSlug,
 } from './chat-template.js';
 
@@ -310,5 +312,48 @@ describe('patchModelDirTemplate / ensureGgufChatTemplate', () => {
       await ensureGgufChatTemplate(gguf, { cacheDir: d, template: 'no gate here' }),
     ).toBeUndefined();
     await rm(d, { recursive: true, force: true });
+  });
+});
+
+describe('patchReasoningEffortDefault — a pinned effort reaches the MLX twin', () => {
+  // Qwen3.8's own template (Qwen/Qwen3.8-27B chat_template.jinja) and froggeric's v22.5, as they read.
+  const QWEN = [
+    "{%- set resolved_reasoning_effort = reasoning_effort|default('xhigh') %}",
+    "{%- if resolved_reasoning_effort not in ('xhigh', 'medium', 'low') %}",
+  ].join('\n');
+  const FROGGERIC = "{%- set _default_reasoning_effort = 'xhigh' %}\n{%- set x = 1 %}";
+
+  it("sets Qwen's default from xhigh to medium (the user, 2026-10-02) and leaves the check alone", () => {
+    const out = patchReasoningEffortDefault(QWEN, 'medium');
+    expect(out).toContain("reasoning_effort|default('medium')");
+    expect(out).toContain("not in ('xhigh', 'medium', 'low')");
+    // Idempotent.
+    expect(patchReasoningEffortDefault(out, 'medium')).toBe(out);
+  });
+
+  it("sets froggeric's default too, and leaves a template with neither form unchanged", () => {
+    expect(patchReasoningEffortDefault(FROGGERIC, 'medium')).toContain(
+      "set _default_reasoning_effort = 'medium'",
+    );
+    const other = '{{ messages }}';
+    expect(patchReasoningEffortDefault(other, 'medium')).toBe(other);
+  });
+
+  it('patches a model directory when asked, and only then', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'pd-effort-'));
+    try {
+      const { writeFile } = await import('node:fs/promises');
+      await writeFile(join(dir, 'chat_template.jinja'), QWEN, 'utf8');
+      await patchModelDirTemplate(dir);
+      expect(await readFile(join(dir, 'chat_template.jinja'), 'utf8')).toContain(
+        "default('xhigh')",
+      );
+      expect(await patchModelDirTemplate(dir, { reasoningEffort: 'medium' })).toBe(true);
+      expect(await readFile(join(dir, 'chat_template.jinja'), 'utf8')).toContain(
+        "default('medium')",
+      );
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });

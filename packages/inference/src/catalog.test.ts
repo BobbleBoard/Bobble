@@ -351,3 +351,11 @@ describe('hfEndpoint — pointing the app at a mirror', () => {
     expect(hfResolveUrl('o/r', 'f')).not.toBe(before);
   });
 });
+
+describe('Qwen3.8 27B thinks at medium effort (the user, 2026-10-02)', () => {
+  it("pins the template's reasoning_effort to medium, not its xhigh default", () => {
+    expect(getCatalogModel('qwen3.8-27b-mtp')?.chatTemplateKwargs).toEqual({
+      reasoning_effort: 'medium',
+    });
+  });
+});
