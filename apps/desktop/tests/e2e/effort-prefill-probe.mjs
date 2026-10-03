@@ -21,7 +21,7 @@
  *   (OUT=<dir> for the JSON and screenshots)
  */
 import { execSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { launchApp, probeHome } from './harness.mjs';
@@ -49,11 +49,30 @@ writeFileSync(
   )}\n`,
 );
 
-const { page, check, finish } = await launchApp('effort-prefill', {
+const { app, page, check, finish } = await launchApp('effort-prefill', {
   realCache: true,
-  env: { HOME: home, PI_BIN: undefined, HF_HOME: path.join(homedir(), '.cache', 'huggingface') },
+  env: {
+    HOME: home,
+    PI_BIN: undefined,
+    HF_HOME: path.join(homedir(), '.cache', 'huggingface'),
+    // Why a warm-up did or did not happen, beside the report.
+    PI_ADV_DEBUG_WARM: path.join(OUT, 'warm.log'),
+  },
   timeout: 120_000,
 });
+/* The main process's own account — the guardian's PARK, llama-server's cache
+   lines ([llama]) — kept beside the report: a turn that re-read its prompt may
+   have met a server that was stopped and started again, not a cache miss. */
+const MAIN_LOG = path.join(OUT, 'main.log');
+for (const stream of [app.process().stdout, app.process().stderr]) {
+  stream?.on('data', (d) => appendFileSync(MAIN_LOG, d));
+}
+const serverPid = (p) =>
+  execSync('ps -ax -o pid,command', { encoding: 'utf8' })
+    .split('\n')
+    .find((l) => l.includes('llama-server') && l.includes(`--port ${p}`))
+    ?.trim()
+    .split(/\s+/)[0] ?? null;
 await page.setViewportSize({ width: 1440, height: 900 });
 await page.waitForFunction(() => typeof window.__pi_store === 'function', { timeout: 90_000 });
 await page.evaluate(() => window.piDesktop.invoke('pi:start', {}));
@@ -103,7 +122,19 @@ check(
 );
 check(report.renders.requestXhigh === 'xhigh', 'a request that names xhigh still gets it');
 
-// 3. Two turns: TTFT, prefill, the thought.
+// 3. A person sends once "Getting ready" has gone: the system prompt's warm-up.
+const warmT0 = Date.now();
+await page
+  .waitForFunction(
+    () => window.__pi_store().getState().extensionStatus?.['harness-prefix-warm'] === 'ready',
+    null,
+    { timeout: 180_000 },
+  )
+  .catch(() => undefined);
+report.warmReadyMs = Date.now() - warmT0;
+log(`warm label ready after ${report.warmReadyMs} ms`);
+
+// 4. Two turns: TTFT, prefill, the thought.
 const shape = () =>
   page.evaluate(() => {
     let chars = 0;
@@ -128,6 +159,7 @@ const slots = async () => {
   }
 };
 const turn = async (label, text) => {
+  const pid = serverPid(port);
   const before = await shape();
   let peak = null;
   let polling = true;
@@ -167,6 +199,7 @@ const turn = async (label, text) => {
         : null,
     thoughtChars: after.thought - before.thought,
     stop: after.stop,
+    serverPid: pid,
   };
   await page.screenshot({ path: path.join(OUT, `${label}.png`) });
   log(label, JSON.stringify(r));
@@ -181,6 +214,23 @@ await sleep(30_000);
 report.turn2 = await turn('turn2', 'And if the bat cost $2.00 more than the ball?');
 check(report.turn1.stop !== 'length', 'turn 1 answered (not cut off at the output limit)');
 check(report.turn2.stop !== 'length', 'turn 2 answered (not cut off at the output limit)');
+// A stopped-and-started server has an empty cache: say which happened.
+let parks = [];
+try {
+  parks = (await import('node:fs'))
+    .readFileSync(MAIN_LOG, 'utf8')
+    .split('\n')
+    .filter((l) => /PARK|park chat model|RESUME/.test(l))
+    .map((l) => l.trim().slice(0, 240));
+} catch {
+  /* no main log */
+}
+report.guardianParks = parks;
+const sameServer = report.turn1.serverPid === report.turn2.serverPid;
+check(
+  sameServer,
+  `the model server stayed up between the turns (pid ${report.turn1.serverPid} → ${report.turn2.serverPid}${parks.length > 0 ? `; ${parks.join(' | ')}` : ''})`,
+);
 check(
   report.turn2.reusedPct !== null && report.turn2.reusedPct >= 80,
   `turn 2 reused ${report.turn2.reusedPct}% of its prompt (prefill)`,
