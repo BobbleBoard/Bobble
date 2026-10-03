@@ -1,0 +1,8 @@
+[llama] 0.10.831.939 I slot get_availabl: id  0 | task -1 | selected slot by LRU, t_last = -1
+[llama] 0.24.424.932 I slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, f_sim_best = 0.959 (> 0.100 thold), f_keep = 0.998
+[pi-diag-usage] engine=llamacpp prompt_tokens=3869 cached_tokens=3707
+[llama] 0.31.700.867 I slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, f_sim_best = 0.999 (> 0.100 thold), f_keep = 1.000
+[llama] 0.33.985.736 I slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, f_sim_best = 0.983 (> 0.100 thold), f_keep = 1.000
+[llama] 0.34.202.970 I slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, f_sim_best = 1.000 (> 0.100 thold), f_keep = 1.000
+[llama] 0.02.298.682 I slot get_availabl: id  0 | task -1 | selected slot by LRU, t_last = -1
+[pi-diag-usage] engine=llamacpp prompt_tokens=3991 cached_tokens=0

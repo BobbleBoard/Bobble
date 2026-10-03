@@ -1,0 +1,10 @@
+[llama] window 12288: 80% free, pause line 15%, reserve fraction 0.63
+  line: 'PAUSE the chat: the system reports memory pressure with 15% free (0.6% of pages)'
+  line: 'PARK the chat model: 14% of memory is free — paused for 20 readings and it did not come back'
+2026-10-03T02:40:41.144Z [desktop:llm] park chat model { ok: true, reason: undefined, bytes: 13146393504 }
+2026-10-03T02:40:55.983Z [desktop:main] guardian { line: 'PAUSE the chat: 15% of memory is free' }
+  line: 'PARK the chat model: 14% of memory is free — paused for 20 readings and it did not come back'
+2026-10-03T02:41:05.918Z [desktop:llm] park chat model { ok: true, reason: undefined, bytes: 13146393504 }
+  line: 'PAUSE the chat: the system reports memory pressure with 14% free (2.9% of pages)'
+  line: 'PARK the chat model: the system reports memory pressure with 14% free (0.6% of pages) — paused for 20 readings and it did not come back'
+2026-10-03T02:42:00.443Z [desktop:llm] park chat model { ok: false, reason: 'a request is in flight', bytes: undefined }

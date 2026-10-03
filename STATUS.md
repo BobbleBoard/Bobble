@@ -1,6 +1,6 @@
 # Bobble — status
 
-Updated: 2026-10-02 (on battery) · main `5e12867f` · dist rebuilt and **installed** (packaged smoke OK) · the user: "drive bobble visually as a user and go and ask for some explanation of some math problem … see if you think bobble does better"
+Updated: 2026-10-02 (on AC) · main `79cd7a7b` · dist rebuilt and **installed** (packaged smoke OK) · the user: "qwen3.8-27b comes with a built in settable thinking effort, it's xhigh by default, set it to medium"
 
 ## Addendum — 2026-10-02: Qwen3.8 27B thinks at medium effort (the user: "it's xhigh by default, set it to medium")
 
@@ -8,9 +8,25 @@ Updated: 2026-10-02 (on battery) · main `5e12867f` · dist rebuilt and **instal
 |---|---|---|
 | The 27B's thinking effort pinned to **medium** | `CatalogModel.chatTemplateKwargs: { reasoning_effort: 'medium' }`, merged into the one `--chat-template-kwargs` the launch carries (`{"preserved_thinking":true,"reasoning_effort":"medium"}`); the MLX twin's template default set to medium; a request that names an effort still wins — `61ede173` | unit tests (launch args, catalog, template patch); llama.cpp b10603's own `/apply-template` on Qwen's template, froggeric v22 and v22.5: **xhigh → medium on the first two**, medium on v22.5 (which had already changed its default) |
 | A prefill trap the pin closes | the warm-up prime renders with thinking off, which drops xhigh's "Reasoning effort is set to xhigh…" line from the system turn — so under an xhigh template the primed prefix never matched the turn | same render: prime ≠ turn before, prime = turn after |
-| Live check on the 27B (TTFT, /slots prefill reuse, thought length, two turns) | `apps/desktop/tests/e2e/effort-prefill-probe.mjs` (`5e12867f`) | **queued under the heavy lock — the Mac is on battery**; it runs when it is plugged in |
+| **Live, on the real 27B** (headless, on AC) | `effort-prefill-probe.mjs` | launch carries `{"preserved_thinking":true,"reasoning_effort":"medium"}`; the server renders medium, and xhigh when a request names it; **thoughts 30–350 chars, "Thought for 10s / 13s", both turns answered correctly** (the day before, at xhigh: 6k–20k-char thoughts that ran into the output limit) — `deliverables/effort-prefill-2026-10-02/qwen38-27b-medium-two-turns.png` |
 
-Installed (`pnpm ship:local`, packaged smoke OK); the installed bundle carries the pin.
+### Prefill — what the check found, and what was fixed
+| # | Found (server's own log, `[pi-diag-usage]` + `[llama]` slot lines) | Fix | Commit | Verified |
+|---|---|---|---|---|
+| 1 | Every side call sent with `enable_thinking:false` (warm-up, prime, title, reviewer, fixer) parted from the chat **right after the tool list**: froggeric's Qwen 3.8 template writes its tool instructions differently when thinking is off. Server: `f_sim_best = 0.224` | the system turn follows the conversation's thinking, not one request's switch (`patchSystemTurnThinking`, in every cached template's patch set); the warm-up and the prime send no switch of their own (Gemma 4's `<|think|>` sits at the top of its system turn — the same trap) | `1919d1c1` | through llama-server's own renderer: title shares **21% → 100%** of the chat's prompt; live 27B: title `f_sim 0.983`, turn 1 **96%** from the warmed prefix |
+| 2 | "Getting ready" cleared one tick after the warm-up **started** (~14 s before the prefix was resident) — turn 1, 96% cached, still waited 12.7 s | the label waits for the in-flight warm-up | `3bee16cd` | test fails without / passes with; live: label up 4.2 s → **20.7 s** (the warm-up's real length) |
+| 3 | Launched beside another model, the 27B answered every request with an in-stream `{"error":"Compute error."}` — read as an **empty reply**, then nudged, then titled, chat stuck on nothing | both providers turn an error frame into an error the person sees ("short of memory…") | `0582d0f6` | tests (llama.cpp + MLX) |
+| 4 | Re-prefills were invisible in the app's logs | llama-server's slot/LCP/checkpoint lines are logged (and written beside `PI_DIAG_PROMPTS`) | `9573d023` | every run above |
+| — | Qwen 3.5 4B, the full flow after the fixes | — | — | **effort-prefill OK**: turn 1 **96%**, first token **426 ms**; turn 2 **98%**, **321 ms**; same server both turns |
+
+### Found, not fixed — the user's call
+| Finding | Measured | Options |
+|---|---|---|
+| **The guardian unloads the 27B between turns** on this 24 GB Mac. It loads to ~16 GB (free 82% → 14–15%, with or without the vision projector, at a 12k window), under the guardian's 15% pause line; 20 readings later it sheds and parks (stops) the model, so each turn reloads it and reads its prompt cold: **first token 17–26 s, `cached_tokens=0`** (4 runs). The cache itself works when the server stays up (#1). | `qwen38-27b-guardian-log.txt`: `PARK the chat model: 14% of memory is free — paused for 20 readings and it did not come back` | (a) keep it — the machine comes first; (b) let an idle chat model stay loaded while nothing swaps or stalls (sheds at 8% / swap+tight / stall unchanged); (c) a smaller 27B quant (~10–11 GB); (d) fewer apps open. A window-sizing change was tried and **reverted** (`cd63e23c`): the window was already 12k — not the lever. |
+| Currency `$…$` in a reply renders as inline maths ("$1.10, then x + … = 1.10$") | 4B turn 2 screenshot | filed as a separate task |
+
+
+Installed (`pnpm ship:local`, packaged smoke OK); the installed bundle carries the pin and the four prefill fixes. Images, reports and server logs: `deliverables/effort-prefill-2026-10-02/`.
 
 ## Report — 2026-10-01: a visual-learner student, Bobble × five local models vs ChatGPT (logged out)
 

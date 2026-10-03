@@ -1,0 +1,35 @@
+{
+  "model": "qwen3.5-4b-mtp",
+  "baseUrl": "http://127.0.0.1:61143/v1",
+  "launchKwargs": null,
+  "renders": {
+    "default": "medium",
+    "requestXhigh": "medium"
+  },
+  "warmReadyMs": 4724,
+  "turn1": {
+    "label": "turn1",
+    "ttftMs": 426,
+    "turnMs": 5250,
+    "engine": "rapid-mlx",
+    "prompt": 3902,
+    "cached": 3738,
+    "reusedPct": 96,
+    "thoughtChars": 322,
+    "stop": "stop",
+    "serverPid": "67055"
+  },
+  "turn2": {
+    "label": "turn2",
+    "ttftMs": 321,
+    "turnMs": 6888,
+    "engine": "rapid-mlx",
+    "prompt": 3986,
+    "cached": 3889,
+    "reusedPct": 98,
+    "thoughtChars": 412,
+    "stop": "stop",
+    "serverPid": "67055"
+  },
+  "guardianParks": []
+}
