@@ -21,6 +21,7 @@ import type {
 import { repairToolCallArguments } from '@pi-desktop/provider-llamacpp';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  forgetResidentPrefix,
   HARNESS_CONFIG_ENTRY,
   HARNESS_LOOP_ENTRY,
   HARNESS_REVIEW_ENTRY,
@@ -277,6 +278,39 @@ describe('repair ladder — live wiring through the provider', () => {
     const labels = second.setStatus.mock.calls.filter((c) => c[0] === 'harness-prefix-warm');
     expect(labels.length).toBeGreaterThan(0);
     expect(labels.at(-1)?.[1]).toBe('ready');
+  });
+
+  /*
+   * MEASURED (Qwen 3.8 27B, 2026-10-02): the label cleared four seconds after
+   * the server came up — one tick after the warm-up STARTED, because the next
+   * tick found the prompt already recorded as warmed and handed the label
+   * back. The 27B was still reading the prompt; a first message sent then
+   * queued behind it.
+   */
+  it('keeps "getting ready" up while the warm-up is still reading the prompt', async () => {
+    forgetResidentPrefix();
+    let finish: (v: string) => void = () => undefined;
+    const callModel = vi.fn(
+      () =>
+        new Promise<string>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const rig = makeRig({ effort: 'medium', callModel });
+    (rig.ctx as unknown as { getSystemPrompt: () => string }).getSystemPrompt = () =>
+      'You are a helpful assistant, still warming.';
+    await startSession(rig);
+    for (let i = 0; i < 6; i += 1) {
+      await rig.fire('model_select', { type: 'model_select', model: { id: 'm', name: 'm' } });
+      await Promise.resolve();
+    }
+    const label = () =>
+      rig.setStatus.mock.calls.filter((c) => c[0] === 'harness-prefix-warm').at(-1)?.[1];
+    expect(callModel).toHaveBeenCalledTimes(1);
+    expect(label()).toBe('warming');
+    finish('ok');
+    await new Promise((r) => setTimeout(r, 0));
+    expect(label()).toBe('ready');
   });
 
   it('rung 5 aborts at the effort abortThreshold and onRepair populates repairFailures', async () => {

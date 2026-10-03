@@ -949,6 +949,8 @@ export function cleanChildEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
 interface ResidentPrefix {
   canonical: string | null;
   warmedKey: string | null;
+  /** The warm-up still reading `warmedKey` into the server, if one is. */
+  warming: Promise<unknown> | null;
 }
 
 /*
@@ -969,7 +971,7 @@ const processGlobals = globalThis as unknown as Record<symbol, ResidentPrefix | 
 function processResidentPrefix(): ResidentPrefix {
   const existing = processGlobals[RESIDENT];
   if (existing !== undefined) return existing;
-  const fresh: ResidentPrefix = { canonical: null, warmedKey: null };
+  const fresh: ResidentPrefix = { canonical: null, warmedKey: null, warming: null };
   processGlobals[RESIDENT] = fresh;
   return fresh;
 }
@@ -979,6 +981,7 @@ const residentPrefix = processResidentPrefix();
 export function forgetResidentPrefix(): void {
   residentPrefix.canonical = null;
   residentPrefix.warmedKey = null;
+  residentPrefix.warming = null;
 }
 
 /**
@@ -1344,6 +1347,8 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   let warmClaimedAt: number | null = null;
   /** The prefix seen on the PREVIOUS attempt — warm only once it repeats. */
   let pendingWarmKey: string | null = null;
+  /** This wiring already waits on the in-flight warm-up to give the label back. */
+  let warmReleaseQueued = false;
   /* Identifies THIS wiring, so a repeated note can be told apart from a second
    * copy of the extension keeping its own state beside the first. */
   const wireId = Math.random().toString(36).slice(2, 7);
@@ -1679,6 +1684,26 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       return;
     }
     if (warmKey === residentPrefix.warmedKey) {
+      /*
+       * WARMED IS NOT THE SAME AS STARTED. The key is recorded when the
+       * warm-up begins, so the next tick lands here while the server is still
+       * reading the prompt — and used to hand the label back then. MEASURED
+       * (Qwen 3.8 27B, 2026-10-02): "Getting ready" cleared one tick after the
+       * warm-up started, ~14 s before the prefix was resident. While one is in
+       * flight, the label goes back when it ends.
+       */
+      const inFlight = residentPrefix.warming;
+      if (inFlight !== null) {
+        note('warm-up still in flight (same prompt + tools)');
+        if (!warmReleaseQueued) {
+          warmReleaseQueued = true;
+          void inFlight.finally(() => {
+            warmReleaseQueued = false;
+            releaseWarmLabel(ctx);
+          });
+        }
+        return;
+      }
       note('already warmed (same prompt + tools)');
       /*
        * AND SAY SO. The label is claimed on the first tick of every wiring —
@@ -1722,11 +1747,13 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       }
     }
     const warmStartedAt = Date.now();
-    void warmSystemPrompt(warmCall, canonical, { tools: warmTools })
+    const warming = warmSystemPrompt(warmCall, canonical, { tools: warmTools })
       .then((ok) => note(`warm result ok=${ok} in ${Date.now() - warmStartedAt}ms`))
       .finally(() => {
+        if (residentPrefix.warming === warming) residentPrefix.warming = null;
         if (ctx.hasUI === true) ctx.ui.setStatus(PREFIX_WARM_STATUS, 'ready');
       });
+    residentPrefix.warming = warming;
   }
 
   // A session-stable per-tool failure counter shared by rungs 4 (bump) and 5
