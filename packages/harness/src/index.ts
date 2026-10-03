@@ -168,6 +168,7 @@ import { presentBridgeFromEnv } from './tools/present-bridge.js';
 import { rawPageFetchRefusal, rawPageFetchUrl } from './tools/raw-page-fetch.js';
 import { withRepeatNotice } from './tools/repeat-notice.js';
 import {
+  allowedWriteRoots,
   registerSandboxFileTools,
   resolveWorkspaceRoot,
   WORKSPACE_ROOT_ENV,
@@ -2918,7 +2919,22 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   // by the small model (fail-open to the regex result).
   runtime.permission = registerPermissions(pi, {
     initialMode: runtime.config.mode,
-    ...(callModel !== undefined ? { flagBash: createBashFlagger(callModel) } : {}),
+    ...(callModel !== undefined
+      ? {
+          flagBash: createBashFlagger(callModel, {
+            /*
+             * The chat's own folder, as bash will meet it: the root every
+             * command starts in (the spawnHook's liveRoot) and the roots the
+             * `write` tool may write. Reads and in-folder writes never reach the
+             * model — see needsModelReview. Per call: the dropdown moves it.
+             */
+            folder: () => {
+              const cwd = liveRoot();
+              return { cwd, roots: allowedWriteRoots(cwd) };
+            },
+          }),
+        }
+      : {}),
   });
 
   function buildStatus(ctx: ExtensionContext): HarnessStatus {

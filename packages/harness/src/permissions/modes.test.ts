@@ -6,6 +6,7 @@ import type {
 } from '@mariozechner/pi-coding-agent';
 import { describe, expect, it, vi } from 'vitest';
 import { SUBAGENT_DEPTH_ENV } from '../subagent/types.js';
+import { createBashFlagger } from './flag-bash.js';
 import { evaluateToolCall, registerPermissions } from './modes.js';
 
 describe('evaluateToolCall — pure policy', () => {
@@ -251,5 +252,53 @@ describe('registerPermissions — event gating', () => {
       if (prev === undefined) delete process.env[SUBAGENT_DEPTH_ENV];
       else process.env[SUBAGENT_DEPTH_ENV] = prev;
     }
+  });
+});
+
+describe('registerPermissions — the chat folder, end to end (2026-10-01 student run)', () => {
+  /*
+   * Each of these put a "Run this command?" card in front of the person in the
+   * Ling 3.0 Tiny run. Through the real gate and the real flagger — with a model
+   * that would flag anything it was shown — none of them asks now.
+   */
+  const home = '/private/var/folders/4h/nq1c73q107v594j4g0lq6bw00000gn/T/pd-home-drive-KwuMtn';
+  const chat = `${home}/Bobble/hi-im-a-really-visual-learner`;
+  const gate = () => {
+    const { pi, fire } = fakePi();
+    const call = vi.fn(async () => 'DANGEROUS: touches a private system path');
+    registerPermissions(pi, {
+      initialMode: 'reviewer',
+      flagBash: createBashFlagger(call, { folder: () => ({ cwd: chat, roots: [chat] }), home }),
+    });
+    return { fire, call };
+  };
+
+  it.each([
+    `bash -c 'ls -la ${chat}/ 2>&1'`,
+    `bash -c '\ncat > ${chat}/area_circle_visual.svg << "EOF"\n<svg viewBox="0 0 600 600">\n  <text x="300" y="45`,
+    `ls -la ${chat}/circle_area_explanation.svg 2>/dev/null && echo "EXISTS" || echo "NOT FOUND"`,
+  ])('no card: %s', async (command) => {
+    const { fire, call } = gate();
+    const ask = answers('deny');
+    expect(await fire(bashEvent(command), ctxWith(ask))).toBeUndefined();
+    expect(ask).not.toHaveBeenCalled();
+    expect(call).not.toHaveBeenCalled();
+  });
+
+  it('a command the rules call scary still asks', async () => {
+    const { fire } = gate();
+    const ask = answers('deny');
+    expect(await fire(bashEvent(`rm -rf ~/Documents`), ctxWith(ask))).toMatchObject({
+      block: true,
+    });
+    expect(ask).toHaveBeenCalledOnce();
+  });
+
+  it('a write outside the folder still goes to the model, and its named harm asks', async () => {
+    const { fire, call } = gate();
+    const ask = answers('deny');
+    await fire(bashEvent('echo x >> ~/.zshrc'), ctxWith(ask));
+    expect(call).toHaveBeenCalledOnce();
+    expect(ask).toHaveBeenCalledOnce();
   });
 });
