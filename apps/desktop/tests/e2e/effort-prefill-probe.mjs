@@ -80,12 +80,14 @@ const MAIN_LOG = path.join(OUT, 'main.log');
 for (const stream of [app.process().stdout, app.process().stderr]) {
   stream?.on('data', (d) => appendFileSync(MAIN_LOG, d));
 }
-const serverPid = (p) =>
-  execSync('ps -ax -o pid,command', { encoding: 'utf8' })
-    .split('\n')
-    .find((l) => l.includes('llama-server') && l.includes(`--port ${p}`))
-    ?.trim()
-    .split(/\s+/)[0] ?? null;
+/** The process listening on the model's port — llama-server or an MLX engine. */
+const serverPid = (p) => {
+  try {
+    return execSync(`lsof -nP -iTCP:${p} -sTCP:LISTEN -t`, { encoding: 'utf8' }).trim() || null;
+  } catch {
+    return null;
+  }
+};
 await page.setViewportSize({ width: 1440, height: 900 });
 await page.waitForFunction(() => typeof window.__pi_store === 'function', { timeout: 90_000 });
 await page.evaluate(() => window.piDesktop.invoke('pi:start', {}));
@@ -107,7 +109,11 @@ const cmd = execSync('ps -ax -o command', { encoding: 'utf8' })
   .find((l) => l.includes('llama-server') && l.includes(`--port ${port}`));
 const kw = /--chat-template-kwargs (\{[^}]*\})/.exec(cmd ?? '')?.[1] ?? null;
 report.launchKwargs = kw;
-check(kw !== null && JSON.parse(kw).reasoning_effort === 'medium', `launched with ${kw}`);
+// The effort pin is Qwen 3.8's; another MODEL runs the prefill half only.
+const PINS_EFFORT = MODEL.startsWith('qwen3.8');
+if (PINS_EFFORT) {
+  check(kw !== null && JSON.parse(kw).reasoning_effort === 'medium', `launched with ${kw}`);
+}
 
 // 2. The template, rendered by that server.
 const render = async (extra) => {
@@ -129,11 +135,13 @@ report.renders = {
   default: await render({}),
   requestXhigh: await render({ chat_template_kwargs: { reasoning_effort: 'xhigh' } }),
 };
-check(
-  report.renders.default === 'medium',
-  `the template renders ${report.renders.default} by default`,
-);
-check(report.renders.requestXhigh === 'xhigh', 'a request that names xhigh still gets it');
+if (PINS_EFFORT) {
+  check(
+    report.renders.default === 'medium',
+    `the template renders ${report.renders.default} by default`,
+  );
+  check(report.renders.requestXhigh === 'xhigh', 'a request that names xhigh still gets it');
+}
 
 // 3. A person sends once "Getting ready" has gone: the system prompt's warm-up.
 const warmT0 = Date.now();
@@ -172,8 +180,8 @@ const usageSince = (from) => {
     return [];
   }
   return [
-    ...text.matchAll(/\[pi-diag-usage\] engine=llamacpp prompt_tokens=(\d+) cached_tokens=(\d+)/g),
-  ].map((m) => ({ prompt: Number(m[1]), cached: Number(m[2]) }));
+    ...text.matchAll(/\[pi-diag-usage\] engine=(\S+) prompt_tokens=(\d+) cached_tokens=(\d+)/g),
+  ].map((m) => ({ engine: m[1], prompt: Number(m[2]), cached: Number(m[3]) }));
 };
 const diagSize = () => {
   try {
@@ -206,6 +214,7 @@ const turn = async (label, text) => {
     label,
     ttftMs: ttft,
     turnMs: Date.now() - t0,
+    engine: first?.engine ?? null,
     prompt: first?.prompt ?? null,
     cached: first?.cached ?? null,
     reusedPct:
