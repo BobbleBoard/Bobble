@@ -11,6 +11,7 @@
 import { execFile, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
+  appendFileSync,
   closeSync,
   createReadStream,
   existsSync,
@@ -174,6 +175,24 @@ const MLX_PROVIDER_NAME = 'mlx';
  * `detectHardware()` spawns a few `sysctl` calls, so we probe once and reuse it for
  * both the catalog reply and the per-hardware launch-arg chooser. */
 let hardwareCache: Awaited<ReturnType<typeof detectHardware>> | null = null;
+/** llama-server's prompt-cache decisions (reuse, checkpoints, a forced full re-read). */
+const PROMPT_CACHE_LINE =
+  /forcing full prompt|context checkpoint|checking checkpoint|n_past\s*=|memory_seq_rm|prompt cache|cache.reuse|selected slot/i;
+
+/** Logged, and beside the request bodies when `PI_DIAG_PROMPTS=<file>` (request-tap). */
+function noteCacheLine(line: string): void {
+  const text = `[llama] ${line.trim().slice(0, 300)}`;
+  console.log(text);
+  const diag = process.env.PI_DIAG_PROMPTS;
+  if (diag?.includes('/')) {
+    try {
+      appendFileSync(diag, `${text}\n`);
+    } catch {
+      /* a diagnostic never breaks a launch */
+    }
+  }
+}
+
 async function getHardware(): Promise<Awaited<ReturnType<typeof detectHardware>>> {
   if (hardwareCache === null) hardwareCache = await detectHardware();
   return hardwareCache;
@@ -3012,6 +3031,9 @@ async function startServerExclusive(
         for (const line of event.text.split('\n')) {
           const tps = parseTps(line);
           if (tps !== undefined) supervisor.recordTimings({ predicted_per_second: tps });
+          /* WHY A PROMPT WAS READ AGAIN, in the server's own words — a re-prefill
+             is otherwise visible only as a slow turn. */
+          if (PROMPT_CACHE_LINE.test(line)) noteCacheLine(line);
         }
       } else if (event.type === 'crash' || event.type === 'restart') {
         beginLoading(model);
