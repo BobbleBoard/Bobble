@@ -45,6 +45,8 @@ writeFileSync(
       enginePreference: 'llamacpp',
       toolInterface: 'bash-cli',
       modelSelection: { mode: 'model', modelId: MODEL },
+      // VISION=0: Settings → engine → Vision off (no projector beside the weights).
+      ...(process.env.VISION === '0' ? { loadVision: false } : {}),
     },
     null,
     2,
