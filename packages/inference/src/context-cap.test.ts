@@ -4,6 +4,7 @@ import {
   CONTEXT_FLOOR,
   chooseContextCap,
   estimateLaunchRamGB,
+  liveMemoryFraction,
 } from './context-cap.js';
 
 const GiB = 1024 ** 3;
@@ -69,5 +70,26 @@ describe('chooseContextCap', () => {
     expect(chooseContextCap({ modelBytes: 4 * GiB, modelMaxContext: 131_072, totalRamGB: 0 })).toBe(
       CONTEXT_CEILING,
     );
+  });
+});
+
+describe("liveMemoryFraction — the launch keeps the guardian's pause line clear", () => {
+  // Qwen 3.8 27B UD-Q3_K_XL as launched on a 24 GB Mac (2026-10-02): 82% free
+  // before the load, the guardian pausing at 15%, the reserve's own 0.833.
+  const QWEN38 = { modelBytes: 13_146_393_504, modelMaxContext: 262_144, totalRamGB: 24 };
+
+  it('steps the 27B down from the 64k window that left 14% free', () => {
+    expect(chooseContextCap({ ...QWEN38, memoryFraction: 0.8333 })).toBe(65_536);
+    const live = liveMemoryFraction(0.82, 0.15);
+    expect(live).toBeCloseTo(0.67);
+    expect(chooseContextCap({ ...QWEN38, memoryFraction: Math.min(0.8333, live ?? 1) })).toBe(
+      32_768,
+    );
+  });
+
+  it('is no ceiling without a reading, and never negative', () => {
+    expect(liveMemoryFraction(undefined, 0.15)).toBeUndefined();
+    expect(liveMemoryFraction(Number.NaN, 0.15)).toBeUndefined();
+    expect(liveMemoryFraction(0.1, 0.15)).toBe(0);
   });
 });

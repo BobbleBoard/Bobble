@@ -90,3 +90,26 @@ export function chooseContextCap(input: ContextCapInput): number {
   // Nothing on the ladder fit — give the smallest usable window the model allows.
   return Math.min(CONTEXT_FLOOR, hardMax);
 }
+
+/**
+ * THE SHARE A LAUNCH MAY TAKE OF WHAT IS FREE NOW, with the guardian's pause
+ * line left clear.
+ *
+ * `memoryFraction` is a share of the whole machine — it assumes the person's
+ * own apps fit in the reserve. MEASURED (Qwen 3.8 27B UD-Q3_K_XL, 24 GB Mac,
+ * 2026-10-02): sized that way it took the 64k window, ~16.3 GB, and the OS's
+ * free figure went 82% → 14% — under the guardian's 15% pause line. The
+ * guardian then stopped the model ten seconds into every idle moment, so each
+ * turn reloaded it and read its prompt from cold (first token at 17–26 s).
+ * llama.cpp reserves the whole KV at launch, so the window is the lever: the
+ * free figure (`kern.memorystatus_level`, 0..1) less the pause line is a
+ * second ceiling, and the ladder steps down to a window the model can keep.
+ * Undefined when there is no reading. Pure.
+ */
+export function liveMemoryFraction(
+  freeNow: number | undefined,
+  pauseLine: number,
+): number | undefined {
+  if (freeNow === undefined || !Number.isFinite(freeNow)) return undefined;
+  return Math.max(0, freeNow - pauseLine);
+}

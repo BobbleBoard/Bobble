@@ -76,8 +76,10 @@ import {
   type LaunchProfile,
   LlamaServerSupervisor,
   type LlamaSpecType,
+  limitsFor,
   listHfGgufFiles,
   listHfRepoFiles,
+  liveMemoryFraction,
   MANAGED_LLAMA_FLAGS,
   mlxWeightsHaveVision,
   mmprojFileFor,
@@ -2876,13 +2878,37 @@ async function startServerExclusive(
      * for the recommender; the launch should have been drawing it too.
      */
     const budgetGB = powerBudgetGB(await accelerators());
+    /*
+     * …AND WHAT IS FREE NOW, with the guardian's pause line left clear (see
+     * liveMemoryFraction). The old server is already gone (disposed above), so
+     * a fresh reading counts only what the launch will sit beside. MEASURED
+     * (Qwen 3.8 27B, 24 GB Mac): the reserve alone chose 64k and left 14% free;
+     * the guardian then stopped the model whenever it idled. The same seam the
+     * guardian reads (PI_GUARDIAN_PAUSE_FREE) moves this line with it.
+     */
+    const pauseEnv = Number(process.env.PI_GUARDIAN_PAUSE_FREE);
+    const pauseLine =
+      Number.isFinite(pauseEnv) && pauseEnv > 0 ? pauseEnv : limitsFor('full').pauseFree;
+    const freeNow = await (async () => {
+      try {
+        const pm = await power();
+        await pm.sample();
+        return pm.lastPressure()?.memoryFree;
+      } catch {
+        return undefined;
+      }
+    })();
+    const liveFraction = liveMemoryFraction(freeNow, pauseLine);
     const contextWindow = chooseContextCap({
       modelBytes: file.bytes + mmprojBytes,
       modelMaxContext: model.contextWindow,
       totalRamGB: budgetGB,
       slots,
-      memoryFraction: powerNow.memoryFraction,
+      memoryFraction: Math.min(powerNow.memoryFraction, liveFraction ?? 1),
     });
+    console.log(
+      `[llama] window ${contextWindow}: ${freeNow === undefined ? 'no free reading' : `${Math.round(freeNow * 100)}% free`}, pause line ${Math.round(pauseLine * 100)}%, reserve fraction ${powerNow.memoryFraction.toFixed(2)}`,
+    );
     // OOM-safe fan-out: for a K-slot fast-text launch the server `-c` must be
     // perSlot × K (llama.cpp splits `-c` across `--parallel` slots) so each slot
     // still gets the full `contextWindow`. K defaults to 1 (single slot, `-c` =
