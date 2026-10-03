@@ -1096,13 +1096,31 @@ export function isStoppedResult(text: string | undefined): boolean {
 /**
  * A FAILED WRITE DID NOT WRITE. The row read "Wrote a file · fox-under-oak-tree.png
  * +12" in red (SEEN) for a write the guard had refused — the colour said no
- * and the verb said yes, and the verb is what gets read. Only the edit family
- * is reworded: "Ran a command" that failed still ran.
+ * and the verb said yes, and the verb is what gets read. The edit family and
+ * the making family are reworded: "Ran a command" that failed still ran.
+ *
+ * …AND A REFUSED PICTURE WAS NOT MADE. A maths figure asked of the image model
+ * is answered with the math command instead (harness math-figure-image.ts),
+ * and its row read "Generated an image" in red over a picture that does not
+ * exist — in the very turn whose picture went missing ("theres no picture in
+ * the chat", the visual-learner student, 2026-10-01).
  */
+const FAILED_LABELS: Readonly<Record<string, string>> = {
+  'Wrote a file': 'Could not write the file',
+  'Edited a file': 'Could not edit the file',
+  'Generated an image': 'Could not make the image',
+  'Edited an image': 'Could not edit the image',
+  'Generated a video': 'Could not make the video',
+  'Drew an SVG': 'Could not draw the SVG',
+  'Composed music': 'Could not make the music',
+  'Made a sound effect': 'Could not make the sound effect',
+  'Read it aloud': 'Could not read it aloud',
+  'Built a 3D model': 'Could not build the 3D model',
+  'Refined a 3D model': 'Could not refine the 3D model',
+};
+
 export function failedLabel(label: string): string {
-  if (label === 'Wrote a file') return 'Could not write the file';
-  if (label === 'Edited a file') return 'Could not edit the file';
-  return label;
+  return FAILED_LABELS[label] ?? label;
 }
 
 /** Map one tool-call block (+ its result) to a chain step and optional canvas tab. */

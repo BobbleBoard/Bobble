@@ -83,3 +83,65 @@ describe('a reply’s presented card stands after its words', () => {
     expect(card?.closest('[data-testid="turn-foot"]')).not.toBeNull();
   });
 });
+
+describe('a picture the turn made and never presented is in the chat', () => {
+  /* The visual-learner student (2026-10-01, Gemma 4 12B, bash-CLI): the picture
+     was made through bash, never presented, and the reply was about it. It sat
+     in the chain row, and the chain folds once the reply begins — "theres no
+     picture in the chat". */
+  const PIC = '/w/generated/slices/cand0_seed259687452.png';
+  const made = call('c1', 'bash', { command: 'media generate image "a circle cut into slices"' });
+  const result: ToolResultMsg = {
+    kind: 'toolResult',
+    id: 'c1',
+    toolCallId: 'c1',
+    toolName: 'bash',
+    text: `Generated 1 image on the canvas:\n  1. ${PIC} (seed 259687452)\nModel: Qwen-Image 2.1`,
+    isError: false,
+    timestamp: 0,
+  };
+  const draw = async (group: AssistantMsg[], live: boolean) => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <CanvasProvider>
+          <AssistantGroup
+            group={group}
+            resultByCallId={new Map([['c1', result]])}
+            runningToolCalls={[]}
+            tps={undefined}
+            live={live}
+          />
+        </CanvasProvider>,
+      );
+    });
+    return container;
+  };
+
+  it('while its chain works it is in the row that made it', async () => {
+    const container = await draw([assistant('m1', [made])], true);
+    const card = container.querySelector('[data-testid="media-card"]');
+    expect(card).not.toBeNull();
+    expect(card?.closest('.pd-chain')).not.toBeNull();
+    expect(card?.closest('[data-testid="turn-foot"]')).toBeNull();
+  });
+
+  it('once the reply is written it stands at the foot, after the words — not in the folded chain', async () => {
+    const container = await draw(
+      [assistant('m1', [made]), assistant('m2', [text('Here are the thin slices.')])],
+      false,
+    );
+    const cards = container.querySelectorAll('[data-testid="media-card"]');
+    expect(cards).toHaveLength(1);
+    const card = cards[0] as Element;
+    expect(card.closest('.pd-chain')).toBeNull();
+    expect(card.closest('[data-testid="turn-foot"]')).not.toBeNull();
+    const words = [...container.querySelectorAll('p')].find((p) =>
+      p.textContent?.includes('Here are the thin slices'),
+    );
+    expect((words as Node).compareDocumentPosition(card) & 4).toBe(4);
+    expect(card.getAttribute('data-kind')).toBe('image');
+  });
+});

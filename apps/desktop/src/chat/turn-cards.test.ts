@@ -37,9 +37,14 @@ describe('what the turn made is the work; what it presented is the answer', () =
   ];
   const cards = [card('e1', V1), card('e2', V2), card('e3', V3)];
 
-  it('every result files into the chain — none of them was handed over', () => {
-    const place = placeTurnCards(calls, cards);
+  it('while the chain works, every result files into it — none of them was handed over', () => {
+    const place = placeTurnCards(calls, cards, 0);
     expect([...place.values()]).toEqual(['inside', 'inside', 'inside']);
+  });
+
+  it('once the chain is done, the last version comes out; the drafts it grew from stay in the work', () => {
+    const place = placeTurnCards(calls, cards, null);
+    expect([...place.values()]).toEqual(['inside', 'inside', 'beneath']);
   });
 
   it('presenting the last version brings it out, full size, once', () => {
@@ -52,15 +57,23 @@ describe('what the turn made is the work; what it presented is the answer', () =
     expect(place.get(`p:${V3}`)).toBe('beneath');
   });
 
-  it('eight pages of a children’s book come out only as the model presents them', () => {
-    const pages = Array.from({ length: 8 }, (_, i) =>
-      call(`g${i}`, 0, 'generate_image', { prompt: `page ${i}` }),
+  const pages = Array.from({ length: 8 }, (_, i) =>
+    call(`g${i}`, 0, 'generate_image', { prompt: `page ${i}` }),
+  );
+  const made = pages.map((c, i) => card(c.id, `${DIR}/page_${i}.png`));
+
+  it('eight pages of a children’s book: in the chain while it works, out when it is done', () => {
+    expect([...placeTurnCards(pages, made, 0).values()].every((p) => p === 'inside')).toBe(true);
+    expect([...placeTurnCards(pages, made, null).values()].every((p) => p === 'beneath')).toBe(
+      true,
     );
-    const made = pages.map((c, i) => card(c.id, `${DIR}/page_${i}.png`));
-    expect([...placeTurnCards(pages, made).values()].every((p) => p === 'inside')).toBe(true);
+  });
+
+  it('…and when the model presents what it chose, the rest stays its work', () => {
     const shown = [...pages, call('p', 1, 'present', { path: `${DIR}` })];
     const place = placeTurnCards(shown, [...made, card('p', DIR, 'record')]);
     expect(place.get(`p:${DIR}`)).toBe('beneath');
+    expect(made.every((m) => place.get(m.key) === 'inside')).toBe(true);
   });
 
   it('a chart or diagram tool presents what it draws — its result says the card is shown', () => {
@@ -88,14 +101,95 @@ describe('what the turn made is the work; what it presented is the answer', () =
     expect(placeTurnCards(calls2, cards2, null).get(`c:${chart}`)).toBe('beneath');
   });
 
-  it('a drawing OmniSVG made is work until presented', () => {
+  it('a drawing OmniSVG made is work while its chain works, and out when it is done', () => {
     const svg = '/w/lighthouse.svg';
-    const place = placeTurnCards([call('s', 0, 'generate_svg')], [card('s', svg, 'record')]);
-    expect(place.get(`s:${svg}`)).toBe('inside');
+    const drew = [call('s', 0, 'generate_svg')];
+    expect(placeTurnCards(drew, [card('s', svg, 'record')], 0).get(`s:${svg}`)).toBe('inside');
+    expect(placeTurnCards(drew, [card('s', svg, 'record')], null).get(`s:${svg}`)).toBe('beneath');
   });
 
   it('a card no call in the turn accounts for stays where it was drawn', () => {
     expect(placeTurnCards([], [card('x', V1)]).get(`x:${V1}`)).toBe('beneath');
+  });
+});
+
+describe('a picture the model made and never presented', () => {
+  /* The visual-learner student (2026-10-01, Gemma 4 12B, bash-CLI): a picture
+     made through bash, a flowchart drawn next in the same chain, then the reply
+     about "the image of the thin slices" — and the student: "theres no picture
+     in the chat". The picture was in the chain row, and the chain folds. */
+  const PIC = '/Users/j/Bobble/generated/a-high-quality/cand0_seed259687452.png';
+  const FLOW = '/Users/j/Bobble/new-chat/visualizations/onion_method.svg';
+  const turn = [
+    {
+      id: 'c1',
+      chain: 0,
+      tool: effectiveToolName('bash', {
+        command: 'media generate image "A high-quality, educational 3D illustration…"',
+      }),
+      args: { command: 'media generate image "A high-quality, educational 3D illustration…"' },
+    },
+    {
+      id: 'c2',
+      chain: 0,
+      tool: effectiveToolName('bash', { command: 'diagram --title "The Onion Method"' }),
+      args: { command: 'diagram --title "The Onion Method"' },
+    },
+  ];
+  const turnCards = [card('c1', PIC), card('c2', FLOW, 'record')];
+
+  it('is in its chain row while the chain works', () => {
+    expect(turn.map((c) => c.tool)).toEqual(['generate_image', 'diagram']);
+    expect(placeTurnCards(turn, turnCards, 0).get(`c1:${PIC}`)).toBe('inside');
+  });
+
+  it('stands at the reply’s foot with the flowchart once the chain is done', () => {
+    const place = placeTurnCards(turn, turnCards, null);
+    expect(place.get(`c1:${PIC}`)).toBe('beneath');
+    expect(place.get(`c2:${FLOW}`)).toBe('beneath');
+  });
+
+  it('a picture a later call made something from is a draft: the new thing shows', () => {
+    const GLB = '/Users/j/Bobble/generated/fox/fox.glb';
+    const calls = [
+      call('g', 0, 'generate_image', { prompt: 'a low-poly fox' }),
+      call('m', 0, 'generate_3d', { image_path: PIC }),
+    ];
+    const place = placeTurnCards(calls, [card('g', PIC), card('m', GLB, 'model')], null);
+    expect(place.get(`g:${PIC}`)).toBe('inside');
+    expect(place.get(`m:${GLB}`)).toBe('beneath');
+  });
+
+  it('a picture merely named later — copied, opened — is still the answer', () => {
+    const calls = [
+      call('g', 0, 'generate_image', { prompt: 'a fox' }),
+      call('b', 0, 'bash', { command: `cp ${PIC} ~/Desktop/fox.png` }),
+    ];
+    expect(placeTurnCards(calls, [card('g', PIC)], null).get(`g:${PIC}`)).toBe('beneath');
+  });
+
+  it('when the model presented another picture, it chose: this one stays its work', () => {
+    const B = `${DIR}/second.png`;
+    const calls = [
+      call('g1', 0, 'generate_image', { prompt: 'a cat' }),
+      call('g2', 0, 'generate_image', { prompt: 'a better cat' }),
+      call('p', 0, 'present', { path: B }),
+    ];
+    const place = placeTurnCards(
+      calls,
+      [card('g1', PIC), card('g2', B), card('p', B, 'record')],
+      null,
+    );
+    expect(place.get(`g1:${PIC}`)).toBe('inside');
+    expect(place.get(`g2:${B}`)).toBe('none');
+    expect(place.get(`p:${B}`)).toBe('beneath');
+  });
+
+  it('the corp feed — rows and words only — keeps it in the row', () => {
+    const place = placeTurnCards(turn, turnCards, null, { madeStaysInWork: true });
+    expect(place.get(`c1:${PIC}`)).toBe('inside');
+    // What a tool presents is unchanged by it.
+    expect(place.get(`c2:${FLOW}`)).toBe('beneath');
   });
 });
 

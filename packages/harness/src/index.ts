@@ -145,6 +145,7 @@ import {
 import { wouldHang } from './tools/hang-guard.js';
 import { registerImageTools } from './tools/image-tools.js';
 import { applyBias, lastAssistantThought, planBias } from './tools/intent-bias.js';
+import { mathFigureImage, mathFigureImageRefusal } from './tools/math-figure-image.js';
 import {
   drawWrittenSpec,
   looksLikeMathSpec,
@@ -4326,6 +4327,34 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       }
     }
     /*
+     * A MATHS OR PHYSICS FIGURE ASKED OF THE IMAGE MODEL — see
+     * math-figure-image.ts. Here, not in the image tool, because the person's
+     * own words are known here: MEASURED (the visual-learner student, Gemma 4
+     * 12B), the prompt carried no notation and the question said it plainest.
+     * The same call again is the way through — a poster can be the ask.
+     */
+    if (event.toolName === 'generate_image' && pi.getAllTools().some((t) => t.name === MATH_TOOL)) {
+      const input = event.input as { prompt?: unknown; save_to?: unknown } | undefined;
+      const prompt = typeof input?.prompt === 'string' ? input.prompt : '';
+      if (mathImageRefused !== null && mathImageRefused === prompt) {
+        mathImageRefused = null;
+      } else {
+        const figure = mathFigureImage({ prompt, request: runtime.lastPrompt });
+        if (figure !== null) {
+          mathImageRefused = prompt;
+          pi.appendEntry(HARNESS_LOOP_ENTRY, { action: 'block', cause: 'math-figure-image' });
+          return {
+            block: true,
+            reason: mathFigureImageRefusal({
+              words: figure.words,
+              ...(typeof input?.save_to === 'string' ? { saveTo: input.save_to } : {}),
+              cli: toolCliMode,
+            }),
+          };
+        }
+      }
+    }
+    /*
      * A WRITE THAT IS REALLY A TOOL CALL — see coerced-write.ts.
      *
      * MEASURED, matrix run 1: `write { path: "read_chrome_url.txt", content:
@@ -4737,6 +4766,8 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   let chartScriptRefused: string | null = null;
   /** The last bash line refused for typing a maths figure as SVG; the same line again goes through. */
   let mathSvgRefused: string | null = null;
+  /** The last picture prompt refused as a maths figure (math-figure-image.ts); the same prompt again goes through. */
+  let mathImageRefused: string | null = null;
   pi.on('tool_result', async (event) => {
     /* In CLI mode every call is `bash`, so the real tool name is only known at
        the dispatch (see the CLI host's `call`); tally there instead, or the

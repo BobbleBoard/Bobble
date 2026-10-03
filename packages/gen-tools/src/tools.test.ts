@@ -11,7 +11,6 @@ import {
   GENERATE_IMAGE_TOOL,
   GENERATE_SVG_TOOL,
   GENERATE_VIDEO_TOOL,
-  mathFigurePrompt,
   parseSize,
   registerGenTools,
   saveOutputs,
@@ -165,6 +164,11 @@ describe('generate_image tool', () => {
     expect(text).toContain('/out/a.png');
     expect(text).toContain('/out/b.png');
     expect(text).toContain('Model: Z-Image Turbo (z-image-turbo, apache-2.0)');
+    /* Where the person sees them — the chat. "On the canvas" was untrue since
+       generation moved into the thread, and a 12B read it as "shown already,
+       elsewhere" (the visual-learner student, 2026-10-01). */
+    expect(text.split('\n')[0]).toBe('Generated 2 images, shown in the chat:');
+    expect(text).not.toMatch(/canvas/i);
     // Both images attached as image blocks.
     const images = res.content.filter((c) => c.type === 'image');
     expect(images).toHaveLength(2);
@@ -406,12 +410,14 @@ describe('generate_video tool', () => {
     });
   });
 
-  it('lists a real video exactly as before', () => {
+  it('lists a real video as one file, shown in the chat', () => {
     const text = videoResultText(
       [{ outputPath: '/out/clip.mp4', modality: 'video', model: 'wan', seed: 3 }],
       'Model: Wan',
     );
-    expect(text).toBe('Generated 1 video on the canvas:\n  1. /out/clip.mp4 (seed 3)\nModel: Wan');
+    expect(text).toBe(
+      'Generated 1 video, shown in the chat:\n  1. /out/clip.mp4 (seed 3)\nModel: Wan',
+    );
   });
 });
 
@@ -462,6 +468,15 @@ describe('generate_svg tool', () => {
     const text = (res.content as Array<{ text?: string }>).map((c) => c.text ?? '').join('');
     expect(text).toContain('assets/gear.svg');
     expect(text).toContain('<img');
+  });
+
+  it('says the drawing is in the chat — never "on the canvas", where drawings no longer go', async () => {
+    const tools = collectSvgTools(new FakeBridge().on('generateSvg', okSvg));
+    const res = await runSvg(tools, { prompt: 'a red heart, flat colours, centered' });
+    const text = (res.content as Array<{ text?: string }>).map((c) => c.text ?? '').join('');
+    expect(text).toMatch(/^Made 1 SVG:\n {2}1\. \/Generated\/heart\/01\.svg — 1 path/);
+    expect(text).toContain('It shows in the chat');
+    expect(text).not.toMatch(/canvas/i);
   });
 
   it('answers markup in its own name, never the picture tool’s', async () => {
@@ -667,35 +682,5 @@ describe('dataChartPrompt — a chart of numbers is not a picture', () => {
     expect(dataChartPrompt('a red fox in a forest, watercolour')).toBeNull();
     // Two numbers is a size, not a dataset.
     expect(dataChartPrompt('bar chart aesthetic wallpaper 1920x1080')).toBeNull();
-  });
-});
-
-describe('mathFigurePrompt — a maths figure is not a picture', () => {
-  it('sends the 4B’s own prompt to math', () => {
-    // MEASURED (the STEM suite): the prompt it gave image generation, trimmed.
-    const p =
-      'Mathematical visualization showing why d/dx(sin x) = cos x. Create a clean diagram with two panels: ' +
-      'Top panel: Unit circle showing a point at angle θ with coordinates (cos θ, sin θ). ' +
-      'Bottom panel: Graph with sin(x) in blue and cos(x) in green curves on the same axes.';
-    expect(mathFigurePrompt(p)).toMatch(/Draw it with the math command/);
-    expect(
-      mathFigurePrompt('a diagram proving the pythagorean theorem, a² + b² = c²'),
-    ).not.toBeNull();
-    // MEASURED (the maths suite): the lever, painted with its torques written wrong.
-    expect(
-      mathFigurePrompt(
-        'A physics diagram showing a seesaw with a small weight far from the pivot balancing a heavy weight close to the pivot.',
-      ),
-    ).toMatch(/Draw it with the math command/);
-    expect(mathFigurePrompt('a child on a seesaw in a sunny park, watercolor')).toBeNull();
-  });
-
-  it('still paints art that only touches maths', () => {
-    expect(mathFigurePrompt('a neon sine wave poster, synthwave')).toBeNull();
-    expect(mathFigurePrompt('Pythagoras teaching his students, renaissance fresco')).toBeNull();
-    expect(
-      mathFigurePrompt('a mathematician at a chalkboard full of equations, oil painting'),
-    ).toBeNull();
-    expect(mathFigurePrompt('a red fox in a forest, watercolour')).toBeNull();
   });
 });

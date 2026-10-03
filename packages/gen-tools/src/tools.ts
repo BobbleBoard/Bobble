@@ -213,7 +213,7 @@ export function registerGenTools(pi: ExtensionAPI, options: GenToolsOptions): vo
     label: 'Generate: Image',
     description:
       'Generate an image from a text prompt, locally on-device (Apple-Silicon MLX). Returns the ' +
-      'image(s) and opens them on the canvas with a live progress bar. Every result is footnoted ' +
+      'image(s) and shows them in the chat, live as they generate. Every result is footnoted ' +
       `with the model that made it. Available models: ${IMAGE_MODEL_IDS.join(', ')} ` +
       '(default: qwen-image-2.1 — the best pictures and exact text, about a minute and a half at ' +
       '1024x1024; flux2-klein-4b is the fast Apache-licensed pick, seconds). Use size like ' +
@@ -271,8 +271,9 @@ export function registerGenTools(pi: ExtensionAPI, options: GenToolsOptions): vo
       }
       const chart = dataChartPrompt(params.prompt);
       if (chart !== null) return errResult(chart);
-      const figure = mathFigurePrompt(params.prompt);
-      if (figure !== null) return errResult(figure);
+      /* A maths or physics figure is answered before this runs, by the harness
+         (math-figure-image.ts), which knows what the person asked as well as
+         what the model wrote — the student's circle had no notation to find. */
       // Resolve + validate the model against the catalog.
       const modelId = params.model ?? defaultImageModel().id;
       const model = getModel(modelId);
@@ -327,8 +328,16 @@ export function registerGenTools(pi: ExtensionAPI, options: GenToolsOptions): vo
             : '';
         const saveNote =
           saved.error !== undefined ? `\nCould not save to ${params.save_to}: ${saved.error}` : '';
+        /*
+         * WHERE THE PERSON SEES IT: in the chat. This said "on the canvas",
+         * which stopped being true when generation moved into the thread
+         * (round 21, apps/desktop gen-stream.ts). MEASURED (the visual-learner
+         * student, Gemma 4 12B, 2026-10-01): it read "Generated 1 image on the
+         * canvas", wrote about "the image of the thin slices", and the student
+         * answered "theres no picture in the chat".
+         */
         const text =
-          `Generated ${outputs.length} image${outputs.length === 1 ? '' : 's'} on the canvas:\n` +
+          `Generated ${outputs.length} image${outputs.length === 1 ? '' : 's'}, shown in the chat:\n` +
           `${lines.join('\n')}${savedLines}${saveNote}\n${footnote}`;
 
         const content: AgentToolResult<GenerateDetails>['content'] = [{ type: 'text', text }];
@@ -365,7 +374,7 @@ export function registerGenTools(pi: ExtensionAPI, options: GenToolsOptions): vo
       'Generate a short video from a text prompt, locally on-device. Two paths, chosen by model: ' +
       'motion-graphics (animated text/titles/charts — deterministic, CPU, commercial-safe) render ' +
       'via HyperFrames; photoreal text→video renders via a local diffusion model (LTX / Wan). ' +
-      'Opens the clip on the canvas with a live progress bar and footnotes it with the model that ' +
+      'Shows the clip in the chat, live as it renders, and footnotes it with the model that ' +
       `made it. Because you cannot watch an MP4, a still POSTER FRAME of the result is attached as ` +
       'an image so you can see (and critique) your own output. Available models: ' +
       `${VIDEO_MODEL_IDS.join(', ')}. If no model is given, a motion-graphics prompt uses ` +
@@ -498,7 +507,7 @@ export function videoResultText(outputs: readonly GenOutput[], footnote: string)
   const frames = outputs.length === 1 ? outputs[0]?.frames : undefined;
   if (frames === undefined) {
     return (
-      `Generated ${outputs.length} video${outputs.length === 1 ? '' : 's'} on the canvas:\n` +
+      `Generated ${outputs.length} video${outputs.length === 1 ? '' : 's'}, shown in the chat:\n` +
       `${lines.join('\n')}\n${footnote}`
     );
   }
@@ -715,43 +724,6 @@ export function dataChartPrompt(prompt: string | undefined): string | null {
     'on an axis. Draw it with the chart tool instead: chart with the type, title, labels and values ' +
     '(CLI: chart bar "Title" --labels "2021, 2022, 2023" --values "12, 19, 27"). It appears in the ' +
     'chat as an interactive card in a second, and writes an .svg into the project for a page or a deck.'
-  );
-}
-
-/**
- * A MATHS OR PHYSICS FIGURE IS NOT A PICTURE EITHER. MEASURED (the STEM suite,
- * 4B): asked why d/dx sin x = cos x "visually", after its hand-made SVG was
- * refused it asked image generation for "a unit circle … Graph with sin(x) in
- * blue and cos(x) in green … a tangent line", waited a minute and a half, and
- * presented a painting with "sos(x)" on its axis and two waves that are
- * neither. The math command draws the curves from their expressions. Narrow
- * like the chart test: maths notation, AND a figure word or a second piece of
- * notation — so "a neon sine-wave poster" and "Pythagoras teaching, fresco"
- * still paint.
- */
-export function mathFigurePrompt(prompt: string | undefined): string | null {
-  const text = prompt ?? '';
-  const notation = [
-    /\b(sin|cos|tan|sec|csc|cot|log|ln|sqrt)\s*\(?\s*(x|θ|theta|t|ωt|[a-z]\s*[+)])/i,
-    /\bd\s*\/\s*d[xtθ]\b|\bf\s*\(\s*x\s*\)|\by\s*=\s*[-\d(a-z]/i,
-    /\b(derivative|integral|unit circle|parabola|asymptote|hypotenuse|pythagorean theorem|free[- ]body|vector diagram|simple harmonic|projectile motion)\b/i,
-    /[a-c]\s*[²2]\s*\+\s*[a-c]\s*[²2]|[∫∑√θπ]/,
-    /* Mechanics: MEASURED (the maths suite, 4B) — "A physics diagram showing
-       a seesaw with a small weight far from the pivot…", painted, with its
-       torques written wrong on the picture ("20 × 2 = 40", "100 × 0.8 = 80",
-       "balanced"). */
-    /\b(torque|fulcrum|pivot|lever|see-?saw|moment arm|pulley|inclined plane|pendulum|physics (?:diagram|figure|illustration))\b/i,
-  ].filter((re) => re.test(text)).length;
-  const figure =
-    /\b(graph|plot|axes|axis|diagram|figure|visuali[sz]\w*|label+ed|explain\w*|educational|lesson|proof|showing why)\b/i.test(
-      text,
-    );
-  if (notation === 0 || (notation === 1 && !figure)) return null;
-  return (
-    'A maths or physics figure is drawn from its equations, not painted — an image model bends the ' +
-    'curves and misspells the labels. Draw it with the math command: write the figure as a spec to ' +
-    'lesson.math.json (curves as expressions, shapes at coordinates, steps tied to the parts) — it is ' +
-    'drawn the moment it is written, in the app, with its labels checked. `math --help` shows a whole spec.'
   );
 }
 
@@ -993,15 +965,15 @@ function registerSvgTool(pi: ExtensionAPI, bridge: GenBridge | null, engines: Sv
             : rel === undefined
               ? 'Reference it by its path, or `cp` it into a project; never retype its markup.'
               : `In a page: <img src="${rel}" alt="…">. Never retype its markup.`;
-        /* What a call makes stays in the work until it is presented (the user,
-           2026-09-24, turn-cards.ts) — and present renders the drawing back, the
-           one look the model gets at what was made. */
+        /* What a call makes is in the work while its chain works, and in the
+           chat once it is done (turn-cards.ts) — and present renders the drawing
+           back, the one look the model gets at what was made. */
         const shown =
-          'It is in your work; present it when it is what they asked for — present also shows you the drawing.';
+          'It shows in the chat; present it when it is what they asked for — present also shows you the drawing.';
         const made =
           editPath !== undefined
             ? `Edited ${path.relative(root, editPath)}`
-            : `Made ${result.outputs.length} SVG${result.outputs.length === 1 ? '' : 's'}${outPath === undefined ? ' on the canvas' : ''}`;
+            : `Made ${result.outputs.length} SVG${result.outputs.length === 1 ? '' : 's'}`;
         const byline =
           route.engine === 'vfig'
             ? 'Model: VFIG 4B (vfig-4b) — SVG code, its words as text, so it can be edited'

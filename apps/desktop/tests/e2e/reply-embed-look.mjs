@@ -11,9 +11,11 @@
  * file and a reply embedding it, by its absolute path (A), relative to the
  * working folder (B), and as the app's pd-file:// URL (C). Counted: the
  * pictures of that file on screen OUTSIDE the chain (the chain's own small copy
- * of a draft is the work, and folds away). D is the control: a picture the
- * model did NOT present — its embed is the only copy outside the chain, and
- * must stay.
+ * of a draft is the work, and folds away). D: a picture the model did NOT
+ * present is still shown once — since 2026-10-02 as its card at the reply's
+ * foot (turn-cards.ts: what a call made comes out when its chain is done; the
+ * student's "theres no picture in the chat"), the reply's own copy stepping
+ * aside as it does for a presented one.
  *
  *   OUT=<dir> node apps/desktop/tests/e2e/reply-embed-look.mjs
  */
@@ -200,8 +202,8 @@ try {
   check(c.outside === 1, `C: …and by the app's own URL (${JSON.stringify(c)})`);
   const d = await stage('d-not-presented', OWL, OWL, { presented: false });
   check(
-    d.outside === 1 && d.kinds[0] === 'reply-embed',
-    `D: a picture that was not presented keeps the reply's embed (${JSON.stringify(d)})`,
+    d.outside === 1 && d.kinds[0] === 'card',
+    `D: a picture that was not presented shows once, as its card (${JSON.stringify(d)})`,
   );
 } finally {
   await finish();

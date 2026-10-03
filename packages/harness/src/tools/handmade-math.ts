@@ -48,17 +48,56 @@ export function mathFigureMarkup(svg: string): boolean {
   return hits.size >= 2 || (hits.size === 1 && /[πθωφ∫∑√²³ΔΣ]/.test(visible));
 }
 
+/** Mechanics a figure is drawn of — a lever and its weights, a ramp. */
+const MECHANICS =
+  /\b(lever|pivot|fulcrum|torque|moment|weights?|balance|pulley|ramp|incline|friction|gravity|newton)\b/gi;
+
+/*
+ * GEOMETRY. MEASURED (the visual-learner student, Gemma 4 12B, 2026-10-01):
+ * after a page on why a circle's area is πr², "how do the slices actually make
+ * a rectangle?? … can you show it with an actual picture" went to image
+ * generation as "a circle being sliced into hundreds of extremely thin,
+ * needle-…" — and not one word of the request or the prompt was a subject
+ * here. These are everyday words too (a pizza slice, a living area), which is
+ * why every reader of them wants two, and the image check more than that.
+ */
+const GEOMETRY =
+  /\b(circles?|circumference|radius|radii|diameter|area|perimeter|rectangles?|parallelograms?|polygons?|sectors?|wedges?|slic(?:e|es|ed|ing)|arcs?|chords?|angles?|spheres?|cylinders?|cones?|cubes?|volume)\b/gi;
+
+const ANY_SUBJECT = new RegExp(
+  [SUBJECT, MECHANICS, GEOMETRY].map((re) => re.source).join('|'),
+  'gi',
+);
+
+/** One key per idea: "circles" is "circle", "sliced" is "slice", "radii" is "radius". */
+function subjectKey(word: string): string {
+  const w = word.toLowerCase();
+  if (w.startsWith('slic')) return 'slice';
+  if (w === 'radii') return 'radius';
+  if (w === 'axes') return 'axis';
+  return /[^su]s$/.test(w) && !w.endsWith('is') ? w.slice(0, -1) : w;
+}
+
+/**
+ * The maths and physics subjects a text names (plain text, not markup) — each
+ * idea once, as first written, in the order they come.
+ */
+export function mathSubjects(text: string): string[] {
+  const seen = new Map<string, string>();
+  for (const w of text.match(ANY_SUBJECT) ?? []) {
+    const key = subjectKey(w);
+    if (!seen.has(key)) seen.set(key, w);
+  }
+  return [...seen.values()];
+}
+
 /**
  * Words that ask for a maths or physics figure — a lever, forces on a slope, a
- * graph of a function — in a request or a brief (plain text, not markup).
- * Two subjects, the same bar as a hand-drawn SVG.
+ * graph of a function, a circle cut into slices — in a request or a brief
+ * (plain text, not markup). Two subjects, the same bar as a hand-drawn SVG.
  */
 export function mathFigureWords(text: string): boolean {
-  const hits = new Set((text.match(SUBJECT) ?? []).map((w) => w.toLowerCase()));
-  const physics =
-    /\b(lever|pivot|fulcrum|torque|moment|weights?|balance|pulley|ramp|incline|friction|gravity|newton)\b/gi;
-  for (const w of text.match(physics) ?? []) hits.add(w.toLowerCase());
-  return hits.size >= 2;
+  return mathSubjects(text).length >= 2;
 }
 
 export const HANDMADE_MATH_NOTE =

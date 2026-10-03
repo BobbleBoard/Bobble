@@ -19,7 +19,7 @@ import type {
   ToolInfo,
 } from '@mariozechner/pi-coding-agent';
 import { repairToolCallArguments } from '@pi-desktop/provider-llamacpp';
-import { publishConnectors, resetToolBus } from '@pi-desktop/tool-bus';
+import { publishConnectors, publishTool, resetToolBus } from '@pi-desktop/tool-bus';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   forgetResidentPrefix,
@@ -1254,6 +1254,73 @@ describe('the per-tool rules hold at every door', () => {
       .find((t) => typeof t === 'string');
     expect(said).toMatch(/^Drew "The slope of x²": \S*tangent_deriv\.html/);
     expect(existsSync(path.join(cwd, 'tangent_deriv.html'))).toBe(true);
+  });
+
+  /*
+   * A MATHS FIGURE ASKED OF THE IMAGE MODEL (math-figure-image.ts). MEASURED
+   * (the visual-learner student, 2026-10-01, Gemma 4 12B, bash-CLI): this
+   * prompt, after this question, made a woven disc in three minutes. Answered
+   * with math at the tool's own door and at the command line the 12B typed —
+   * once, and the same call again goes through.
+   */
+  it('answers a maths figure asked of the image model with math — at every door, once', async () => {
+    const STUDENT =
+      'ok i watched the page on the side. i kind of get cutting it like a pizza but the slices never actually move into the rectangle, its just a box next to the circle. how do the slices actually make a rectangle?? the edges are all curvy. can you show it with an actual picture';
+    const PROMPT =
+      'A high-quality, educational 3D illustration showing a circle being sliced into hundreds of extremely thin, needle-like wedges';
+    const tools = ['read', 'write', 'edit', 'ls', 'bash', 'math', 'generate_image'];
+    const imageCall = (prompt: string) => ({
+      type: 'tool_call' as const,
+      toolName: 'generate_image',
+      toolCallId: 'g1',
+      input: { prompt },
+    });
+
+    const direct = await session('schemas', STUDENT, tools);
+    const refused = blockOf(await direct.rig.fire('tool_call', imageCall(PROMPT)));
+    expect(refused?.reason).toMatch(
+      /^Not generated: this picture is a maths figure \("circle", "sliced", "wedges"\)/,
+    );
+    expect(refused?.reason).toContain('Write the figure as a spec to circle-sliced.math.json');
+    expect(refused?.reason).toContain('make the same call again UNCHANGED');
+    expect(blockOf(await direct.rig.fire('tool_call', imageCall(PROMPT)))).toBeNull();
+    // A picture is a picture.
+    expect(
+      blockOf(await direct.rig.fire('tool_call', imageCall('a red fox in deep snow, watercolour'))),
+    ).toBeNull();
+
+    /* The command line, to a generator that records what reaches it. */
+    const reached: unknown[] = [];
+    publishTool({
+      name: 'generate_image',
+      execute: async (_id: unknown, params: { prompt?: unknown }) => {
+        reached.push(params.prompt);
+        return { content: [{ type: 'text', text: 'Generated 1 image, shown in the chat:' }] };
+      },
+    });
+    try {
+      const shell = await session('cli', STUDENT, tools);
+      const argv = ['media', 'generate', 'image', '--prompt', PROMPT];
+      expect(blockOf(await shell.rig.fire('tool_call', bashCall(argv)))).toBeNull();
+      const first = await run(shell.bridge, argv);
+      expect(first.isError).toBe(true);
+      expect(first.text).toMatch(/^Not generated: this picture is a maths figure/);
+      expect(first.text).toContain('run the same command again UNCHANGED');
+      expect(reached).toEqual([]);
+      expect(blockOf(await shell.rig.fire('tool_call', bashCall(argv)))).toBeNull();
+      expect((await run(shell.bridge, argv)).isError).toBe(false);
+      expect(reached).toEqual([PROMPT]);
+    } finally {
+      resetToolBus();
+    }
+
+    /* With no math command to point at, the picture is made as asked. */
+    const noMath = await session(
+      'schemas',
+      STUDENT,
+      tools.filter((t) => t !== 'math'),
+    );
+    expect(blockOf(await noMath.rig.fire('tool_call', imageCall(PROMPT)))).toBeNull();
   });
 
   /*

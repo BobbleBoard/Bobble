@@ -392,7 +392,10 @@ export function AssistantGroup({
       });
     }
   }
-  const placed = placeTurnCards(turnCalls, turnCards, liveChain);
+  /* The corp feed is rows and words only (J3): what its calls make stays in them. */
+  const placed = placeTurnCards(turnCalls, turnCards, liveChain, {
+    madeStaysInWork: suppressInlineArtifacts,
+  });
   const placeOf = (kind: 'm' | 'r', callId: string, path: string): CardPlace =>
     placed.get(`${kind}:${callId}:${path}`) ?? 'beneath';
   /* Each presented card's home (see CardSlot), by its card key — kept while the

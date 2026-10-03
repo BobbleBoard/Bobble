@@ -1417,7 +1417,39 @@ describe('a running command says what it is', () => {
 });
 
 describe('a failed write says it could not write', () => {
-  it('rewords the edit family only', () => {
+  /* The student's turn (2026-10-01): a maths figure asked of the image model,
+     answered with the math command — the row must not say a picture was made. */
+  it('a refused picture says it was not made — the tool call and the CLI line', () => {
+    const steer: ToolResultMsg = {
+      ...result('g1', 'Not generated: this picture is a maths figure ("circle", "sliced")'),
+      toolName: 'generate_image',
+      isError: true,
+    };
+    const direct = mapToolStep(
+      call('g1', 'generate_image', { prompt: 'a circle sliced' }),
+      steer,
+      false,
+    );
+    expect(direct.data.failed).toBe(true);
+    expect(direct.data.label).toBe('Could not make the image');
+    const line = mapToolStep(
+      call('g1', 'bash', { command: 'media generate image "a circle sliced"' }),
+      { ...steer, toolName: 'bash' },
+      false,
+    );
+    expect(line.data.failed).toBe(true);
+    expect(line.data.label).toBe('Could not make the image');
+    // A picture that was made still says so.
+    expect(
+      mapToolStep(
+        call('g1', 'generate_image', { prompt: 'a fox' }),
+        { ...steer, isError: false },
+        false,
+      ).data.label,
+    ).toBe('Generated an image');
+  });
+
+  it('rewords the edit and making families, and nothing else', () => {
     const write = call('w1', 'write', { path: 'fox.png', content: 'x' });
     const refused: ToolResultMsg = {
       ...result('w1', 'Not written: fox.png is a picture'),

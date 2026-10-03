@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { handmadeMathVisual } from './handmade-math';
+import { handmadeMathVisual, mathFigureWords, mathSubjects } from './handmade-math';
 
 /* Excerpts of what the 4B made in the STEM suite (2026-09-25), and what it did not. */
 const CUBE =
@@ -33,5 +33,33 @@ describe('a maths or physics visual made by hand', () => {
         'html',
       ),
     ).toBe(false);
+  });
+});
+
+describe('the words of a maths or physics figure', () => {
+  it('reads geometry — the student’s circle, its slices and the rectangle they make', () => {
+    // MEASURED (the visual-learner student, 2026-10-01): none of these were subjects.
+    const ask =
+      'how do the slices actually make a rectangle?? its just a box next to the circle. can you show it with an actual picture';
+    expect(mathSubjects(ask)).toEqual(['slices', 'rectangle', 'circle']);
+    expect(mathFigureWords(ask)).toBe(true);
+    expect(mathFigureWords('the lever and its weights on the pivot')).toBe(true);
+  });
+
+  it('counts an idea once, however it is written', () => {
+    expect(mathSubjects('a slice, then sliced slices of circles and a circle')).toEqual([
+      'slice',
+      'circles',
+    ]);
+    expect(mathSubjects('the radius and the radii, the axis and its axes')).toEqual([
+      'radius',
+      'axis',
+    ]);
+    expect(mathFigureWords('one weight, two weights')).toBe(false);
+  });
+
+  it('wants two, so an everyday word alone is not a figure', () => {
+    expect(mathFigureWords('a pizza cut into eight slices')).toBe(false);
+    expect(mathFigureWords('a cozy reading area by the window')).toBe(false);
   });
 });
