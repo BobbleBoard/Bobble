@@ -3,7 +3,7 @@ import type { CallModelRequest } from './call-model.js';
 import { warmSystemPrompt } from './warmup.js';
 
 describe('warmSystemPrompt', () => {
-  it('fires a 1-token, no-think completion carrying the system prompt', async () => {
+  it('fires a 1-token completion carrying the system prompt, rendered as the chat renders', async () => {
     const seen: CallModelRequest[] = [];
     const callModel = vi.fn(async (req: CallModelRequest) => {
       seen.push(req);
@@ -16,9 +16,9 @@ describe('warmSystemPrompt', () => {
     expect(req?.system).toBe('You are a local agent.');
     expect(req?.maxTokens).toBe(1);
     expect(req?.temperature).toBe(0);
-    expect((req?.extraBody as { chat_template_kwargs?: unknown })?.chat_template_kwargs).toEqual({
-      enable_thinking: false,
-    });
+    // No thinking switch of its own: a template whose system turn reads it
+    // (froggeric's Qwen, Gemma 4) would warm a prefix the chat never sends.
+    expect(req?.extraBody).toBeUndefined();
   });
 
   it('carries the initial tool set so the warmed prefix matches a real turn', async () => {

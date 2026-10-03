@@ -77,9 +77,14 @@ export async function warmSystemPrompt(
       maxTokens: 1,
       temperature: 0,
       timeoutMs: opts.timeoutMs ?? WARMUP_TIMEOUT_MS,
-      // Never let a reasoning model "think" during a warm-up — we only want the
-      // prefill, not a token budget burned on hidden reasoning.
-      extraBody: { chat_template_kwargs: { enable_thinking: false } },
+      /*
+       * No thinking switch of its own: the warm-up renders as the chat renders,
+       * or it warms a prefix no turn will match. One token is all it generates,
+       * so thinking costs nothing. MEASURED (Qwen 3.8 27B, 2026-10-02): with
+       * `enable_thinking: false` its system turn wrote the tool instructions
+       * without their thinking lines, and the turn after re-read the prompt.
+       * Gemma 4 marks thinking at the top of the system turn — the same trap.
+       */
       signal: opts.signal,
     });
     return true;

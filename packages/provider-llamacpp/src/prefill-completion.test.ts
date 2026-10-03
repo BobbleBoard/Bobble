@@ -70,10 +70,10 @@ describe('prefillCompletion', () => {
       'http://127.0.0.1:8080/apply-template',
       'http://127.0.0.1:8080/completion',
     ]);
-    // apply-template body: no generation prompt, thinking off, tools mapped.
+    // apply-template body: no generation prompt, the server's own thinking
+    // default (as the turn renders), tools mapped.
     expect(bodies[0]?.add_generation_prompt).toBe(false);
     expect(bodies[0]?.chat_template_kwargs).toEqual({
-      enable_thinking: false,
       preserve_thinking: true,
       preserved_thinking: true,
       preserve_reasoning: true,

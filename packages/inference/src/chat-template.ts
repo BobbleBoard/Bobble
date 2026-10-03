@@ -284,9 +284,44 @@ export function patchPreserveThinking(content: string): string {
   );
 }
 
+/**
+ * THE SYSTEM TURN DOES NOT CHANGE WITH ONE REQUEST'S THINKING SWITCH.
+ *
+ * froggeric's Qwen-Fixed template writes its tool instructions two ways — with
+ * thinking on it adds a `<think>` example and two reminder lines — and picks by
+ * `ns_state.thinking`, which a request's `enable_thinking: false` turns off.
+ * Every side call that shares the chat's one slot sends that (the title, the
+ * command reviewer, the repair fixer), so each one's prompt parted from the
+ * chat's right after the tool list. MEASURED (Qwen 3.8 27B, 2026-10-02): the
+ * slot kept the side call's version and the next turn re-read 3,830 of its
+ * 4,019 tokens.
+ *
+ * Here the system turn (and the effort line it carries) follows thinking as
+ * the conversation sets it — the effort, the `<|think_*|>` markers — and not
+ * the request's own switch, which still decides the generation prompt (an
+ * empty think block). Only templates with froggeric's `ns_state` shape change;
+ * idempotent. Pure.
+ */
+export function patchSystemTurnThinking(content: string): string {
+  if (content.includes('_sys_thinking')) return content;
+  const start = content.search(/\{%-?\s*set\s+reasoning_instructions\s*=\s*''\s*-?%\}/);
+  const end = content.search(/\{%-?\s*if\s+add_generation_prompt\s*-?%\}/);
+  if (start < 0 || end < start || !content.includes('ns_state')) return content;
+  const body = content
+    .slice(start, end)
+    .replace(/(\{%-?\s*if\s+)ns_state\.thinking(\s*-?%\})/g, '$1_sys_thinking$2');
+  return (
+    content.slice(0, start) +
+    "{#- pi-desktop: one request's enable_thinking does not rewrite the system turn (the prefix every side call shares). -#}\n" +
+    '{%- set _sys_thinking = ns_state.thinking or (enable_thinking is defined and not enable_thinking) %}\n' +
+    body +
+    content.slice(end)
+  );
+}
+
 /** Every patch this module applies to a chat template, in order. Pure. */
 export function patchChatTemplate(content: string): string {
-  return patchPreserveThinking(patchReasoningContentGate(content));
+  return patchSystemTurnThinking(patchPreserveThinking(patchReasoningContentGate(content)));
 }
 
 /** Read a cached template, apply {@link patchChatTemplate}, rewrite only if it

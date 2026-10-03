@@ -277,6 +277,54 @@ describe('patchPreserveThinking', () => {
   });
 });
 
+describe("patchSystemTurnThinking — a side call shares the chat's system turn", () => {
+  // froggeric's Qwen-Fixed v22.5, cut to its shape: the effort line and the
+  // tool instructions read ns_state.thinking, and so does the generation prompt.
+  const FROGGERIC = [
+    '{%- set enable_thinking = enable_thinking if enable_thinking is defined else true %}',
+    "{%- set ns_state = namespace(thinking=enable_thinking, effort='medium') %}",
+    "{%- set reasoning_instructions = '' %}",
+    '{%- if ns_state.thinking %}',
+    "    {%- set reasoning_instructions = 'Reasoning effort is set to xhigh.' %}",
+    '{%- endif %}',
+    "{{- '<|im_start|>system\\n' }}",
+    '        {%- if ns_state.thinking %}',
+    "            {{- '<think>\\nBrief explanation of tool call\\n</think>\\n' }}",
+    '        {%- endif %}',
+    "{{- '<|im_end|>\\n' }}",
+    '{%- if add_generation_prompt %}',
+    "    {{- '<|im_start|>assistant\\n' }}",
+    '    {%- if not ns_state.thinking %}',
+    "        {{- '<think>\\n\\n</think>\\n\\n' }}",
+    '    {%- endif %}',
+    '{%- endif %}',
+  ].join('\n');
+
+  it("makes the system turn read the conversation, and leaves the generation prompt the request's", async () => {
+    const { patchChatTemplate, patchSystemTurnThinking } = await import('./chat-template.js');
+    const out = patchSystemTurnThinking(FROGGERIC);
+    expect(out).toContain(
+      '{%- set _sys_thinking = ns_state.thinking or (enable_thinking is defined and not enable_thinking) %}',
+    );
+    const [system = '', generation = ''] = out.split('{%- if add_generation_prompt %}');
+    // Both system-turn branches moved; none still reads the request's switch.
+    expect(system.match(/\{%- if _sys_thinking %\}/g)).toHaveLength(2);
+    expect(system).not.toMatch(/\{%- if ns_state\.thinking %\}/);
+    // The generation prompt still follows the request: an empty think block when off.
+    expect(generation).toContain('{%- if not ns_state.thinking %}');
+    // Idempotent, and part of the patch set every cached template gets.
+    expect(patchSystemTurnThinking(out)).toBe(out);
+    expect(patchChatTemplate(FROGGERIC)).toContain('_sys_thinking');
+  });
+
+  it('leaves a template without that shape alone (Gemma marks thinking in the system turn itself)', async () => {
+    const { patchSystemTurnThinking } = await import('./chat-template.js');
+    const gemma =
+      "{%- set enable_thinking = enable_thinking | default(false) -%}\n{%- if enable_thinking -%}{{- '<|think|>\\n' -}}{%- endif -%}\n{%- if add_generation_prompt -%}x{%- endif -%}";
+    expect(patchSystemTurnThinking(gemma)).toBe(gemma);
+  });
+});
+
 describe('patchModelDirTemplate / ensureGgufChatTemplate', () => {
   const GATE = `{%- if loop.index0 > ns.last_query_index and reasoning_content %}\nA\n{%- else %}\nB\n{%- endif %}`;
 

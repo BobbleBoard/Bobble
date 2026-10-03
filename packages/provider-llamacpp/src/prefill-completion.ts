@@ -26,9 +26,13 @@
  * KV-reuse mechanic the resume adapter uses (there for a partial assistant reply;
  * here for a partial user message).
  *
- * `enable_thinking` on the render is irrelevant to the prefix: it only affects the
- * assistant generation framing, which is AFTER the truncation point — so a turn
- * with thinking ON still reuses a prefix rendered with it off (MEASURED).
+ * The render sends no `enable_thinking` of its own: it renders as the turn
+ * renders, with the server's default. That it only shapes the generation framing
+ * (after the truncation point) was MEASURED on templates where that is so — and
+ * is not so everywhere: froggeric's Qwen 3.8 template writes its tool
+ * instructions differently with thinking off, and Gemma 4 marks thinking at the
+ * top of the system turn. MEASURED (Qwen 3.8 27B, 2026-10-02): a prime rendered
+ * with thinking off parted from the turn right after the tool list.
  *
  * Text only by design: images are NOT primed. On the pinned llama.cpp build the
  * vision (ViT/mmproj) encode re-runs on every request — it is not cached across
@@ -160,11 +164,11 @@ export async function prefillCompletion(
         // No generation prompt: we prime up to (and truncate within) the user
         // message; the assistant framing belongs to the real turn.
         add_generation_prompt: false,
-        // Rendered as the turn renders: every past turn keeps its think block
-        // (the server's --reasoning-preserve default; said explicitly so the
-        // prime cannot drift from the turn on an engine without that default).
+        // Rendered as the turn renders: the server's own thinking default, and
+        // every past turn keeps its think block (the server's --reasoning-preserve
+        // default; said explicitly so the prime cannot drift from the turn on an
+        // engine without that default).
         chat_template_kwargs: {
-          enable_thinking: false,
           preserve_thinking: true,
           preserved_thinking: true,
           preserve_reasoning: true,
