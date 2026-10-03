@@ -10,7 +10,8 @@
  *   2. the template on that server renders medium — no "Reasoning effort is
  *      set to xhigh" line — and still renders xhigh when a request names it;
  *   3. two short turns: TTFT (Enter → first character on screen), the
- *      server's own prefill account from /slots (prompt tokens vs processed),
+ *      server's own prefill account (llama.cpp's timings: prompt tokens vs
+ *      the ones its cache served, via PI_DIAG_PROMPTS),
  *      how long the thought was, and how the turn ended.
  *
  * Turn 2 is the prefill check (the user's rule: chat work is not done until
@@ -21,7 +22,7 @@
  *   (OUT=<dir> for the JSON and screenshots)
  */
 import { execSync } from 'node:child_process';
-import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { launchApp, probeHome } from './harness.mjs';
@@ -32,6 +33,7 @@ mkdirSync(OUT, { recursive: true });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
 
+const DIAG = process.env.PI_DIAG_PROMPTS ?? path.join(OUT, 'diag.log');
 const home = probeHome('effort-prefill');
 mkdirSync(path.join(home, '.pi', 'desktop'), { recursive: true });
 writeFileSync(
@@ -57,6 +59,15 @@ const { app, page, check, finish } = await launchApp('effort-prefill', {
     HF_HOME: path.join(homedir(), '.cache', 'huggingface'),
     // Why a warm-up did or did not happen, beside the report.
     PI_ADV_DEBUG_WARM: path.join(OUT, 'warm.log'),
+    /* The server's own account of every request — prompt tokens and how many
+       its cache served (`[pi-diag-usage]`, from llama.cpp's timings). /slots'
+       counters read 0% reused on a turn the server served 96% from cache. */
+    PI_DIAG_PROMPTS: DIAG,
+    // A measurement seam: PI_GUARDIAN_PAUSE_FREE=0.10 keeps the guardian on
+    // (its shed lines intact) while a 27B that idles at 14% free stays loaded.
+    ...(process.env.PI_GUARDIAN_PAUSE_FREE !== undefined
+      ? { PI_GUARDIAN_PAUSE_FREE: process.env.PI_GUARDIAN_PAUSE_FREE }
+      : {}),
   },
   timeout: 120_000,
 });
@@ -150,27 +161,29 @@ const shape = () =>
     }
     return { chars, thought, stop };
   });
-const slots = async () => {
+/** The server's account of the requests sent since `from` (a byte offset into DIAG). */
+const usageSince = (from) => {
+  let text = '';
   try {
-    const s = await (await fetch(`http://127.0.0.1:${port}/slots`)).json();
-    return s.map((x) => ({ total: x.n_prompt_tokens, processed: x.n_prompt_tokens_processed }));
+    text = readFileSync(DIAG, 'utf8').slice(from);
   } catch {
     return [];
+  }
+  return [
+    ...text.matchAll(/\[pi-diag-usage\] engine=llamacpp prompt_tokens=(\d+) cached_tokens=(\d+)/g),
+  ].map((m) => ({ prompt: Number(m[1]), cached: Number(m[2]) }));
+};
+const diagSize = () => {
+  try {
+    return statSync(DIAG).size;
+  } catch {
+    return 0;
   }
 };
 const turn = async (label, text) => {
   const pid = serverPid(port);
   const before = await shape();
-  let peak = null;
-  let polling = true;
-  const poller = (async () => {
-    while (polling) {
-      for (const s of await slots()) {
-        if (s.total > 0 && (peak === null || s.processed >= peak.processed)) peak = s;
-      }
-      await sleep(50);
-    }
-  })();
+  const from = diagSize();
   await page.click('.pd-composer-editor');
   await page.keyboard.type(text, { delay: 5 });
   const t0 = Date.now();
@@ -184,19 +197,17 @@ const turn = async (label, text) => {
     if (ttft !== null && busy === 0) break;
     await sleep(100);
   }
-  polling = false;
-  await poller;
   const after = await shape();
+  // The turn's own request is the first the chat's provider sent after Enter.
+  const first = usageSince(from)[0] ?? null;
   const r = {
     label,
     ttftMs: ttft,
     turnMs: Date.now() - t0,
-    prompt: peak?.total ?? null,
-    processed: peak?.processed ?? null,
+    prompt: first?.prompt ?? null,
+    cached: first?.cached ?? null,
     reusedPct:
-      peak !== null && peak.total > 0
-        ? Math.round(((peak.total - peak.processed) / peak.total) * 100)
-        : null,
+      first !== null && first.prompt > 0 ? Math.round((first.cached / first.prompt) * 100) : null,
     thoughtChars: after.thought - before.thought,
     stop: after.stop,
     serverPid: pid,
@@ -217,8 +228,7 @@ check(report.turn2.stop !== 'length', 'turn 2 answered (not cut off at the outpu
 // A stopped-and-started server has an empty cache: say which happened.
 let parks = [];
 try {
-  parks = (await import('node:fs'))
-    .readFileSync(MAIN_LOG, 'utf8')
+  parks = readFileSync(MAIN_LOG, 'utf8')
     .split('\n')
     .filter((l) => /PARK|park chat model|RESUME/.test(l))
     .map((l) => l.trim().slice(0, 240));
@@ -230,6 +240,10 @@ const sameServer = report.turn1.serverPid === report.turn2.serverPid;
 check(
   sameServer,
   `the model server stayed up between the turns (pid ${report.turn1.serverPid} → ${report.turn2.serverPid}${parks.length > 0 ? `; ${parks.join(' | ')}` : ''})`,
+);
+check(
+  report.turn1.reusedPct !== null && report.turn1.reusedPct >= 80,
+  `turn 1 reused ${report.turn1.reusedPct}% of its prompt (the warmed system prompt)`,
 );
 check(
   report.turn2.reusedPct !== null && report.turn2.reusedPct >= 80,
