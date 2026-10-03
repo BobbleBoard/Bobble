@@ -31,6 +31,7 @@ import {
   MAX_OVERFLOW_RETRIES,
   parseContextOverflow,
   REPLY_MARGIN_TOKENS,
+  streamErrorMessage,
   trimContextForOverflow,
 } from './context-trim.js';
 import { createLiveTpsReporter } from './live-tps.js';
@@ -456,6 +457,8 @@ interface OAIChunk {
   /** Prefill progress (present on `return_progress` prefill frames, which carry
    * an empty `choices` array — handled before the per-choice delta logic). */
   prompt_progress?: LlamaPromptProgress;
+  /** A failure after the response began (`{"error":{"code":500,"message":"Compute error."}}`). */
+  error?: unknown;
 }
 
 interface ToolState {
@@ -736,6 +739,13 @@ export function createLlamaCppStream(deps: LlamaCppStreamDeps = {}): LlamaCppStr
               chunk = JSON.parse(payload) as OAIChunk;
             } catch {
               continue; // skip non-JSON keep-alives
+            }
+            if (chunk.error != null) {
+              // eslint-disable-next-line no-console
+              console.error(
+                `[pi-ctx] llama-server stream error: ${JSON.stringify(chunk.error).slice(0, 500)}`,
+              );
+              throw new Error(streamErrorMessage(chunk.error));
             }
             if (chunk.timings !== undefined) {
               lastTimings = chunk.timings;

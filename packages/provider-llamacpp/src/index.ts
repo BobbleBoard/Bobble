@@ -92,6 +92,7 @@ export default function activate(pi: ExtensionAPI): void {
 }
 
 export * from './advanced-hook.js';
+export { streamErrorMessage } from './context-trim.js';
 export * from './live-tps.js';
 export * from './repair.js';
 export * from './repair-bridge.js';

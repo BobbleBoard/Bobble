@@ -336,3 +336,25 @@ export function cleanProviderError(status: number, overflow: ContextOverflow | u
   }
   return `The local model server returned an error (HTTP ${status}). Please try again.`;
 }
+
+/**
+ * An error the server sent INSIDE the stream — `data: {"error": …}` after a
+ * 200 — which is how llama-server reports a generation that failed once the
+ * response had begun. MEASURED (Qwen 3.8 27B beside another model, 2026-10-02):
+ * a launch short of memory answered `/health` and then sent "Compute error." to
+ * every request. Read as nothing it became an empty reply; it is an error the
+ * person should see, with the one thing that helps. Pure.
+ */
+export function streamErrorMessage(error: unknown): string {
+  const raw =
+    typeof error === 'string'
+      ? error
+      : typeof (error as { message?: unknown })?.message === 'string'
+        ? (error as { message: string }).message
+        : '';
+  if (/compute error/i.test(raw)) {
+    return 'The local model could not run ("Compute error.") — it is short of memory. Close other apps or choose a smaller model, then try again.';
+  }
+  const said = raw.trim() !== '' ? `: ${raw.trim().slice(0, 200)}` : '';
+  return `The local model server stopped with an error${said}. Please try again.`;
+}

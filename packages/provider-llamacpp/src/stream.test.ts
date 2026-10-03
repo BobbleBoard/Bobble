@@ -306,6 +306,21 @@ describe('createLlamaCppStream — text', () => {
     expect(final.stopReason).toBe('stop');
   });
 
+  it('ends in an error, not an empty reply, when the server sends an error frame', async () => {
+    // MEASURED (Qwen 3.8 27B, 2026-10-02): a server short of memory came up
+    // healthy and answered every request with this one frame. Read as nothing,
+    // it became an empty reply — and the empty-reply nudge sent the dead server
+    // another request.
+    const { fetchImpl } = sseFetch([
+      { error: { code: 500, message: 'Compute error.', type: 'server_error' } },
+    ]);
+    const stream = createLlamaCppStream({ fetchImpl })(makeModel(), emptyContext());
+    const { final } = await consume(stream);
+    expect(final.stopReason).toBe('error');
+    expect(final.errorMessage).toMatch(/Compute error/);
+    expect(final.errorMessage).toMatch(/memory/);
+  });
+
   it('does not require onPromptProgress — a prefill frame is a safe no-op without it', async () => {
     const { fetchImpl } = sseFetch([
       { choices: [], prompt_progress: { processed: 10, total: 20 } },

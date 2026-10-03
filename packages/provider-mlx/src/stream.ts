@@ -41,6 +41,7 @@ import {
   resolveUnknownToolName,
   settleNote,
   settleReply,
+  streamErrorMessage,
   type ToolCallFixer,
   type ToolSchemaLike,
   tapRequest,
@@ -113,6 +114,8 @@ interface OAIChunk {
     /** What the engine's prefix cache served (rapid-mlx, mlx_lm.server). */
     prompt_tokens_details?: { cached_tokens?: number } | null;
   } | null;
+  /** A failure after the response began — an error, never an empty reply. */
+  error?: unknown;
 }
 
 interface ToolState {
@@ -398,6 +401,13 @@ export function createMlxStream(deps: MlxStreamDeps = {}): MlxStreamFn {
               chunk = JSON.parse(payload) as OAIChunk;
             } catch {
               continue; // skip non-JSON keep-alives
+            }
+            if (chunk.error != null) {
+              // eslint-disable-next-line no-console
+              console.error(
+                `[pi-ctx] ${engineOf(model)} stream error: ${JSON.stringify(chunk.error).slice(0, 500)}`,
+              );
+              throw new Error(streamErrorMessage(chunk.error));
             }
             if (chunk.usage != null) {
               output.usage.input = chunk.usage.prompt_tokens ?? output.usage.input;

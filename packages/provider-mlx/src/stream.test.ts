@@ -87,6 +87,13 @@ describe('createMlxStream — text + CLIENT-side TPS', () => {
     expect(calls).toHaveLength(1);
   });
 
+  it('ends in an error, not an empty reply, when the engine sends an error frame', async () => {
+    const { fetchImpl } = sseFetch([{ error: { message: 'Metal: out of memory', code: 500 } }]);
+    const { final } = await consume(createMlxStream({ fetchImpl })(makeModel(), emptyContext()));
+    expect(final.stopReason).toBe('error');
+    expect(final.errorMessage).toMatch(/out of memory/);
+  });
+
   it('does not report TPS when no tokens were produced', async () => {
     const { fetchImpl } = sseFetch([
       { choices: [{ delta: {}, finish_reason: 'stop' }], usage: { completion_tokens: 0 } },
