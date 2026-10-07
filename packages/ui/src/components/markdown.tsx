@@ -201,6 +201,10 @@ export interface MarkdownProps extends Omit<HTMLAttributes<HTMLDivElement>, 'chi
   /** A host's own tree passes, run AFTER the defaults (the app's citation
    * grouping — links to a turn's sources becoming one chip). */
   rehypePlugins?: Options['rehypePlugins'];
+  /** The text is still arriving (the reply or thought being written now):
+   * its unfinished last line is held back (see holdBackPartialTail). A
+   * finished text renders exactly as written. */
+  streaming?: boolean;
 }
 
 /**
@@ -221,8 +225,12 @@ export function widenUrlTransform(keep: RegExp): NonNullable<Options['urlTransfo
  * next byte arrived. Every bulleted list that follows a paragraph flashed
  * its lead-in as a heading. The same trailing fragment can open an empty
  * code fence ("`") or a thematic break ("--"). Such a tail is held back
- * until the line has more in it; on a finished message the same characters
- * alone on the last line mean nothing anyway.
+ * until the line has more in it.
+ *
+ * ONLY WHILE THE TEXT IS STREAMING (`Markdown`'s `streaming`). On a finished
+ * reply the last character is final, and holding back its `$` turned
+ * "**Answer:** $x = 5$" — and a reply ending on `$$\pi r^2$$` — into source
+ * text (MEASURED 2026-10-06).
  */
 export function holdBackPartialTail(text: string): string {
   return (
@@ -235,100 +243,168 @@ export function holdBackPartialTail(text: string): string {
   );
 }
 
+/** A money amount at the start of a `$…$` body, then a break: "1.10, then", "2.00 more". */
+const MONEY_START = /^\d[\d,]*(?:\.\d+)?(?=[\s,;:!?)]|\.(?!\d)|$)/;
+
+/** Two-letter words that are English, not a product of two variables. */
+const SHORT_WORDS = new Set('an as at be by if in is it no of on or so to we'.split(' '));
+
+/** Function names a model writes without their backslash (`$2 sin x$`). */
+const MATH_WORDS = new Set([
+  ...'sin cos tan sec csc cot sinh cosh tanh arcsin arccos arctan'.split(' '),
+  ...'log exp lim max min sup inf det deg dim ker gcd lcm mod arg'.split(' '),
+]);
+
+/** Whether a `$…$` body has English words in it — outside TeX commands and their braces. */
+function readsAsProse(body: string): boolean {
+  let bare = body.replace(/\\[A-Za-z]+/g, ' ');
+  for (let k = 0; k < 3; k += 1) bare = bare.replace(/\{[^{}]*\}/g, ' ');
+  return (bare.match(/[A-Za-z]+/g) ?? []).some((word) => {
+    const w = word.toLowerCase();
+    return w.length >= 3 ? !MATH_WORDS.has(w) : SHORT_WORDS.has(w);
+  });
+}
+
+/**
+ * Where the run of exactly `n` `$`s that closes a pair starts, on this line, or
+ * -1. remark-math pairs dollars the way CommonMark pairs backticks into a code
+ * span: a run of another length is content, and a backslash escapes nothing
+ * inside (`$a\$b$` closes at the `\$`).
+ */
+function closingRun(line: string, from: number, n: number): number {
+  let j = from;
+  while (j < line.length) {
+    if (line[j] !== '$') {
+      j += 1;
+      continue;
+    }
+    let run = 1;
+    while (line[j + run] === '$') run += 1;
+    if (run === n) return j;
+    j += run;
+  }
+  return -1;
+}
+
+/** Whether the `$…$` pair at `open`…`close` on this line is a formula, not money. */
+function isFormula(line: string, open: number, close: number): boolean {
+  const body = line.slice(open + 1, close);
+  // Pandoc: a closer followed by a digit is a price ("$5 to $10").
+  if (/\d/.test(line[close + 1] ?? '')) return false;
+  // Pandoc: no space inside the opener and none before the closer — "$12 and
+  // $19". Padded on BOTH sides (`$ x $`) is a formula written loosely.
+  if (/\s/.test(body[0] ?? '') !== /\s/.test(body.at(-1) ?? '')) return false;
+  // Punctuation ends a formula and never starts one ("1.10$, so …").
+  if (/^[,;:!?)\]}]/.test(body)) return false;
+  // A money amount running on into a sentence.
+  return !(MONEY_START.test(body) && readsAsProse(body));
+}
+
+/** A link written out — `<https://…>` or bare — whose `$`s are the URL's. */
+const WRITTEN_LINK = /<[A-Za-z][\w+.-]*:[^\s<>]*>|https?:\/\/\S+/y;
+
+/** One line outside any fence: each `$` that opens no formula becomes a literal `\$`. */
+function guardLine(line: string): string {
+  let res = '';
+  let i = 0;
+  while (i < line.length) {
+    const ch = line[i] as string;
+    if (ch === '`') {
+      // A code span: copy through its matching backtick run verbatim.
+      let run = 0;
+      while (line[i + run] === '`') run += 1;
+      const ticks = '`'.repeat(run);
+      const close = line.indexOf(ticks, i + run);
+      if (close === -1) {
+        res += line.slice(i);
+        i = line.length;
+      } else {
+        res += line.slice(i, close + run);
+        i = close + run;
+      }
+      continue;
+    }
+    if (ch === '\\') {
+      res += line.slice(i, i + 2);
+      i += 2;
+      continue;
+    }
+    if (ch === '<' || ch === 'h') {
+      WRITTEN_LINK.lastIndex = i;
+      const link = WRITTEN_LINK.exec(line);
+      if (link !== null) {
+        res += link[0];
+        i += link[0].length;
+        continue;
+      }
+    }
+    if (ch !== '$') {
+      res += ch;
+      i += 1;
+      continue;
+    }
+    let run = 1;
+    while (line[i + run] === '$') run += 1;
+    const close = closingRun(line, i + run, run);
+    if (run > 1 || (close !== -1 && isFormula(line, i, close))) {
+      // `$$…$$` (never money) or a formula: through its closer untouched.
+      const end = close === -1 ? i + run : close + run;
+      res += line.slice(i, end);
+      i = end;
+      continue;
+    }
+    // Money: a literal `$`. The scan goes on from the next character, so this
+    // pair's closer is free to open the next one ("$5 and $x$").
+    res += '\\$';
+    i += 1;
+  }
+  return res;
+}
+
 /**
  * A DOLLAR AMOUNT IS NOT A FORMULA.
  *
- * remark-math reads `$…$` as inline TeX, so "Revenue was $412,000, up 14% on
- * Q2, and margin $3" renders "412,000, up 14% on Q2, and margin" as an
- * equation — in italics, spaces gone — which is most of what a business deck
- * says. Pandoc's rule tells the two apart: a closing `$` may not be followed
- * by a digit. So a `$…$` pair whose closer is followed by a digit is not
- * math, and its opener is escaped; the closer is then free to open the next
- * pair, which is how "$5 to $10" and "from $12 and $19 each" both come out
- * as prices. Code spans and fences are left alone (a `$` in code is code).
- * MEASURED by the flicker guard (2026-09-17): streamed text with stray `$`s
- * rendered as KaTeX for a frame and snapped back — the same family.
+ * remark-math reads any two `$`s in a paragraph as inline TeX — spaces, prose
+ * and line breaks between them — so "Revenue was $412,000, up 14% on Q2, and
+ * margin $3" rendered "412,000, up 14% on Q2, and margin" as an equation, in
+ * italics with the spaces gone. This finds the pairs remark-math would make
+ * and escapes the opener of each that is money rather than maths (isFormula):
+ * pandoc's rules (a closer followed by a digit; a pair padded on one side),
+ * and a pair that opens on a money amount and runs on through English.
+ *
+ * SEEN 2026-10-02, a 4B on the bat-and-ball puzzle: "together they're $1.10,
+ * then x + (x + 2.00) = 1.10$, so 2x = -0.90". The closer is followed by a
+ * comma, so pandoc calls it maths, and the chat drew "1.10, thenx + …" in
+ * KaTeX. A formula that starts with a number — `$2\pi$`, `$2 + 3 = 5$`, `$5
+ * cm$` — has no English in it.
+ *
+ * A `$` with no closer ON ITS LINE is escaped too: remark-math pairs across a
+ * soft break, so "Bat: $1.05" over "Ball: $0.05" became one equation, and
+ * inline maths in a reply never wraps. `$$…$$` is never money and is left
+ * alone, as are code spans, fences (code and `$$` maths) and links written
+ * out. MEASURED by the flicker guard (2026-09-17): streamed text with stray
+ * `$`s rendered as KaTeX for a frame and snapped back — the same family.
  */
 export function guardCurrencyDollars(text: string): string {
-  let out = '';
-  let i = 0;
-  let inFence = false;
-  const lines = text.split('\n');
-  for (let li = 0; li < lines.length; li += 1) {
-    const line = lines[li] as string;
-    if (/^\s{0,3}(```|~~~)/.test(line)) {
-      inFence = !inFence;
-      out += (li > 0 ? '\n' : '') + line;
-      continue;
-    }
-    if (inFence) {
-      out += (li > 0 ? '\n' : '') + line;
-      continue;
-    }
-    // Outside a fence: walk the line, skipping code spans, judging `$` pairs.
-    let res = '';
-    i = 0;
-    while (i < line.length) {
-      const ch = line[i] as string;
-      if (ch === '`') {
-        // A code span: copy through its matching backtick run verbatim.
-        let run = 0;
-        while (line[i + run] === '`') run += 1;
-        const ticks = '`'.repeat(run);
-        const close = line.indexOf(ticks, i + run);
-        if (close === -1) {
-          res += line.slice(i);
-          i = line.length;
-        } else {
-          res += line.slice(i, close + run);
-          i = close + run;
-        }
-        continue;
+  let codeFence = false;
+  let mathFence = false;
+  return text
+    .split('\n')
+    .map((line) => {
+      if (!mathFence && /^\s{0,3}(```|~~~)/.test(line)) {
+        codeFence = !codeFence;
+        return line;
       }
-      if (ch === '\\') {
-        res += line.slice(i, i + 2);
-        i += 2;
-        continue;
+      if (codeFence) return line;
+      // A `$$` line with no other `$` opens display maths (what follows `$$`
+      // there is its meta), and a bare `$$` line closes it; between, TeX.
+      if (mathFence ? /^\s{0,3}\$\$+\s*$/.test(line) : /^\s{0,3}\$\$[^$]*$/.test(line)) {
+        mathFence = !mathFence;
+        return line;
       }
-      if (ch === '$' && line[i + 1] !== '$') {
-        // A candidate opener (remark-math pairs any two single `$`s, spaces
-        // or not — it is a code span with a different fence); find its closer.
-        let j = i + 1;
-        let close = -1;
-        while (j < line.length) {
-          if (line[j] === '\\') {
-            j += 2;
-            continue;
-          }
-          if (line[j] === '$' && line[j + 1] !== '$') {
-            close = j;
-            break;
-          }
-          if (line[j] === '$') {
-            j += 2;
-            continue;
-          }
-          j += 1;
-        }
-        if (close !== -1 && /\d/.test(line[close + 1] ?? '')) {
-          // Money, not math: the opener becomes literal, the scan resumes at
-          // the closer, which may open the next pair.
-          res += `\\$${line.slice(i + 1, close)}`;
-          i = close;
-          continue;
-        }
-        if (close !== -1) {
-          res += line.slice(i, close + 1);
-          i = close + 1;
-          continue;
-        }
-      }
-      res += ch;
-      i += 1;
-    }
-    out += (li > 0 ? '\n' : '') + res;
-  }
-  return out;
+      return mathFence ? line : guardLine(line);
+    })
+    .join('\n');
 }
 
 /**
@@ -337,7 +413,7 @@ export function guardCurrencyDollars(text: string): string {
  * hosts should not double-wrap it in `<Prose>`.
  */
 export const Markdown = forwardRef<HTMLDivElement, MarkdownProps>(function Markdown(
-  { children, className, components, urlTransform, rehypePlugins, ...rest },
+  { children, className, components, urlTransform, rehypePlugins, streaming = false, ...rest },
   ref,
 ) {
   const merged = useMemo(
@@ -355,7 +431,7 @@ export const Markdown = forwardRef<HTMLDivElement, MarkdownProps>(function Markd
         components={merged}
         {...(urlTransform === undefined ? {} : { urlTransform })}
       >
-        {holdBackPartialTail(guardCurrencyDollars(children))}
+        {guardCurrencyDollars(streaming ? holdBackPartialTail(children) : children)}
       </ReactMarkdown>
     </div>
   );

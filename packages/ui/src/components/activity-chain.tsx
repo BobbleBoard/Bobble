@@ -717,7 +717,7 @@ function ChainThought({ text, live = false }: { text: string; live?: boolean }) 
        * on `.pd-chain-thought .pd-markdown` just scales it to the footnote size +
        * secondary color of a thought. The clamp/fade lives on the wrapper. */}
       <div className="pd-chain-thought-text" data-clamped={clamped}>
-        <Markdown>{text}</Markdown>
+        <Markdown streaming={live}>{text}</Markdown>
       </div>
       {long && !live ? (
         <button

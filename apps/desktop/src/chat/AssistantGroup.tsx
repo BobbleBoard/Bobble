@@ -495,9 +495,17 @@ export function AssistantGroup({
      * references' do; the text inside still wraps where it did.
      */
     <div className="flex w-full min-w-0 max-w-full flex-col gap-2">
-      {segments.map((seg) => {
+      {segments.map((seg, index) => {
         if (seg.kind === 'text') {
-          return <Markdown key={`${groupId}-t${textN++}`} text={seg.text} />;
+          // Only the reply's last run is still being written; a run a tool
+          // call followed is finished, and so is everything once the turn is.
+          return (
+            <Markdown
+              key={`${groupId}-t${textN++}`}
+              text={seg.text}
+              streaming={streaming && index === segments.length - 1}
+            />
+          );
         }
         if (seg.kind === 'artifact') {
           // J3: never render an inline artifact widget in the corp feed — it opens

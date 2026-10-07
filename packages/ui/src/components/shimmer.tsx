@@ -207,7 +207,13 @@ function ThoughtWell({ long, showMore, live = false, onShowMore, children }: Tho
         data-clamped={long && !showMore}
         data-md={isMarkdown || undefined}
       >
-        {isMarkdown ? <Markdown className="pd-thinking-md">{children}</Markdown> : children}
+        {isMarkdown ? (
+          <Markdown className="pd-thinking-md" streaming={live}>
+            {children}
+          </Markdown>
+        ) : (
+          children
+        )}
       </div>
       {long && !live ? (
         <button

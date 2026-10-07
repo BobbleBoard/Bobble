@@ -127,10 +127,16 @@ function LocalImage({
 /* Links to the turn's sources become citation chips (./sources). */
 const COMPONENTS = { img: LocalImage, ...CITATION_COMPONENTS };
 
-export function Markdown({ text }: { text: string }) {
+/** `streaming`: this is the text still being written (see the UI Markdown's prop). */
+export function Markdown({ text, streaming = false }: { text: string; streaming?: boolean }) {
   const rehypePlugins = useCitationRehype();
   return (
-    <UiMarkdown components={COMPONENTS} urlTransform={URL_TRANSFORM} rehypePlugins={rehypePlugins}>
+    <UiMarkdown
+      components={COMPONENTS}
+      urlTransform={URL_TRANSFORM}
+      rehypePlugins={rehypePlugins}
+      streaming={streaming}
+    >
       {text}
     </UiMarkdown>
   );
