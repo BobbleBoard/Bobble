@@ -2,7 +2,7 @@
  * Renders a connector's mark inside the gallery's icon boxes: the real,
  * self-contained inline brand SVG (`connector.iconSvg`) when present — a
  * published brand glyph for known brands, a neutral category glyph otherwise —
- * else the emoji `icon` as a last resort.
+ * else the neutral connector glyph (never the catalog's emoji `icon`).
  *
  * Brand glyphs fill in their canonical brand color; neutral fallbacks stay
  * `currentColor`. A handful of near-black brands (GitHub, Notion, Unity…) fill
@@ -13,6 +13,7 @@
  * (packages/mcp-lite), never user input or the network.
  */
 import type { KnownConnector } from '@pi-desktop/mcp-lite';
+import { IconConnector } from '@pi-desktop/ui';
 
 export function ConnectorIcon({
   connector,
@@ -34,5 +35,17 @@ export function ConnectorIcon({
       />
     );
   }
-  return <span aria-hidden>{connector.icon}</span>;
+  /* NEVER THE EMOJI. the user (2026-10-07): "standing no emoji's rule" — seen as a
+     wrench on a custom server in + › Connectors. A connector without a mark
+     gets the neutral connector glyph, at the size its mark would have had. */
+  return (
+    <span
+      className="pd-connector-icon inline-flex items-center justify-center"
+      style={{ width: size, height: size }}
+      data-testid="connector-icon-glyph"
+      aria-hidden
+    >
+      <IconConnector size={size} />
+    </span>
+  );
 }
