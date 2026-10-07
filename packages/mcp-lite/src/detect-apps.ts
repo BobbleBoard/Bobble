@@ -632,24 +632,42 @@ const CATALOG_BASE: KnownConnector[] = [
 
   // ── Creative / media / games ───────────────────────────────────────────────
   {
+    /*
+     * NOT AN MCP SERVER ANY MORE. This card used to install `uvx blender-mcp`, a
+     * third-party server from PyPI that sends its own message types to port
+     * 9876 — where Blender Lab's add-on (the one Blender's own extensions
+     * platform ships) listens and accepts only `execute`. Every call failed; it
+     * also carried telemetry and cloud asset downloads. the user: "fix that to be a
+     * small cli tool". The `blender` command (mac-connectors/blender.ts) talks
+     * to that add-on directly, and is registered only where Blender is
+     * installed — so this card shows only there too (built-in, detected).
+     */
     id: 'blender',
     name: 'Blender',
-    icon: '🟠',
-    description: 'Drive Blender scenes and rendering over MCP.',
-    homepage: 'https://github.com/ahujasid/blender-mcp',
+    icon: '',
+    kind: 'builtin',
+    firstParty: true,
+    description:
+      'The `blender` command: read the open scene, run Python (bpy) in it, and render a picture ' +
+      "of it — through Blender Lab's MCP add-on (Blender › Preferences › Get Extensions › MCP).",
+    homepage: 'https://www.blender.org/lab/mcp-server/',
     category: 'creative',
-    official: false,
+    official: true,
     appBundles: ['Blender.app'],
     bundleIds: ['org.blenderfoundation.blender'],
     processNames: ['Blender'],
-    template: tmpl({
+    tools: [
+      { name: 'blender scene', description: 'What is in the open file.' },
+      { name: 'blender run', description: 'Run Python (bpy) inside Blender.' },
+      { name: 'blender render', description: 'Render a still from the scene camera to a PNG.' },
+    ],
+    template: {
       id: 'blender',
       name: 'Blender',
-      icon: '🟠',
-      description: 'Drive Blender scenes and rendering over MCP.',
-      command: 'uvx',
-      args: ['blender-mcp'],
-    }),
+      icon: '',
+      description: 'The `blender` command, through Blender Lab’s MCP add-on.',
+      command: '',
+    },
   },
   {
     id: 'unity',
@@ -969,7 +987,8 @@ export function recommendedConnectors(
     const ids = Array.isArray(mapping.connectorId) ? mapping.connectorId : [mapping.connectorId];
     for (const id of ids) {
       const connector = byId.get(id);
-      if (connector === undefined || seen.has(id)) continue;
+      // A built-in has nothing to add: it is listed where it applies, not recommended.
+      if (connector === undefined || connector.kind === 'builtin' || seen.has(id)) continue;
       seen.add(id);
       out.push({ ...connector, detected: true, reason: mapping.reason });
     }

@@ -29,6 +29,21 @@
    "parameters": "{\"type\":\"object\",\"required\":[\"command\"],\"properties\":{\"command\":{\"description\":\"Bash command to execute\",\"type\":\"string\"},\"timeout\":{\"description\":\"Timeout in seconds (optional, no default timeout)\",\"type\":\"number\"},\"background\":{\"type\":\"boolean\",\"description\":\"Run this in the background and return immediately. Use it for anything that does not finish on its own — a server, a watcher, a GUI. Output goes to a log file whose path comes back in the result.\"}}}"
   },
   {
+   "name": "blender_render",
+   "description": "blender_render tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "blender_run",
+   "description": "blender_run tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "blender_scene",
+   "description": "blender_scene tool",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
    "name": "browser_back",
    "description": "browser_back tool",
    "parameters": "{\"type\":\"object\",\"properties\":{}}"
@@ -90,9 +105,9 @@
   },
   {
    "name": "capability",
-   "description": "Turn on a group of tools you need but do not currently have. Call it with no argument to see what is available, or with a name to switch that group on: browser, computer-use, chrome, personal, web-research, generation, svg, diagram, chart, math, office, 3d, connectors. The tools join your list from your NEXT reply onward — they are not callable in the same reply that turns them on. Turn on only what the task actually needs.",
+   "description": "Turn on a group of tools you need but do not currently have. Call it with no argument to see what is available, or with a name to switch that group on: browser, computer-use, chrome, personal, web-research, generation, svg, diagram, chart, math, office, 3d, blender, connectors. The tools join your list from your NEXT reply onward — they are not callable in the same reply that turns them on. Turn on only what the task actually needs.",
    "promptSnippet": "Turn on a group of tools (browser, computer-use, personal, …)",
-   "parameters": "{\"type\":\"object\",\"properties\":{\"name\":{\"description\":\"The capability to turn on: browser, computer-use, chrome, personal, web-research, generation, svg, diagram, chart, math, office, 3d, connectors. Omit to list them.\",\"type\":\"string\"}}}"
+   "parameters": "{\"type\":\"object\",\"properties\":{\"name\":{\"description\":\"The capability to turn on: browser, computer-use, chrome, personal, web-research, generation, svg, diagram, chart, math, office, 3d, blender, connectors. Omit to list them.\",\"type\":\"string\"}}}"
   },
   {
    "name": "chart",

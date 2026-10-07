@@ -289,10 +289,11 @@ describe('detectedSuggestions', () => {
 });
 
 describe('recommendedConnectors', () => {
-  it('pins Blender first when Blender is installed', () => {
-    const out = recommendedConnectors(env({ listApps: () => ['Blender.app', 'Safari.app'] }));
-    expect(out[0]?.id).toBe('blender');
-    expect(out[0]?.reason).toBe('Blender is installed');
+  it('does not recommend Blender — it is the built-in `blender` command, detected not added', () => {
+    const apps = { listApps: () => ['Blender.app', 'Safari.app'] };
+    expect(recommendedConnectors(env(apps)).map((s) => s.id)).not.toContain('blender');
+    // …and the scan still finds it, which is what shows its card.
+    expect(detectedSuggestions(env(apps)).map((s) => s.id)).toContain('blender');
   });
 
   it('expands a multi-connector app mapping (VS Code → git/filesystem/github)', () => {

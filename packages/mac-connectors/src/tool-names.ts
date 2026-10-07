@@ -37,3 +37,9 @@ export const MAC_CONNECTOR_TOOLS = [
   MESSAGES_RECENT_TOOL,
   MESSAGES_SEND_TOOL,
 ] as const;
+
+/** Blender, through Blender Lab's own MCP add-on (blender.ts) — registered only where Blender is installed. */
+export const BLENDER_RUN_TOOL = 'blender_run';
+export const BLENDER_SCENE_TOOL = 'blender_scene';
+export const BLENDER_RENDER_TOOL = 'blender_render';
+export const BLENDER_TOOLS = [BLENDER_SCENE_TOOL, BLENDER_RUN_TOOL, BLENDER_RENDER_TOOL] as const;

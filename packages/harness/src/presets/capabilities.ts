@@ -37,6 +37,7 @@
  * through that. Then activation is pure text and costs nothing.
  */
 import { threeD } from './capabilities/3d.js';
+import { blender } from './capabilities/blender.js';
 import { browser } from './capabilities/browser.js';
 import { chart } from './capabilities/chart.js';
 import { chrome } from './capabilities/chrome.js';
@@ -87,6 +88,7 @@ export const CAPABILITIES: readonly Capability[] = [
   math,
   office,
   threeD,
+  blender,
   memory,
   workflows,
   connectors,

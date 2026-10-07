@@ -1122,6 +1122,7 @@ export function useCatalog(): Catalog {
   const installedModels = useConnectorsStore((s) => s.installedModels);
   const moduleConnectors = useConnectorsStore((s) => s.moduleConnectors);
   const recommended = useConnectorsStore((s) => s.recommended);
+  const detected = useConnectorsStore((s) => s.detected);
   const loaded = useConnectorsStore((s) => s.loaded);
   const busy = useConnectorsStore((s) => s.busyId);
   const load = useConnectorsStore((s) => s.load);
@@ -1146,7 +1147,13 @@ export function useCatalog(): Catalog {
       return f !== undefined && f !== null && f.cmd === commandLine(server) ? f : undefined;
     };
     const installedModelIds = new Set(installedModels);
-    const connectors: ConnectorItem[] = catalog.map((c) => {
+    /* A built-in that drives an APP (Blender) is there only where the app is:
+       the scan's own detection, not a card claiming a command this Mac lacks. */
+    const detectedIds = new Set(detected.map((d) => d.id));
+    const present = catalog.filter(
+      (c) => !(c.kind === 'builtin' && (c.appBundles?.length ?? 0) > 0 && !detectedIds.has(c.id)),
+    );
+    const connectors: ConnectorItem[] = present.map((c) => {
       const server = installedServer(registry, c.id);
       return {
         kind: 'connector',
@@ -1205,6 +1212,7 @@ export function useCatalog(): Catalog {
     installedModels,
     moduleConnectors,
     recommended,
+    detected,
     loaded,
     busy,
     skills,

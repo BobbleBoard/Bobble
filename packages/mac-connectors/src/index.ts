@@ -26,9 +26,22 @@
  * `registerMacConnectors(pi, options)` is the configured seam (inject runners /
  * force platform in tests).
  */
+
+import { readFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import path from 'node:path';
 import type { AgentToolResult, ExtensionAPI } from '@mariozechner/pi-coding-agent';
 import { shareTool } from '@pi-desktop/tool-bus';
 import { Type } from '@sinclair/typebox';
+import {
+  blenderExecute,
+  findBlenderApp,
+  formatReply,
+  RENDER_TIMEOUT_MS,
+  type RenderLook,
+  renderCode,
+  SCENE_CODE,
+} from './blender.js';
 import { type CalendarEvent, runCalendarCreateEvent, runCalendarListEvents } from './calendar.js';
 import { runContactsSearch } from './contacts.js';
 import { type MailMessage, runMailRead, runMailRecent, runMailSearch } from './mail.js';
@@ -45,6 +58,9 @@ import { runRemindersCreate, runRemindersList } from './reminders.js';
 // live in a dependency-free module so name-only consumers (the harness presets)
 // can import them without dragging in this extension. Re-exported below.
 import {
+  BLENDER_RENDER_TOOL,
+  BLENDER_RUN_TOOL,
+  BLENDER_SCENE_TOOL,
   CALENDAR_CREATE_EVENT_TOOL,
   CALENDAR_LIST_EVENTS_TOOL,
   CONTACTS_SEARCH_TOOL,
@@ -57,6 +73,7 @@ import {
   REMINDERS_LIST_TOOL,
 } from './tool-names.js';
 
+export * from './blender.js';
 export * from './calendar.js';
 export * from './contacts.js';
 export * from './exec.js';
@@ -73,6 +90,8 @@ export interface MacConnectorsOptions {
   readonly sqlite?: SqliteRunner;
   /** Platform override (test seam / force-enable); defaults to `process.platform`. */
   readonly platform?: NodeJS.Platform;
+  /** Where Blender is installed (test seam); default: found on disk. Null = not installed. */
+  readonly blenderApp?: string | null;
 }
 
 function textResult<D>(text: string, details: D): AgentToolResult<D> {
@@ -568,6 +587,141 @@ export function registerMacConnectors(pi: ExtensionAPI, options: MacConnectorsOp
 }
 
 /** pi extension factory (zero-config; real osascript + sqlite runners). */
+/**
+ * BLENDER — `blender scene | run | render`, through the add-on Blender Lab ships
+ * (see blender.ts). Registered only on a Mac with Blender installed, so a Mac
+ * without it has no `blender` line in its prompt and no command that cannot
+ * work.
+ */
+export function registerBlenderTools(pi: ExtensionAPI, options: MacConnectorsOptions = {}): void {
+  const platform = options.platform ?? process.platform;
+  const app = options.blenderApp === undefined ? findBlenderApp() : options.blenderApp;
+  if (platform !== 'darwin' || app === null || app === undefined) return;
+
+  const run = async (code: string, timeoutMs: number, signal?: AbortSignal) => {
+    try {
+      const reply = await blenderExecute(code, { timeoutMs, ...(signal ? { signal } : {}) });
+      return { ...formatReply(reply), reply };
+    } catch (error) {
+      const text = error instanceof Error ? error.message : String(error);
+      return { text, isError: true, reply: undefined };
+    }
+  };
+
+  shareTool(pi, {
+    name: BLENDER_SCENE_TOOL,
+    label: 'Blender Scene',
+    description:
+      "What is in the open Blender file: every object's name, type, location and size, the " +
+      'camera, the render engine and the frame range. Read it before changing anything.',
+    promptSnippet: 'Read what is in the open Blender scene',
+    parameters: Type.Object({}),
+    async execute(_id, _params, signal): Promise<AgentToolResult<{ isError: boolean }>> {
+      const r = await run(SCENE_CODE, 30_000, signal);
+      return textResult(r.text, { isError: r.isError });
+    },
+  });
+
+  shareTool(pi, {
+    name: BLENDER_RUN_TOOL,
+    label: 'Blender Python',
+    description:
+      'Run Python (bpy) inside the open Blender. Put what you want back in the `result` dict ' +
+      "(`result['count'] = len(bpy.data.objects)`); print() output comes back too, and an " +
+      'error comes back as its traceback. For more than a few lines write a .py file and pass ' +
+      'it as file.',
+    promptSnippet: 'Run Python inside the open Blender',
+    parameters: Type.Object({
+      code: Type.Optional(Type.String({ description: 'Python to run in Blender (bpy).' })),
+      file: Type.Optional(
+        Type.String({ description: 'A .py file to run instead (relative to the working folder).' }),
+      ),
+    }),
+    async execute(
+      _id,
+      params,
+      signal,
+      _onUpdate,
+      ctx,
+    ): Promise<AgentToolResult<{ isError: boolean }>> {
+      let code = params.code ?? '';
+      if (params.file !== undefined && params.file.trim() !== '') {
+        const file = path.resolve(
+          ctx?.cwd ?? process.cwd(),
+          params.file.replace(/^~(?=$|\/)/, homedir()),
+        );
+        try {
+          code = await readFile(file, 'utf8');
+        } catch {
+          return textResult(`No such file: ${file}`, { isError: true });
+        }
+      }
+      if (code.trim() === '') {
+        return textResult('Nothing to run: pass code, or a .py file as file.', { isError: true });
+      }
+      const r = await run(code, 120_000, signal);
+      return textResult(r.text, { isError: r.isError });
+    },
+  });
+
+  shareTool(pi, {
+    name: BLENDER_RENDER_TOOL,
+    label: 'Blender Render',
+    description:
+      "Render a still from the scene's camera to a PNG, then look at it. look: quick (the " +
+      'solid workbench view, seconds — the default), eevee (materials and lights), or cycles ' +
+      '(path-traced, slow). The scene keeps its own render settings.',
+    promptSnippet: 'Render the Blender scene to a picture',
+    parameters: Type.Object({
+      out: Type.String({ description: 'Where to save the .png (relative to the working folder).' }),
+      look: Type.Optional(
+        Type.Union([Type.Literal('quick'), Type.Literal('eevee'), Type.Literal('cycles')], {
+          description: 'quick (default), eevee or cycles.',
+        }),
+      ),
+      percent: Type.Optional(
+        Type.Number({
+          description: 'Size, % of the scene resolution (default 50).',
+          minimum: 10,
+          maximum: 100,
+        }),
+      ),
+    }),
+    async execute(
+      _id,
+      params,
+      signal,
+      _onUpdate,
+      ctx,
+    ): Promise<AgentToolResult<{ isError: boolean; saved?: string }>> {
+      const look: RenderLook = params.look ?? 'quick';
+      let out = path.resolve(
+        ctx?.cwd ?? process.cwd(),
+        params.out.replace(/^~(?=$|\/)/, homedir()),
+      );
+      if (!/\.png$/i.test(out)) out = `${out}.png`;
+      const r = await run(
+        renderCode(out, look, Math.round(params.percent ?? 50)),
+        RENDER_TIMEOUT_MS[look],
+        signal,
+      );
+      const result = r.reply?.result as { saved?: string; error?: string } | undefined;
+      if (result?.error !== undefined) return textResult(result.error, { isError: true });
+      if (result?.saved !== undefined) {
+        return textResult(
+          `${r.text}\n\nSaved ${result.saved} — look at it before saying it is done.`,
+          {
+            isError: false,
+            saved: result.saved,
+          },
+        );
+      }
+      return textResult(r.text, { isError: true });
+    },
+  });
+}
+
 export default function activate(pi: ExtensionAPI): void {
   registerMacConnectors(pi);
+  registerBlenderTools(pi);
 }
