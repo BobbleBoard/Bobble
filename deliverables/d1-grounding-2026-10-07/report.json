@@ -1,0 +1,841 @@
+{
+ "grid_hits": 9,
+ "direction_hits": 0,
+ "grid_level_accuracy": [
+  14,
+  12,
+  8,
+  10
+ ],
+ "ms_per_decision_grid": [
+  1616,
+  786,
+  1063,
+  1172
+ ],
+ "ms_per_decision_direction": 1824,
+ "grid": [
+  {
+   "element": "the File menu in the top menu bar",
+   "point": [
+    48,
+    48
+   ],
+   "hit": true,
+   "levels_right": 3,
+   "levels": [
+    {
+     "picked": 1,
+     "true": 1,
+     "p": 0.93
+    },
+    {
+     "picked": 1,
+     "true": 1,
+     "p": 0.94
+    },
+    {
+     "picked": 4,
+     "true": 1,
+     "p": 0.95
+    },
+    {
+     "picked": 2,
+     "true": 2,
+     "p": 0.96
+    }
+   ]
+  },
+  {
+   "element": "the Render menu in the top menu bar",
+   "point": [
+    121,
+    48
+   ],
+   "hit": true,
+   "levels_right": 3,
+   "levels": [
+    {
+     "picked": 1,
+     "true": 1,
+     "p": 0.8
+    },
+    {
+     "picked": 1,
+     "true": 1,
+     "p": 0.68
+    },
+    {
+     "picked": 5,
+     "true": 2,
+     "p": 0.72
+    },
+    {
+     "picked": 2,
+     "true": 2,
+     "p": 0.89
+    }
+   ]
+  },
+  {
+   "element": "the Help menu in the top menu bar",
+   "point": [
+    208,
+    48
+   ],
+   "hit": true,
+   "levels_right": 3,
+   "levels": [
+    {
+     "picked": 1,
+     "true": 1,
+     "p": 0.94
+    },
+    {
+     "picked": 2,
+     "true": 2,
+     "p": 0.7
+    },
+    {
+     "picked": 4,
+     "true": 1,
+     "p": 0.39
+    },
+    {
+     "picked": 2,
+     "true": 2,
+     "p": 0.95
+    }
+   ]
+  },
+  {
+   "element": "the Modeling workspace tab",
+   "point": [
+    366,
+    48
+   ],
+   "hit": true,
+   "levels_right": 2,
+   "levels": [
+    {
+     "picked": 1,
+     "true": 1,
+     "p": 0.42
+    },
+    {
+     "picked": 3,
+     "true": 2,
+     "p": 0.57
+    },
+    {
+     "picked": 4,
+     "true": 1,
+     "p": 0.24
+    },
+    {
+     "picked": 1,
+     "true": 1,
+     "p": 0.5
+    }
+   ]
+  },
+  {
+   "element": "the Shading workspace tab",
+   "point": [
+    631,
+    48
+   ],
+   "hit": true,
+   "levels_right": 3,
+   "levels": [
+    {
+     "picked": 2,
+     "true": 2,
+     "p": 0.7
+    },
+    {
+     "picked": 1,
+     "true": 1,
+     "p": 0.38
+    },
+    {
+     "picked": 6,
+     "true": 3,
+     "p": 0.77
+    },
+    {
+     "picked": 2,
+     "true": 2,
+     "p": 0.96
+    }
+   ]
+  },
+  {
+   "element": "the Scripting workspace tab",
+   "point": [
+    642,
+    46
+   ],
+   "hit": false,
+   "levels_right": 3,
+   "levels": [
+    {
+     "picked": 1,
+     "true": 3,
+     "p": 0.15
+    },
+    {
+     "picked": 3,
+     "true": 3,
+     "p": 0.39
+    },
+    {
+     "picked": 3,
+     "true": 3,
+     "p": 0.13
+    },
+    {
+     "picked": 9,
+     "true": 9,
+     "p": 0.06
+    }
+   ]
+  },
+  {
+   "element": "the Object Mode dropdown",
+   "point": [
+    159,
+    69
+   ],
+   "hit": false,
+   "levels_right": 3,
+   "levels": [
+    {
+     "picked": 1,
+     "true": 1,
+     "p": 0.94
+    },
+    {
+     "picked": 1,
+     "true": 1,
+     "p": 0.51
+    },
+    {
+     "picked": 5,
+     "true": 5,
+     "p": 0.69
+    },
+    {
+     "picked": 6,
+     "true": 5,
+     "p": 0.66
+    }
+   ]
+  },
+  {
+   "element": "the Add menu in the 3D viewport header",
+   "point": [
+    258,
+    69
+   ],
+   "hit": true,
+   "levels_right": 4,
+   "levels": [
+    {
+     "picked": 1,
+     "true": 1,
+     "p": 0.75
+    },
+    {
+     "picked": 2,
+     "true": 2,
+     "p": 0.36
+    },
+    {
+     "picked": 5,
+     "true": 5,
+     "p": 0.66
+    },
+    {
+     "picked": 4,
+     "true": 4,
+     "p": 0.81
+    }
+   ]
+  },
+  {
+   "element": "the Move tool in the left toolbar",
+   "point": [
+    19,
+    69
+   ],
+   "hit": false,
+   "levels_right": 1,
+   "levels": [
+    {
+     "picked": 1,
+     "true": 1,
+     "p": 0.63
+    },
+    {
+     "picked": 1,
+     "true": 4,
+     "p": 0.3
+    },
+    {
+     "picked": 4,
+     "true": 7,
+     "p": 0.4
+    },
+    {
+     "picked": 4,
+     "true": 7,
+     "p": 0.26
+    }
+   ]
+  },
+  {
+   "element": "the Rotate tool in the left toolbar",
+   "point": [
+    48,
+    252
+   ],
+   "hit": true,
+   "levels_right": 2,
+   "levels": [
+    {
+     "picked": 1,
+     "true": 1,
+     "p": 0.63
+    },
+    {
+     "picked": 4,
+     "true": 7,
+     "p": 0.24
+    },
+    {
+     "picked": 7,
+     "true": 7,
+     "p": 0.46
+    },
+    {
+     "picked": 8,
+     "true": 7,
+     "p": 0.31
+    }
+   ]
+  },
+  {
+   "element": "the Scale tool in the left toolbar",
+   "point": [
+    48,
+    148
+   ],
+   "hit": false,
+   "levels_right": 1,
+   "levels": [
+    {
+     "picked": 1,
+     "true": 1,
+     "p": 0.47
+    },
+    {
+     "picked": 4,
+     "true": 7,
+     "p": 0.25
+    },
+    {
+     "picked": 4,
+     "true": 7,
+     "p": 0.19
+    },
+    {
+     "picked": 2,
+     "true": 7,
+     "p": 0.19
+    }
+   ]
+  },
+  {
+   "element": "the Add Cube tool in the left toolbar",
+   "point": [
+    48,
+    94
+   ],
+   "hit": false,
+   "levels_right": 1,
+   "levels": [
+    {
+     "picked": 1,
+     "true": 4,
+     "p": 0.6
+    },
+    {
+     "picked": 1,
+     "true": 7,
+     "p": 0.29
+    },
+    {
+     "picked": 7,
+     "true": 7,
+     "p": 0.28
+    },
+    {
+     "picked": 2,
+     "true": 7,
+     "p": 0.24
+    }
+   ]
+  },
+  {
+   "element": "the zoom (magnifying glass) button in the 3D viewport",
+   "point": [
+    48,
+    235
+   ],
+   "hit": false,
+   "levels_right": 0,
+   "levels": [
+    {
+     "picked": 1,
+     "true": 3,
+     "p": 0.38
+    },
+    {
+     "picked": 7,
+     "true": 6,
+     "p": 0.32
+    },
+    {
+     "picked": 1,
+     "true": 3,
+     "p": 0.57
+    },
+    {
+     "picked": 5,
+     "true": 3,
+     "p": 0.16
+    }
+   ]
+  },
+  {
+   "element": "the camera view button in the 3D viewport",
+   "point": [
+    48,
+    173
+   ],
+   "hit": false,
+   "levels_right": 0,
+   "levels": [
+    {
+     "picked": 1,
+     "true": 3,
+     "p": 0.09
+    },
+    {
+     "picked": 4,
+     "true": 9,
+     "p": 0.82
+    },
+    {
+     "picked": 4,
+     "true": 9,
+     "p": 0.23
+    },
+    {
+     "picked": 5,
+     "true": 9,
+     "p": 0.1
+    }
+   ]
+  },
+  {
+   "element": "the blue Z axis circle on the navigation gizmo",
+   "point": [
+    1210,
+    148
+   ],
+   "hit": false,
+   "levels_right": 3,
+   "levels": [
+    {
+     "picked": 3,
+     "true": 3,
+     "p": 0.85
+    },
+    {
+     "picked": 5,
+     "true": 5,
+     "p": 0.93
+    },
+    {
+     "picked": 5,
+     "true": 2,
+     "p": 0.42
+    },
+    {
+     "picked": 2,
+     "true": 2,
+     "p": 0.82
+    }
+   ]
+  },
+  {
+   "element": "the search field in the outliner",
+   "point": [
+    1464,
+    48
+   ],
+   "hit": false,
+   "levels_right": 2,
+   "levels": [
+    {
+     "picked": 3,
+     "true": 3,
+     "p": 0.25
+    },
+    {
+     "picked": 3,
+     "true": 3,
+     "p": 0.42
+    },
+    {
+     "picked": 6,
+     "true": 5,
+     "p": 0.71
+    },
+    {
+     "picked": 2,
+     "true": 4,
+     "p": 0.12
+    }
+   ]
+  },
+  {
+   "element": "Scene Collection in the outliner",
+   "point": [
+    1348,
+    94
+   ],
+   "hit": true,
+   "levels_right": 3,
+   "levels": [
+    {
+     "picked": 3,
+     "true": 3,
+     "p": 0.6
+    },
+    {
+     "picked": 3,
+     "true": 3,
+     "p": 0.61
+    },
+    {
+     "picked": 7,
+     "true": 7,
+     "p": 0.64
+    },
+    {
+     "picked": 3,
+     "true": 2,
+     "p": 0.67
+    }
+   ]
+  },
+  {
+   "element": "the play button in the timeline",
+   "point": [
+    598,
+    796
+   ],
+   "hit": false,
+   "levels_right": 3,
+   "levels": [
+    {
+     "picked": 7,
+     "true": 8,
+     "p": 0.43
+    },
+    {
+     "picked": 9,
+     "true": 9,
+     "p": 0.5
+    },
+    {
+     "picked": 6,
+     "true": 6,
+     "p": 0.88
+    },
+    {
+     "picked": 5,
+     "true": 5,
+     "p": 0.93
+    }
+   ]
+  },
+  {
+   "element": "the End frame field in the timeline",
+   "point": [
+    1152,
+    796
+   ],
+   "hit": true,
+   "levels_right": 3,
+   "levels": [
+    {
+     "picked": 8,
+     "true": 9,
+     "p": 0.49
+    },
+    {
+     "picked": 9,
+     "true": 9,
+     "p": 0.86
+    },
+    {
+     "picked": 6,
+     "true": 6,
+     "p": 0.72
+    },
+    {
+     "picked": 6,
+     "true": 6,
+     "p": 0.92
+    }
+   ]
+  },
+  {
+   "element": "the Gravity checkbox in the properties panel",
+   "point": [
+    1353,
+    659
+   ],
+   "hit": false,
+   "levels_right": 1,
+   "levels": [
+    {
+     "picked": 6,
+     "true": 6,
+     "p": 0.44
+    },
+    {
+     "picked": 9,
+     "true": 6,
+     "p": 0.36
+    },
+    {
+     "picked": 8,
+     "true": 1,
+     "p": 0.12
+    },
+    {
+     "picked": 7,
+     "true": 1,
+     "p": 0.09
+    }
+   ]
+  }
+ ],
+ "direction": [
+  {
+   "element": "the File menu in the top menu bar",
+   "point": [
+    0,
+    216
+   ],
+   "hit": false,
+   "said_on": false,
+   "moves": "ulllllllllllllll"
+  },
+  {
+   "element": "the Render menu in the top menu bar",
+   "point": [
+    1511,
+    0
+   ],
+   "hit": false,
+   "said_on": false,
+   "moves": "urruuuuuuuuuuuuu"
+  },
+  {
+   "element": "the Help menu in the top menu bar",
+   "point": [
+    756,
+    0
+   ],
+   "hit": false,
+   "said_on": false,
+   "moves": "uuuuuuuuuuuuuuuu"
+  },
+  {
+   "element": "the Modeling workspace tab",
+   "point": [
+    1511,
+    432
+   ],
+   "hit": false,
+   "said_on": false,
+   "moves": "rrrrrrrrrrrrrrrr"
+  },
+  {
+   "element": "the Shading workspace tab",
+   "point": [
+    0,
+    432
+   ],
+   "hit": false,
+   "said_on": false,
+   "moves": "llllllllllllllll"
+  },
+  {
+   "element": "the Scripting workspace tab",
+   "point": [
+    1511,
+    432
+   ],
+   "hit": false,
+   "said_on": false,
+   "moves": "rrrrrrrrrrrrrrrr"
+  },
+  {
+   "element": "the Object Mode dropdown",
+   "point": [
+    0,
+    432
+   ],
+   "hit": false,
+   "said_on": false,
+   "moves": "llllllllllllllll"
+  },
+  {
+   "element": "the Add menu in the 3D viewport header",
+   "point": [
+    1511,
+    432
+   ],
+   "hit": false,
+   "said_on": false,
+   "moves": "rrrrrrrrrrrrrrrr"
+  },
+  {
+   "element": "the Move tool in the left toolbar",
+   "point": [
+    1511,
+    432
+   ],
+   "hit": false,
+   "said_on": false,
+   "moves": "rrrrrrrrrrrrrrrr"
+  },
+  {
+   "element": "the Rotate tool in the left toolbar",
+   "point": [
+    440,
+    432
+   ],
+   "hit": false,
+   "said_on": false,
+   "moves": "lrllrrllrrllrrll"
+  },
+  {
+   "element": "the Scale tool in the left toolbar",
+   "point": [
+    1511,
+    432
+   ],
+   "hit": false,
+   "said_on": false,
+   "moves": "rrrrrrrrrrrrrrrr"
+  },
+  {
+   "element": "the Add Cube tool in the left toolbar",
+   "point": [
+    472,
+    432
+   ],
+   "hit": false,
+   "said_on": false,
+   "moves": "lrllrrlrrlrrlrrl"
+  },
+  {
+   "element": "the zoom (magnifying glass) button in the 3D viewport",
+   "point": [
+    1511,
+    432
+   ],
+   "hit": false,
+   "said_on": false,
+   "moves": "rrrrrrrrrrrrrrrr"
+  },
+  {
+   "element": "the camera view button in the 3D viewport",
+   "point": [
+    1511,
+    432
+   ],
+   "hit": false,
+   "said_on": false,
+   "moves": "rrrrrrrrrrrrrrrr"
+  },
+  {
+   "element": "the blue Z axis circle on the navigation gizmo",
+   "point": [
+    1511,
+    432
+   ],
+   "hit": false,
+   "said_on": false,
+   "moves": "rrrrrrrrrrrrrrrr"
+  },
+  {
+   "element": "the search field in the outliner",
+   "point": [
+    1511,
+    432
+   ],
+   "hit": false,
+   "said_on": false,
+   "moves": "rrrrrrrrrrrrrrrr"
+  },
+  {
+   "element": "Scene Collection in the outliner",
+   "point": [
+    1511,
+    432
+   ],
+   "hit": false,
+   "said_on": false,
+   "moves": "rrrrrrrrrrrrrrrr"
+  },
+  {
+   "element": "the play button in the timeline",
+   "point": [
+    1511,
+    432
+   ],
+   "hit": false,
+   "said_on": false,
+   "moves": "rrrrrrrrrrrrrrrr"
+  },
+  {
+   "element": "the End frame field in the timeline",
+   "point": [
+    1511,
+    432
+   ],
+   "hit": false,
+   "said_on": false,
+   "moves": "rrrrrrrrrrrrrrrr"
+  },
+  {
+   "element": "the Gravity checkbox in the properties panel",
+   "point": [
+    1511,
+    432
+   ],
+   "hit": false,
+   "said_on": false,
+   "moves": "rrrrrrrrrrrrrrrr"
+  }
+ ]
+}
