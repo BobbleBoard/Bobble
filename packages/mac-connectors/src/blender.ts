@@ -18,7 +18,7 @@
 import { execFile } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
 import net from 'node:net';
-import { homedir } from 'node:os';
+import { userInfo } from 'node:os';
 import path from 'node:path';
 
 export const BLENDER_PORT = 9876;
@@ -41,8 +41,18 @@ export interface BlenderEnv {
   readonly addonInstalled?: () => boolean;
 }
 
+/**
+ * The person's real home — Blender keeps its add-ons there whatever HOME says
+ * (an app given a different HOME still runs the person's Blender). MEASURED: a
+ * probe's throwaway HOME made the add-on read as "not installed" while it was
+ * installed and Blender was simply closed.
+ */
+function realHome(): string {
+  return userInfo().homedir;
+}
+
 /** Where Blender is installed on this Mac, if it is. */
-export function findBlenderApp(home = homedir(), exists = existsSync): string | undefined {
+export function findBlenderApp(home = realHome(), exists = existsSync): string | undefined {
   for (const app of ['/Applications/Blender.app', path.join(home, 'Applications', 'Blender.app')]) {
     if (exists(app)) return app;
   }
@@ -50,7 +60,7 @@ export function findBlenderApp(home = homedir(), exists = existsSync): string | 
 }
 
 /** Blender Lab's add-on, in any Blender version's extensions or add-ons folder. */
-export function blenderAddonInstalled(home = homedir()): boolean {
+export function blenderAddonInstalled(home = realHome()): boolean {
   const root = path.join(home, 'Library', 'Application Support', 'Blender');
   let versions: string[] = [];
   try {
@@ -152,7 +162,11 @@ export function blenderExecute(
         }
       });
     });
+    let failed = false;
     socket.on('error', (error: NodeJS.ErrnoException) => {
+      /* 'close' follows 'error' at once; the sentence below needs a moment
+         (is Blender running?), and 'close' must not answer for it. */
+      failed = true;
       if (error.code === 'ECONNREFUSED') {
         void notListeningMessage(opts).then((m) =>
           done(() => reject(new BlenderUnreachableError(m))),
@@ -161,9 +175,10 @@ export function blenderExecute(
       }
       done(() => reject(error));
     });
-    socket.on('close', () =>
-      done(() => reject(new Error('Blender closed the connection without an answer.'))),
-    );
+    socket.on('close', () => {
+      if (failed) return;
+      done(() => reject(new Error('Blender closed the connection without an answer.')));
+    });
   });
 }
 

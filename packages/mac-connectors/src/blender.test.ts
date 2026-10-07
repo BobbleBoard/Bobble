@@ -64,6 +64,14 @@ describe('blenderExecute — the add-on’s own wire', () => {
     await expect(refused({ installed: false, running: false })).rejects.toThrow(
       /add-on is not installed.*Get Extensions/,
     );
+    // A slow running-check (pgrep) must still win over the socket's 'close'.
+    await expect(
+      blenderExecute('x', {
+        port: free,
+        addonInstalled: () => true,
+        blenderRunning: () => new Promise((r) => setTimeout(() => r(false), 50)),
+      }),
+    ).rejects.toThrow(/Blender isn't open/);
     await expect(refused({ installed: true, running: false })).rejects.toThrow(
       /Blender isn't open\. Open it with `open -a Blender`/,
     );
