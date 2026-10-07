@@ -47,6 +47,7 @@ import {
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
+  DropdownMenuSwitchItem,
   DropdownMenuTrigger,
 } from './dropdown-menu.tsx';
 import {
@@ -155,6 +156,10 @@ export interface AddMenuEntry {
   readonly hint?: string;
   /** A mode that is on or off: the row is a checkbox (the Web search idiom). */
   readonly checked?: boolean;
+  /** Something the person turns on or off: the row ends in a switch and the menu stays open. */
+  readonly switchOn?: boolean;
+  /** A rule between this entry's neighbours (label and handlers unused). */
+  readonly separator?: true;
   /** A row that opens a submenu (`Workflows ›`). */
   readonly children?: readonly AddMenuEntry[];
   /** The row was picked (a checkbox row flips its mode here). */
@@ -162,6 +167,20 @@ export interface AddMenuEntry {
 }
 
 function renderEntry(entry: AddMenuEntry): ReactNode {
+  if (entry.separator === true) return <DropdownMenuSeparator key={entry.key} />;
+  if (entry.switchOn !== undefined) {
+    return (
+      <DropdownMenuSwitchItem
+        key={entry.key}
+        icon={entry.icon}
+        checked={entry.switchOn}
+        data-testid={entry.testid}
+        onSelect={() => entry.onSelect?.()}
+      >
+        {entry.label}
+      </DropdownMenuSwitchItem>
+    );
+  }
   if (entry.children !== undefined) {
     return (
       <DropdownMenuSub key={entry.key}>

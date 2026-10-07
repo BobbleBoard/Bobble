@@ -350,6 +350,17 @@
   font-size: calc(var(--pd-font-size-caption) * var(--pd-menu-scale, 1));
 }
 
+/* A switch row's switch: at the row's end, centred on the whole row. */
+.pd-menu-switch {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  align-self: center;
+  margin-left: auto;
+  padding-left: calc(16px * var(--pd-menu-scale, 1));
+  pointer-events: none;
+}
+
 .pd-menu-check + .pd-menu-hint {
   margin-left: 0;
 }

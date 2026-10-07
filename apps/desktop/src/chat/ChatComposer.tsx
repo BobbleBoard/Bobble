@@ -73,6 +73,8 @@ import { pathOfFile } from './composer/file-paths';
 import { attachPlan, TEXT_MAX_BYTES } from './composer/incoming-files';
 import type { PillData } from './composer/pill-node';
 import { type AcToken, EMPTY_TOKEN } from './composer/tokens';
+import { claimsUndoForUnsend, isUndoKey, UNSEND_WINDOW_MS } from './composer/unsend-gesture';
+import { useConnectorsMenuEntry } from './composer-connectors';
 import {
   composerMenuEntries,
   hasSubmitInterceptors,
@@ -80,7 +82,6 @@ import {
   useComposerActionsVersion,
   useComposerModeChips,
 } from './composer-entries';
-import { claimsUndoForUnsend, isUndoKey, UNSEND_WINDOW_MS } from './composer/unsend-gesture';
 import { GEN_ACTION_PLANS } from './composer-gen-actions';
 import { DictationBar } from './DictationBar';
 import { IconWarning } from './icons-pill';
@@ -1309,7 +1310,11 @@ export function ChatComposer({
      the chip of a mode that is on. Nothing until one registers. */
   useComposerActionsVersion();
   const modeChips = useComposerModeChips();
-  const extraMenuEntries = composerMenuEntries((glyph) => <Glyph name={glyph} size={16} />);
+  const connectorsEntry = useConnectorsMenuEntry();
+  const extraMenuEntries = [
+    connectorsEntry,
+    ...composerMenuEntries((glyph) => <Glyph name={glyph} size={16} />),
+  ];
 
   const submit = async () => {
     const raw = text.trim();

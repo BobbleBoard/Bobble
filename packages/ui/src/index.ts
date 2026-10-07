@@ -142,6 +142,7 @@ export type {
   DropdownMenuItemProps,
   DropdownMenuRadioItemProps,
   DropdownMenuSubTriggerProps,
+  DropdownMenuSwitchItemProps,
 } from './components/dropdown-menu.tsx';
 export {
   DropdownMenu,
@@ -156,6 +157,7 @@ export {
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
+  DropdownMenuSwitchItem,
   DropdownMenuTrigger,
 } from './components/dropdown-menu.tsx';
 export type { EffortSliderProps } from './components/effort-slider.tsx';

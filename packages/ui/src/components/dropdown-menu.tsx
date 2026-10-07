@@ -94,6 +94,47 @@ export const DropdownMenuCheckboxItem = forwardRef<HTMLDivElement, DropdownMenuC
   },
 );
 
+/**
+ * A row that turns something on or off — the connector switches in the
+ * composer's "+ › Connectors" (the user's reference: an icon, a name, a switch at
+ * the right). Semantically a checkbox item (`menuitemcheckbox`, aria-checked),
+ * drawn with the Switch's own track and thumb so it reads as the settings
+ * switch it is. The switch is a picture, not a second control: one row, one
+ * focus stop. Flipping it keeps the menu open — the next switch is usually the
+ * next thing touched.
+ */
+export interface DropdownMenuSwitchItemProps
+  extends Omit<ComponentPropsWithoutRef<typeof RD.CheckboxItem>, 'onSelect'> {
+  icon?: ReactNode;
+  checked: boolean;
+  onSelect?: () => void;
+}
+
+export const DropdownMenuSwitchItem = forwardRef<HTMLDivElement, DropdownMenuSwitchItemProps>(
+  function DropdownMenuSwitchItem({ icon, checked, onSelect, className, children, ...rest }, ref) {
+    const state = checked ? 'checked' : 'unchecked';
+    return (
+      <RD.CheckboxItem
+        ref={ref}
+        className={menuItemClass({ className })}
+        checked={checked}
+        onSelect={(e) => {
+          e.preventDefault();
+          onSelect?.();
+        }}
+        {...rest}
+      >
+        <MenuRowContent icon={icon}>{children}</MenuRowContent>
+        <span className="pd-menu-switch" aria-hidden="true">
+          <span className="pd-switch pd-switch--sm" data-state={state}>
+            <span className="pd-switch-thumb" data-state={state} />
+          </span>
+        </span>
+      </RD.CheckboxItem>
+    );
+  },
+);
+
 export interface DropdownMenuRadioItemProps extends ComponentPropsWithoutRef<typeof RD.RadioItem> {
   description?: ReactNode;
 }
