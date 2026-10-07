@@ -30,6 +30,11 @@ const MODEL = process.env.MODEL ?? 'qwen3.5-4b-mtp';
 const OUT = process.env.OUT ?? '/tmp/connector-call';
 mkdirSync(OUT, { recursive: true });
 const DIAG = path.join(OUT, 'diag.log');
+/* FINDER_PATH=1: the app gets the bare system PATH a Finder-launched Bobble has. */
+const FINDER_PATH = process.env.FINDER_PATH === '1';
+/* BLENDER=1: one read-only question about the open Blender scene (needs Blender
+   open with Blender Lab's MCP add-on; it changes nothing in the scene). */
+const BLENDER = process.env.BLENDER === '1';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
 
@@ -82,6 +87,7 @@ const { page, check, finish } = await launchApp('connector-call', {
     HF_HOME: path.join(homedir(), '.cache', 'huggingface'),
     PI_DIAG_PROMPTS: DIAG,
     PI_DIAG_PROMPTS_FULL: '1',
+    ...(FINDER_PATH ? { PATH: '/usr/bin:/bin:/usr/sbin:/sbin' } : {}),
   },
   timeout: 120_000,
 });
@@ -155,11 +161,17 @@ const turn = async (label, text) => {
   const t0 = Date.now();
   await page.keyboard.press('Enter');
   await sleep(1500);
+  /* Idle for 3 s running, not one glance: a turn pauses between its steps
+     (a nudge, a retry), and the next question typed into that gap queued
+     behind it and read as its answer. */
+  let idleSince = null;
   while (Date.now() - t0 < 600_000) {
     const busy = await page
       .locator('[data-testid="composer-stop"], [data-testid="composer-paused"]')
       .count();
-    if (busy === 0) break;
+    if (busy > 0) idleSince = null;
+    else if (idleSince === null) idleSince = Date.now();
+    else if (Date.now() - idleSince > 3000) break;
     await sleep(250);
   }
   // The request after the turn's last tool result carries it; a turn that
@@ -173,27 +185,71 @@ const turn = async (label, text) => {
   return r;
 };
 
-const report = { model: MODEL };
-const sys = textOf(bodies()[0]?.body.messages?.[0]?.content ?? '');
-report.systemPromptMentions = {
-  'pi-tool': sys.includes('pi-tool'),
-  time: /\btime\b.*connector|connector.*\btime\b|pi-tool time/i.test(sys),
+const report = { model: MODEL, finderPath: FINDER_PATH };
+const usageSince = (from) => {
+  try {
+    return [
+      ...readFileSync(DIAG, 'utf8')
+        .slice(from)
+        .matchAll(/\[pi-diag-usage\] engine=(\S+) prompt_tokens=(\d+) cached_tokens=(\d+)/g),
+    ].map((m) => ({ prompt: Number(m[2]), cached: Number(m[3]) }));
+  } catch {
+    return [];
+  }
 };
-report.a = await turn('a-tokyo', 'What time is it in Tokyo right now?');
-report.b = await turn('b-list', 'Run `pi-tool list` in bash and tell me exactly what it prints.');
+const diagSize = () => (existsSync(DIAG) ? readFileSync(DIAG).length : 0);
 
-const usedConnector = (t) => t.calls.some((c) => /pi-tool\s+time\b/.test(c.args));
-const listWorked = report.b.calls.some(
-  (c) => /pi-tool\s+list/.test(c.args) && /\btime\b/i.test(c.result),
+const at = diagSize();
+report.a = await turn('a-tokyo', 'What time is it in Tokyo right now?');
+const first = usageSince(at)[0];
+report.turn1Prefill = first ?? null;
+// The prompt as the chat's first request sent it.
+const sys = textOf(bodies()[0]?.body.messages?.[0]?.content ?? '');
+report.systemPrompt = {
+  timeLine: (sys.match(/^ {2}pi-tool time — .*$/m) ?? [null])[0],
+  blenderLine: (sys.match(/^ {2}blender — .*$/m) ?? [null])[0],
+};
+report.a2 = await turn('a2-named', 'Use my Time connector to tell me the time in Tokyo.');
+report.b = await turn('b-list', 'Run `pi-tool list` in bash and tell me exactly what it prints.');
+if (BLENDER) report.c = await turn('c-blender', "What's in my Blender scene right now?");
+
+const used = (t, re) => t.calls.some((c) => re.test(c.args));
+check(
+  report.systemPrompt.timeLine !== null,
+  `the prompt names the connector: ${report.systemPrompt.timeLine}`,
 );
 check(
-  listWorked,
-  `pi-tool list answered with the time server (${JSON.stringify(report.b.calls.map((c) => c.result.slice(0, 120)))})`,
+  first !== undefined && first.cached / first.prompt >= 0.8,
+  `turn 1 read its prompt from the warmed cache (${first?.cached}/${first?.prompt})`,
+);
+log(
+  `natural ask used the connector: ${used(report.a, /pi-tool\s+time\b/)} (${JSON.stringify(report.a.calls.map((c) => c.args))})`,
 );
 check(
-  usedConnector(report.a),
-  `asked the time in Tokyo, the model used the connector (${JSON.stringify(report.a.calls.map((c) => c.args))})`,
+  report.a2.calls.some(
+    (c) => /pi-tool\s+time\s+\S/.test(c.args) && /Tokyo|\d{2}:\d{2}/.test(c.result),
+  ),
+  `named, the model ran the connector and it answered (${JSON.stringify(report.a2.calls.map((c) => [c.args, c.result.slice(0, 80)]))})`,
 );
+check(
+  report.b.calls.some(
+    (c) =>
+      /pi-tool\s+list/.test(c.args) &&
+      /pi-tool time \S+ --help/.test(c.result) &&
+      !/mcp_call/.test(c.result),
+  ),
+  'pi-tool list speaks CLI (pi-tool time <tool> --help, no mcp_call)',
+);
+if (BLENDER) {
+  check(
+    report.systemPrompt.blenderLine !== null,
+    `the prompt names Blender: ${report.systemPrompt.blenderLine}`,
+  );
+  check(
+    report.c.calls.some((c) => /\bblender\s+scene\b/.test(c.args) && /object_count/.test(c.result)),
+    `asked about the Blender scene, the model read it (${JSON.stringify(report.c.calls.map((c) => c.args))})`,
+  );
+}
 writeFileSync(path.join(OUT, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
 log('report', JSON.stringify({ systemPromptMentions: report.systemPromptMentions }));
 
