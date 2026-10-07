@@ -6,6 +6,7 @@ import {
   coerceArgs,
   commandLineForCall,
   commandNameFor,
+  connectorCommandForCall,
   parseArgv,
   pathFor,
   renderCommandHelp,
@@ -732,5 +733,35 @@ describe('a tool call that named the command — turned back into the line', () 
     expect(commandLineForCall(full, 'browser click', { pos: { x: 1, y: 2 } }, shims)).toBe(
       'browser click "{\\"x\\":1,\\"y\\":2}"',
     );
+  });
+});
+
+describe('connectorCommandForCall — a connector named as a tool', () => {
+  const ids = ['time', 'google-drive'];
+  it("turns the 4B's `time` {} into the connector's own help", () => {
+    expect(connectorCommandForCall(ids, 'time', {})).toBe('pi-tool time');
+  });
+  it('carries a named tool and its arguments as flags, whatever the joiner', () => {
+    const want = 'pi-tool time get_current_time --timezone=Asia/Tokyo';
+    expect(connectorCommandForCall(ids, 'time get_current_time', { timezone: 'Asia/Tokyo' })).toBe(
+      want,
+    );
+    expect(connectorCommandForCall(ids, 'time_get_current_time', { timezone: 'Asia/Tokyo' })).toBe(
+      want,
+    );
+    expect(connectorCommandForCall(ids, 'time.get_current_time', { timezone: 'Asia/Tokyo' })).toBe(
+      want,
+    );
+    expect(
+      connectorCommandForCall(ids, 'pi-tool time get_current_time', { timezone: 'Asia/Tokyo' }),
+    ).toBe(want);
+    expect(connectorCommandForCall(ids, 'google-drive_search', { query: 'q 1' })).toBe(
+      'pi-tool google-drive search "--query=q 1"',
+    );
+  });
+  it('leaves anything that is not a connector alone', () => {
+    expect(connectorCommandForCall(ids, 'timer', {})).toBeUndefined();
+    expect(connectorCommandForCall(ids, 'weather', {})).toBeUndefined();
+    expect(connectorCommandForCall([], 'time', {})).toBeUndefined();
   });
 });

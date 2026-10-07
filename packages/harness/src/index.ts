@@ -171,7 +171,13 @@ import {
   resolveWorkspaceRoot,
   WORKSPACE_ROOT_ENV,
 } from './tools/sandbox-fs.js';
-import { buildCli, commandLineForCall, commandNameFor, pathFor } from './tools/tool-cli.js';
+import {
+  buildCli,
+  commandLineForCall,
+  commandNameFor,
+  connectorCommandForCall,
+  pathFor,
+} from './tools/tool-cli.js';
 import { protectShimDollars, registerToolCli } from './tools/tool-cli-bridge.js';
 import { toolCliGroups, toolCliShimCommands } from './tools/tool-cli-groups.js';
 import { truncateToolOutput } from './tools/tool-output-truncate.js';
@@ -1849,12 +1855,18 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       ...(toolCliMode
         ? {
             resolveUnknownTool: (name: string, args: Record<string, unknown>) => {
-              const command = commandLineForCall(
-                buildCli(toolCliGroups(), cliVisibleTools()),
-                name,
-                args,
-                toolCliShimCommands(toolCliGroups()),
-              );
+              const command =
+                commandLineForCall(
+                  buildCli(toolCliGroups(), cliVisibleTools()),
+                  name,
+                  args,
+                  toolCliShimCommands(toolCliGroups()),
+                ) ??
+                connectorCommandForCall(
+                  sharedConnectors().map((c) => c.id),
+                  name,
+                  args,
+                );
               return command === undefined ? undefined : { name: 'bash', arguments: { command } };
             },
           }

@@ -977,3 +977,45 @@ export function renderSearch(cli: CliModel, query: string): string {
   lines.push('', 'Run any of them with --help for arguments.');
   return lines.join('\n');
 }
+
+/**
+ * A CONNECTOR'S NAME TYPED AS A TOOL NAME, in bash-CLI mode.
+ *
+ * MEASURED (Qwen 3.5 4B, connector-call-probe, 2026-10-07): told "Use my Time
+ * connector", with `pi-tool time — …` in its command list, the model called a
+ * structured tool named `time` with `{}` and got "Tool time not found" — then
+ * ran the shell's own `time` and `which time`. The same slip as a command typed
+ * as a tool (commandLineForCall), one layer out: the call becomes the `pi-tool`
+ * line it meant — the connector's tool list when no tool is named, which is the
+ * lesson at the moment of the mistake. Accepts `time`, `time get_current_time`,
+ * `time_get_current_time`, `time.get_current_time`, and any of them after
+ * `pi-tool`. Undefined when the name is not one of the connectors given.
+ */
+export function connectorCommandForCall(
+  connectorIds: readonly string[],
+  name: string,
+  args: Readonly<Record<string, unknown>>,
+): string | undefined {
+  let words = name
+    .trim()
+    .split(/\s+/)
+    .filter((w) => w !== '');
+  if (words[0] === 'pi-tool' || words[0] === 'pi_tool') words = words.slice(1);
+  if (words.length === 0) return undefined;
+  const first = words[0] as string;
+  let id = connectorIds.find((c) => c === first);
+  let rest = words.slice(1);
+  if (id === undefined) {
+    // `time_get_current_time` / `time.get_current_time`: the id, a joiner, the tool.
+    id = [...connectorIds]
+      .sort((a, b) => b.length - a.length)
+      .find((c) => first.startsWith(`${c}_`) || first.startsWith(`${c}.`));
+    if (id === undefined) return undefined;
+    rest = [first.slice(id.length + 1), ...rest];
+  }
+  const tool = rest.join('_');
+  const flags = Object.entries(args)
+    .filter(([, v]) => v !== undefined && v !== null)
+    .map(([k, v]) => `--${k}=${typeof v === 'object' ? JSON.stringify(v) : String(v)}`);
+  return ['pi-tool', id, ...(tool !== '' ? [tool] : []), ...flags].map(shellWord).join(' ');
+}
