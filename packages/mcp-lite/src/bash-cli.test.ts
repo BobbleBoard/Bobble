@@ -66,9 +66,12 @@ describe('parseDispatcherArgs', () => {
     });
   });
 
-  it('errors clearly when a tool name is missing', () => {
-    const cmd = parseDispatcherArgs(['github']);
-    expect(cmd.op).toBe('error');
+  it("reads `<server>` and `<server> --help` as that server's tools, like any command", () => {
+    // The prompt says: first use, run `<command> --help`. A model that does
+    // that with `pi-tool time --help` used to get an error.
+    expect(parseDispatcherArgs(['github'])).toEqual({ op: 'list', server: 'github' });
+    expect(parseDispatcherArgs(['github', '--help'])).toEqual({ op: 'list', server: 'github' });
+    expect(parseDispatcherArgs(['github', '-h'])).toEqual({ op: 'list', server: 'github' });
   });
 });
 
@@ -149,6 +152,13 @@ describe('dispatchCommand (in-process routing)', () => {
     const list = await dispatchCommand(host, parseDispatcherArgs(['list']));
     expect(list.isError).toBe(false);
     expect(list.text).toContain('echo');
+    // CLI words, not the proxy tools this mode does not advertise.
+    expect(list.text).toContain('pi-tool a echo --help');
+    expect(list.text).not.toMatch(/mcp_call|mcp_schema/);
+
+    const one = await dispatchCommand(host, parseDispatcherArgs(['a', '--help']));
+    expect(one.isError).toBe(false);
+    expect(one.text).toContain('echo');
 
     const help = await dispatchCommand(host, parseDispatcherArgs(['a', 'echo', '--help']));
     expect(help.text).toContain('--message');

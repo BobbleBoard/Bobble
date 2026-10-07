@@ -100,10 +100,13 @@ export function parseDispatcherArgs(argv: readonly string[]): DispatcherCommand 
   }
   const server = first as string;
   const tool = args[1];
-  if (tool === undefined || tool.startsWith('-')) {
+  /* `pi-tool time` and `pi-tool time --help` are a connector's own help — the
+     same first move the prompt asks for with every command. */
+  if (tool === undefined || tool === '--help' || tool === '-h') return { op: 'list', server };
+  if (tool.startsWith('-')) {
     return {
       op: 'error',
-      message: `pi-tool: expected "pi-tool ${server} <tool> [--key value]". Run "pi-tool list" to see tools.`,
+      message: `pi-tool: expected "pi-tool ${server} <tool> [--key value]". Run "pi-tool ${server} --help" to see its tools.`,
     };
   }
   const rest = args.slice(2);
@@ -209,7 +212,7 @@ export async function dispatchCommand(
     case 'error':
       return { text: cmd.message, isError: true };
     case 'list':
-      return { text: renderCatalogText(host.getCatalog(), cmd.server), isError: false };
+      return { text: renderCatalogText(host.getCatalog(), cmd.server, 'cli'), isError: false };
     case 'help': {
       const def = host.getTool(cmd.server, cmd.tool);
       return { text: renderHelp(cmd.server, cmd.tool, def), isError: def === undefined };

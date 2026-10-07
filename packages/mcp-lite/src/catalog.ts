@@ -35,7 +35,12 @@ export type McpCatalog = CatalogServerEntry[];
  * Render the catalog as compact text for the `mcp_list` tool result.
  * @param filterServerId when set, only that server's section is rendered.
  */
-export function renderCatalogText(catalog: McpCatalog, filterServerId?: string): string {
+export function renderCatalogText(
+  catalog: McpCatalog,
+  filterServerId?: string,
+  /** `cli`: the `pi-tool` words, for Bash-CLI mode (which has no mcp_call). */
+  style: 'tools' | 'cli' = 'tools',
+): string {
   const servers = filterServerId ? catalog.filter((s) => s.id === filterServerId) : catalog;
   if (servers.length === 0) {
     return filterServerId
@@ -54,8 +59,16 @@ export function renderCatalogText(catalog: McpCatalog, filterServerId?: string):
     }
   }
   lines.push('');
-  lines.push('Call a tool with mcp_call {server, tool, arguments}.');
-  lines.push('Fetch one tool’s full input schema with mcp_schema {server, tool}.');
+  if (style === 'cli') {
+    const s = servers.find((x) => x.status === 'connected' && x.tools.length > 0);
+    const example =
+      s !== undefined ? `pi-tool ${s.id} ${s.tools[0]?.name}` : 'pi-tool <connector> <tool>';
+    lines.push(`Run \`${example} --help\` for a tool's arguments, then the same without`);
+    lines.push('`--help` and with `--key value` for each argument to call it.');
+  } else {
+    lines.push('Call a tool with mcp_call {server, tool, arguments}.');
+    lines.push('Fetch one tool’s full input schema with mcp_schema {server, tool}.');
+  }
   return lines.join('\n');
 }
 
