@@ -1,0 +1,52 @@
+{
+  "model": "qwen3.5-4b-mtp",
+  "finderPath": true,
+  "a": {
+    "label": "a-tokyo",
+    "ms": 12971,
+    "calls": [
+      {
+        "name": "bash",
+        "args": "{\"command\":\"pi-tool time\"}",
+        "result": "Time (time) — 2 tool(s)\n  get_current_time: Get current time in a specific timezone\n  convert_time: Convert time between timezones\n\nRun `pi-tool time get_current_time --help` for a tool's arguments, then the same without\n`--help` and with `--key value` for each argument to call it.\n"
+      },
+      {
+        "name": "bash",
+        "args": "{\"command\":\"pi-tool time get_current_time --help\"}",
+        "result": "Usage: pi-tool time get_current_time [--key value …]\n\nGet current time in a specific timezone\n\nArguments:\n  --timezone <string> (required) — IANA timezone name (e.g., 'America/New_York', 'Europe/London'). Use 'America/Los_Angeles' as local timezone if no timezone provided by the user.\n"
+      },
+      {
+        "name": "bash",
+        "args": "{\"command\":\"pi-tool time get_current_time --timezone Asia/Tokyo\"}",
+        "result": "{\n  \"timezone\": \"Asia/Tokyo\",\n  \"datetime\": \"2026-10-08T06:21:32+09:00\",\n  \"day_of_week\": \"Thursday\",\n  \"is_dst\": false\n}\n"
+      }
+    ],
+    "reply": "It's currently **6:21 AM on Thursday, October 8, 2026** in Tokyo."
+  },
+  "turn1Prefill": {
+    "prompt": 3930,
+    "cached": 3790
+  },
+  "systemPrompt": {
+    "timeLine": "  pi-tool time — Current time and timezone conversions. (a connector)",
+    "blenderLine": "  blender — The user's own Blender, when they name it: read the open scene, run Python (bpy) in it, and render a picture of it."
+  },
+  "a2": {
+    "label": "a2-named",
+    "ms": 7536,
+    "calls": [],
+    "reply": "It's currently **6:21 AM on Thursday, October 8, 2026** in Tokyo (JST, UTC+9)."
+  },
+  "b": {
+    "label": "b-list",
+    "ms": 12393,
+    "calls": [
+      {
+        "name": "bash",
+        "args": "{\"command\":\"pi-tool list\"}",
+        "result": "Time (time) — 2 tool(s)\n  get_current_time: Get current time in a specific timezone\n  convert_time: Convert time between timezones\n\nRun `pi-tool time get_current_time --help` for a tool's arguments, then the same without\n`--help` and with `--key value` for each argument to call it.\n"
+      }
+    ],
+    "reply": "Here's exactly what `pi-tool list` prints:\n\n```\nTime (time) — 2 tool(s)\n  get_current_time: Get current time in a specific timezone\n  convert_time: Convert time between timezones\n\nRun `pi-tool time get_current_time --help` for the tool's arguments, then the same without\n`--help` and with `--key value` for each call.\n```"
+  }
+}

@@ -1,6 +1,29 @@
 # Bobble — status
 
-Updated: 2026-10-02 (on AC) · main `79cd7a7b` · dist rebuilt and **installed** (packaged smoke OK) · the user: "qwen3.8-27b comes with a built in settable thinking effort, it's xhigh by default, set it to medium"
+Updated: 2026-10-07 (on AC) · main `1608d367` · dist rebuilt and **installed** (packaged smoke OK) · the user: "are the connectors seamless and working at all?" · "I agree on your 1-3 … sample UI from the + menu" · Blender: "fix that to be a small cli tool" · "standing no emoji's rule"
+
+## Report — 2026-10-06/07: connectors that work, a + › Connectors menu, Blender as a command
+
+**The question.** "are the connectors seamless and working at all?" — measured, the first time a real model met a real MCP server in the real app (`connector-call-probe.mjs`, Qwen 3.5 4B, the official Time server): the bridge worked, but **the model was never told a connector existed** (asked the time in Tokyo it ran `date` and tried curl), `pi-tool list` taught the wrong commands, a Finder-launched Bobble could not even start `npx`/`uvx` servers, and the Blender connector could never work with the add-on installed.
+
+### Fixed
+| # | Found | Fix | Commit | Verified |
+|---|---|---|---|---|
+| 1 | The prompt never names a connector the person added | mcp-lite publishes the enabled connectors (tool bus) from the registry before any server starts; the CLI prompt lists them, one line each: `pi-tool time — Current time and timezone conversions. (a connector)` | `dc71ecbc` | live (4B): asked plainly, it ran `pi-tool time` → `--help` → the call and answered **6:21 AM Thursday in Tokyo**; turn 1 read **3,790 / 3,930** prompt tokens from the warmed cache, each later request ~97% |
+| 2 | `pi-tool list` told a CLI model to use `mcp_call`/`mcp_schema`; `pi-tool time --help` was an error | CLI wording; `pi-tool <id>` / `--help` lists that connector's tools | `b0e2b584` | tests; live `pi-tool list` |
+| 3 | Finder PATH: `spawn npx ENOENT` for 27 of 29 catalog servers | look in Homebrew, `~/.local/bin`, cargo, Volta, Bun, newest nvm; that folder in front of the server's PATH; a missing `uvx` runs on the app's own uv; no Node → "This connector runs on Node.js (`npx`), which isn't installed on this Mac…" | `5e1f6599` | tests; the live run above **under the bare Finder PATH** |
+| 4 | The 4B called a tool named `time` ("Tool time not found") | a connector named as a tool runs as the `pi-tool` line it meant | `de91cffa` | tests (the 4B's exact calls); the rerun went straight to `pi-tool time` |
+| 5 | the user: "+ menu … turn (installed) on and off … their actual app / connector icon" | **+ › Connectors**: Browse, Manage, a rule, every installed connector with its real mark and a switch (`DropdownMenuSwitchItem`, one focus stop, stays open); a flip re-opens this chat's session once it is idle | `87d104b6` | `connectors-menu-look.mjs` OK (rows, marks, switch state = registry, flip lands in the file, Manage opens the screen) — `deliverables/connectors-2026-10-06/plus-menu-connectors-*.png` |
+| 6 | Blender: the catalog ran `uvx blender-mcp`, a third-party server whose messages Blender Lab's add-on (the one installed) rejects ("Unknown request type") — every call failed; it also carried telemetry and cloud asset tools | **`blender scene | run | render`** — a small command on the add-on's own wire (NUL-terminated `{"type":"execute"}`), registered only where Blender is installed; built-in card shown only where detected | `9f39811a`, `5a8919a5` | fake-add-on tests; the code in Blender 5.2 background (scene read; quick render 1 s, EEVEE 2.7 s at 25%); a **read-only** scene query against the user's running Blender: ok in 452 ms, errors come back as tracebacks |
+| 7 | the user: "standing no emoji's rule" (a wrench emoji on a custom server) | a connector without a mark gets the neutral connector glyph; rule saved | `c2093226` | menu look, zoomed |
+
+**State.** suites: desktop 3,566 (+1 known timing flake under the full parallel run, passes alone) · ui 431 · harness 1,907 · mcp-lite 110 · mac-connectors 81 · tool-bus 6 · inference 404 · providers 209 / 32 · typecheck clean.
+
+### Not done / the user's call
+| Item | Why |
+|---|---|
+| A model-driven Blender run that **changes** a scene | it would edit the user's open Blender session; the read-only path is verified |
+| Natural "what time is it" sometimes still goes to `date` | `date` is a right answer too; named or not, the connector is now reached |
 
 ## Addendum — 2026-10-02: Qwen3.8 27B thinks at medium effort (the user: "it's xhigh by default, set it to medium")
 
