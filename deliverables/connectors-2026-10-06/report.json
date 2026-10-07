@@ -1,0 +1,36 @@
+{
+  "model": "qwen3.5-4b-mtp",
+  "systemPromptMentions": {
+    "pi-tool": false,
+    "time": false
+  },
+  "a": {
+    "label": "a-tokyo",
+    "ms": 9651,
+    "calls": [
+      {
+        "name": "bash",
+        "args": "{\"command\":\"date -u \\\"@$(date +%s)\\\" +\\\"%Y-%m-%d %H:%M:%S UTC\\\" && curl -s \\\"http://worldtimeapi.org/api/ip\\\" || date -R\"}",
+        "result": "date: illegal time format\nusage: date [-jnRu] [-I[date|hours|minutes|seconds|ns]] [-f input_fmt]\n            [ -z output_zone ] [-r filename|seconds] [-v[+|-]val[y|m|w|d|H|M|S]]\n            [[[[mm]dd]HH]MM[[cc]yy][.SS] | new_date] [+output_fmt]\nTue, 06 Oct 2026 18:18:43 -0700\n"
+      },
+      {
+        "name": "bash",
+        "args": "{\"command\":\"TZ=Asia/Tokyo date +\\\"%Y-%m-%d %H:%M:%S %Z\\\"\"}",
+        "result": "2026-10-07 10:18:45 JST\n"
+      }
+    ],
+    "reply": "It's currently **10:18:45 AM JST** (Japan Standard Time) in Tokyo."
+  },
+  "b": {
+    "label": "b-list",
+    "ms": 6346,
+    "calls": [
+      {
+        "name": "bash",
+        "args": "{\"command\":\"pi-tool list\"}",
+        "result": "Time (time) — 2 tool(s)\n  get_current_time: Get current time in a specific timezone\n  convert_time: Convert time between timezones\n\nCall a tool with mcp_call {server, tool, arguments}.\nFetch one tool’s full input schema with mcp_schema {server, tool}.\n"
+      }
+    ],
+    "reply": "The user asked me to run `pi-tool list` in bash and report its output. I executed the command and the output shows:\n\n- `time (time)` — 2 tool(s)\n  - `get_current_time: Get current time in a specific timezone`\n  - `convert_time: Convert time between timezones`\n\nIt indicates that the `time` tool is available with 2 functions: one to get the current time in a specific timezone, and one to convert time between timezones."
+  }
+}
