@@ -14,6 +14,7 @@
  */
 import * as os from 'node:os';
 import type { ExtensionAPI } from '@mariozechner/pi-coding-agent';
+import { publishConnectors } from '@pi-desktop/tool-bus';
 import { type BashCliHandle, type BashCliOptions, registerBashCliTools } from './bash-cli';
 import { ConnectorHost } from './connector-host';
 import { registerNativeTools, registerProxyTools } from './pi-tools';
@@ -66,6 +67,25 @@ export async function activateMcpLite(
   const host = options.host ?? new ConnectorHost();
 
   const enabled = registry.servers.filter((s) => s.enabled !== false);
+  /*
+   * NAMED IN THE PROMPT, before any server is started: the harness lists these
+   * beside its own commands (`pi-tool <id> — …`). From the registry, not from
+   * what connected, so the prompt — and the prefix the warm-up primes — is the
+   * same from the first turn; a connector that fails to start says so when it
+   * is run. MEASURED (connector-call-probe, 4B): unnamed, a working Time
+   * connector was never used.
+   */
+  publishConnectors(
+    enabled
+      .filter((s) => (s.mode ?? registry.mode) === 'bash-cli')
+      .map((s) => ({
+        id: s.id,
+        name: s.name,
+        ...(s.description !== undefined && s.description !== ''
+          ? { description: s.description }
+          : {}),
+      })),
+  );
   const summary: string[] = [];
   let proxyRegistered = false;
   let bashCli: BashCliHandle | null = null;

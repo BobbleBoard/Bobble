@@ -107,4 +107,38 @@ export function sharedToolNames(): string[] {
 /** Test seam. Never call this from a real extension. */
 export function resetToolBus(): void {
   busMap().clear();
+  delete (globalThis as unknown as { [k: symbol]: unknown })[
+    Symbol.for('@pi-desktop/tool-bus/connectors')
+  ];
+}
+
+/**
+ * THE CONNECTORS THE PERSON ADDED, for the prompt that names them.
+ *
+ * MEASURED (Qwen 3.5 4B, 2026-10-06, connector-call-probe): with the Time
+ * connector added and working — `pi-tool list` answered with its two tools —
+ * the system prompt said nothing of it, and asked the time in Tokyo the model
+ * ran `date` and tried curl. A connector the model is never told about is not
+ * there. mcp-lite (which reads the registry) publishes the list here; the
+ * harness (which writes the abilities list) reads it. Same process, separate
+ * module graphs — the reason this sits on the bus.
+ */
+export interface SharedConnector {
+  /** The registry id: the word after `pi-tool`. */
+  readonly id: string;
+  readonly name: string;
+  readonly description?: string;
+}
+
+const CONNECTORS_KEY = Symbol.for('@pi-desktop/tool-bus/connectors');
+type ConnectorHost = { [CONNECTORS_KEY]?: readonly SharedConnector[] };
+
+/** Replace the published list (mcp-lite, once it has read the registry). */
+export function publishConnectors(list: readonly SharedConnector[]): void {
+  (globalThis as unknown as ConnectorHost)[CONNECTORS_KEY] = [...list];
+}
+
+/** The published connectors, in registry order; empty when none were published. */
+export function sharedConnectors(): readonly SharedConnector[] {
+  return (globalThis as unknown as ConnectorHost)[CONNECTORS_KEY] ?? [];
 }

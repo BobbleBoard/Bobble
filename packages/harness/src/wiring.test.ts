@@ -19,6 +19,7 @@ import type {
   ToolInfo,
 } from '@mariozechner/pi-coding-agent';
 import { repairToolCallArguments } from '@pi-desktop/provider-llamacpp';
+import { publishConnectors, resetToolBus } from '@pi-desktop/tool-bus';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   forgetResidentPrefix,
@@ -1514,6 +1515,49 @@ describe('unfinished-plan steer', () => {
  * tool is already a command on PATH (`cliVisibleTools` reads `getAllTools`, not
  * the active set) — so it is a full re-prefill for no capability at all.
  */
+describe('connectors the person added are named in the CLI prompt', () => {
+  const OLD = process.env.PI_DESKTOP_TOOL_CLI;
+  afterEach(() => {
+    if (OLD === undefined) delete process.env.PI_DESKTOP_TOOL_CLI;
+    else process.env.PI_DESKTOP_TOOL_CLI = OLD;
+    resetToolBus();
+  });
+  const systemPromptOf = async () => {
+    const rig = makeRig();
+    await startSession(rig);
+    const [res] = (await rig.fire('before_agent_start', {
+      type: 'before_agent_start',
+      prompt: 'What time is it in Tokyo right now?',
+      systemPrompt: 'sys',
+      images: [],
+    })) as Array<{ systemPrompt?: string } | undefined>;
+    return res?.systemPrompt ?? '';
+  };
+
+  /* MEASURED (Qwen 3.5 4B, connector-call-probe): a working Time connector the
+     prompt never named was never used — the model ran `date`. */
+  it('one line per connector, beside the commands, as `pi-tool <id>`', async () => {
+    process.env.PI_DESKTOP_TOOL_CLI = '1';
+    publishConnectors([
+      {
+        id: 'time',
+        name: 'Time',
+        description: 'Current time and timezone conversions. Uses the IANA database.',
+      },
+    ]);
+    const sys = await systemPromptOf();
+    expect(sys).toContain('  pi-tool time — Current time and timezone conversions. (a connector)');
+    expect(sys).not.toContain('IANA');
+    // Beside the commands: before the paragraph that follows the list.
+    expect(sys.indexOf('pi-tool time')).toBeLessThan(sys.indexOf('They are the ONLY way'));
+  });
+
+  it('nothing about connectors when none were added', async () => {
+    process.env.PI_DESKTOP_TOOL_CLI = '1';
+    expect(await systemPromptOf()).not.toContain('pi-tool');
+  });
+});
+
 describe('CLI mode keeps one advertised tool', () => {
   const OLD = process.env.PI_DESKTOP_TOOL_CLI;
   afterEach(() => {

@@ -1,5 +1,13 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { publishTool, resetToolBus, sharedTool, sharedToolNames, shareTool } from './index.js';
+import {
+  publishConnectors,
+  publishTool,
+  resetToolBus,
+  sharedConnectors,
+  sharedTool,
+  sharedToolNames,
+  shareTool,
+} from './index.js';
 
 // biome-ignore lint/suspicious/noExplicitAny: a structural stand-in for pi's ExtensionAPI.
 const fakePi = (sink: unknown[]) => ({ registerTool: (d: any) => sink.push(d) }) as any;
@@ -45,5 +53,26 @@ describe('tool bus', () => {
 
   it('reports nothing for a name no one shared', () => {
     expect(sharedTool('nope')).toBeUndefined();
+  });
+});
+
+describe('connector roster', () => {
+  beforeEach(() => resetToolBus());
+
+  it('is empty until published, then the published list in order', () => {
+    expect(sharedConnectors()).toEqual([]);
+    publishConnectors([
+      { id: 'time', name: 'Time', description: 'Current time.' },
+      { id: 'notion', name: 'Notion' },
+    ]);
+    expect(sharedConnectors().map((c) => c.id)).toEqual(['time', 'notion']);
+  });
+
+  it('is one list for the whole process, whichever module graph reads it', () => {
+    publishConnectors([{ id: 'time', name: 'Time' }]);
+    const key = Symbol.for('@pi-desktop/tool-bus/connectors');
+    expect((globalThis as unknown as Record<symbol, unknown>)[key]).toEqual([
+      { id: 'time', name: 'Time' },
+    ]);
   });
 });

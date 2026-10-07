@@ -27,7 +27,7 @@ import type {
   ExtensionContext,
 } from '@mariozechner/pi-coding-agent';
 import { createBashToolDefinition } from '@mariozechner/pi-coding-agent';
-import { sharedTool, sharedToolNames } from '@pi-desktop/tool-bus';
+import { sharedConnectors, sharedTool, sharedToolNames } from '@pi-desktop/tool-bus';
 import { registerCompactionGate } from './compaction-gate.js';
 import { corpToolEnabled, registerCreateHierarchyTool } from './corp/promote-tool.js';
 import { CREATE_PRODUCTION_HIERARCHY } from './corp/promotion.js';
@@ -3155,6 +3155,16 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
    * 34/36 with none, and five of the six models to a clean sweep. Kept short on
    * purpose — it rides in every request.
    */
+  /** A connector's description as one short line: its first sentence, clipped. */
+  function connectorSummary(text: string): string {
+    const first =
+      text
+        .replace(/\s+/g, ' ')
+        .trim()
+        .split(/(?<=[.!?])\s/)[0] ?? '';
+    return first.length > 100 ? `${first.slice(0, 99).trimEnd()}…` : first;
+  }
+
   function toolCliPreamble(): string {
     const cli = buildCli(toolCliGroups(), cliVisibleTools());
     const presentCommand = cli.groups.some((g) =>
@@ -3227,6 +3237,17 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
        * would advertise one capability under two names.
        */
       ...cli.groups.filter((g) => g.name !== 'file').map((g) => `  ${g.name} — ${g.summary}`),
+      /*
+       * AND THE CONNECTORS THE PERSON ADDED, one line each, the same shape.
+       * MEASURED (Qwen 3.5 4B, connector-call-probe, 2026-10-06): a working
+       * Time connector, unnamed here, was never reached for — asked the time in
+       * Tokyo the model ran `date` and tried curl. mcp-lite publishes the list
+       * from the registry (tool-bus), so it is fixed for the session and the
+       * warm-up primes it with the rest.
+       */
+      ...sharedConnectors().map(
+        (c) => `  pi-tool ${c.id} — ${connectorSummary(c.description ?? c.name)} (a connector)`,
+      ),
       '',
       'They are the ONLY way to do what they do. Do not look for other programs —',
       'ffmpeg, sox, say, festival, imaging libraries and the like are not how this',
