@@ -1,0 +1,39 @@
+<!-- @dsCard group="Brand" height=420 subtitle="Fraunces, softened, for what a picture or a page is called; SF for everything read and touched" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Type</title>
+<style>
+  body { margin: 0; background: var(--ground); color: var(--ink); }
+  .sheet { display: grid; grid-template-columns: 1.1fr 1fr; gap: 0; margin: 28px 32px; border-radius: var(--radius-lg); background: var(--surface); box-shadow: 0 0 0 1px var(--hairline), var(--shadow-sm); overflow: hidden; }
+  .disp { padding: 28px 28px 24px; border-right: 1px solid var(--hairline); display: flex; flex-direction: column; }
+  .disp .big { margin: 0; font-size: 104px; line-height: 0.95; letter-spacing: -0.03em; }
+  .disp .glyphs { margin: 18px 0 0; color: var(--ink-secondary); font-size: 34px; line-height: 40px; letter-spacing: 0; }
+  .meta { margin: auto 0 0; padding-top: 18px; color: var(--ink-muted); }
+  .ui { padding: 24px 28px; display: grid; align-content: start; gap: 12px; }
+  .ui .row { display: grid; grid-template-columns: 72px 1fr; align-items: baseline; gap: 12px; }
+  .ui .row > span:first-child { color: var(--ink-muted); }
+  .ui p { margin: 0; }
+  .ui .eyebrow { color: var(--ink-muted); text-transform: uppercase; }
+</style>
+</head>
+<body>
+<div class="sheet bb-scene">
+  <div class="disp">
+    <p class="big display-xl">Bobble</p>
+    <p class="glyphs display-m">Aa Gg Rr &amp; 2026</p>
+    <p class="meta caption">Fraunces · Soft 100 · Wonk 0 · optical size auto · weights 420 to 460</p>
+  </div>
+  <div class="ui">
+    <div class="row"><span class="caption">title</span><p class="title">Connect your calendar</p></div>
+    <div class="row"><span class="caption">heading</span><p class="heading">What Bobble can see</p></div>
+    <div class="row"><span class="caption">prose</span><p class="prose">Bobble reads the events you name and adds the ones you ask for. Nothing leaves this Mac.</p></div>
+    <div class="row"><span class="caption">body</span><p class="body">Finds a free hour and books it.</p></div>
+    <div class="row"><span class="caption">label</span><p class="label">On this Mac</p></div>
+    <div class="row"><span class="caption">caption</span><p class="caption" style="color:var(--ink-muted)">Updated 2 minutes ago</p></div>
+    <div class="row"><span class="caption">code</span><p class="code" style="font-family:var(--font-mono)">blender scene --json</p></div>
+  </div>
+</div>
+</body>
+</html>

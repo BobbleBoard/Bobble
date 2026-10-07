@@ -1,0 +1,38 @@
+<!-- @dsCard group="Foundations" height=300 subtitle="The surface a picture sits on: a hairline and a grounded shadow" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Frame</title>
+<style>
+  body { margin: 0; background: var(--ground); }
+  .sheet { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; padding: 36px 32px 28px; align-items: end; }
+  .sheet figure { margin: 0; }
+  .bb-frame { height: 150px; padding: 18px; }
+  .bb-window { padding: 0; }
+  .k { margin: 14px 2px 0; color: var(--ink-muted); }
+  .k b { color: var(--ink-secondary); font-weight: 500; }
+  .bb-frame .bb-lines { --bb-line-h: 7px; }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <figure class="bb-scene bb-hue-teal">
+    <div class="bb-frame"><div class="bb-lines"><i class="bb-line bb-line--strong" style="--w:50%"></i><i class="bb-line"></i><i class="bb-line" style="--w:80%"></i></div></div>
+    <figcaption class="caption k"><b>frame</b> radius-lg, hairline, shadow-md</figcaption>
+  </figure>
+  <figure class="bb-scene bb-hue-teal">
+    <div class="bb-frame bb-frame--lift"><div class="bb-lines"><i class="bb-line bb-line--strong" style="--w:50%"></i><i class="bb-line"></i><i class="bb-line" style="--w:80%"></i></div></div>
+    <figcaption class="caption k"><b>lift</b> the one in front: shadow-lg</figcaption>
+  </figure>
+  <figure class="bb-scene bb-hue-sun">
+    <div class="bb-frame bb-frame--wash"><div class="bb-lines"><i class="bb-line bb-line--strong" style="--w:50%"></i><i class="bb-line"></i><i class="bb-line" style="--w:80%"></i></div></div>
+    <figcaption class="caption k"><b>wash</b> the hue's tint, for a number or a scene</figcaption>
+  </figure>
+  <figure class="bb-scene bb-hue-pink">
+    <div class="bb-frame bb-window"><div class="bb-window__bar"><i></i><i></i><i></i></div><div class="bb-window__body" style="padding:18px"><div class="bb-lines"><i class="bb-line bb-line--strong" style="--w:50%"></i><i class="bb-line"></i></div></div></div>
+    <figcaption class="caption k"><b>window</b> an app a demo drives</figcaption>
+  </figure>
+</div>
+</body>
+</html>

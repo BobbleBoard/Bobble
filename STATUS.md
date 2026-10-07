@@ -1,6 +1,39 @@
 # Bobble — status
 
-Updated: 2026-10-07 (on AC) · main `1608d367` · dist rebuilt and **installed** (packaged smoke OK) · the user: "are the connectors seamless and working at all?" · "I agree on your 1-3 … sample UI from the + menu" · Blender: "fix that to be a small cli tool" · "standing no emoji's rule"
+Updated: 2026-10-07 (on AC) · main `3c36aa96` + the design-language commit · the user: "build out the anatomy, the building blocks … make bobble's design language … to the same level that we see with anthropic" · "the shades of blues and yellows you've picked out so far seem really nice"
+
+## Report — 2026-10-07: Bobble's design language (a Design System artifact)
+
+**The ask.** Bobble's own design language at Anthropic's level, its building blocks and anatomy, without the components yet. Built as a Design System artifact, private to the user: (private link) (source in `design/language/project/`, mirrored byte for byte). Evidence: `deliverables/design-language-2026-10-07/` (every card, light and dark, plus frame strips of each demo).
+
+### What it holds
+| Part | What | Source |
+|---|---|---|
+| Tokens | the shipping neutrals, radii, shadows; the mark's three hues with a tint and an ink each; `on-hue`; `agent` blue; 8 durations, 7 curves | `packages/themes` bobble flavor; `bobble-tiles.ts` before 13028e18; `agent-cursor.ts`; `global.css` loader |
+| Type | Fraunces (OFL, variable, `SOFT 100`, `WONK 0`) names things; the system face does the rest; 12 styles | new; font file in `fonts/` |
+| Building blocks (8) | Tile, Line, Frame, Picture, Chart, Cells, Cursor, Chip: one `bundle.css` (`.bb-*`) | new, except the cursor (the user's drawing, pasted) |
+| Brand (3) | Mark (clear space, hues, app icon), Hues (one job each), Type | the mark and icon copied |
+| Motion (2) | Curves (each verb doing its verb), Slide (the mark's puzzle, rule-checked frame by frame) | the loader's own curve and beat |
+| Scenes (3) | Kinds (doc, deck, sheet, design), Month (marks landing on the diagonal), Trend | new |
+| Demos (3) | Edit (select, ask, rewritten), Computer use (the real cursor's 300 ms glide, 150 ms squeeze, "Typing"/"Clicking" pill), Parts (a lamp tinted part by part, then taken apart) | timings from `agent-cursor.ts` |
+| Anatomy (3) | Made card, Demo card (a connector's explore card), Toolbar | new |
+| Brand book | README (principles, colour, type, shape, voice with real app copy, iconography) + Pictures + Motion sections; a README per card | — |
+| Assets | 4 logos, 2 cursors, 90 icons (the 34 Hugeicons glyphs + 56 control icons, rendered from `packages/ui`; GitHub's mark excluded), 2 licences | copied |
+
+### Decisions for the user
+| # | Change | Why |
+|---|---|---|
+| 1 | **Accent is teal** (`teal-ink` light / `teal` dark), not the shipping system blue `#0071e3` | the hues are the brand; blue is now the agent's alone |
+| 2 | **Muted text `#69696e`** replaces `#86868b` | `#86868b` is 3.3:1 on ground; the new one is 4.6:1 or more on every surface, both themes |
+| 3 | **Hue jobs:** teal = words and numbers, sun = pictures and pages, pink = things that move (video, 3D) | one hue per picture, so a colour says what kind of thing it is |
+| 4 | **Display face Fraunces, softened** | the system face had no voice for titles; Soft 100 rounds the terminals toward the tile corner |
+| 5 | The language **copies the shipping cursor**; my first pink-heeled pointer and press ring were wrong and are gone | `agent-cursor.ts`: "nothing else may carry its own copy" |
+
+### Checked
+- every card rendered headless (Playwright, the page's own tokens.css compile) in light and dark and LOOKED at; the demos as six-frame strips seeked to exact times; Reduce Motion stills show each result
+- contrast: every text pair the README names holds 4.5:1 (focus 3:1) in both themes
+- not checked: the live page itself; the built-in browser is not signed in to claude.ai
+
 
 ## Report — 2026-10-06/07: connectors that work, a + › Connectors menu, Blender as a command
 

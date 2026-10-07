@@ -1,0 +1,58 @@
+<!-- @dsCard group="Anatomy" height=380 subtitle="What Bobble made, as a card in the reply: picture, name, kind and place, one action" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Made card</title>
+<style>
+  body { margin: 0; background: var(--ground); color: var(--ink); }
+  .sheet { display: grid; grid-template-columns: 1fr 230px; gap: 32px; padding: 32px; align-items: start; }
+  .cards { display: grid; gap: 12px; }
+  .made { position: relative; display: grid; grid-template-columns: 76px 1fr auto; gap: 14px; align-items: center; padding: 10px 12px 10px 10px; border-radius: var(--radius-lg); background: var(--surface); box-shadow: 0 0 0 1px var(--hairline), var(--shadow-sm); }
+  .thumb { position: relative; width: 76px; height: 56px; border-radius: var(--radius-md); background: var(--hue-tint); overflow: hidden; }
+  .thumb .bb-lines { --bb-line-h: 4px; position: absolute; left: 10px; right: 26px; top: 12px; gap: 4px; }
+  .thumb .bb-bars { position: absolute; right: 8px; bottom: 10px; --chart-h: 30px; gap: 3px; border-bottom-width: 1px; }
+  .thumb .bb-bar { --bw: 6px; }
+  .thumb .bb-picture { position: absolute; inset: 0; border-radius: 0; aspect-ratio: auto; }
+  .thumb .play { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; background: var(--hue); }
+  .thumb .play::after { content: ''; position: absolute; left: 8.5px; top: 6.5px; border: solid transparent; border-width: 4.5px 0 4.5px 7px; border-left-color: var(--on-hue); }
+  .name { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .meta { margin: 2px 0 0; color: var(--ink-muted); }
+  .open { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: var(--radius-full); background: var(--surface-sunken); box-shadow: inset 0 0 0 1px var(--hairline); color: var(--ink); }
+  .open svg { width: 14px; height: 14px; }
+  .n { position: absolute; display: grid; place-items: center; width: 18px; height: 18px; border-radius: var(--radius-tile); background: var(--ink); color: var(--surface); font: 600 11px/1 var(--font-ui); }
+  .legend { margin: 6px 0 0; padding: 0; list-style: none; display: grid; gap: 14px; }
+  .legend li { display: grid; grid-template-columns: 18px 1fr; gap: 10px; align-items: start; color: var(--ink-secondary); }
+  .legend .n { position: static; }
+  .legend b { display: block; color: var(--ink); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <div class="cards">
+    <div class="made bb-scene bb-hue-sun">
+      <span class="thumb"><span class="bb-lines"><i class="bb-line bb-line--strong" style="--w:80%"></i><i class="bb-line"></i><i class="bb-line" style="--w:70%"></i></span><span class="bb-bars"><i class="bb-bar" style="--h:45%"></i><i class="bb-bar" style="--h:95%"></i><i class="bb-bar" style="--h:65%"></i></span></span>
+      <div><p class="name heading">Launch plan</p><p class="meta caption">Deck · On this Mac</p></div>
+      <span class="open label">Open <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8.5V11.5A1.5 1.5 0 0 1 10.5 13H4.5A1.5 1.5 0 0 1 3 11.5V5.5A1.5 1.5 0 0 1 4.5 4H7.5"></path><path d="M10 3h3v3"></path><path d="M13 3 8 8"></path></svg></span>
+      <span class="n" style="left:-6px;top:-6px">1</span><span class="n" style="left:96px;top:-6px">2</span><span class="n" style="left:96px;bottom:-6px">3</span><span class="n" style="right:-6px;top:-6px">4</span>
+    </div>
+    <div class="made bb-scene bb-hue-teal">
+      <span class="thumb" style="background:var(--surface-sunken)"><span class="bb-lines" style="right:12px"><i class="bb-line bb-line--strong" style="--w:60%"></i><i class="bb-line"></i><i class="bb-line"></i><i class="bb-line" style="--w:50%"></i></span></span>
+      <div><p class="name heading">Q3 board update</p><p class="meta caption">Doc · On this Mac</p></div>
+      <span class="open label">Open <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8.5V11.5A1.5 1.5 0 0 1 10.5 13H4.5A1.5 1.5 0 0 1 3 11.5V5.5A1.5 1.5 0 0 1 4.5 4H7.5"></path><path d="M10 3h3v3"></path><path d="M13 3 8 8"></path></svg></span>
+    </div>
+    <div class="made bb-scene bb-hue-pink">
+      <span class="thumb"><span class="play"></span></span>
+      <div><p class="name heading">Product walkthrough</p><p class="meta caption">Video · 0:42 · On this Mac</p></div>
+      <span class="open label">Open <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8.5V11.5A1.5 1.5 0 0 1 10.5 13H4.5A1.5 1.5 0 0 1 3 11.5V5.5A1.5 1.5 0 0 1 4.5 4H7.5"></path><path d="M10 3h3v3"></path><path d="M13 3 8 8"></path></svg></span>
+    </div>
+  </div>
+  <ol class="legend body">
+    <li><span class="n">1</span><span><b>The picture</b>The kind's scene, small, in its hue</span></li>
+    <li><span class="n">2</span><span><b>The name</b>heading, one line, cut with an ellipsis</span></li>
+    <li><span class="n">3</span><span><b>Kind and place</b>caption in ink-muted; "On this Mac", always</span></li>
+    <li><span class="n">4</span><span><b>One action</b>Open; the rest lives in its toolbar</span></li>
+  </ol>
+</div>
+</body>
+</html>

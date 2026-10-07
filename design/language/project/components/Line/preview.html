@@ -1,0 +1,54 @@
+<!-- @dsCard group="Foundations" height=320 subtitle="Words in a picture are lines; only a title is type" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Line</title>
+<style>
+  body { margin: 0; background: var(--ground); }
+  .sheet { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; padding: 32px; }
+  .sheet figure { margin: 0; }
+  .sheet .bb-frame { height: 196px; }
+  .k { margin: 12px 2px 0; color: var(--ink-muted); }
+  .k b { color: var(--ink-secondary); font-weight: 500; }
+  .bb-frame .bb-title { margin-bottom: 18px; }
+  .measure { position: relative; }
+  .measure .bb-lines { position: relative; }
+  .rule { position: absolute; right: -14px; width: 8px; border: solid var(--ink-muted); border-width: 1px 1px 1px 0; }
+  .rule span { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font: 500 11px/1 var(--font-ui); color: var(--ink-muted); white-space: nowrap; }
+</style>
+</head>
+<body>
+<div class="bb-scene bb-hue-teal sheet">
+  <figure>
+    <div class="bb-frame">
+      <h3 class="bb-title bb-title--s">Launch plan</h3>
+      <div class="bb-lines"><i class="bb-line" style="--w:94%"></i><i class="bb-line"></i><i class="bb-line" style="--w:86%"></i><i class="bb-line" style="--w:48%"></i></div>
+      <div class="bb-lines"><i class="bb-line"></i><i class="bb-line" style="--w:72%"></i></div>
+    </div>
+    <figcaption class="caption k"><b>A paragraph</b>: lines of 8 on gaps of 8; the last is short</figcaption>
+  </figure>
+  <figure>
+    <div class="bb-frame measure">
+      <div class="bb-lines" style="width:78%"><i class="bb-line bb-line--strong" style="--w:60%"></i></div>
+      <div class="bb-lines" style="width:78%;margin-top:14px"><i class="bb-line"></i><i class="bb-line" style="--w:90%"></i><i class="bb-line" style="--w:64%"></i>
+        <span class="rule" style="top:0;height:8px"><span>8</span></span>
+        <span class="rule" style="top:16px;height:8px"><span>8</span></span>
+      </div>
+      <div class="bb-lines" style="width:78%"><i class="bb-line"></i><i class="bb-line" style="--w:40%"></i>
+        <span class="rule" style="top:-20px;height:20px"><span>20</span></span>
+      </div>
+    </div>
+    <figcaption class="caption k"><b>The measure</b>: 8 high, 8 apart, groups 20 apart; strong for a heading</figcaption>
+  </figure>
+  <figure>
+    <div class="bb-frame">
+      <h3 class="bb-title bb-title--s">Notes</h3>
+      <div class="bb-lines"><i class="bb-line" style="--w:88%"></i><i class="bb-line bb-line--hue" style="--w:42%"></i><i class="bb-line" style="--w:96%"></i><i class="bb-line" style="--w:56%"></i></div>
+      <div class="bb-lines bb-selected" style="margin-top:20px"><i class="bb-line" style="--w:100%"></i><i class="bb-line" style="--w:70%"></i></div>
+    </div>
+    <figcaption class="caption k"><b>In the hue</b>: a link, or what is selected</figcaption>
+  </figure>
+</div>
+</body>
+</html>

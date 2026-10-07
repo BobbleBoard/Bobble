@@ -1,0 +1,58 @@
+<!-- @dsCard height=300 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Bobble</title>
+<style>
+  body { margin: 0; background: var(--ground); }
+  .cover { position: relative; width: 960px; height: 300px; overflow: hidden; background: var(--ground); }
+  .cover svg { position: absolute; left: 0; top: 0; }
+  .teal { fill: var(--teal); }
+  .sun { fill: var(--sun); }
+  .pink { fill: var(--pink); }
+  .ink { fill: var(--ink); }
+  .tint { fill: var(--teal-tint); }
+  /* radius-tile is 28% of the side: a corner sized to each tile's short side */
+  .r64 { rx: 17.92px; }
+  .r136 { rx: 38.08px; }
+  .name { position: absolute; left: 48px; bottom: 70px; margin: 0; max-width: 440px; font-family: var(--font-display); font-size: 120px; line-height: 0.92; font-weight: 440; letter-spacing: -0.03em; color: var(--ink); }
+  .tag { position: absolute; left: 50px; bottom: 40px; margin: 0; max-width: 440px; font-family: var(--font-ui); font-size: 14px; line-height: 20px; color: var(--ink-muted); }
+</style>
+</head>
+<body>
+<div class="cover">
+  <svg width="960" height="300" viewBox="0 0 960 300" aria-hidden="true">
+    <!--
+      blocks: teal (two 136x136 merged tiles), sun (136x64), pink and ink (64 tiles, ink 136x64 once), teal-tint as relief
+      arrangement: the mark's board grown to 6x5 at its own pitch (tile 64 : gap 8 ~ the mark's 12.5 : 1.5), bleeding off the top and right
+      pattern: tiles cut by radius-tile, some merged two-wide like the components, and one cell left empty: the sliding puzzle's hole
+      steps and radii: pitch 72 = tile 64 + space-2; corner radius-tile (28%) of each tile's short side; x from 540, clear of the name, last column bleeding right
+    -->
+      <rect class="tint r64" x="540" y="-26" width="64" height="64"/>
+      <rect class="sun r64" x="612" y="-26" width="136" height="64"/>
+      <rect class="tint r64" x="756" y="-26" width="64" height="64"/>
+      <rect class="ink r64" x="828" y="-26" width="64" height="64"/>
+      <rect class="tint r64" x="900" y="-26" width="64" height="64"/>
+      <rect class="teal r136" x="540" y="46" width="136" height="136"/>
+      <rect class="pink r64" x="684" y="46" width="64" height="64"/>
+      <rect class="tint r64" x="828" y="46" width="64" height="64"/>
+      <rect class="sun r64" x="900" y="46" width="64" height="64"/>
+      <rect class="tint r64" x="684" y="118" width="64" height="64"/>
+      <rect class="ink r64" x="756" y="118" width="136" height="64"/>
+      <rect class="tint r64" x="900" y="118" width="64" height="64"/>
+      <rect class="pink r64" x="540" y="190" width="64" height="64"/>
+      <rect class="tint r64" x="612" y="190" width="64" height="64"/>
+      <rect class="sun r64" x="684" y="190" width="64" height="64"/>
+      <rect class="tint r64" x="756" y="190" width="64" height="64"/>
+      <rect class="teal r136" x="828" y="190" width="136" height="136"/>
+      <rect class="tint r64" x="540" y="262" width="64" height="64"/>
+      <rect class="ink r64" x="612" y="262" width="64" height="64"/>
+      <rect class="tint r64" x="684" y="262" width="64" height="64"/>
+      <rect class="pink r64" x="756" y="262" width="64" height="64"/>
+  </svg>
+  <p class="name display-xl">Bobble</p>
+  <p class="tag">Three tiles, three hues, one verb at a time.</p>
+</div>
+</body>
+</html>

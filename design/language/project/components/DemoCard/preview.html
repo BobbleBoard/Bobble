@@ -1,0 +1,68 @@
+<!-- @dsCard group="Anatomy" height=470 subtitle="How a connector shows what it does: a moving demo above, a name and a sentence below" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Demo card</title>
+<style>
+  body { margin: 0; background: var(--ground); color: var(--ink); }
+  .sheet { display: grid; grid-template-columns: 340px 1fr; gap: 36px; padding: 32px; align-items: start; }
+  .card { border-radius: var(--radius-xl); background: var(--surface); box-shadow: 0 0 0 1px var(--hairline), var(--shadow-md); overflow: hidden; }
+  .demo { position: relative; height: 210px; background: var(--hue-tint); display: grid; place-items: center; }
+  .demo .bb-frame { width: 212px; padding: 14px; border-radius: var(--radius-md); }
+  .demo .bb-cells { --cols: 7; --cell: 22px; --gap: 4px; font-size: 10px; }
+  .demo .bb-cell { position: relative; }
+  .demo .bb-cell > span { position: relative; }
+  .demo .mark::before { content: ''; position: absolute; inset: 0; border-radius: var(--radius-tile); background: var(--hue); animation: mark-in 4800ms var(--ease-bob) infinite backwards; animation-delay: calc(var(--d) * 90ms); }
+  .demo .mark > span { color: var(--on-hue); font-weight: 600; }
+  @keyframes mark-in { 0%, 10% { transform: scale(0.2); opacity: 0; } 22%, 86% { transform: none; opacity: 1; } 96%, 100% { transform: scale(0.6); opacity: 0; } }
+  .demo .head { margin: 0 0 10px; font: 600 12px/16px var(--font-ui); color: var(--ink); }
+  .info { padding: 18px 20px 20px; }
+  .who { display: flex; align-items: center; gap: 10px; }
+  .app { width: 32px; height: 32px; border-radius: var(--radius-sm); display: grid; place-items: center; background: var(--surface-sunken); box-shadow: inset 0 0 0 1px var(--hairline); color: var(--ink-secondary); }
+  .app svg { width: 18px; height: 18px; }
+  .who p { margin: 0; }
+  .what { margin: 10px 0 16px; color: var(--ink-secondary); }
+  .foot { display: flex; align-items: center; justify-content: space-between; }
+  .foot .where { color: var(--ink-muted); }
+  .turn { height: 30px; padding: 0 14px; border-radius: var(--radius-full); background: var(--ink); color: var(--surface); display: inline-flex; align-items: center; }
+  .n { position: absolute; display: grid; place-items: center; width: 18px; height: 18px; border-radius: var(--radius-tile); background: var(--ink); color: var(--surface); font: 600 11px/1 var(--font-ui); z-index: 2; }
+  .legend { margin: 4px 0 0; padding: 0; list-style: none; display: grid; gap: 16px; }
+  .legend li { display: grid; grid-template-columns: 18px 1fr; gap: 10px; align-items: start; color: var(--ink-secondary); }
+  .legend .n { position: static; }
+  .legend b { display: block; color: var(--ink); font-weight: 600; }
+  .wrap { position: relative; }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <div class="wrap">
+    <div class="card bb-scene bb-hue-teal">
+      <div class="demo"><div class="bb-frame"><p class="head">October</p><div class="bb-cells" id="cells"></div></div></div>
+      <div class="info">
+        <div class="who"><span class="app"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3H11C7.22876 3 5.34315 3 4.17157 4.17157C3 5.34315 3 7.22876 3 11V13C3 16.7712 3 18.6569 4.17157 19.8284C5.34315 21 7.22876 21 11 21H13C16.7712 21 18.6569 21 19.8284 19.8284C21 18.6569 21 16.7712 21 13V11C21 7.22876 21 5.34315 19.8284 4.17157C18.6569 3 16.7712 3 13 3Z"></path><path d="M3 9H21"></path><path d="M11 13H16M8 13H8.00898M13 17H8M16 17H15.991"></path></svg></span><p class="title">Calendar</p></div>
+        <p class="what body">Finds a free hour, books it, and tells you what moved.</p>
+        <div class="foot"><span class="where caption">Runs on this Mac</span><span class="turn label">Turn on</span></div>
+      </div>
+    </div>
+    <span class="n" style="left:-7px;top:-7px">1</span><span class="n" style="left:-7px;top:222px">2</span><span class="n" style="left:-7px;top:282px">3</span><span class="n" style="right:-7px;bottom:22px">4</span>
+  </div>
+  <ol class="legend body">
+    <li><span class="n">1</span><span><b>The demo</b>The connector's verb, looping on its wash: one hue, one verb, at most 4.8 s, resting on the result. With Reduce Motion it is the result.</span></li>
+    <li><span class="n">2</span><span><b>The app</b>Its own icon, copied from the app, on a sunken tile. Never drawn; with no icon, a glyph from the set.</span></li>
+    <li><span class="n">3</span><span><b>One sentence</b>What it does for you, in body. A verb first.</span></li>
+    <li><span class="n">4</span><span><b>Where it runs, and the one action</b>Always "this Mac". One button.</span></li>
+  </ol>
+</div>
+<script>
+  var head = ['S','M','T','W','T','F','S'], marked = {2:1, 7:1, 13:1, 14:1, 21:1, 23:1, 29:1};
+  var h = head.map(function (d) { return '<i class="bb-cell bb-cell--head">' + d + '</i>'; }).join('');
+  for (var i = 0; i < 4; i++) h += '<i class="bb-cell"></i>';
+  for (var day = 1; day <= 31; day++) {
+    var slot = day + 3, d = Math.floor(slot / 7) + (slot % 7);
+    h += marked[day] ? '<i class="bb-cell mark" style="--d:' + d + '"><span>' + day + '</span></i>' : '<i class="bb-cell"><span>' + day + '</span></i>';
+  }
+  document.getElementById('cells').innerHTML = h;
+</script>
+</body>
+</html>

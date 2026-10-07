@@ -1,0 +1,82 @@
+<!-- @dsCard group="Motion" height=400 width=1080 subtitle="Six curves, one per verb, each shown doing its verb" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Curves</title>
+<style>
+  body { margin: 0; background: var(--ground); color: var(--ink); }
+  .sheet { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 28px 32px; }
+  .verb { display: grid; grid-template-columns: 64px 128px 1fr; gap: 16px; align-items: center; padding: 14px 16px; border-radius: var(--radius-lg); background: var(--surface); box-shadow: 0 0 0 1px var(--hairline), var(--shadow-sm); }
+  .plot { width: 64px; height: 64px; overflow: visible; }
+  .plot .box { fill: var(--surface-sunken); }
+  .plot .lin { stroke: var(--line-strong); stroke-width: 1; stroke-dasharray: 2 2; }
+  .plot .c { fill: none; stroke: var(--hue); stroke-width: 2.5; stroke-linecap: round; }
+  .stage { position: relative; height: 56px; border-radius: var(--radius-md); background: var(--surface-sunken); overflow: hidden; }
+  .verb p { margin: 0; }
+  .verb .name { font-family: var(--font-mono); font-size: 12px; line-height: 16px; color: var(--hue-ink); }
+  .verb .use { margin-top: 3px; color: var(--ink-secondary); }
+  .loop { --loop: 2400ms; }
+
+  /* settle: a frame arrives */
+  .s-frame { position: absolute; left: 34px; top: 12px; width: 60px; height: 34px; border-radius: 7px; background: var(--surface); box-shadow: 0 0 0 1px var(--hairline), var(--shadow-sm); }
+  .loop .s-frame { animation: arrive var(--loop) var(--ease-settle) infinite; }
+  @keyframes arrive { 0%, 14% { transform: translateY(26px); opacity: 0; } 50%, 90% { transform: none; opacity: 1; } 100% { transform: none; opacity: 0; } }
+  /* glide: the pointer travels */
+  .g-ptr { left: 92px; top: 16px; }
+  .loop .g-ptr { animation: travel var(--loop) var(--ease-glide) infinite; }
+  @keyframes travel { 0%, 20% { transform: translateX(-74px); } 32.5%, 90% { transform: none; opacity: 1; } 100% { transform: none; opacity: 0; } }
+  /* slide: a tile into the hole */
+  .hole { position: absolute; top: 12px; width: 32px; height: 32px; border-radius: var(--radius-tile); box-shadow: inset 0 0 0 1.5px var(--line-strong); }
+  .sl-tile { position: absolute; left: 66px; top: 12px; --s: 32px; }
+  .loop .sl-tile { animation: slide var(--loop) var(--ease-slide) infinite; }
+  @keyframes slide { 0%, 20% { transform: translateX(-36px); } 40%, 90% { transform: none; opacity: 1; } 100% { transform: none; opacity: 0; } }
+  /* bob: a tile is placed */
+  .b-tile { position: absolute; left: 48px; top: 12px; --s: 32px; }
+  .loop .b-tile { animation: place var(--loop) var(--ease-bob) infinite; }
+  @keyframes place { 0%, 16% { transform: scale(0.2); opacity: 0; } 44%, 90% { transform: none; opacity: 1; } 100% { transform: none; opacity: 0; } }
+  /* standard: a colour changes */
+  .c-tile { position: absolute; left: 48px; top: 12px; --s: 32px; }
+  .loop .c-tile { animation: tint var(--loop) var(--ease-standard) infinite; }
+  @keyframes tint { 0%, 16% { background: var(--line-strong); } 50%, 90% { background: var(--hue); } 100% { background: var(--line-strong); } }
+  /* exit: a chip leaves */
+  .x-chip { position: absolute; left: 24px; top: 15px; width: 80px; height: 26px; border-radius: var(--radius-full); background: var(--overlay); box-shadow: 0 0 0 1px var(--edge), var(--shadow-sm); }
+  .loop .x-chip { animation: leave var(--loop) var(--ease-exit) infinite; }
+  @keyframes leave { 0%, 30% { opacity: 1; transform: none; } 56%, 100% { opacity: 0; transform: translateY(-10px) scale(0.96); } }
+</style>
+</head>
+<body>
+<div class="sheet loop">
+  <div class="verb bb-scene bb-hue-teal">
+    <svg class="plot" viewBox="0 0 64 64" aria-hidden="true"><rect class="box" width="64" height="64" rx="10"/><line class="lin" x1="8" y1="56" x2="56" y2="8"/><path class="c" d="M8 56C23.4 21.4 8 8 56 8"/></svg>
+    <div class="stage"><span class="s-frame"></span></div>
+    <div><p class="name">ease-settle</p><p class="use body">Arriving: a sheet, a frame, a line growing</p></div>
+  </div>
+  <div class="verb bb-scene bb-hue-teal">
+    <svg class="plot" viewBox="0 0 64 64" aria-hidden="true"><rect class="box" width="64" height="64" rx="10"/><line class="lin" x1="8" y1="56" x2="56" y2="8"/><path class="c" d="M8 56C18.6 12.8 23.4 3.2 56 8"/></svg>
+    <div class="stage"><span class="bb-cursor g-ptr"><svg width="22.14" height="25.30" viewBox="49.499 49.514 191.719 219.132" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><filter id="pi-cur-glow" x="-150%" y="-150%" width="400%" height="400%" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="68.95"/></filter><filter id="pi-cur-shadow" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="27.72"/></filter></defs><path d="M 58.48 87.06 A 24.06 25.11 -36 0 1 93.89 61.34 L 223.67 137.27 A 18.23 19.02 -36 0 1 218.85 171.89 A 117.23 122.31 -36 0 0 131.29 247.95 A 19.66 20.51 -36 0 1 92.88 244.4 Z" fill="rgba(13, 15, 33, 0.3)" transform="translate(0 12.13)" filter="url(#pi-cur-shadow)"/><path d="M 58.48 87.06 A 24.06 25.11 -36 0 1 93.89 61.34 L 223.67 137.27 A 18.23 19.02 -36 0 1 218.85 171.89 A 117.23 122.31 -36 0 0 131.29 247.95 A 19.66 20.51 -36 0 1 92.88 244.4 Z" fill="#2769ef" stroke="#2769ef" stroke-width="15.17" stroke-linejoin="round" opacity="0.36" filter="url(#pi-cur-glow)"/><path d="M 58.48 87.06 A 24.06 25.11 -36 0 1 93.89 61.34 L 223.67 137.27 A 18.23 19.02 -36 0 1 218.85 171.89 A 117.23 122.31 -36 0 0 131.29 247.95 A 19.66 20.51 -36 0 1 92.88 244.4 Z" fill="#0a0b0f" stroke="#ffffff" stroke-width="13.79" stroke-linejoin="round"/><path d="M 58.48 87.06 A 24.06 25.11 -36 0 1 93.89 61.34 L 223.67 137.27 A 18.23 19.02 -36 0 1 218.85 171.89 A 117.23 122.31 -36 0 0 131.29 247.95 A 19.66 20.51 -36 0 1 92.88 244.4 Z" fill="none" stroke="#ffffff" stroke-width="4.69" stroke-linejoin="round"/></svg></span></div>
+    <div><p class="name">ease-glide</p><p class="use body">The cursor's glide: 300ms, a hair past and home</p></div>
+  </div>
+  <div class="verb bb-scene bb-hue-teal">
+    <svg class="plot" viewBox="0 0 64 64" aria-hidden="true"><rect class="box" width="64" height="64" rx="10"/><line class="lin" x1="8" y1="56" x2="56" y2="8"/><path class="c" d="M8 56C23.4 56 15.2 8 56 8"/></svg>
+    <div class="stage"><span class="hole" style="left:30px"></span><span class="hole" style="left:66px"></span><span class="bb-tile sl-tile"></span></div>
+    <div><p class="name">ease-slide</p><p class="use body">A tile into the hole: firm, no bounce</p></div>
+  </div>
+  <div class="verb bb-scene bb-hue-sun">
+    <svg class="plot" viewBox="0 0 64 64" aria-hidden="true"><rect class="box" width="64" height="64" rx="10"/><line class="lin" x1="8" y1="56" x2="56" y2="8"/><path class="c" d="M8 56C24.3 -11.2 38.7 8 56 8"/></svg>
+    <div class="stage"><span class="bb-tile b-tile"></span></div>
+    <div><p class="name">ease-bob</p><p class="use body">Placing: a mark on a day, a chip appearing</p></div>
+  </div>
+  <div class="verb bb-scene bb-hue-teal">
+    <svg class="plot" viewBox="0 0 64 64" aria-hidden="true"><rect class="box" width="64" height="64" rx="10"/><line class="lin" x1="8" y1="56" x2="56" y2="8"/><path class="c" d="M8 56C20 51.2 20 8 56 8"/></svg>
+    <div class="stage"><span class="bb-tile c-tile"></span></div>
+    <div><p class="name">ease-standard</p><p class="use body">Colour and opacity</p></div>
+  </div>
+  <div class="verb bb-scene bb-hue-teal">
+    <svg class="plot" viewBox="0 0 64 64" aria-hidden="true"><rect class="box" width="64" height="64" rx="10"/><line class="lin" x1="8" y1="56" x2="56" y2="8"/><path class="c" d="M8 56C27.2 56 56 56 56 8"/></svg>
+    <div class="stage"><span class="x-chip"></span></div>
+    <div><p class="name">ease-exit</p><p class="use body">Leaving: quick to go, never lingering</p></div>
+  </div>
+</div>
+</body>
+</html>

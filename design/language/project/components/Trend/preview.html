@@ -1,0 +1,44 @@
+<!-- @dsCard group="Scenes" height=400 subtitle="A number and its line: the line draws, the last node lands" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Trend</title>
+<style>
+  body { margin: 0; background: var(--ground); }
+  .stage { display: grid; place-items: center; padding: 36px 24px; }
+  .card { width: 420px; }
+  .card .bb-title { margin-bottom: 22px; }
+  .bb-spark { height: 150px; }
+  .bb-spark .grid { stroke: var(--line); stroke-width: 1; stroke-dasharray: 2 4; }
+  .bb-spark .area { fill: var(--hue); opacity: 0.12; }
+  .days { display: flex; justify-content: space-between; margin-top: 10px; color: var(--ink-muted); }
+  .loop .path { stroke-dasharray: 420; animation: draw 4800ms var(--ease-settle) infinite; }
+  .loop .area { animation: area 4800ms var(--ease-standard) infinite; }
+  .loop .node { transform-box: fill-box; transform-origin: center; animation: land 4800ms var(--ease-bob) infinite; }
+  .loop .bb-title { animation: rise 4800ms var(--ease-settle) infinite; }
+  @keyframes draw { 0%, 8% { stroke-dashoffset: 420; } 42%, 92% { stroke-dashoffset: 0; opacity: 1; } 100% { stroke-dashoffset: 0; opacity: 0; } }
+  @keyframes area { 0%, 30% { opacity: 0; } 48%, 92% { opacity: 0.12; } 100% { opacity: 0; } }
+  @keyframes land { 0%, 40% { transform: scale(0); } 50%, 92% { transform: scale(1); opacity: 1; } 100% { transform: scale(1); opacity: 0; } }
+  @keyframes rise { 0%, 36% { opacity: 0.25; } 48%, 100% { opacity: 1; } }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="bb-scene bb-hue-teal loop">
+    <div class="bb-frame bb-frame--wash card">
+      <p class="bb-eyebrow">Visits this week</p>
+      <h3 class="bb-title bb-title--l">Up 24%</h3>
+      <svg class="bb-spark" viewBox="0 0 372 150" preserveAspectRatio="none" aria-hidden="true">
+        <line class="grid" x1="0" y1="40" x2="372" y2="40"/><line class="grid" x1="0" y1="90" x2="372" y2="90"/>
+        <line class="rule" x1="0" y1="148" x2="372" y2="148"/>
+        <path class="area" d="M8 118 L66 104 L124 112 L182 74 L240 84 L298 52 L360 30 L360 148 L8 148Z"/>
+        <path class="path" d="M8 118 L66 104 L124 112 L182 74 L240 84 L298 52 L360 30"/>
+        <circle class="node" cx="360" cy="30" r="7"/>
+      </svg>
+      <div class="days caption"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

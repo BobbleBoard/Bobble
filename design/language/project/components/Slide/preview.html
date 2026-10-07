@@ -1,0 +1,44 @@
+<!-- @dsCard group="Motion" height=380 subtitle="The mark's own motion: a sliding-tile puzzle that never breaks its rule" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Slide</title>
+<style>
+  body { margin: 0; background: var(--ground); color: var(--ink); }
+  .sheet { display: grid; grid-template-columns: 280px 1fr; gap: 28px; padding: 32px; align-items: center; }
+  .hero { height: 280px; border-radius: var(--radius-xl); background: var(--surface); box-shadow: 0 0 0 1px var(--hairline), var(--shadow-md); display: grid; place-items: center; }
+  .hero .bb-mark { --s: 168px; overflow: visible; }
+  .steps { display: flex; gap: 14px; }
+  .steps figure { margin: 0; display: grid; justify-items: center; gap: 8px; }
+  .steps figcaption { color: var(--ink-muted); }
+  .board { --s: 84px; }
+  .board .frame { fill: var(--surface); stroke: var(--hairline); stroke-width: 0.5; }
+  .board .was { fill: none; stroke: var(--line-strong); stroke-width: 0.6; stroke-dasharray: 1.4 1.2; }
+  .rules { margin: 22px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+  .rules li { display: grid; grid-template-columns: 14px 1fr; gap: 10px; align-items: baseline; color: var(--ink-secondary); }
+  .rules li::before { content: ''; width: 8px; height: 8px; border-radius: var(--radius-tile); background: var(--ink); transform: translateY(-1px); }
+  .rules b { color: var(--ink); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="sheet bb-scene">
+  <div class="hero">
+    <svg class="bb-mark bb-mark--slide" viewBox="0 0 32 32" role="img" aria-label="Bobble"><rect class="t1" x="16.75" y="2.75" width="12.5" height="12.5" rx="3.5"/><rect class="t3" x="16.75" y="16.75" width="12.5" height="12.5" rx="3.5"/><rect class="t2" x="2.75" y="16.75" width="12.5" height="12.5" rx="3.5"/></svg>
+  </div>
+  <div>
+    <div class="steps">
+      <figure><svg class="bb-mark bb-mark--hues board" viewBox="0 0 32 32" aria-hidden="true"><rect class="frame" x="0.75" y="0.75" width="30.5" height="30.5" rx="5"/><rect class="t1" x="16.75" y="2.75" width="12.5" height="12.5" rx="3.5"/><rect class="t2" x="2.75" y="16.75" width="12.5" height="12.5" rx="3.5"/><rect class="t3" x="16.75" y="16.75" width="12.5" height="12.5" rx="3.5"/></svg><figcaption class="caption">Rest</figcaption></figure>
+      <figure><svg class="bb-mark bb-mark--hues board" viewBox="0 0 32 32" aria-hidden="true"><rect class="frame" x="0.75" y="0.75" width="30.5" height="30.5" rx="5"/><rect class="was" x="2.75" y="16.75" width="12.5" height="12.5" rx="3.5"/><rect class="t1" x="16.75" y="2.75" width="12.5" height="12.5" rx="3.5"/><rect class="t2" x="2.75" y="2.75" width="12.5" height="12.5" rx="3.5"/><rect class="t3" x="16.75" y="16.75" width="12.5" height="12.5" rx="3.5"/></svg><figcaption class="caption">Beat 1</figcaption></figure>
+      <figure><svg class="bb-mark bb-mark--hues board" viewBox="0 0 32 32" aria-hidden="true"><rect class="frame" x="0.75" y="0.75" width="30.5" height="30.5" rx="5"/><rect class="was" x="16.75" y="16.75" width="12.5" height="12.5" rx="3.5"/><rect class="t1" x="16.75" y="2.75" width="12.5" height="12.5" rx="3.5"/><rect class="t2" x="2.75" y="2.75" width="12.5" height="12.5" rx="3.5"/><rect class="t3" x="2.75" y="16.75" width="12.5" height="12.5" rx="3.5"/></svg><figcaption class="caption">Beat 2</figcaption></figure>
+      <figure><svg class="bb-mark bb-mark--hues board" viewBox="0 0 32 32" aria-hidden="true"><rect class="frame" x="0.75" y="0.75" width="30.5" height="30.5" rx="5"/><rect class="was" x="16.75" y="2.75" width="12.5" height="12.5" rx="3.5"/><rect class="t1" x="16.75" y="16.75" width="12.5" height="12.5" rx="3.5"/><rect class="t2" x="2.75" y="2.75" width="12.5" height="12.5" rx="3.5"/><rect class="t3" x="2.75" y="16.75" width="12.5" height="12.5" rx="3.5"/></svg><figcaption class="caption">Beat 3</figcaption></figure>
+    </div>
+    <ul class="rules body">
+      <li><span><b>Only the tile beside the hole moves</b>, and only into the hole.</span></li>
+      <li><span><b>One slide per beat</b> of duration-slide, on ease-slide: firm, no bounce.</span></li>
+      <li><span><b>Twelve beats bring every tile home</b>, so the loop closes on the still mark.</span></li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>

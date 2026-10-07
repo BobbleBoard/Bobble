@@ -1,0 +1,44 @@
+<!-- @dsCard group="Foundations" height=300 subtitle="One cursor drawing: yours plain, Bobble's with the blue edge glow and a pill that names the action" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cursor</title>
+<style>
+  body { margin: 0; background: var(--ground); }
+  .sheet { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; padding: 32px; }
+  .sheet figure { margin: 0; }
+  .plate { position: relative; height: 150px; border-radius: var(--radius-lg); background: var(--surface); box-shadow: 0 0 0 1px var(--hairline), var(--shadow-sm); overflow: hidden; }
+  .k { margin: 12px 2px 0; color: var(--ink-muted); }
+  .k b { color: var(--ink-secondary); font-weight: 500; }
+  .big .bb-cursor { left: calc(50% - 16px); top: 44px; transform: scale(1.6); }
+  .btn { position: absolute; left: 22px; top: 44px; width: 96px; height: 34px; border-radius: var(--radius-md); background: var(--ink); display: grid; place-items: center; }
+  .btn i { width: 44px; height: 6px; border-radius: 3px; background: var(--surface); opacity: 0.85; }
+  .press .bb-cursor { left: 84px; top: 62px; transform: scale(0.78); }
+  .field { position: absolute; left: 16px; right: 16px; top: 34px; height: 36px; border-radius: var(--radius-md); background: var(--surface-sunken); box-shadow: inset 0 0 0 1px var(--hairline), 0 0 0 2px var(--hue); display: flex; align-items: center; gap: 2px; padding: 0 12px; }
+  .field .bb-line { width: 72px; height: 7px; background: var(--ink); opacity: 0.55; }
+  .field .bb-caret { height: 18px; animation: none; }
+  .typing .bb-cursor { left: 96px; top: 50px; }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <figure class="bb-scene">
+    <div class="plate big"><span class="bb-cursor"><svg width="22.14" height="25.30" viewBox="49.499 49.514 191.719 219.132" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><filter id="pi-cur-shadow" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="27.72"/></filter></defs><path d="M 58.48 87.06 A 24.06 25.11 -36 0 1 93.89 61.34 L 223.67 137.27 A 18.23 19.02 -36 0 1 218.85 171.89 A 117.23 122.31 -36 0 0 131.29 247.95 A 19.66 20.51 -36 0 1 92.88 244.4 Z" fill="rgba(13, 15, 33, 0.3)" transform="translate(0 12.13)" filter="url(#pi-cur-shadow)"/><path d="M 58.48 87.06 A 24.06 25.11 -36 0 1 93.89 61.34 L 223.67 137.27 A 18.23 19.02 -36 0 1 218.85 171.89 A 117.23 122.31 -36 0 0 131.29 247.95 A 19.66 20.51 -36 0 1 92.88 244.4 Z" fill="#0a0b0f" stroke="#ffffff" stroke-width="13.79" stroke-linejoin="round"/><path d="M 58.48 87.06 A 24.06 25.11 -36 0 1 93.89 61.34 L 223.67 137.27 A 18.23 19.02 -36 0 1 218.85 171.89 A 117.23 122.31 -36 0 0 131.29 247.95 A 19.66 20.51 -36 0 1 92.88 244.4 Z" fill="none" stroke="#ffffff" stroke-width="4.69" stroke-linejoin="round"/></svg></span></div>
+    <figcaption class="caption k"><b>Yours</b>: the drawing, black with a white keyline</figcaption>
+  </figure>
+  <figure class="bb-scene">
+    <div class="plate big"><span class="bb-cursor"><svg width="22.14" height="25.30" viewBox="49.499 49.514 191.719 219.132" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><filter id="pi-cur-glow" x="-150%" y="-150%" width="400%" height="400%" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="68.95"/></filter><filter id="pi-cur-shadow" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="27.72"/></filter></defs><path d="M 58.48 87.06 A 24.06 25.11 -36 0 1 93.89 61.34 L 223.67 137.27 A 18.23 19.02 -36 0 1 218.85 171.89 A 117.23 122.31 -36 0 0 131.29 247.95 A 19.66 20.51 -36 0 1 92.88 244.4 Z" fill="rgba(13, 15, 33, 0.3)" transform="translate(0 12.13)" filter="url(#pi-cur-shadow)"/><path d="M 58.48 87.06 A 24.06 25.11 -36 0 1 93.89 61.34 L 223.67 137.27 A 18.23 19.02 -36 0 1 218.85 171.89 A 117.23 122.31 -36 0 0 131.29 247.95 A 19.66 20.51 -36 0 1 92.88 244.4 Z" fill="#2769ef" stroke="#2769ef" stroke-width="15.17" stroke-linejoin="round" opacity="0.36" filter="url(#pi-cur-glow)"/><path d="M 58.48 87.06 A 24.06 25.11 -36 0 1 93.89 61.34 L 223.67 137.27 A 18.23 19.02 -36 0 1 218.85 171.89 A 117.23 122.31 -36 0 0 131.29 247.95 A 19.66 20.51 -36 0 1 92.88 244.4 Z" fill="#0a0b0f" stroke="#ffffff" stroke-width="13.79" stroke-linejoin="round"/><path d="M 58.48 87.06 A 24.06 25.11 -36 0 1 93.89 61.34 L 223.67 137.27 A 18.23 19.02 -36 0 1 218.85 171.89 A 117.23 122.31 -36 0 0 131.29 247.95 A 19.66 20.51 -36 0 1 92.88 244.4 Z" fill="none" stroke="#ffffff" stroke-width="4.69" stroke-linejoin="round"/></svg></span></div>
+    <figcaption class="caption k"><b>Bobble's</b>: the same, with the agent's blue at its edge</figcaption>
+  </figure>
+  <figure class="bb-scene bb-hue-teal press">
+    <div class="plate"><span class="btn"><i></i></span><span class="bb-cursor"><svg width="22.14" height="25.30" viewBox="49.499 49.514 191.719 219.132" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><filter id="pi-cur-glow" x="-150%" y="-150%" width="400%" height="400%" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="68.95"/></filter><filter id="pi-cur-shadow" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="27.72"/></filter></defs><path d="M 58.48 87.06 A 24.06 25.11 -36 0 1 93.89 61.34 L 223.67 137.27 A 18.23 19.02 -36 0 1 218.85 171.89 A 117.23 122.31 -36 0 0 131.29 247.95 A 19.66 20.51 -36 0 1 92.88 244.4 Z" fill="rgba(13, 15, 33, 0.3)" transform="translate(0 12.13)" filter="url(#pi-cur-shadow)"/><path d="M 58.48 87.06 A 24.06 25.11 -36 0 1 93.89 61.34 L 223.67 137.27 A 18.23 19.02 -36 0 1 218.85 171.89 A 117.23 122.31 -36 0 0 131.29 247.95 A 19.66 20.51 -36 0 1 92.88 244.4 Z" fill="#2769ef" stroke="#2769ef" stroke-width="15.17" stroke-linejoin="round" opacity="0.36" filter="url(#pi-cur-glow)"/><path d="M 58.48 87.06 A 24.06 25.11 -36 0 1 93.89 61.34 L 223.67 137.27 A 18.23 19.02 -36 0 1 218.85 171.89 A 117.23 122.31 -36 0 0 131.29 247.95 A 19.66 20.51 -36 0 1 92.88 244.4 Z" fill="#0a0b0f" stroke="#ffffff" stroke-width="13.79" stroke-linejoin="round"/><path d="M 58.48 87.06 A 24.06 25.11 -36 0 1 93.89 61.34 L 223.67 137.27 A 18.23 19.02 -36 0 1 218.85 171.89 A 117.23 122.31 -36 0 0 131.29 247.95 A 19.66 20.51 -36 0 1 92.88 244.4 Z" fill="none" stroke="#ffffff" stroke-width="4.69" stroke-linejoin="round"/></svg><span class="bb-status">Clicking</span></span></div>
+    <figcaption class="caption k"><b>A press</b>: a 150ms squeeze to 0.78; no ring</figcaption>
+  </figure>
+  <figure class="bb-scene bb-hue-teal typing">
+    <div class="plate"><span class="field"><i class="bb-line"></i><i class="bb-caret"></i></span><span class="bb-cursor"><svg width="22.14" height="25.30" viewBox="49.499 49.514 191.719 219.132" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><filter id="pi-cur-glow" x="-150%" y="-150%" width="400%" height="400%" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="68.95"/></filter><filter id="pi-cur-shadow" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="27.72"/></filter></defs><path d="M 58.48 87.06 A 24.06 25.11 -36 0 1 93.89 61.34 L 223.67 137.27 A 18.23 19.02 -36 0 1 218.85 171.89 A 117.23 122.31 -36 0 0 131.29 247.95 A 19.66 20.51 -36 0 1 92.88 244.4 Z" fill="rgba(13, 15, 33, 0.3)" transform="translate(0 12.13)" filter="url(#pi-cur-shadow)"/><path d="M 58.48 87.06 A 24.06 25.11 -36 0 1 93.89 61.34 L 223.67 137.27 A 18.23 19.02 -36 0 1 218.85 171.89 A 117.23 122.31 -36 0 0 131.29 247.95 A 19.66 20.51 -36 0 1 92.88 244.4 Z" fill="#2769ef" stroke="#2769ef" stroke-width="15.17" stroke-linejoin="round" opacity="0.36" filter="url(#pi-cur-glow)"/><path d="M 58.48 87.06 A 24.06 25.11 -36 0 1 93.89 61.34 L 223.67 137.27 A 18.23 19.02 -36 0 1 218.85 171.89 A 117.23 122.31 -36 0 0 131.29 247.95 A 19.66 20.51 -36 0 1 92.88 244.4 Z" fill="#0a0b0f" stroke="#ffffff" stroke-width="13.79" stroke-linejoin="round"/><path d="M 58.48 87.06 A 24.06 25.11 -36 0 1 93.89 61.34 L 223.67 137.27 A 18.23 19.02 -36 0 1 218.85 171.89 A 117.23 122.31 -36 0 0 131.29 247.95 A 19.66 20.51 -36 0 1 92.88 244.4 Z" fill="none" stroke="#ffffff" stroke-width="4.69" stroke-linejoin="round"/></svg><span class="bb-status">Typing</span></span></div>
+    <figcaption class="caption k"><b>The pill</b> names the action, never what is typed</figcaption>
+  </figure>
+</div>
+</body>
+</html>

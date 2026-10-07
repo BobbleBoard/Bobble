@@ -1,0 +1,93 @@
+<!-- @dsCard group="Demos" height=440 subtitle="Find the parts, colour them, take them apart" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Parts</title>
+<style>
+  body { margin: 0; background: var(--ground); }
+  .stage { display: grid; place-items: center; padding: 32px 24px; }
+  .card { width: 400px; padding-bottom: 12px; }
+  .card .bb-title { margin-bottom: 4px; }
+  svg.lamp { display: block; width: 352px; height: 288px; margin: 0 auto; overflow: visible; }
+  /* untinted, a part is the ink mixed into the surface; tinted, it is its hue */
+  .lamp { --n-top: color-mix(in srgb, var(--ink) 7%, var(--surface)); --n-body: color-mix(in srgb, var(--ink) 15%, var(--surface)); --n-in: color-mix(in srgb, var(--ink) 30%, var(--surface)); }
+  .ground { fill: rgba(0, 0, 0, 0.06); }
+  [data-theme="dark"] .ground { fill: rgba(0, 0, 0, 0.32); }
+  /* the light lies on the curved sides only; a flat top or an opening takes its own tone */
+  .n .top { fill: var(--n-top); }
+  .n .body { fill: var(--n-body); }
+  .n .in { fill: var(--n-in); }
+  .h .top { fill: color-mix(in srgb, var(--hue) 52%, #fff); }
+  .h .body { fill: var(--hue); }
+  .h .in { fill: color-mix(in srgb, var(--hue) 62%, #000); }
+  .light { fill: url(#round); pointer-events: none; }
+  .tag text { font: 500 12px/1 var(--font-ui); fill: var(--ink-secondary); }
+  .tag rect { fill: var(--hue); }
+  .tag line { stroke: var(--line-strong); stroke-width: 1; stroke-dasharray: 2 3; }
+
+  /* the result is the static frame: coloured, apart, named */
+  .stem { transform: translateY(-32px); }
+  .shade { transform: translateY(-64px); }
+  .loop .h { animation: var(--tint) 4800ms var(--ease-standard) infinite; }
+  .loop .base .h { --tint: tint-1; }
+  .loop .stem .h { --tint: tint-2; }
+  .loop .shade .h { --tint: tint-3; }
+  .loop .stem { animation: lift-stem 4800ms var(--ease-settle) infinite; }
+  .loop .shade { animation: lift-shade 4800ms var(--ease-settle) infinite; }
+  .loop .tag { animation: tag 4800ms var(--ease-standard) infinite; }
+  @keyframes tint-1 { 0%, 10% { opacity: 0; } 17%, 86% { opacity: 1; } 94%, 100% { opacity: 0; } }
+  @keyframes tint-2 { 0%, 16% { opacity: 0; } 23%, 86% { opacity: 1; } 94%, 100% { opacity: 0; } }
+  @keyframes tint-3 { 0%, 22% { opacity: 0; } 29%, 86% { opacity: 1; } 94%, 100% { opacity: 0; } }
+  @keyframes lift-stem { 0%, 38% { transform: none; } 52%, 80% { transform: translateY(-32px); } 92%, 100% { transform: none; } }
+  @keyframes lift-shade { 0%, 34% { transform: none; } 50%, 80% { transform: translateY(-64px); } 92%, 100% { transform: none; } }
+  @keyframes tag { 0%, 50% { opacity: 0; transform: translateX(-6px); } 57%, 77% { opacity: 1; transform: none; } 82%, 100% { opacity: 0; transform: none; } }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="bb-scene bb-hue-sun">
+    <div class="bb-frame card">
+      <p class="bb-eyebrow">Three parts</p>
+      <h3 class="bb-title bb-title--s">Desk lamp</h3>
+      <svg class="lamp loop" viewBox="0 0 352 288" aria-hidden="true">
+        <defs>
+          <!-- one light from the upper left, laid over every curved face -->
+          <linearGradient id="round" x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0" stop-color="#fff" stop-opacity="0.22"/>
+            <stop offset="0.42" stop-color="#fff" stop-opacity="0"/>
+            <stop offset="1" stop-color="#000" stop-opacity="0.2"/>
+          </linearGradient>
+        </defs>
+        <ellipse class="ground" cx="140" cy="262" rx="78" ry="20"/>
+
+        <g class="part base bb-hue-teal">
+          <g class="n"><path class="body" d="M80 236V250A60 18 0 0 0 200 250V236Z"/></g>
+          <g class="h"><path class="body" d="M80 236V250A60 18 0 0 0 200 250V236Z"/></g>
+          <path class="light" d="M80 236V250A60 18 0 0 0 200 250V236Z"/>
+          <g class="n"><ellipse class="top" cx="140" cy="236" rx="60" ry="18"/></g>
+          <g class="h"><ellipse class="top" cx="140" cy="236" rx="60" ry="18"/></g>
+          <g class="tag"><line x1="208" y1="243" x2="236" y2="243"/><rect x="244" y="239" width="8" height="8" rx="2.24"/><text x="258" y="247">Base</text></g>
+        </g>
+
+        <g class="part stem bb-hue-sun">
+          <g class="n"><path class="body" d="M133 146V236A7 2.2 0 0 0 147 236V146Z"/></g>
+          <g class="h"><path class="body" d="M133 146V236A7 2.2 0 0 0 147 236V146Z"/></g>
+          <path class="light" d="M133 146V236A7 2.2 0 0 0 147 236V146Z"/>
+          <g class="tag"><line x1="154" y1="200" x2="236" y2="200"/><rect x="244" y="196" width="8" height="8" rx="2.24"/><text x="258" y="204">Stem</text></g>
+        </g>
+
+        <g class="part shade bb-hue-pink">
+          <g class="n"><path class="body" d="M110 102L78 164A62 18.6 0 0 0 202 164L170 102Z"/></g>
+          <g class="h"><path class="body" d="M110 102L78 164A62 18.6 0 0 0 202 164L170 102Z"/></g>
+          <path class="light" d="M110 102L78 164A62 18.6 0 0 0 202 164L170 102Z"/>
+          <g class="n"><ellipse class="in" cx="140" cy="102" rx="30" ry="9"/></g>
+          <g class="h"><ellipse class="in" cx="140" cy="102" rx="30" ry="9"/></g>
+          <g class="tag"><line x1="206" y1="138" x2="236" y2="138"/><rect x="244" y="134" width="8" height="8" rx="2.24"/><text x="258" y="142">Shade</text></g>
+        </g>
+      </svg>
+    </div>
+  </div>
+</div>
+</body>
+</html>

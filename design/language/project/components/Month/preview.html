@@ -1,0 +1,65 @@
+<!-- @dsCard group="Scenes" height=420 subtitle="Cells and marks; the marks arrive on the diagonal" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Month</title>
+<style>
+  body { margin: 0; background: var(--ground); }
+  .stage { display: grid; place-items: center; padding: 36px 24px; }
+  .month { width: 340px; }
+  .month .bb-title { margin-bottom: 20px; }
+  .bb-cells { --cell: 36px; --gap: 8px; }
+  .bb-cell { position: relative; font-size: 13px; }
+  .bb-cell > span { position: relative; }
+  /* backwards: a mark still waiting out its delay shows its first frame, not the static one */
+  /* a mark is a tile BEHIND the numeral, so the tile can bob while the day stays put */
+  .mark::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: var(--radius-tile);
+    background: var(--hue);
+    animation: mark-in 4800ms var(--ease-bob) infinite backwards;
+    animation-delay: calc(var(--d) * 70ms);
+  }
+  .mark > span { color: var(--on-hue); font-weight: 600; animation: mark-ink 4800ms var(--ease-standard) infinite backwards; animation-delay: calc(var(--d) * 70ms); }
+  @keyframes mark-in {
+    0%, 8% { transform: scale(0.2); opacity: 0; }
+    20%, 86% { transform: scale(1); opacity: 1; }
+    96%, 100% { transform: scale(0.6); opacity: 0; }
+  }
+  @keyframes mark-ink {
+    0%, 10% { color: var(--ink-muted); font-weight: 400; }
+    18%, 86% { color: var(--on-hue); font-weight: 600; }
+    96%, 100% { color: var(--ink-muted); font-weight: 400; }
+  }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="bb-scene bb-hue-teal">
+    <div class="bb-frame month">
+      <p class="bb-eyebrow">A busy month</p>
+      <h3 class="bb-title bb-title--l">October</h3>
+      <div class="bb-cells" id="cells"></div>
+    </div>
+  </div>
+</div>
+<script>
+  // October 2026 begins on a Thursday. The marks arrive along the diagonal (row + column).
+  var head = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+  var marked = { 2: 1, 7: 1, 13: 1, 14: 1, 21: 1, 23: 1, 29: 1 };
+  var el = document.getElementById('cells');
+  var html = head.map(function (h) { return '<i class="bb-cell bb-cell--head">' + h + '</i>'; }).join('');
+  for (var i = 0; i < 4; i++) html += '<i class="bb-cell"></i>';
+  for (var day = 1; day <= 31; day++) {
+    var slot = day + 3, row = Math.floor(slot / 7), col = slot % 7;
+    html += marked[day]
+      ? '<i class="bb-cell mark" style="--d:' + (row + col) + '"><span>' + day + '</span></i>'
+      : '<i class="bb-cell"><span>' + day + '</span></i>';
+  }
+  el.innerHTML = html;
+</script>
+</body>
+</html>

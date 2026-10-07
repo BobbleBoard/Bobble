@@ -1,0 +1,59 @@
+<!-- @dsCard group="Foundations" height=330 subtitle="The mark's own square, and the dot and pill it stretches into" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Tile</title>
+<style>
+  body { margin: 0; background: var(--ground); }
+  .sheet { display: grid; grid-template-columns: 300px 1fr; gap: 40px; padding: 32px 36px; align-items: center; }
+  .k { margin: 10px 0 0; color: var(--ink-muted); }
+  .k b { color: var(--ink-secondary); font-weight: 500; }
+  /* the corner is a share of the side, so a tile is the same shape at every size */
+  .geo { position: relative; width: 168px; height: 168px; margin: 0 auto; }
+  .geo .bb-tile { --s: 168px; }
+  .geo svg { position: absolute; inset: 0; overflow: visible; }
+  .geo .guide { fill: none; stroke: var(--on-hue); stroke-width: 1.5; stroke-dasharray: 3 3; opacity: 0.55; }
+  .geo .tick { stroke: var(--ink-muted); stroke-width: 1; }
+  .geo text { font: 500 12px/1 var(--font-ui); fill: var(--ink-secondary); }
+  .row { display: flex; align-items: flex-end; gap: 22px; }
+  .row figure { margin: 0; display: grid; justify-items: center; }
+  .row + .row { margin-top: 28px; }
+  .sizes .bb-tile { background: var(--ink); }
+</style>
+</head>
+<body>
+<div class="bb-scene bb-hue-teal sheet">
+  <div>
+    <div class="geo">
+      <span class="bb-tile"></span>
+      <svg viewBox="0 0 168 168" aria-hidden="true">
+        <!-- the corner: radius-tile, 28% of the side (the mark's 3.5 on 12.5) -->
+        <path class="guide" d="M0 47V0h47"/>
+        <circle class="guide" cx="47" cy="47" r="47"/>
+        <line class="tick" x1="0" y1="-12" x2="47" y2="-12"/><line class="tick" x1="0" y1="-16" x2="0" y2="-8"/><line class="tick" x1="47" y1="-16" x2="47" y2="-8"/>
+        <text x="56" y="-8">28% of the side</text>
+      </svg>
+    </div>
+  </div>
+  <div>
+    <div class="row">
+      <figure><span class="bb-tile" style="--s:56px"></span><figcaption class="caption k"><b>hue</b></figcaption></figure>
+      <figure><span class="bb-tile bb-tile--tint" style="--s:56px"></span><figcaption class="caption k"><b>tint</b></figcaption></figure>
+      <figure><span class="bb-tile bb-tile--ink" style="--s:56px"></span><figcaption class="caption k"><b>ink</b></figcaption></figure>
+      <figure><span class="bb-tile bb-tile--line" style="--s:56px"></span><figcaption class="caption k"><b>line</b></figcaption></figure>
+      <figure><span class="bb-tile bb-tile--lift" style="--s:56px;background:var(--surface)"></span><figcaption class="caption k"><b>lift</b></figcaption></figure>
+    </div>
+    <div class="row">
+      <figure><span class="bb-tile" style="--s:40px"></span><figcaption class="caption k"><b>tile</b> 28%</figcaption></figure>
+      <figure><span class="bb-dot" style="--s:40px"></span><figcaption class="caption k"><b>dot</b> 50%</figcaption></figure>
+      <figure><span class="bb-pill" style="--w:96px;--s:40px"></span><figcaption class="caption k"><b>pill</b> a stretched dot</figcaption></figure>
+    </div>
+    <div class="row sizes">
+      <span class="bb-tile" style="--s:8px"></span><span class="bb-tile" style="--s:12px"></span><span class="bb-tile" style="--s:16px"></span><span class="bb-tile" style="--s:24px"></span><span class="bb-tile" style="--s:32px"></span><span class="bb-tile" style="--s:48px"></span>
+      <span class="caption k" style="margin:0 0 2px;white-space:nowrap">8 to 48, one shape</span>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,38 @@
+<!-- @dsCard group="Foundations" height=300 subtitle="The glass pill that offers an action on what is selected" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Chip</title>
+<style>
+  body { margin: 0; background: var(--ground); }
+  .sheet { display: grid; grid-template-columns: 1.25fr 1fr; gap: 28px; padding: 32px; align-items: start; }
+  .sheet figure { margin: 0; }
+  .k { margin: 12px 2px 0; color: var(--ink-muted); }
+  .k b { color: var(--ink-secondary); font-weight: 500; }
+  .doc { height: 176px; }
+  .doc .bb-lines + .bb-lines { margin-top: 18px; }
+  .doc .bb-chip { position: absolute; left: 112px; top: 118px; }
+  .stack { display: grid; gap: 14px; justify-items: start; padding-top: 6px; }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <figure class="bb-scene bb-hue-teal">
+    <div class="bb-frame doc">
+      <div class="bb-lines"><i class="bb-line" style="--w:90%"></i><i class="bb-line" style="--w:76%"></i></div>
+      <div class="bb-lines bb-selected"><i class="bb-line"></i><i class="bb-line" style="--w:94%"></i><i class="bb-line" style="--w:58%"></i></div>
+      <span class="bb-chip"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10.6 2.3 13.7 5.4 6.2 12.9 3.1 9.8z"/><path d="M8.9 4 12 7.1"/><path d="M3.1 9.8 2.1 13.9l4.1-1z"/></svg>Edit with Bobble</span>
+    </div>
+    <figcaption class="caption k"><b>On a selection</b>: below it, never over it</figcaption>
+  </figure>
+  <figure class="bb-scene bb-hue-teal">
+    <div class="stack">
+      <span class="bb-chip"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10.6 2.3 13.7 5.4 6.2 12.9 3.1 9.8z"/><path d="M8.9 4 12 7.1"/><path d="M3.1 9.8 2.1 13.9l4.1-1z"/></svg>Edit with Bobble</span>
+      <span class="bb-chip"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.5 3.5L13 4.5"/></svg>Added to Calendar</span>
+    </div>
+    <figcaption class="caption k"><b>Two jobs</b>: offer an action, confirm it was done. What the agent is doing now is its cursor's pill, not a chip.</figcaption>
+  </figure>
+</div>
+</body>
+</html>

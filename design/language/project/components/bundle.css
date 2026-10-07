@@ -1,0 +1,570 @@
+/* Bobble — the building blocks.
+ *
+ * Every illustration and demo in Bobble is drawn from these, on the tokens in
+ * tokens.json. Three rules hold the set together:
+ *   1. Tiles, dots and pills only. The tile is the mark's own (corner = 28% of
+ *      the side, radius-tile); a dot is a tile at 50%; a pill is a stretched dot.
+ *   2. One hue per picture. A scene sets --hue/--hue-tint/--hue-ink once with
+ *      .bb-hue-teal | -sun | -pink; everything inside takes it.
+ *   3. The rest state is the picture. Motion runs from an earlier state INTO the
+ *      static styles below, so with Reduce Motion the result is what shows.
+ */
+
+/* ── the hue a scene is drawn in ─────────────────────────────────────────── */
+.bb-hue-teal {
+  --hue: var(--teal);
+  --hue-tint: var(--teal-tint);
+  --hue-ink: var(--teal-ink);
+}
+.bb-hue-sun {
+  --hue: var(--sun);
+  --hue-tint: var(--sun-tint);
+  --hue-ink: var(--sun-ink);
+}
+.bb-hue-pink {
+  --hue: var(--pink);
+  --hue-tint: var(--pink-tint);
+  --hue-ink: var(--pink-ink);
+}
+
+.bb-scene {
+  --hue: var(--teal);
+  --hue-tint: var(--teal-tint);
+  --hue-ink: var(--teal-ink);
+  --bb-unit: 8px;
+  --bb-line-h: 8px;
+  font-family: var(--font-ui);
+  color: var(--ink);
+}
+.bb-scene.bb-hue-sun {
+  --hue: var(--sun);
+  --hue-tint: var(--sun-tint);
+  --hue-ink: var(--sun-ink);
+}
+.bb-scene.bb-hue-pink {
+  --hue: var(--pink);
+  --hue-tint: var(--pink-tint);
+  --hue-ink: var(--pink-ink);
+}
+
+/* ── frame: the surface a picture sits on ────────────────────────────────── */
+.bb-frame {
+  position: relative;
+  box-sizing: border-box;
+  padding: var(--space-6);
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  /* a hairline, and the contact + cast shadow do the grounding */
+  box-shadow:
+    0 0 0 1px var(--hairline),
+    var(--shadow-md);
+  overflow: hidden;
+}
+.bb-frame--lift {
+  box-shadow:
+    0 0 0 1px var(--hairline),
+    var(--shadow-lg);
+}
+.bb-frame--wash {
+  background: var(--hue-tint);
+  box-shadow:
+    0 0 0 1px var(--hairline),
+    var(--shadow-sm);
+}
+.bb-frame--hero {
+  border-radius: var(--radius-xl);
+  padding: var(--space-8);
+}
+
+/* the window a demo of an app runs in: a quiet bar, no traffic-light colours */
+.bb-window {
+  padding: 0;
+}
+.bb-window__bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 var(--space-3);
+  border-bottom: 1px solid var(--hairline);
+}
+.bb-window__bar i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--line-strong);
+}
+.bb-window__body {
+  padding: var(--space-6);
+}
+
+/* ── the display face ─────────────────────────────────────────────────────
+ * Fraunces, softened: SOFT 100 rounds every terminal toward the tile's corner,
+ * WONK 0 keeps the letters upright and calm. tokens.css's display classes carry
+ * only size, leading, weight and tracking, so the axes live here, once. The
+ * optical size is left to the font (font-optical-sizing: auto). */
+.display-xl,
+.display-l,
+.display-m,
+.display-s,
+.bb-title {
+  font-optical-sizing: auto;
+  font-variation-settings:
+    "SOFT" 100,
+    "WONK" 0;
+}
+
+/* ── words: the title is real type, everything else is a line ─────────────── */
+.bb-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 26px;
+  line-height: 30px;
+  font-weight: 440;
+  letter-spacing: -0.012em;
+  color: var(--ink);
+  text-wrap: balance;
+}
+.bb-title--s {
+  font-size: 20px;
+  line-height: 24px;
+  font-weight: 460;
+  letter-spacing: -0.005em;
+}
+.bb-title--l {
+  font-size: 40px;
+  line-height: 44px;
+  font-weight: 420;
+  letter-spacing: -0.018em;
+}
+.bb-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--ink-secondary);
+}
+.bb-eyebrow::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-tile);
+  background: var(--hue);
+}
+
+.bb-lines {
+  display: grid;
+  gap: var(--bb-line-h);
+}
+.bb-lines + .bb-lines {
+  margin-top: calc(var(--bb-line-h) * 2.5);
+}
+.bb-line {
+  display: block;
+  width: var(--w, 100%);
+  height: var(--bb-line-h);
+  border-radius: var(--radius-full);
+  background: var(--line);
+}
+.bb-line--strong {
+  background: var(--line-strong);
+}
+.bb-line--hue {
+  background: var(--hue);
+}
+
+/* ── tile, dot, pill ──────────────────────────────────────────────────────── */
+.bb-tile {
+  display: block;
+  width: var(--s, 32px);
+  height: var(--s, 32px);
+  border-radius: var(--radius-tile);
+  background: var(--hue);
+}
+.bb-tile--tint {
+  background: var(--hue-tint);
+}
+.bb-tile--ink {
+  background: var(--ink);
+}
+.bb-tile--line {
+  background: var(--line-strong);
+}
+.bb-tile--lift {
+  box-shadow: var(--shadow-sm);
+}
+.bb-dot {
+  display: block;
+  width: var(--s, 10px);
+  height: var(--s, 10px);
+  border-radius: 50%;
+  background: var(--hue);
+}
+.bb-pill {
+  display: block;
+  width: var(--w, 48px);
+  height: var(--s, 12px);
+  border-radius: var(--radius-full);
+  background: var(--hue);
+}
+
+/* the mark itself: three tiles on a 2x2 board, the top-left cell empty */
+.bb-mark {
+  display: block;
+  width: var(--s, 32px);
+  height: var(--s, 32px);
+}
+.bb-mark rect {
+  fill: var(--mark-ink);
+}
+.bb-mark--hues .t1 {
+  fill: var(--teal);
+}
+.bb-mark--hues .t2 {
+  fill: var(--sun);
+}
+.bb-mark--hues .t3 {
+  fill: var(--pink);
+}
+
+/*
+ * The mark's own motion: a sliding-tile puzzle (global.css .pd-bobble-loader).
+ * Only the tile beside the hole moves, only into the hole, one per beat; the
+ * tiles walk clockwise, the hole counter-clockwise, and twelve beats bring every
+ * tile home. A tile in a frame has nowhere to overshoot to, so it SLIDES on
+ * ease-slide and never bobs. t1 rests top-right, t2 bottom-left, t3 bottom-right.
+ */
+.bb-mark--slide rect {
+  animation: bb-slide calc(var(--duration-slide) * 12) var(--ease-slide) infinite both;
+}
+.bb-mark--slide .t1 {
+  --x1: 0px;
+  --y1: 14px;
+  --x2: -14px;
+  --y2: 14px;
+  --x3: -14px;
+  --y3: 0px;
+  animation-delay: calc(var(--duration-slide) * 2);
+}
+.bb-mark--slide .t2 {
+  --x1: 0px;
+  --y1: -14px;
+  --x2: 14px;
+  --y2: -14px;
+  --x3: 14px;
+  --y3: 0px;
+}
+.bb-mark--slide .t3 {
+  --x1: -14px;
+  --y1: 0px;
+  --x2: -14px;
+  --y2: -14px;
+  --x3: 0px;
+  --y3: -14px;
+  animation-delay: var(--duration-slide);
+}
+@keyframes bb-slide {
+  0%,
+  8.333% {
+    transform: none;
+  }
+  11.667%,
+  33.333% {
+    transform: translate(var(--x1), var(--y1));
+  }
+  36.667%,
+  58.333% {
+    transform: translate(var(--x2), var(--y2));
+  }
+  61.667%,
+  83.333% {
+    transform: translate(var(--x3), var(--y3));
+  }
+  86.667%,
+  100% {
+    transform: none;
+  }
+}
+
+/* ── picture: what a made image looks like before it is made ─────────────── */
+.bb-picture {
+  position: relative;
+  display: block;
+  border-radius: var(--radius-md);
+  background: var(--hue-tint);
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+}
+.bb-picture svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.bb-picture .hill {
+  fill: var(--hue);
+}
+.bb-picture .hill-back {
+  fill: var(--hue);
+  opacity: 0.55;
+}
+.bb-picture .sun {
+  fill: var(--surface);
+}
+[data-theme="dark"] .bb-picture .sun {
+  fill: var(--hue);
+}
+
+/* ── numbers: bars on a baseline, a line through nodes ───────────────────── */
+.bb-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+  height: var(--chart-h, 120px);
+  border-bottom: 2px solid var(--line);
+}
+.bb-bar {
+  display: block;
+  width: var(--bw, 28px);
+  height: var(--h, 50%);
+  background: var(--hue);
+  /* a tile standing on the baseline: tile corners on top, square at the foot */
+  border-radius: calc(var(--bw, 28px) * 0.28) calc(var(--bw, 28px) * 0.28) 2px 2px;
+}
+.bb-bar--quiet {
+  background: var(--hue-tint);
+  box-shadow: inset 0 0 0 1.5px var(--hue);
+}
+.bb-spark {
+  display: block;
+  width: 100%;
+  overflow: visible;
+}
+.bb-spark .rule {
+  stroke: var(--line);
+  stroke-width: 2;
+}
+.bb-spark .path {
+  fill: none;
+  stroke: var(--hue);
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.bb-spark .node {
+  fill: var(--hue);
+  stroke: var(--surface);
+  stroke-width: 3;
+}
+
+/* ── cells: a calendar, a sheet, anything on a grid ──────────────────────── */
+.bb-cells {
+  display: grid;
+  grid-template-columns: repeat(var(--cols, 7), var(--cell, 32px));
+  gap: var(--gap, 6px);
+  font-size: 12px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+}
+.bb-cell {
+  display: grid;
+  place-items: center;
+  font-style: normal; /* cells are <i>, which would otherwise slant the numerals */
+  width: var(--cell, 32px);
+  height: var(--cell, 32px);
+  border-radius: var(--radius-tile);
+  color: var(--ink-muted);
+}
+.bb-cell--head {
+  height: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--ink-muted);
+}
+.bb-cell--mark {
+  background: var(--hue);
+  color: var(--on-hue);
+  font-weight: 600;
+}
+.bb-cell--soft {
+  background: var(--hue-tint);
+  color: var(--hue-ink);
+  font-weight: 600;
+}
+.bb-cell--sheet {
+  border-radius: 4px;
+  background: var(--surface-sunken);
+}
+
+/* ── the cursor, and what it does ─────────────────────────────────────────
+ * One drawing for every pointer a picture shows: the user's cursor from
+ * packages/shared/src/agent-cursor.ts, pasted as its own SVG (never redrawn).
+ * Yours is the drawing alone; Bobble's carries the blue edge glow and, while it
+ * acts, the status pill. The wrapper is the drawing's box; the tip, not the box,
+ * is the position, and a press squeezes to 0.78 about the tip. No ring. */
+.bb-cursor {
+  position: absolute;
+  width: 22.14px;
+  height: 25.3px;
+  margin: -0.92px 0 0 -1.53px;
+  transform-origin: 1.53px 0.92px;
+  pointer-events: none;
+}
+.bb-cursor > svg {
+  display: block;
+  overflow: visible;
+}
+/* the status pill: says the action, never its contents ("Typing", "Clicking") */
+.bb-status {
+  position: absolute;
+  left: 12.53px;
+  top: 15.92px;
+  padding: 6px 12px;
+  border-radius: 13px;
+  background: var(--agent-pill);
+  box-shadow: var(--shadow-agent-pill);
+  color: var(--on-agent);
+  font: 600 12px / 1.2 var(--font-ui);
+  white-space: nowrap;
+}
+
+/* selection: each line takes its own tint, the way selected text does */
+/* the group isolates, so a tint at z-index -1 lands above the frame and below its line */
+.bb-selected {
+  isolation: isolate;
+}
+.bb-selected .bb-line {
+  position: relative;
+  background: var(--line-strong);
+}
+.bb-selected .bb-line::before {
+  content: "";
+  position: absolute;
+  inset: -4px -5px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--hue) 22%, transparent);
+  transform-origin: left center;
+  z-index: -1;
+}
+.bb-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 32px;
+  padding: 0 14px 0 11px;
+  border-radius: var(--radius-full);
+  background: var(--overlay);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  backdrop-filter: blur(20px) saturate(1.4);
+  box-shadow:
+    0 0 0 1px var(--edge),
+    var(--shadow-popover);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.bb-chip svg {
+  width: 15px;
+  height: 15px;
+}
+.bb-chip svg path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.bb-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.1em;
+  vertical-align: -0.15em;
+  border-radius: 1px;
+  background: var(--hue-ink);
+  animation: bb-blink 1s steps(1, end) infinite;
+}
+
+/* the label under a demo: what the picture is */
+.bb-caption {
+  margin: var(--space-3) 0 0;
+  text-align: center;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+  color: var(--ink-secondary);
+}
+
+/* ── motion: the verbs ───────────────────────────────────────────────────── */
+@keyframes bb-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+@keyframes bb-bob-in {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@keyframes bb-grow-x {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+@keyframes bb-grow-y {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+@keyframes bb-rise {
+  from {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+/* one-shot verbs, for a class added by a timeline */
+.bb-bob {
+  animation: bb-bob-in var(--duration-beat) var(--ease-bob) both;
+}
+.bb-grow {
+  transform-origin: left center;
+  animation: bb-grow-x var(--duration-beat) var(--ease-settle) both;
+}
+.bb-rise {
+  animation: bb-rise var(--duration-slow) var(--ease-settle) both;
+}
+
+/* Reduce Motion: no animation at all. The static styles ARE the result, so
+   what shows is the end of the story, never the empty first frame. */
+@media (prefers-reduced-motion: reduce) {
+  .bb-scene *,
+  .bb-scene *::before,
+  .bb-scene *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

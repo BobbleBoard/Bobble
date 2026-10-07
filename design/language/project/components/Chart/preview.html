@@ -1,0 +1,44 @@
+<!-- @dsCard group="Foundations" height=320 subtitle="Numbers: tiles standing on a baseline, a line through nodes" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Chart</title>
+<style>
+  body { margin: 0; background: var(--ground); }
+  .sheet { display: grid; grid-template-columns: 1fr 1.3fr 0.8fr; gap: 24px; padding: 32px; align-items: end; }
+  .sheet figure { margin: 0; }
+  .k { margin: 12px 2px 0; color: var(--ink-muted); }
+  .k b { color: var(--ink-secondary); font-weight: 500; }
+  .bb-frame { height: 186px; display: flex; flex-direction: column; justify-content: flex-end; }
+  .bb-bars { --chart-h: 132px; }
+  .detail { display: grid; place-items: end center; height: 186px; }
+  .detail .bb-bars { --chart-h: 150px; gap: 0; width: 120px; justify-content: center; }
+  .detail .bb-bar { --bw: 72px; }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <figure class="bb-scene bb-hue-teal">
+    <div class="bb-frame">
+      <div class="bb-bars"><i class="bb-bar" style="--h:38%"></i><i class="bb-bar" style="--h:62%"></i><i class="bb-bar bb-bar--quiet" style="--h:50%"></i><i class="bb-bar" style="--h:88%"></i><i class="bb-bar" style="--h:70%"></i></div>
+    </div>
+    <figcaption class="caption k"><b>Bars</b>: quiet is the hue as an outline</figcaption>
+  </figure>
+  <figure class="bb-scene bb-hue-teal">
+    <div class="bb-frame bb-frame--wash">
+      <svg class="bb-spark" viewBox="0 0 300 132" aria-hidden="true">
+        <line class="rule" x1="0" y1="130" x2="300" y2="130"/>
+        <path class="path" d="M8 104 L66 86 L124 96 L182 52 L240 62 L292 22"/>
+        <circle class="node" cx="182" cy="52" r="6"/><circle class="node" cx="292" cy="22" r="6"/>
+      </svg>
+    </div>
+    <figcaption class="caption k"><b>A line</b>: 3.5 wide, nodes only where it matters</figcaption>
+  </figure>
+  <figure class="bb-scene bb-hue-teal">
+    <div class="detail"><div class="bb-bars"><i class="bb-bar" style="--h:100%"></i></div></div>
+    <figcaption class="caption k"><b>A bar</b>: tile corners on top, square at the foot</figcaption>
+  </figure>
+</div>
+</body>
+</html>

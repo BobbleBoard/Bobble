@@ -1,0 +1,54 @@
+<!-- @dsCard group="Foundations" height=320 subtitle="What a made image looks like in a picture: hills, a sun, the hue" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Picture</title>
+<style>
+  body { margin: 0; background: var(--ground); }
+  .sheet { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; padding: 32px; }
+  .sheet figure { margin: 0; }
+  .k { margin: 12px 2px 0; color: var(--ink-muted); }
+  .k b { color: var(--ink-secondary); font-weight: 500; }
+  .page { padding: 14px; }
+  .page .bb-picture { aspect-ratio: 16 / 7; }
+  .page .bb-lines { --bb-line-h: 7px; margin-top: 14px; }
+  .making { display: grid; place-items: center; }
+  .making .bb-mark { --s: 44px; }
+  .making .bb-mark rect { fill: var(--hue); }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <figure class="bb-scene bb-hue-sun">
+    <span class="bb-picture" aria-hidden="true">
+      <svg viewBox="0 0 160 100" preserveAspectRatio="xMidYMax slice">
+        <circle class="sun" cx="118" cy="30" r="12"/>
+        <rect class="hill-back" x="70" y="52" width="70" height="70" rx="19.6" transform="rotate(45 105 87)"/>
+        <rect class="hill" x="12" y="48" width="78" height="78" rx="21.8" transform="rotate(45 51 87)"/>
+      </svg>
+    </span>
+    <figcaption class="caption k"><b>A picture</b>: two hills are tiles turned 45°</figcaption>
+  </figure>
+  <figure class="bb-scene bb-hue-sun">
+    <div class="bb-frame page">
+      <span class="bb-picture" aria-hidden="true">
+        <svg viewBox="0 0 160 70" preserveAspectRatio="xMidYMax slice">
+          <circle class="sun" cx="126" cy="20" r="9"/>
+          <rect class="hill-back" x="78" y="40" width="54" height="54" rx="15.1" transform="rotate(45 105 67)"/>
+          <rect class="hill" x="20" y="36" width="62" height="62" rx="17.4" transform="rotate(45 51 67)"/>
+        </svg>
+      </span>
+      <div class="bb-lines"><i class="bb-line bb-line--strong" style="--w:58%"></i><i class="bb-line" style="--w:90%"></i></div>
+    </div>
+    <figcaption class="caption k"><b>A page</b>: the picture leads, lines follow</figcaption>
+  </figure>
+  <figure class="bb-scene bb-hue-sun">
+    <span class="bb-picture making" aria-hidden="true">
+      <svg class="bb-mark bb-mark--slide" viewBox="0 0 32 32" style="position:static;width:44px;height:44px;overflow:visible"><rect class="t1" x="16.75" y="2.75" width="12.5" height="12.5" rx="3.5"/><rect class="t3" x="16.75" y="16.75" width="12.5" height="12.5" rx="3.5"/><rect class="t2" x="2.75" y="16.75" width="12.5" height="12.5" rx="3.5"/></svg>
+    </span>
+    <figcaption class="caption k"><b>Being made</b>: the plate, and the mark's puzzle at work</figcaption>
+  </figure>
+</div>
+</body>
+</html>

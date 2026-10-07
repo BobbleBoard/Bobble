@@ -1,0 +1,55 @@
+<!-- @dsCard group="Foundations" height=330 subtitle="Anything on a grid: a day, a cell, a mark on it" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cells</title>
+<style>
+  body { margin: 0; background: var(--ground); }
+  .sheet { display: grid; grid-template-columns: auto 1fr; gap: 28px 48px; padding: 32px 36px; align-items: start; }
+  .sheet figure { margin: 0; }
+  .k { margin: 14px 0 0; color: var(--ink-muted); }
+  .k b { color: var(--ink-secondary); font-weight: 500; }
+  .states { --cols: 4; --cell: 44px; --gap: 10px; font-size: 13px; }
+  .states .ring { box-shadow: inset 0 0 0 2px var(--hue); color: var(--hue-ink); font-weight: 600; }
+  .legend { display: grid; grid-template-columns: repeat(4, 44px); gap: 10px; margin-top: 8px; }
+  .legend span { text-align: center; color: var(--ink-muted); }
+  .sheetgrid { --cols: 5; --cell: 46px; --gap: 3px; }
+  .sheetgrid .bb-cell { height: 22px; }
+  .sheetgrid .head { background: var(--line-strong); height: 16px; }
+  .sheetgrid .col { background: var(--hue-tint); }
+  .sheetgrid .pick { background: var(--surface); box-shadow: inset 0 0 0 2px var(--hue); }
+  .rules { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; padding-top: 20px; border-top: 1px solid var(--hairline); }
+  .rules p { margin: 0; color: var(--ink-secondary); }
+  .rules p b { color: var(--ink); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="bb-scene bb-hue-teal sheet">
+  <figure>
+    <div class="bb-cells states">
+      <i class="bb-cell"><span>12</span></i>
+      <i class="bb-cell bb-cell--soft"><span>13</span></i>
+      <i class="bb-cell bb-cell--mark"><span>14</span></i>
+      <i class="bb-cell ring"><span>15</span></i>
+    </div>
+    <div class="legend caption"><span>day</span><span>soft</span><span>mark</span><span>today</span></div>
+  </figure>
+  <figure>
+    <div class="bb-cells sheetgrid">
+      <i class="bb-cell bb-cell--sheet head"></i><i class="bb-cell bb-cell--sheet head"></i><i class="bb-cell bb-cell--sheet head"></i><i class="bb-cell bb-cell--sheet head"></i><i class="bb-cell bb-cell--sheet head"></i>
+      <i class="bb-cell bb-cell--sheet"></i><i class="bb-cell bb-cell--sheet"></i><i class="bb-cell bb-cell--sheet col"></i><i class="bb-cell bb-cell--sheet"></i><i class="bb-cell bb-cell--sheet"></i>
+      <i class="bb-cell bb-cell--sheet"></i><i class="bb-cell bb-cell--sheet"></i><i class="bb-cell bb-cell--sheet col pick"></i><i class="bb-cell bb-cell--sheet"></i><i class="bb-cell bb-cell--sheet"></i>
+      <i class="bb-cell bb-cell--sheet"></i><i class="bb-cell bb-cell--sheet"></i><i class="bb-cell bb-cell--sheet col"></i><i class="bb-cell bb-cell--sheet"></i><i class="bb-cell bb-cell--sheet"></i>
+      <i class="bb-cell bb-cell--sheet"></i><i class="bb-cell bb-cell--sheet"></i><i class="bb-cell bb-cell--sheet col"></i><i class="bb-cell bb-cell--sheet"></i><i class="bb-cell bb-cell--sheet"></i>
+    </div>
+    <figcaption class="caption k"><b>A sheet</b>: radius 4, a header row, the picked cell ringed</figcaption>
+  </figure>
+  <div class="rules body">
+    <p><b>Days are tiles.</b> A marked day is the hue with on-hue numerals; a soft day is the tint with hue-ink.</p>
+    <p><b>Today is a ring</b>, never a fill, so it can sit on a marked day.</p>
+    <p><b>Numerals are tabular</b>, so a column of dates does not wobble.</p>
+  </div>
+</div>
+</body>
+</html>
