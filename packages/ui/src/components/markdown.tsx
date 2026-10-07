@@ -11,11 +11,13 @@ import rehypeKatex from 'rehype-katex';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import { CodeBlock } from './code-block.tsx';
+import { fenceLatexDisplay, remarkLatexMath } from './latex-math.ts';
 import { useOpenUrl } from './web-search.js';
 
 /*
  * Reusable markdown renderer (round-3 #P4). react-markdown + remark-gfm +
- * remark-math + rehype-katex, rendered into a `.pd-prose` container so it reads
+ * remark-math (with LaTeX's `\(…\)` and `\[…\]` beside the dollars — see
+ * latex-math.ts) + rehype-katex, rendered into a `.pd-prose` container so it reads
  * in the flavor's response voice. Custom renderers:
  *   - fenced code  -> CodeBlock (the sticky-copy panel)
  *   - inline code  -> a subtle rounded mono box; if the token IS a hex color
@@ -184,7 +186,12 @@ function remarkDisplayMath() {
   };
 }
 
-const REMARK_PLUGINS: Options['remarkPlugins'] = [remarkGfm, remarkMath, remarkDisplayMath];
+const REMARK_PLUGINS: Options['remarkPlugins'] = [
+  remarkGfm,
+  remarkMath,
+  remarkLatexMath,
+  remarkDisplayMath,
+];
 const REHYPE_PLUGINS: Options['rehypePlugins'] = [
   [rehypeKatex, { throwOnError: false, errorColor: 'currentColor' }],
 ];
@@ -240,6 +247,9 @@ export function holdBackPartialTail(text: string): string {
       // formula's closing delimiter — unknowable until the next byte, and the
       // two render nothing alike (see guardCurrencyDollars).
       .replace(/(^|[^\\])\$$/, '$1')
+      // A trailing lone "\" is the first byte of "\(" or "\[" (latex-math.ts),
+      // which the parser would show as a backslash until the next byte.
+      .replace(/(^|[^\\])\\$/, '$1')
   );
 }
 
@@ -431,7 +441,9 @@ export const Markdown = forwardRef<HTMLDivElement, MarkdownProps>(function Markd
         components={merged}
         {...(urlTransform === undefined ? {} : { urlTransform })}
       >
-        {guardCurrencyDollars(streaming ? holdBackPartialTail(children) : children)}
+        {guardCurrencyDollars(
+          fenceLatexDisplay(streaming ? holdBackPartialTail(children) : children, streaming),
+        )}
       </ReactMarkdown>
     </div>
   );

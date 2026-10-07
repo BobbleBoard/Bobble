@@ -42,14 +42,17 @@ const final = (text, stopReason) => ({
 });
 
 /**
- * One scripted turn: `text` streamed as `chunks` deltas `stepMs` apart.
- * `match` pins it to a prompt containing that substring (mock-pi consumes
- * turns in order otherwise). `leadMs` holds the reply EMPTY that long first —
- * the pre-first-token window, in which the composer queues a second message.
+ * One scripted turn: `text` streamed as `chunks` deltas `stepMs` apart — or,
+ * given an array, streamed as exactly those deltas (a probe that needs a
+ * chunk to end on a particular character). `match` pins it to a prompt
+ * containing that substring (mock-pi consumes turns in order otherwise).
+ * `leadMs` holds the reply EMPTY that long first — the pre-first-token
+ * window, in which the composer queues a second message.
  */
-export function streamedTurn(text, { chunks = 24, stepMs = 120, match, leadMs = 0 } = {}) {
-  const words = text.split(/(?<= )/);
-  const per = Math.max(1, Math.ceil(words.length / chunks));
+export function streamedTurn(reply, { chunks = 24, stepMs = 120, match, leadMs = 0 } = {}) {
+  const text = Array.isArray(reply) ? reply.join('') : reply;
+  const words = Array.isArray(reply) ? reply : text.split(/(?<= )/);
+  const per = Array.isArray(reply) ? 1 : Math.max(1, Math.ceil(words.length / chunks));
   const steps = [
     { emit: { type: 'agent_start' } },
     { delayMs: 5, emit: { type: 'turn_start' } },
