@@ -24,6 +24,7 @@
   },
   "dependencies": {
     "@pi-desktop/tool-bus": "workspace:*",
+    "@pi-desktop/web-tools": "workspace:*",
     "@sinclair/typebox": "^0.34.49",
     "simple-icons": "^16.25.0"
   }

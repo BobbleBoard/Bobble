@@ -795,6 +795,9 @@ importers:
       '@pi-desktop/tool-bus':
         specifier: workspace:*
         version: link:../tool-bus
+      '@pi-desktop/web-tools':
+        specifier: workspace:*
+        version: link:../web-tools
       '@sinclair/typebox':
         specifier: ^0.34.49
         version: 0.34.49

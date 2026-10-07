@@ -27,6 +27,7 @@ import type {
   McpToolDef,
 } from './mcp-types';
 import { MCP_PROTOCOL_VERSION } from './mcp-types';
+import { type ResolvedCommand, resolveServerCommand } from './resolve-command';
 
 /** Structural slice of a Node ChildProcess so tests can inject a fake. */
 export interface McpChildProcess {
@@ -76,6 +77,16 @@ export interface McpStdioClientOptions {
   killGraceMs?: number;
   /** Structural spawn injection for tests. Defaults to node:child_process spawn. */
   spawnFn?: McpSpawnFn;
+  /**
+   * How `command` becomes an executable (see resolve-command.ts). Default: the
+   * real search — PATH, then where runtimes are installed, then the app's uv
+   * for a missing `uvx`. With an injected `spawnFn`, the command is used as is.
+   */
+  resolveCommand?: (
+    command: string,
+    args: readonly string[],
+    envPath: string | undefined,
+  ) => Promise<ResolvedCommand>;
   /** Identity advertised in the handshake. */
   clientInfo?: McpClientInfo;
 }
@@ -98,6 +109,7 @@ export class McpStdioClient {
   private readonly onClose: (code: number | null, signal: string | null) => void;
   private readonly killGraceMs: number;
   private readonly spawnFn: McpSpawnFn;
+  private readonly resolveCommand: NonNullable<McpStdioClientOptions['resolveCommand']>;
   private readonly clientInfo: McpClientInfo;
 
   private child: McpChildProcess | null = null;
@@ -125,6 +137,17 @@ export class McpStdioClient {
     this.onClose = typeof opts.onClose === 'function' ? opts.onClose : () => {};
     this.killGraceMs = opts.killGraceMs ?? 1500;
     this.spawnFn = opts.spawnFn ?? defaultSpawn;
+    this.resolveCommand =
+      opts.resolveCommand ??
+      (opts.spawnFn !== undefined
+        ? async (command, args) => ({ command, args, pathPrefix: [] })
+        : (command, args, envPath) =>
+            resolveServerCommand(command, args, envPath, {
+              ensureUv: async () => {
+                const { ensureUv } = await import('@pi-desktop/web-tools');
+                return (await ensureUv()).uvPath;
+              },
+            }));
     this.clientInfo = opts.clientInfo ?? { name: 'pi-desktop-mcp-lite', version: '1.0.0' };
   }
 
@@ -140,7 +163,12 @@ export class McpStdioClient {
   async start(opts: { timeoutMs?: number } = {}): Promise<McpToolDef[]> {
     if (!this.command) throw new Error("McpStdioClient: no 'command' configured");
     const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-    this.spawnChild();
+    const env: Record<string, string | undefined> = { ...process.env, ...this.env };
+    const run = await this.resolveCommand(this.command, this.args, env.PATH);
+    if (run.pathPrefix.length > 0) {
+      env.PATH = [...run.pathPrefix, env.PATH ?? ''].filter((d) => d !== '').join(':');
+    }
+    this.spawnChild(run.command, run.args, env);
     try {
       const init = (await this.request(
         'initialize',
@@ -263,14 +291,15 @@ export class McpStdioClient {
 
   // ── internals ──────────────────────────────────────────────────────────────
 
-  private spawnChild(): void {
+  private spawnChild(
+    command: string,
+    args: readonly string[],
+    env: Record<string, string | undefined>,
+  ): void {
     this.closedPromise = new Promise((resolve) => {
       this.closedResolve = resolve;
     });
-    const child = this.spawnFn(this.command, this.args, {
-      env: { ...process.env, ...this.env },
-      cwd: this.cwd,
-    });
+    const child = this.spawnFn(command, [...args], { env, cwd: this.cwd });
     this.child = child;
     child.stdout.setEncoding('utf8');
     child.stdout.on('data', (d) => this.onStdout(d));
