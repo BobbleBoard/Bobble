@@ -115,12 +115,13 @@ describe('CorpChatStream — pushed deltas stream like the normal chat', () => {
     );
 
     const { container, unmount } = await render(stream());
-    // The thinking run is a real ActivityChain — force-expanded while it streams,
-    // so its left connector RAIL (`.pd-chain-steps`, whose ::before is the rail)
-    // is on screen mid-thought, not only once the thought settles.
+    // The thinking run is a real ActivityChain. Chains are collapsed by default
+    // since 2026-10-08 (the user: "tools collapsed by default"), live or not; the
+    // steps and their left connector RAIL (`.pd-chain-steps`, whose ::before is
+    // the rail) stay mounted under the fold, ready the moment it opens.
     const chain = container.querySelector('.pd-chain');
     expect(chain).not.toBeNull();
-    expect(chain?.getAttribute('data-expanded')).toBe('true');
+    expect(chain?.getAttribute('data-expanded')).toBe('false');
     expect(container.querySelector('.pd-chain-steps')).not.toBeNull();
     const thinkingStep = container.querySelector('.pd-chain-step[data-kind="thinking"]');
     expect(thinkingStep).not.toBeNull();
@@ -421,7 +422,8 @@ describe('CorpChatStream — J4: the lead streams through the vision→promotion
      */
     expect(container.querySelector('.pd-chain-step[data-kind="manager"]')).not.toBeNull();
     expect(container.querySelector('.pd-chain-step[data-kind="tool"]')).toBeNull();
-    expect(container.querySelector('.pd-chain')?.getAttribute('data-expanded')).toBe('true');
+    // Collapsed by default (2026-10-08); the steps above are mounted under the fold.
+    expect(container.querySelector('.pd-chain')?.getAttribute('data-expanded')).toBe('false');
     // But NO idle "Working…"/waiting tail of its own (A3 preserved — the
     // "Waiting for N…" indicator carries the coordinating signal).
     expect(container.querySelector('[data-testid="corp-current-action"]')).toBeNull();

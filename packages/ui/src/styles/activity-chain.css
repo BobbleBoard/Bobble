@@ -44,19 +44,21 @@
   white-space: nowrap;
 }
 
+/* Always shown (the user, 2026-10-08: "let's have the > next to tools show by
+   default now not requiring hover") — with chains collapsed by default, the
+   chevron is the only sign that a summary opens. Muted at rest, ink on hover. */
 .pd-chain-summary-chevron {
   display: inline-flex;
   flex: none;
-  opacity: 0;
+  color: var(--pd-text-muted);
   transition:
-    opacity var(--pd-duration-base) var(--pd-easing-standard),
+    color var(--pd-duration-base) var(--pd-easing-standard),
     rotate var(--pd-duration-base) var(--pd-easing-standard);
 }
 
 .pd-chain-summary:hover .pd-chain-summary-chevron,
-.pd-chain-summary:focus-visible .pd-chain-summary-chevron,
-.pd-chain[data-expanded="true"] .pd-chain-summary-chevron {
-  opacity: 1;
+.pd-chain-summary:focus-visible .pd-chain-summary-chevron {
+  color: var(--pd-text-primary);
 }
 
 .pd-chain-summary-chevron[data-expanded="true"] {

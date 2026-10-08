@@ -1822,6 +1822,13 @@ export interface ActivityChainProps extends Omit<HTMLAttributes<HTMLDivElement>,
   onExpandedChange?: (expanded: boolean) => void;
   /** Seed which pill-gated step's content is open on mount (index into `steps`). */
   defaultOpenStep?: number;
+  /**
+   * Open the chain by itself while it is the live one. Off by default: the user
+   * (2026-10-08) "I think we should have tools collapsed by default actually,
+   * that's what everyone's going toward, we can put a setting to auto expand
+   * later if needed" — this is that setting's hook.
+   */
+  autoExpandLive?: boolean;
   /** Override the derived past-tense summary line. */
   summary?: ReactNode;
   /** The chain's wall-clock span (first call's request to last result), for "Worked for". */
@@ -1939,6 +1946,7 @@ export const ActivityChain = forwardRef<HTMLDivElement, ActivityChainProps>(func
     complete,
     onExpandedChange,
     defaultOpenStep,
+    autoExpandLive = false,
     resolveAppIcon,
     summary,
     wallMs,
@@ -1999,7 +2007,13 @@ export const ActivityChain = forwardRef<HTMLDivElement, ActivityChainProps>(func
    */
   const waitRow = useFoldingWaitRow(prefill, steps.length);
   const live = active || running || prefill !== undefined;
-  const isExpanded = expanded ?? (userChose || !live ? internalExpanded : true);
+  /*
+   * COLLAPSED BY DEFAULT, LIVE OR NOT (2026-10-08). A running chain shows its
+   * shimmering summary line and opens when someone asks; `autoExpandLive`
+   * brings back the old open-while-running behaviour for whoever wants it.
+   */
+  const isExpanded =
+    expanded ?? (autoExpandLive && live && !userChose ? true : internalExpanded);
   /* A PREFILLING turn is not a settled one. Without this the chain has no
    * running step, goes quiet, and prints "Done" over a model that is still
    * ingesting the prompt — the premature-completion family again, one layer

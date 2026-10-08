@@ -32,7 +32,12 @@ afterEach(() => {
 });
 
 /** Mount once; `rerender` drives the prop changes the bug lives in. */
-function mount(props: { steps: ActivityStepData[]; complete?: boolean; active?: boolean }) {
+function mount(props: {
+  steps: ActivityStepData[];
+  complete?: boolean;
+  active?: boolean;
+  autoExpandLive?: boolean;
+}) {
   host = document.createElement('div');
   document.body.appendChild(host);
   root = createRoot(host);
@@ -102,26 +107,40 @@ describe('ActivityChain — Done never covers a live turn', () => {
  * actual response, even if a new one starts right after, the old one is then
  * collapsed."
  */
-describe('ActivityChain — a finished chain folds even while the turn runs on', () => {
+/*
+ * COLLAPSED BY DEFAULT (the user, 2026-10-08: "I think we should have tools
+ * collapsed by default actually, that's what everyone's going toward, we can put
+ * a setting to auto expand later if needed"): a live chain shows its summary and
+ * opens when asked. `autoExpandLive` keeps the old open-while-live behaviour.
+ */
+describe('ActivityChain — collapsed by default, even while it runs', () => {
+  const steps = [step(), step({ id: 's2', kind: 'thinking', label: 'Thinking' })];
+  it('stays folded while it is the live chain', () => {
+    const ui = mount({ steps, complete: false, active: true });
+    expect(ui.expanded()).toBe(false);
+  });
+});
+
+describe('ActivityChain — with autoExpandLive, a finished chain folds even while the turn runs on', () => {
   const steps = [step(), step({ id: 's2', kind: 'thinking', label: 'Thinking' })];
   it('is open while it is the live chain', () => {
-    const ui = mount({ steps, complete: false, active: true });
+    const ui = mount({ steps, complete: false, active: true, autoExpandLive: true });
     expect(ui.expanded()).toBe(true);
   });
 
   it('folds the moment it stops being the live one, though the turn is not over', () => {
-    const ui = mount({ steps, complete: false, active: true });
+    const ui = mount({ steps, complete: false, active: true, autoExpandLive: true });
     expect(ui.expanded()).toBe(true);
     // The model starts typing its reply: a later segment exists, so this chain
     // is no longer the live one — but the TURN is still streaming, which is
     // exactly the case that used to hold it open.
-    ui.rerender({ steps, complete: false, active: false });
+    ui.rerender({ steps, complete: false, active: false, autoExpandLive: true });
     expect(ui.expanded()).toBe(false);
   });
 
   it('folds when the turn ends too', () => {
-    const ui = mount({ steps, complete: false, active: true });
-    ui.rerender({ steps, complete: true, active: false });
+    const ui = mount({ steps, complete: false, active: true, autoExpandLive: true });
+    ui.rerender({ steps, complete: true, active: false, autoExpandLive: true });
     expect(ui.expanded()).toBe(false);
   });
 });
