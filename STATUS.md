@@ -1,6 +1,89 @@
 # Bobble — status
 
-Updated: 2026-10-08 (on AC) · main `fccc658d` + the design-language icons commit · the user: "I like the 1px stroke 13px text, I still like the hugeicons better than drawn … you can install the set, you can replace whatever feels right"
+Updated: 2026-10-08 (on AC) · main `1957adde` · the user: "let's refresh ourselves … make sure we don't leave ideas or plans behind"
+
+## Backlog — everything discussed and not yet done (consolidated 2026-10-08)
+
+Gathered from every message the user wrote since 2026-09-25, every open list in this file, ROADMAP-LATEST.md, the plan notes, and the branches not on main. Deduplicated; each item says its state and where it came from.
+
+### 1. Finished, but not on main (verified by `git cherry`: none of these changes are on main)
+| Branch | What it fixes | From |
+|---|---|---|
+| `claude/hungry-heyrovsky-06ed0f` | "show me a picture" of maths goes to `math`, not text-to-image; a made picture always shows in the chat (`18b550ab`) | student comparison, 10-01 |
+| `claude/mystifying-thompson-ca5066` | the reviewer stops flagging work in the chat's own folder; a flag must name a harm (`869f1360`) | student comparison, 10-01 |
+| `claude/reverent-murdock-81e9aa` | a price is not a formula ("$1.10 … $" no longer renders as maths); `\(…\)` and `\[…\]` render as maths | 27B check, 10-02 |
+| `claude/competent-brahmagupta-c44b97` | a stream that goes silent is sent again once, unless the engine is still working (`f910fc79`) | maths run 6, 09-26 |
+| `claude/hungry-lederberg-f51017` | Quick Download decides on the hub's host (as Top Recommended does), not on total RAM | 09-25 |
+| `claude/compassionate-montalcini-fc1e34` | unit tests no longer leak a scratch library folder per file | 09-18 |
+| `claude/festive-tesla-7a13c2`, `claude/angry-mclaren-92d492` | the model-fit UI probe (e2e only) | 09-25 |
+| Probably stale, to check before dropping: `claude/practical-dhawan-bf1d62` (09-17 code-block frame; later code-card work may supersede it), `claude/loving-driscoll-74b4e8` (fixed differently on main, `16e519e3`), `push/vq-office-w1`, `push/w0-b`, `push/wf-00b`, `bench/bench-1` (unverified WIP from 09-23), two old agent worktrees (09-17 design candidates, 07-26 3D workspace look) | | |
+
+### 2. Waiting on the user's decision
+| Decision | Options / note | From |
+|---|---|---|
+| The design language's four proposals | teal accent instead of system blue; muted text `#69696e` (the shipping `#86868b` fails contrast); Fraunces softened as the display face; the hue jobs. "All looks pretty good", not ruled one by one; nothing is in the app yet | 10-07 |
+| The guardian parks the 27B between turns (each turn reloads it cold: first token 17–26 s) | (a) keep; (b) let an idle chat model stay loaded unless swap/stall; (c) a smaller 27B quant; (d) fewer apps | 10-02 |
+| Thinking can eat the whole output budget (27B thought 20k chars, three `length` stops) | cap thinking at the output limit minus room for the reply (llama.cpp ships it off) | 10-01 |
+| A model-driven Blender run that **changes** a scene | needs your OK to touch your open Blender; the read-only path is verified | 10-07 |
+| The 10 design prototypes (`deliverables/gallery.html`: image editor click-to-comment, Devices, Workflows + Deep research, Memory, Bobble help) | waiting on your critique since 09-23 | 09-23 |
+| CI | needs a push to the public GitHub repo (XP-03/04) | 09-23 |
+| "Got it!" | the cards say "Got it" (the voice rule bans exclamation marks); one word to change back | 10-08 |
+
+### 3. The agreed roadmap (ROADMAP-LATEST.md, in order)
+| # | Item | State |
+|---|---|---|
+| 1 | **Corp harness**: done only when the full 3D-game prompt runs end to end, autonomously | never completed end to end. The mesh is built (phases 1, 2a–c); phase 3 open: emergent dispatch concurrency, live mid-tool-call injection, file attachments. Also open: xhigh/max effort = coarser decomposition; inter-agent Q&A with aggressive KV/context caching |
+| 2 | Lemonade (AMD inference server) as a backend behind `baseUrl` | not started |
+| 3 | Connectors / skills / scheduled tasks with zero user instructions (one click injects e.g. a Blender or Unity extension) | partly: connectors are named in the prompt, CLI-shaped, + › Connectors switches, Blender as a command (10-07). One-click injection not designed |
+| 4 | Access from anywhere / universal hotkey UI | not started |
+| 5 | Ubuntu + Windows native, then clustering over Tailscale | uv installer per platform only; Tailscale Devices backend merged, no UI |
+| 6 | Autonomous fine-tuning (strictly after 5) | plan only |
+
+### 4. Ideas from the strategy talk (10-06/07), not yet acted on
+| Idea | State |
+|---|---|
+| Long-running tasks: per-step reliability is the lever (30 steps at 95% finish 21% of the time, at 99% 74%) | this IS the corp-harness work (§3.1) |
+| Blender / Godot through code, not screenshots (UE5 doesn't fit in 24 GB) | Blender command built; a Godot connector not started |
+| CLI over MCP (models are trained on bash and `--help`) | connectors run in bash-CLI mode; continue making every connector CLI-shaped |
+| Hot-swapping LoRAs (llama.cpp loads adapters at launch and switches them per request) | not built; the harness LoRA is plan only |
+| Long-video semantic search with a multimodal embedding model (embeddinggemma2): embed and search a 2-hour film instead of tokenizing it | not started |
+| d1 decision models: tune d1-3B for grounding (grid zoom 9/20 untuned; directional moves 0/20) | tested untuned (10-07); tuning not started. d1-omni-600M (audio-visual) noted for later |
+| A memory system: Hindsight (the user: "a good pick") | not built (a Memory prototype in the gallery) |
+| A 5–10× decode advantage; sublinear attention in the next Qwen/Gemma | watch items, no work |
+| The reliability bar ("none of this ever happens on OAI/Anthropic any more") | the open gaps are §7 |
+
+### 5. Design language → the app (the language exists; nothing is wired)
+- The tokens (accent, muted, Fraunces), once §2 is decided.
+- The components: first-use intro cards (Computer use, 3D Studio), pop-outs with a notch (Segment, Connectors in +), Try it playing on every connector's page, the Made card, the connector Demo card, the toolbar.
+- the user's wider list (10-07): connector explore demos for each connector; the rendering of tables, visuals, office documents and inline cards at the same level.
+
+### 6. Visual quality (pinned since 09-24), what is still open
+| Kind | State |
+|---|---|
+| Website, app-like UI screens | not worked on beyond SVG unblocking |
+| pptx / docx / xlsx, charts | renderer fixes done; no model-driven run since |
+| HyperFrames animations, interactive widgets | partial (title card; widgets built, no model run) |
+| SVG icons / art | OmniSVG's catalog repo (`Lavanuke/OmniSVG1.1_4B-GGUF`) does not exist on the Hub, so a fresh install can't download it |
+| Images: observe and improve loop | a small look-back only |
+| 3D for games (generate, rig, retopo) | not touched in the push |
+| Mixes (a deck with diagrams, data, images and animation; a site with images, SVG and UI) | not started |
+| Ming 0.1 for design + the image → editable pptx idea (ling-cookbook) | not started (engine spike only) |
+| One generation per kind "you're proud of"; the quick-email control | not done |
+
+### 7. Reliability gaps still open
+- A 2B looped 26 minutes with no identical calls: the loop guard needs a wall-clock "no progress" budget.
+- The guardian's park → resume → swap ping-pong on the 27B: back off after two parks.
+- The 27B's first send waits ~122 s "starting up" (the select-time warm-up doesn't cover it).
+- Compaction summarizes nothing on a small window and still costs a model call.
+- "Thought for 1m 28s" over ~20 minutes of thinking (same family as the fixed "Worked for").
+- The renderer page was replaced mid-turn under swap (10–13% free).
+- An inline maths page isn't rebuilt after an app restart.
+- The 4B writes research into `notes.md` instead of answering (3 of 4 runs).
+- "What time is it" sometimes runs `date` instead of the connector.
+
+### 8. Smaller known bugs
+The office chip flicker (1 of 15 probe runs) · rapid-mlx never lands the paste prime (~4.5k tokens re-read) · img2img edits are subtle (the instruction editor needs the 3D engine) · a finished card remounts into the chain when the next tool call starts · a picture embedded in the reply shows twice · ⌘Z into a turn already answering keeps the partial reply · an image-only message can't be rewound · the Ladle build in the bundle (excluded `68cf0219`, unconfirmed) · ~60 unused old icon files in the design artifact's storage.
+
 
 ## Report — 2026-10-08: one icon family, Hugeicons at 1px
 
