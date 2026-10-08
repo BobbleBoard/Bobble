@@ -10522,14 +10522,45 @@ body[data-media-expanded="true"] .pd-studio-compose {
   object-fit: cover;
   pointer-events: none;
 }
-/* "a bit bigger" on hover: the preview lifts in place, over its neighbours. */
+/* Under the pointer the thumbnail is ringed; the picture itself opens large in
+   the hover card below (.pd-chain-preview). */
 .pd-chain-thumb:hover,
 .pd-chain-thumb:focus-visible {
-  z-index: 2;
-  transform: scale(2.6);
+  box-shadow:
+    0 0 0 1px var(--pd-border-strong),
+    var(--pd-shadow-sm);
+}
+
+/* The hover card: the picture large, under its thumbnail, right edges lined up
+   (the Claude app's preview). It never takes the pointer, so the thumbnail
+   keeps its hover. */
+.pd-chain-preview {
+  position: fixed;
+  z-index: 9050;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--pd-bg-inset);
   box-shadow:
     0 0 0 0.5px var(--pd-border-default),
     var(--pd-shadow-popover);
+  pointer-events: none;
+  transform-origin: 100% 0;
+  animation: pd-chain-preview-in var(--pd-duration-fast) var(--pd-easing-enter) both;
+}
+.pd-chain-preview[data-side="above"] {
+  transform-origin: 100% 100%;
+}
+.pd-chain-preview[data-side] img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+@keyframes pd-chain-preview-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
 }
 .pd-chain-thumb--more {
   font-size: 12px;
@@ -10580,22 +10611,62 @@ body[data-media-expanded="true"] .pd-studio-compose {
   position: fixed;
   inset: 0;
   z-index: 9100;
-  display: grid;
-  grid-template-rows: 1fr auto;
-  place-items: center;
-  padding: 48px 48px 20px;
+  overflow: hidden;
   background: rgba(0, 0, 0, 0.78);
   -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
   animation: pd-intro-fade var(--pd-duration-base) var(--pd-easing-standard) both;
 }
-.pd-lightbox-img {
-  max-width: min(100%, 1600px);
-  max-height: calc(100vh - 140px);
-  object-fit: contain;
+/* The pictures in a row: the current one centred, each neighbour pushed out
+   until only a sliver is left at the window's edge (chain-visuals.tsx slotX).
+   A step moves every slide to its new place, so the clicked sliver slides in. */
+.pd-lightbox-track {
+  position: absolute;
+  inset: 52px 0 76px;
+}
+.pd-lightbox-slide {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  overflow: hidden;
   border-radius: 10px;
+  transition:
+    transform var(--pd-duration-slow) var(--pd-easing-standard),
+    opacity var(--pd-duration-slow) var(--pd-easing-standard),
+    filter var(--pd-duration-slow) var(--pd-easing-standard),
+    box-shadow var(--pd-duration-slow) var(--pd-easing-standard);
+}
+.pd-lightbox-track .pd-lightbox-slide img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+.pd-lightbox-current {
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
   animation: pd-lightbox-in var(--pd-duration-slow) var(--pd-easing-enter) both;
+}
+/* A neighbour: greyed and cut off; it lifts a little under the pointer. */
+.pd-lightbox-peek {
+  cursor: pointer;
+  opacity: 0.4;
+  filter: grayscale(0.7) brightness(0.7);
+}
+.pd-lightbox-peek:hover,
+.pd-lightbox-peek:focus-within {
+  opacity: 0.62;
+  filter: grayscale(0.35) brightness(0.9);
+}
+.pd-lightbox-peek-hit {
+  position: absolute;
+  inset: 0;
+  cursor: pointer;
+  border-radius: inherit;
+}
+.pd-lightbox-peek-hit:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.7);
+  outline-offset: -2px;
 }
 .pd-lightbox-close {
   position: absolute;
@@ -10613,7 +10684,10 @@ body[data-media-expanded="true"] .pd-studio-compose {
   color: #ffffff;
 }
 .pd-lightbox-foot {
-  position: relative;
+  position: absolute;
+  right: 48px;
+  bottom: 20px;
+  left: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -10650,9 +10724,13 @@ body[data-media-expanded="true"] .pd-studio-compose {
   border-radius: var(--pd-radius-full);
   color: rgba(255, 255, 255, 0.82);
 }
-.pd-lightbox-step:hover {
+.pd-lightbox-step:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.12);
   color: #ffffff;
+}
+.pd-lightbox-step:disabled {
+  opacity: 0.3;
+  cursor: default;
 }
 @keyframes pd-lightbox-in {
   from {
@@ -10662,8 +10740,10 @@ body[data-media-expanded="true"] .pd-studio-compose {
 }
 @media (prefers-reduced-motion: reduce) {
   .pd-chain-thumb,
+  .pd-chain-preview,
   .pd-lightbox,
-  .pd-lightbox-img {
+  .pd-lightbox-slide,
+  .pd-lightbox-current {
     transition: none;
     animation: none;
   }

@@ -5,7 +5,7 @@ import type { AppInfo } from '../electron/ipc-contract';
 import { CandidatesRoute, candidateSet } from './candidates/CandidatesRoute';
 import { ChatApp } from './chat/ChatApp';
 import { CanvasPopoutView } from './chat/canvas/CanvasPopoutView';
-import { ImageLightbox } from './chat/chain-visuals';
+import { HoverPreview, ImageLightbox } from './chat/chain-visuals';
 import { useGenStream } from './chat/gen-stream';
 import { SituationDemoView } from './demo/SituationDemoView';
 import { GalleryView } from './gallery/GalleryView';
@@ -401,6 +401,7 @@ export function App() {
               <IntroCard />
               <FeatureTipLayer />
               <ImageLightbox />
+              <HoverPreview />
               {/* The Model hub renders INSIDE the chat shell so the sidebar and
                   top bar stay put — the user: "ensure that this keeps the left
                   sidebar present when clicked". It is a content route, not a
