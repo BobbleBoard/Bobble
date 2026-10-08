@@ -1,6 +1,6 @@
 # Bobble — status
 
-Updated: 2026-10-08 (on AC) · main `db49897b` · the user: "yes merge them all and install"
+Updated: 2026-10-08 (on AC) · main `7a97ced0` · the user: "fix the lint errors and the flaky tests too"
 
 ## Backlog — everything discussed and not yet done (consolidated 2026-10-08)
 
@@ -86,8 +86,19 @@ Still to check before dropping (not merged): `claude/practical-dhawan-bf1d62` (0
 - "What time is it" sometimes runs `date` instead of the connector.
 
 ### 8. Smaller known bugs
-The office chip flicker (1 of 15 probe runs) · rapid-mlx never lands the paste prime (~4.5k tokens re-read) · img2img edits are subtle (the instruction editor needs the 3D engine) · a finished card remounts into the chain when the next tool call starts · a picture embedded in the reply shows twice · ⌘Z into a turn already answering keeps the partial reply · an image-only message can't be rewound · the Ladle build in the bundle (excluded `68cf0219`, unconfirmed) · ~60 unused old icon files in the design artifact's storage. · `pnpm lint` fails on main in four packages, none touched by the merge: unused vars and the like in apps/desktop (auto-router.ts, vfig.test.ts, probes), SVGs without a title in ui's file-type-glyph.tsx and gen-service's OmniSVG golden fixtures, descending specificity in canvas and desktop CSS · two flaky tests under the full parallel run, both green alone: pi-mac's EPIPE test (the error reads "Cannot call write after a stream was destroyed" under load) and a canvas timer that fires after jsdom is torn down ("window is not defined").
+The office chip flicker (1 of 15 probe runs) · rapid-mlx never lands the paste prime (~4.5k tokens re-read) · img2img edits are subtle (the instruction editor needs the 3D engine) · a finished card remounts into the chain when the next tool call starts · a picture embedded in the reply shows twice · ⌘Z into a turn already answering keeps the partial reply · an image-only message can't be rewound · the Ladle build in the bundle (excluded `68cf0219`, unconfirmed) · ~60 unused old icon files in the design artifact's storage.
 
+
+## Report — 2026-10-08: lint clean in every package, two flaky tests fixed
+
+| What | Fix | Commit |
+|---|---|---|
+| `pnpm lint` failed in desktop, ui, canvas, gen-service (warnings in gen-tools, harness) | 0 findings of any level in all 39 packages: fixture SVG/HTML not linted, dead code removed, CSS state rules below their base rules, false positives suppressed with the reason | `5546fc4e` |
+| The 3D studio's Image-stage picture sat under the floating card (lint found a `padding-left: 312px` cancelled by a later `padding`) | pads by the measured cover, as the empty state does; image-stage-look.mjs: before FAILED (picture 409 px, card ends 670), after OK (711–966) | `235892f4` |
+| canvas: "window is not defined" after a green run | `dispose()` cancels the queued measurement and settle timer; new test failed before (measured 1) | `587268cb` |
+| pi-mac: EPIPE test read "Cannot call write after a stream was destroyed" | the test raced the first write; reproduced 3/3 with a stall after spawn, now waits for the helper to say it closed stdin | `7a97ced0` |
+
+Checked: three full `pnpm test --force` runs back to back, 39/39 each, no unhandled errors; typecheck 39/39; installed.
 
 ## Report — 2026-10-08: one icon family, Hugeicons at 1px
 
