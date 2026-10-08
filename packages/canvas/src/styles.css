@@ -429,8 +429,17 @@
  * flare and whose two outer borders are the hairline: the arc is drawn by the
  * same border rasteriser as the tab's sides, so it is the same line. Inside the
  * arc the box is the strip's ground (it also covers the seam under the foot, so
- * the foot is one line, not two stacked); outside it, a spread shadow in the
- * pane's colour, clipped to the box, is the fill that becomes the pane.
+ * the foot is one line, not two stacked); outside it, the pane's colour is the
+ * fill that becomes the pane.
+ *
+ * TWO SNAPPED LAYERS, NOT A CLIPPED SHADOW. That fill was first a spread shadow
+ * clipped back to the box with `clip-path: inset(0)` — and a clip-path is not
+ * snapped to device pixels the way a box is. MEASURED at device pixels: where a
+ * flare's outer edge fell between pixels, the shadow leaked through as a 1px
+ * lighter column (light 241 on 236, dark 21 on 18) that notched the seam (dark
+ * 44 in a line of 56). Now the flare's own box is the pane colour and its
+ * ::before, the same box, is the strip ground with the hairline and the
+ * rounded corner — two rects that snap alike, so only the arc is antialiased.
  *
  * On every tab, hidden, so the fold fades in both directions.
  */
@@ -439,30 +448,34 @@
   /* -1px: offsets are from the PADDING box and the tab keeps a 1px border, so
      this lands the flare on the tab's own bottom edge — the seam's row. */
   bottom: -1px;
-  box-sizing: border-box;
   width: var(--pd-canvas-tab-flare);
   height: var(--pd-canvas-tab-flare);
-  background: var(--pd-bg-inset);
-  clip-path: inset(0);
+  background: var(--pd-bg-raised);
   pointer-events: none;
   opacity: 0;
   transition: opacity var(--pd-duration-fast) var(--pd-easing-standard);
 }
+.pd-canvas-tab-flare::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  background: var(--pd-bg-inset);
+  border-bottom: 1px solid var(--pd-canvas-tab-rule);
+}
 .pd-canvas-tab-flare[data-side="l"] {
   left: calc(-1 * var(--pd-canvas-tab-flare));
+}
+.pd-canvas-tab-flare[data-side="l"]::before {
   border-right: 1px solid var(--pd-canvas-tab-rule);
-  border-bottom: 1px solid var(--pd-canvas-tab-rule);
   border-bottom-right-radius: var(--pd-canvas-tab-flare);
-  box-shadow: calc(var(--pd-canvas-tab-flare) / 2) calc(var(--pd-canvas-tab-flare) / 2) 0
-    calc(var(--pd-canvas-tab-flare) / 2) var(--pd-bg-raised);
 }
 .pd-canvas-tab-flare[data-side="r"] {
   right: calc(-1 * var(--pd-canvas-tab-flare));
+}
+.pd-canvas-tab-flare[data-side="r"]::before {
   border-left: 1px solid var(--pd-canvas-tab-rule);
-  border-bottom: 1px solid var(--pd-canvas-tab-rule);
   border-bottom-left-radius: var(--pd-canvas-tab-flare);
-  box-shadow: calc(var(--pd-canvas-tab-flare) / -2) calc(var(--pd-canvas-tab-flare) / 2) 0
-    calc(var(--pd-canvas-tab-flare) / 2) var(--pd-bg-raised);
 }
 .pd-canvas-tab[data-active] .pd-canvas-tab-flare {
   opacity: 1;
