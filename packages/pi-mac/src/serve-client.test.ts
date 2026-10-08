@@ -257,16 +257,28 @@ describe('a helper that stopped reading its stdin', () => {
      moment before Node hears that it exited. A request written in that window
      fails with EPIPE — and Node also emits that as an 'error' EVENT on the
      child's stdin, which with no listener is an uncaught exception: in Electron
-     main, a crash dialog. A REAL child reproduces it: /bin/sh closes its stdin
-     at once and lives on for a second. */
+     main, a crash dialog. A REAL child reproduces it: /bin/sh reads one
+     request, closes its stdin, says so on stderr, and lives on.
+
+     It waits for that word rather than a fixed 250 ms: under a full parallel
+     test run the shell could close stdin before the FIRST request reached the
+     pipe, that write failed with EPIPE and destroyed the stream, and the second
+     then read "Cannot call write after a stream was destroyed". */
   it('rejects the request instead of throwing an uncaught EPIPE', async () => {
+    let closed: () => void = () => undefined;
+    const stdinClosed = new Promise<void>((r) => {
+      closed = r;
+    });
     const client = new MacHelperClient({
       helperPath: '/bin/sh',
-      helperArgs: ['-c', 'exec 0<&-; sleep 1'],
-      requestTimeoutMs: 2_000,
+      helperArgs: ['-c', 'read -r line; exec 0<&-; echo stdin-closed >&2; sleep 5'],
+      requestTimeoutMs: 10_000,
+      onStderr: (l) => {
+        if (l === 'stdin-closed') closed();
+      },
     });
     const first = client.request('info').catch((e: Error) => e.message);
-    await new Promise((r) => setTimeout(r, 250)); // the shell has closed stdin by now
+    await stdinClosed;
     const second = await client.request('info').catch((e: Error) => e.message);
     expect(second).toMatch(/EPIPE/);
     client.dispose();
