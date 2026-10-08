@@ -17,7 +17,7 @@
  * (ICON_STROKE_MIN) and clampIconStroke() enforce the same bound in JS.
  */
 .pd-icon {
-  stroke-width: max(1, var(--pd-icon-stroke, 1.5));
+  stroke-width: max(1, var(--pd-icon-stroke, 1));
 }
 
 /*

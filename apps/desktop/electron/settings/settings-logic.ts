@@ -27,8 +27,10 @@ import {
   ICON_SCALE_MAX,
   ICON_SCALE_MIN,
   ICON_STROKE_DEFAULT,
+  ICON_STROKE_LEGACY_DEFAULT,
   ICON_STROKE_MAX,
   ICON_STROKE_MIN,
+  ICON_STROKE_REV,
   MCP_MODES,
   type McpMode,
   MODEL_SELECTION_TIERS,
@@ -141,6 +143,7 @@ export const DEFAULT_SETTINGS: DesktopSettings = {
   capabilities: { image: true, video: true, audio: true, threeD: true, training: false },
   customInstructions: '',
   iconStroke: ICON_STROKE_DEFAULT,
+  iconStrokeRev: ICON_STROKE_REV,
   iconScale: ICON_SCALE_DEFAULT,
   sidebarScale: UI_SCALE_DEFAULT,
   menuScale: UI_SCALE_DEFAULT,
@@ -403,7 +406,13 @@ export function clampSettings(raw: unknown): DesktopSettings {
       training: bool(caps.training, d.capabilities.training),
     },
     customInstructions: str(o.customInstructions, d.customInstructions),
-    iconStroke: num(o.iconStroke, d.iconStroke, ICON_STROKE_MIN, ICON_STROKE_MAX),
+    // A file saved before the 1px default carries the old default as if chosen:
+    // move it once, then mark the file so a later 1.25 is the person's own.
+    iconStroke:
+      o.iconStrokeRev !== ICON_STROKE_REV && o.iconStroke === ICON_STROKE_LEGACY_DEFAULT
+        ? d.iconStroke
+        : num(o.iconStroke, d.iconStroke, ICON_STROKE_MIN, ICON_STROKE_MAX),
+    iconStrokeRev: ICON_STROKE_REV,
     iconScale: num(o.iconScale, d.iconScale, ICON_SCALE_MIN, ICON_SCALE_MAX),
     sidebarScale: num(o.sidebarScale, d.sidebarScale, UI_SCALE_MIN, UI_SCALE_MAX),
     menuScale: num(o.menuScale, d.menuScale, UI_SCALE_MIN, UI_SCALE_MAX),

@@ -28,7 +28,7 @@ import { applyCodeFont, applyCodeTheme } from '../store/code-theme';
 import { type ThemeFlavor, useThemeStore } from '../store/theme';
 import { applyHarnessConfig } from './pi-connect';
 
-const ICON_STROKE_DEFAULT = 1.25;
+const ICON_STROKE_DEFAULT = 1;
 
 const DEFAULTS: DesktopSettings = {
   version: 1,
@@ -68,6 +68,7 @@ const DEFAULTS: DesktopSettings = {
   capabilities: { image: true, video: true, audio: true, threeD: true, training: false },
   customInstructions: '',
   iconStroke: ICON_STROKE_DEFAULT,
+  iconStrokeRev: 2,
   iconScale: 1.0,
   sidebarScale: 1.0,
   menuScale: 1.0,

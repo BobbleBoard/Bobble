@@ -1051,6 +1051,9 @@ importers:
 
   packages/ui:
     dependencies:
+      '@hugeicons/core-free-icons':
+        specifier: 4.3.5
+        version: 4.3.5
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
@@ -1945,6 +1948,9 @@ packages:
     peerDependenciesMeta:
       '@modelcontextprotocol/sdk':
         optional: true
+
+  '@hugeicons/core-free-icons@4.3.5':
+    resolution: {integrity: sha512-Sv+NjHRPnQk+yZsGCMcGznCHdTfJR9PMMOEKcJYAQU4gy90dmlc9PwdtvYOImBZIjiheMsTLL5eMn2DmHxUiUg==}
 
   '@inquirer/ansi@2.0.7':
     resolution: {integrity: sha512-3eTuUO1vH2cZm2ZKHeQxnOqlTi9EfZDGgIe3BL3I4u+rJHocr9Fz86M4fjYABPvFnQG/gGK551HqDiIcETwU6Q==}
@@ -7838,6 +7844,8 @@ snapshots:
       - bufferutil
       - supports-color
       - utf-8-validate
+
+  '@hugeicons/core-free-icons@4.3.5': {}
 
   '@inquirer/ansi@2.0.7': {}
 

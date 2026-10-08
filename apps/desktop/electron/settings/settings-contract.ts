@@ -409,8 +409,11 @@ export interface DesktopSettings extends FeatureSettings {
   customInstructions: string;
   /** Global SVG icon stroke width, in PIXELS (every stroked shape is
    * non-scaling); applied to `--pd-icon-stroke` on <html>. Defaults to the
-   * token value (1.25). */
+   * token value (1). */
   iconStroke: number;
+  /** Which icon-stroke default the file was saved under (ICON_STROKE_REV);
+   * absent on a file from before the move to 1px. */
+  iconStrokeRev: number;
   /** Global icon size, a multiplier on every icon's own size; applied to
    * `--pd-icon-scale` on <html>. Default 1.0 (no-op). */
   iconScale: number;
@@ -552,6 +555,7 @@ export interface DesktopSettingsPatch extends FeatureSettingsPatch {
   capabilities?: Partial<GenerationCapabilities>;
   customInstructions?: string;
   iconStroke?: number;
+  iconStrokeRev?: number;
   iconScale?: number;
   sidebarScale?: number;
   menuScale?: number;
@@ -593,7 +597,15 @@ export interface DesktopSettingsPatch extends FeatureSettingsPatch {
  */
 export const ICON_STROKE_MIN = 1;
 export const ICON_STROKE_MAX = 1.75;
-export const ICON_STROKE_DEFAULT = 1.25;
+export const ICON_STROKE_DEFAULT = 1;
+/**
+ * The default before 2026-10-08. Every save writes the whole settings object, so
+ * an install that never touched the slider holds this value explicitly; once,
+ * it is read as "the default" and moves to the new one (ICON_STROKE_REV marks
+ * the file as moved, so a 1.25 chosen after that is kept).
+ */
+export const ICON_STROKE_LEGACY_DEFAULT = 1.25;
+export const ICON_STROKE_REV = 2;
 /** Icon-size bounds: 0.85× keeps a 16px glyph legible (13.6px); 1.25× (20px)
  * is as large as the rows and toolbars take without crowding their labels. */
 export const ICON_SCALE_MIN = 0.85;

@@ -125,8 +125,18 @@ describe('clampSettings', () => {
     expect(clampSettings({ sidebarScale: Number.NaN }).sidebarScale).toBe(1.0);
   });
 
+  it('moves a file saved under the old 1.25 default to 1px, once (the user, 2026-10-08: "I like the 1px stroke")', () => {
+    // A file from before: the old default, written as if chosen, and no rev.
+    expect(clampSettings({ iconStroke: 1.25 }).iconStroke).toBe(1);
+    expect(clampSettings({ iconStroke: 1.25 }).iconStrokeRev).toBe(2);
+    // A choice made before the move that was not the old default is kept.
+    expect(clampSettings({ iconStroke: 1.5 }).iconStroke).toBe(1.5);
+    // After the move, 1.25 is the person's own choice and stays.
+    expect(clampSettings({ iconStroke: 1.25, iconStrokeRev: 2 }).iconStroke).toBe(1.25);
+  });
+
   it('icon thickness stops at 1.75 px and icon size at 0.85–1.25× — the range a person cannot make look bad (the user, 2026-09-20)', () => {
-    expect(DEFAULT_SETTINGS.iconStroke).toBe(1.25);
+    expect(DEFAULT_SETTINGS.iconStroke).toBe(1);
     expect(DEFAULT_SETTINGS.iconScale).toBe(1.0);
     // An older file with the old 2.5 ceiling comes back inside the new one.
     expect(clampSettings({ iconStroke: 2.5 }).iconStroke).toBe(1.75);

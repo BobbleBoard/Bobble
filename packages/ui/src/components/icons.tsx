@@ -1,10 +1,94 @@
 /**
- * Minimal inline icon set (generic geometry, no copied assets). Glyphs are
- * decorative (aria-hidden); icon-only controls carry their own aria-labels.
+ * THE ICON SET: Hugeicons, one drawing system for the whole app.
+ *
+ * the user (2026-10-08): "I still like the hugeicons better than drawn". Every
+ * icon here is a Hugeicons stroke-rounded drawing (MIT, Copyright (c) 2025
+ * Hugeicons, from @hugeicons/core-free-icons, pinned) on the 24-grid, the same
+ * family as the Glyph set (glyph.tsx); where an idea already has a glyph (chat,
+ * image, video, audio, puzzle, folder, compass) the icon IS that glyph, so one
+ * idea is drawn once across the app. The one exception is GitHub, whose mark is
+ * the brand's own (simple-icons, CC0) and is filled. Nothing here is drawn by us.
+ *
+ * Every icon is decorative (aria-hidden); an icon-only control carries its own
+ * label. Names say what the icon stands for in the app, so a swap is one line.
+ * Thickness and size come from icons.css: `--pd-icon-stroke` is the stroke in
+ * screen pixels at any size (1 by default: the user, "I like the 1px stroke 13px
+ * text"), `--pd-icon-base` and `--pd-icon-scale` the box.
  */
 
+import Add01Icon from '@hugeicons/core-free-icons/Add01Icon';
+import AiBrain01Icon from '@hugeicons/core-free-icons/AiBrain01Icon';
+import Alert02Icon from '@hugeicons/core-free-icons/Alert02Icon';
+import Analytics01Icon from '@hugeicons/core-free-icons/Analytics01Icon';
+import ArrowDown01Icon from '@hugeicons/core-free-icons/ArrowDown01Icon';
+import ArrowExpand02Icon from '@hugeicons/core-free-icons/ArrowExpand02Icon';
+import ArrowLeft01Icon from '@hugeicons/core-free-icons/ArrowLeft01Icon';
+import ArrowRight01Icon from '@hugeicons/core-free-icons/ArrowRight01Icon';
+import ArrowUp02Icon from '@hugeicons/core-free-icons/ArrowUp02Icon';
+import Attachment01Icon from '@hugeicons/core-free-icons/Attachment01Icon';
+import Camera01Icon from '@hugeicons/core-free-icons/Camera01Icon';
+import Cancel01Icon from '@hugeicons/core-free-icons/Cancel01Icon';
+import CheckmarkCircle02Icon from '@hugeicons/core-free-icons/CheckmarkCircle02Icon';
+import Clock01Icon from '@hugeicons/core-free-icons/Clock01Icon';
+import CommandLineIcon from '@hugeicons/core-free-icons/CommandLineIcon';
+import Copy01Icon from '@hugeicons/core-free-icons/Copy01Icon';
+import CpuIcon from '@hugeicons/core-free-icons/CpuIcon';
+import CubeIcon from '@hugeicons/core-free-icons/CubeIcon';
+import Cursor01Icon from '@hugeicons/core-free-icons/Cursor01Icon';
+import DashboardSpeed02Icon from '@hugeicons/core-free-icons/DashboardSpeed02Icon';
+import DashboardSquare01Icon from '@hugeicons/core-free-icons/DashboardSquare01Icon';
+import Delete02Icon from '@hugeicons/core-free-icons/Delete02Icon';
+import Download01Icon from '@hugeicons/core-free-icons/Download01Icon';
+import File02Icon from '@hugeicons/core-free-icons/File02Icon';
+import FireIcon from '@hugeicons/core-free-icons/FireIcon';
+import FlashIcon from '@hugeicons/core-free-icons/FlashIcon';
+import FolderAddIcon from '@hugeicons/core-free-icons/FolderAddIcon';
+import GitCompareIcon from '@hugeicons/core-free-icons/GitCompareIcon';
+import Globe02Icon from '@hugeicons/core-free-icons/Globe02Icon';
+import HierarchySquare02Icon from '@hugeicons/core-free-icons/HierarchySquare02Icon';
+import InformationCircleIcon from '@hugeicons/core-free-icons/InformationCircleIcon';
+import Key01Icon from '@hugeicons/core-free-icons/Key01Icon';
+import KeyboardIcon from '@hugeicons/core-free-icons/KeyboardIcon';
+import LayoutLeftIcon from '@hugeicons/core-free-icons/LayoutLeftIcon';
+import LayoutRightIcon from '@hugeicons/core-free-icons/LayoutRightIcon';
+import LinkSquare02Icon from '@hugeicons/core-free-icons/LinkSquare02Icon';
+import Menu01Icon from '@hugeicons/core-free-icons/Menu01Icon';
+import Mic01Icon from '@hugeicons/core-free-icons/Mic01Icon';
+import Moon02Icon from '@hugeicons/core-free-icons/Moon02Icon';
+import MoreHorizontalIcon from '@hugeicons/core-free-icons/MoreHorizontalIcon';
+import MusicNote03Icon from '@hugeicons/core-free-icons/MusicNote03Icon';
+import PanelRightIcon from '@hugeicons/core-free-icons/PanelRightIcon';
+import PauseIcon from '@hugeicons/core-free-icons/PauseIcon';
+import PencilEdit01Icon from '@hugeicons/core-free-icons/PencilEdit01Icon';
+import PieChartIcon from '@hugeicons/core-free-icons/PieChartIcon';
+import Pin02Icon from '@hugeicons/core-free-icons/Pin02Icon';
+import PlayIcon from '@hugeicons/core-free-icons/PlayIcon';
+import Plug01Icon from '@hugeicons/core-free-icons/Plug01Icon';
+import Refresh01Icon from '@hugeicons/core-free-icons/Refresh01Icon';
+import Search01Icon from '@hugeicons/core-free-icons/Search01Icon';
+import SentIcon from '@hugeicons/core-free-icons/SentIcon';
+import Settings01Icon from '@hugeicons/core-free-icons/Settings01Icon';
+import Share03Icon from '@hugeicons/core-free-icons/Share03Icon';
+import Shield01Icon from '@hugeicons/core-free-icons/Shield01Icon';
+import SidebarLeftIcon from '@hugeicons/core-free-icons/SidebarLeftIcon';
+import SlidersHorizontalIcon from '@hugeicons/core-free-icons/SlidersHorizontalIcon';
+import SourceCodeIcon from '@hugeicons/core-free-icons/SourceCodeIcon';
+import SparkleIcon from '@hugeicons/core-free-icons/SparkleIcon';
+import SparklesIcon from '@hugeicons/core-free-icons/SparklesIcon';
+import SquareLock02Icon from '@hugeicons/core-free-icons/SquareLock02Icon';
+import StarIcon from '@hugeicons/core-free-icons/StarIcon';
+import StopIcon from '@hugeicons/core-free-icons/StopIcon';
+import Sun03Icon from '@hugeicons/core-free-icons/Sun03Icon';
+import TaskDone01Icon from '@hugeicons/core-free-icons/TaskDone01Icon';
+import ThumbsDownIcon from '@hugeicons/core-free-icons/ThumbsDownIcon';
+import ThumbsUpIcon from '@hugeicons/core-free-icons/ThumbsUpIcon';
+import Tick02Icon from '@hugeicons/core-free-icons/Tick02Icon';
+import Video01Icon from '@hugeicons/core-free-icons/Video01Icon';
+import ViewIcon from '@hugeicons/core-free-icons/ViewIcon';
+import Wrench01Icon from '@hugeicons/core-free-icons/Wrench01Icon';
 import { clsx } from 'clsx';
-import type { CSSProperties, ReactNode, SVGProps } from 'react';
+import { type CSSProperties, createElement, type ReactNode, type SVGProps } from 'react';
+import { GLYPHS, type GlyphName } from './glyph';
 
 export type IconProps = SVGProps<SVGSVGElement> & { size?: number };
 
@@ -17,7 +101,10 @@ export function iconBaseStyle(size: number, style?: CSSProperties): CSSPropertie
   return { ...style, '--pd-icon-base': size } as CSSProperties;
 }
 
-function Icon({
+/** A Hugeicons drawing: `[tag, attributes]` pairs on the 24-grid. */
+type HugeiconData = readonly (readonly [string, { readonly [key: string]: string | number }])[];
+
+function Svg24({
   size = 16,
   className,
   style,
@@ -28,12 +115,12 @@ function Icon({
     <svg
       width={size}
       height={size}
-      viewBox="0 0 16 16"
+      viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
       // `.pd-icon` sets `stroke-width: var(--pd-icon-stroke)`; CSS beats this
-      // presentation attribute (attrs have the lowest cascade priority), so the
-      // token wins when styles are loaded and this stays a no-CSS fallback.
+      // presentation attribute, so the token wins when styles are loaded and
+      // this stays a no-CSS fallback (Hugeicons' own 1.5 on the 24-grid).
       strokeWidth={1.5}
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -47,610 +134,399 @@ function Icon({
   );
 }
 
-export function IconChevronDown(props: IconProps) {
+/**
+ * Draw one Hugeicons icon. Each element's own `strokeWidth` is dropped: a
+ * presentation attribute on the path would beat the stroke the svg inherits
+ * from `.pd-icon`, and the one thickness token is the point. A `stroke` of
+ * currentColor is dropped too (the svg sets it); any other paint is kept.
+ */
+function Huge({ icon, ...props }: IconProps & { icon: HugeiconData }) {
   return (
-    <Icon {...props}>
-      <path d="M4 6l4 4 4-4" />
-    </Icon>
+    <Svg24 {...props}>
+      {icon.map(([tag, attrs], i) => {
+        const { key, strokeWidth: _w, stroke, ...rest } = attrs;
+        return createElement(tag, {
+          key: key ?? i,
+          ...rest,
+          ...(stroke !== undefined && stroke !== 'currentColor' ? { stroke } : {}),
+        });
+      })}
+    </Svg24>
   );
+}
+
+/** The glyph for an idea the Glyph set already draws, at icon sizes. */
+function FromGlyph({ glyph, ...props }: IconProps & { glyph: GlyphName }) {
+  return (
+    <Svg24 {...props}>
+      {GLYPHS[glyph].map((p) => (
+        <path
+          key={p.d}
+          d={p.d}
+          {...('cap' in p && p.cap === 'butt' ? { strokeLinecap: 'butt' as const } : {})}
+          {...('join' in p && p.join === 'miter' ? { strokeLinejoin: 'miter' as const } : {})}
+        />
+      ))}
+    </Svg24>
+  );
+}
+
+export function IconChevronDown(props: IconProps) {
+  return <Huge icon={ArrowDown01Icon} {...props} />;
 }
 
 export function IconPin(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <path d="M8 13.5v-4" />
-      <path d="M5 9.5h6l-.7-3 1.2-1.2-4-4-1.2 1.2-3.3.7 1.7 1.7z" />
-    </Icon>
-  );
+  return <Huge icon={Pin02Icon} {...props} />;
 }
 
 export function IconTrash(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <path d="M2.75 4.25h10.5" />
-      <path d="M6 4.25V2.75h4v1.5" />
-      <path d="M4 4.25l.55 8.2a1 1 0 0 0 1 .93h4.9a1 1 0 0 0 1-.93L12 4.25" />
-      <path d="M6.75 6.75v4M9.25 6.75v4" />
-    </Icon>
-  );
+  return <Huge icon={Delete02Icon} {...props} />;
 }
 
 export function IconChevronRight(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <path d="M6 4l4 4-4 4" />
-    </Icon>
-  );
+  return <Huge icon={ArrowRight01Icon} {...props} />;
 }
 
 export function IconChevronLeft(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <path d="M10 4l-4 4 4 4" />
-    </Icon>
-  );
+  return <Huge icon={ArrowLeft01Icon} {...props} />;
 }
 
 export function IconCheck(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <path d="M3 8.5l3.5 3.5L13 4.5" />
-    </Icon>
-  );
+  return <Huge icon={Tick02Icon} {...props} />;
 }
 
 export function IconClose(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <path d="M4 4l8 8M12 4l-8 8" />
-    </Icon>
-  );
+  return <Huge icon={Cancel01Icon} {...props} />;
 }
 
 export function IconCopy(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <rect x="5.5" y="5.5" width="7" height="7" rx="1.5" />
-      <path d="M10.5 5.5V4a1.5 1.5 0 0 0-1.5-1.5H4A1.5 1.5 0 0 0 2.5 4v5A1.5 1.5 0 0 0 4 10.5h1.5" />
-    </Icon>
-  );
+  return <Huge icon={Copy01Icon} {...props} />;
 }
 
 export function IconPlus(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <path d="M8 3v10M3 8h10" />
-    </Icon>
-  );
+  return <Huge icon={Add01Icon} {...props} />;
 }
 
-/** An arrow into a tray: fetch something and keep it. Pairs with IconArrowUp. */
 export function IconDownload(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <path d="M8 2.5v7.5M4.5 7L8 10.5 11.5 7M3 12.5h10" />
-    </Icon>
-  );
+  return <Huge icon={Download01Icon} {...props} />;
 }
 
 export function IconArrowUp(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <path d="M8 13V3M3.5 7.5L8 3l4.5 4.5" />
-    </Icon>
-  );
+  return <Huge icon={ArrowUp02Icon} {...props} />;
 }
 
-/*
- * A pencil with a BODY, a tip and a ferrule — not a single tapered outline.
- *
- * the user: "the pencil icons need to be updated". The old one was one closed path
- * whose narrow end doubled as the point, so at 16px it read as a bent stick and
- * the "sharpened" end was indistinguishable from the other. Three strokes fix
- * it: the barrel, the band across it, and a tip that is its own shape. Nothing
- * crosses anything.
- */
 export function IconPencil(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <path d="M10.6 2.3 13.7 5.4 6.2 12.9 3.1 9.8z" />
-      <path d="M8.9 4 12 7.1" />
-      <path d="M3.1 9.8 2.1 13.9l4.1-1z" />
-    </Icon>
-  );
+  return <Huge icon={PencilEdit01Icon} {...props} />;
 }
 
 export function IconSearch(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <circle cx="7" cy="7" r="4.5" />
-      <path d="M13.5 13.5L10.3 10.3" />
-    </Icon>
-  );
+  return <Huge icon={Search01Icon} {...props} />;
 }
 
 export function IconChat(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <path d="M13.5 8A5.5 5.5 0 1 1 8 2.5 5.5 5.5 0 0 1 13.5 8z" />
-      <path d="M8 13.5L5.5 15v-2.5" />
-    </Icon>
-  );
+  return <FromGlyph glyph="chat" {...props} />;
 }
 
 export function IconSidebar(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <rect x="2" y="3" width="12" height="10" rx="2" />
-      <path d="M6 3v10" />
-    </Icon>
-  );
+  return <Huge icon={SidebarLeftIcon} {...props} />;
 }
 
-/** A bar chart — the data-visuals mark (a `chart` tool step, the chart card). */
 export function IconChart(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <path d="M2 13.5h12M4 11V7.5M7.5 11V4M11 11V6" />
-    </Icon>
-  );
+  return <Huge icon={Analytics01Icon} {...props} />;
 }
 
 export function IconTerminal(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <path d="M3 4.5L6.5 8 3 11.5M8 12h5" />
-    </Icon>
-  );
+  return <Huge icon={CommandLineIcon} {...props} />;
 }
 
 export function IconFile(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <path d="M9 2H4.5A1.5 1.5 0 0 0 3 3.5v9A1.5 1.5 0 0 0 4.5 14h7a1.5 1.5 0 0 0 1.5-1.5V6L9 2z" />
-      <path d="M9 2v4h4" />
-    </Icon>
-  );
+  return <Huge icon={File02Icon} {...props} />;
 }
 
-/**
- * Code-execution glyph (angle brackets `< >`). Reads as "ran code / Python",
- * kept distinct from the bash terminal caret (`>` prompt) so a python_run row
- * never collides with a shell-command row.
- */
 export function IconCode(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <path d="M5.5 4.5 2.5 8l3 3.5M10.5 4.5l3 3.5-3 3.5" />
-    </Icon>
-  );
+  return <Huge icon={SourceCodeIcon} {...props} />;
 }
 
-/** Thinking / duration glyph (clock). */
 export function IconClock(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <circle cx="8" cy="8" r="5.5" />
-      <path d="M8 4.8V8l2.2 1.6" />
-    </Icon>
-  );
+  return <Huge icon={Clock01Icon} {...props} />;
 }
 
-/**
- * Settings glyph — a proper cog (toothed rim + center bore). Deliberately reads
- * as a GEAR, not a sun: the teeth sit on the perimeter with a hollow hub, so it
- * never collides with the light/dark sun toggle (IconSun's rays off a solid disc).
- */
 export function IconSettings(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <path d="M6.87 3.44 L7.08 1.87 L8.92 1.87 L9.13 3.44 L10.42 3.97 L11.68 3.01 L12.99 4.32 L12.03 5.58 L12.56 6.87 L14.13 7.08 L14.13 8.92 L12.56 9.13 L12.03 10.42 L12.99 11.68 L11.68 12.99 L10.42 12.03 L9.13 12.56 L8.92 14.13 L7.08 14.13 L6.87 12.56 L5.58 12.03 L4.32 12.99 L3.01 11.68 L3.97 10.42 L3.44 9.13 L1.87 8.92 L1.87 7.08 L3.44 6.87 L3.97 5.58 L3.01 4.32 L4.32 3.01 L5.58 3.97 Z" />
-      <circle cx="8" cy="8" r="2.3" />
-    </Icon>
-  );
+  return <Huge icon={Settings01Icon} {...props} />;
 }
 
-/**
- * "Advanced settings" glyph — two cogs (a larger one upper-left, a smaller one
- * lower-right), the standard "machinery / advanced" idiom. Stroke-only, matches
- * the 16×16 icon grid.
- */
 export function IconGears(props: IconProps) {
-  return (
-    <Icon {...props}>
-      {/* larger gear (upper-left): body + 6 teeth */}
-      <circle cx="6" cy="6.5" r="1.9" />
-      <path d="M7.9 6.5L8.9 6.5M6.95 8.15L7.45 9.01M5.05 8.15L4.55 9.01M4.1 6.5L3.1 6.5M5.05 4.86L4.55 3.99M6.95 4.86L7.45 3.99" />
-      {/* smaller gear (lower-right): body + 6 teeth (offset half a tooth) */}
-      <circle cx="11" cy="10.5" r="1.35" />
-      <path d="M12.17 11.18L12.95 11.63M11 11.85L11 12.75M9.83 11.18L9.05 11.63M9.83 9.83L9.05 9.38M11 9.15L11 8.25M12.17 9.83L12.95 9.38" />
-    </Icon>
-  );
+  return <Huge icon={Wrench01Icon} {...props} />;
 }
 
-/**
- * "Opens elsewhere" glyph: a box with its top-right CORNER open, and an arrow
- * leaving through the gap.
- *
- * The old geometry closed the top edge all the way to x=12 and put the gap on
- * the right edge below it, so the arrow crossed a nearly-complete box and read
- * as a line struck THROUGH a square — or, at 12-14px, as a scribble. The whole
- * idea of the glyph is that the corner is missing because something left
- * through it, so that is the corner that has to be missing.
- *
- * The arrow head is drawn as the two edges meeting at the corner rather than as
- * a chevron on the diagonal: at this size a chevron and its shaft merge into a
- * blob, while a right angle stays legible down to 12px.
- */
 export function IconExternal(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <path d="M12 8.5V11.5A1.5 1.5 0 0 1 10.5 13H4.5A1.5 1.5 0 0 1 3 11.5V5.5A1.5 1.5 0 0 1 4.5 4H7.5" />
-      <path d="M10 3h3v3" />
-      <path d="M13 3 8 8" />
-    </Icon>
-  );
+  return <Huge icon={LinkSquare02Icon} {...props} />;
 }
 
-/** Film frame — the Video Studio's rail glyph. */
 export function IconVideo(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <rect x="2" y="4" width="9" height="8" rx="1.5" />
-      <path d="M11 7.2 14 5.4v5.2L11 8.8z" />
-    </Icon>
-  );
+  return <Huge icon={Video01Icon} {...props} />;
 }
 
-/**
- * Waveform — the Audio Studio's rail glyph.
- *
- * Bars rather than a sine: a sine reads as "signal" in the abstract, while
- * uneven bars read as a RECORDING, which is what this room makes. Asymmetric on
- * purpose; a symmetrical set looks like a chart axis.
- */
 export function IconWaveform(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <path d="M2.5 7v2M5 4.5v7M7.5 6v4M10 3.5v9M12.5 6.5v3" />
-    </Icon>
-  );
+  return <FromGlyph glyph="audio" {...props} />;
 }
 
 export function IconDiff(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <path d="M5 2.5v6M2.5 5.5H8" />
-      <path d="M8.5 11h5" />
-      <path d="M11 13.5A2.5 2.5 0 1 0 11 8.5" />
-    </Icon>
-  );
+  return <Huge icon={GitCompareIcon} {...props} />;
 }
 
 export function IconMic(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <rect x="6" y="2" width="4" height="7" rx="2" />
-      <path d="M3.5 7.5a4.5 4.5 0 0 0 9 0M8 12v2.5" />
-    </Icon>
-  );
+  return <Huge icon={Mic01Icon} {...props} />;
 }
 
 export function IconInfo(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <circle cx="8" cy="8" r="6" />
-      <path d="M8 7.5v3.2" />
-      <path d="M8 5.1v.2" />
-    </Icon>
-  );
+  return <Huge icon={InformationCircleIcon} {...props} />;
 }
 
 export function IconRefresh(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <path d="M12.8 8a4.8 4.8 0 1 1-1.4-3.4" />
-      <path d="M12.8 3v2.6h-2.6" />
-    </Icon>
-  );
+  return <Huge icon={Refresh01Icon} {...props} />;
 }
 
 export function IconThumbUp(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <path d="M4.6 7.2 7 2.6a1 1 0 0 1 1.9.5V6h3a1 1 0 0 1 1 1.2l-.8 4.1a1 1 0 0 1-1 .8H4.6z" />
-      <path d="M4.6 7.2H3v5.5h1.6z" />
-    </Icon>
-  );
+  return <Huge icon={ThumbsUpIcon} {...props} />;
 }
 
 export function IconThumbDown(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <g transform="rotate(180 8 8)">
-        <path d="M4.6 7.2 7 2.6a1 1 0 0 1 1.9.5V6h3a1 1 0 0 1 1 1.2l-.8 4.1a1 1 0 0 1-1 .8H4.6z" />
-        <path d="M4.6 7.2H3v5.5h1.6z" />
-      </g>
-    </Icon>
-  );
+  return <Huge icon={ThumbsDownIcon} {...props} />;
 }
 
 export function IconShare(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <path d="M8 10V2.6M5.3 5.3 8 2.6l2.7 2.7" />
-      <path d="M4 8.5v4a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-4" />
-    </Icon>
-  );
+  return <Huge icon={Share03Icon} {...props} />;
 }
 
 export function IconMore(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <circle cx="3.6" cy="8" r="1.1" fill="currentColor" stroke="none" />
-      <circle cx="8" cy="8" r="1.1" fill="currentColor" stroke="none" />
-      <circle cx="12.4" cy="8" r="1.1" fill="currentColor" stroke="none" />
-    </Icon>
-  );
+  return <Huge icon={MoreHorizontalIcon} {...props} />;
 }
 
-/** Context-fullness glyph (half-donut gauge + needle) for the msg action bar. */
 export function IconGauge(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <path d="M3 11a5 5 0 0 1 10 0" />
-      <path d="M8 11V6.2" />
-    </Icon>
-  );
+  return <Huge icon={PieChartIcon} {...props} />;
 }
 
-/** Response-speed glyph (speedometer). */
 export function IconSpeed(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <path d="M2.8 11.6a5.5 5.5 0 1 1 10.4 0" />
-      <path d="M8 8.7 10.8 6.4" />
-      <circle cx="8" cy="8.7" r="0.9" fill="currentColor" stroke="none" />
-    </Icon>
-  );
+  return <Huge icon={DashboardSpeed02Icon} {...props} />;
 }
 
 export function IconCamera(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <path d="M2.5 6a1.5 1.5 0 0 1 1.5-1.5h1L6 3h4l1 1.5h1A1.5 1.5 0 0 1 13.5 6v5.5A1.5 1.5 0 0 1 12 13H4a1.5 1.5 0 0 1-1.5-1.5z" />
-      <circle cx="8" cy="8.5" r="2.1" />
-    </Icon>
-  );
+  return <Huge icon={Camera01Icon} {...props} />;
 }
 
 export function IconImage(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <rect x="2.5" y="3.5" width="11" height="9" rx="1.5" />
-      <circle cx="5.8" cy="6.5" r="1" />
-      <path d="M3 11.5 6.5 8l2.5 2.5L11 8.5l2.5 2.3" />
-    </Icon>
-  );
+  return <FromGlyph glyph="image" {...props} />;
 }
 
 export function IconFilm(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <rect x="2.5" y="3" width="11" height="10" rx="1.5" />
-      <path d="M5.5 3v10M10.5 3v10" />
-      <path d="M2.5 6.3h3M2.5 9.7h3M10.5 6.3h3M10.5 9.7h3" />
-    </Icon>
-  );
+  return <FromGlyph glyph="video" {...props} />;
 }
 
 export function IconPaperclip(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <path d="M12 7.4 7.3 12a2.5 2.5 0 0 1-3.5-3.5l4.9-4.9a1.6 1.6 0 0 1 2.3 2.3l-4.8 4.8a.7.7 0 0 1-1-1l4.3-4.3" />
-    </Icon>
-  );
+  return <Huge icon={Attachment01Icon} {...props} />;
 }
 
+/** GitHub's own mark (simple-icons, CC0): filled, the one non-stroke icon. */
 export function IconGithub(props: IconProps) {
   return (
-    <Icon {...props}>
+    <Svg24 {...props}>
       <path
-        d="M8 2a6 6 0 0 0-1.9 11.7c.3.05.4-.13.4-.29l-.01-1.02c-1.67.36-2.02-.71-2.02-.71-.27-.7-.67-.88-.67-.88-.55-.37.04-.37.04-.37.6.05.93.62.93.62.54.93 1.42.66 1.76.5.06-.39.21-.66.38-.81-1.34-.15-2.75-.67-2.75-2.99a2.34 2.34 0 0 1 .62-1.62c-.06-.15-.27-.77.06-1.6 0 0 .5-.16 1.65.62a5.6 5.6 0 0 1 3 0c1.14-.78 1.65-.62 1.65-.62.33.83.12 1.45.06 1.6a2.34 2.34 0 0 1 .62 1.62c0 2.33-1.42 2.84-2.77 2.99.22.19.41.55.41 1.11l-.01 1.65c0 .16.11.35.41.29A6 6 0 0 0 8 2z"
+        d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"
         fill="currentColor"
         stroke="none"
       />
-    </Icon>
+    </Svg24>
   );
 }
 
-/** Connector / extension glyph (plug). */
 export function IconConnector(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <path d="M6 2.5V5M10 2.5V5" />
-      <rect x="4.5" y="5" width="7" height="3.6" rx="1" />
-      <path d="M8 8.6v2.4a2.5 2.5 0 0 0 2.5 2.5H12" />
-    </Icon>
-  );
+  return <Huge icon={Plug01Icon} {...props} />;
 }
 
 export function IconPuzzle(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <rect x="2.6" y="2.6" width="4.3" height="4.3" rx="1" />
-      <rect x="9.1" y="2.6" width="4.3" height="4.3" rx="1" />
-      <rect x="2.6" y="9.1" width="4.3" height="4.3" rx="1" />
-      <path d="M11.2 9.3v3.9M9.3 11.2h3.9" />
-    </Icon>
-  );
+  return <FromGlyph glyph="extensions" {...props} />;
 }
 
 export function IconGlobe(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <circle cx="8" cy="8" r="5.5" />
-      <path d="M2.5 8h11" />
-      <path d="M8 2.5c1.7 1.5 2.7 3.5 2.7 5.5S9.7 12 8 13.5C6.3 12 5.3 10 5.3 8S6.3 4 8 2.5z" />
-    </Icon>
-  );
+  return <Huge icon={Globe02Icon} {...props} />;
 }
 
-/*
- * A BRAIN, for the two places that mean THINKING.
- *
- * They were sparkles. the user: "replace the sparkles it's never the only option" —
- * which is the whole problem with that glyph. A sparkle means "the AI one", and
- * it was labelling the smartest tier in a list of three tiers and the reasoning
- * pill in a row of capability pills. In both, the other options are equally
- * "AI"; what distinguishes this one is that it thinks longer.
- */
 export function IconBrain(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <path d="M6.4 4.4a2.6 2.6 0 0 0-2.5 3.3 2.5 2.5 0 0 0 .3 4.3 2.5 2.5 0 0 0 3.6 2.3" />
-      <path d="M9.6 4.4a2.6 2.6 0 0 1 2.5 3.3 2.5 2.5 0 0 1-.3 4.3 2.5 2.5 0 0 1-3.6 2.3" />
-      <path d="M8 4.2v10.4" />
-    </Icon>
-  );
+  return <Huge icon={AiBrain01Icon} {...props} />;
 }
 
 export function IconSparkles(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <path d="M7.2 2.6 8.3 5.5l2.9 1.1-2.9 1.1-1.1 2.9-1.1-2.9L3.2 6.6l2.9-1.1z" />
-      <path d="M11.8 9.6l.5 1.4 1.4.5-1.4.5-.5 1.4-.5-1.4-1.4-.5 1.4-.5z" />
-    </Icon>
-  );
+  return <Huge icon={SparklesIcon} {...props} />;
 }
 
-/** Folder — a directory LISTING. Distinct from IconFolderPlus (which creates
- * one) and from IconFile: "Listed a folder" showing a document sheet was the
- * bug this exists for. */
 export function IconFolder(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <path d="M2.5 4.5a1 1 0 0 1 1-1h2.4l1.2 1.4h5.4a1 1 0 0 1 1 1v6.1a1 1 0 0 1-1 1H3.5a1 1 0 0 1-1-1z" />
-    </Icon>
-  );
+  return <FromGlyph glyph="folder" {...props} />;
 }
 
-/**
- * Folder being LOOKED INTO — the lid tilted open.
- *
- * the user: "it among the specialists should have specific icons, eg. an open
- * folder as an icon when it 'lists files from a folder' rather than a file
- * icon." A closed folder is a place; an open one is the act of reading it, and
- * that is what an `ls` row actually reports.
- */
 export function IconFolderOpen(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <path d="M2.5 12.5V4.5a1 1 0 0 1 1-1h2.4l1.2 1.4h5.4a1 1 0 0 1 1 1v1.1" />
-      <path d="M2.5 12.5 4.4 7.4a1 1 0 0 1 .95-.7h8.3a1 1 0 0 1 .95 1.3l-1.5 4.5z" />
-    </Icon>
-  );
+  return <FromGlyph glyph="folderOpen" {...props} />;
 }
 
-/** A message handed to somebody — the corp `talk_to` row. Distinct from
- * IconChat (a conversation) because this is one directed hand-off. */
 export function IconHandoff(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <path d="M2.5 4.5h11v6.2h-6l-2.6 2.3v-2.3H2.5z" />
-      <path d="M5.5 7.6h5" />
-    </Icon>
-  );
+  return <Huge icon={SentIcon} {...props} />;
 }
 
-/**
- * One node branching into a team — the CEO→manager `talk_to_manager` row.
- * Deliberately NOT IconHandoff: this is the row that answers "did it delegate
- * at all", so it reads as an org appearing rather than a message being passed.
- */
 export function IconOrg(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <rect x="6.2" y="2.2" width="3.6" height="3" rx="0.6" />
-      <path d="M8 5.2v2.6M4 10.4V8.6h8v1.8" />
-      <rect x="2.2" y="10.4" width="3.6" height="3" rx="0.6" />
-      <rect x="10.2" y="10.4" width="3.6" height="3" rx="0.6" />
-    </Icon>
-  );
+  return <Huge icon={HierarchySquare02Icon} {...props} />;
 }
 
-/** Work handed back up — the `submit_work` row. */
 export function IconSubmit(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <path d="M8 12.5V3.6" />
-      <path d="M4.6 7 8 3.6 11.4 7" />
-      <path d="M3 13.2h10" />
-    </Icon>
-  );
+  return <Huge icon={TaskDone01Icon} {...props} />;
 }
 
-/** A gate that has opened — `ready_to_delegate`. */
 export function IconGateOpen(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <circle cx="8" cy="8" r="5.5" />
-      <path d="M5.6 8.2 7.2 9.8l3.2-3.6" />
-    </Icon>
-  );
+  return <Huge icon={CheckmarkCircle02Icon} {...props} />;
 }
 
 export function IconFolderPlus(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <path d="M2.5 4.5a1 1 0 0 1 1-1h2.4l1.2 1.4h5.4a1 1 0 0 1 1 1v6.1a1 1 0 0 1-1 1H3.5a1 1 0 0 1-1-1z" />
-      <path d="M8 8v3.2M6.4 9.6h3.2" />
-    </Icon>
-  );
+  return <Huge icon={FolderAddIcon} {...props} />;
 }
 
-/*
- * Browser-action glyphs (round-10 #17): each browser tool step gets its own
- * icon so the activity chain reads "navigated / clicked / typed / viewed" at a
- * glance instead of the generic file sheet. Compass = navigate, pointer =
- * click, keyboard = type, eye = read/snapshot.
- */
-
-/** Compass — browser navigate / goto / open / back / forward. */
 export function IconCompass(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <circle cx="8" cy="8" r="5.75" />
-      <path d="M10.6 5.4 9 9 5.4 10.6 7 7z" />
-    </Icon>
-  );
+  return <FromGlyph glyph="discover" {...props} />;
 }
 
-/** Arrow pointer — browser click / hover / select / scroll. */
 export function IconCursor(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <path d="M3.5 2.8 3.5 12.4 6 10 7.6 13.4 9.4 12.6 7.8 9.3 11.2 9.2z" />
-    </Icon>
-  );
+  return <Huge icon={Cursor01Icon} {...props} />;
 }
 
-/** Keyboard — browser type / fill / press key. */
 export function IconKeyboard(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <rect x="1.75" y="4.5" width="12.5" height="7.5" rx="1.5" />
-      <path d="M4.2 7.3h.01M6.6 7.3h.01M9 7.3h.01M11.4 7.3h.01M5 9.7h6" />
-    </Icon>
-  );
+  return <Huge icon={KeyboardIcon} {...props} />;
 }
 
-/** Eye — browser read / snapshot / screenshot. */
 export function IconEye(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <path d="M1.5 8S4 3.75 8 3.75 14.5 8 14.5 8 12 12.25 8 12.25 1.5 8 1.5 8z" />
-      <circle cx="8" cy="8" r="2" />
-    </Icon>
-  );
+  return <Huge icon={ViewIcon} {...props} />;
+}
+
+// ── the app-local set (Settings, Models, media), on the same drawings ──────
+
+/** Play: start a run, a preview, a voice. */
+export function IconPlay(props: IconProps) {
+  return <Huge icon={PlayIcon} {...props} />;
+}
+
+/** Stop. */
+export function IconStop(props: IconProps) {
+  return <Huge icon={StopIcon} {...props} />;
+}
+
+/** Pause. */
+export function IconPause(props: IconProps) {
+  return <Huge icon={PauseIcon} {...props} />;
+}
+
+/** The processor. */
+export function IconCpu(props: IconProps) {
+  return <Huge icon={CpuIcon} {...props} />;
+}
+
+/** Needs a look. */
+export function IconWarning(props: IconProps) {
+  return <Huge icon={Alert02Icon} {...props} />;
+}
+
+/** Done, settled, verified. */
+export function IconCheckCircle(props: IconProps) {
+  return <Huge icon={CheckmarkCircle02Icon} {...props} />;
+}
+
+/** Kept safe: permissions, privacy. */
+export function IconShield(props: IconProps) {
+  return <Huge icon={Shield01Icon} {...props} />;
+}
+
+/** A key or a token. */
+export function IconKey(props: IconProps) {
+  return <Huge icon={Key01Icon} {...props} />;
+}
+
+/** Tuning controls. */
+export function IconSlider(props: IconProps) {
+  return <Huge icon={SlidersHorizontalIcon} {...props} />;
+}
+
+/** Light appearance. */
+export function IconSun(props: IconProps) {
+  return <Huge icon={Sun03Icon} {...props} />;
+}
+
+/** Dark appearance. */
+export function IconMoon(props: IconProps) {
+  return <Huge icon={Moon02Icon} {...props} />;
+}
+
+/** A favourite. */
+export function IconStar(props: IconProps) {
+  return <Huge icon={StarIcon} {...props} />;
+}
+
+/** Locked. */
+export function IconLock(props: IconProps) {
+  return <Huge icon={SquareLock02Icon} {...props} />;
+}
+
+/** Fast, or power. */
+export function IconBolt(props: IconProps) {
+  return <Huge icon={FlashIcon} {...props} />;
+}
+
+/** One sparkle: a single generated touch. */
+export function IconSparkle(props: IconProps) {
+  return <Huge icon={SparkleIcon} {...props} />;
+}
+
+/** Music. */
+export function IconMusic(props: IconProps) {
+  return <Huge icon={MusicNote03Icon} {...props} />;
+}
+
+/** A 3D object. */
+export function IconCube(props: IconProps) {
+  return <Huge icon={CubeIcon} {...props} />;
+}
+
+/** Hot, trending, heavy load. */
+export function IconFlame(props: IconProps) {
+  return <Huge icon={FireIcon} {...props} />;
+}
+
+/** A compact list: a view that shows rows only. */
+export function IconListCompact(props: IconProps) {
+  return <Huge icon={Menu01Icon} {...props} />;
+}
+
+/** A layout with a narrow pane on the right (a split view). */
+export function IconLayoutRight(props: IconProps) {
+  return <Huge icon={LayoutRightIcon} {...props} />;
+}
+
+/** A layout with a narrow pane on the left (a detail view). */
+export function IconLayoutLeft(props: IconProps) {
+  return <Huge icon={LayoutLeftIcon} {...props} />;
+}
+
+/** Some application: four rounded squares. */
+export function IconApps(props: IconProps) {
+  return <Huge icon={DashboardSquare01Icon} {...props} />;
+}
+
+/** The canvas, the panel beside the chat. */
+export function IconPanelRight(props: IconProps) {
+  return <Huge icon={PanelRightIcon} {...props} />;
+}
+
+/** Open bigger: arrows apart on the ↖↘ diagonal (the user: "a diagonal arrow pointing up left and down right"). */
+export function IconExpand(props: IconProps) {
+  return <Huge icon={ArrowExpand02Icon} {...props} />;
+}
+
+/** The 3D Studio, as the sidebar draws it. */
+export function IconStudio3d(props: IconProps) {
+  return <FromGlyph glyph="studio3d" {...props} />;
 }

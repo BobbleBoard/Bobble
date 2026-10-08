@@ -1,7 +1,6 @@
 import { clsx } from 'clsx';
-import type { CSSProperties } from 'react';
 import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { IconChevronDown } from './icons.tsx';
+import { IconApps, IconChevronDown, IconPanelRight } from './icons.tsx';
 import { clipBounds, type MenuPlacement, menuPlacement } from './menu-placement.ts';
 
 /*
@@ -67,31 +66,11 @@ function useOutsideClose(ref: RefObject<HTMLElement | null>, open: boolean, clos
 }
 
 /*
- * The four-square "some application" glyph, matching the canvas one. Inlined
- * rather than imported: this component lives in the design system and canvas
- * depends on IT, so reaching upward for the icon would invert that.
+ * "Some application": the shared four rounded squares (icons.tsx lives in
+ * this package too, so nothing reaches upward).
  */
 function GenericApp() {
-  return (
-    <svg
-      width={16}
-      height={16}
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.5}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="pd-icon"
-      style={{ '--pd-icon-base': 16 } as CSSProperties}
-      aria-hidden="true"
-    >
-      <rect x="2.75" y="2.75" width="4.5" height="4.5" rx="1.2" />
-      <rect x="8.75" y="2.75" width="4.5" height="4.5" rx="1.2" />
-      <rect x="2.75" y="8.75" width="4.5" height="4.5" rx="1.2" />
-      <rect x="8.75" y="8.75" width="4.5" height="4.5" rx="1.2" />
-    </svg>
-  );
+  return <IconApps size={16} />;
 }
 
 function AppIcon({ app, inMenu = false }: { app?: OpenWithChoice; inMenu?: boolean }) {
@@ -113,24 +92,7 @@ function AppIcon({ app, inMenu = false }: { app?: OpenWithChoice; inMenu?: boole
  */
 /** The canvas mark for a primary Open: the panel beside the chat, not an app. */
 function CanvasGlyph() {
-  return (
-    <svg
-      width={16}
-      height={16}
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.5}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="pd-icon"
-      style={{ '--pd-icon-base': 16 } as CSSProperties}
-      aria-hidden="true"
-    >
-      <rect x="2" y="3" width="12" height="10" rx="2" />
-      <path d="M9.5 3v10" />
-    </svg>
-  );
+  return <IconPanelRight size={16} />;
 }
 
 export function OpenSplitButton({

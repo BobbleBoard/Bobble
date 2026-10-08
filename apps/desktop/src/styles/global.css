@@ -4167,6 +4167,9 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   border-radius: 999px;
   cursor: pointer;
   color: #fff;
+  /* A glyph lying on a picture needs more weight than one on the app's own
+     ground: the shared set draws at 1px, these at 1.6, the weight they had. */
+  --pd-icon-stroke: 1.6;
   background: transparent;
   border: 1px solid transparent;
   opacity: 0;

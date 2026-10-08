@@ -23,7 +23,14 @@
  * app's own dialog treatment — large, centred, the transcript still visibly
  * behind it — so it reads as looking closer at something rather than leaving.
  */
-import { useCopyFeedback } from '@pi-desktop/ui';
+import {
+  IconCheck,
+  IconCopy,
+  IconExpand,
+  IconShare,
+  IconStudio3d,
+  useCopyFeedback,
+} from '@pi-desktop/ui';
 import { type JSX, type MouseEvent, useEffect, useMemo, useState } from 'react';
 import { pdFileUrl } from '../chat/canvas/file-preview';
 import { ThreadAudio } from '../chat/ThreadAudio';
@@ -90,89 +97,11 @@ function Surface({
 }
 
 /*
- * TWO ARROWS ON THE ↖↘ DIAGONAL. the user: "a diagonal arrow pointing up left and
- * down right". The four-corner bracket it replaced is the "crop" mark — it says
- * frame this, not open this bigger. Arrows pointing away from each other along
- * one diagonal say the thing is about to grow, which is what the button does.
+ * The corner glyphs are the shared set (icons.tsx). Expand keeps the user's ↖↘
+ * diagonal ("a diagonal arrow pointing up left and down right"): arrows apart
+ * along one diagonal say the thing is about to grow, where a four-corner bracket
+ * says "crop". They lie on the picture, so .pd-media-btn draws them heavier.
  */
-function GlyphExpand(): JSX.Element {
-  return (
-    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <title>Expand</title>
-      <path
-        /* Heads at the TOP-LEFT and BOTTOM-RIGHT — the ↖↘ diagonal the user asked
-           for. Drawn the other way round first, which is the same icon on the
-           other diagonal and reads as a different gesture entirely. */
-        d="M9.6 3.6H3.6V9.6M3.6 3.6L10.3 10.3M14.4 20.4H20.4V14.4M20.4 20.4L13.7 13.7"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function GlyphExport(): JSX.Element {
-  return (
-    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <title>Export</title>
-      <path
-        d="M8 10.4V2.6M5.2 5.4L8 2.6l2.8 2.8M2.8 10v2.6a.8.8 0 00.8.8h8.8a.8.8 0 00.8-.8V10"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-/** Two sheets, one over the other — Copy, the same glyph the chat's bar uses. */
-function GlyphCopy(): JSX.Element {
-  return (
-    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <title>Copy</title>
-      <rect x="5.5" y="5.5" width="8" height="8" rx="1.6" stroke="currentColor" strokeWidth="1.5" />
-      <path
-        d="M10.5 5.5V3.9a1.4 1.4 0 00-1.4-1.4H3.9a1.4 1.4 0 00-1.4 1.4v5.2a1.4 1.4 0 001.4 1.4h1.6"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-function GlyphCheck(): JSX.Element {
-  return (
-    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <title>Copied</title>
-      <path
-        d="M3.2 8.4l3 3 6.6-6.8"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function GlyphCube(): JSX.Element {
-  return (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <title>Studio</title>
-      <path
-        d="M8 1.9l5.4 3v6.2L8 14.1l-5.4-3V4.9zM2.6 4.9L8 7.9l5.4-3M8 7.9v6.2"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 /** The corner controls. Same set in the card and in the expanded view. */
 function Controls({
   item,
@@ -206,7 +135,7 @@ function Controls({
           aria-label="Open larger"
           onClick={onExpand}
         >
-          <GlyphExpand />
+          <IconExpand size={19} />
         </button>
       ) : null}
       {/*
@@ -235,7 +164,7 @@ function Controls({
           if (!inItsStudio) setModality(target === '3d' ? '3d' : target);
         }}
       >
-        {item.kind === 'model' && !inItsStudio ? <GlyphCube /> : null}
+        {item.kind === 'model' && !inItsStudio ? <IconStudio3d size={14} /> : null}
         {inItsStudio ? 'Use as input' : 'Open in studio'}
       </button>
       {/*
@@ -257,7 +186,7 @@ function Controls({
           });
         }}
       >
-        {copied ? <GlyphCheck /> : <GlyphCopy />}
+        {copied ? <IconCheck size={18} /> : <IconCopy size={18} />}
       </button>
       <button
         type="button"
@@ -266,7 +195,7 @@ function Controls({
         aria-label={`Export ${item.name}`}
         onClick={() => exportFile(item.path, item.name)}
       >
-        <GlyphExport />
+        <IconShare size={18} />
       </button>
     </>
   );

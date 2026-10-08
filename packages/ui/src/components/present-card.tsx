@@ -1,5 +1,6 @@
 import { fileTypeOf } from './file-type.ts';
 import { FileTypeGlyph } from './file-type-glyph.tsx';
+import { IconFolder } from './icons.tsx';
 import { OpenSplitButton, type OpenWithChoice } from './open-split-button.tsx';
 import { fileExt as fileExtOf } from './tool-icons.tsx';
 /**
@@ -18,7 +19,7 @@ import { fileExt as fileExtOf } from './tool-icons.tsx';
  */
 
 import clsx from 'clsx';
-import { type CSSProperties, forwardRef, type HTMLAttributes } from 'react';
+import { forwardRef, type HTMLAttributes } from 'react';
 
 /** What kind of thing was presented — drives the glyph and the `Kind · EXT` line. */
 export type PresentKind =
@@ -94,28 +95,11 @@ export function kindLine(item: PresentedItem): string {
 
 /*
  * The folder on the "Show" button — it reveals the artefact in the OS file
- * manager, and the word alone did not say that ("Reveal" said even less).
- * Inline for the same reason as the kind glyphs: the card carries no icon
- * dependency.
+ * manager, and the word alone did not say that ("Reveal" said even less). The
+ * shared folder (the Glyph set's own), so it matches the sidebar.
  */
 function FolderGlyph() {
-  return (
-    <svg
-      width={14}
-      height={14}
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.5}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="pd-icon"
-      style={{ '--pd-icon-base': 14 } as CSSProperties}
-      aria-hidden="true"
-    >
-      <path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h2.3l1.4 1.5h5.3A1.5 1.5 0 0 1 14 6v5.5A1.5 1.5 0 0 1 12.5 13h-9A1.5 1.5 0 0 1 2 11.5z" />
-    </svg>
-  );
+  return <IconFolder size={14} />;
 }
 
 export interface PresentCardProps extends Omit<HTMLAttributes<HTMLElement>, 'onSelect'> {

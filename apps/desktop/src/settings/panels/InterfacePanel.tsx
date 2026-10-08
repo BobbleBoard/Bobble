@@ -4,7 +4,7 @@
  * SIZE panel — the icons' own scale (`--pd-icon-scale`, `iconScale`) beside
  * the sidebar and menu scales. An ADVANCED section below holds the nitpicky
  * customization: the theme FLAVOR toggle and a developer entry into the
- * component GALLERY. Default icon stroke is the token value (1.25).
+ * component GALLERY. Default icon stroke is the token value (1px).
  *
  * the user (2026-09-20): "add to the interface slider a more realistic range of
  * stroke thickness none of which look absolutely excessive … also add to that

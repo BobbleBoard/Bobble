@@ -491,7 +491,7 @@ const claudeControl: ThemeTokens['control'] = {
   md: '32px', // --h-control
   lg: '40px', // derived: +8 step
   icon: '20px', // --icon
-  iconStroke: '1.25', // lighter than the old hardcoded 1.5 (the user: icons too thick)
+  iconStroke: '1', // 1px at any size, the stem of 13px text (the user, 2026-10-08: "I like the 1px stroke")
 };
 
 const codexControl: ThemeTokens['control'] = {
@@ -499,7 +499,7 @@ const codexControl: ThemeTokens['control'] = {
   md: '28px', // --spacing-token-button-composer (7 x 4px)
   lg: '36px', // --height-toolbar-sm
   icon: '16px', // derived: codex glyphs render at 16px in 28px controls
-  iconStroke: '1.25', // global icon stroke; single value across flavors
+  iconStroke: '1', // global icon stroke; single value across flavors
 };
 
 const claudeLayout: ThemeTokens['layout'] = {
@@ -1042,7 +1042,7 @@ const bobbleControl: ThemeTokens['control'] = {
   md: '28px',
   lg: '36px',
   icon: '18px',
-  iconStroke: '1.25',
+  iconStroke: '1',
 };
 
 const bobbleLayout: ThemeTokens['layout'] = {

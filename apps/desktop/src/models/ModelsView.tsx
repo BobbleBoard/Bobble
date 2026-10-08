@@ -35,14 +35,18 @@ import {
   IconChevronDown,
   IconClock,
   IconCopy,
+  IconDownload as IconDownloadShared,
   IconExternal,
+  IconLayoutLeft,
+  IconLayoutRight,
+  IconListCompact,
   IconMore,
   IconRefresh,
   ScrollArea,
   Spinner,
   writeClipboardText,
 } from '@pi-desktop/ui';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   DatasetHitDTO,
   HfGgufFileDTO,
@@ -500,34 +504,13 @@ const DETAIL_HEIGHT = 'h-[calc(100vh-236px)]';
 const NAME_SAYS_SIZE = /\d+(?:\.\d+)?\s*[BM]\b/i;
 
 /**
- * The download mark.
- *
- * the user: "the down arrow feels out of place, maybe better with the bottom half
- * of a square's edge line below the down arrow and being slightly thicker."
- *
- * It was `IconArrowUp` rotated 180deg — a bare arrow, which at 12-13px beside a
- * number reads as a sort direction or a chevron, not as a count of downloads.
- * The tray is what makes it the download glyph everywhere else in software, and
- * the extra stroke keeps three short strokes legible next to text.
+ * The download count's glyph: the shared tray-and-arrow (Hugeicons), not a bare
+ * arrow. the user: "the down arrow feels out of place, maybe better with the bottom
+ * half of a square's edge line below the down arrow and being slightly
+ * thicker." So it keeps one step more weight than the 1px set beside a number.
  */
 function IconDownload({ size = 13 }: { size?: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.7}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M8 2.75v6.5" />
-      <path d="M5.25 6.75 8 9.5l2.75-2.75" />
-      <path d="M3.25 10.5v2.25h9.5V10.5" />
-    </svg>
-  );
+  return <IconDownloadShared size={size} style={{ '--pd-icon-stroke': 1.25 } as CSSProperties} />;
 }
 
 /** Nor a heart, and likes need one. Inline rather than a text glyph, which
@@ -1945,40 +1928,11 @@ export function ModelsView() {
                 >
                   <span className="flex h-4 w-4 items-center justify-center">
                     {v === 'compact' ? (
-                      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden>
-                        <title>Compact</title>
-                        <rect x="1" y="3" width="14" height="1.6" rx=".8" fill="currentColor" />
-                        <rect x="1" y="7.2" width="14" height="1.6" rx=".8" fill="currentColor" />
-                        <rect x="1" y="11.4" width="14" height="1.6" rx=".8" fill="currentColor" />
-                      </svg>
+                      <IconListCompact size={14} />
                     ) : v === 'split' ? (
-                      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden>
-                        <title>Split</title>
-                        <rect x="1" y="2" width="8.4" height="12" rx="1.4" fill="currentColor" />
-                        <rect
-                          x="10.8"
-                          y="2"
-                          width="4.2"
-                          height="12"
-                          rx="1.4"
-                          fill="currentColor"
-                          opacity=".45"
-                        />
-                      </svg>
+                      <IconLayoutRight size={14} />
                     ) : (
-                      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden>
-                        <title>Detail</title>
-                        <rect
-                          x="1"
-                          y="2"
-                          width="5"
-                          height="12"
-                          rx="1.4"
-                          fill="currentColor"
-                          opacity=".45"
-                        />
-                        <rect x="7.4" y="2" width="7.6" height="12" rx="1.4" fill="currentColor" />
-                      </svg>
+                      <IconLayoutLeft size={14} />
                     )}
                   </span>
                 </button>
