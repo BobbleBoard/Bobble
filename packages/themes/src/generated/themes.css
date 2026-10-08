@@ -158,7 +158,7 @@
   --pd-control-md: 32px;
   --pd-control-lg: 40px;
   --pd-icon-size: 20px;
-  --pd-icon-stroke: 1.25;
+  --pd-icon-stroke: 1;
   --pd-row-height: 32px;
   --pd-sidebar-width: 288px;
   --pd-height-topbar: 46px;
@@ -354,7 +354,7 @@
   --pd-control-md: 32px;
   --pd-control-lg: 40px;
   --pd-icon-size: 20px;
-  --pd-icon-stroke: 1.25;
+  --pd-icon-stroke: 1;
   --pd-row-height: 32px;
   --pd-sidebar-width: 288px;
   --pd-height-topbar: 46px;
@@ -550,7 +550,7 @@
   --pd-control-md: 28px;
   --pd-control-lg: 36px;
   --pd-icon-size: 16px;
-  --pd-icon-stroke: 1.25;
+  --pd-icon-stroke: 1;
   --pd-row-height: 30px;
   --pd-sidebar-width: 240px;
   --pd-height-topbar: 46px;
@@ -746,7 +746,7 @@
   --pd-control-md: 28px;
   --pd-control-lg: 36px;
   --pd-icon-size: 16px;
-  --pd-icon-stroke: 1.25;
+  --pd-icon-stroke: 1;
   --pd-row-height: 30px;
   --pd-sidebar-width: 240px;
   --pd-height-topbar: 46px;
@@ -942,7 +942,7 @@
   --pd-control-md: 28px;
   --pd-control-lg: 36px;
   --pd-icon-size: 18px;
-  --pd-icon-stroke: 1.25;
+  --pd-icon-stroke: 1;
   --pd-row-height: 28px;
   --pd-sidebar-width: 272px;
   --pd-height-topbar: 48px;
@@ -1138,7 +1138,7 @@
   --pd-control-md: 28px;
   --pd-control-lg: 36px;
   --pd-icon-size: 18px;
-  --pd-icon-stroke: 1.25;
+  --pd-icon-stroke: 1;
   --pd-row-height: 28px;
   --pd-sidebar-width: 272px;
   --pd-height-topbar: 48px;
