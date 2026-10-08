@@ -171,6 +171,28 @@ body {
  * transition so it tracks the cursor. Reduced-motion drops both. */
 .pd-canvas-rail {
   transition: width var(--pd-duration-base, 220ms) var(--pd-easing-standard, ease);
+  /* A named element in a view transition (an inline card moving to or from the
+     canvas): the rail's box morphs with the card, sliding open or shut, rather
+     than cross-fading with the page. */
+  view-transition-name: pd-canvas-rail;
+}
+/* While a view transition runs the layout must already be final when it is
+   captured (view-transition.ts): the rail does not animate its own width. */
+:root[data-vt] .pd-canvas-rail {
+  transition: none;
+}
+/* The rail's snapshots keep their size and are cut by the moving box, so the
+   panel slides in (or out) at the right edge instead of being scaled up from a
+   sliver. */
+::view-transition-group(pd-canvas-rail) {
+  overflow: clip;
+}
+::view-transition-old(pd-canvas-rail),
+::view-transition-new(pd-canvas-rail) {
+  width: auto;
+  height: 100%;
+  object-fit: none;
+  object-position: left top;
 }
 .pd-canvas-rail[data-dragging="true"] {
   transition: none;

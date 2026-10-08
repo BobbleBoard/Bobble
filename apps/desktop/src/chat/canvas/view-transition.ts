@@ -29,7 +29,30 @@ export function withViewTransition(update: () => void): void {
     update();
     return;
   }
-  doc.startViewTransition(() => {
-    flushSync(update);
-  });
+  /*
+   * THE LAYOUT IS FINAL WHEN IT IS CAPTURED. the user (2026-10-08): "the animation
+   * seems smooth mostly but theres some jitteriness both ways". MEASURED
+   * (inline-move-film.mjs): the canvas rail animates its own width, so the
+   * "after" snapshot caught it mid-way — into the canvas the morph aimed at the
+   * panel's spot with the rail still 0 wide (x 1440) and the panel then slid to
+   * x 1000; back into the chat it aimed at the card beside the open canvas
+   * (x 301) and the card then slid to x 521 as the rail closed. While a
+   * transition runs, `data-vt` switches those layout transitions off
+   * (global.css), so the update lands in its final shape and the morph — the
+   * rail is a named element too — carries all of the movement.
+   */
+  const root = document.documentElement;
+  root.dataset.vt = '1';
+  const clear = () => {
+    delete root.dataset.vt;
+  };
+  try {
+    const t = doc.startViewTransition(() => {
+      flushSync(update);
+    });
+    t.finished.then(clear, clear);
+  } catch {
+    clear();
+    update();
+  }
 }

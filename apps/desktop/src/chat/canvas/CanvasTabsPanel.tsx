@@ -530,7 +530,19 @@ export function CanvasTabsPanel({ suppressed = false }: { suppressed?: boolean }
   // While dragging, track the live preview width (both directions, below min
   // toward 0); otherwise the animated `renderWidth` owns it. data-dragging
   // disables the transition so the drag tracks the cursor 1:1.
-  const shownWidth = dragging && dragWidth !== null ? dragWidth : renderWidth;
+  /*
+   * INSIDE A VIEW TRANSITION THE RAIL IS AT ITS WIDTH AT ONCE. The 0-frame-then-
+   * grow above exists so the CSS slide has a frame to start from — but a view
+   * transition captures the page as it stands after the update, so the rail was
+   * captured CLOSED and the morph aimed an inline card at x 1440, off the window
+   * (MEASURED, inline-move-film.mjs), with the panel sliding in after it. While
+   * one runs (`data-vt`, view-transition.ts) the open rail renders at its width
+   * and the morph does the sliding.
+   */
+  const inViewTransition =
+    typeof document !== 'undefined' && document.documentElement.dataset.vt === '1';
+  const shownWidth =
+    dragging && dragWidth !== null ? dragWidth : open && inViewTransition ? sideWidth : renderWidth;
 
   return (
     <aside

@@ -6165,6 +6165,12 @@
 ::view-transition-group(.pd-inline) {
   overflow: clip;
   border-radius: var(--pd-radius-lg);
+  /* Above every other moving box. Groups stack in the order their elements
+   * were painted BEFORE the move, so a card leaving the chat sat under the
+   * canvas rail (which comes after the chat) and flew in hidden: the panel
+   * stood empty for 200ms and the chart appeared at the end (SEEN in real
+   * screenshots, inline-move-film.mjs SNAPS=1). */
+  z-index: 1;
 }
 
 ::view-transition-old(.pd-inline),
@@ -6172,6 +6178,11 @@
   height: 100%;
   object-fit: cover;
   object-position: top;
+  /* The same chart in two shapes: hand over early, then fly as one. A fade the
+   * length of the flight showed both — a wide card's bars ghosting through the
+   * panel's tall ones — for most of the move. */
+  animation-duration: 140ms;
+  animation-timing-function: linear;
 }
 
 @media (prefers-reduced-motion: reduce) {

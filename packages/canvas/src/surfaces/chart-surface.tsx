@@ -140,7 +140,19 @@ export function ChartView({ spec, fill = false, corner, className, enter = true 
    * markers pop); it is dropped once the animation has had its second, so a
    * hover or a redraw never replays it. Reduced motion skips it (CSS).
    */
-  const [entering, setEntering] = useState(enter);
+  /*
+   * …BUT NOT WHEN IT IS MOVED. A chart that mounts during a view transition is
+   * one that already existed, arriving in its new home — the card lifted into
+   * the canvas, or the tab dropped back into the chat. Building it again from
+   * the axis made the morph cross-fade a finished chart into an empty one that
+   * then refilled: the jitter the user saw "both ways" (2026-10-08), SEEN frame by
+   * frame in inline-move-film.mjs. `data-vt` is set for the length of the
+   * transition (apps/desktop view-transition.ts).
+   */
+  const [entering, setEntering] = useState(
+    () =>
+      enter && !(typeof document !== 'undefined' && document.documentElement.dataset.vt === '1'),
+  );
   useEffect(() => {
     const t = setTimeout(() => setEntering(false), 1100);
     return () => clearTimeout(t);
