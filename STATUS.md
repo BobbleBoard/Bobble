@@ -1,22 +1,26 @@
 # Bobble — status
 
-Updated: 2026-10-08 (on AC) · main `1957adde` · the user: "let's refresh ourselves … make sure we don't leave ideas or plans behind"
+Updated: 2026-10-08 (on AC) · main `db49897b` · the user: "yes merge them all and install"
 
 ## Backlog — everything discussed and not yet done (consolidated 2026-10-08)
 
 Gathered from every message the user wrote since 2026-09-25, every open list in this file, ROADMAP-LATEST.md, the plan notes, and the branches not on main. Deduplicated; each item says its state and where it came from.
 
-### 1. Finished, but not on main (verified by `git cherry`: none of these changes are on main)
-| Branch | What it fixes | From |
+### 1. Finished branches — MERGED to main 2026-10-08 (the user: "yes merge them all and install")
+Cherry-picked onto main (the branches' own STATUS-only commits left out), then typecheck, every unit suite (desktop 3,610, ui 449, harness 1,919, engine 146, providers 276, gen-tools 63), the build, the branches' own five headless probes (all OK) and `ship:local`.
+| What it fixes | On main | From |
 |---|---|---|
-| `claude/hungry-heyrovsky-06ed0f` | "show me a picture" of maths goes to `math`, not text-to-image; a made picture always shows in the chat (`18b550ab`) | student comparison, 10-01 |
-| `claude/mystifying-thompson-ca5066` | the reviewer stops flagging work in the chat's own folder; a flag must name a harm (`869f1360`) | student comparison, 10-01 |
-| `claude/reverent-murdock-81e9aa` | a price is not a formula ("$1.10 … $" no longer renders as maths); `\(…\)` and `\[…\]` render as maths | 27B check, 10-02 |
-| `claude/competent-brahmagupta-c44b97` | a stream that goes silent is sent again once, unless the engine is still working (`f910fc79`) | maths run 6, 09-26 |
-| `claude/hungry-lederberg-f51017` | Quick Download decides on the hub's host (as Top Recommended does), not on total RAM | 09-25 |
-| `claude/compassionate-montalcini-fc1e34` | unit tests no longer leak a scratch library folder per file | 09-18 |
-| `claude/festive-tesla-7a13c2`, `claude/angry-mclaren-92d492` | the model-fit UI probe (e2e only) | 09-25 |
-| Probably stale, to check before dropping: `claude/practical-dhawan-bf1d62` (09-17 code-block frame; later code-card work may supersede it), `claude/loving-driscoll-74b4e8` (fixed differently on main, `16e519e3`), `push/vq-office-w1`, `push/w0-b`, `push/wf-00b`, `bench/bench-1` (unverified WIP from 09-23), two old agent worktrees (09-17 design candidates, 07-26 3D workspace look) | | |
+| "show me a picture" of maths goes to `math`, not text-to-image; a made picture always shows in the chat | `bd3506bf` | student comparison, 10-01 |
+| the reviewer stops flagging work in the chat's own folder; a flag must name a harm | `0feb29b3` | student comparison, 10-01 |
+| a price is not a formula ("$1.10 … $" no longer renders as maths); `\(…\)` and `\[…\]` render as maths | `03ff44c2`, `dd4d0870` | 27B check, 10-02 |
+| a stream that goes silent is sent again once, unless the engine is still working | `ee08abc3` | maths run 6, 09-26 |
+| Quick Download decides on the hub's host (as Top Recommended does), not on total RAM | `dd72a443` | 09-25 |
+| a repo's card counts what is on disk under any entry; "Use" starts what is on disk (+ the model-fit UI probe) | `bfef3afe`, `3a86c0c3`, `ec11a7e4`, `4a54ccbe` | 09-25 |
+| unit tests no longer leak a scratch library folder per file | `8fec2b06` | 09-18 |
+| the generated theme CSS still said a 1.25 icon stroke after the 1px change (the themes test caught it) | `c78acccf` | 10-08 icon work |
+| a text recipe's Download asks for the file it names: Ling 3.0's "tiny · Q4" fetched the 11 GB Q8_K_XL (quick-download-probe's one failure, older than the branch) | `db49897b` | 10-08 merge check |
+
+Still to check before dropping (not merged): `claude/practical-dhawan-bf1d62` (09-17 code-block frame; later code-card work may supersede it), `claude/loving-driscoll-74b4e8` (fixed differently on main, `16e519e3`), `push/vq-office-w1`, `push/w0-b`, `push/wf-00b`, `bench/bench-1` (unverified WIP from 09-23), two old agent worktrees (09-17 design candidates, 07-26 3D workspace look).
 
 ### 2. Waiting on the user's decision
 | Decision | Options / note | From |
@@ -82,7 +86,7 @@ Gathered from every message the user wrote since 2026-09-25, every open list in 
 - "What time is it" sometimes runs `date` instead of the connector.
 
 ### 8. Smaller known bugs
-The office chip flicker (1 of 15 probe runs) · rapid-mlx never lands the paste prime (~4.5k tokens re-read) · img2img edits are subtle (the instruction editor needs the 3D engine) · a finished card remounts into the chain when the next tool call starts · a picture embedded in the reply shows twice · ⌘Z into a turn already answering keeps the partial reply · an image-only message can't be rewound · the Ladle build in the bundle (excluded `68cf0219`, unconfirmed) · ~60 unused old icon files in the design artifact's storage.
+The office chip flicker (1 of 15 probe runs) · rapid-mlx never lands the paste prime (~4.5k tokens re-read) · img2img edits are subtle (the instruction editor needs the 3D engine) · a finished card remounts into the chain when the next tool call starts · a picture embedded in the reply shows twice · ⌘Z into a turn already answering keeps the partial reply · an image-only message can't be rewound · the Ladle build in the bundle (excluded `68cf0219`, unconfirmed) · ~60 unused old icon files in the design artifact's storage. · `pnpm lint` fails on main in four packages, none touched by the merge: unused vars and the like in apps/desktop (auto-router.ts, vfig.test.ts, probes), SVGs without a title in ui's file-type-glyph.tsx and gen-service's OmniSVG golden fixtures, descending specificity in canvas and desktop CSS · two flaky tests under the full parallel run, both green alone: pi-mac's EPIPE test (the error reads "Cannot call write after a stream was destroyed" under load) and a canvas timer that fires after jsdom is torn down ("window is not defined").
 
 
 ## Report — 2026-10-08: one icon family, Hugeicons at 1px
