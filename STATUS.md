@@ -19,6 +19,8 @@ Updated: 2026-10-08 (on AC) · main `fccc658d` + the design-language icons commi
 | Kept as they are: the filled warning badge over photos, the audio player's filled play/pause, the file glyph's letterforms and the project folder morph (already Hugeicons-based or the user's drawings) | — | — |
 | Design language: Icons assets re-rendered (115), its cards use the same drawings at 1px (`.bb-icon`), Iconography rules rewritten, backdrops retaken from the new build; artifact v6 | design/language | this commit |
 
+**Follow-up (the user: "the top left buttons for the computer use icon have a bit of mushiness").** The window's three lights were stroked rings of r 0.7, 2.2 apart, under a bar at 6. At 16px each rounded into a 1.9px blob, 1.5px from the next and against the top edge, so they ran into one bar. Now they are solid dots of r 0.9, 3 apart, with the bar at 6.75, aligned to whole pixels on a 2x screen (`b303f8ea`, test `079053e5`; a test holds the spacing). Installed; design language v7. Images: `11-computer-use-lights-before-after.png`, `12-…-variants.png`.
+
 **Checked.** ui 431 and desktop 3,568 tests (a new one for the migration), typecheck clean. `tests/e2e/icons-look.mjs` ran headless before and after: sidebar, + menu with Connectors, a tool chain with its message actions, Extensions, Models, Settings. The before/after crops are in the deliverables. No icon needed drawing by hand: every concept had a Hugeicons drawing that fits.
 
 

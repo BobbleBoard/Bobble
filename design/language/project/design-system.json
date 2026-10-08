@@ -213,8 +213,8 @@
         },
         "glyph-computerUse.svg": {
           "name": "glyph-computerUse.svg",
-          "blob": "1bc3c492986bc53e55d51c8354f70edf",
-          "size": 812,
+          "blob": "769378d05c6fc1a7b86bf02a23e2ac56",
+          "size": 923,
           "type": "image/svg+xml"
         },
         "glyph-devices.svg": {
@@ -943,8 +943,8 @@
   },
   "lastChange": {
     "by": "the user",
-    "at": "2026-10-08T03:36:47Z",
+    "at": "2026-10-08T04:14:15Z",
     "via": "Claude Code",
-    "note": "Icons: one Hugeicons family at 1px; the hand-drawn sets replaced"
+    "note": "Computer use glyph: the window's three lights are solid dots that stay apart at 16px"
   }
 }
