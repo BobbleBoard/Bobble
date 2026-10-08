@@ -22,7 +22,7 @@ const SETTLE_MS = 600;
  * accept messages only when `event.source === win.parent` (the embedder) rather
  * than by origin, and post replies with `targetOrigin: '*'`.
  *
- * Returns a disposer that removes the message listener.
+ * Returns a disposer that removes the message listener and cancels anything queued.
  */
 export function startHarness(win: Window, options: StartHarnessOptions = {}): () => void {
   const root = options.root ?? win.document.body;
@@ -52,6 +52,8 @@ export function startHarness(win: Window, options: StartHarnessOptions = {}): ()
    */
   let lastHeight = -1;
   let queued = false;
+  /** Cancels the report `schedule` queued; dispose runs it, so nothing measures after. */
+  let cancelReport: (() => void) | null = null;
   const measure = (): number => {
     const body = win.document.body;
     if (body === null) return 0;
@@ -67,6 +69,7 @@ export function startHarness(win: Window, options: StartHarnessOptions = {}): ()
   };
   const report = (): void => {
     queued = false;
+    cancelReport = null;
     const height = measure();
     if (height <= 0 || Math.abs(height - lastHeight) < 1) return;
     lastHeight = height;
@@ -76,8 +79,13 @@ export function startHarness(win: Window, options: StartHarnessOptions = {}): ()
     if (queued) return;
     queued = true;
     const raf = win.requestAnimationFrame?.bind(win);
-    if (raf) raf(report);
-    else win.setTimeout(report, 16);
+    if (raf) {
+      const id = raf(report);
+      cancelReport = () => win.cancelAnimationFrame?.(id);
+    } else {
+      const id = win.setTimeout(report, 16);
+      cancelReport = () => win.clearTimeout(id);
+    }
   };
   // The frame's own constructors (the window the harness runs in), when it has them.
   const ctors = win as unknown as {
@@ -196,5 +204,11 @@ export function startHarness(win: Window, options: StartHarnessOptions = {}): ()
     win.removeEventListener('load', schedule);
     sizes?.disconnect();
     shape?.disconnect();
+    // What is queued dies with the harness: a report a frame later, a restart
+    // once the patches settle.
+    cancelReport?.();
+    cancelReport = null;
+    queued = false;
+    win.clearTimeout(settle);
   };
 }

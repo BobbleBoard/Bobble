@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { startHarness } from './harness-runtime.ts';
 import type { FrameToHostMessage, HostToFrameMessage } from './protocol.ts';
 
@@ -36,11 +36,27 @@ function fakeWindow(root: HTMLElement) {
   return { win: win as unknown as Window, posted, deliver, listenerCount: () => listeners.length };
 }
 
+/*
+ * Every harness a test starts is disposed after it. A patch queues a
+ * measurement; one still queued when the file ended fired while jsdom was being
+ * torn down ("window is not defined", an unhandled error that failed a green
+ * run under the full parallel suite).
+ */
+const started: Array<() => void> = [];
+const start = (...args: Parameters<typeof startHarness>): (() => void) => {
+  const dispose = startHarness(...args);
+  started.push(dispose);
+  return dispose;
+};
+afterEach(() => {
+  for (const dispose of started.splice(0)) dispose();
+});
+
 describe('startHarness', () => {
   it('announces ready and applies a patch from the parent', () => {
     const root = document.createElement('div');
     const { win, posted, deliver } = fakeWindow(root);
-    startHarness(win, { root });
+    start(win, { root });
 
     expect(posted.some((m) => m.type === 'ready')).toBe(true);
 
@@ -52,7 +68,7 @@ describe('startHarness', () => {
   it('ignores messages that are not from the parent window', () => {
     const root = document.createElement('div');
     const { win, deliver } = fakeWindow(root);
-    startHarness(win, { root });
+    start(win, { root });
 
     deliver(
       { channel: 'pd-canvas', type: 'patch', seq: 1, html: '<p>nope</p>' },
@@ -64,7 +80,7 @@ describe('startHarness', () => {
   it('replies to a ping with ready', () => {
     const root = document.createElement('div');
     const { win, posted, deliver } = fakeWindow(root);
-    startHarness(win, { root });
+    start(win, { root });
     posted.length = 0;
     deliver({ channel: 'pd-canvas', type: 'ping' });
     expect(posted.some((m) => m.type === 'ready')).toBe(true);
@@ -73,10 +89,33 @@ describe('startHarness', () => {
   it('dispose() removes the message listener', () => {
     const root = document.createElement('div');
     const state = fakeWindow(root);
-    const dispose = startHarness(state.win, { root });
+    const dispose = start(state.win, { root });
     expect(state.listenerCount()).toBe(1);
     dispose();
     expect(state.listenerCount()).toBe(0);
+  });
+
+  /* A patch queues a measurement (a frame later, or 16 ms without rAF). A
+     harness that is gone must not run it: it measured a document that was no
+     longer there, and in the suite it fired after jsdom was torn down —
+     "window is not defined", an unhandled error on a green run. */
+  it('dispose() cancels the measurement a patch queued: nothing runs after it', async () => {
+    const root = document.createElement('div');
+    const state = fakeWindow(root);
+    let measured = 0;
+    const win = state.win as unknown as { getComputedStyle: (el: Element) => CSSStyleDeclaration };
+    const real = win.getComputedStyle;
+    win.getComputedStyle = (el) => {
+      measured += 1;
+      return real(el);
+    };
+    const dispose = start(state.win, { root });
+    state.deliver({ channel: 'pd-canvas', type: 'patch', seq: 1, html: '<p>hi</p>' });
+    dispose();
+    const posted = state.posted.length;
+    await new Promise((r) => setTimeout(r, 40));
+    expect(measured).toBe(0);
+    expect(state.posted.length).toBe(posted);
   });
 
   describe('a page whose scripts have run', () => {
@@ -86,7 +125,7 @@ describe('startHarness', () => {
       const root = document.createElement('div');
       const state = fakeWindow(root);
       let restarts = 0;
-      startHarness(state.win, {
+      start(state.win, {
         root,
         settleMs: 20,
         restart: () => {
