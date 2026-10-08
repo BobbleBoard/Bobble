@@ -187,7 +187,7 @@ try {
   for (const l of mainLog
     .filter((l) => /pi\]|workspace|spawn|restart|exit|harness/i.test(l))
     .slice(-25))
-    console.log('  ' + l.slice(0, 220));
+    console.log(`  ${l.slice(0, 220)}`);
   const after = await win.evaluate(() => ({
     cwd: window.__pi_store().getState().session?.cwd ?? null,
     sessionFile: window.__pi_store().getState().session?.sessionFile ?? null,

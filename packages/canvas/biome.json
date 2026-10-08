@@ -4,6 +4,6 @@
   "root": false,
   "vcs": { "useIgnoreFile": false },
   "files": {
-    "includes": ["**", "!harness", "!node_modules", "!.turbo"]
+    "includes": ["!harness", "!node_modules", "!.turbo"]
   }
 }

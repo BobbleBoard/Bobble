@@ -24,13 +24,20 @@ afterEach(() => {
   rmSync(work, { recursive: true, force: true });
 });
 
+/** A capture the test needs to have happened; null fails here rather than at the restore. */
+function captured(...args: Parameters<typeof capture>) {
+  const cp = capture(...args);
+  if (cp === null) throw new Error('capture returned null');
+  return cp;
+}
+
 describe('capture + restore', () => {
   it('puts a file back exactly as it was', () => {
     const f = path.join(work, 'a.ts');
     writeFileSync(f, 'const before = 1;\n');
-    const cp = capture(root, 1, f);
+    const cp = captured(root, 1, f);
     writeFileSync(f, 'const after = 2;\n');
-    expect(restore(cp!)).toEqual({ ok: true });
+    expect(restore(cp)).toEqual({ ok: true });
     expect(readFileSync(f, 'utf8')).toBe('const before = 1;\n');
   });
 
@@ -40,19 +47,19 @@ describe('capture + restore', () => {
     const f = path.join(work, 'img.png');
     const bytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x00, 0xff, 0xfe, 0x01]);
     writeFileSync(f, bytes);
-    const cp = capture(root, 1, f);
+    const cp = captured(root, 1, f);
     writeFileSync(f, Buffer.from([0x00]));
-    restore(cp!);
+    restore(cp);
     expect(readFileSync(f).equals(bytes)).toBe(true);
   });
 
   it('records a CREATED file as having no backup, and restoring deletes it', () => {
     // Pretending it had empty content would leave an empty file behind.
     const f = path.join(work, 'new.ts');
-    const cp = capture(root, 1, f);
+    const cp = captured(root, 1, f);
     expect(cp).toEqual({ target: f, backup: null, bytes: 0 });
     writeFileSync(f, 'created by the turn');
-    expect(restore(cp!)).toEqual({ ok: true });
+    expect(restore(cp)).toEqual({ ok: true });
     expect(existsSync(f)).toBe(false);
   });
 
@@ -61,9 +68,9 @@ describe('capture + restore', () => {
     mkdirSync(dir);
     const f = path.join(dir, 'a.ts');
     writeFileSync(f, 'x');
-    const cp = capture(root, 1, f);
+    const cp = captured(root, 1, f);
     rmSync(dir, { recursive: true, force: true });
-    expect(restore(cp!).ok).toBe(true);
+    expect(restore(cp).ok).toBe(true);
     expect(readFileSync(f, 'utf8')).toBe('x');
   });
 
@@ -85,9 +92,9 @@ describe('capture + restore', () => {
   it('reports a missing backup rather than claiming success', () => {
     const f = path.join(work, 'a.ts');
     writeFileSync(f, 'v1');
-    const cp = capture(root, 1, f);
-    rmSync(cp!.backup as string, { force: true });
-    expect(restore(cp!).ok).toBe(false);
+    const cp = captured(root, 1, f);
+    rmSync(cp.backup as string, { force: true });
+    expect(restore(cp).ok).toBe(false);
   });
 });
 

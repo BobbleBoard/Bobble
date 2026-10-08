@@ -76,6 +76,7 @@ const REPLY = [
   '',
   '```ts',
   'function greet(name: string) {',
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: a line of TypeScript source, shown as text
   '  return `Hello, ${name}!`;',
   '}',
   '```',

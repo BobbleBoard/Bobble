@@ -107,7 +107,9 @@ try {
     for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
     const dt = new DataTransfer();
     dt.items.add(new File([arr], 'model.glb', { type: 'model/gltf-binary' }));
-    document.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
+    document.dispatchEvent(
+      new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }),
+    );
   }, b64);
   await page
     .waitForSelector('[data-testid="tp-history-rail"]', { timeout: 30_000 })

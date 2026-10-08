@@ -51,7 +51,7 @@ const moduleState = (id) =>
 const t0 = Date.now();
 const say = (m) => console.log(`${((Date.now() - t0) / 1000).toFixed(0)}s  ${m}`);
 
-async function installModule(id, studioTestid, label) {
+async function installModule(id, label) {
   const card = await until(
     (mid) => document.querySelector(`[data-testid="module-card-${mid}"]`) !== null,
     20_000,
@@ -89,7 +89,7 @@ try {
   if (ONLY.includes('audio')) {
     await page.click('[data-testid="modality-audio"]');
     await page.waitForSelector('[data-testid="audio-studio"]', { timeout: 15_000 });
-    if (await installModule('audio', 'audio-studio', 'audio')) {
+    if (await installModule('audio', 'audio')) {
       await page.fill(
         '[data-testid="studio-prompt"]',
         'Hello from Bobble. This voice was made on this Mac.',
@@ -116,7 +116,7 @@ try {
   if (ONLY.includes('video')) {
     await page.click('[data-testid="modality-video"]');
     await page.waitForSelector('[data-testid="video-studio"]', { timeout: 15_000 });
-    if (await installModule('comfy', 'video-studio', 'video (ComfyUI)')) {
+    if (await installModule('comfy', 'video (ComfyUI)')) {
       // HyperFrames: the local motion path, no weights — the one video that a
       // fresh Mac can make before any model is downloaded.
       await page.click('[data-testid="video-model"]');

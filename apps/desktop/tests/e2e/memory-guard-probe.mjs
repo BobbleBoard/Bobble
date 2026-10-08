@@ -21,7 +21,7 @@
  *   MODE=pause SHOT_DIR=/tmp/guard node apps/desktop/tests/e2e/memory-guard-probe.mjs
  */
 import { execFileSync, spawn } from 'node:child_process';
-import { appendFileSync, copyFileSync, existsSync, mkdirSync } from 'node:fs';
+import { appendFileSync, copyFileSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

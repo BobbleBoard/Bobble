@@ -116,7 +116,7 @@ try {
   if (MODE === 'scripted') {
     await scripted(dbg, targetPid);
   } else {
-    await modelDriven(page, targetPid);
+    await modelDriven(page);
   }
   clearInterval(watcher);
 
@@ -177,7 +177,7 @@ async function scripted(dbg, pid) {
 }
 
 /** The local model drives, using only its Mac control tools. */
-async function modelDriven(page, pid) {
+async function modelDriven(page) {
   const started = await page.evaluate(
     (id) => window.piDesktop.invoke('llm:start-server', { modelId: id }),
     MODEL_ID,

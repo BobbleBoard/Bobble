@@ -316,7 +316,9 @@ try {
     const tops = [];
     window.__cardTops = tops;
     const tick = () => {
-      const svg = document.querySelector('[data-testid="presented-diagram"] .pd-inline-widget-box svg');
+      const svg = document.querySelector(
+        '[data-testid="presented-diagram"] .pd-inline-widget-box svg',
+      );
       if (svg) tops.push({ t: performance.now(), y: svg.getBoundingClientRect().y });
       if (tops.length < 400 && window.__cardTops === tops) requestAnimationFrame(tick);
     };

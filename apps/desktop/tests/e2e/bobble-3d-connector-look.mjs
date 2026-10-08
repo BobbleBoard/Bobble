@@ -100,7 +100,7 @@ async function run(label, { engine }) {
     let card = await cardState();
     console.log(label, 'card', JSON.stringify(card));
     await shot('1-gallery');
-    check(card !== null && card.hasSvgMark, `${label}: the Bobble 3D card is in the gallery`);
+    check(card?.hasSvgMark === true, `${label}: the Bobble 3D card is in the gallery`);
     if (engine) {
       check(
         card?.section === 'connectors-section-recommended' &&

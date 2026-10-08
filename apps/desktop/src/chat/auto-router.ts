@@ -46,9 +46,7 @@ import { useLlmStore } from '../state/llm-store';
 import { activateLocalModel } from '../state/local-model';
 import { type DowngradeMemory, useModelSelectionStore } from '../state/model-selection-store';
 import { agentInFlight } from '../state/pi-connect';
-import { usePiStore } from '../state/pi-slice';
 import { setModelSelection, useSettingsStore } from '../state/settings-store';
-import { parseHarnessStatus } from './harness-status';
 
 // --- Tuning knobs ----------------------------------------------------------
 
@@ -360,31 +358,6 @@ export function tierSpeed(tier: ModelTier): 'fast' | 'balanced' | 'slow' {
 /** The tier picks resolved for this machine (undefined before catalog load). */
 function tierModels(): Record<ModelTier, LlmTierPick> | undefined {
   return useLlmStore.getState().recommendation?.tierModels;
-}
-
-/**
- * The harness's authoritative classification for the CURRENT task, read live from
- * its published status. `activeClass` is fed back into our own tier-1 as the
- * continuity prior (so a terse follow-up inherits the same class the harness
- * keeps), and `activeTier` — which the harness may have tier-2-corrected — anchors
- * the hysteresis's notion of "where we are" instead of the raw running-model→tier
- * mapping. Together they keep the app router and the harness in agreement on the
- * model for a task. Both null before the harness has classified (a fresh task's
- * first turn), where the app's own tier-1 bootstraps the pick.
- */
-function harnessTaskContext(): { activeTier: ModelTier | null } {
-  // The harness no longer publishes a task class or a routed tier — it does not
-  // choose models any more. "Where we are" is simply what is running.
-  return { activeTier: null };
-}
-
-/** Prior user turns in the thread (0-based turn index for the classifier's
- * continuation branch). `sendPrompt` appends this turn's user echo BEFORE routing,
- * so the current message is already counted — subtract it to get the prior count.
- * >0 (with a `priorClass`) is what lets a bare "continue" inherit the task class. */
-function priorUserTurns(): number {
-  const users = usePiStore.getState().messages.filter((m) => m.kind === 'user').length;
-  return Math.max(0, users - 1);
 }
 
 /** The last effort level auto-pushed to the harness — so `effort:'auto'` only

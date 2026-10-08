@@ -68,7 +68,10 @@ try {
   // …and the seam actually LOADS from there (a bundle that is present but
   // fails to require would degrade the same silent way).
   const office = await page.evaluate(() => window.piDesktop.invoke('office:available', {}));
-  assert(office?.available === true, `office seam did not load from the bundle: ${JSON.stringify(office)}`);
+  assert(
+    office?.available === true,
+    `office seam did not load from the bundle: ${JSON.stringify(office)}`,
+  );
 
   console.log(
     `packaged-probe OK — ${appBundle} boots (${flavor}/${mode}, boot event received, office editors bundled)`,

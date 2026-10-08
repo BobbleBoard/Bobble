@@ -61,6 +61,7 @@ const SVG = [
 const REFUSAL =
   'Not written: sample.svg is hand-written SVG markup, and drawing SVGs is what the `svg` command is for — it runs OmniSVG on-device and produces a real vector drawing, not a guess at one.\n\nRun it with the bash tool, describing what to draw, and say where the file goes:\n  svg "a red heart with smooth curved edges, centered" --out sample.svg';
 const OLD = 'function greet(name: string) {\n  return "Hello, " + name;\n}';
+// biome-ignore lint/suspicious/noTemplateCurlyInString: TypeScript source, written to a file as text
 const NEW = 'function greet(name: string) {\n  return `Hello, ${name}!`;\n}';
 
 const user = {

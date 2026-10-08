@@ -8,7 +8,8 @@ function fakeView(): CssHost & { live: () => string[] } {
   return {
     isDestroyed: () => false,
     insertCSS: async (css) => {
-      const key = `k${(n += 1)}`;
+      n += 1;
+      const key = `k${n}`;
       sheets.set(key, css);
       return key;
     },

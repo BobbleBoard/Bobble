@@ -955,10 +955,9 @@ function registerSvgTool(pi: ExtensionAPI, bridge: GenBridge | null, engines: Sv
         /* Say how to USE it, in the reply the model reads next: a page references
            the file by its path; the markup is not pasted back in. */
         const first = result.outputs[0];
-        const rel =
-          first !== undefined && first.outputPath.startsWith(`${root}${path.sep}`)
-            ? path.relative(root, first.outputPath)
-            : undefined;
+        const rel = first?.outputPath.startsWith(`${root}${path.sep}`)
+          ? path.relative(root, first.outputPath)
+          : undefined;
         const usage =
           editPath !== undefined
             ? 'The file is changed in place.'

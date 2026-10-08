@@ -10,7 +10,7 @@
  *   LOG=/tmp/first-token.log node apps/desktop/tests/e2e/first-token-probe.mjs
  * MEASURED 2026-09-18 (09d75b41): 282 ms, 3320 of 3438 prompt tokens reused.
  */
-import { appendFileSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { launchApp, probeHome } from './harness.mjs';

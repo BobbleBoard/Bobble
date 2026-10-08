@@ -26,10 +26,8 @@ async function standIn(
     hangUp = r;
   });
   server = createServer((req, res) => {
-    let body = '';
-    req.on('data', (d) => {
-      body += d;
-    });
+    // The request is read to its end and not looked at; the reply is scripted.
+    req.resume();
     req.on('end', () => {
       res.writeHead(200, { 'content-type': 'text/event-stream' });
       const send = (content: string) =>

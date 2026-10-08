@@ -145,9 +145,7 @@ try {
         .evaluate((el) => el.click());
       await win.waitForTimeout(400);
     }
-    say(
-      `finish: ${await win.evaluate(() => window.__tripo_store?.().getState?.().genFinish)}`,
-    );
+    say(`finish: ${await win.evaluate(() => window.__tripo_store?.().getState?.().genFinish)}`);
   }
 
   filming = true;

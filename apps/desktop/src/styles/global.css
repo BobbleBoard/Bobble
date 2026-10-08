@@ -7210,15 +7210,6 @@ body[data-media-expanded="true"] .pd-studio-compose {
   inset: 0;
   display: block;
 }
-.pd-media-card--pending .pd-bobble-loader-host[data-fill="true"] .pd-bobble-canvas {
-  /* The scrim STAYS. In fill mode the canvas is the whole frame, so its ground
-     is the frame's ground — no box within a box — and on the light theme that
-     ground is what makes white blocks visible at all. SEEN in the thread: a
-     white frame with nothing in it. (`--pd-bobble-scrim` is transparent on the
-     dark theme, where the frame is already dark.) The radius is the frame's,
-     which clips. */
-  border-radius: 0;
-}
 
 /*
  * THE REVEAL. The finished media sits under the canvas and is uncovered along
@@ -7476,6 +7467,15 @@ body[data-media-expanded="true"] .pd-studio-compose {
   background: var(--pd-bobble-scrim);
   /* The scrim fades with the loader rather than snapping off with it. */
   transition: background 300ms var(--pd-easing-standard, ease);
+}
+.pd-media-card--pending .pd-bobble-loader-host[data-fill="true"] .pd-bobble-canvas {
+  /* The scrim STAYS. In fill mode the canvas is the whole frame, so its ground
+     is the frame's ground — no box within a box — and on the light theme that
+     ground is what makes white blocks visible at all. SEEN in the thread: a
+     white frame with nothing in it. (`--pd-bobble-scrim` is transparent on the
+     dark theme, where the frame is already dark.) The radius is the frame's,
+     which clips. */
+  border-radius: 0;
 }
 
 /* A light surface needs the ground; a dark one already is one. */
@@ -8126,15 +8126,6 @@ body[data-media-expanded="true"] .pd-studio-compose {
   color: var(--pd-text-muted);
   border-style: dashed;
 }
-/* Shared knobs (portable-knobs.ts): a row the engine cannot spell is greyed,
-   not hidden — the value is kept for the engines that can. */
-.pd-knob-row[data-supported="no"] .pd-knob-label,
-.pd-knob-row[data-supported="no"] .pd-flag-desc {
-  color: var(--pd-text-muted);
-}
-.pd-knob-row[data-supported="no"] .pd-flag-control {
-  opacity: 0.55;
-}
 .pd-knob-label {
   font-family: var(--pd-font-sans);
   font-weight: 600;
@@ -8170,6 +8161,15 @@ body[data-media-expanded="true"] .pd-studio-compose {
   gap: 6px;
   flex: none;
   max-width: 46%;
+}
+/* Shared knobs (portable-knobs.ts): a row the engine cannot spell is greyed,
+   not hidden — the value is kept for the engines that can. */
+.pd-knob-row[data-supported="no"] .pd-knob-label,
+.pd-knob-row[data-supported="no"] .pd-flag-desc {
+  color: var(--pd-text-muted);
+}
+.pd-knob-row[data-supported="no"] .pd-flag-control {
+  opacity: 0.55;
 }
 .pd-flag-input,
 .pd-flag-select {

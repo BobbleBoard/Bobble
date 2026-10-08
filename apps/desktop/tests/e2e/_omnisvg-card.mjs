@@ -18,9 +18,6 @@ try {
   await page.waitForTimeout(1800);
   await page.getByPlaceholder('Search connectors').fill('OmniSVG');
   await page.waitForTimeout(700);
-  const card = page
-    .locator('[data-testid="connector-download-omnisvg"], [data-testid="connector-add-omnisvg"]')
-    .first();
   const heading = page.getByText('OmniSVG', { exact: true }).first();
   await page.screenshot({ path: process.argv[2] ?? '/tmp/omnisvg-connectors.png' });
   const add = await page.locator('[data-testid="connector-download-omnisvg"]').count();

@@ -1864,6 +1864,7 @@
   gap: 2px;
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: a different button — the browser opbar's (.pd-canvas-opbar[data-kind="browser"] .pd-icon-btn) is never inside an inline widget */
 .pd-inline-widget-actions .pd-icon-btn,
 .pd-inline-widget-copy,
 .pd-inline-widget-move {
@@ -5995,10 +5996,12 @@
 }
 /* A line or area keeps its shape while it is typed (PendingChartCard
    padLineValues), so it eases the way a bar does, and its dots with it. */
+/* biome-ignore-start lint/style/noDescendingSpecificity: sets only `transition`; the [data-enter] rules above set the dash and the animation, so neither overrides the other */
 .pd-chart--building .pd-chart-line,
 .pd-chart--building .pd-chart-area {
   transition: d 280ms var(--pd-easing-standard, ease-out);
 }
+/* biome-ignore-end lint/style/noDescendingSpecificity: end of the range above */
 .pd-chart--building .pd-chart-marker {
   transition:
     cx 280ms var(--pd-easing-standard, ease-out),
@@ -6096,6 +6099,7 @@
   .pd-chart--landed {
     animation: none;
   }
+  /* biome-ignore-start lint/style/noDescendingSpecificity: sets only `transition`, which no [data-enter] rule sets */
   .pd-chart--building .pd-chart-bar,
   .pd-chart--building .pd-chart-line,
   .pd-chart--building .pd-chart-area,
@@ -6103,6 +6107,7 @@
   .pd-chart--building .pd-chart-slice {
     transition: none;
   }
+  /* biome-ignore-end lint/style/noDescendingSpecificity: end of the range above */
 }
 
 /* The corner control beside the chart ⇄ table toggle. */

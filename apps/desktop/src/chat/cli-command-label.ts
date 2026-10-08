@@ -480,7 +480,7 @@ export function cliCommandLabel(command: string | undefined): CliCommandLabel | 
         chart: { type: 'chart', ...(bare[1] === undefined ? {} : { title: bare[1] }) },
       };
     }
-    const typeFlag = rest.findIndex((w) => w === '--type');
+    const typeFlag = rest.indexOf('--type');
     const rawType =
       (typeFlag >= 0 ? rest[typeFlag + 1] : undefined) ??
       bare.find((w) => CHART_TYPE_WORDS.has(w.toLowerCase()));

@@ -31,7 +31,13 @@ const assistant = (blocks, isStreaming) => ({
   timestamp: Date.now(),
   isStreaming,
 });
-const typing = (argsText) => ({ type: 'toolCall', id: 'c1', name: 'bash', arguments: {}, argsText });
+const typing = (argsText) => ({
+  type: 'toolCall',
+  id: 'c1',
+  name: 'bash',
+  arguments: {},
+  argsText,
+});
 const call = { type: 'toolCall', id: 'c1', name: 'bash', arguments: { command: 'npm test' } };
 const result = (text) => ({
   kind: 'toolResult',
@@ -106,7 +112,9 @@ try {
   await set({ toolOutputPartials: { c1: '> buggyapp@1.0.0 test\n> vitest run\n' } });
   await sleep(500);
   await set({
-    toolOutputPartials: { c1: '> buggyapp@1.0.0 test\n> vitest run\n\n ✓ src/app.test.ts (3 tests) 12ms\n' },
+    toolOutputPartials: {
+      c1: '> buggyapp@1.0.0 test\n> vitest run\n\n ✓ src/app.test.ts (3 tests) 12ms\n',
+    },
   });
   await sleep(600);
   const streaming = await read();
@@ -125,7 +133,9 @@ try {
     messages: [
       user,
       assistant([call], false),
-      result('> buggyapp@1.0.0 test\n> vitest run\n\n ✓ src/app.test.ts (3 tests) 12ms\n\nTests  3 passed (3)'),
+      result(
+        '> buggyapp@1.0.0 test\n> vitest run\n\n ✓ src/app.test.ts (3 tests) 12ms\n\nTests  3 passed (3)',
+      ),
     ],
     runningToolCalls: [],
     toolOutputPartials: {},

@@ -29,6 +29,7 @@ describe('wouldDestroyWorkspace — what it refuses', () => {
   it('refuses removing $HOME, however it is written', () => {
     expect(guard('rm -rf ~')).toMatch(/home directory/);
     expect(guard('rm -rf $HOME')).toMatch(/home directory/);
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the shell's ${HOME}, as a model would type it
     expect(guard('rm -rf ${HOME}')).toMatch(/home directory/);
   });
 

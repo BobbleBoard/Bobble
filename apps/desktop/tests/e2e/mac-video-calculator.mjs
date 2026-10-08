@@ -37,7 +37,6 @@ import {
   mkdtempSync,
   readdirSync,
   rmSync,
-  statSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
@@ -132,7 +131,7 @@ await new Promise((resolve) => {
     });
   helper.stdout.on('data', (d) => {
     buf += d;
-    for (let i; (i = buf.indexOf('\n')) >= 0; ) {
+    for (let i = buf.indexOf('\n'); i >= 0; i = buf.indexOf('\n')) {
       const line = buf.slice(0, i);
       buf = buf.slice(i + 1);
       if (line.trim() === '') continue;
@@ -210,7 +209,7 @@ try {
     return res.result;
   };
 
-  const camera = (async () => {
+  void (async () => {
     while (shooting) {
       const at = Date.now();
       try {

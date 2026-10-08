@@ -63,9 +63,7 @@ try {
     }),
   );
   await sleep(2500);
-  const sub = await page.evaluate(() =>
-    window.piDesktop.invoke('mac:monitor:subscribe', { frames: true }),
-  );
+  await page.evaluate(() => window.piDesktop.invoke('mac:monitor:subscribe', { frames: true }));
   await sleep(4000);
   const st = await page.evaluate(() =>
     window.piDesktop.invoke('mac:monitor:subscribe', { frames: true }),

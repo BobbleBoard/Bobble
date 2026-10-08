@@ -42,7 +42,11 @@ function mount(props: Props) {
 describe('ActivityChain — the wait row', () => {
   it('stays mounted, marked leaving, while it folds, then goes', () => {
     vi.useFakeTimers();
-    const ui = mount({ steps: [step('a')], active: true, prefill: { percent: null, label: 'Processing' } });
+    const ui = mount({
+      steps: [step('a')],
+      active: true,
+      prefill: { percent: null, label: 'Processing' },
+    });
     const before = ui.row();
     expect(before).not.toBeNull();
     expect(before?.getAttribute('data-leaving')).toBeNull();
@@ -58,7 +62,11 @@ describe('ActivityChain — the wait row', () => {
   });
 
   it('is simply replaced when the next step arrives in the same render', () => {
-    const ui = mount({ steps: [step('a')], active: true, prefill: { percent: 40, label: 'Processing' } });
+    const ui = mount({
+      steps: [step('a')],
+      active: true,
+      prefill: { percent: 40, label: 'Processing' },
+    });
     expect(ui.row()).not.toBeNull();
     ui.rerender({ steps: [step('a'), step('b')], active: true });
     expect(ui.row()).toBeNull();

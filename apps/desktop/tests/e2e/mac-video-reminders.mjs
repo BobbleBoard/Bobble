@@ -96,7 +96,7 @@ try {
     return res.result;
   };
 
-  const camera = (async () => {
+  void (async () => {
     while (shooting) {
       const at = Date.now();
       try {

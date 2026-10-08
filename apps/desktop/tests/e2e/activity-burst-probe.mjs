@@ -145,7 +145,7 @@ try {
         });
         let t = '';
         for (let i = 0; i < 30; i++) {
-          t += `$ cmd ${k}-${i}\n` + 'x'.repeat(200) + '\n';
+          t += `$ cmd ${k}-${i}\n${'x'.repeat(200)}\n`;
           ctl.updateTab(id, { data: { mirror: true, mirrorText: t } });
         }
         // No await: reset in the same tick the writes were queued.

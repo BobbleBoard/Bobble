@@ -51,6 +51,12 @@
   },
   "overrides": [
     {
+      "includes": ["**/fixtures/**/*.svg", "**/fixtures/**/*.html"],
+      "linter": {
+        "enabled": false
+      }
+    },
+    {
       "includes": ["**/build/**"],
       "linter": {
         "rules": {

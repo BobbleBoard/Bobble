@@ -133,7 +133,7 @@ try {
 
   // Frames carry their capture time so the video plays back at the speed the
   // run actually happened rather than at a uniform rate.
-  const camera = (async () => {
+  void (async () => {
     while (shooting) {
       const at = Date.now();
       try {
@@ -287,7 +287,7 @@ try {
       .catch(() => '');
     say(`saved ${file} (${rtf.length} bytes)`);
     say(`  contains the typed line: ${rtf.toLowerCase().includes('bobble typed this line')}`);
-    say(`  contains a bold run: ${rtf.includes(String.fromCharCode(92) + 'b')}`);
+    say(`  contains a bold run: ${rtf.includes('\\b')}`);
   }
 
   await sleep(1200);

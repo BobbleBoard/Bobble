@@ -43,14 +43,6 @@ const { page, shot, check, finish } = await launchApp('comfy3d-fresh', {
   env: { HOME: home, GEN3D_CACHE_DIR: path.join(home, '.cache', 'bobble', 'gen3d') },
 });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const until = async (fn, timeout, arg) => {
-  try {
-    await page.waitForFunction(fn, arg, { timeout, polling: 500 });
-    return true;
-  } catch {
-    return false;
-  }
-};
 try {
   if (process.env.RESERVE_GB !== undefined) {
     const file = path.join(home, '.pi', 'desktop', 'settings.json');
@@ -80,7 +72,7 @@ try {
     `the ComfyUI download is the primary (${gate.comfyBtn})`,
   );
   check(
-    gate.engineBtn !== null && gate.engineBtn.includes('Xcode'),
+    gate.engineBtn?.includes('Xcode') === true,
     `the engine is offered as the secondary, saying what it needs (${gate.engineBtn})`,
   );
   await shot('01-gate');

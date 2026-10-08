@@ -122,19 +122,19 @@ export function wouldDestroyWorkspace(
      */
     if (target.includes('*') || target.includes('?')) continue;
     if (target === '/') {
-      return refusal(command, '/', workspace);
+      return refusal('/', workspace);
     }
     if (target === home) {
-      return refusal(command, 'your home directory', workspace);
+      return refusal('your home directory', workspace);
     }
     if (coversWorkspace(target, workspace)) {
-      return refusal(command, target === workspace ? 'the working directory' : target, workspace);
+      return refusal(target === workspace ? 'the working directory' : target, workspace);
     }
   }
   return null;
 }
 
-function refusal(command: string, what: string, workspace: string): string {
+function refusal(what: string, workspace: string): string {
   return (
     `that command would delete ${what}, which is where this task's work lives (${workspace}) — ` +
     'so it was not run. Everything you have made is in there, and nothing in the request ' +

@@ -123,7 +123,7 @@ function connectorState(
      which is what puts it under "Recommended for you" with its reason. */
   if (c.kind === 'module') {
     const m = moduleConnectors[c.id];
-    return m !== undefined && m.ready && m.on ? 'on' : 'available';
+    return m?.ready && m.on ? 'on' : 'available';
   }
   if (server === undefined) return 'available';
   if (server.enabled !== false) return 'on';
