@@ -17,7 +17,7 @@
  *    keys), Esc or a click outside to close.
  */
 import { IconChevronLeft, IconChevronRight, IconClose } from '@pi-desktop/ui';
-import { type JSX, useEffect } from 'react';
+import { type JSX, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { create } from 'zustand';
 import { pdFileUrl } from './canvas/file-preview';
@@ -55,8 +55,11 @@ export const useLightboxStore = create<LightboxState>((set, get) => ({
 const MAX_THUMBS = 4;
 
 /** The chain's pictures, small, at the right of its summary row. */
-export function ChainThumbs({ items }: { items: readonly ChainVisual[] }): JSX.Element | null {
+export function ChainThumbs({ items: all }: { items: readonly ChainVisual[] }): JSX.Element | null {
   const open = useLightboxStore((s) => s.open);
+  // A picture that will not load (moved, deleted) is left out, not drawn broken.
+  const [failed, setFailed] = useState<ReadonlySet<string>>(() => new Set());
+  const items = all.filter((v) => !failed.has(v.path));
   if (items.length === 0) return null;
   const shown = items.slice(0, MAX_THUMBS);
   const more = items.length - shown.length;
@@ -72,7 +75,12 @@ export function ChainThumbs({ items }: { items: readonly ChainVisual[] }): JSX.E
           title={v.name}
           onClick={() => open(items, i)}
         >
-          <img src={pdFileUrl(v.path)} alt={v.name} draggable={false} />
+          <img
+            src={pdFileUrl(v.path)}
+            alt={v.name}
+            draggable={false}
+            onError={() => setFailed((f) => new Set(f).add(v.path))}
+          />
         </button>
       ))}
       {more > 0 ? (
