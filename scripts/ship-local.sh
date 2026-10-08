@@ -105,9 +105,18 @@ DEST="/Applications/Bobble.app"
 # the user's Bobble open because the running-check and the ship shared one command.)
 if pgrep -f "$DEST/Contents/MacOS/Bobble" >/dev/null; then
   echo "ship-local: Bobble is running — asking it to quit"
+  # The Apple Event can go unheard (no Automation grant for whatever runs this
+  # script): 2026-10-08 the ship waited 30s on a Bobble that never got the ask.
+  # So after 10s, SIGTERM the main process. It is the same quit, not a force:
+  # Electron turns it into app.quit(), and before-quit's hold (pi/quit-hold.ts)
+  # still stops pi and the model servers.
   osascript -e 'tell application "Bobble" to quit' >/dev/null 2>&1 || true
-  for _ in $(seq 1 60); do
+  for i in $(seq 1 60); do
     pgrep -f "$DEST/Contents/MacOS/Bobble" >/dev/null || break
+    if [ "$i" -eq 20 ]; then
+      echo "ship-local: no answer to the Apple Event — sending SIGTERM (a normal quit)"
+      pkill -TERM -f "^$DEST/Contents/MacOS/Bobble( |\$)" || true
+    fi
     sleep 0.5
   done
   if pgrep -f "$DEST/Contents/MacOS/Bobble" >/dev/null; then
