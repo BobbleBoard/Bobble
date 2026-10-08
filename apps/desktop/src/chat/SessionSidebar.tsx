@@ -65,6 +65,8 @@ import { useProjectStore } from '../state/project-store';
 import { useSettingsStore } from '../state/settings-store';
 import { publishSessionList } from '../state/visible-projects';
 import { useThemeStore } from '../store/theme';
+import { screenOf } from '../tour/tour-steps';
+import { useTourStore } from '../tour/tour-store';
 import { formatModuleSize } from '../tripo/module-state';
 import { BobbleMark } from './BobbleMark';
 import { BG_RUN_IDLE, type BgRunWatch, watchBgRun } from './bg-run-watch';
@@ -175,7 +177,17 @@ function SidebarProfileMenu({
         data-testid="profile-menu"
       >
         {PROFILE_MENU_ACTIONS.map((action) =>
-          action.id === 'settings' ? (
+          action.id === 'tour' ? (
+            <DropdownMenuItem
+              key={action.id}
+              data-testid={action.testid}
+              icon={<Glyph name="help" size={16} />}
+              // Read the screen now, while it is the one being looked at.
+              onSelect={() => useTourStore.getState().start(screenOf(document))}
+            >
+              {action.label}
+            </DropdownMenuItem>
+          ) : action.id === 'settings' ? (
             <DropdownMenuItem
               key={action.id}
               data-testid={action.testid}

@@ -16,7 +16,7 @@ afterEach(() => {
 describe('the workspace nav registry', () => {
   it('draws the three rows the sidebar had, in order, with the same words, glyphs and test ids', () => {
     expect(workspaceNavRows(caps(true)).map((r) => [r.id, r.label, r.glyph, r.testid])).toEqual([
-      ['models', 'Model management', 'models', 'nav-model-management'],
+      ['models', 'Models', 'models', 'nav-model-management'],
       ['connectors', 'Extensions', 'extensions', 'nav-connectors'],
       ['scheduled', 'Scheduled', 'scheduled', 'nav-scheduled'],
     ]);

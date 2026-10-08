@@ -10,6 +10,7 @@
 
 import type { JSX } from 'react';
 import { useEffect, useState } from 'react';
+import { introduce } from '../intro/intro-store';
 import { exitModality } from '../state/modality-store';
 import { useStudioHandoff } from '../state/studio-handoff';
 import { GenPanel } from './GenPanel';
@@ -31,6 +32,10 @@ import {
 import './tripo.css';
 
 export function TripoWorkspace(): JSX.Element {
+  // The first time the studio opens on this Mac, the language's intro card says what it is for.
+  useEffect(() => {
+    introduce('studio3d');
+  }, []);
   const closeMenus = useTripoStore((s) => s.closeMenus);
   const [dropActive, setDropActive] = useState(false);
   /*

@@ -22,6 +22,7 @@
  * REPLACES it. Falling behind by dropping frames is a live view with a hiccup;
  * falling behind by queueing is a live view that is quietly minutes stale.
  */
+
 import type {
   CanvasController,
   MacMonitorAxScene,
@@ -33,6 +34,7 @@ import type {
 } from '@pi-desktop/canvas';
 import { IDLE_MAC_MONITOR_SESSION } from '@pi-desktop/canvas';
 import { useEffect, useRef } from 'react';
+import { introduce } from '../../intro/intro-store';
 import { useCanvasStore } from '../../state/canvas-store';
 import { useCorpStore } from '../../state/corp-store';
 import { abortPi, pausePi } from '../../state/pi-connect';
@@ -566,6 +568,8 @@ export function useMacMonitor(controller: CanvasController): void {
       if (tab !== undefined) controller.focusTab(tab.id);
       useCanvasStore.getState().setCanvasOpen(true);
       present.current = true;
+      // The first time Bobble uses an app on this Mac, the language's intro says what is happening.
+      introduce('computerUse');
     };
     present.current = controller.getState().tabs.some((t) => t.key === MAC_MONITOR_TAB_KEY);
     apply();

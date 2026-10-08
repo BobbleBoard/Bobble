@@ -25,6 +25,7 @@ import {
 } from '@pi-desktop/ui';
 import type { SerializedEditorState } from 'lexical';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useFeatureTipAt } from '../intro/FeatureTip';
 import { ExpandedScrim } from '../media/ExpandedScrim';
 import { usePictureViewer } from '../media/picture-viewer';
 import { IconMic, IconPause, IconPlay, IconStop } from '../settings/icons';
@@ -1311,6 +1312,8 @@ export function ChatComposer({
   useComposerActionsVersion();
   const modeChips = useComposerModeChips();
   const connectorsEntry = useConnectorsMenuEntry();
+  // The first time the pointer rests on +, its pop-out says the connectors live there.
+  useFeatureTipAt('connectors', '[aria-label="Add to message"]');
   const extraMenuEntries = [
     connectorsEntry,
     ...composerMenuEntries((glyph) => <Glyph name={glyph} size={16} />),

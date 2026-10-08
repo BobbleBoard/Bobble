@@ -362,7 +362,7 @@ try {
   /* ── 7b. go download a model, and switch to it ───────────────────────────── */
   await mark(page, 'model-download');
   await dismissBlockers();
-  await page.click('text=Model management');
+  await page.click('[data-testid="nav-model-management"]');
   await page.waitForSelector('[data-testid="models-view"]', { timeout: 10_000 });
   await page.waitForTimeout(900);
   // Drive the download the way the store does, so the bar, the percentage and
@@ -411,7 +411,7 @@ try {
   }
   await page.click('text=the seeded conversation');
   await page.waitForTimeout(700);
-  await page.click('text=Model management');
+  await page.click('[data-testid="nav-model-management"]');
   await page.waitForTimeout(900);
   await shot('07-model-hub');
   await page.click('text=the seeded conversation');

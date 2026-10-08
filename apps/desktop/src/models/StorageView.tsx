@@ -649,7 +649,11 @@ export function StorageView() {
               onExport={() => void exportNodes([focus])}
             />
           ) : (
-            <div className="pd-storage-card" data-testid="storage-summary">
+            <div
+              className="pd-storage-card"
+              data-testid="storage-summary"
+              title={`Measured in ${(overview.scanMs / 1000).toFixed(1)} s`}
+            >
               <div className="pd-storage-sum">
                 <div className="pd-storage-sum-line">
                   <span className="pd-storage-sum-big" data-tone={sizeTone(overview.library.bytes)}>
@@ -732,9 +736,8 @@ export function StorageView() {
                   .
                 </p>
               ) : null}
-              <p className="pd-storage-card-foot">
-                Measured in {(overview.scanMs / 1000).toFixed(1)} s.
-              </p>
+              {/* How long the scan took was a debug readout on the card; it is on
+                  the card's tooltip now, for whoever wants it. */}
             </div>
           )}
         </aside>

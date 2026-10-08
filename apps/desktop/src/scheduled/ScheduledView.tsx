@@ -559,7 +559,7 @@ export function ScheduledView() {
         ) : (
           <div className="sd-body" key="list">
             <header className="sd-header">
-              <h1 className="sd-title" data-testid="sd-title">
+              <h1 className="sd-title pd-display-l" data-testid="sd-title">
                 Scheduled
               </h1>
               <div className="sd-header-actions">

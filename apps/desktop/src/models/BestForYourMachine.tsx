@@ -35,7 +35,7 @@ import { Carousel } from './Carousel';
 import { DownloadBar } from './DownloadBar';
 import { type ModelRecommendation, type RecommenderHost, recommendAll } from './model-recommender';
 import { compactBytes } from './models-layout';
-import { Pill } from './Pill';
+import { hueForOutput, Pill } from './Pill';
 import { installKindOf, type ModelTask, type OutputModality } from './recommended-catalog';
 
 export interface BestForYourMachineProps {
@@ -174,7 +174,7 @@ function Card({
 
       {/* The footer: what it does, and the one thing to do about it. */}
       <div className="mt-auto flex items-center gap-2">
-        <Pill tone="info" testid={`best-task-${rec.modality}`}>
+        <Pill tone={hueForOutput(rec.modality)} testid={`best-task-${rec.modality}`}>
           {tag}
         </Pill>
         {progress !== undefined ? (

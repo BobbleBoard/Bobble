@@ -1163,8 +1163,26 @@ body {
  * ~30px. Local to this menu on purpose: it is a proportion between two adjacent
  * controls, not a claim about menus in general.
  */
+/*
+ * THE QUANT MENU'S ROWS ARE TARGETS, not lines of a table. the user (2026-10-08):
+ * the hover "seems really thin … it should be a bit wider and a bunch taller".
+ * They were 30px tall with the wash inset 5px from the panel — a strip under a
+ * 13px label. Now a 36px row whose wash reaches 4px from the panel edge, with a
+ * little more room either side of the label, so the live row reads as a block.
+ */
+.pd-menu.pd-quant-menu {
+  padding: 4px;
+}
 .pd-quant-menu .pd-menu-item {
-  min-height: 30px;
+  min-height: 36px;
+  padding-inline: 12px;
+  border-radius: 9px;
+}
+/* A wash that reads as a block in both themes: the shared hover is 4% ink on
+   the light panel, which on a 36px row still looked like nothing was lit. */
+.pd-quant-menu .pd-menu-item:hover,
+.pd-quant-menu .pd-menu-item:focus-visible {
+  background: color-mix(in srgb, var(--pd-text-primary) 7%, transparent);
 }
 
 .pd-wordmark {
@@ -9389,4 +9407,1052 @@ body[data-media-expanded="true"] .pd-studio-compose {
 }
 .pd-live-svg .pd-inline-widget-head {
   display: none;
+}
+
+/* ── The design language's three hues (design/language, 2026-10-07) ───────
+ * The mark's own tile colours, each with a tint (a wash behind a picture) and
+ * an ink (the step that holds 4.5:1 as text). One hue per picture, chosen by
+ * what it shows: teal is words and numbers, sun is pictures and pages, pink is
+ * things that move. Text on a hue fill is near-black in both themes. */
+:root {
+  --pd-hue-teal: #10bdbd;
+  --pd-hue-teal-tint: #e2f5f5;
+  --pd-hue-teal-ink: #0a7272;
+  --pd-hue-sun: #fbc52b;
+  --pd-hue-sun-tint: #fdf3d3;
+  --pd-hue-sun-ink: #8a5a00;
+  --pd-hue-pink: #f73e9c;
+  --pd-hue-pink-tint: #fde5f1;
+  --pd-hue-pink-ink: #b0126a;
+  --pd-on-hue: #111113;
+}
+:root[data-mode="dark"] {
+  --pd-hue-teal: #2bd0d0;
+  --pd-hue-teal-tint: #123a3a;
+  --pd-hue-teal-ink: #5ddcdb;
+  --pd-hue-sun: #ffd04d;
+  --pd-hue-sun-tint: #3b3214;
+  --pd-hue-sun-ink: #ffd25e;
+  --pd-hue-pink: #ff5aad;
+  --pd-hue-pink-tint: #42172d;
+  --pd-hue-pink-ink: #ff8cc6;
+}
+
+/* ── The Models page's header (ModelsView) ──────────────────────────────────
+ * the user (2026-10-08): the hub read as "a thing for technical users … a mess of
+ * filters and options all dumped there". The three places are the first,
+ * largest control; the machine's specs and the power filters fold away behind
+ * quiet pill buttons and open in place. */
+.pd-hub-tabs {
+  display: inline-flex;
+  flex: none;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--pd-radius-full);
+  border: 1px solid var(--pd-border-subtle);
+  background: var(--pd-bg-inset);
+}
+.pd-hub-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 16px;
+  border-radius: var(--pd-radius-full);
+  font-size: var(--pd-font-size-body);
+  font-weight: 500;
+  color: var(--pd-text-secondary);
+  transition:
+    background-color var(--pd-duration-base) var(--pd-easing-standard),
+    color var(--pd-duration-base) var(--pd-easing-standard);
+}
+.pd-hub-tab:hover {
+  color: var(--pd-text-primary);
+}
+.pd-hub-tab[data-active="true"] {
+  background: var(--pd-bg-raised);
+  color: var(--pd-text-primary);
+  box-shadow: var(--pd-shadow-sm);
+}
+
+/* A quiet pill: This Mac, Filters, the ⋯ menu. */
+.pd-hub-quiet {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 11px;
+  border-radius: var(--pd-radius-full);
+  border: 1px solid var(--pd-border-subtle);
+  background: var(--pd-bg-raised);
+  font-size: var(--pd-font-size-footnote);
+  color: var(--pd-text-secondary);
+  white-space: nowrap;
+  transition:
+    background-color var(--pd-duration-base) var(--pd-easing-standard),
+    color var(--pd-duration-base) var(--pd-easing-standard);
+}
+.pd-hub-quiet:hover,
+.pd-hub-quiet[aria-expanded="true"],
+.pd-hub-quiet[data-state="open"] {
+  background: var(--pd-bg-hover);
+  color: var(--pd-text-primary);
+}
+.pd-hub-quiet--icon {
+  width: 30px;
+  padding: 0;
+  justify-content: center;
+}
+/* How many refinements behind Filters are set. */
+.pd-hub-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: var(--pd-radius-full);
+  background: var(--pd-accent-subtle);
+  color: var(--pd-accent-primary);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+/* Opens in place: the row's height eases from nothing to its content
+   (grid rows 0fr ↔ 1fr, no measuring). Clipped only while closed, because the
+   dropdowns inside hang below the row once it is open. */
+.pd-hub-reveal {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows var(--pd-duration-slow) var(--pd-easing-standard),
+    opacity var(--pd-duration-base) var(--pd-easing-standard);
+}
+.pd-hub-reveal > * {
+  min-height: 0;
+  overflow: hidden;
+}
+.pd-hub-reveal[data-open="true"] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+.pd-hub-reveal[data-open="true"] > * {
+  overflow: visible;
+}
+
+/* ── The quick tour (tour/GuidedTour.tsx) ────────────────────────────────────
+ * A spotlight and the design language's pop-out: a card on the raised surface
+ * with an edge ring and the popover shadow, a 12px notch turned 45° toward the
+ * control it explains (--notch is how far along the edge), a 15px semibold
+ * title, a 13px line in the secondary ink, and Next in the accent. */
+.pd-tour {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  pointer-events: none;
+}
+.pd-tour-shield {
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+}
+.pd-tour-spot {
+  position: absolute;
+  border-radius: 12px;
+  box-shadow:
+    0 0 0 2px var(--pd-accent-primary),
+    0 0 0 9999px var(--pd-bg-backdrop);
+  transition:
+    left var(--pd-duration-slow) var(--pd-easing-enter),
+    top var(--pd-duration-slow) var(--pd-easing-enter),
+    width var(--pd-duration-slow) var(--pd-easing-enter),
+    height var(--pd-duration-slow) var(--pd-easing-enter);
+}
+.pd-tour-card {
+  position: absolute;
+  box-sizing: border-box;
+  width: 300px;
+  padding: 14px 14px 10px;
+  border-radius: 14px;
+  background: var(--pd-bg-raised);
+  box-shadow:
+    0 0 0 1px var(--pd-border-default),
+    var(--pd-shadow-popover);
+  color: var(--pd-text-primary);
+  pointer-events: auto;
+  transition:
+    left var(--pd-duration-slow) var(--pd-easing-enter),
+    top var(--pd-duration-slow) var(--pd-easing-enter);
+  animation: pd-tour-in var(--pd-duration-slow) var(--pd-easing-enter) both;
+}
+.pd-tour-card::before {
+  content: "";
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: var(--pd-bg-raised);
+  transform: rotate(45deg);
+}
+.pd-tour-card--left::before {
+  left: -6px;
+  top: calc(var(--notch, 28px) - 6px);
+  border-bottom-left-radius: 3px;
+  box-shadow: -1px 1px 0 0 var(--pd-border-default);
+}
+.pd-tour-card--right::before {
+  right: -6px;
+  top: calc(var(--notch, 28px) - 6px);
+  border-top-right-radius: 3px;
+  box-shadow: 1px -1px 0 0 var(--pd-border-default);
+}
+.pd-tour-card--up::before {
+  top: -6px;
+  left: calc(var(--notch, 28px) - 6px);
+  border-top-left-radius: 3px;
+  box-shadow: -1px -1px 0 0 var(--pd-border-default);
+}
+.pd-tour-card--down::before {
+  bottom: -6px;
+  left: calc(var(--notch, 28px) - 6px);
+  border-bottom-right-radius: 3px;
+  box-shadow: 1px 1px 0 0 var(--pd-border-default);
+}
+.pd-tour-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--pd-radius-full);
+  color: var(--pd-text-muted);
+}
+.pd-tour-close:hover {
+  background: var(--pd-bg-hover);
+  color: var(--pd-text-primary);
+}
+.pd-tour-title {
+  margin: 0;
+  padding-right: 24px;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 600;
+}
+.pd-tour-text {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--pd-text-secondary);
+}
+.pd-tour-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+}
+.pd-tour-count {
+  margin-right: auto;
+  font-size: 12px;
+  color: var(--pd-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.pd-tour-btn {
+  height: 28px;
+  padding: 0 14px;
+  border-radius: var(--pd-radius-full);
+  background: var(--pd-accent-primary);
+  color: var(--pd-text-on-accent);
+  font-size: 13px;
+  font-weight: 500;
+  transition: background-color var(--pd-duration-base) var(--pd-easing-standard);
+}
+.pd-tour-btn:hover {
+  background: var(--pd-accent-hover);
+}
+.pd-tour-btn--quiet {
+  background: transparent;
+  color: var(--pd-text-secondary);
+}
+.pd-tour-btn--quiet:hover {
+  background: var(--pd-bg-hover);
+  color: var(--pd-text-primary);
+}
+/* It opens from the notch: a short settle out of the control it explains. */
+@keyframes pd-tour-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pd-tour-spot,
+  .pd-tour-card {
+    transition: none;
+    animation: none;
+  }
+}
+
+/* ── First-use intro card (intro/IntroCard.tsx) ──────────────────────────────
+ * The design language's .bb-intro: frosted overlay glass on a dimmed, blurred
+ * window; a 236px stage washed in the picture's hue; an eyebrow, a display-face
+ * title, one sentence, and "Got it" bottom right. */
+.pd-intro-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  display: grid;
+  place-items: center;
+  background: var(--pd-bg-backdrop);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  animation: pd-intro-fade var(--pd-duration-slow) var(--pd-easing-standard) both;
+}
+.pd-intro {
+  --hue: var(--pd-hue-sun);
+  --hue-tint: var(--pd-hue-sun-tint);
+  --hue-ink: var(--pd-hue-sun-ink);
+  box-sizing: border-box;
+  width: 440px;
+  max-width: calc(100vw - 32px);
+  padding: 8px;
+  border-radius: 18px;
+  background: var(--pd-bg-overlay);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  backdrop-filter: blur(20px) saturate(1.4);
+  box-shadow:
+    0 0 0 1px var(--pd-border-subtle),
+    var(--pd-shadow-lg);
+  color: var(--pd-text-primary);
+  animation: pd-intro-in var(--pd-duration-slow) var(--pd-easing-enter) both;
+}
+.pd-intro[data-hue="teal"] {
+  --hue: var(--pd-hue-teal);
+  --hue-tint: var(--pd-hue-teal-tint);
+  --hue-ink: var(--pd-hue-teal-ink);
+}
+.pd-intro[data-hue="pink"] {
+  --hue: var(--pd-hue-pink);
+  --hue-tint: var(--pd-hue-pink-tint);
+  --hue-ink: var(--pd-hue-pink-ink);
+}
+.pd-intro-stage {
+  position: relative;
+  height: 236px;
+  border-radius: 10px;
+  background: var(--hue-tint);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+.pd-intro-body {
+  padding: 18px 14px 0;
+}
+.pd-intro-eyebrow {
+  margin: 0 0 6px;
+  font-size: 11px;
+  line-height: 14px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--pd-text-muted);
+}
+.pd-intro-text {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--pd-text-secondary);
+}
+.pd-intro-foot {
+  display: flex;
+  justify-content: flex-end;
+  padding: 18px 6px 6px;
+}
+.pd-intro-foot .pd-tour-btn {
+  height: 32px;
+  padding: 0 18px;
+  font-size: 14px;
+}
+@keyframes pd-intro-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes pd-intro-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+
+/* The 3D demo: a picture in the hue becomes a model, built from the ground up. */
+.pd-intro-make {
+  display: block;
+  width: 424px;
+  height: 236px;
+  overflow: visible;
+}
+.pd-intro-plate {
+  fill: var(--pd-bg-raised);
+  stroke: var(--pd-border-subtle);
+  stroke-width: 1;
+}
+.pd-intro-flat {
+  fill: var(--hue);
+}
+.pd-intro-flat-ink {
+  fill: var(--hue-ink);
+}
+.pd-intro-dot {
+  fill: var(--hue);
+}
+.pd-intro-model {
+  --n-top: color-mix(in srgb, var(--pd-text-primary) 7%, var(--pd-bg-raised));
+  --n-body: color-mix(in srgb, var(--pd-text-primary) 15%, var(--pd-bg-raised));
+  --n-in: color-mix(in srgb, var(--pd-text-primary) 30%, var(--pd-bg-raised));
+}
+.pd-intro-top {
+  fill: var(--n-top);
+}
+.pd-intro-body-fill {
+  fill: var(--n-body);
+}
+.pd-intro-in {
+  fill: var(--n-in);
+}
+.pd-intro-light {
+  fill: url(#pd-intro-round);
+}
+.pd-intro-ground {
+  fill: rgba(0, 0, 0, 0.06);
+}
+:root[data-mode="dark"] .pd-intro-ground {
+  fill: rgba(0, 0, 0, 0.32);
+}
+.pd-intro-part {
+  animation: pd-intro-build 4800ms cubic-bezier(0.32, 0.72, 0, 1) infinite backwards;
+}
+.pd-intro-base {
+  animation-delay: 1150ms;
+}
+.pd-intro-stem {
+  animation-delay: 1450ms;
+}
+.pd-intro-shade {
+  animation-delay: 1750ms;
+}
+.pd-intro-dot {
+  animation: pd-intro-think 4800ms var(--pd-easing-standard) infinite backwards;
+}
+.pd-intro-d2 {
+  animation-delay: 160ms;
+}
+.pd-intro-d3 {
+  animation-delay: 320ms;
+}
+@keyframes pd-intro-build {
+  0% {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  12%,
+  70% {
+    opacity: 1;
+    transform: none;
+  }
+  78%,
+  100% {
+    opacity: 0;
+    transform: none;
+  }
+}
+@keyframes pd-intro-think {
+  0% {
+    opacity: 0.25;
+  }
+  6%,
+  14% {
+    opacity: 1;
+  }
+  22%,
+  100% {
+    opacity: 0.25;
+  }
+}
+/* The rest state is the picture: with Reduce Motion, the finished model. */
+@media (prefers-reduced-motion: reduce) {
+  .pd-intro-scrim,
+  .pd-intro,
+  .pd-intro-part,
+  .pd-intro-dot {
+    animation: none;
+  }
+}
+
+/* ── The pop-out (intro/FeatureTip.tsx) ──────────────────────────────────────
+ * The tour card's surface and notch with the language's demo stage on top:
+ * 288px wide, 6px around a 136px stage washed in the picture's hue. */
+.pd-tour-card.pd-tip {
+  width: 288px;
+  padding: 6px;
+}
+.pd-tip-stage {
+  position: relative;
+  z-index: 1;
+  height: 136px;
+  border-radius: 8px;
+  background: var(--pd-hue-sun-tint);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+.pd-tip[data-hue="teal"] .pd-tip-stage {
+  background: var(--pd-hue-teal-tint);
+}
+.pd-tip[data-hue="pink"] .pd-tip-stage {
+  background: var(--pd-hue-pink-tint);
+}
+.pd-tip-title {
+  margin: 0;
+  padding: 12px 10px 0;
+}
+.pd-tip .pd-tour-text {
+  padding: 0 10px;
+}
+.pd-tip-foot {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 4px 4px;
+}
+
+/* The Segment demo: the lamp takes a hue per part, then the parts lift apart. */
+.pd-segdemo {
+  display: block;
+  width: 150px;
+  height: 128px;
+  overflow: visible;
+  --n-top: color-mix(in srgb, var(--pd-text-primary) 7%, var(--pd-bg-raised));
+  --n-body: color-mix(in srgb, var(--pd-text-primary) 15%, var(--pd-bg-raised));
+  --n-in: color-mix(in srgb, var(--pd-text-primary) 30%, var(--pd-bg-raised));
+}
+.pd-segdemo-part[data-hue="teal"] {
+  --hue: var(--pd-hue-teal);
+}
+.pd-segdemo-part[data-hue="sun"] {
+  --hue: var(--pd-hue-sun);
+}
+.pd-segdemo-part[data-hue="pink"] {
+  --hue: var(--pd-hue-pink);
+}
+.pd-segdemo-n-body {
+  fill: var(--n-body);
+}
+.pd-segdemo-n-top {
+  fill: var(--n-top);
+}
+.pd-segdemo-n-in {
+  fill: var(--n-in);
+}
+.pd-segdemo-h-body {
+  fill: var(--hue);
+}
+.pd-segdemo-h-top {
+  fill: color-mix(in srgb, var(--hue) 52%, #fff);
+}
+.pd-segdemo-h-in {
+  fill: color-mix(in srgb, var(--hue) 62%, #000);
+}
+/* The rest state is the result: coloured and apart. */
+.pd-segdemo-stem {
+  transform: translateY(-32px);
+}
+.pd-segdemo-shade {
+  transform: translateY(-64px);
+}
+.pd-segdemo-h-body,
+.pd-segdemo-h-top,
+.pd-segdemo-h-in {
+  animation: pd-segdemo-tint 4800ms var(--pd-easing-standard) infinite;
+}
+.pd-segdemo-stem :is(.pd-segdemo-h-body, .pd-segdemo-h-top, .pd-segdemo-h-in) {
+  animation-delay: 300ms;
+}
+.pd-segdemo-shade :is(.pd-segdemo-h-body, .pd-segdemo-h-top, .pd-segdemo-h-in) {
+  animation-delay: 600ms;
+}
+.pd-segdemo-stem {
+  animation: pd-segdemo-lift-stem 4800ms cubic-bezier(0.32, 0.72, 0, 1) infinite;
+}
+.pd-segdemo-shade {
+  animation: pd-segdemo-lift-shade 4800ms cubic-bezier(0.32, 0.72, 0, 1) infinite;
+}
+@keyframes pd-segdemo-tint {
+  0%,
+  10% {
+    opacity: 0;
+  }
+  17%,
+  86% {
+    opacity: 1;
+  }
+  94%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes pd-segdemo-lift-stem {
+  0%,
+  38% {
+    transform: none;
+  }
+  52%,
+  80% {
+    transform: translateY(-32px);
+  }
+  92%,
+  100% {
+    transform: none;
+  }
+}
+@keyframes pd-segdemo-lift-shade {
+  0%,
+  34% {
+    transform: none;
+  }
+  50%,
+  80% {
+    transform: translateY(-64px);
+  }
+  92%,
+  100% {
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pd-segdemo-stem,
+  .pd-segdemo-shade,
+  .pd-segdemo-h-body,
+  .pd-segdemo-h-top,
+  .pd-segdemo-h-in {
+    animation: none;
+  }
+}
+
+/* The computer-use demo (IntroCard CursorAtWork): the language's ComputerUse
+   card at 62%, one 4.8s loop — glide, type, glide, press, done. */
+.pd-cu-mini {
+  --loop: 4800ms;
+  transform: scale(0.62);
+}
+.pd-cu-window {
+  width: 380px;
+  border-radius: 14px;
+  background: var(--pd-bg-raised);
+  box-shadow:
+    0 0 0 1px var(--pd-border-subtle),
+    var(--pd-shadow-md);
+}
+.pd-cu-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--pd-border-subtle);
+}
+.pd-cu-bar i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--pd-text-primary) 18%, transparent);
+}
+.pd-cu-body {
+  position: relative;
+  padding: 24px 24px 28px;
+}
+.pd-cu-title {
+  margin-bottom: 18px;
+}
+.pd-cu-label {
+  width: 64px;
+  height: 7px;
+  margin: 0 0 8px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--pd-text-primary) 10%, transparent);
+}
+.pd-cu-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 34px;
+  margin-bottom: 16px;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: var(--pd-bg-inset);
+  box-shadow: inset 0 0 0 1px var(--pd-border-subtle);
+}
+.pd-cu-focus {
+  animation: pd-cu-focus var(--loop) var(--pd-easing-standard) infinite;
+}
+.pd-cu-typed {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.pd-cu-line {
+  display: block;
+  width: 132px;
+  height: 7px;
+  border-radius: 9999px;
+  background: var(--pd-text-primary);
+  opacity: 0.55;
+  animation: pd-cu-type var(--loop) steps(9, end) infinite;
+}
+.pd-cu-caret {
+  display: inline-block;
+  width: 2px;
+  height: 16px;
+  border-radius: 1px;
+  background: var(--hue-ink);
+  opacity: 0;
+  animation: pd-cu-caret var(--loop) linear infinite;
+}
+.pd-cu-btn {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 108px;
+  height: 34px;
+  margin-top: 6px;
+  border-radius: 10px;
+  background: var(--pd-text-primary);
+}
+.pd-cu-btn i {
+  width: 48px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--pd-bg-raised);
+  animation: pd-cu-btn-word var(--loop) var(--pd-easing-standard) infinite;
+}
+.pd-cu-btn svg {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  color: var(--pd-bg-raised);
+  stroke-width: 1.5;
+  animation: pd-cu-btn-done var(--loop) cubic-bezier(0.34, 1.4, 0.64, 1) infinite;
+}
+/* The tip rests on the button; every other place is a translate from there. */
+.pd-cu-cursor {
+  position: absolute;
+  left: 92px;
+  top: 214px;
+  width: 22.14px;
+  height: 25.3px;
+  margin: -0.92px 0 0 -1.53px;
+  transform-origin: 1.53px 0.92px;
+  pointer-events: none;
+  animation: pd-cu-travel var(--loop) linear infinite;
+}
+.pd-cu-cursor svg {
+  display: block;
+  overflow: visible;
+}
+.pd-cu-status {
+  position: absolute;
+  left: 12.53px;
+  top: 15.92px;
+  padding: 6px 12px;
+  border-radius: 13px;
+  background: rgba(39, 105, 239, 0.96);
+  box-shadow: 0 4px 14px rgba(6, 8, 14, 0.35);
+  color: #ffffff;
+  font: 600 12px / 1.2 var(--pd-font-sans);
+  white-space: nowrap;
+  opacity: 0;
+}
+.pd-cu-s-type {
+  animation: pd-cu-s-type var(--loop) var(--pd-easing-standard) infinite;
+}
+.pd-cu-s-click {
+  animation: pd-cu-s-click var(--loop) var(--pd-easing-standard) infinite;
+}
+/* Glides are 6.25% of the loop on the cursor's ease; a press is a 150ms
+   squeeze to 0.78 about the tip, as agent-cursor.ts has it. */
+@keyframes pd-cu-travel {
+  0% {
+    transform: translate(226px, 30px);
+    opacity: 0;
+  }
+  4%,
+  8% {
+    transform: translate(226px, 30px);
+    opacity: 1;
+    animation-timing-function: cubic-bezier(0.22, 0.9, 0.32, 1.1);
+  }
+  14.25%,
+  15% {
+    transform: translate(206px, -116px);
+    animation-timing-function: ease-in-out;
+  }
+  16.4% {
+    transform: translate(206px, -116px) scale(0.78);
+    animation-timing-function: ease-in-out;
+  }
+  18.1%,
+  54% {
+    transform: translate(206px, -116px);
+    animation-timing-function: cubic-bezier(0.22, 0.9, 0.32, 1.1);
+  }
+  60.25%,
+  61% {
+    transform: none;
+    animation-timing-function: ease-in-out;
+  }
+  62.4% {
+    transform: scale(0.78);
+    animation-timing-function: ease-in-out;
+  }
+  64.1%,
+  92% {
+    transform: none;
+    opacity: 1;
+  }
+  100% {
+    transform: none;
+    opacity: 0;
+  }
+}
+@keyframes pd-cu-focus {
+  0%,
+  17% {
+    box-shadow:
+      inset 0 0 0 1px var(--pd-border-subtle),
+      0 0 0 0 var(--hue);
+  }
+  19%,
+  62% {
+    box-shadow:
+      inset 0 0 0 1px var(--pd-border-subtle),
+      0 0 0 2px var(--hue);
+  }
+  66%,
+  100% {
+    box-shadow:
+      inset 0 0 0 1px var(--pd-border-subtle),
+      0 0 0 0 var(--hue);
+  }
+}
+@keyframes pd-cu-type {
+  0%,
+  20% {
+    width: 0;
+  }
+  46%,
+  95% {
+    width: 132px;
+  }
+  100% {
+    width: 0;
+  }
+}
+@keyframes pd-cu-caret {
+  0%,
+  18% {
+    opacity: 0;
+  }
+  19%,
+  52% {
+    opacity: 1;
+  }
+  53%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes pd-cu-s-type {
+  0%,
+  18% {
+    opacity: 0;
+  }
+  20%,
+  48% {
+    opacity: 1;
+  }
+  51%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes pd-cu-s-click {
+  0%,
+  60% {
+    opacity: 0;
+  }
+  61.5%,
+  70% {
+    opacity: 1;
+  }
+  73%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes pd-cu-btn-word {
+  0%,
+  63.5% {
+    opacity: 0.85;
+  }
+  65%,
+  95% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0.85;
+  }
+}
+@keyframes pd-cu-btn-done {
+  0%,
+  64% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  69%,
+  95% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+/* The rest state is the picture: typed, pressed, done. */
+@media (prefers-reduced-motion: reduce) {
+  .pd-cu-focus,
+  .pd-cu-line,
+  .pd-cu-caret,
+  .pd-cu-btn i,
+  .pd-cu-btn svg,
+  .pd-cu-cursor,
+  .pd-cu-s-type,
+  .pd-cu-s-click {
+    animation: none;
+  }
+  .pd-cu-btn i {
+    opacity: 0;
+  }
+}
+.pd-intro-foot .pd-intro-action {
+  margin-right: auto;
+}
+
+/* The Connectors demo (FeatureTip ConnectorsDemo): the + menu's list, small,
+   and the first switch turning on. */
+.pd-cdemo {
+  width: 210px;
+  padding: 5px;
+  border-radius: 12px;
+  background: var(--pd-bg-overlay);
+  box-shadow:
+    0 0 0 1px var(--pd-border-subtle),
+    var(--pd-shadow-md);
+}
+.pd-cdemo-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--pd-text-primary);
+}
+.pd-cdemo-mark {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  background: var(--pd-bg-inset);
+}
+.pd-cdemo-mark--plain {
+  background: transparent;
+  color: var(--pd-text-secondary);
+}
+.pd-cdemo-name {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+}
+.pd-cdemo-switch {
+  position: relative;
+  width: 26px;
+  height: 16px;
+  border-radius: 9999px;
+  background: var(--pd-bg-track);
+}
+.pd-cdemo-switch i {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+.pd-cdemo-switch[data-on="true"] {
+  background: var(--pd-hue-teal);
+}
+.pd-cdemo-switch[data-on="true"] i {
+  transform: translateX(10px);
+}
+.pd-cdemo-switch--flip {
+  animation: pd-cdemo-track 4800ms var(--pd-easing-standard) infinite;
+}
+.pd-cdemo-switch--flip i {
+  animation: pd-cdemo-knob 4800ms cubic-bezier(0.34, 1.4, 0.64, 1) infinite;
+}
+@keyframes pd-cdemo-track {
+  0%,
+  30% {
+    background: var(--pd-bg-track);
+  }
+  36%,
+  88% {
+    background: var(--pd-hue-teal);
+  }
+  94%,
+  100% {
+    background: var(--pd-bg-track);
+  }
+}
+@keyframes pd-cdemo-knob {
+  0%,
+  30% {
+    transform: none;
+  }
+  38%,
+  88% {
+    transform: translateX(10px);
+  }
+  94%,
+  100% {
+    transform: none;
+  }
+}
+/* The rest state: on. */
+@media (prefers-reduced-motion: reduce) {
+  .pd-cdemo-switch--flip,
+  .pd-cdemo-switch--flip i {
+    animation: none;
+  }
+  .pd-cdemo-switch--flip {
+    background: var(--pd-hue-teal);
+  }
+  .pd-cdemo-switch--flip i {
+    transform: translateX(10px);
+  }
 }

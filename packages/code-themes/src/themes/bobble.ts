@@ -36,8 +36,8 @@ export const bobbleLight: CodeTheme = {
     bg: '#ffffff',
     fg: '#1d1d1f',
     lineNumber: '#1d1d1f4d',
-    selection: '#0071e340',
-    cursor: '#0071e3',
+    selection: '#0a727240',
+    cursor: '#0a7272',
   },
   syntax: {
     keyword: '#a3236b',
@@ -60,7 +60,7 @@ export const bobbleLight: CodeTheme = {
   terminal: {
     fg: '#1d1d1f',
     bg: '#00000000',
-    cursor: '#0071e3',
+    cursor: '#0a7272',
     selection: '#7878801f',
     ansi: {
       black: '#1d1d1f',
@@ -96,8 +96,8 @@ export const bobbleDark: CodeTheme = {
     bg: '#1e1e21',
     fg: '#f5f5f7',
     lineNumber: '#f5f5f74d',
-    selection: '#0a84ff40',
-    cursor: '#0a84ff',
+    selection: '#16a3a340',
+    cursor: '#16a3a3',
   },
   syntax: {
     keyword: '#ff9ac8',
@@ -120,7 +120,7 @@ export const bobbleDark: CodeTheme = {
   terminal: {
     fg: '#f5f5f7',
     bg: '#00000000',
-    cursor: '#0a84ff',
+    cursor: '#16a3a3',
     selection: '#ffffff17',
     ansi: {
       black: '#5c5c64',

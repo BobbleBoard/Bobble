@@ -65,11 +65,8 @@
   gap: 16px 24px;
   padding-top: 36px;
 }
+/* Set in the display face (.pd-display-l, the design language's screen title). */
 .pdc-title {
-  font-size: 28px;
-  line-height: 34px;
-  font-weight: var(--pd-font-weight-semibold);
-  letter-spacing: -0.015em;
   color: var(--pd-text-primary);
 }
 .pdc-sub {

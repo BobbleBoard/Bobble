@@ -26,7 +26,16 @@
 import type { JSX, ReactNode } from 'react';
 import { cx } from '../onboarding/cx';
 
-export type PillTone = 'neutral' | 'accent' | 'info' | 'success' | 'warning' | 'danger';
+export type PillTone =
+  | 'neutral'
+  | 'accent'
+  | 'info'
+  | 'success'
+  | 'warning'
+  | 'danger'
+  | 'teal'
+  | 'sun'
+  | 'pink';
 
 const TOKEN: Record<PillTone, string> = {
   neutral: '--pd-text-muted',
@@ -35,7 +44,24 @@ const TOKEN: Record<PillTone, string> = {
   success: '--pd-status-success-fg',
   warning: '--pd-status-warning-fg',
   danger: '--pd-status-danger-fg',
+  // The design language's hue jobs (global.css --pd-hue-*-ink).
+  teal: '--pd-hue-teal-ink',
+  sun: '--pd-hue-sun-ink',
+  pink: '--pd-hue-pink-ink',
 };
+
+/**
+ * WHAT A MODEL MAKES, IN ITS HUE — the design language's one rule for colour on
+ * a picture, carried onto the tag that names the picture: teal is words and
+ * numbers, sun is pictures and pages, pink is things that move (video, 3D, and
+ * sound, which moves in time). Every "what it makes" tag in the hub was the same
+ * blue "info" pill.
+ */
+export function hueForOutput(output: string): 'teal' | 'sun' | 'pink' {
+  if (output === 'image') return 'sun';
+  if (output === 'video' || output === '3d' || output === 'audio') return 'pink';
+  return 'teal';
+}
 
 export interface PillProps {
   readonly tone?: PillTone;

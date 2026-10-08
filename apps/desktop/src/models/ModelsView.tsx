@@ -30,6 +30,10 @@ import {
   reliableAuthorsForDomains,
 } from '@pi-desktop/inference/catalog';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   Glyph,
   IconCheck,
   IconChevronDown,
@@ -42,6 +46,7 @@ import {
   IconListCompact,
   IconMore,
   IconRefresh,
+  IconSlider,
   ScrollArea,
   Spinner,
   writeClipboardText,
@@ -751,6 +756,17 @@ export function ModelsView() {
     kind === 'datasets'
       ? setDatasetFilters(DEFAULT_DATASET_FILTERS)
       : setModelFilters(DEFAULT_FILTERS);
+  /** The refinements behind Filters that are set — the count on its button. */
+  const refinements =
+    (filters.format !== (kind === 'datasets' ? DEFAULT_DATASET_FILTERS : DEFAULT_FILTERS).format
+      ? 1
+      : 0) +
+    (filters.capabilities.length > 0 ? 1 : 0) +
+    (filters.onlyFits ? 1 : 0) +
+    (filters.maxSize !== undefined ? 1 : 0);
+  /* The machine's specs and the power filters are folded away until asked for. */
+  const [macOpen, setMacOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const isFiltered =
     (filters.outputs ?? []).length > 0 ||
     filters.capabilities.length > 0 ||
@@ -1706,108 +1722,128 @@ export function ModelsView() {
       {/* No traffic-light strip: the hub renders INSIDE the chat shell now, which
           already owns the drag region and the top bar. A second one here left a
           dead 44px band and a back button under the real title. */}
-      {/* Header + hardware strip */}
-      <div className="flex shrink-0 items-start justify-between gap-6 px-6 pt-3 pb-3">
-        <div>
-          {/* No "Back to chat": the sidebar is always present now and its New
-              chat row sits inches away — the user: "don't put a back to chat button
-              it's right next to the 'new chat' button anyways." */}
-          <h1 className="text-title text-text-primary">
-            {kind === 'datasets' ? 'Datasets' : 'Model hub'}
+      {/*
+       * THE HEADER, FOR SOMEONE WHO JUST WANTS A MODEL.
+       *
+       * the user (2026-10-08): "'model hub' feels like a thing for technical users
+       * when it's put like this, but it's placed by default on the sidebar … we
+       * should make it more friendly", and the page was "a mess of filters and
+       * options all dumped there". So: one plain title; the three places
+       * (Discover, On this Mac, Storage) are the first control; the machine's
+       * specs fold into "This Mac"; datasets (for training) move into the ⋯
+       * menu; and the power filters (format, capabilities, sort, size, layout)
+       * sit behind one Filters button. The testids are unchanged.
+       */}
+      <div className="flex shrink-0 items-start justify-between gap-6 px-6 pt-4 pb-3">
+        <div className="min-w-0">
+          <h1 className="pd-display-l text-text-primary">
+            {kind === 'datasets' ? 'Datasets' : 'Models'}
           </h1>
-          <p className="mt-0.5 text-footnote text-text-muted">
+          <p className="mt-1 text-footnote text-text-secondary">
             {kind === 'datasets'
-              ? 'Discover, download, and train on datasets locally.'
-              : 'Find, download and run models on this computer.'}
+              ? 'Data to train a model on, from Hugging Face.'
+              : 'Pick one for what you want to make. It downloads once, then runs on this Mac.'}
           </p>
         </div>
-        <div
-          className="flex max-w-[560px] flex-wrap items-center justify-end gap-1.5"
-          data-testid="hardware-strip"
-        >
-          {/*
-           * READ THESE OUT LOUD. They used to say "4 Local · 21 Models · 24 GiB
-           * RAM · 15 CPU" — two different counts of models with no way to tell
-           * which was which, a unit nobody outside a datasheet writes, and
-           * "15 CPU", which is not a thing. This strip is the first line a new
-           * user's eye lands on after the title, and it was reading like a
-           * debug HUD.
-           *
-           * GB rather than GiB because `compactBytes` already labels 1024-based
-           * gigabytes "GB" on every card in the hub, and one screen should not
-           * use two conventions for the same quantity.
-           */}
-          <Chip label="downloaded" value={String(localCount)} />
-          <Chip label="available" value={String(all.length)} />
-          {hw !== null ? (
-            <>
-              <Chip label="GB RAM" value={String(hw.ramGiB)} />
-              <Chip label={hw.cpus === 1 ? 'CPU core' : 'CPU cores'} value={String(hw.cpus)} />
-            </>
-          ) : null}
-          {disk !== null ? (
-            <span data-testid="hub-disk-free" title={`${compactBytes(disk.total)} disk`}>
-              <Chip label="GB free" value={String(Math.round(disk.free / 1024 ** 3))} />
-            </span>
-          ) : null}
+        <div className="flex shrink-0 items-center gap-1.5 pt-1">
+          <button
+            type="button"
+            data-testid="hub-mac-toggle"
+            aria-expanded={macOpen}
+            onClick={() => setMacOpen((v) => !v)}
+            className="pd-hub-quiet pd-focusable"
+          >
+            <Glyph name="onDevice" size={14} />
+            <span>This Mac</span>
+            {hw !== null ? (
+              <span className="text-text-muted tabular-nums">{hw.ramGiB} GB</span>
+            ) : null}
+            <IconChevronDown
+              size={13}
+              className={cx('text-text-muted transition-transform', macOpen && 'rotate-180')}
+            />
+          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                data-testid="hub-more"
+                aria-label="More"
+                title="More"
+                className="pd-hub-quiet pd-hub-quiet--icon pd-focusable"
+              >
+                <IconMore size={16} />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" sideOffset={6} className="min-w-[220px]">
+              {kind === 'models' ? (
+                <DropdownMenuItem
+                  data-testid="hub-kind-datasets"
+                  icon={<Glyph name="training" size={16} />}
+                  onSelect={() => setKind('datasets')}
+                >
+                  Datasets for training
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem
+                  data-testid="hub-kind-models"
+                  icon={<Glyph name="models" size={16} />}
+                  onSelect={() => setKind('models')}
+                >
+                  Back to models
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
-      {/* Tabs + search */}
-      <div className="flex shrink-0 items-center gap-3 px-6 pb-3">
-        <div
-          className="flex rounded-full border border-border-subtle bg-bg-inset p-0.5"
-          data-testid="hub-kind"
-        >
-          {(['models', 'datasets'] as const).map((k) => (
-            <button
-              key={k}
-              type="button"
-              data-testid={`hub-kind-${k}`}
-              onClick={() => setKind(k)}
-              className={cx(
-                'rounded-full px-4 py-1.5 text-footnote transition-colors',
-                kind === k ? 'bg-bg-raised text-text-primary shadow-sm' : 'text-text-secondary',
-              )}
-            >
-              {k === 'models' ? 'Models' : 'Datasets'}
-            </button>
-          ))}
+      {/* This Mac — what the fit verdicts are judged against, one click away. */}
+      <div className="pd-hub-reveal shrink-0 px-6" data-open={macOpen} inert={!macOpen}>
+        <div>
+          <div className="flex flex-wrap items-center gap-1.5 pb-3" data-testid="hardware-strip">
+            <Chip label="downloaded" value={String(localCount)} />
+            <Chip label="available" value={String(all.length)} />
+            {hw !== null ? (
+              <>
+                <Chip label="GB RAM" value={String(hw.ramGiB)} />
+                <Chip label={hw.cpus === 1 ? 'CPU core' : 'CPU cores'} value={String(hw.cpus)} />
+              </>
+            ) : null}
+            {disk !== null ? (
+              <span data-testid="hub-disk-free" title={`${compactBytes(disk.total)} disk`}>
+                <Chip label="GB free" value={String(Math.round(disk.free / 1024 ** 3))} />
+              </span>
+            ) : null}
+          </div>
         </div>
-        {/* Same hairline as its neighbour: `bg-inset` is within a few percent of
-            the page on the dark themes, so without it the unselected half is a
-            word floating loose beside a button rather than the other side of a
-            switch. */}
-        <div
-          className={cx(
-            'flex rounded-full border border-border-subtle bg-bg-inset p-0.5',
-            kind === 'datasets' && 'hidden',
-          )}
-        >
-          {(['discover', 'device', 'storage'] as const).map((t) => (
-            <button
-              key={t}
-              type="button"
-              data-testid={`models-tab-${t}`}
-              onClick={() => setTab(t)}
-              className={cx(
-                'rounded-full px-5 py-1.5 text-footnote transition-colors',
-                tab === t ? 'bg-bg-raised text-text-primary shadow-sm' : 'text-text-secondary',
-              )}
-            >
-              {/* Each tab wears its glyph (the user's 2026-09-20 set): the compass,
-                  this laptop, the drive. */}
-              <span className="inline-flex items-center gap-1.5">
+      </div>
+
+      {/* The three places, then search. */}
+      <div className="flex shrink-0 items-center gap-3 px-6 pb-3">
+        {kind === 'models' ? (
+          <div className="pd-hub-tabs" role="tablist" aria-label="Models">
+            {(['discover', 'device', 'storage'] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                role="tab"
+                aria-selected={tab === t}
+                data-testid={`models-tab-${t}`}
+                data-active={tab === t}
+                onClick={() => setTab(t)}
+                className="pd-hub-tab pd-focusable"
+              >
                 <Glyph
                   name={t === 'storage' ? 'storage' : t === 'discover' ? 'discover' : 'onDevice'}
-                  size={14}
+                  size={16}
                 />
-                {t === 'discover' ? 'Discover' : t === 'device' ? 'On Device' : 'Manage Storage'}
-              </span>
-            </button>
-          ))}
-        </div>
-        {tab === 'storage' ? null : (
+                {t === 'discover' ? 'Discover' : t === 'device' ? 'On this Mac' : 'Storage'}
+              </button>
+            ))}
+          </div>
+        ) : null}
+        {tab === 'storage' && kind === 'models' ? null : (
           <input
             data-testid="models-search"
             value={filters.query}
@@ -1819,224 +1855,267 @@ export function ModelsView() {
       </div>
 
       {/*
-        Filter row.
+        WHAT THE LIST SHOWS. Recommended or All, and what a model makes, stay in
+        view — they are what people arrive with. Everything else is a refinement
+        of All and opens with Filters.
 
         WHAT IS HIDDEN ON THE RECOMMENDED VIEW, AND WHY. The curated list has its
         own order — smallest way into each family first — and its own shape: a
         family, not a repo. So the sort, the quant format and the capability
         filter have nothing to act on there. Left visible they were worse than
-        useless: the sort read "Newest" over a list that is not sorted by date,
-        which is a control telling the user something untrue about what they are
-        looking at. The Recommended/All switch is right beside them, so the full
-        set is one click away and nothing is buried.
+        useless: the sort read "Newest" over a list that is not sorted by date.
        */}
-      {tab === 'storage' ? null : (
-        <div className="flex shrink-0 items-center gap-2 px-6 pb-4">
-          {/* A quant format is a model property; datasets have none, so offering
-            the control there is offering a dead end. */}
-          {kind === 'models' && !curated ? (
-            <Dropdown
-              testid="filter-format"
-              value={filters.format}
-              options={formatOptions}
-              onChange={(format) => setFilters((f) => ({ ...f, format }))}
-            />
-          ) : null}
-          {kind === 'models' && !curated ? (
-            <CapabilityFilter
-              selected={filters.capabilities}
-              options={capabilityOptions}
-              onChange={(capabilities) => setFilters((f) => ({ ...f, capabilities }))}
-            />
-          ) : null}
-          {curated ? null : (
-            <Dropdown
-              testid="filter-sort"
-              value={filters.sort}
-              options={SORT_OPTIONS}
-              onChange={(sort) => setFilters((f) => ({ ...f, sort }))}
-              footer={
-                <button
-                  type="button"
-                  data-testid="filter-only-fits"
-                  onClick={() => setFilters((f) => ({ ...f, onlyFits: !f.onlyFits }))}
-                  className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left text-body text-text-secondary hover:bg-bg-hover"
-                >
-                  <span
-                    className={cx(
-                      'flex h-4 w-4 shrink-0 items-center justify-center rounded-full border',
-                      filters.onlyFits
-                        ? 'border-transparent bg-accent-primary text-text-on-accent'
-                        : 'border-border-strong',
-                    )}
-                  >
-                    {filters.onlyFits ? <IconCheck size={11} /> : null}
-                  </span>
-                  <span className="whitespace-nowrap">Only show models that fit</span>
-                </button>
-              }
-            />
-          )}
-          {/*
-           * RECOMMENDED / ALL. the user: "by default, the 'newest' will show just a
-           * bunch of random models, so if you could just have reputable
-           * organizations shown, for example a 'reccomended/all' toggle".
-           *
-           * A two-state pill rather than another dropdown: it has two values, it
-           * is the single biggest lever over what the list contains, and it should
-           * be visible without opening anything.
-           */}
-          <div
-            className="flex rounded-full border border-border-subtle bg-bg-inset p-0.5"
-            data-testid="hub-scope"
-          >
-            {(['recommended', 'all'] as const).map((v) => (
-              <button
-                key={v}
-                type="button"
-                data-testid={`hub-scope-${v}`}
-                aria-pressed={(filters.scope ?? 'recommended') === v}
-                onClick={() => setFilters((f) => ({ ...f, scope: v }))}
-                className={cx(
-                  'rounded-full px-3 py-1 text-footnote transition-colors',
-                  (filters.scope ?? 'recommended') === v
-                    ? 'bg-bg-raised text-text-primary shadow-[0_1px_2px_rgba(0,0,0,0.05)]'
-                    : 'text-text-muted hover:text-text-primary',
-                )}
-              >
-                {v === 'recommended' ? 'Recommended' : 'All'}
-              </button>
-            ))}
-          </div>
-
-          {/*
-           * OUTPUT — what a model MAKES. the user: "everything filterable by output
-           * also".
-           *
-           * Pills rather than another dropdown, because this is the axis people
-           * arrive with ("I want to make a video") and there are only five of
-           * them: a menu would hide a five-item choice behind a click. Multi-select
-           * with none-means-all, the same grammar as the capability filter.
-           */}
-          <div className="flex items-center gap-1" data-testid="filter-output">
-            {(['text', 'image', 'video', 'audio', '3d'] as const).map((o) => {
-              const on = (filters.outputs ?? []).includes(o);
-              return (
-                <button
-                  key={o}
-                  type="button"
-                  data-testid={`filter-output-${o}`}
-                  aria-pressed={on}
-                  onClick={() =>
-                    setFilters((f) => {
-                      const cur = f.outputs ?? [];
-                      return {
-                        ...f,
-                        outputs: cur.includes(o)
-                          ? cur.filter((x) => x !== o)
-                          : ([...cur, o] as readonly OutputModality[]),
-                      };
-                    })
-                  }
-                  className={cx(
-                    'rounded-full border px-3 py-1.5 text-footnote transition-colors pd-focusable',
-                    on
-                      ? 'border-transparent bg-accent-primary text-text-on-accent'
-                      : 'border-border-subtle bg-bg-raised text-text-secondary hover:bg-bg-hover hover:text-text-primary',
-                  )}
-                >
-                  {OUTPUT_LABEL[o]}
-                </button>
-              );
-            })}
-          </div>
-
-          {/*
-           * SIZE CAP. A maximum rather than a range: the question a hub gets asked
-           * is "what fits", never "what is at least this big".
-           *
-           * The UNIT follows the rows, and the label says which. Datasets and
-           * on-disk files have real bytes; a Discover repo only has a parameter
-           * count, because its storage is every quant it publishes summed
-           * together. Capping repo bytes would hide a 27B repo that holds a
-           * perfectly good 8GB Q4 — so the axis there is B of parameters.
-           */}
-          {curated ? null : (
-            <label
-              className="flex items-center gap-2 rounded-full border border-border-subtle bg-bg-raised px-3.5 py-1.5 text-footnote text-text-secondary shadow-[0_1px_2px_rgba(0,0,0,0.03)]"
-              data-testid="filter-size"
+      {tab === 'storage' && kind === 'models' ? null : (
+        <>
+          <div className="flex shrink-0 flex-wrap items-center gap-2 px-6 pb-3">
+            {/*
+             * RECOMMENDED / ALL. the user: "by default, the 'newest' will show just a
+             * bunch of random models, so if you could just have reputable
+             * organizations shown, for example a 'reccomended/all' toggle".
+             *
+             * A two-state pill rather than another dropdown: it has two values, it
+             * is the single biggest lever over what the list contains, and it should
+             * be visible without opening anything.
+             */}
+            <div
+              className={cx(
+                'flex rounded-full border border-border-subtle bg-bg-inset p-0.5',
+                // Recommended or All chooses what Discover lists; it does not
+                // touch what is on this Mac, so there it is not offered.
+                tab === 'device' && kind === 'models' && 'hidden',
+              )}
+              data-testid="hub-scope"
             >
-              <span className="whitespace-nowrap">
-                {filters.maxSize === undefined
-                  ? 'Any size'
-                  : `≤ ${filters.maxSize}${sizeUnit === 'gb' ? ' GB' : 'B params'}`}
-              </span>
-              <input
-                type="range"
-                min={1}
-                max={SIZE_CAP_MAX}
-                step={1}
-                aria-label={sizeUnit === 'gb' ? 'Maximum size in GB' : 'Maximum parameters in B'}
-                value={filters.maxSize ?? SIZE_CAP_MAX}
-                onChange={(e) => {
-                  const v = Number(e.target.value);
-                  // The top of the range means "no cap", so the slider can be
-                  // dismissed without a second control.
-                  setFilters((f) => ({ ...f, maxSize: v >= SIZE_CAP_MAX ? undefined : v }));
-                }}
-                className="h-1 w-24 cursor-pointer accent-[var(--pd-accent-primary)]"
-              />
-            </label>
-          )}
-
-          {isFiltered ? (
-            <button
-              type="button"
-              data-testid="filters-reset"
-              onClick={resetFilters}
-              className="rounded-full border border-border-subtle bg-bg-raised px-3 py-1.5 text-footnote text-text-secondary transition-colors hover:bg-bg-hover hover:text-text-primary pd-focusable"
-            >
-              Reset
-            </button>
-          ) : null}
-          {/*
-           * THE LAYOUT SWITCH HAS NO LAYOUT TO SWITCH ON THE CURATED VIEW.
-           *
-           * the user: "the layout buttons actually don't do anything except they
-           * oddly resize the model card." Exactly right — the curated grid is
-           * hardcoded to list-plus-420px-pane (a card list has nowhere to put a
-           * table), so the only thing these three buttons still reached was the
-           * pane's max-height, which made the card grow and shrink for no stated
-           * reason. They belong to the table, so they appear with it.
-           */}
-          {curated ? null : (
-            <div className="ml-auto flex rounded-lg border border-border-subtle bg-bg-raised p-0.5">
-              {(['split', 'detail', 'compact'] as const).map((v) => (
+              {(['recommended', 'all'] as const).map((v) => (
                 <button
                   key={v}
                   type="button"
-                  data-testid={`view-${v}`}
-                  aria-pressed={view === v}
-                  onClick={() => setView(v)}
+                  data-testid={`hub-scope-${v}`}
+                  aria-pressed={(filters.scope ?? 'recommended') === v}
+                  onClick={() => setFilters((f) => ({ ...f, scope: v }))}
                   className={cx(
-                    'rounded-md px-2 py-1 text-footnote',
-                    view === v ? 'bg-bg-active text-text-primary' : 'text-text-muted',
+                    'rounded-full px-3 py-1 text-footnote transition-colors',
+                    (filters.scope ?? 'recommended') === v
+                      ? 'bg-bg-raised text-text-primary shadow-[0_1px_2px_rgba(0,0,0,0.05)]'
+                      : 'text-text-muted hover:text-text-primary',
                   )}
                 >
-                  <span className="flex h-4 w-4 items-center justify-center">
-                    {v === 'compact' ? (
-                      <IconListCompact size={14} />
-                    ) : v === 'split' ? (
-                      <IconLayoutRight size={14} />
-                    ) : (
-                      <IconLayoutLeft size={14} />
-                    )}
-                  </span>
+                  {v === 'recommended' ? 'Recommended' : 'All'}
                 </button>
               ))}
             </div>
+
+            {/*
+             * OUTPUT — what a model MAKES. the user: "everything filterable by output
+             * also".
+             *
+             * Pills rather than another dropdown, because this is the axis people
+             * arrive with ("I want to make a video") and there are only five of
+             * them: a menu would hide a five-item choice behind a click. Multi-select
+             * with none-means-all, the same grammar as the capability filter.
+             */}
+            <div className="flex items-center gap-1" data-testid="filter-output">
+              {(['text', 'image', 'video', 'audio', '3d'] as const).map((o) => {
+                const on = (filters.outputs ?? []).includes(o);
+                return (
+                  <button
+                    key={o}
+                    type="button"
+                    data-testid={`filter-output-${o}`}
+                    aria-pressed={on}
+                    onClick={() =>
+                      setFilters((f) => {
+                        const cur = f.outputs ?? [];
+                        return {
+                          ...f,
+                          outputs: cur.includes(o)
+                            ? cur.filter((x) => x !== o)
+                            : ([...cur, o] as readonly OutputModality[]),
+                        };
+                      })
+                    }
+                    className={cx(
+                      'rounded-full border px-3 py-1.5 text-footnote transition-colors pd-focusable',
+                      on
+                        ? 'border-transparent bg-accent-primary text-text-on-accent'
+                        : 'border-border-subtle bg-bg-raised text-text-secondary hover:bg-bg-hover hover:text-text-primary',
+                    )}
+                  >
+                    {OUTPUT_LABEL[o]}
+                  </button>
+                );
+              })}
+            </div>
+
+            {curated ? null : (
+              <button
+                type="button"
+                data-testid="hub-filters"
+                aria-expanded={filtersOpen}
+                onClick={() => setFiltersOpen((v) => !v)}
+                className="pd-hub-quiet pd-focusable"
+              >
+                <IconSlider size={14} />
+                <span>Filters</span>
+                {refinements > 0 ? <span className="pd-hub-count">{refinements}</span> : null}
+                <IconChevronDown
+                  size={13}
+                  className={cx(
+                    'text-text-muted transition-transform',
+                    filtersOpen && 'rotate-180',
+                  )}
+                />
+              </button>
+            )}
+            {isFiltered ? (
+              <button
+                type="button"
+                data-testid="filters-reset"
+                onClick={resetFilters}
+                className="rounded-full border border-border-subtle bg-bg-raised px-3 py-1.5 text-footnote text-text-secondary transition-colors hover:bg-bg-hover hover:text-text-primary pd-focusable"
+              >
+                Reset
+              </button>
+            ) : null}
+          </div>
+          {curated ? null : (
+            <div
+              className="pd-hub-reveal shrink-0 px-6"
+              data-open={filtersOpen}
+              inert={!filtersOpen}
+            >
+              <div>
+                <div
+                  className="flex flex-wrap items-center gap-2 pb-4"
+                  data-testid="hub-filters-panel"
+                >
+                  {/* A quant format is a model property; datasets have none, so offering
+                      the control there is offering a dead end. */}
+                  {kind === 'models' && !curated ? (
+                    <Dropdown
+                      testid="filter-format"
+                      value={filters.format}
+                      options={formatOptions}
+                      onChange={(format) => setFilters((f) => ({ ...f, format }))}
+                    />
+                  ) : null}
+                  {kind === 'models' && !curated ? (
+                    <CapabilityFilter
+                      selected={filters.capabilities}
+                      options={capabilityOptions}
+                      onChange={(capabilities) => setFilters((f) => ({ ...f, capabilities }))}
+                    />
+                  ) : null}
+                  {curated ? null : (
+                    <Dropdown
+                      testid="filter-sort"
+                      value={filters.sort}
+                      options={SORT_OPTIONS}
+                      onChange={(sort) => setFilters((f) => ({ ...f, sort }))}
+                      footer={
+                        <button
+                          type="button"
+                          data-testid="filter-only-fits"
+                          onClick={() => setFilters((f) => ({ ...f, onlyFits: !f.onlyFits }))}
+                          className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left text-body text-text-secondary hover:bg-bg-hover"
+                        >
+                          <span
+                            className={cx(
+                              'flex h-4 w-4 shrink-0 items-center justify-center rounded-full border',
+                              filters.onlyFits
+                                ? 'border-transparent bg-accent-primary text-text-on-accent'
+                                : 'border-border-strong',
+                            )}
+                          >
+                            {filters.onlyFits ? <IconCheck size={11} /> : null}
+                          </span>
+                          <span className="whitespace-nowrap">Only show models that fit</span>
+                        </button>
+                      }
+                    />
+                  )}
+                  {/*
+                   * SIZE CAP. A maximum rather than a range: the question a hub gets asked
+                   * is "what fits", never "what is at least this big".
+                   *
+                   * The UNIT follows the rows, and the label says which. Datasets and
+                   * on-disk files have real bytes; a Discover repo only has a parameter
+                   * count, because its storage is every quant it publishes summed
+                   * together. Capping repo bytes would hide a 27B repo that holds a
+                   * perfectly good 8GB Q4 — so the axis there is B of parameters.
+                   */}
+                  {curated ? null : (
+                    <label
+                      className="flex items-center gap-2 rounded-full border border-border-subtle bg-bg-raised px-3.5 py-1.5 text-footnote text-text-secondary shadow-[0_1px_2px_rgba(0,0,0,0.03)]"
+                      data-testid="filter-size"
+                    >
+                      <span className="whitespace-nowrap">
+                        {filters.maxSize === undefined
+                          ? 'Any size'
+                          : `≤ ${filters.maxSize}${sizeUnit === 'gb' ? ' GB' : 'B params'}`}
+                      </span>
+                      <input
+                        type="range"
+                        min={1}
+                        max={SIZE_CAP_MAX}
+                        step={1}
+                        aria-label={
+                          sizeUnit === 'gb' ? 'Maximum size in GB' : 'Maximum parameters in B'
+                        }
+                        value={filters.maxSize ?? SIZE_CAP_MAX}
+                        onChange={(e) => {
+                          const v = Number(e.target.value);
+                          // The top of the range means "no cap", so the slider can be
+                          // dismissed without a second control.
+                          setFilters((f) => ({ ...f, maxSize: v >= SIZE_CAP_MAX ? undefined : v }));
+                        }}
+                        className="h-1 w-24 cursor-pointer accent-[var(--pd-accent-primary)]"
+                      />
+                    </label>
+                  )}
+
+                  {/*
+                   * THE LAYOUT SWITCH HAS NO LAYOUT TO SWITCH ON THE CURATED VIEW.
+                   *
+                   * the user: "the layout buttons actually don't do anything except they
+                   * oddly resize the model card." Exactly right — the curated grid is
+                   * hardcoded to list-plus-420px-pane (a card list has nowhere to put a
+                   * table), so the only thing these three buttons still reached was the
+                   * pane's max-height, which made the card grow and shrink for no stated
+                   * reason. They belong to the table, so they appear with it.
+                   */}
+                  {curated ? null : (
+                    <div className="ml-auto flex rounded-lg border border-border-subtle bg-bg-raised p-0.5">
+                      {(['split', 'detail', 'compact'] as const).map((v) => (
+                        <button
+                          key={v}
+                          type="button"
+                          data-testid={`view-${v}`}
+                          aria-pressed={view === v}
+                          onClick={() => setView(v)}
+                          className={cx(
+                            'rounded-md px-2 py-1 text-footnote',
+                            view === v ? 'bg-bg-active text-text-primary' : 'text-text-muted',
+                          )}
+                        >
+                          <span className="flex h-4 w-4 items-center justify-center">
+                            {v === 'compact' ? (
+                              <IconListCompact size={14} />
+                            ) : v === 'split' ? (
+                              <IconLayoutRight size={14} />
+                            ) : (
+                              <IconLayoutLeft size={14} />
+                            )}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           )}
-        </div>
+        </>
       )}
 
       {hfError !== null ? (
@@ -2249,7 +2328,7 @@ export function ModelsView() {
                           {kind === 'datasets'
                             ? 'All datasets'
                             : tab === 'device'
-                              ? 'On this machine'
+                              ? 'On this Mac'
                               : 'All models'}
                         </h2>
                         <button
@@ -2269,7 +2348,7 @@ export function ModelsView() {
 
                     {curated ? (
                       <h2
-                        className="mb-3 text-title font-medium text-text-primary"
+                        className="pd-display-m mb-3 text-text-primary"
                         data-testid="top-recommended-heading"
                       >
                         Top Recommended
@@ -2301,7 +2380,7 @@ export function ModelsView() {
                        */
                       <div className="flex flex-col gap-2" data-testid="curated-families">
                         <h2
-                          className="mt-4 mb-1 text-title font-medium text-text-primary"
+                          className="pd-display-m mt-4 mb-1 text-text-primary"
                           data-testid="more-heading"
                         >
                           More
@@ -2468,12 +2547,34 @@ export function ModelsView() {
                           </button>
                         ))}
                         {rows.length === 0 ? (
-                          <p
-                            className="px-4 py-6 text-body text-text-muted"
-                            data-testid="models-empty"
-                          >
-                            Nothing matches these filters.
-                          </p>
+                          tab === 'device' && kind === 'models' && localCount === 0 ? (
+                            /* Nothing installed is not "nothing matches these
+                               filters" — there were no filters to match. */
+                            <div
+                              className="flex items-center gap-3 px-4 py-6"
+                              data-testid="models-empty"
+                            >
+                              <span className="text-body text-text-secondary">
+                                No models on this Mac yet.
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setTab('discover')}
+                                className="pd-hub-quiet pd-focusable"
+                                data-testid="models-empty-discover"
+                              >
+                                <Glyph name="discover" size={14} />
+                                Find one in Discover
+                              </button>
+                            </div>
+                          ) : (
+                            <p
+                              className="px-4 py-6 text-body text-text-muted"
+                              data-testid="models-empty"
+                            >
+                              Nothing matches these filters.
+                            </p>
+                          )
                         ) : null}
                       </div>
                     ) : (
@@ -2528,8 +2629,8 @@ export function ModelsView() {
                       )}
                       data-testid="curated-detail-hint"
                     >
-                      Open a family and pick a version to see its card, its quant ladder and what it
-                      needs.
+                      Pick a model to see what it makes, how big it is, and whether it fits this
+                      Mac.
                     </aside>
                   ) : null}
                   {(curated || view !== 'compact') && detail !== undefined ? (

@@ -58,12 +58,9 @@
   margin-bottom: 20px;
 }
 
+/* Set in the display face (.pd-display-l, the design language's screen title). */
 .sd-title {
   margin: 0;
-  font-size: var(--pd-font-size-title);
-  line-height: var(--pd-leading-title);
-  font-weight: var(--pd-font-weight-medium);
-  letter-spacing: -0.02em;
 }
 
 .sd-header-actions {

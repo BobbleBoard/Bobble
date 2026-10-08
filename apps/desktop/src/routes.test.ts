@@ -10,7 +10,7 @@ afterEach(() => {
 
 describe('the route registry', () => {
   it('titles the three shipped routes as App did', () => {
-    expect(contentRoute('models')?.title).toBe('Model management');
+    expect(contentRoute('models')?.title).toBe('Models');
     expect(contentRoute('scheduled')?.title).toBe('Scheduled');
     expect(contentRoute('connectors')?.title).toBe('Extensions');
     expect(contentRoute('chat')).toBeUndefined();

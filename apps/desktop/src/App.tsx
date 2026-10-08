@@ -8,6 +8,8 @@ import { CanvasPopoutView } from './chat/canvas/CanvasPopoutView';
 import { useGenStream } from './chat/gen-stream';
 import { SituationDemoView } from './demo/SituationDemoView';
 import { GalleryView } from './gallery/GalleryView';
+import { FeatureTipLayer } from './intro/FeatureTip';
+import { IntroCard } from './intro/IntroCard';
 import { appNavAllowList } from './nav-allow';
 import { FirstRunTips, resetFirstRunTips } from './onboarding/FirstRunTips';
 import { OnboardingWizard } from './onboarding/OnboardingWizard';
@@ -20,6 +22,7 @@ import { exitModality, useModalityStore } from './state/modality-store';
 import { newSession } from './state/pi-connect';
 import { usePiStore } from './state/pi-slice';
 import { applyThemeAttributes, useThemeStore } from './store/theme';
+import { GuidedTour } from './tour/GuidedTour';
 
 /** First-run gate status: unknown until onboarding:get-state resolves. */
 type GateStatus = 'loading' | 'onboarding' | 'ready';
@@ -393,6 +396,9 @@ export function App() {
             </div>
           ) : (
             <div className="relative h-full">
+              <GuidedTour />
+              <IntroCard />
+              <FeatureTipLayer />
               {/* The Model hub renders INSIDE the chat shell so the sidebar and
                   top bar stay put — the user: "ensure that this keeps the left
                   sidebar present when clicked". It is a content route, not a

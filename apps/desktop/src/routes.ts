@@ -52,7 +52,7 @@ export interface ContentRoute {
 const BUILT_IN: Partial<Record<MainView, ContentRoute>> = {
   models: {
     id: 'models',
-    title: 'Model management',
+    title: 'Models',
     render: () => createElement(ModelsView),
   },
   scheduled: {

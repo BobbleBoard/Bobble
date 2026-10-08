@@ -3,7 +3,8 @@
  * section: Image / Model / Segment / Retopo / Texture / Animate. No sub-tool
  * inset groups (they read as misaligned buttons) and no product badges.
  */
-import type { JSX, ReactNode } from 'react';
+import { type JSX, type ReactNode, useRef } from 'react';
+import { useFeatureTip } from '../intro/FeatureTip';
 import { IcAnimate, IcImage, IcModel, IcRetopo, IcSegment, IcTexture } from './icons';
 import { type TripoTool, useTripoStore } from './store';
 
@@ -19,12 +20,16 @@ const ENTRIES: readonly { tool: TripoTool; label: string; icon: ReactNode }[] = 
 export function Rail(): JSX.Element {
   const tool = useTripoStore((s) => s.tool);
   const setTool = useTripoStore((s) => s.setTool);
+  // Segment is the stage people do not guess from its name: its pop-out says.
+  const segmentRef = useRef<HTMLButtonElement | null>(null);
+  useFeatureTip('segment', segmentRef);
 
   return (
     <nav className="tp-rail" data-testid="tp-rail">
       {ENTRIES.map((e) => (
         <button
           key={e.tool}
+          ref={e.tool === 'segment' ? segmentRef : undefined}
           type="button"
           className="tp-rail-item"
           data-active={tool === e.tool}

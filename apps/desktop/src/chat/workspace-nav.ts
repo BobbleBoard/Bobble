@@ -47,7 +47,9 @@ export interface WorkspaceNavState {
 export const WORKSPACE_NAV: readonly WorkspaceNavRow[] = [
   {
     id: 'models',
-    label: 'Model management',
+    /* the user (2026-10-08): "model hub" / "model management" read as a page for
+       technical users, and this row is on every sidebar by default. */
+    label: 'Models',
     glyph: 'models',
     testid: 'nav-model-management',
     // `models` is the settings-section id App routes to the Model management view.

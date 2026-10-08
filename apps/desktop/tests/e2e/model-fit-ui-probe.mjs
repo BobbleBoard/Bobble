@@ -912,6 +912,11 @@ try {
       els.map((el) => el.getAttribute('data-testid')?.slice('model-row-'.length) ?? ''),
     );
   const before = await onDevice();
+  // The sort lives behind Filters now (the user 2026-10-08: the power filters fold away).
+  if ((await page.getAttribute('[data-testid="hub-filters"]', 'aria-expanded')) !== 'true') {
+    await page.click('[data-testid="hub-filters"]');
+    await page.waitForTimeout(350);
+  }
   await page.click('[data-testid="filter-sort"]');
   await page.click('[data-testid="filter-only-fits"]');
   await page.waitForTimeout(500);

@@ -32,7 +32,7 @@ import { OrgAvatar } from '../settings/brand-icons';
 import { DownloadBar } from './DownloadBar';
 import { quickPickFor, type RecommenderHost } from './model-recommender';
 import { compactBytes } from './models-layout';
-import { Pill } from './Pill';
+import { hueForOutput, Pill } from './Pill';
 import {
   type FitVerdict,
   fitFor,
@@ -216,7 +216,7 @@ export function FamilyCard({
                 <span className="shrink-0 text-caption text-text-muted tabular-nums">{size}</span>
               )}
               {(v.tasks ?? []).map((t) => (
-                <Pill key={t} tone="info" testid={`task-${t}`}>
+                <Pill key={t} tone={hueForOutput(family.output)} testid={`task-${t}`}>
                   {TASK_LABEL[t]}
                 </Pill>
               ))}
@@ -347,7 +347,7 @@ export function FamilyCard({
                   it was the one grey hairline in a row of tinted pills, which
                   reads as disabled rather than informative. */}
               {installKindOf(family) === 'gen' ? (
-                <Pill tone="info" title="What this family generates">
+                <Pill tone={hueForOutput(family.output)} title="What this family generates">
                   {family.output}
                 </Pill>
               ) : null}

@@ -1,6 +1,6 @@
 # Bobble — status
 
-Updated: 2026-10-08 (on AC) · main `7a97ced0` · the user: "fix the lint errors and the flaky tests too"
+Updated: 2026-10-08 (on AC) · the user: "you can wire the design language into the app … a quick guided tour button … a lot of cleanup to be done for the model hub"
 
 ## Backlog — everything discussed and not yet done (consolidated 2026-10-08)
 
@@ -25,7 +25,6 @@ Still to check before dropping (not merged): `claude/practical-dhawan-bf1d62` (0
 ### 2. Waiting on the user's decision
 | Decision | Options / note | From |
 |---|---|---|
-| The design language's four proposals | teal accent instead of system blue; muted text `#69696e` (the shipping `#86868b` fails contrast); Fraunces softened as the display face; the hue jobs. "All looks pretty good", not ruled one by one; nothing is in the app yet | 10-07 |
 | The guardian parks the 27B between turns (each turn reloads it cold: first token 17–26 s) | (a) keep; (b) let an idle chat model stay loaded unless swap/stall; (c) a smaller 27B quant; (d) fewer apps | 10-02 |
 | Thinking can eat the whole output budget (27B thought 20k chars, three `length` stops) | cap thinking at the output limit minus room for the reply (llama.cpp ships it off) | 10-01 |
 | A model-driven Blender run that **changes** a scene | needs your OK to touch your open Blender; the read-only path is verified | 10-07 |
@@ -56,9 +55,9 @@ Still to check before dropping (not merged): `claude/practical-dhawan-bf1d62` (0
 | A 5–10× decode advantage; sublinear attention in the next Qwen/Gemma | watch items, no work |
 | The reliability bar ("none of this ever happens on OAI/Anthropic any more") | the open gaps are §7 |
 
-### 5. Design language → the app (the language exists; nothing is wired)
-- The tokens (accent, muted, Fraunces), once §2 is decided.
-- The components: first-use intro cards (Computer use, 3D Studio), pop-outs with a notch (Segment, Connectors in +), Try it playing on every connector's page, the Made card, the connector Demo card, the toolbar.
+### 5. Design language → the app (wired 2026-10-08 on the user's "you can wire the design language into the app")
+- Done: the tokens (teal accent, muted `#69696e`, teal focus), Fraunces on screen titles, the three hues on "what it makes" tags, the intro card (3D Studio, Computer use), the pop-out (Segment on the 3D rail, Connectors on the composer's +), the tour on the pop-out's anatomy.
+- Still to do: Try it playing on every connector's page, the Made card, the connector Demo card, the toolbar.
 - the user's wider list (10-07): connector explore demos for each connector; the rendering of tables, visuals, office documents and inline cards at the same level.
 
 ### 6. Visual quality (pinned since 09-24), what is still open
@@ -88,6 +87,16 @@ Still to check before dropping (not merged): `claude/practical-dhawan-bf1d62` (0
 ### 8. Smaller known bugs
 The office chip flicker (1 of 15 probe runs) · rapid-mlx never lands the paste prime (~4.5k tokens re-read) · img2img edits are subtle (the instruction editor needs the 3D engine) · a finished card remounts into the chain when the next tool call starts · a picture embedded in the reply shows twice · ⌘Z into a turn already answering keeps the partial reply · an image-only message can't be rewound · the Ladle build in the bundle (excluded `68cf0219`, unconfirmed) · ~60 unused old icon files in the design artifact's storage.
 
+
+## Report — 2026-10-08: the design language in the app, a friendlier Models page, the quick tour
+
+| Asked | Done | Checked on screen |
+|---|---|---|
+| Wire the design language into the app | Accent and focus are teal (light `#0a7272` with white text, dark a mid `#16a3a3` with dark ink: the mark's neon `#2bd0d0` made a column of Download buttons the loudest thing on the page); muted text `#69696e` (4.6:1, was 3.3:1); Fraunces bundled (OFL) and softened, on the Models, Extensions and Scheduled titles and the hub's section heads; the three hues as tokens, on every "what it makes" tag (text teal, pictures sun, video/3D/sound pink); system blue now only on Bobble's cursor | tour-look checks Fraunces is loaded with SOFT 100 / WONK 0; light and dark shots |
+| Intro cards / pop-outs | The language's intro card opens centred the first time the 3D Studio opens (a picture becomes a model) and the first time Bobble drives an app (its cursor types and presses; Choose apps, Got it); the pop-out opens on first hover beside Segment (the lamp splits into its parts) and above the composer's + (Connectors live in +, with the catalog's own marks) | tour-look photographs each; Got it closes and remembers |
+| Quant dropdown hover "really thin" | Rows 30 px → 36 px, the wash 4 px from the panel edge, 7% ink (light was 4%, barely visible) | hub-polish-look: hovered row 419×36 |
+| "Model hub" reads as a technical page; filters dumped together | Named "Models" (sidebar, top bar, palette); one display title and a plain line; Discover / On this Mac / Storage are the first, largest control; the machine's specs fold into "This Mac"; Datasets moved into the ⋯ menu; format, capabilities, sort, size and layout behind one Filters button with a count; friendlier copy; On this Mac without models says so and offers Discover; Storage's "Measured in" readout moved to a tooltip | hub-polish-look (both themes), model-fit-ui-probe and quick-download-probe still OK |
+| A guided tour from the bottom-left menu | "Take a quick tour": spots each control of the screen you are on (chat 9 steps, Models 8, 3D Studio 6, Extensions, Scheduled), skips what is not on screen, the language's pop-out with the notch, step count, Back, Next / Got it, Esc | tour-look walks every step: card inside the window, beside its target, Got it and Esc close it |
 
 ## Report — 2026-10-08: lint clean in every package, two flaky tests fixed
 

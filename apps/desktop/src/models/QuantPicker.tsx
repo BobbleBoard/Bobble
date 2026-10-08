@@ -270,7 +270,7 @@ export function QuantPicker({
          */
         <div
           data-testid="quant-menu"
-          className="pd-menu pd-quant-menu absolute top-full right-0 left-0 z-20 mt-1 max-h-[320px]"
+          className="pd-menu pd-quant-menu absolute top-full right-0 left-0 z-20 mt-1 max-h-[360px]"
         >
           {best !== undefined ? (
             <>

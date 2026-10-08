@@ -1,0 +1,67 @@
+/*
+ * THE DISPLAY FACE — Bobble's design language (design/language/project).
+ *
+ * Fraunces names things: a page head, a greeting, a card's title, an intro.
+ * Everything read and touched stays in the system face. It is always softened:
+ * SOFT 100 rounds every terminal toward the mark's tile corner, WONK 0 keeps the
+ * letters upright and calm, and the optical size is left to the font. Never
+ * below 20px, never body copy.
+ *
+ * The font is bundled (OFL, ../fonts/Fraunces-OFL.txt) — Bobble runs offline.
+ */
+@font-face {
+  font-family: "Fraunces";
+  src: url("../fonts/Fraunces-Variable-latin.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --pd-font-display: "Fraunces", "New York", ui-serif, Georgia, serif;
+}
+
+.pd-display-xl,
+.pd-display-l,
+.pd-display-m,
+.pd-display-s {
+  margin: 0;
+  font-family: var(--pd-font-display);
+  font-optical-sizing: auto;
+  font-variation-settings:
+    "SOFT" 100,
+    "WONK" 0;
+  text-wrap: balance;
+}
+
+/* The one big line that introduces something: an intro card, onboarding. */
+.pd-display-xl {
+  font-size: 56px;
+  line-height: 60px;
+  font-weight: 460;
+  letter-spacing: -0.02em;
+}
+
+/* A screen that is about one thing: Models, Extensions, Scheduled. */
+.pd-display-l {
+  font-size: 40px;
+  line-height: 44px;
+  font-weight: 420;
+  letter-spacing: -0.018em;
+}
+
+/* The title inside an illustration; the greeting above an empty composer. */
+.pd-display-m {
+  font-size: 26px;
+  line-height: 30px;
+  font-weight: 440;
+  letter-spacing: -0.012em;
+}
+
+/* A small card's heading: a tour step, a pop-out, a demo. */
+.pd-display-s {
+  font-size: 20px;
+  line-height: 24px;
+  font-weight: 460;
+  letter-spacing: -0.005em;
+}

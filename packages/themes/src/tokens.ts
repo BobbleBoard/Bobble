@@ -1120,16 +1120,18 @@ const bobbleLight: ThemeTokens = {
      *
      * #55555a is 6.8:1 on the page (7.4:1 on a raised card): primary:secondary
      * 2.27x and secondary:muted 2.04x — an even ladder between the two
-     * references rather than a copy of either. `muted` stays where it was
-     * because it already IS Apple's secondaryLabel (60% #3c3c43 over #f5f5f7
-     * composites to exactly #86868b).
+     * references rather than a copy of either.
+     *
+     * `muted` was Apple's secondaryLabel, #86868b — 3.3:1 on the page, under
+     * the 4.5:1 that metadata needs. The design language (2026-10-07,
+     * design/language) sets it to #69696e: 4.6:1 on the page and on a card.
      */
     secondary: '#55555a',
-    muted: '#86868b',
+    muted: '#69696e',
     inverse: '#ffffff',
     icon: '#1d1d1f',
     onAccent: '#ffffff',
-    link: '#0066cc',
+    link: '#0a7272',
     placeholder: '#9d9da3',
     ghost: '#1d1d1f4d',
   },
@@ -1137,13 +1139,19 @@ const bobbleLight: ThemeTokens = {
     subtle: '#0000000f', // hairlines everywhere
     default: '#0000001a',
     strong: '#00000038',
-    focus: '#0071e3',
+    focus: '#0a7272',
   },
+  /*
+   * THE ACCENT IS TEAL — the design language's (2026-10-07): the mark's own
+   * teal, at its ink step so white text on it holds 5.9:1. System blue now
+   * belongs to the agent's cursor and its status pill alone (agent-cursor.ts),
+   * so a blue thing on screen is always Bobble at work.
+   */
   accent: {
-    primary: '#0071e3', // restrained system blue — the ONLY accent in the chrome
-    hover: '#0077ed',
-    active: '#0062c4',
-    subtle: '#0071e31a',
+    primary: '#0a7272', // teal-ink — the ONLY accent in the chrome
+    hover: '#0b7d7d',
+    active: '#075e5e',
+    subtle: '#0a72721a',
   },
   status: {
     info: { bg: '#e8f2fd', fg: '#0058b0', border: '#a7cdf7', solid: '#007aff' },
@@ -1229,11 +1237,12 @@ const bobbleDark: ThemeTokens = {
      * 10.1:1 — claude's dark secondary measures 10.2, chatgpt's 10.1 — giving
      * 1.66x down from primary and 1.58x down to muted. */
     secondary: '#c0c0c6',
-    muted: '#98989f',
+    muted: '#9a9aa1',
     inverse: '#1d1d1f',
     icon: '#ffffff',
-    onAccent: '#ffffff',
-    link: '#2997ff',
+    // Dark ink on the bright teal: white on it is under 2:1.
+    onAccent: '#0b2626',
+    link: '#5ddcdb',
     placeholder: '#7c7c85',
     ghost: '#f5f5f74d',
   },
@@ -1241,13 +1250,16 @@ const bobbleDark: ThemeTokens = {
     subtle: '#ffffff14',
     default: '#ffffff1f',
     strong: '#ffffff3d',
-    focus: '#2997ff',
+    focus: '#5ddcdb',
   },
+  /* A mid teal, not the mark's neon #2bd0d0: a column of filled Download
+     buttons in that shade was the loudest thing on the Models page. Dark ink
+     on it holds 5.2:1, and as text on graphite it holds 5.9:1. */
   accent: {
-    primary: '#0a84ff', // system blue (dark)
-    hover: '#2997ff',
-    active: '#006edb',
-    subtle: '#0a84ff29',
+    primary: '#16a3a3', // teal (dark) — the design language's accent
+    hover: '#1fb3b3',
+    active: '#128f8f',
+    subtle: '#16a3a329',
   },
   status: {
     info: { bg: '#0a84ff24', fg: '#6cb2ff', border: '#0a84ff66', solid: '#0a84ff' },

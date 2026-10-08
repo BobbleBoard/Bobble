@@ -649,7 +649,7 @@ export function ConnectorsScreen({
         <div className="pdc-col">
           <div className="pdc-head">
             <div className="min-w-0">
-              <h1 className="pdc-title">Extensions</h1>
+              <h1 className="pdc-title pd-display-l">Extensions</h1>
               <p className="pdc-sub" data-testid="connectors-intro">
                 Tools and skills Bobble can use. Everything here runs on this Mac.
               </p>
