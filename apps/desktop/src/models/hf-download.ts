@@ -53,9 +53,33 @@ export function quantLabel(quant: string | undefined, filePath: string): string 
   if (looksParsed) return quant;
   const file = (quant ?? filePath).split('/').pop() ?? filePath;
   const stem = file.replace(/\.gguf$/i, '');
-  // UD-Q4_K_XL / IQ3_M / Q8_0 / BF16 / F16 — the shapes that actually appear.
-  const m = /((?:UD-)?(?:IQ|Q)\d[A-Z0-9_]*|BF16|F16|F32)/i.exec(stem);
+  const m = QUANT_IN_NAME.exec(stem);
   return m?.[1] ?? stem;
+}
+
+/** UD-Q4_K_XL / IQ3_M / Q8_0 / BF16 / F16 — the shapes that actually appear. */
+const QUANT_IN_NAME = /((?:UD-)?(?:IQ|Q)\d[A-Z0-9_]*|BF16|F16|F32)/i;
+
+/**
+ * The quant a text recipe's `allow` names, for its Download to ask for.
+ *
+ * A GGUF variant went to the hub's Download with its repo alone, and that
+ * fetches the picker's recommendation for the machine — so Ling 3.0's
+ * "tiny · Q4" (`Ling-3.0-tiny-UD-Q4_K_XL.gguf`, 5.3 GB) asked for
+ * Ling-3.0-tiny-UD-Q8_K_XL.gguf, 11 GB, on a 24 GB Mac (quick-download-probe).
+ * The label comes out of each entry, a file or a shard folder
+ * (`UD-IQ3_XXS/*`); a projector does not count. Entries that name no quant, or
+ * name two, give no answer, and the Download keeps the recommendation.
+ */
+export function recipeQuant(allow: readonly string[] | undefined): string | undefined {
+  const labels = new Set<string>();
+  for (const entry of allow ?? []) {
+    if (/mmproj/i.test(entry)) continue;
+    const m = QUANT_IN_NAME.exec(entry.replace(/\.gguf$/i, ''));
+    if (m?.[1] === undefined) return undefined;
+    labels.add(m[1]);
+  }
+  return labels.size === 1 ? [...labels][0] : undefined;
 }
 
 /** `…-00001-of-00002.gguf`: one part of a model published across several files. */

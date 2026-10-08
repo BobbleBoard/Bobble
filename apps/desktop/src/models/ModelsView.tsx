@@ -66,7 +66,14 @@ import { hasRepo, useStoreModels } from '../state/store-models';
 import { BestForYourMachine } from './BestForYourMachine';
 import { DownloadAction } from './DownloadAction';
 import { FamilyCard } from './FamilyCard';
-import { type HfLadder, hfLadder, pickHfDownload, pickRefusal, quantsOnDisk } from './hf-download';
+import {
+  type HfLadder,
+  hfLadder,
+  pickHfDownload,
+  pickRefusal,
+  quantsOnDisk,
+  recipeQuant,
+} from './hf-download';
 import { type LocalUse, pickLocalUse } from './local-use';
 import { ModelCard } from './ModelCard';
 import { CapabilityPills } from './model-pills';
@@ -1509,7 +1516,9 @@ export function ModelsView() {
   const downloadVariant = async (family: RecommendedFamily, variant: RecommendedVariant) => {
     if (installKindOf(family) === 'gguf') {
       setSelected(variant.repo);
-      await download(variant.repo);
+      // The recipe's own file when it names one (Ling 3.0's "tiny · Q4"), not
+      // whatever the picker would recommend for this machine.
+      await download(variant.repo, recipeQuant(variant.allow));
       return;
     }
     /*

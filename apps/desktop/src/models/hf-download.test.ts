@@ -8,6 +8,7 @@ import {
   pickRefusal,
   quantLabel,
   quantsOnDisk,
+  recipeQuant,
 } from './hf-download';
 
 /**
@@ -282,6 +283,43 @@ describe('pickRefusal — saying which half failed', () => {
   it('a label that went missing says it is missing', () => {
     expect(pickRefusal(repo, { kind: 'missing', quant: 'Q3_K_M' })).toBe(
       `${repo} no longer lists Q3_K_M. Pick another from the list.`,
+    );
+  });
+});
+
+describe('recipeQuant', () => {
+  it("names the quant of a recipe's one file", () => {
+    expect(recipeQuant(['Ling-3.0-tiny-UD-Q4_K_XL.gguf'])).toBe('UD-Q4_K_XL');
+    expect(recipeQuant(['Ling-3.0-tiny-UD-Q6_K_XL.gguf'])).toBe('UD-Q6_K_XL');
+  });
+
+  it("names the quant of a recipe's shard folder", () => {
+    expect(recipeQuant(['UD-IQ3_XXS/*'])).toBe('UD-IQ3_XXS');
+  });
+
+  it('leaves a projector out of the answer', () => {
+    expect(recipeQuant(['model-Q4_K_M.gguf', 'mmproj-F16.gguf'])).toBe('Q4_K_M');
+  });
+
+  it('gives no answer without an allow, for a name with no quant, or for two quants', () => {
+    expect(recipeQuant(undefined)).toBeUndefined();
+    expect(recipeQuant(['README.md'])).toBeUndefined();
+    expect(recipeQuant(['a-Q4_K_M.gguf', 'a-Q8_0.gguf'])).toBeUndefined();
+  });
+
+  it('is a label the ladder shows, so the Download fetches that file', () => {
+    const files = [
+      f('Ling-3.0-tiny-UD-Q4_K_XL.gguf', 5_340_611_552, 'UD-Q4_K_XL'),
+      f('Ling-3.0-tiny-UD-Q6_K_XL.gguf', 7_274_546_528, 'UD-Q6_K_XL'),
+      f('Ling-3.0-tiny-UD-Q8_K_XL.gguf', 11_190_000_000, 'UD-Q8_K_XL'),
+    ];
+    const quant = recipeQuant(['Ling-3.0-tiny-UD-Q4_K_XL.gguf']);
+    const pick = pickHfDownload(files, { totalRamGB: 24 }, quant === undefined ? {} : { quant });
+    expect(pick.kind === 'file' ? pick.file.path : pick.kind).toBe('Ling-3.0-tiny-UD-Q4_K_XL.gguf');
+    // Without the recipe's quant, the recommendation for a 24 GB Mac is the bigger file.
+    const unasked = pickHfDownload(files, { totalRamGB: 24 });
+    expect(unasked.kind === 'file' ? unasked.file.path : unasked.kind).not.toBe(
+      'Ling-3.0-tiny-UD-Q4_K_XL.gguf',
     );
   });
 });
