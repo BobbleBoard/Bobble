@@ -808,3 +808,73 @@
     transform: none;
   }
 }
+
+/* ── Try it, played (ConnectorDemo) ─────────────────────────────────────────
+ * A small chat on the card: the ask slides up into its bubble, the reply's
+ * first line arrives, then the connector's own row works under a fast
+ * "Worked for", and Done. The ask, the reply and the row keep their places
+ * from the start (they only become visible), so the card grows only by the
+ * Done row at the end, never shuffles. */
+.pdc-demo {
+  position: relative;
+  /* The Try it card is the frame; the demo is its content, with room under the
+     last row for Replay. */
+  padding: 4px 4px 30px;
+}
+/* The sped-up "Worked for" is the clock here; the row's own real-seconds timer
+   would contradict it. */
+.pdc-demo .pd-chain-step-elapsed {
+  display: none;
+}
+.pdc-demo-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.pdc-demo-ask {
+  transition:
+    opacity var(--pd-duration-slow) var(--pd-easing-enter),
+    transform var(--pd-duration-slow) var(--pd-easing-enter);
+}
+.pdc-demo-ask[data-shown="false"] {
+  opacity: 0;
+  transform: translateY(14px);
+}
+.pdc-demo-reply {
+  margin: 0;
+  font-size: 15px;
+  line-height: 22px;
+  color: var(--pd-text-primary);
+  transition: opacity var(--pd-duration-slow) var(--pd-easing-standard);
+}
+.pdc-demo-reply[data-shown="false"],
+.pdc-demo-work[data-shown="false"] {
+  opacity: 0;
+}
+.pdc-demo-work {
+  transition: opacity var(--pd-duration-slow) var(--pd-easing-standard);
+}
+.pdc-demo-replay {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--pd-radius-full);
+  font-size: 12px;
+  color: var(--pd-text-muted);
+}
+.pdc-demo-replay:hover {
+  background: var(--pd-bg-hover);
+  color: var(--pd-text-primary);
+}
+@media (prefers-reduced-motion: reduce) {
+  .pdc-demo-ask,
+  .pdc-demo-reply,
+  .pdc-demo-work {
+    transition: none;
+  }
+}

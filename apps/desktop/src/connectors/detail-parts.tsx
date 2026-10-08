@@ -7,6 +7,7 @@
  * ask for (Try it), then what it has (Tools), what it touches (Reach), and the
  * facts (About). The outcome before the inventory.
  */
+
 import type { McpMode, McpServerConfig } from '@pi-desktop/mcp-lite';
 import {
   Button,
@@ -26,6 +27,7 @@ import {
 import { type CSSProperties, type JSX, type ReactNode, useEffect, useState } from 'react';
 import { cx } from '../onboarding/cx';
 import { useConnectorsStore } from '../state/connectors-store';
+import { ConnectorDemo } from './ConnectorDemo';
 import { ItemMark, StateDot } from './marks';
 import {
   type Actions,
@@ -278,15 +280,14 @@ export function DetailHeader({
  * reference keeps it.
  */
 export function TrySection({ item, tools }: { item: Item; tools: readonly Tool[] }): JSX.Element {
-  const prompt = examplePrompt(item, tools);
   const ready = usable(item);
   return (
     <section data-testid="connector-try">
       <SectionTitle aside={ready ? undefined : 'once it is on'}>Try it</SectionTitle>
       <div className="pdc-try">
-        <div className="pdc-try-bubble" data-testid="connector-try-prompt">
-          {prompt}
-        </div>
+        {/* Played the way the chat draws it (ConnectorDemo): the ask, the
+            reply's first line, the connector's own row, Done. */}
+        <ConnectorDemo item={item} tools={tools} />
         <p className="text-caption text-text-muted">
           {ready
             ? 'Try in chat opens a new chat with this ready to send. Change it as you like.'

@@ -461,6 +461,9 @@ function Detail({
                 onEditKeys={hasKeys(item) && !editKeys ? () => setEditKeys(true) : undefined}
                 onEdit={edit}
               />
+              {/* What it does, played, before what it needs (the user 2026-10-08:
+                  "a prominent card" for each connector). */}
+              <TrySection item={item} tools={tools} />
               <SetupSection
                 item={item}
                 busy={busy}
@@ -468,7 +471,6 @@ function Detail({
                 open={editKeys}
                 onClose={() => setEditKeys(false)}
               />
-              <TrySection item={item} tools={tools} />
               <ToolsSection item={item} actions={actions} mode={cat.mode} split />
               <ReachSection
                 item={item}
