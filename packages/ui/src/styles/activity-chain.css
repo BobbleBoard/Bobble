@@ -234,8 +234,12 @@ button.pd-chain-step-row:hover {
   flex: none;
   width: 22px;
   height: 22px;
-  /* Opaque, so the connector line reads as segmented between icons. */
-  background: var(--pd-bg-base);
+  /* Opaque, so the connector line reads as segmented between icons — in the
+     colour of the surface the chain sits on. Base is the chat's; a chain on a
+     raised card or panel sets --pd-chain-ground, or the backing shows as a dark
+     square behind every icon (the user, 2026-10-08, on the connector demo's Done:
+     "it used to be a clean circle"). */
+  background: var(--pd-chain-ground, var(--pd-bg-base));
   color: var(--pd-text-muted);
 }
 

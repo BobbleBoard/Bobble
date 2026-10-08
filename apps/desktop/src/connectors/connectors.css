@@ -710,6 +710,8 @@
    One real ask, drawn the way the chat draws it — a person's bubble on the
    right — over a raised card. The button that sends it is in the header. */
 .pdc-try {
+  /* The demo's chain sits on this card, not on the chat (activity-chain.css). */
+  --pd-chain-ground: var(--pd-bg-raised);
   display: flex;
   flex-direction: column;
   gap: 12px;
