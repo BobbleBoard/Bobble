@@ -79,13 +79,28 @@ const pics = {
 const S = 384;
 writeFileSync(
   pics.a,
-  png(S, S, (x, y) => (y > S * 0.7 ? [40, 110, 160] : x > S * 0.45 && x < S * 0.55 && y > S * 0.25 ? [235, 235, 230] : [150, 200, 235])),
+  png(S, S, (x, y) =>
+    y > S * 0.7
+      ? [40, 110, 160]
+      : x > S * 0.45 && x < S * 0.55 && y > S * 0.25
+        ? [235, 235, 230]
+        : [150, 200, 235],
+  ),
 );
 writeFileSync(
   pics.b,
-  png(S, S, (x, y) => (y > S * 0.7 ? [30, 40, 90] : x > S * 0.45 && x < S * 0.55 && y > S * 0.25 ? [250, 210, 120] : [230, 120, 90])),
+  png(S, S, (x, y) =>
+    y > S * 0.7
+      ? [30, 40, 90]
+      : x > S * 0.45 && x < S * 0.55 && y > S * 0.25
+        ? [250, 210, 120]
+        : [230, 120, 90],
+  ),
 );
-writeFileSync(pics.c, png(S, Math.round(S * 0.66), (x) => [200 - (x % 40), 190, 170]));
+writeFileSync(
+  pics.c,
+  png(S, Math.round(S * 0.66), (x) => [200 - (x % 40), 190, 170]),
+);
 
 const bash = (id, command) => ({ type: 'toolCall', id, name: 'bash', arguments: { command } });
 const result = (callId, assistantId, text, t) => ({
@@ -99,7 +114,12 @@ const result = (callId, assistantId, text, t) => ({
   timestamp: t,
 });
 const messages = [
-  { kind: 'user', id: 'u1', text: 'make me a lighthouse picture, then a dusk version', timestamp: 1 },
+  {
+    kind: 'user',
+    id: 'u1',
+    text: 'make me a lighthouse picture, then a dusk version',
+    timestamp: 1,
+  },
   {
     kind: 'assistant',
     id: 'a1',
@@ -111,8 +131,22 @@ const messages = [
       bash('c2', `media edit image "${pics.a}" "the same at dusk"`),
     ],
   },
-  { kind: 'toolResult', id: 'tr-a1-c0', toolCallId: 'c0', assistantId: 'a1', toolName: 'read', text: 'Read image file [image/png]', isError: false, timestamp: 11 },
-  result('c1', 'a1', `Generated 1 image on the canvas:\n  1. ${pics.a} (seed 7)\nModel: Qwen-Image 2.1`, 12),
+  {
+    kind: 'toolResult',
+    id: 'tr-a1-c0',
+    toolCallId: 'c0',
+    assistantId: 'a1',
+    toolName: 'read',
+    text: 'Read image file [image/png]',
+    isError: false,
+    timestamp: 11,
+  },
+  result(
+    'c1',
+    'a1',
+    `Generated 1 image on the canvas:\n  1. ${pics.a} (seed 7)\nModel: Qwen-Image 2.1`,
+    12,
+  ),
   result('c2', 'a1', `Edited the image:\n  1. ${pics.b} (seed 8)\nModel: Qwen-Image Edit`, 14),
   {
     kind: 'assistant',
@@ -131,7 +165,10 @@ try {
   await page.evaluate((m) => window.__pi_store().setState({ messages: m }), messages);
   await page.waitForSelector('[data-testid="chain-thumbs"]', { timeout: 10_000 });
   await page.waitForFunction(
-    () => [...document.querySelectorAll('[data-testid="chain-thumb"] img')].every((i) => i.complete && i.naturalWidth > 0),
+    () =>
+      [...document.querySelectorAll('[data-testid="chain-thumb"] img')].every(
+        (i) => i.complete && i.naturalWidth > 0,
+      ),
     undefined,
     { timeout: 8000 },
   );
@@ -167,7 +204,10 @@ try {
   await sleep(400);
   const after = await first.boundingBox();
   console.log('hover', JSON.stringify({ before, after }));
-  check(after !== null && before !== null && after.width > before.width * 2, 'hovering a preview makes it bigger');
+  check(
+    after !== null && before !== null && after.width > before.width * 2,
+    'hovering a preview makes it bigger',
+  );
   await shot('2-hover');
   await page.mouse.move(5, 5);
   await sleep(300);
@@ -185,7 +225,10 @@ try {
   check(count2?.trim() === '3 of 3', `the arrow key steps to the next (${count2})`);
   await page.click('[data-testid="lightbox-prev"]');
   await sleep(300);
-  check((await page.textContent('[data-testid="lightbox-count"]'))?.trim() === '2 of 3', '‹ steps back');
+  check(
+    (await page.textContent('[data-testid="lightbox-count"]'))?.trim() === '2 of 3',
+    '‹ steps back',
+  );
   await page.keyboard.press('Escape');
   await sleep(300);
   check((await page.$('[data-testid="lightbox"]')) === null, 'Esc closes the lightbox');
@@ -194,10 +237,18 @@ try {
   await page.click('.pd-chain-summary');
   await sleep(600);
   const tallest = await page.evaluate(() =>
-    Math.max(0, ...[...document.querySelectorAll('.pd-chain img')].map((i) => i.getBoundingClientRect().height)),
+    Math.max(
+      0,
+      ...[...document.querySelectorAll('.pd-chain img')].map(
+        (i) => i.getBoundingClientRect().height,
+      ),
+    ),
   );
   console.log('tallest picture in the expanded chain', tallest);
-  check(tallest > 0 && tallest <= 80, `no picture in the expanded chain is taller than a preview (${tallest}px)`);
+  check(
+    tallest > 0 && tallest <= 80,
+    `no picture in the expanded chain is taller than a preview (${tallest}px)`,
+  );
   await shot('4-expanded');
 } finally {
   await finish();

@@ -35,13 +35,17 @@ async function go(text) {
 try {
   await page.waitForFunction(() => typeof window.__pi_canvas === 'function', { timeout: 8000 });
   await page.evaluate(() => window.__pi_canvas().openTab({ kind: 'browser', title: 'New tab' }));
-  await page.waitForSelector('[data-testid="canvas-tabs-panel"] .pd-browser-url', { timeout: 8000 });
+  await page.waitForSelector('[data-testid="canvas-tabs-panel"] .pd-browser-url', {
+    timeout: 8000,
+  });
   await sleep(800);
 
   const searched = await go('best pizza near me');
   console.log('words →', searched);
   check(
-    /^https:\/\/www\.google\.[a-z.]+\/search\?.*q=best(\+|%20)pizza(\+|%20)near(\+|%20)me/.test(searched),
+    /^https:\/\/www\.google\.[a-z.]+\/search\?.*q=best(\+|%20)pizza(\+|%20)near(\+|%20)me/.test(
+      searched,
+    ),
     `words search Google (${searched})`,
   );
   check(!searched.startsWith('https://best'), 'never https://<words>');

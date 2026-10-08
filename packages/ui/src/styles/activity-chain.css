@@ -22,9 +22,6 @@
   gap: 12px;
   min-width: 0;
 }
-.pd-chain-head > .pd-chain-summary {
-  align-self: center;
-}
 .pd-chain-aside {
   display: flex;
   flex: none;
@@ -49,6 +46,10 @@
   line-height: var(--pd-leading-body);
   text-align: left;
   cursor: pointer;
+}
+/* In the head row it sits on the pictures' centre line, not their top. */
+.pd-chain-head > .pd-chain-summary {
+  align-self: center;
 }
 
 .pd-chain-summary:hover {

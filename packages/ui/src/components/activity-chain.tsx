@@ -2020,8 +2020,7 @@ export const ActivityChain = forwardRef<HTMLDivElement, ActivityChainProps>(func
    * shimmering summary line and opens when someone asks; `autoExpandLive`
    * brings back the old open-while-running behaviour for whoever wants it.
    */
-  const isExpanded =
-    expanded ?? (autoExpandLive && live && !userChose ? true : internalExpanded);
+  const isExpanded = expanded ?? (autoExpandLive && live && !userChose ? true : internalExpanded);
   /* A PREFILLING turn is not a settled one. Without this the chain has no
    * running step, goes quiet, and prints "Done" over a model that is still
    * ingesting the prompt — the premature-completion family again, one layer
