@@ -175,6 +175,15 @@ body {
 .pd-canvas-rail[data-dragging="true"] {
   transition: none;
 }
+/* DOCKED, THE CANVAS HAS NO CORNER OF ITS OWN. the user (2026-10-08): "the top of
+   the border between the canvas and chat area … there's an inexplicable rounded
+   corner". The canvas card keeps --pd-radius-surface for when it floats; docked
+   in this rail it runs flush to the window's top and to the chat, and its
+   rounded top-left showed the rail's lighter ground as a wedge beside the
+   strip's darker one (canvas-edges-look.mjs, 4x). */
+.pd-canvas-rail .pd-canvas-tabs {
+  border-radius: 0;
+}
 @keyframes pd-inline-canvas-in {
   from {
     opacity: 0;

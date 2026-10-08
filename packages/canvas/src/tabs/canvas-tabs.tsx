@@ -456,6 +456,10 @@ export function CanvasTabs({
                       >
                         <IconClose size={12} />
                       </button>
+                      {/* The two fillets under the selected tab, each drawing
+                          its arc as a real border (styles.css). */}
+                      <span className="pd-canvas-tab-flare" data-side="l" aria-hidden="true" />
+                      <span className="pd-canvas-tab-flare" data-side="r" aria-hidden="true" />
                     </div>
                   </div>
                 );

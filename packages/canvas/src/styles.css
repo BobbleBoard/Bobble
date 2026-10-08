@@ -111,6 +111,16 @@
    * so the canvas has a single dial the next person can turn.
    */
   --pd-canvas-rule: var(--pd-border-default);
+  /*
+   * THE TAB'S HAIRLINE, SOLID. The rule is a translucent white (or black), so
+   * one line read two brightnesses depending on what it lay over: the selected
+   * tab's sides and top over its own fill (57 in bobble dark), the arcs of its
+   * flares and the strip's seam over the strip's darker ground (47). MEASURED at
+   * the join (canvas-edges-look.mjs) — the step from 57 to 47 where the curve
+   * begins is what read as a different, thicker line. Mixed once over the pane,
+   * it is the same line everywhere it runs.
+   */
+  --pd-canvas-tab-rule: color-mix(in srgb, var(--pd-text-primary) 12%, var(--pd-bg-raised));
   /* How far the selected tab's fill runs out past its own sides on the way into
    * the pane — the width of each of Chrome's two bottom flares. It matches the
    * tab's own corner radius, so the curve that opens out at the bottom is the
@@ -171,8 +181,8 @@
   background: linear-gradient(
     to right,
     transparent,
-    var(--pd-canvas-rule) 4%,
-    var(--pd-canvas-rule) 96%,
+    var(--pd-canvas-tab-rule) 4%,
+    var(--pd-canvas-tab-rule) 96%,
     transparent
   );
 }
@@ -391,7 +401,7 @@
    * the side one flare-height above the border box's bottom. */
   bottom: calc(var(--pd-canvas-tab-flare) - 1px);
   left: -1px;
-  border: 1px solid var(--pd-canvas-rule);
+  border: 1px solid var(--pd-canvas-tab-rule);
   border-bottom: 0;
   border-radius: var(--pd-radius-md) var(--pd-radius-md) 0 0;
   pointer-events: none;
@@ -404,87 +414,57 @@
 }
 
 /*
- * THE TWO FLARES UNDER THE SELECTED TAB — the half of Chrome's shape that a
- * border-radius cannot draw. Each is a concave fillet in the PANE's own colour,
- * so the tab's fill does not stop at its own edge: it runs out sideways, curves
- * down and becomes the pane. Without them a squared-off bottom is just a tab
- * that has lost its corners.
+ * THE TWO FLARES UNDER THE SELECTED TAB — the half of Chrome's shape that the
+ * tab's own border-radius cannot draw: a concave fillet each side, in the PANE's
+ * colour, so the tab's fill runs out sideways, curves down and becomes the pane,
+ * and the hairline that came down the tab's side (the ::before above) goes on
+ * round the curve to the strip's seam.
  *
- * Each fillet also carries the HAIRLINE round its arc — a 1px ring at the
- * circle's edge — so the line that came down the tab's side (the ::before
- * above) continues round the curve and lands on the strip's seam.
+ * A BORDER, NOT A GRADIENT. the user (2026-10-08): "there's a bit of wierdness
+ * around the edges of the tabs, the curve up a bit thicker or something than
+ * the rest". The arc was a ring painted inside a radial-gradient: MEASURED at
+ * device pixels (canvas-edges-look.mjs), 2–2.5 px at value 47 against the
+ * sides' crisp 2 px at 57 — softer and wider, so it read heavier. Each flare is
+ * now its own box, flare × flare, whose bottom-outer corner is rounded by the
+ * flare and whose two outer borders are the hairline: the arc is drawn by the
+ * same border rasteriser as the tab's sides, so it is the same line. Inside the
+ * arc the box is the strip's ground (it also covers the seam under the foot, so
+ * the foot is one line, not two stacked); outside it, a spread shadow in the
+ * pane's colour, clipped to the box, is the fill that becomes the pane.
  *
- * It is declared on EVERY tab (hidden at opacity 0) so the fold animates in
- * both directions — a rule that only exists while [data-active] has nothing to
- * fade back out of.
+ * On every tab, hidden, so the fold fades in both directions.
  */
-.pd-canvas-tab::after {
-  content: "";
+.pd-canvas-tab-flare {
   position: absolute;
-  /* -1px, not 0: an absolutely positioned box is offset from its containing
-   * block's PADDING box, and the tab keeps a 1px border all round. At 0 the
-   * flare stopped one row short and the strip's seam went on painting straight
-   * through the widest part of the curve (SEEN in a pixel map of the corner,
-   * not deduced). -1px lands it on the tab's own bottom edge, which is also the
-   * scroller's, so nothing clips. */
+  /* -1px: offsets are from the PADDING box and the tab keeps a 1px border, so
+     this lands the flare on the tab's own bottom edge — the seam's row. */
   bottom: -1px;
-  left: calc(-1 * var(--pd-canvas-tab-flare));
-  right: calc(-1 * var(--pd-canvas-tab-flare));
+  box-sizing: border-box;
+  width: var(--pd-canvas-tab-flare);
   height: var(--pd-canvas-tab-flare);
+  background: var(--pd-bg-inset);
+  clip-path: inset(0);
   pointer-events: none;
   opacity: 0;
-  /* The transparent quarter-disc is centred on the corner the tab occupies, so
-   * the painted part is the arc BELOW it — zero thickness where it meets the
-   * tab, full flare width where it meets the pane.
-   *
-   * THE FOOT. the user (2026-09-18): "some sort of artifacting/sharpness … at the
-   * edges of tabs", circled where each flare lands on the seam. MEASURED at
-   * device pixels (canvas-tab-corner-look.mjs): the seam is 2 rows at 47/255;
-   * the arc's foot was 3 rows at 72 — the ring is the same 18%-alpha rule as
-   * the seam, and where it lands it painted OVER the seam, alpha on alpha,
-   * nearly twice as bright, half a pixel taller. Two changes: the ring is a
-   * true 1px line ON the seam's rows — solid from one pixel in to the flare's
-   * edge, a quarter-pixel ramp either side, so at the tangent it covers the
-   * seam's two device rows and no more — and a
-   * 1px band of the strip's ground sits BENEATH each ring's foot (the third
-   * and fourth backgrounds, flare-wide, at the two bottom corners: layers
-   * composite top-down before the box meets the page), so the foot paints
-   * over the strip's colour exactly as the seam does, not over the seam.
-   * Flare-wide, not box-wide: a band under the whole tab put the strip's
-   * colour back under the selected tab's fill (MEASURED 17/18 across its
-   * bottom row over a 31 pane) — the very line the fold exists to remove. */
-  background-image:
-    radial-gradient(
-      circle var(--pd-canvas-tab-flare) at top left,
-      transparent calc(var(--pd-canvas-tab-flare) - 1.25px),
-      var(--pd-canvas-rule) calc(var(--pd-canvas-tab-flare) - 1px),
-      var(--pd-canvas-rule) var(--pd-canvas-tab-flare),
-      var(--pd-bg-raised) calc(var(--pd-canvas-tab-flare) + 0.25px)
-    ),
-    radial-gradient(
-      circle var(--pd-canvas-tab-flare) at top right,
-      transparent calc(var(--pd-canvas-tab-flare) - 1.25px),
-      var(--pd-canvas-rule) calc(var(--pd-canvas-tab-flare) - 1px),
-      var(--pd-canvas-rule) var(--pd-canvas-tab-flare),
-      var(--pd-bg-raised) calc(var(--pd-canvas-tab-flare) + 0.25px)
-    ),
-    linear-gradient(var(--pd-bg-inset), var(--pd-bg-inset)),
-    linear-gradient(var(--pd-bg-inset), var(--pd-bg-inset));
-  background-position:
-    left bottom,
-    right bottom,
-    left bottom,
-    right bottom;
-  background-size:
-    var(--pd-canvas-tab-flare) 100%,
-    var(--pd-canvas-tab-flare) 100%,
-    var(--pd-canvas-tab-flare) 1px,
-    var(--pd-canvas-tab-flare) 1px;
-  background-repeat: no-repeat;
   transition: opacity var(--pd-duration-fast) var(--pd-easing-standard);
 }
-
-.pd-canvas-tab[data-active]::after {
+.pd-canvas-tab-flare[data-side="l"] {
+  left: calc(-1 * var(--pd-canvas-tab-flare));
+  border-right: 1px solid var(--pd-canvas-tab-rule);
+  border-bottom: 1px solid var(--pd-canvas-tab-rule);
+  border-bottom-right-radius: var(--pd-canvas-tab-flare);
+  box-shadow: calc(var(--pd-canvas-tab-flare) / 2) calc(var(--pd-canvas-tab-flare) / 2) 0
+    calc(var(--pd-canvas-tab-flare) / 2) var(--pd-bg-raised);
+}
+.pd-canvas-tab-flare[data-side="r"] {
+  right: calc(-1 * var(--pd-canvas-tab-flare));
+  border-left: 1px solid var(--pd-canvas-tab-rule);
+  border-bottom: 1px solid var(--pd-canvas-tab-rule);
+  border-bottom-left-radius: var(--pd-canvas-tab-flare);
+  box-shadow: calc(var(--pd-canvas-tab-flare) / -2) calc(var(--pd-canvas-tab-flare) / 2) 0
+    calc(var(--pd-canvas-tab-flare) / 2) var(--pd-bg-raised);
+}
+.pd-canvas-tab[data-active] .pd-canvas-tab-flare {
   opacity: 1;
 }
 
