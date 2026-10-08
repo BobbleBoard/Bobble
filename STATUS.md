@@ -1,6 +1,26 @@
 # Bobble — status
 
-Updated: 2026-10-08 (on AC) · main `cba25bd0` + the in-app cards commit · the user: "build out some example cards and where they might appear … center screen popups for the first time using a feature … the connectors page showing a sample chat message being sent … pop out cards … a little < poking out … 'Got it!'"
+Updated: 2026-10-08 (on AC) · main `fccc658d` + the design-language icons commit · the user: "I like the 1px stroke 13px text, I still like the hugeicons better than drawn … you can install the set, you can replace whatever feels right"
+
+## Report — 2026-10-08: one icon family, Hugeicons at 1px
+
+**The ask.** the user liked 1px icons beside 13px text, and preferred Hugeicons over the hand-drawn ones (the connector icon "really low quality"). Measured first: SF 13px regular stems are ~1.23px, 14px ~1.33, 13px medium ~1.48. The app drew every icon at 1.25px from two systems: 35 Hugeicons glyphs (24-grid) and 56 + 27 hand-drawn 16-grid icons. Evidence: `deliverables/icon-review-2026-10-08/` (every icon as drawn, 6x magnified, candidate sheets, before/after in the app).
+
+| Change | Where | Commit |
+|---|---|---|
+| `@hugeicons/core-free-icons` 4.3.5 (MIT), one module per icon | packages/ui | `fccc658d` |
+| All 56 `icons.tsx` icons drawn from Hugeicons, every export name kept, so no call site moved; where an idea is already a glyph (chat, image, video, audio, puzzle, folder, compass), the icon is that glyph | packages/ui icons.tsx | `fccc658d` |
+| Connector is a real plug (Plug01); Gauge (a filling pie) and Speed (a speedometer) read apart in the message bar; gears became a wrench | icons.tsx | `fccc658d` |
+| GitHub: the brand's own mark (simple-icons), not a drawn copy | icons.tsx | `fccc658d` |
+| The second hand-drawn set (settings/icons.tsx, 27) re-exports the shared set; 18 new shared icons cover what only it had | apps/desktop | `fccc658d` |
+| One-offs moved onto the set: "Show" folder, the generic-app and canvas marks, ModelsView's view toggles (now with accessible names) and download count, MediaCard's corner controls | ui + desktop | `fccc658d` |
+| `--pd-icon-stroke` defaults to **1** in every flavor; a settings file saved under the old 1.25 default moves to 1 once (`iconStrokeRev`), a later 1.25 is kept | themes, settings | `fccc658d` |
+| Kept on purpose, a step heavier: icons lying on pictures (1.6, scoped on `.pd-media-btn`); the models download count (1.25, the user's "slightly thicker") | global.css, ModelsView | `fccc658d` |
+| Kept as they are: the filled warning badge over photos, the audio player's filled play/pause, the file glyph's letterforms and the project folder morph (already Hugeicons-based or the user's drawings) | — | — |
+| Design language: Icons assets re-rendered (115), its cards use the same drawings at 1px (`.bb-icon`), Iconography rules rewritten, backdrops retaken from the new build; artifact v6 | design/language | this commit |
+
+**Checked.** ui 431 and desktop 3,568 tests (a new one for the migration), typecheck clean. `tests/e2e/icons-look.mjs` ran headless before and after: sidebar, + menu with Connectors, a tool chain with its message actions, Extensions, Models, Settings. The before/after crops are in the deliverables. No icon needed drawing by hand: every concept had a Hugeicons drawing that fits.
+
 
 ## Report — 2026-10-08: example cards, in place on the real app
 

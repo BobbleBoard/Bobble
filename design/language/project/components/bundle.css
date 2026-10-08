@@ -473,13 +473,7 @@
   width: 15px;
   height: 15px;
 }
-.bb-chip svg path {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.5;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
+
 .bb-caret {
   display: inline-block;
   width: 2px;
@@ -567,6 +561,25 @@
     animation: none !important;
     transition: none !important;
   }
+}
+
+/*
+ * ── the app's icons, inline ─────────────────────────────────────────────────
+ * The shared Hugeicons drawings (Icons assets), pasted with class="bb-icon": a
+ * 1px stroke at any size, the stem of 13px text, as the app draws them
+ * (--pd-icon-stroke). --bb-icon-stroke gives one more step where an icon must
+ * hold its own, on a filled button or over a picture.
+ */
+.bb-icon {
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: var(--bb-icon-stroke, 1px);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.bb-icon * {
+  vector-effect: non-scaling-stroke;
 }
 
 /* ── buttons a card ends with ─────────────────────────────────────────────── */

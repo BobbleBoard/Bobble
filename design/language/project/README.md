@@ -55,7 +55,7 @@ Separate facts with a middle dot ("Deck · On this Mac", "Built in · always on"
 
 ## Iconography
 
-- **Glyphs** (`glyph-*` in Icons) are the app's 24-grid Hugeicons set: stroke 1.5 at 24px, round caps and joins. They mark places and tools: sidebar rows, studios, menu items.
-- **Icons** (`icon-*` in Icons) are the app's 16-grid set for controls: check, close, copy, share, pencil, chevrons. Draw them 16px inside a 32px target, `ink-secondary` at rest and `ink` on hover.
+- **One family.** Every icon is a Hugeicons stroke-rounded drawing on the 24-grid (Icons assets): `glyph-*` for places and tools (sidebar rows, studios, menu items), `icon-*` for controls (check, close, copy, share, pencil, chevrons). One idea is drawn once; where a glyph exists, the icon is that glyph. Never draw an icon the set already has. If it has nothing that fits, draw one on the same grid, in the same idiom (round caps and joins, soft corners, no fills), and hold it to the set's quality.
+- **1px at any size.** The stroke is a screen pixel (`--pd-icon-stroke`, default 1), the stem of 13px text. Draw icons 16px in a 32px target, `ink-secondary` at rest and `ink` on hover. Inline in a card, paste the drawing with `class="bb-icon"`. An icon gets one step more weight (`--bb-icon-stroke` 1.5, or the app's 1.6) only where it must hold its own: white on a filled button, or lying on a picture.
 - **The cursor** is one drawing (Cursor assets). Yours is the plain drawing. Bobble's adds the `agent` edge glow and, while it acts, the status pill, which names the action ("Typing", "Clicking") and never what is typed.
-- A connector's own icon is its official mark, copied, on a `surface-sunken` tile. Without one, use a glyph from the set. Never draw a brand.
+- **Brand marks are copied.** A connector's own icon is its official mark, on a `surface-sunken` tile; GitHub's is the brand's own. Without a mark, use the connector glyph (the plug). Never draw a brand.
