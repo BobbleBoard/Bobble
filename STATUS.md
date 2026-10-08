@@ -1,6 +1,6 @@
 # Bobble — status
 
-Updated: 2026-10-08 (on AC) · the user: "you can wire the design language into the app … a quick guided tour button … a lot of cleanup to be done for the model hub"
+Updated: 2026-10-08 late (on AC) · the user: "for the connectors I would imagine we want a prominent card … for the chat area i'm noticing a bunch of ui ux issues"
 
 ## Backlog — everything discussed and not yet done (consolidated 2026-10-08)
 
@@ -53,11 +53,13 @@ Still to check before dropping (not merged): `claude/practical-dhawan-bf1d62` (0
 | d1 decision models: tune d1-3B for grounding (grid zoom 9/20 untuned; directional moves 0/20) | tested untuned (10-07); tuning not started. d1-omni-600M (audio-visual) noted for later |
 | A memory system: Hindsight (the user: "a good pick") | not built (a Memory prototype in the gallery) |
 | A 5–10× decode advantage; sublinear attention in the next Qwen/Gemma | watch items, no work |
+| Context Language Models (arXiv 2609.37725, Meta/UW, 2026-09-29): the model edits its own context as a file; Suffix Cache Reuse re-rotates RoPE to reuse KV after edits (SGLang patch, code at facebookresearch/context-language-models). Tested at a 32K window; zero-shot works on Qwen3.6-27B, weaker on Qwen3.5-9B until RL (28.8 vs 34.7, 42.5 after) | watch item (the user 10-08: "something to keep an eye on"), no work |
 | The reliability bar ("none of this ever happens on OAI/Anthropic any more") | the open gaps are §7 |
 
 ### 5. Design language → the app (wired 2026-10-08 on the user's "you can wire the design language into the app")
 - Done: the tokens (teal accent, muted `#69696e`, teal focus), Fraunces on screen titles, the three hues on "what it makes" tags, the intro card (3D Studio, Computer use), the pop-out (Segment on the 3D rail, Connectors on the composer's +), the tour on the pop-out's anatomy.
-- Still to do: Try it playing on every connector's page, the Made card, the connector Demo card, the toolbar.
+- Done 2026-10-08 late: Try it plays on every connector's page (the connector demo card).
+- Still to do: the Made card, the toolbar.
 - the user's wider list (10-07): connector explore demos for each connector; the rendering of tables, visuals, office documents and inline cards at the same level.
 
 ### 6. Visual quality (pinned since 09-24), what is still open
@@ -87,6 +89,27 @@ Still to check before dropping (not merged): `claude/practical-dhawan-bf1d62` (0
 ### 8. Smaller known bugs
 The office chip flicker (1 of 15 probe runs) · rapid-mlx never lands the paste prime (~4.5k tokens re-read) · img2img edits are subtle (the instruction editor needs the 3D engine) · a finished card remounts into the chain when the next tool call starts · a picture embedded in the reply shows twice · ⌘Z into a turn already answering keeps the partial reply · an image-only message can't be rewound · the Ladle build in the bundle (excluded `68cf0219`, unconfirmed) · ~60 unused old icon files in the design artifact's storage.
 
+
+## Report — 2026-10-08 late: a connector demo card, tool chains collapsed, pictures beside the chain, and the chat-area fixes
+
+| Asked | Done | Checked on screen |
+|---|---|---|
+| Connectors: a prominent card — the ask slides up, "Sure, I'll use <connector> to do this", the Used row, a sped-up Worked for, Done | Every connector's page opens with Try it playing: the user's bubble slides up, the reply's line, the real chain row with the connector's own mark ("Using …" while it runs, then "Used …"), a "Worked for" that counts to 1m 12s in 1.7 s, then Done; Replay plays it again; Reduce Motion shows the finished exchange | connector-demo-look: each phase photographed, the final words checked, Replay restarts it |
+| Tools collapsed by default | A chain is folded while it runs too; `autoExpandLive` on ActivityChain brings back open-while-running for a future setting | unit tests + every chat probe |
+| The > beside a tool chain shown without hover | Always shown, muted, ink on hover | chain-visuals-look |
+| Pictures worked with in a chain: small at the right, level with it; hover bigger; click opens it, with the others either side | Up to four thumbnails (+N) at the right of the chain's summary row, level with it; hover grows one 2.6×; click opens a lightbox — the picture, its name, ‹ 2 of 3 ›, arrow keys, Esc, click outside; a picture that will not load is left out | chain-visuals-look: three thumbnails level with the row, hover, lightbox steps 2→3→2, Esc |
+| Nothing full size inside an expanded chain | Pictures in a chain row are 72 px previews (they open the lightbox); players and other cards are capped | chain-visuals-look: tallest picture in the open chain 72 px |
+| A radar chart, then a failed turn; back in the chat the chart showed at the bottom (twice) | Two causes: a card was placed by message id, and ids differ live and reloaded, so a reopened chat lost the anchor and put a copy at the end; and a chat's folder was owned per window, so a restart made `<name>-2`. Cards are now anchored by their tool-call id (stable both ways) and a lost one is re-anchored, not copied; a saved chat keeps its folder across launches (`~/.pi/desktop/chat-workspaces.json`) | chart-reentry-probe, real pi + a scripted server, three ways (in place, pi restarted, app restarted): one card, after the asking message, one folder |
+| The inline ⇄ canvas move "not totally seamless" | Measured four faults and fixed each: the rail animated its own width, so the morph aimed at a half-open layout and the card jumped 440 px / 220 px at the end; a moved chart replayed its entrance; leaving the chat the card flew UNDER the rail, so the panel stood empty ~200 ms; the two snapshots cross-faded the whole flight (a wide card's bars ghosting through the tall panel's) | inline-move-film: the morph's planned end against where the card settles, dx 0 both ways; real screenshots every ~40 ms after the click, both directions |
+| The address bar should search, not open https://<words> | Words go to a Google search; an address still opens (https, or http for localhost and IPs) | address unit tests; browser-search-probe: "best pizza near me" → google.com/search?q=… |
+| The tab's curves heavier than its sides; a stray rounded corner where the canvas meets the chat | The curves are drawn by the same border as the sides (were a gradient ring, 2–2.5 px at 47 against crisp 2 px at 57); the docked canvas has square corners. Found while checking: where a flare's edge fell between pixels, a 1 px seam notched the strip's line (a clip-path is not pixel-snapped) — the flare is now two snapped boxes | canvas-edges-look at device pixels, light and dark: one line value all round, no lone column |
+| (later note) "this square on the 'done' — it used to be a clean circle" | The icon backing that segments the chain's line was the chat's colour; on the connector card it showed as a square. It now takes its surface's colour | connector-demo-look: base-coloured pixels inside the card 2,812 → 0 |
+
+Also: `ship:local` follows an unheard quit with SIGTERM after 10 s — the same quit, through the app's quit hold — instead of giving up at 30 s (the Apple Event went unanswered tonight; SIGTERM quit Bobble in ~1 s with no stray model server).
+
+Checks: lint clean in every package, typecheck, every unit suite (the 9 desktop and 1 harness failures in the all-packages run were timeouts under load; each file passes alone), the build, the eight probes above, `ship:local` (installed). Commits on main: `3e7d14dc` → `8f33d0a7` (12).
+
+Not done / known: Google answers the AUTOMATED test browser with its bot check (`/sorry/`) after the search lands — Playwright runs Electron with `navigator.webdriver` true; a Bobble you open yourself does not. Not bypassed.
 
 ## Report — 2026-10-08: the design language in the app, a friendlier Models page, the quick tour
 
