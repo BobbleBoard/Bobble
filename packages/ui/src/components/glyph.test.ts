@@ -158,16 +158,16 @@ describe('the computer-use window lights', () => {
 
   it('keep at least half a pixel apart at 16px', () => {
     const c = lights.map((p) => circle(p.d)).sort((a, b) => a.cx - b.cx);
-    for (let i = 1; i < c.length; i++) {
-      const gap = (c[i]!.cx - c[i - 1]!.cx - c[i]!.r - c[i - 1]!.r) * PX;
-      expect(gap).toBeGreaterThanOrEqual(0.5);
-    }
+    c.slice(1).forEach((right, i) => {
+      const left = c[i] ?? right;
+      expect((right.cx - left.cx - right.r - left.r) * PX).toBeGreaterThanOrEqual(0.5);
+    });
   });
 
   it('clear the title bar line by half a pixel at 16px (its 1px stroke counted)', () => {
     const bar = GLYPHS.computerUse.find((p) => /^M2 [\d.]+H21$/.test(p.d));
-    expect(bar).toBeDefined();
-    const barY = Number(bar!.d.split(' ')[1]!.split('H')[0]);
+    const barY = Number(/^M2 ([\d.]+)H21$/.exec(bar?.d ?? '')?.[1] ?? Number.NaN);
+    expect(Number.isFinite(barY)).toBe(true);
     for (const p of lights) {
       const { cy, r } = circle(p.d);
       expect((barY - cy - r) * PX - 0.5).toBeGreaterThanOrEqual(0.4);
