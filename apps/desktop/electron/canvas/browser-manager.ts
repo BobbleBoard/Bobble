@@ -18,6 +18,7 @@
  * directly (the renderer flips `driving` on via controller.updateTab). Manual
  * browsing is fully wired today; the tool set is the later feature.
  */
+
 import { createIpcEventSender, createLogger } from '@pi-desktop/shared';
 import {
   app,
@@ -30,6 +31,7 @@ import {
 } from 'electron';
 import type { AppEventMap } from '../ipc-contract';
 import { isTrustedIpcEvent } from '../trusted-senders';
+import { addressToUrl } from './address';
 import type { BrowserBounds, BrowserStateEvent } from './browser-contract';
 
 const log = createLogger('desktop:browser');
@@ -115,12 +117,9 @@ function emitState(owner: WebContents, patch: BrowserStateEvent): void {
   if (!owner.isDestroyed()) events.send(owner, 'browser:state', patch);
 }
 
-/** Add https:// when the user typed a bare host; pass through explicit schemes. */
+/** A page to open, or a search — see address.ts. */
 function normalizeUrl(raw: string): string {
-  const value = raw.trim();
-  if (value === '') return value;
-  if (/^[a-z][a-z0-9+.-]*:/i.test(value)) return value;
-  return `https://${value}`;
+  return addressToUrl(raw);
 }
 
 function navState(wc: WebContents): Pick<BrowserStateEvent, 'url' | 'canGoBack' | 'canGoForward'> {
