@@ -138,3 +138,39 @@ describe('the file glyph', () => {
     );
   });
 });
+
+describe('the computer-use window lights', () => {
+  // the user (2026-10-08): "the top left buttons … have a bit of mushiness". At
+  // 16px a unit is 2/3 of a pixel and the stroke is 1px: stroked rings of r 0.7,
+  // 2.2 apart, ran into one bar. The lights must stay three dots at that size.
+  const PX = 16 / 24;
+  const lights = GLYPHS.computerUse.filter((p) => 'fill' in p && p.fill === true);
+  const circle = (d: string) => {
+    const n = d.match(/-?\d+(?:\.\d+)?/g)?.map(Number) ?? [];
+    // M x0 y A r r 0 1 0 x1 y …: centre halfway between x0 and x1.
+    const [x0, y, r, , , , , x1] = n as [number, number, number, ...number[]];
+    return { cx: (x0 + (x1 ?? x0)) / 2, cy: y, r };
+  };
+
+  it('are three solid dots, not rings', () => {
+    expect(lights).toHaveLength(3);
+  });
+
+  it('keep at least half a pixel apart at 16px', () => {
+    const c = lights.map((p) => circle(p.d)).sort((a, b) => a.cx - b.cx);
+    for (let i = 1; i < c.length; i++) {
+      const gap = (c[i]!.cx - c[i - 1]!.cx - c[i]!.r - c[i - 1]!.r) * PX;
+      expect(gap).toBeGreaterThanOrEqual(0.5);
+    }
+  });
+
+  it('clear the title bar line by half a pixel at 16px (its 1px stroke counted)', () => {
+    const bar = GLYPHS.computerUse.find((p) => /^M2 [\d.]+H21$/.test(p.d));
+    expect(bar).toBeDefined();
+    const barY = Number(bar!.d.split(' ')[1]!.split('H')[0]);
+    for (const p of lights) {
+      const { cy, r } = circle(p.d);
+      expect((barY - cy - r) * PX - 0.5).toBeGreaterThanOrEqual(0.4);
+    }
+  });
+});

@@ -29,6 +29,9 @@ interface GlyphPath {
   readonly d: string;
   readonly cap?: 'round' | 'butt';
   readonly join?: 'round' | 'miter';
+  /** A solid mark (a dot): filled with the ink, no stroke. A stroked dot that
+   * small rounds into a blob at 16px, and three of them run together. */
+  readonly fill?: true;
 }
 
 const P = (d: string, extra: Omit<GlyphPath, 'd'> = {}): GlyphPath => ({ d, ...extra });
@@ -225,10 +228,20 @@ export const GLYPHS = {
     P(
       'M21 11V8C21 5.17157 21 3.75736 20.1213 2.87868C19.2426 2 17.8284 2 15 2H8C5.17157 2 3.75736 2 2.87868 2.87868C2 3.75736 2 5.17157 2 8V13C2 15.8284 2 17.2426 2.87868 18.1213C3.75736 19 5.17157 19 8 19H10',
     ),
-    P('M2 6H21'),
-    P('M3.70 4A0.7 0.7 0 1 0 5.10 4A0.7 0.7 0 1 0 3.70 4Z'),
-    P('M5.90 4A0.7 0.7 0 1 0 7.30 4A0.7 0.7 0 1 0 5.90 4Z'),
-    P('M8.10 4A0.7 0.7 0 1 0 9.50 4A0.7 0.7 0 1 0 8.10 4Z'),
+    /*
+     * The title bar and its three lights, sized for 16px (the user, 2026-10-08:
+     * "the top left buttons … have a bit of mushiness"). They were stroked
+     * rings of r 0.7, 2.2 apart, under a bar at 6: at 16px each ring rounds into
+     * a 1.9px blob only 1.5px from the next, pressed against the window's top
+     * edge, so the three ran into one bar. Now they are SOLID dots of r 0.9, 3
+     * apart, and the bar sits at 6.75; on a 2x screen the bar lands on whole
+     * pixels (9) and the dots' centres too (7, 11, 15 across; 5.9 down), each
+     * with a pixel of clear space above, below and between.
+     */
+    P('M2 6.75H21'),
+    P('M4.35 4.4A0.9 0.9 0 1 0 6.15 4.4A0.9 0.9 0 1 0 4.35 4.4Z', { fill: true }),
+    P('M7.35 4.4A0.9 0.9 0 1 0 9.15 4.4A0.9 0.9 0 1 0 7.35 4.4Z', { fill: true }),
+    P('M10.35 4.4A0.9 0.9 0 1 0 12.15 4.4A0.9 0.9 0 1 0 10.35 4.4Z', { fill: true }),
     P(
       'M12.702 14.276A1.12 1.169 -36 0 1 14.35 13.079L20.391 16.613A0.849 0.885 -36 0 1 20.167 18.224A5.457 5.693 -36 0 0 16.091 21.765A0.915 0.955 -36 0 1 14.303 21.6Z',
       { join: 'round' },
@@ -467,6 +480,7 @@ export function Glyph({ name, size = 16, strokeWidth, className, style, ...rest 
           vectorEffect="non-scaling-stroke"
           {...(p.cap === 'butt' ? { strokeLinecap: 'butt' as const } : {})}
           {...(p.join === 'miter' ? { strokeLinejoin: 'miter' as const } : {})}
+          {...('fill' in p && p.fill ? { fill: 'currentColor', stroke: 'none' } : {})}
         />
       ))}
     </svg>

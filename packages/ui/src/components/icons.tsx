@@ -165,6 +165,7 @@ function FromGlyph({ glyph, ...props }: IconProps & { glyph: GlyphName }) {
           d={p.d}
           {...('cap' in p && p.cap === 'butt' ? { strokeLinecap: 'butt' as const } : {})}
           {...('join' in p && p.join === 'miter' ? { strokeLinejoin: 'miter' as const } : {})}
+          {...('fill' in p && p.fill ? { fill: 'currentColor', stroke: 'none' } : {})}
         />
       ))}
     </Svg24>
