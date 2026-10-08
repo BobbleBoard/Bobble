@@ -2078,7 +2078,8 @@
   top: calc(50% + 10.5px);
   bottom: calc(-50% + 10.5px);
   width: 2px;
-  background: linear-gradient(
+  background:
+    linear-gradient(
       to bottom,
       transparent 1.5px,
       var(--tp-history-line) 1.5px,
@@ -4817,14 +4818,17 @@
 .tp-image-stage {
   position: absolute;
   inset: 0;
-  /* Clear of the floating card. */
-  padding-left: 312px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 12px;
   padding: 40px;
+  /* Clear of the floating cards, measured (viewport-cover.ts) as the empty
+     state is: a fixed 312px written above the shorthand never applied, so the
+     picture sat centred under the card. */
+  padding-left: calc(40px + var(--tp-covered-left, 0px));
+  padding-right: calc(40px + var(--tp-covered-right, 0px));
 }
 .tp-image-stage-img {
   max-width: 100%;
