@@ -15,6 +15,23 @@
 
 /* ---- collapsed summary line ---- */
 
+/* The summary row: the summary on the left, the chain's pictures at the right. */
+.pd-chain-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.pd-chain-head > .pd-chain-summary {
+  align-self: center;
+}
+.pd-chain-aside {
+  display: flex;
+  flex: none;
+  align-items: center;
+  margin-left: auto;
+}
+
 .pd-chain-summary {
   display: inline-flex;
   align-items: center;

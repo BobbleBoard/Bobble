@@ -120,12 +120,18 @@ describe('a picture the turn made and never presented is in the chat', () => {
     return container;
   };
 
-  it('while its chain works it is in the row that made it', async () => {
+  it('while its chain works it is in the row that made it — as a small preview', async () => {
     const container = await draw([assistant('m1', [made])], true);
-    const card = container.querySelector('[data-testid="media-card"]');
-    expect(card).not.toBeNull();
-    expect(card?.closest('.pd-chain')).not.toBeNull();
-    expect(card?.closest('[data-testid="turn-foot"]')).toBeNull();
+    // Nothing full size in a chain (2026-10-08): the row holds a preview, not the card.
+    const preview = container.querySelector('[data-testid="chain-row-thumbs"]');
+    expect(preview).not.toBeNull();
+    expect(preview?.closest('.pd-chain')).not.toBeNull();
+    expect(container.querySelector('.pd-chain [data-testid="media-card"]')).toBeNull();
+    expect(
+      container.querySelector('[data-testid="turn-foot"] [data-testid="media-card"]'),
+    ).toBeNull();
+    // …and it is among the chain's pictures beside the summary.
+    expect(container.querySelector('[data-testid="chain-thumbs"]')).not.toBeNull();
   });
 
   it('once the reply is written it stands at the foot, after the words — not in the folded chain', async () => {

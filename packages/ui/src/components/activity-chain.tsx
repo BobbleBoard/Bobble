@@ -1831,6 +1831,13 @@ export interface ActivityChainProps extends Omit<HTMLAttributes<HTMLDivElement>,
   autoExpandLive?: boolean;
   /** Override the derived past-tense summary line. */
   summary?: ReactNode;
+  /**
+   * Drawn at the right end of the summary row, outside its button: the
+   * pictures the chain worked with, as small previews (the user 2026-10-08: "put
+   * on the right side of the chat area but vertically in line with the tool
+   * chain a little preview of the image").
+   */
+  summaryAside?: ReactNode;
   /** The chain's wall-clock span (first call's request to last result), for "Worked for". */
   wallMs?: number;
   /** Activated for a step whose `opensInCanvas` is set. */
@@ -1947,6 +1954,7 @@ export const ActivityChain = forwardRef<HTMLDivElement, ActivityChainProps>(func
     onExpandedChange,
     defaultOpenStep,
     autoExpandLive = false,
+    summaryAside,
     resolveAppIcon,
     summary,
     wallMs,
@@ -2124,19 +2132,26 @@ export const ActivityChain = forwardRef<HTMLDivElement, ActivityChainProps>(func
       data-running={running}
       {...rest}
     >
-      <button
-        type="button"
-        className="pd-chain-summary pd-focusable"
-        aria-expanded={isExpanded}
-        onClick={toggleChain}
-      >
-        <span className="pd-chain-summary-text">
-          {running ? <ShimmerText>{summaryText}</ShimmerText> : summaryText}
-        </span>
-        <span className="pd-chain-summary-chevron" data-expanded={isExpanded}>
-          <IconChevronRight size={14} />
-        </span>
-      </button>
+      <div className="pd-chain-head">
+        <button
+          type="button"
+          className="pd-chain-summary pd-focusable"
+          aria-expanded={isExpanded}
+          onClick={toggleChain}
+        >
+          <span className="pd-chain-summary-text">
+            {running ? <ShimmerText>{summaryText}</ShimmerText> : summaryText}
+          </span>
+          <span className="pd-chain-summary-chevron" data-expanded={isExpanded}>
+            <IconChevronRight size={14} />
+          </span>
+        </button>
+        {summaryAside === undefined || summaryAside === null ? null : (
+          <div className="pd-chain-aside" data-testid="chain-aside">
+            {summaryAside}
+          </div>
+        )}
+      </div>
 
       {/* The step list rolls open/closed (grid-rows reveal) — steps stay mounted
        * so the collapse animates too. */}

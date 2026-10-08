@@ -4729,7 +4729,9 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
  * finished-looking results. The answer beneath the chain keeps the full size.
  */
 .pd-chain-step-attachment {
-  --pd-media-max-h: 240px;
+  /* Nothing in an expanded chain at full size (the user, 2026-10-08): pictures are
+     row previews (chain-visuals.tsx); a clip, a sound or a model sits small. */
+  --pd-media-max-h: 120px;
 }
 /*
  * …AND NOT YET HANDED OVER. the user (2026-09-24): "still clickable within the
@@ -10454,5 +10456,184 @@ body[data-media-expanded="true"] .pd-studio-compose {
   }
   .pd-cdemo-switch--flip i {
     transform: translateX(10px);
+  }
+}
+
+/* ── The pictures a chain worked with (chat/chain-visuals.tsx) ───────────────
+ * Small previews at the right of the chain's summary row, a step bigger under
+ * the pointer; small previews in an expanded row; and the lightbox. */
+.pd-chain-thumbs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.pd-chain-thumb {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 32px;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 7px;
+  background: var(--pd-bg-inset);
+  box-shadow:
+    0 0 0 1px var(--pd-border-subtle),
+    var(--pd-shadow-sm);
+  transform-origin: 100% 50%;
+  transition:
+    transform var(--pd-duration-base) var(--pd-easing-enter),
+    box-shadow var(--pd-duration-base) var(--pd-easing-standard);
+}
+.pd-chain-thumbs .pd-chain-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+/* "a bit bigger" on hover: the preview lifts in place, over its neighbours. */
+.pd-chain-thumb:hover,
+.pd-chain-thumb:focus-visible {
+  z-index: 2;
+  transform: scale(2.6);
+  box-shadow:
+    0 0 0 0.5px var(--pd-border-default),
+    var(--pd-shadow-popover);
+}
+.pd-chain-thumb--more {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pd-text-secondary);
+}
+.pd-chain-thumb--more:hover {
+  transform: none;
+  color: var(--pd-text-primary);
+}
+
+.pd-chain-row-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.pd-chain-row-thumb {
+  display: grid;
+  place-items: center;
+  height: 72px;
+  max-width: 128px;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--pd-bg-inset);
+  box-shadow: 0 0 0 1px var(--pd-border-subtle);
+  transition: box-shadow var(--pd-duration-base) var(--pd-easing-standard);
+}
+.pd-chain-row-thumbs .pd-chain-row-thumb img {
+  height: 72px;
+  width: auto;
+  max-width: 128px;
+  object-fit: cover;
+  pointer-events: none;
+}
+.pd-chain-row-thumb:hover {
+  box-shadow: 0 0 0 1px var(--pd-border-strong);
+}
+/* A page a row still holds (a widget, an explanation) sits small too. */
+.pd-chain-step-attachment [data-testid="presented-widget"],
+.pd-chain-step-attachment [data-testid="presented-explanation"] {
+  max-height: 160px;
+  overflow: hidden;
+  mask-image: linear-gradient(to bottom, #000 70%, transparent);
+}
+
+.pd-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 9100;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  place-items: center;
+  padding: 48px 48px 20px;
+  background: rgba(0, 0, 0, 0.78);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  animation: pd-intro-fade var(--pd-duration-base) var(--pd-easing-standard) both;
+}
+.pd-lightbox-img {
+  max-width: min(100%, 1600px);
+  max-height: calc(100vh - 140px);
+  object-fit: contain;
+  border-radius: 10px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  animation: pd-lightbox-in var(--pd-duration-slow) var(--pd-easing-enter) both;
+}
+.pd-lightbox-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--pd-radius-full);
+  color: rgba(255, 255, 255, 0.82);
+}
+.pd-lightbox-close:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+.pd-lightbox-foot {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 40px;
+  color: rgba(255, 255, 255, 0.9);
+}
+.pd-lightbox-name {
+  position: absolute;
+  left: 0;
+  max-width: 30%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+}
+.pd-lightbox-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.pd-lightbox-count {
+  min-width: 64px;
+  text-align: center;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.pd-lightbox-step {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--pd-radius-full);
+  color: rgba(255, 255, 255, 0.82);
+}
+.pd-lightbox-step:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+@keyframes pd-lightbox-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pd-chain-thumb,
+  .pd-lightbox,
+  .pd-lightbox-img {
+    transition: none;
+    animation: none;
   }
 }

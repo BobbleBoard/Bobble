@@ -33,6 +33,7 @@ import { appIconSrc, useAppIconStore } from './app-icons';
 // Local module (NOT a package barrel) — keep the open-in-canvas action off the
 // renderer-forbidden barrels (the gotcha); `openFileInCanvas` reads via IPC.
 import { openFileInCanvas } from './canvas/file-tabs';
+import { ChainThumbs, type ChainVisual } from './chain-visuals';
 import {
   PREFILL_STATUS_KEY,
   parsePrefillPercent,
@@ -98,6 +99,7 @@ export function ThreadActivityChain({
   onOpenFile,
   chainKey,
   attachments,
+  visuals,
   chainStartedAt,
 }: {
   blocks: ActivityBlock[];
@@ -151,6 +153,8 @@ export function ThreadActivityChain({
    * call (turn-cards.ts); this only puts them in their rows.
    */
   attachments?: ReadonlyMap<string, ReactNode>;
+  /** The pictures this chain worked with, previewed at the right of its summary row. */
+  visuals?: readonly ChainVisual[];
   /** When the request that began this chain was sent — its first block's message. */
   chainStartedAt?: number;
 }): ReactNode {
@@ -374,6 +378,9 @@ export function ThreadActivityChain({
       data-testid="activity-chain"
       steps={steps.map((s) => s.data)}
       defaultExpanded={false}
+      {...(visuals !== undefined && visuals.length > 0
+        ? { summaryAside: <ChainThumbs items={visuals} /> }
+        : {})}
       /*
        * EXPANDED WHILE THIS CHAIN IS THE LIVE ONE — not for the whole turn.
        *

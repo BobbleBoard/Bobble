@@ -21,6 +21,7 @@ import type { PresentedRecord } from '../state/present-store';
 import { segmentGroup } from './activity-mapping';
 import { InlineArtifact } from './canvas/InlineArtifacts';
 import { withViewTransition } from './canvas/view-transition';
+import { ChainRowThumbs, type ChainVisual, VISUAL_EXT } from './chain-visuals';
 import { liveSource, pendingDiagramArgs } from './diagram-stream';
 import { useGeneratingJob, useModel3dLive } from './GeneratingMedia';
 import { jobSamples, recordJobDuration } from './job-history';
@@ -135,6 +136,24 @@ function callArgsFor(group: readonly AssistantMsg[], callId: string | undefined)
  * times and drown every other sample it has.
  */
 const RECORDED = new Set<string>();
+
+/**
+ * The picture a call READ, when it read one by an absolute path — the `read`
+ * tool on a .png, say. Relative paths are left out: the thread has no sure
+ * folder to resolve them against here, and a broken preview is worse than none.
+ */
+function readPictureOf(b: { name?: string; arguments?: unknown }): string | null {
+  if (b.name !== 'read') return null;
+  const args = (b.arguments ?? {}) as { path?: unknown; file_path?: unknown };
+  const p =
+    typeof args.path === 'string'
+      ? args.path
+      : typeof args.file_path === 'string'
+        ? args.file_path
+        : null;
+  if (p === null) return null;
+  return p.startsWith('/') && VISUAL_EXT.test(p) ? p : null;
+}
 
 export function AssistantGroup({
   group,
@@ -538,32 +557,67 @@ export function AssistantGroup({
         const segIndex = segments.indexOf(seg);
         const inside = new Map<string, ReactNode>();
         const beneath: ReactNode[] = [];
+        /*
+         * THE PICTURES THIS CHAIN WORKED WITH — what its calls made, the
+         * drawings and charts they handed over, and pictures they read — shown
+         * small at the right of its summary row and stepped through in the
+         * lightbox (chain-visuals.tsx). In order, each once.
+         */
+        const visuals: ChainVisual[] = [];
+        const visualPaths = new Set<string>();
+        const addVisual = (path: string): ChainVisual | null => {
+          if (!VISUAL_EXT.test(path)) return null;
+          const v = { path, name: path.split('/').pop() ?? path };
+          if (!visualPaths.has(path)) {
+            visualPaths.add(path);
+            visuals.push(v);
+          }
+          return v;
+        };
         for (const b of seg.blocks) {
           if (b.type !== 'toolCall') continue;
           const media = (mediaByCall.get(b.id) ?? []).filter((item) => !heldBack(item.path));
           const records = recordsByCall?.get(b.id) ?? [];
+          for (const item of media) if (item.kind === 'image') addVisual(item.path);
+          for (const r of records) addVisual(r.path);
+          const read = readPictureOf(b);
+          const readVisual = read === null ? null : addVisual(read);
           const mediaIn = media.filter((item) => placeOf('m', b.id, item.path) === 'inside');
           const recordsIn = records.filter((r) => placeOf('r', b.id, r.path) === 'inside');
-          if (mediaIn.length > 0 || recordsIn.length > 0) {
+          /*
+           * NOTHING AT FULL SIZE IN AN EXPANDED CHAIN (the user, 2026-10-08): a
+           * picture, a chart or a drawing in a row is a small preview that opens
+           * the lightbox; a clip, a sound or a model keeps its player, small
+           * (global.css); a page keeps its card, clipped short.
+           */
+          const picturesIn: ChainVisual[] = [
+            ...mediaIn.filter((i) => i.kind === 'image').map((i) => addVisual(i.path)),
+            ...recordsIn.map((r) => addVisual(r.path)),
+            readVisual,
+          ].filter((v): v is ChainVisual => v !== null);
+          const playersIn = mediaIn.filter((i) => i.kind !== 'image');
+          const cardsIn = recordsIn.filter((r) => !VISUAL_EXT.test(r.path));
+          if (picturesIn.length > 0 || playersIn.length > 0 || cardsIn.length > 0) {
             inside.set(
               b.id,
               <>
-                {mediaIn.length > 0 ? (
+                {picturesIn.length > 0 ? (
                   /* Named for the handover: the result that just came out from
                      under its generating card travels into this row. */
                   <div
                     style={
-                      mediaIn.length === 1 && mediaIn[0] !== undefined
-                        ? { viewTransitionName: handoverName(mediaIn[0].path) }
+                      picturesIn.length === 1 && picturesIn[0] !== undefined
+                        ? { viewTransitionName: handoverName(picturesIn[0].path) }
                         : undefined
                     }
                   >
-                    <ThreadMedia items={mediaIn} />
+                    <ChainRowThumbs items={picturesIn} all={visuals} />
                   </div>
                 ) : null}
+                {playersIn.length > 0 ? <ThreadMedia items={playersIn} /> : null}
                 {renderRecord === undefined
                   ? null
-                  : recordsIn.map((r) => (
+                  : cardsIn.map((r) => (
                       <CardSlot key={`rec:${r.path}`} home={homeFor(`r:${b.id}:${r.path}`)} />
                     ))}
               </>,
@@ -751,6 +805,7 @@ export function AssistantGroup({
               tps={tps}
               {...(onOpenFile !== undefined ? { onOpenFile } : {})}
               {...(inside.size > 0 ? { attachments: inside } : {})}
+              {...(visuals.length > 0 ? { visuals } : {})}
             />
             {/* Always mounted and box-less (`contents`): its children lay out
                 in this column exactly as they did before it existed, and it is
