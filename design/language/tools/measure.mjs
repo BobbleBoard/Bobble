@@ -5,7 +5,9 @@ const [file, rootSel, ...sels] = process.argv.slice(2);
 const b = await chromium.launch({
   executablePath: `${process.env.HOME}/Library/Caches/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-mac-arm64/chrome-headless-shell`,
 });
-const p = await b.newPage({ viewport: { width: 760, height: 600 } });
+const p = await b.newPage({ viewport: { width: 1280, height: 800 } });
+// The still frame (Reduce Motion), so a box is measured where it rests, not mid-animation.
+await p.emulateMedia({ reducedMotion: 'reduce' });
 await p.goto(`file://${file}`);
 await p.evaluate(() => document.fonts.ready);
 const out = await p.evaluate(

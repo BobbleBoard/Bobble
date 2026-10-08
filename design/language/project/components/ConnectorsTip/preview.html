@@ -1,0 +1,80 @@
+<!-- @dsCard group="In the app" height=800 width=1280 subtitle="A pop-out rising from the composer's +: the notch points down at it" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pop-out: Connectors</title>
+<style>
+  body { margin: 0; background: var(--ground); }
+  /* the real window, photographed headless (tests/e2e/design-moments-probe.mjs), 2x */
+  .screen { position: relative; width: 1280px; height: 800px; overflow: hidden;
+    background: url(/_blob/3e6c23d1ff18a350da60ea8e6eb57ddd) 0 0 / 1280px 800px no-repeat; }
+  [data-theme="dark"] .screen { background-image: url(/_blob/2bfe60725a1c10215c56a908049510f5); }
+  .tip { left: 420px; top: 106px; --notch: 30px; transform-origin: 30px calc(100% + 6px); }
+  .bb-cursor.you { left: 452px; top: 403px; }
+  /* the + menu, small: two connectors with their own marks and switches */
+  .menu { width: 214px; padding: 5px; border-radius: 10px; background: var(--overlay); box-shadow: 0 0 0 1px var(--edge), var(--shadow-popover); font: 400 12px/16px var(--font-ui); color: var(--ink); position: relative; }
+  .mrow { display: flex; align-items: center; gap: 8px; height: 26px; padding: 0 7px; border-radius: 6px; }
+  .mrow.plain { color: var(--ink-secondary); }
+  .mrule { height: 1px; margin: 4px 6px; background: var(--hairline); }
+  .mmark { width: 14px; height: 14px; display: grid; place-items: center; color: var(--ink-muted); }
+  .mmark svg { width: 14px; height: 14px; }
+  .mmark:not(.brand) svg path, .mmark:not(.brand) svg rect { fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+  .mname { flex: 1; }
+  .sw { width: 26px; height: 16px; border-radius: 8px; background: var(--line-strong); position: relative; }
+  .sw i { position: absolute; left: 2px; top: 2px; width: 12px; height: 12px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); }
+  .sw.on { background: var(--accent); }
+  .sw.on i { transform: translateX(10px); }
+  .flip .sw { background: var(--accent); }
+  .flip .sw i { transform: translateX(10px); }
+  .mini-you { position: absolute; left: 191px; top: 55px; transform: scale(0.82); transform-origin: 1.53px 0.92px; }
+  .loop .flip .sw { animation: sw 4800ms var(--ease-standard) infinite; }
+  .loop .flip .sw i { animation: knob 4800ms var(--ease-press) infinite; }
+  .loop .mini-you { animation: mini 4800ms linear infinite; }
+  @keyframes sw { 0%, 46% { background: var(--line-strong); } 50%, 92% { background: var(--accent); } 96%, 100% { background: var(--line-strong); } }
+  @keyframes knob { 0%, 46% { transform: none; } 50%, 92% { transform: translateX(10px); } 96%, 100% { transform: none; } }
+  @keyframes mini {
+    0%, 14% { transform: translate(40px, 34px) scale(0.82); opacity: 0; }
+    18%, 30% { transform: translate(40px, 34px) scale(0.82); opacity: 1; animation-timing-function: var(--ease-glide); }
+    36.25%, 44% { transform: scale(0.82); animation-timing-function: ease-in-out; }
+    45.5% { transform: scale(0.64); animation-timing-function: ease-in-out; }
+    47%, 88% { transform: scale(0.82); opacity: 1; }
+    94%, 100% { transform: scale(0.82); opacity: 0; }
+  }
+  .loop .tip { animation: tip 6000ms var(--ease-settle) infinite; }
+  .loop .you { animation: you 6000ms linear infinite; }
+  @keyframes tip { 0%, 9% { opacity: 0; transform: scale(0.94); } 13%, 86% { opacity: 1; transform: none; } 90%, 100% { opacity: 0; transform: scale(0.97); } }
+  @keyframes you {
+    0% { transform: translate(260px, 170px); opacity: 0; }
+    2%, 3% { transform: translate(260px, 170px); opacity: 1; animation-timing-function: var(--ease-glide); }
+    8%, 76% { transform: none; animation-timing-function: var(--ease-glide); }
+    81%, 82% { transform: translate(219px, -55px); animation-timing-function: ease-in-out; }
+    83.2% { transform: translate(219px, -55px) scale(0.78); animation-timing-function: ease-in-out; }
+    84.5%, 96% { transform: translate(219px, -55px); opacity: 1; }
+    100% { transform: translate(219px, -55px); opacity: 0; }
+  }
+
+</style>
+</head>
+<body>
+<div class="screen bb-scene loop">
+  <div class="bb-popout bb-popout--down tip bb-hue-teal" role="dialog" aria-label="Connectors">
+    <div class="bb-popout__stage">
+      <div class="menu">
+        <div class="mrow plain"><span class="mmark"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 2.5V5M10 2.5V5"/><rect x="4.5" y="5" width="7" height="3.6" rx="1"/><path d="M8 8.6v2.4a2.5 2.5 0 0 0 2.5 2.5H12"/></svg></span><span class="mname">Browse connectors</span></div>
+        <div class="mrule"></div>
+        <div class="mrow flip"><span class="mmark brand"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%" aria-hidden="true"><g><g transform="translate(3.75 3.75)"><path fill="#FFFFFF" d="M148.882,43.618l-47.368-5.263l-57.895,5.263L38.355,96.25l5.263,52.632l52.632,6.579l52.632-6.579 l5.263-53.947L148.882,43.618z"/><path fill="#1A73E8" d="M65.211,125.276c-3.934-2.658-6.658-6.539-8.145-11.671l9.132-3.763c0.829,3.158,2.276,5.605,4.342,7.342 c2.053,1.737,4.553,2.592,7.474,2.592c2.987,0,5.553-0.908,7.697-2.724s3.224-4.132,3.224-6.934c0-2.868-1.132-5.211-3.395-7.026 s-5.105-2.724-8.5-2.724h-5.276v-9.039H76.5c2.921,0,5.382-0.789,7.382-2.368c2-1.579,3-3.737,3-6.487 c0-2.447-0.895-4.395-2.684-5.855s-4.053-2.197-6.803-2.197c-2.684,0-4.816,0.711-6.395,2.145s-2.724,3.197-3.447,5.276 l-9.039-3.763c1.197-3.395,3.395-6.395,6.618-8.987c3.224-2.592,7.342-3.895,12.342-3.895c3.697,0,7.026,0.711,9.974,2.145 c2.947,1.434,5.263,3.421,6.934,5.947c1.671,2.539,2.5,5.382,2.5,8.539c0,3.224-0.776,5.947-2.329,8.184 c-1.553,2.237-3.461,3.947-5.724,5.145v0.539c2.987,1.25,5.421,3.158,7.342,5.724c1.908,2.566,2.868,5.632,2.868,9.211 s-0.908,6.776-2.724,9.579c-1.816,2.803-4.329,5.013-7.513,6.618c-3.197,1.605-6.789,2.421-10.776,2.421 C73.408,129.263,69.145,127.934,65.211,125.276z"/><path fill="#1A73E8" d="M121.25,79.961l-9.974,7.25l-5.013-7.605l17.987-12.974h6.895v61.197h-9.895L121.25,79.961z"/><path fill="#EA4335" d="M148.882,196.25l47.368-47.368l-23.684-10.526l-23.684,10.526l-10.526,23.684L148.882,196.25z"/><path fill="#34A853" d="M33.092,172.566l10.526,23.684h105.263v-47.368H43.618L33.092,172.566z"/><path fill="#4285F4" d="M12.039-3.75C3.316-3.75-3.75,3.316-3.75,12.039v136.842l23.684,10.526l23.684-10.526V43.618h105.263 l10.526-23.684L148.882-3.75H12.039z"/><path fill="#188038" d="M-3.75,148.882v31.579c0,8.724,7.066,15.789,15.789,15.789h31.579v-47.368H-3.75z"/><path fill="#FBBC04" d="M148.882,43.618v105.263h47.368V43.618l-23.684-10.526L148.882,43.618z"/><path fill="#1967D2" d="M196.25,43.618V12.039c0-8.724-7.066-15.789-15.789-15.789h-31.579v47.368H196.25z"/></g></g></svg></span><span class="mname">Google Calendar</span><span class="sw"><i></i></span></div>
+        <div class="mrow "><span class="mmark brand"><svg xmlns="http://www.w3.org/2000/svg" viewBox="52 42 88 66" width="100%" height="100%" aria-hidden="true"><path fill="#4285f4" d="M58 108h14V74L52 59v43c0 3.32 2.69 6 6 6"/><path fill="#34a853" d="M120 108h14c3.32 0 6-2.69 6-6V59l-20 15"/><path fill="#fbbc04" d="M120 48v26l20-15v-8c0-7.42-8.47-11.65-14.4-7.2"/><path fill="#ea4335" d="M72 74V48l24 18 24-18v26L96 92"/><path fill="#c5221f" d="M52 51v8l20 15V48l-5.6-4.2c-5.94-4.45-14.4-.22-14.4 7.2"/></svg></span><span class="mname">Gmail</span><span class="sw on"><i></i></span></div>
+        <span class="bb-cursor mini-you"><svg width="22.14" height="25.30" viewBox="49.499 49.514 191.719 219.132" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><filter id="pi-cur-shadow" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="27.72"/></filter></defs><path d="M 58.48 87.06 A 24.06 25.11 -36 0 1 93.89 61.34 L 223.67 137.27 A 18.23 19.02 -36 0 1 218.85 171.89 A 117.23 122.31 -36 0 0 131.29 247.95 A 19.66 20.51 -36 0 1 92.88 244.4 Z" fill="rgba(13, 15, 33, 0.3)" transform="translate(0 12.13)" filter="url(#pi-cur-shadow)"/><path d="M 58.48 87.06 A 24.06 25.11 -36 0 1 93.89 61.34 L 223.67 137.27 A 18.23 19.02 -36 0 1 218.85 171.89 A 117.23 122.31 -36 0 0 131.29 247.95 A 19.66 20.51 -36 0 1 92.88 244.4 Z" fill="#0a0b0f" stroke="#ffffff" stroke-width="13.79" stroke-linejoin="round"/><path d="M 58.48 87.06 A 24.06 25.11 -36 0 1 93.89 61.34 L 223.67 137.27 A 18.23 19.02 -36 0 1 218.85 171.89 A 117.23 122.31 -36 0 0 131.29 247.95 A 19.66 20.51 -36 0 1 92.88 244.4 Z" fill="none" stroke="#ffffff" stroke-width="4.69" stroke-linejoin="round"/></svg></span>
+      </div>
+    </div>
+    <div class="bb-popout__body">
+      <p class="bb-popout__title">Connectors live in +</p>
+      <p class="bb-popout__text">Turn one on or off for this chat. Bobble only knows about the ones that are on.</p>
+    </div>
+    <div class="bb-popout__foot"><span class="bb-btn bb-btn--primary bb-btn--s">Got it</span></div>
+  </div>
+  <span class="bb-cursor you"><svg width="22.14" height="25.30" viewBox="49.499 49.514 191.719 219.132" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><filter id="pi-cur-shadow" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="27.72"/></filter></defs><path d="M 58.48 87.06 A 24.06 25.11 -36 0 1 93.89 61.34 L 223.67 137.27 A 18.23 19.02 -36 0 1 218.85 171.89 A 117.23 122.31 -36 0 0 131.29 247.95 A 19.66 20.51 -36 0 1 92.88 244.4 Z" fill="rgba(13, 15, 33, 0.3)" transform="translate(0 12.13)" filter="url(#pi-cur-shadow)"/><path d="M 58.48 87.06 A 24.06 25.11 -36 0 1 93.89 61.34 L 223.67 137.27 A 18.23 19.02 -36 0 1 218.85 171.89 A 117.23 122.31 -36 0 0 131.29 247.95 A 19.66 20.51 -36 0 1 92.88 244.4 Z" fill="#0a0b0f" stroke="#ffffff" stroke-width="13.79" stroke-linejoin="round"/><path d="M 58.48 87.06 A 24.06 25.11 -36 0 1 93.89 61.34 L 223.67 137.27 A 18.23 19.02 -36 0 1 218.85 171.89 A 117.23 122.31 -36 0 0 131.29 247.95 A 19.66 20.51 -36 0 1 92.88 244.4 Z" fill="none" stroke="#ffffff" stroke-width="4.69" stroke-linejoin="round"/></svg></span>
+</div>
+</body>
+</html>

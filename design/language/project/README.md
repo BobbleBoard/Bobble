@@ -33,6 +33,10 @@ Bobble's design language: how a picture, a demo or a card is drawn, so that ever
 
 Words in a picture are lines (`.bb-line`), never lorem ipsum. Only a title is real type. A made image is a plate with two hills (tiles turned 45°) and a sun. A number is a bar standing on a baseline or a line through nodes. A day or a cell is a tile. See **Pictures** for the full grammar.
 
+## In the app
+
+Two cards teach a feature where it lives. An **intro card** (`.bb-intro` on `.bb-scrim`) opens centred the first time a feature is used: the feature's demo on top, its name, what it does for you, and "Got it" bottom right. A **pop-out** (`.bb-popout`) opens beside the control it explains, on hover or on first sight, with a notch facing that control: a demo, a title, a line, and a small "Got it". On a connector's page, **Try it** plays its sample ask through to the answer. The In the app cards show each in place on the real app, photographed headless (Backdrops).
+
 ## Motion
 
 Seven curves, one per verb: things arrive on `ease-settle`, the cursor glides on `ease-glide`, tiles slide on `ease-slide`, placed marks land on `ease-bob`, colour changes on `ease-standard`, things leave on `ease-exit`, and presses use `ease-press`. A demo loop shows one verb, runs at most `duration-loop` (4.8 s) and rests `duration-hold` on its result. See **Motion**.

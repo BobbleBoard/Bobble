@@ -9,7 +9,7 @@
   "namespace": "Bobble",
   "libraries": [],
   "sections": {},
-  "groups": ["Logos", "Cursor", "Icons", "Licenses"],
+  "groups": ["Logos", "Cursor", "Icons", "Backdrops", "Licenses"],
   "assetGroups": {
     "Logos": {
       "name": "Logos",
@@ -709,6 +709,56 @@
       "tile": "s",
       "order": [],
       "files": {}
+    },
+    "Backdrops": {
+      "name": "Backdrops",
+      "tile": "l",
+      "order": [
+        "home-light.png",
+        "home-dark.png",
+        "connector-light.png",
+        "connector-dark.png",
+        "studio3d-light.png",
+        "studio3d-dark.png"
+      ],
+      "files": {
+        "home-light.png": {
+          "name": "home-light.png",
+          "blob": "3e6c23d1ff18a350da60ea8e6eb57ddd",
+          "size": 113468,
+          "type": "image/png"
+        },
+        "home-dark.png": {
+          "name": "home-dark.png",
+          "blob": "2bfe60725a1c10215c56a908049510f5",
+          "size": 115673,
+          "type": "image/png"
+        },
+        "connector-light.png": {
+          "name": "connector-light.png",
+          "blob": "c58dcf47e35d1fe9890667bc0a5b3863",
+          "size": 212859,
+          "type": "image/png"
+        },
+        "connector-dark.png": {
+          "name": "connector-dark.png",
+          "blob": "612b3c1619cc2c66ac4f6eb82920607c",
+          "size": 218721,
+          "type": "image/png"
+        },
+        "studio3d-light.png": {
+          "name": "studio3d-light.png",
+          "blob": "4a3ff0f685b39ba0ec54c5a226732436",
+          "size": 408484,
+          "type": "image/png"
+        },
+        "studio3d-dark.png": {
+          "name": "studio3d-dark.png",
+          "blob": "5117f118d617706abe97d5e9ed8f2eae",
+          "size": 426419,
+          "type": "image/png"
+        }
+      }
     }
   },
   "blobs": {},
@@ -718,8 +768,8 @@
   },
   "lastChange": {
     "by": "the user",
-    "at": "2026-10-07T23:50:00Z",
+    "at": "2026-10-08T01:45:42Z",
     "via": "Claude Code",
-    "note": "Bobble's design language: tokens, building blocks, scenes, demos, anatomy and the cover"
+    "note": "In the app: intro cards, pop-outs with a notch, Try it on a connector page, on real backdrops"
   }
 }

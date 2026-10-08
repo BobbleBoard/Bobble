@@ -58,6 +58,18 @@ const tokens = JSON.parse(readFileSync(path.join(ROOT, 'tokens.json'), 'utf8'));
 const tokensCss = compileTokens(tokens);
 writeFileSync(path.join(OUT, 'tokens.css'), tokensCss);
 const bundleCss = readFileSync(path.join(ROOT, 'components', 'bundle.css'), 'utf8');
+// An upload's /_blob/<id> resolves on the page; here it resolves to the local file the index names.
+const index = JSON.parse(readFileSync(path.join(ROOT, 'design-system.json'), 'utf8'));
+const blobFile = new Map();
+for (const [group, g] of Object.entries(index.assetGroups ?? {})) {
+  for (const f of Object.values(g.files ?? {})) {
+    blobFile.set(f.blob, path.join(ROOT, 'assets', group, f.name));
+  }
+}
+const localBlobs = (html) =>
+  html.replace(/\/_blob\/([0-9a-f]{32})/g, (m, id) =>
+    blobFile.has(id) ? `file://${blobFile.get(id)}` : m,
+  );
 
 const only = process.argv.slice(2);
 const comps = readdirSync(path.join(ROOT, 'components')).filter(
@@ -91,7 +103,7 @@ async function renderComp(comp) {
   const height = Number(/height=(\d+)/.exec(marker)?.[1] ?? 240);
   const width = Number(/width=(\d+)/.exec(marker)?.[1] ?? (comp === 'Cover' ? 960 : 760));
   for (const theme of ['light', 'dark']) {
-    const html = raw
+    const html = localBlobs(raw)
       .replace(/<html([^>]*)>/, `<html$1 data-theme="${theme}">`)
       .replace(
         '<head>',

@@ -1,0 +1,3 @@
+A connector's page, with Try it playing instead of standing still: its sample ask is sent, the connector does the work, the answer lands.
+
+This is the page's own Try it box, grown to hold the demo, with the page below closing up under it. It plays the user's bubble, then two connector rows written the way the chain writes them, "Used <mark> Google Calendar <action>", each with a spinner while it runs and the connectors glyph when done. Then Done, then the answer, and a day showing the free hour in teal. The loop is 6.4 s with a 1.8 s hold, longer than a picture's because a conversation needs reading time. At rest, the whole exchange is on the page.

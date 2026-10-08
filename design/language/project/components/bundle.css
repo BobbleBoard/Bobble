@@ -568,3 +568,186 @@
     transition: none !important;
   }
 }
+
+/* ── buttons a card ends with ─────────────────────────────────────────────── */
+.bb-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--radius-full);
+  font: 500 13px / 18px var(--font-ui);
+  white-space: nowrap;
+}
+/* the one action: ink, so it reads the same in both themes */
+.bb-btn--primary {
+  background: var(--ink);
+  color: var(--surface);
+}
+.bb-btn--quiet {
+  background: transparent;
+  color: var(--ink-secondary);
+}
+.bb-btn--s {
+  height: 28px;
+  padding: 0 14px;
+}
+
+/*
+ * ── the intro card: a feature, the first time it is used ───────────────────
+ * Centred over the window on the scrim. The top is the feature's demo, inset in
+ * the card (concentric corners: radius-xl outside, 8 in, radius-md inside); the
+ * foot ends in one action, "Got it", bottom right.
+ */
+.bb-scrim {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: var(--scrim);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+.bb-intro {
+  position: relative;
+  box-sizing: border-box;
+  width: 440px;
+  padding: 8px;
+  border-radius: var(--radius-xl);
+  background: var(--overlay);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  backdrop-filter: blur(20px) saturate(1.4);
+  box-shadow:
+    0 0 0 1px var(--hairline),
+    var(--shadow-lg);
+  color: var(--ink);
+  font-family: var(--font-ui);
+}
+.bb-intro__stage {
+  position: relative;
+  height: 236px;
+  border-radius: var(--radius-md);
+  background: var(--hue-tint);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+.bb-intro__body {
+  padding: 18px 14px 0;
+}
+.bb-intro__body .bb-eyebrow {
+  margin-bottom: 6px;
+}
+.bb-intro__text {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink-secondary);
+}
+.bb-intro__foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 18px 6px 6px;
+}
+.bb-intro__foot .bb-btn--quiet {
+  margin-right: auto;
+}
+
+/*
+ * ── the pop-out: a card that comes from what it is about ───────────────────
+ * Opens on hover (or on first sight) beside the control it explains, with a
+ * notch on the side facing it: --left is the "<" for a rail or sidebar row,
+ * --down rises from a control below, --up hangs from one above, --right faces
+ * back to the left edge. --notch is where along that side the notch sits, so it
+ * can point at the control's centre. The notch is a turned square in the card's
+ * own surface, drawn over the card's edge so the join has no seam; the demo sits
+ * above it, inset, so the notch never cuts into the picture.
+ */
+.bb-popout {
+  position: absolute;
+  box-sizing: border-box;
+  width: 288px;
+  padding: 6px;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow:
+    0 0 0 1px var(--edge),
+    var(--shadow-popover);
+  color: var(--ink);
+  font-family: var(--font-ui);
+}
+.bb-popout::before {
+  content: "";
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: var(--surface);
+  transform: rotate(45deg);
+}
+.bb-popout--left::before {
+  left: -6px;
+  top: calc(var(--notch, 28px) - 6px);
+  border-bottom-left-radius: 3px;
+  box-shadow: -1px 1px 0 0 var(--edge);
+}
+.bb-popout--down::before {
+  bottom: -6px;
+  left: calc(var(--notch, 28px) - 6px);
+  border-bottom-right-radius: 3px;
+  box-shadow: 1px 1px 0 0 var(--edge);
+}
+.bb-popout--up::before {
+  top: -6px;
+  left: calc(var(--notch, 28px) - 6px);
+  border-top-left-radius: 3px;
+  box-shadow: -1px -1px 0 0 var(--edge);
+}
+.bb-popout--right::before {
+  right: -6px;
+  top: calc(var(--notch, 28px) - 6px);
+  border-top-right-radius: 3px;
+  box-shadow: 1px -1px 0 0 var(--edge);
+}
+.bb-popout__stage {
+  position: relative;
+  z-index: 1;
+  height: 136px;
+  border-radius: 8px;
+  background: var(--hue-tint);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+.bb-popout__body {
+  padding: 12px 10px 0;
+}
+.bb-popout__title {
+  margin: 0;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.bb-popout__text {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-secondary);
+}
+.bb-popout__foot {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 4px 4px;
+}
+/* it opens from the notch: a short settle out of the control it explains */
+@keyframes bb-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+}

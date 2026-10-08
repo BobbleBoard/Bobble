@@ -1,6 +1,26 @@
 # Bobble — status
 
-Updated: 2026-10-07 (on AC) · main `3c36aa96` + the design-language commit · the user: "build out the anatomy, the building blocks … make bobble's design language … to the same level that we see with anthropic" · "the shades of blues and yellows you've picked out so far seem really nice"
+Updated: 2026-10-08 (on AC) · main `cba25bd0` + the in-app cards commit · the user: "build out some example cards and where they might appear … center screen popups for the first time using a feature … the connectors page showing a sample chat message being sent … pop out cards … a little < poking out … 'Got it!'"
+
+## Report — 2026-10-08: example cards, in place on the real app
+
+**The ask.** Example cards and where they appear: centre-screen popups the first time a feature is used, a connector page showing a sample message sent and done with the tool, and pop-out cards with a "<" notch on hover, an animation on top and Got it bottom right. All of it is in the Design System artifact ((private link), v5) under **In the app** and **Anatomy**. Each in-app card sits over the real app, photographed headless at 2x by `apps/desktop/tests/e2e/design-moments-probe.mjs`. Evidence: `deliverables/design-language-in-app-2026-10-07/`.
+
+| Card | Where | What plays |
+|---|---|---|
+| Intro: Computer use | centred over a new chat, the first time Bobble asks to use an app | the Computer use demo (Bobble's real cursor, "Typing" and "Clicking" pill); "Choose apps" + **Got it** |
+| Intro: 3D Studio | centred over the studio the first time it opens | a flat lamp picture, three dots, the lamp model building from the ground up; **Got it** |
+| Pop-out: Segment | from the studio rail's real Segment button, "<" notch pointing at it | your cursor hovers, the card opens out of the notch, the lamp colours part by part and comes apart, Got it closes it |
+| Pop-out: Connectors | rising from the composer's +, notch pointing down | the + menu, small: Google Calendar's switch flips on beside Gmail (official marks copied from the app) |
+| Try it | Google Calendar's page (a stand-in server, so it shows the working state) | the sample ask is sent, two rows "Used <mark> Google Calendar <action>" spin then finish, Done, the answer, a day with the free hour in teal |
+| Intro card, Pop-out (anatomy) | — | numbered parts; the notch in all four directions |
+
+**New in the language.** `.bb-intro` + `.bb-scrim` (the bobble flavor's own scrim: 35% / 50% black, 8px blur; new `scrim` token), `.bb-popout` with `--left/--down/--up/--right` and `--notch`, `.bb-btn` (primary in ink, quiet). In-app loops may run to 6.4 s with a 1.8 s hold, because a conversation needs reading time (motion.md).
+
+**Checked.** Every card rendered headless in light and dark and looked at; the animated ones as six-frame strips seeked to exact times (pop-outs open, play, and close on Got it; Try it runs ask, rows, Done, answer); Reduce Motion stills show the open card or the finished exchange. The connector row copies `activity-chain.tsx` exactly (22px icon box, "Used" muted, the app's 14px mark, name at 550, action secondary). The live page itself was not checked; the built-in browser is not signed in.
+
+**Words.** "Got it" without the exclamation mark, per the voice rule ("no exclamation marks").
+
 
 ## Report — 2026-10-07: Bobble's design language (a Design System artifact)
 

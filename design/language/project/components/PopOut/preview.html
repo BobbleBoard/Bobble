@@ -1,0 +1,56 @@
+<!-- @dsCard group="Anatomy" height=500 width=900 subtitle="A card that comes from what it explains: the notch faces the control, the demo sits above, Got it below" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pop-out</title>
+<style>
+  body { margin: 0; background: var(--ground); color: var(--ink); }
+  .sheet { display: grid; grid-template-columns: 340px 1fr; gap: 48px; padding: 40px; align-items: start; }
+  .demo { position: relative; height: 330px; }
+  .anchor { position: absolute; left: 0; top: 38px; width: 34px; height: 34px; border-radius: var(--radius-md); background: color-mix(in srgb, var(--ink) 7%, transparent); display: grid; place-items: center; color: var(--ink-secondary); }
+  .anchor svg { width: 18px; height: 18px; }
+  .anchor svg path, .anchor svg rect { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+  .demo .bb-popout { left: 50px; top: 0; --notch: 55px; }
+  .stage-demo { width: 150px; }
+  .stage-demo .bb-frame { padding: 12px; }
+  .stage-demo .bb-lines { --bb-line-h: 6px; }
+  .dirs { display: grid; grid-template-columns: repeat(2, 1fr); gap: 26px 30px; margin-top: 4px; }
+  .dir { position: relative; }
+  .dir .bb-popout { position: relative; width: 100%; height: 64px; padding: 0; }
+  .dir .bb-popout--left { margin-left: 8px; width: calc(100% - 8px); }
+  .dir .bb-popout--right { width: calc(100% - 8px); }
+  .dir .bb-popout--up { margin-top: 10px; }
+  .dir p { margin: 12px 2px 0; font-size: 13px; line-height: 18px; color: var(--ink-muted); }
+  .dir p b { color: var(--ink-secondary); font-weight: 500; }
+  .legend { margin: 28px 0 0; padding: 0; list-style: none; display: grid; gap: 12px; }
+  .legend li { color: var(--ink-secondary); }
+  .legend b { color: var(--ink); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="sheet bb-scene bb-hue-sun">
+  <div class="demo">
+    <span class="anchor"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="2.5"/><path d="M8 2.5v11"/></svg></span>
+    <div class="bb-popout bb-popout--left">
+      <div class="bb-popout__stage"><div class="stage-demo"><div class="bb-frame bb-frame--lift"><div class="bb-lines"><i class="bb-line bb-line--strong" style="--w:60%"></i><i class="bb-line"></i><i class="bb-line" style="--w:72%"></i></div></div></div></div>
+      <div class="bb-popout__body"><p class="bb-popout__title">The control's name</p><p class="bb-popout__text">What it does, in one or two short sentences.</p></div>
+      <div class="bb-popout__foot"><span class="bb-btn bb-btn--primary bb-btn--s">Got it</span></div>
+    </div>
+  </div>
+  <div>
+    <div class="dirs">
+      <div class="dir"><div class="bb-popout bb-popout--left" style="--notch:32px"></div><p><b>left</b>: from a rail or sidebar row</p></div>
+      <div class="dir"><div class="bb-popout bb-popout--right" style="--notch:32px"></div><p><b>right</b>: facing back left</p></div>
+      <div class="dir"><div class="bb-popout bb-popout--down" style="--notch:34px"></div><p><b>down</b>: rising from below</p></div>
+      <div class="dir"><div class="bb-popout bb-popout--up" style="--notch:34px"></div><p><b>up</b>: hanging from above</p></div>
+    </div>
+    <ul class="legend body">
+      <li><b>The notch faces the control</b> and points at its centre (<code>--notch</code>); the card opens out of it, a 180ms settle from 0.94.</li>
+      <li><b>The demo is inset</b> 6px, so the notch never cuts into it. 136 tall; one verb.</li>
+      <li><b>On hover, or on first sight</b>, beside the control, 10px clear of it. Got it closes it for good; moving away closes it until next time.</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>

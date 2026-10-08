@@ -14,7 +14,7 @@ A demo shows one action. "Edit" selects lines, asks, and the lines come back rew
 - **Place** a mark or a chip on `ease-bob`, the one curve that overshoots. Tiles and dots only.
 - **Change colour** on `ease-standard`. **Leave** on `ease-exit`.
 
-A loop runs at most `duration-loop` (4800ms) and holds its result for about `duration-hold` (1400ms) before it starts again. Stagger along the diagonal (row plus column) at 70 to 110ms a step, so marks arrive as a wave rather than all at once.
+A loop runs at most `duration-loop` (4800ms) and holds its result for about `duration-hold` (1400ms) before it starts again. A demo set in the app may run to 6.4 s when it tells a conversation or a hover (Try it, a pop-out opening and closing); its hold is at least 1.8 s, because words need reading time. Stagger along the diagonal (row plus column) at 70 to 110ms a step, so marks arrive as a wave rather than all at once.
 
 ## The mark's puzzle
 

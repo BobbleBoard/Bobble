@@ -1,0 +1,58 @@
+<!-- @dsCard group="Anatomy" height=560 subtitle="The first time a feature is used: a demo on top, what it does, Got it bottom right" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Intro card</title>
+<style>
+  body { margin: 0; background: var(--ground); color: var(--ink); }
+  .sheet { display: grid; grid-template-columns: 440px 1fr; gap: 40px; padding: 36px 40px; align-items: start; }
+  .wrap { position: relative; }
+  .bb-intro { background: var(--surface); }
+  .stage-demo { display: grid; gap: 10px; width: 236px; }
+  .stage-demo .bb-frame { padding: 16px; }
+  .n { position: absolute; z-index: 3; display: grid; place-items: center; width: 18px; height: 18px; border-radius: var(--radius-tile); background: var(--ink); color: var(--surface); font: 600 11px/1 var(--font-ui); }
+  .legend { margin: 6px 0 0; padding: 0; list-style: none; display: grid; gap: 16px; }
+  .legend li { display: grid; grid-template-columns: 18px 1fr; gap: 10px; align-items: start; color: var(--ink-secondary); }
+  .legend .n { position: static; }
+  .legend b { display: block; color: var(--ink); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="sheet bb-scene">
+  <div class="wrap">
+    <div class="bb-intro bb-hue-teal">
+      <div class="bb-intro__stage">
+        <div class="stage-demo">
+          <div class="bb-frame bb-frame--lift">
+            <div class="bb-lines"><i class="bb-line bb-line--strong" style="--w:54%"></i><i class="bb-line"></i><i class="bb-line" style="--w:82%"></i></div>
+          </div>
+        </div>
+      </div>
+      <div class="bb-intro__body">
+        <p class="bb-eyebrow">The feature</p>
+        <h2 class="bb-title bb-title--s">What it does for you</h2>
+        <p class="bb-intro__text">One or two sentences: what to expect, where it runs, and the one thing worth knowing first.</p>
+      </div>
+      <div class="bb-intro__foot">
+        <span class="bb-btn bb-btn--quiet">Optional second step</span>
+        <span class="bb-btn bb-btn--primary">Got it</span>
+      </div>
+    </div>
+    <span class="n" style="left:-7px;top:-7px">1</span>
+    <span class="n" style="left:-7px;top:262px">2</span>
+    <span class="n" style="left:-7px;top:292px">3</span>
+    <span class="n" style="left:-7px;top:326px">4</span>
+    <span class="n" style="right:-7px;bottom:16px">5</span>
+  </div>
+  <ol class="legend body">
+    <li><span class="n">1</span><span><b>The demo</b>The feature doing its one verb, on its hue's wash, inset 8px in the card. A loop of at most 4.8 s that rests on the result; with Reduce Motion, the result.</span></li>
+    <li><span class="n">2</span><span><b>The feature's name</b>An eyebrow with the hue's tile, the name as the app shows it ("Computer use", "3D Studio").</span></li>
+    <li><span class="n">3</span><span><b>What it does for you</b>Fraunces, softened, in display-s. A sentence, not a slogan.</span></li>
+    <li><span class="n">4</span><span><b>What to know</b>One or two sentences in body, ink-secondary: what happens, where it runs, what stays yours.</span></li>
+    <li><span class="n">5</span><span><b>Got it</b>The one action, ink, bottom right. A second step, if there is one, is a quiet button on the left.</span></li>
+    <li><span class="n" style="background:var(--line-strong);color:var(--ink)">·</span><span><b>Once</b>Centred on the scrim, the first time the feature opens or is asked for. Got it, Escape or a click outside close it, and it does not come back.</span></li>
+  </ol>
+</div>
+</body>
+</html>

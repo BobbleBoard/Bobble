@@ -1,0 +1,76 @@
+<!-- @dsCard group="In the app" height=800 width=1280 subtitle="Centre screen, the first time the 3D Studio opens: a picture becomes a model" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Intro: 3D Studio</title>
+<style>
+  body { margin: 0; background: var(--ground); }
+  /* the real window, photographed headless (tests/e2e/design-moments-probe.mjs), 2x */
+  .screen { position: relative; width: 1280px; height: 800px; overflow: hidden;
+    background: url(/_blob/4a3ff0f685b39ba0ec54c5a226732436) 0 0 / 1280px 800px no-repeat; }
+  [data-theme="dark"] .screen { background-image: url(/_blob/5117f118d617706abe97d5e9ed8f2eae); }
+  .make { width: 424px; height: 236px; display: block; overflow: visible; }
+  /* the picture: a flat lamp in the hue, on a white plate */
+  .plate { fill: var(--surface); stroke: var(--hairline); stroke-width: 1; }
+  .flat { fill: var(--hue); }
+  .flat-ink { fill: var(--hue-ink); }
+  /* the model: the Parts lamp, untinted, lit from the upper left */
+  .model { --n-top: color-mix(in srgb, var(--ink) 7%, var(--surface)); --n-body: color-mix(in srgb, var(--ink) 15%, var(--surface)); --n-in: color-mix(in srgb, var(--ink) 30%, var(--surface)); }
+  .model .n .top { fill: var(--n-top); }
+  .model .n .body { fill: var(--n-body); }
+  .model .n .in { fill: var(--n-in); }
+  .model .light { fill: url(#round3d); }
+  .model .ground { fill: rgba(0, 0, 0, 0.06); }
+  [data-theme="dark"] .model .ground { fill: rgba(0, 0, 0, 0.32); }
+  .dot { fill: var(--hue); }
+  /* the model builds from the ground up, each part settling into place */
+  .loop .part { animation: build 4800ms var(--ease-settle) infinite backwards; }
+  .loop .base { animation-delay: 1150ms; }
+  .loop .stem { animation-delay: 1450ms; }
+  .loop .shade { animation-delay: 1750ms; }
+  .loop .dot { animation: think 4800ms var(--ease-standard) infinite backwards; }
+  .loop .d2 { animation-delay: 160ms; }
+  .loop .d3 { animation-delay: 320ms; }
+  @keyframes build { 0% { opacity: 0; transform: translateY(18px); } 12%, 70% { opacity: 1; transform: none; } 78%, 100% { opacity: 0; transform: none; } }
+  @keyframes think { 0% { opacity: 0.25; } 6%, 14% { opacity: 1; } 22%, 100% { opacity: 0.25; } }
+
+</style>
+</head>
+<body>
+<div class="screen bb-scene">
+  <div class="bb-scrim">
+    <div class="bb-intro bb-hue-sun" role="dialog" aria-label="A picture becomes a model">
+      <div class="bb-intro__stage">
+        <svg class="make loop" viewBox="0 0 424 236" aria-hidden="true">
+          <defs>
+            <linearGradient id="round3d" x1="0" x2="1" y1="0" y2="0">
+              <stop offset="0" stop-color="#fff" stop-opacity="0.22"/><stop offset="0.42" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.2"/>
+            </linearGradient>
+          </defs>
+          <rect class="plate" x="44" y="50" width="136" height="136" rx="14"/>
+          <path class="flat" d="M96 82h32l16 40H80z"/>
+          <rect class="flat-ink" x="109" y="122" width="6" height="32" rx="2"/>
+          <rect class="flat" x="86" y="152" width="52" height="12" rx="6"/>
+          <circle class="dot d1" cx="200" cy="118" r="3.5"/><circle class="dot d2" cx="212" cy="118" r="3.5"/><circle class="dot d3" cx="224" cy="118" r="3.5"/>
+          <svg class="model" x="240" y="24" width="168" height="190" viewBox="56 84 168 190">
+            <ellipse class="ground" cx="140" cy="262" rx="78" ry="20"/>
+        <g class="part base"><g class="n"><path class="body" d="M80 236V250A60 18 0 0 0 200 250V236Z"/></g><path class="light" d="M80 236V250A60 18 0 0 0 200 250V236Z"/><g class="n"><ellipse class="top" cx="140" cy="236" rx="60" ry="18"/></g></g>
+        <g class="part stem"><g class="n"><path class="body" d="M133 146V236A7 2.2 0 0 0 147 236V146Z"/></g><path class="light" d="M133 146V236A7 2.2 0 0 0 147 236V146Z"/></g>
+        <g class="part shade"><g class="n"><path class="body" d="M110 102L78 164A62 18.6 0 0 0 202 164L170 102Z"/></g><path class="light" d="M110 102L78 164A62 18.6 0 0 0 202 164L170 102Z"/><g class="n"><ellipse class="in" cx="140" cy="102" rx="30" ry="9"/></g></g>
+          </svg>
+        </svg>
+      </div>
+      <div class="bb-intro__body">
+        <p class="bb-eyebrow">3D Studio</p>
+        <h2 class="bb-title bb-title--s">A picture becomes a model</h2>
+        <p class="bb-intro__text">Drop in a picture or describe what you want. Bobble builds the model here on this Mac, and you can texture and animate it after.</p>
+      </div>
+      <div class="bb-intro__foot">
+        <span class="bb-btn bb-btn--primary">Got it</span>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
