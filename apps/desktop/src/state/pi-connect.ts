@@ -1295,11 +1295,17 @@ export async function ensureChatWorkspace(firstMessage: string): Promise<void> {
 export async function syncWorkspace(opts: {
   selected: string | null;
   conversationName: string;
+  /** The chat already has a reply: it is being reopened, not started. */
+  resumed?: boolean;
 }): Promise<string | null> {
+  /* The chat's own name for itself across launches — main maps it to its
+     folder (project-dir.ts `chatWorkspacesPath`); the window's id is not. */
+  const sessionFile = usePiStore.getState().session?.sessionFile ?? '';
   const res = await window.piDesktop
     .invoke('project:resolve-workspace', {
       ...(opts.selected !== null && opts.selected !== '' ? { selected: opts.selected } : {}),
       conversationName: opts.conversationName,
+      ...(sessionFile !== '' ? { sessionFile, resumed: opts.resumed === true } : {}),
       /*
        * ALWAYS the conversation id. Without it main takes the anonymous branch —
        * no claim file, so no de-duplication between same-titled chats and no

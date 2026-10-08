@@ -712,11 +712,25 @@ export function ChatThread() {
     const owner = m.assistantId !== undefined ? rowOfMessage.get(m.assistantId) : undefined;
     if (owner !== undefined) rowOfMessage.set(m.id, owner);
   }
+  /*
+   * THE CALL FIRST. A card knows the tool call that handed it over, and a call
+   * keeps its id when the chat is read back from disk — the message ids do not
+   * (present-store.ts `callId`). So the row that holds the call is where the
+   * card goes, and the message anchor is the fallback for a card from before.
+   */
+  const rowOfCall = new Map<string, string>();
+  for (const m of messages) {
+    if (m.kind !== 'assistant') continue;
+    const row = rowOfMessage.get(m.id);
+    if (row === undefined) continue;
+    for (const b of m.blocks) if (b.type === 'toolCall') rowOfCall.set(b.id, row);
+  }
   const presentedByAnchor = new Map<string, PresentedRecord[]>();
   const orphanPresented: PresentedRecord[] = [];
   for (const record of presented) {
     const row =
-      record.afterMessageId === null ? undefined : rowOfMessage.get(record.afterMessageId);
+      (record.callId === undefined ? undefined : rowOfCall.get(record.callId)) ??
+      (record.afterMessageId === null ? undefined : rowOfMessage.get(record.afterMessageId));
     if (row === undefined) {
       orphanPresented.push(record);
       continue;

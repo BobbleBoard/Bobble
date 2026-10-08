@@ -396,7 +396,12 @@ export function ChatApp({
    * there the instant the user hits enter, before any tool runs.
    */
   const firstUserText = usePiStore((s) => s.messages.find((m) => m.kind === 'user')?.text ?? '');
+  /* Reopened (it has a reply) or just started, and the session file that names
+     it across launches — the folder is the chat's, not the window's. */
+  const resumedChat = usePiStore((s) => s.messages.some((m) => m.kind === 'assistant'));
+  const chatSessionFile = usePiStore((s) => s.session?.sessionFile ?? '');
   const projectsLoaded = useProjectStore((s) => s.loaded);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: chatSessionFile re-runs it once the chat's session file is known, so main records which folder is this chat's (syncWorkspace reads it from the store)
   useEffect(() => {
     /*
      * WAIT FOR THE PROJECT STORE. `load()` is async, so resolving before it
@@ -426,14 +431,28 @@ export function ChatApp({
     if ((activeProjectPath === null || activeProjectPath === '') && firstUserText.trim() === '') {
       return;
     }
-    void syncWorkspace({
-      selected: activeProjectPath,
-      conversationName:
-        firstUserText.trim() !== ''
-          ? conversationNameFrom(firstUserText)
-          : (windowTitle ?? 'new chat'),
-    });
-  }, [activeProjectPath, windowTitle, firstUserText, projectsLoaded]);
+    /*
+     * ONLY THE SETTLED STATE. Opening a chat loads its messages and names its
+     * session a beat apart (pi-connect `switchSession`: loadViewedThread, then
+     * setViewPointer), and in between the store holds one chat's messages under
+     * another's session file. MEASURED 2026-10-08 (chart-reentry-probe,
+     * RESTART=1): at that instant this resolved the reopened chat's name for
+     * the boot session — whose folder map said the name was taken — and made an
+     * empty `~/Bobble/<name>-2`. A quarter second later is past the gap; a newer
+     * state cancels the older one.
+     */
+    const settle = setTimeout(() => {
+      void syncWorkspace({
+        selected: activeProjectPath,
+        conversationName:
+          firstUserText.trim() !== ''
+            ? conversationNameFrom(firstUserText)
+            : (windowTitle ?? 'new chat'),
+        resumed: resumedChat,
+      });
+    }, 250);
+    return () => clearTimeout(settle);
+  }, [activeProjectPath, windowTitle, firstUserText, projectsLoaded, resumedChat, chatSessionFile]);
 
   // Tiny-window adaptation (adversarial finding): a narrow window lets the fixed
   // ~300px sidebar squeeze the chat and overflow the pane. Auto-collapse it below

@@ -162,6 +162,90 @@ export function bobbleProjectPath(name: string, home: string = os.homedir()): st
  * always resolves to the same directory, and a different chat with the same
  * title gets `-2`. Re-running a chat never migrates its files.
  */
+/**
+ * WHICH FOLDER EACH SAVED CHAT USES — sessionFile → folder, kept by main in
+ * `~/.pi/desktop/chat-workspaces.json`.
+ *
+ * The claim file (`.bobble-chat`) holds the id the renderer passed, and that id
+ * is the WINDOW's (pi-connect `conversationId`, sessionStorage), minted again
+ * every launch. So a chat reopened after a restart no longer owned its own
+ * folder, and resolving it made `~/Bobble/<name>-2`: the chat's later work went
+ * to a second folder, and the transcript's relative paths ("Drew …:
+ * skills.svg") pointed at a folder without them — the card never came back.
+ * MEASURED 2026-10-08 (chart-reentry-probe, RESTART=1): `radar-make-a-radar-
+ * chart` held the chart, the reopened chat worked in `…-2`. The session file is
+ * the one name a chat keeps across launches, so it decides.
+ */
+export interface ChatWorkspaceMap {
+  [sessionFile: string]: string;
+}
+
+export function chatWorkspacesPath(home: string = os.homedir()): string {
+  return path.join(home, '.pi', 'desktop', 'chat-workspaces.json');
+}
+
+export function readChatWorkspaces(home: string = os.homedir()): ChatWorkspaceMap {
+  try {
+    const raw = JSON.parse(fs.readFileSync(chatWorkspacesPath(home), 'utf8')) as unknown;
+    if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return {};
+    const out: ChatWorkspaceMap = {};
+    for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+      if (typeof v === 'string' && v !== '') out[k] = v;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+function writeChatWorkspaces(map: ChatWorkspaceMap, home: string): void {
+  try {
+    const file = chatWorkspacesPath(home);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, `${JSON.stringify(map, null, 2)}\n`);
+  } catch {
+    /* an unwritable map only costs the next launch a lookup by name */
+  }
+}
+
+/**
+ * The folder for a SAVED chat: its own, by the map; else the first of `base`,
+ * `base-2`, … that no other chat's session is mapped to — and, for a chat that
+ * is being REOPENED, an existing folder of its name that nobody is mapped to
+ * even when its claim names another window: a folder from before this map
+ * existed, which is this chat's (the claim's id was only ever a window's).
+ */
+function chatDir(
+  base: string,
+  owner: string,
+  chat: { sessionFile: string; resumed: boolean },
+  map: ChatWorkspaceMap,
+): string {
+  const takenBy = new Map<string, string>();
+  for (const [session, dir] of Object.entries(map)) takenBy.set(dir, session);
+  for (let n = 1; n < 200; n += 1) {
+    const dir = n === 1 ? base : `${base}-${n}`;
+    const claim = path.join(dir, '.bobble-chat');
+    try {
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(claim, owner);
+        return dir;
+      }
+      const other = takenBy.get(dir);
+      if (other !== undefined && other !== chat.sessionFile) continue;
+      const existing = fs.existsSync(claim) ? fs.readFileSync(claim, 'utf8').trim() : '';
+      if (existing === owner || existing === '' || chat.resumed || other === chat.sessionFile) {
+        fs.writeFileSync(claim, owner);
+        return dir;
+      }
+    } catch {
+      return dir;
+    }
+  }
+  return base;
+}
+
 function uniqueDir(base: string, owner: string): string {
   const claimFile = path.join(base, '.bobble-chat');
   for (let n = 1; n < 200; n += 1) {
@@ -218,6 +302,8 @@ export function resolveProjectDir(
   conversationName: string,
   home: string = os.homedir(),
   conversationId?: string,
+  /** The chat's session file, when it has one, and whether it is being reopened. */
+  chat?: { sessionFile: string; resumed: boolean },
 ): string {
   const chosen = typeof selected === 'string' ? selected.trim() : '';
   if (chosen !== '') {
@@ -252,13 +338,26 @@ export function resolveProjectDir(
    * paths the model has already used would stop existing mid-turn.
    */
   const placeholder = bobbleProjectPath('new chat', home);
+  const map = chat === undefined ? null : readChatWorkspaces(home);
+  // A saved chat's own folder first, while it still exists.
+  if (chat !== undefined && map !== null) {
+    const known = map[chat.sessionFile];
+    if (known !== undefined && fs.existsSync(known)) return known;
+  }
+  const remember = (dir: string): string => {
+    if (chat !== undefined && map !== null && map[chat.sessionFile] !== dir) {
+      writeChatWorkspaces({ ...map, [chat.sessionFile]: dir }, home);
+    }
+    return dir;
+  };
   if (base !== placeholder && ownsEmptyDir(placeholder, conversationId)) {
     try {
       fs.renameSync(placeholder, base);
-      return base;
+      return remember(base);
     } catch {
       /* a rename we cannot do is not worth failing the run over */
     }
   }
+  if (chat !== undefined && map !== null) return remember(chatDir(base, conversationId, chat, map));
   return uniqueDir(base, conversationId);
 }

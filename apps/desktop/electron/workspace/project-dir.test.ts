@@ -213,3 +213,67 @@ describe('names read like names, not truncations', () => {
     expect(conversationNameFrom('a of to')).toBe('a');
   });
 });
+
+describe('a saved chat keeps its folder across launches', () => {
+  /*
+   * MEASURED 2026-10-08 (chart-reentry-probe, RESTART=1): the claim file held
+   * the WINDOW's id, minted again every launch, so the chat reopened after a
+   * restart was given `radar-make-a-radar-chart-2` — its later work in a second
+   * folder, and its chart's relative path pointing at the folder without it.
+   */
+  const home = () => mkdtempSync(join(tmpdir(), 'bobble-map-'));
+
+  it('the same chat in a new window (a new id) gets the same folder back', () => {
+    const h = home();
+    const chat = { sessionFile: '/s/radar.jsonl', resumed: false };
+    const first = resolveProjectDir(null, 'radar chart', h, 'window-1', chat);
+    const reopened = resolveProjectDir(null, 'radar chart', h, 'window-2', {
+      ...chat,
+      resumed: true,
+    });
+    expect(reopened).toBe(first);
+    expect(first.endsWith('radar-chart')).toBe(true);
+  });
+
+  it('another chat of the same name still gets its own folder, in the same window', () => {
+    const h = home();
+    const a = resolveProjectDir(null, 'radar chart', h, 'window-1', {
+      sessionFile: '/s/a.jsonl',
+      resumed: false,
+    });
+    const b = resolveProjectDir(null, 'radar chart', h, 'window-1', {
+      sessionFile: '/s/b.jsonl',
+      resumed: false,
+    });
+    expect(b).not.toBe(a);
+    expect(b.endsWith('radar-chart-2')).toBe(true);
+    // …and each keeps its own after a restart.
+    expect(
+      resolveProjectDir(null, 'radar chart', h, 'window-9', {
+        sessionFile: '/s/b.jsonl',
+        resumed: true,
+      }),
+    ).toBe(b);
+  });
+
+  it('a chat from before the map adopts its folder when reopened, not a new -2', () => {
+    const h = home();
+    // Made by an old launch: claimed by a window id nobody holds any more.
+    const old = resolveProjectDir(null, 'sales tool', h, 'old-window');
+    const reopened = resolveProjectDir(null, 'sales tool', h, 'new-window', {
+      sessionFile: '/s/sales.jsonl',
+      resumed: true,
+    });
+    expect(reopened).toBe(old);
+  });
+
+  it("a NEW chat does not adopt another chat's older folder", () => {
+    const h = home();
+    const old = resolveProjectDir(null, 'sales tool', h, 'old-window');
+    const fresh = resolveProjectDir(null, 'sales tool', h, 'new-window', {
+      sessionFile: '/s/fresh.jsonl',
+      resumed: false,
+    });
+    expect(fresh).not.toBe(old);
+  });
+});

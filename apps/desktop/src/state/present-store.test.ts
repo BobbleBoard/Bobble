@@ -10,6 +10,7 @@ import {
   isInlinePresented,
   openPresented,
   presentedFor,
+  presentingCall,
   presentTabKey,
   rehydratePresented,
   showPresented,
@@ -440,8 +441,8 @@ describe('the cards follow the chat', () => {
       },
     ];
     expect(chartsInTranscript(messages)).toEqual([
-      { path: '/w/units.svg', afterMessageId: 'a1' },
-      { path: '/w/trend.svg', afterMessageId: 'a1' },
+      { path: '/w/units.svg', afterMessageId: 'a1', callId: 'c1' },
+      { path: '/w/trend.svg', afterMessageId: 'a1', callId: 'c2' },
     ]);
   });
 
@@ -461,11 +462,11 @@ describe('the cards follow the chat', () => {
       },
     ];
     expect(chartsInTranscript(messages, '/w/chat/')).toEqual([
-      { path: '/w/chat/charts/units.svg', afterMessageId: 'a1' },
+      { path: '/w/chat/charts/units.svg', afterMessageId: 'a1', callId: 'c1' },
     ]);
     // Without a root a relative name stays as said — never invented.
     expect(chartsInTranscript(messages)).toEqual([
-      { path: 'charts/units.svg', afterMessageId: 'a1' },
+      { path: 'charts/units.svg', afterMessageId: 'a1', callId: 'c1' },
     ]);
   });
 
@@ -507,9 +508,74 @@ describe('the cards follow the chat', () => {
     expect(n).toBe(1);
     const cards = presentedFor(usePresentStore.getState(), '/sessions/x.jsonl');
     expect(cards).toHaveLength(1);
-    expect(cards[0]).toMatchObject({ path: '/w/units.svg', kind: 'chart', afterMessageId: 'a1' });
+    expect(cards[0]).toMatchObject({
+      path: '/w/units.svg',
+      kind: 'chart',
+      afterMessageId: 'a1',
+      callId: 'c1',
+    });
     expect(cards[0]?.chart?.title).toBe('Units');
     // Twice is still once.
     expect(await rehydratePresented('/sessions/x.jsonl', messages)).toBe(0);
+  });
+
+  /*
+   * the user (2026-10-08): "I asked for a radar chart, it was made, then I asked
+   * about something else, it failed, but then going out and back into the chat,
+   * it showed two radar charts at the bottom, not where they were originally".
+   * MEASURED (chart-reentry-probe, PIRESTART=1): after pi restarted under the
+   * chat, its messages came back with the transcript's ids (`a-h1`), the card
+   * still named the live one (`a-1791…`) and fell to the foot.
+   */
+  it('a card whose message id changed under it is re-anchored, never copied', async () => {
+    const invoke = vi.fn(async (channel: string, req: { path: string }) => {
+      if (channel === 'fs:read-file' && req.path === '/w/radar.chart.json') {
+        return {
+          text: JSON.stringify({ type: 'radar', labels: ['a', 'b', 'c'], values: [1, 2, 3] }),
+        };
+      }
+      return {};
+    });
+    (window as unknown as { piDesktop: unknown }).piDesktop = { invoke, onEvent: () => () => {} };
+    const chat = '/sessions/radar.jsonl';
+    // Handed over live: anchored to the router's id for the message.
+    usePresentStore.getState().add({ path: '/w/radar.svg', chat, afterMessageId: 'a-1791-1' });
+    // The chat read back: the same conversation, the transcript's ids.
+    const messages = [
+      { kind: 'user', id: 'u-h0' },
+      { kind: 'assistant', id: 'a-h1', blocks: [{ type: 'toolCall', id: 'call_1', name: 'bash' }] },
+      {
+        kind: 'toolResult',
+        id: 'tr-h2',
+        toolCallId: 'call_1',
+        toolName: 'bash',
+        text: 'Drew a radar chart "Skills" (3 points, look mono): /w/radar.svg (the spec beside it: radar.chart.json).',
+      },
+    ];
+    expect(await rehydratePresented(chat, messages)).toBe(0);
+    const cards = presentedFor(usePresentStore.getState(), chat);
+    expect(cards).toHaveLength(1);
+    expect(cards[0]).toMatchObject({ afterMessageId: 'a-h1', callId: 'call_1' });
+    // And a card that knows its call is left where it is.
+    expect(await rehydratePresented(chat, messages)).toBe(0);
+    expect(presentedFor(usePresentStore.getState(), chat)).toHaveLength(1);
+  });
+
+  it('presentingCall: the newest tool call of the latest assistant message', () => {
+    expect(
+      presentingCall([
+        { kind: 'assistant', blocks: [{ type: 'toolCall', id: 'old' }] },
+        { kind: 'toolResult' },
+        {
+          kind: 'assistant',
+          blocks: [
+            { type: 'text' },
+            { type: 'toolCall', id: 'c1' },
+            { type: 'toolCall', id: 'c2' },
+          ],
+        },
+      ]),
+    ).toBe('c2');
+    expect(presentingCall([{ kind: 'user' }])).toBeUndefined();
   });
 });

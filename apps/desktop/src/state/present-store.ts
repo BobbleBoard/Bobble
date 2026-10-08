@@ -42,6 +42,20 @@ export interface PresentedRecord {
    * which is where they were made).
    */
   afterMessageId: string | null;
+  /**
+   * THE TOOL CALL THAT HANDED IT OVER — the anchor that survives a reload.
+   *
+   * A message's id is the router's while the turn is live (`a-1791…`) and the
+   * transcript's once the chat is read back from its session file (`a-h1`), so
+   * after pi restarted under a chat, or the chat was reopened, `afterMessageId`
+   * named a message that no longer existed: the card fell to the foot of the
+   * thread, under whatever was said next — and the transcript rebuild, matching
+   * on that dead id, added a second copy beside it. the user (2026-10-08): "it
+   * showed two radar charts at the bottom, not where they were originally".
+   * A tool call's id is the provider's and is written into the session file,
+   * so it is the same in both.
+   */
+  callId?: string;
   /** Apps that can open it — hydrated after the record appears. */
   openApps?: readonly OpenWithChoice[];
   defaultApp?: OpenWithChoice;
@@ -179,7 +193,20 @@ interface PresentState {
     html?: { text: string; title?: string; explanation?: true; spec?: string };
     /** Handed over just now, in this run (see PresentedRecord.shownAt). */
     shownAt?: number;
+    /** The tool call that handed it over (see PresentedRecord.callId). */
+    callId?: string;
   }) => PresentedRecord;
+  /**
+   * Re-anchor a chat's card whose anchor no longer names anything in the
+   * thread (see PresentedRecord.callId) — moved back to where it was made,
+   * never copied.
+   */
+  reanchor: (
+    chat: string,
+    path: string,
+    oldAfterMessageId: string | null,
+    anchor: { afterMessageId: string; callId?: string },
+  ) => void;
   /** Attach the apps that can open a presented artefact (async, best-effort). */
   setApps: (path: string, apps: OpenWithChoice[], defaultAppId: string | null) => void;
   /**
@@ -222,6 +249,7 @@ export const usePresentStore = create<PresentState>((set, get) => ({
     svg,
     html,
     shownAt,
+    callId,
   }) => {
     const { kind } = classifyPresented(path);
     const have = presentedFor(get(), chat);
@@ -246,6 +274,7 @@ export const usePresentStore = create<PresentState>((set, get) => ({
       ...(svg !== undefined ? { svg } : {}),
       ...(html !== undefined ? { html } : {}),
       ...(shownAt !== undefined ? { shownAt } : {}),
+      ...(callId !== undefined ? { callId } : {}),
     };
     /*
      * A file presented again from the SAME message (the model iterating within
@@ -259,7 +288,12 @@ export const usePresentStore = create<PresentState>((set, get) => ({
         ...s.byChat,
         [chat]: [
           ...presentedFor(s, chat).filter(
-            (i) => !(i.path === path && i.afterMessageId === afterMessageId),
+            (i) =>
+              !(
+                i.path === path &&
+                (i.afterMessageId === afterMessageId ||
+                  (callId !== undefined && i.callId === callId))
+              ),
           ),
           record,
         ],
@@ -308,6 +342,20 @@ export const usePresentStore = create<PresentState>((set, get) => ({
         ]),
       ),
     })),
+  reanchor: (chat, path, oldAfterMessageId, anchor) =>
+    set((s) => {
+      const items = presentedFor(s, chat);
+      const i = items.findIndex((r) => r.path === path && r.afterMessageId === oldAfterMessageId);
+      if (i === -1) return {};
+      const next = items.slice();
+      const old = items[i] as PresentedRecord;
+      next[i] = {
+        ...old,
+        afterMessageId: anchor.afterMessageId,
+        ...(anchor.callId !== undefined ? { callId: anchor.callId } : {}),
+      };
+      return { byChat: { ...s.byChat, [chat]: next } };
+    }),
   claimUnsaved: (chat) =>
     set((s) => {
       const unsaved = s.byChat[UNSAVED_CHAT];
@@ -350,8 +398,8 @@ export function chartsInTranscript(
   }>,
   /** The chat's working folder — what a relative path in a reply is relative to. */
   root?: string,
-): Array<{ path: string; afterMessageId: string }> {
-  const out: Array<{ path: string; afterMessageId: string }> = [];
+): Array<{ path: string; afterMessageId: string; callId: string }> {
+  const out: Array<{ path: string; afterMessageId: string; callId: string }> = [];
   const owner = new Map<string, string>();
   for (const m of messages) {
     if (m.kind !== 'assistant') continue;
@@ -384,7 +432,7 @@ export function chartsInTranscript(
     const key = `${path}@${anchor}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push({ path, afterMessageId: anchor });
+    out.push({ path, afterMessageId: anchor, callId: m.toolCallId });
   }
   return out;
 }
@@ -403,8 +451,41 @@ export async function rehydratePresented(
 ): Promise<number> {
   const bridge = typeof window === 'undefined' ? undefined : window.piDesktop;
   if (bridge === undefined) return 0;
+  /*
+   * WHAT THE THREAD CAN STILL FIND. A card whose anchor names nothing here — the
+   * live message id it was handed over under, gone since the chat was read back
+   * — is not a different card: it is this one, lost. It is moved back to the
+   * call that made it rather than joined by a copy.
+   */
+  const messageIds = new Set(messages.map((m) => m.id));
+  const callIds = new Set<string>();
+  for (const m of messages) {
+    for (const b of m.blocks ?? [])
+      if (b.type === 'toolCall' && b.id !== undefined) callIds.add(b.id);
+  }
+  const resolves = (r: PresentedRecord): boolean =>
+    (r.callId !== undefined && callIds.has(r.callId)) ||
+    (r.afterMessageId !== null && messageIds.has(r.afterMessageId));
+  /** Already here (true), lost and now re-anchored (true), or still to add (false). */
+  const settle = (path: string, afterMessageId: string, callId: string): boolean => {
+    const have = presentedFor(usePresentStore.getState(), chat);
+    if (
+      have.some(
+        (r) => r.path === path && (r.callId === callId || r.afterMessageId === afterMessageId),
+      )
+    ) {
+      return true;
+    }
+    const lost = have.find((r) => r.path === path && !resolves(r));
+    if (lost === undefined) return false;
+    usePresentStore
+      .getState()
+      .reanchor(chat, path, lost.afterMessageId, { afterMessageId, callId });
+    return true;
+  };
   let added = 0;
-  for (const { path, afterMessageId } of chartsInTranscript(messages, root)) {
+  for (const { path, afterMessageId, callId } of chartsInTranscript(messages, root)) {
+    if (settle(path, afterMessageId, callId)) continue;
     if (/\.html?$/i.test(path)) {
       let html: { text: string; title?: string } | null = null;
       try {
@@ -414,9 +495,8 @@ export async function rehydratePresented(
         html = null;
       }
       if (html === null) continue;
-      const have = presentedFor(usePresentStore.getState(), chat);
-      if (have.some((r) => r.path === path && r.afterMessageId === afterMessageId)) continue;
-      usePresentStore.getState().add({ path, chat, afterMessageId, html });
+      if (settle(path, afterMessageId, callId)) continue;
+      usePresentStore.getState().add({ path, chat, afterMessageId, callId, html });
       added += 1;
       continue;
     }
@@ -456,12 +536,12 @@ export async function rehydratePresented(
       if (diagram === undefined && svg?.text === undefined) continue;
     }
     // The chat may have been opened elsewhere while the sidecars were read.
-    const have = presentedFor(usePresentStore.getState(), chat);
-    if (have.some((r) => r.path === path && r.afterMessageId === afterMessageId)) continue;
+    if (settle(path, afterMessageId, callId)) continue;
     usePresentStore.getState().add({
       path,
       chat,
       afterMessageId,
+      callId,
       ...(chart === undefined ? {} : { chart }),
       ...(diagram === undefined ? {} : { diagram }),
       ...(svg === undefined ? {} : { svg }),
@@ -710,26 +790,34 @@ export function connectPresent(): () => void {
       lastFile = file;
     }
     lastEpoch = epoch;
-    if (
-      file !== UNSAVED_CHAT &&
-      !rehydrated.has(file) &&
-      state.messages.length > 0 &&
-      state.agent.isStreaming !== true &&
-      presentedFor(usePresentStore.getState(), file).length === 0
-    ) {
-      rehydrated.add(file);
-      // The working folder the tools used, as the harness publishes it — a
-      // reply names its chart relative to it since 2026-09-17.
-      let root: string | undefined = state.session?.cwd ?? undefined;
-      try {
-        const raw = state.extensionStatus?.harness;
-        const parsed = raw === undefined ? null : (JSON.parse(raw) as { workspaceRoot?: string });
-        if (typeof parsed?.workspaceRoot === 'string' && parsed.workspaceRoot !== '') {
-          root = parsed.workspaceRoot;
-        }
-      } catch {
-        /* the status is not for us to parse strictly */
+    if (file === UNSAVED_CHAT || state.messages.length === 0 || state.agent.isStreaming === true) {
+      return;
+    }
+    // The working folder the tools used, as the harness publishes it — a
+    // reply names its chart relative to it since 2026-09-17.
+    let root: string | undefined = state.session?.cwd ?? undefined;
+    try {
+      const raw = state.extensionStatus?.harness;
+      const parsed = raw === undefined ? null : (JSON.parse(raw) as { workspaceRoot?: string });
+      if (typeof parsed?.workspaceRoot === 'string' && parsed.workspaceRoot !== '') {
+        root = parsed.workspaceRoot;
       }
+    } catch {
+      /* the status is not for us to parse strictly */
+    }
+    /*
+     * NOT ONCE PER CHAT — once per (chat, thread length, working folder). It ran
+     * only for a chat with no cards at all, and only ever once: a chat read back
+     * with a card already in memory never had it re-anchored (it fell to the
+     * foot), and a chat reopened after a restart resolved "skills.svg" against
+     * the folder pi had not published yet, found nothing, and never tried again
+     * once the harness said where the chat's folder was. The rebuild skips what
+     * is already here, so running it again costs a file read only for a card
+     * still missing.
+     */
+    const key = `${file}|${state.messages.length}|${root ?? ''}`;
+    if (!rehydrated.has(key)) {
+      rehydrated.add(key);
       void rehydratePresented(
         file,
         state.messages as Parameters<typeof rehydratePresented>[1],
@@ -772,10 +860,12 @@ export function presentFromMain({
   const messages = bg !== null ? bg.messages : pi.messages;
   const chat = bg !== null ? bg.sessionFile : (pi.session?.sessionFile ?? UNSAVED_CHAT);
   const anchor = messages[messages.length - 1]?.id ?? null;
+  const callId = presentingCall(messages);
   const record = usePresentStore.getState().add({
     path,
     chat,
     afterMessageId: anchor,
+    ...(callId !== undefined ? { callId } : {}),
     ...(note !== undefined ? { note } : {}),
     ...(chart !== undefined ? { chart } : {}),
     ...(diagram !== undefined ? { diagram } : {}),
@@ -790,6 +880,24 @@ export function presentFromMain({
   if (bg === null && !isInlinePresented(record)) {
     void openPresented(getCanvasController() as never, record);
   }
+}
+
+/**
+ * The call that is handing this over: the last tool call of the latest
+ * assistant message — `present`, `chart`, or the `bash` running either. Main
+ * fires present:show while that call runs, so it is the newest one there is.
+ */
+export function presentingCall(
+  messages: ReadonlyArray<{ kind: string; blocks?: ReadonlyArray<{ type: string; id?: string }> }>,
+): string | undefined {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (m?.kind !== 'assistant') continue;
+    const calls = (m.blocks ?? []).filter((b) => b.type === 'toolCall' && b.id !== undefined);
+    const last = calls.at(-1);
+    if (last?.id !== undefined) return last.id;
+  }
+  return undefined;
 }
 
 /** Canvas tab kind → the artifact kind its surface expects. */

@@ -106,9 +106,18 @@ export type ProjectInvokeMap = {
    * THE workspace for a chat, resolved and created. `selected` is the composer
    * dropdown verbatim (absent = "No project" → ~/Bobble/<name>); `conversationId`
    * keeps two chats with the same generated title from sharing a folder.
+   * `sessionFile` names the chat itself, so a chat reopened after a restart
+   * (a new window, a new conversationId) gets its own folder back rather than a
+   * `-2`; `resumed` says it already has a reply (it is reopened, not new).
    */
   'project:resolve-workspace': {
-    request: { selected?: string; conversationName: string; conversationId?: string };
+    request: {
+      selected?: string;
+      conversationName: string;
+      conversationId?: string;
+      sessionFile?: string;
+      resumed?: boolean;
+    };
     response: { path: string };
   };
 };

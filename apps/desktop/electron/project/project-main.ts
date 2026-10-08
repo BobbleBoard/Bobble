@@ -179,6 +179,9 @@ const handlers: IpcHandlers<ProjectInvokeMap> = {
       req.conversationName,
       os.homedir(),
       req.conversationId,
+      req.sessionFile !== undefined && req.sessionFile !== ''
+        ? { sessionFile: req.sessionFile, resumed: req.resumed === true }
+        : undefined,
     );
     // TRACKABILITY: "where did the files go" has cost more runs than any other
     // question here. Say the answer, and what decided it, every time.
