@@ -175,6 +175,12 @@ function canvasShellInvoke(channel: string, req: unknown, appName?: string): voi
     verb: channel === 'canvas:reveal' ? 'reveal' : 'open',
     path,
     ...(appName !== undefined ? { appName } : {}),
+    retryAt: (p) =>
+      // biome-ignore lint/suspicious/noExplicitAny: narrowed by the overloads above.
+      window.piDesktop.invoke(
+        channel as any,
+        { ...(req as object), path: p } as any,
+      ) as Promise<OpenOutcome>,
   });
 }
 
@@ -474,8 +480,28 @@ export class NativeSurfaces {
           .then((res) => {
             if (!res.ok) {
               // Surfacing beats silence: an editor that fails to open otherwise
-              // shows an empty rectangle indistinguishable from a slow load.
-              this.#controller.updateTab(tabId, { title: `${tab?.title ?? 'Document'} (failed)` });
+              // shows an empty rectangle indistinguishable from a slow load. Say
+              // so in words, with the way on: the file's own app.
+              const name = tab?.title ?? 'This document';
+              usePiStore.setState((st) => ({
+                notifications: [
+                  ...st.notifications.slice(-3),
+                  {
+                    id: `office-${tabId}-${Date.now()}`,
+                    level: 'error' as const,
+                    message: `Couldn't open the editor for ${name} here.`,
+                    timestamp: Date.now(),
+                    action: {
+                      label: 'Open in its app',
+                      run: () =>
+                        void reportOpen(
+                          () => window.piDesktop.invoke('canvas:open-default', { path: filePath }),
+                          { verb: 'open', path: filePath },
+                        ),
+                    },
+                  },
+                ],
+              }));
             }
           })
           .catch(() => undefined);

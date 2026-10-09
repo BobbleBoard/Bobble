@@ -429,13 +429,19 @@ export function ChatThread() {
           const app = [item.defaultApp, ...(item.openApps ?? [])].find((a) => a?.id === appId);
           void reportOpen(
             () => window.piDesktop.invoke('canvas:open-with', { path: item.path, appId }),
-            { verb: 'open', path: item.path, ...(app !== undefined ? { appName: app.name } : {}) },
+            {
+              verb: 'open',
+              path: item.path,
+              ...(app !== undefined ? { appName: app.name } : {}),
+              retryAt: (p) => window.piDesktop.invoke('canvas:open-with', { path: p, appId }),
+            },
           );
         }}
         onReveal={() => {
           void reportOpen(() => window.piDesktop.invoke('canvas:reveal', { path: item.path }), {
             verb: 'reveal',
             path: item.path,
+            retryAt: (p) => window.piDesktop.invoke('canvas:reveal', { path: p }),
           });
         }}
       />

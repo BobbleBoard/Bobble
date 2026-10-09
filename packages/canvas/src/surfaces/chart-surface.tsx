@@ -970,7 +970,13 @@ export function ChartTable({ spec }: { spec: ChartSpec }) {
 export function ChartSurface({ content, onExport }: SurfaceProps) {
   const parsed = useMemo(() => specFromText(content.text), [content.text]);
   if ('error' in parsed) {
-    return <div className="pd-canvas-empty">This chart could not be read: {parsed.error}</div>;
+    // The parser's own words are for the console, not the canvas.
+    console.warn('[chart] unreadable spec:', parsed.error);
+    return (
+      <div className="pd-canvas-empty">
+        This chart’s data could not be read. Asking for the chart again redraws it.
+      </div>
+    );
   }
   void onExport;
   return <ChartView spec={parsed} fill />;

@@ -881,7 +881,11 @@ function DefaultSurface({
 }
 
 function SurfaceMissing({ kind }: { kind: string }) {
-  return <div className="pd-canvas-empty">No surface for “{kind}”.</div>;
+  return (
+    <div className="pd-canvas-empty">
+      This kind of content ({kind}) cannot be shown in the canvas yet. Open it from the chat instead.
+    </div>
+  );
 }
 
 /** Last path segment of a file path (the display filename), or undefined. */

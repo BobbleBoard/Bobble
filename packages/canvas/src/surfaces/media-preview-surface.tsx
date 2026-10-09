@@ -1,6 +1,7 @@
 import { Button, Spinner } from '@pi-desktop/ui';
 import { useEffect, useReducer, useState } from 'react';
 import type { MediaPreviewStatus } from '../tabs/tab-model.ts';
+import { previewFailure, previewStatus } from './preview-failure';
 
 export type { MediaPreviewStatus };
 
@@ -140,13 +141,31 @@ export function MediaPreviewSurface({
     onRefresh?.();
   };
 
+  // Why it failed (the pd-file server says: 404 moved, 403 outside its folders).
+  const [failStatus, setFailStatus] = useState<number | null>(null);
+  useEffect(() => {
+    if (status !== 'error') return;
+    let live = true;
+    void previewStatus(src).then((st) => {
+      if (live) setFailStatus(st);
+    });
+    return () => {
+      live = false;
+    };
+  }, [status, src]);
+
   const rootClass = ['pd-media', className].filter(Boolean).join(' ');
   return (
     <div className={rootClass}>
       <div className="pd-media-body pd-scroll">
         {status === 'error' ? (
-          <div className="pd-media-error" role="alert">
-            <p className="pd-media-error-title">Failed to load file content</p>
+          <div className="pd-media-error" role="status">
+            <p className="pd-media-error-title">
+              {previewFailure(
+                failStatus,
+                isVideo ? 'video' : isAudio ? 'recording' : isPdf ? 'document' : 'file',
+              )}
+            </p>
             <Button size="sm" variant="secondary" onClick={retry}>
               Try again
             </Button>

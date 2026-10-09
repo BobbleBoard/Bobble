@@ -65,7 +65,7 @@ export const ArtifactPanel = forwardRef<HTMLDivElement, ArtifactPanelProps>(func
         ) : null}
         {state === 'error' ? (
           <div className="pd-artifact-status">
-            {errorMessage ?? 'Something went wrong loading this content.'}
+            {errorMessage ?? 'This content could not be shown here.'}
           </div>
         ) : null}
       </div>

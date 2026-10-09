@@ -3,6 +3,7 @@ import DOMPurify from 'dompurify';
 import { unzipSync } from 'fflate';
 import * as mammoth from 'mammoth';
 import { type JSX, useEffect, useState } from 'react';
+import { previewFailure } from './preview-failure';
 
 // `import * as mammoth from 'mammoth'` resolves the bare package, so Vite applies
 // mammoth's `browser` field — it swaps the two node-only internals (unzip / file
@@ -237,12 +238,13 @@ export function DocSurface({
         // A fetch failure is an app/permission problem; anything else here is a
         // decode failure — mammoth/fflate throwing means the bytes aren't a valid
         // OOXML package (corrupt, or a flat-XML export mislabeled .docx/.pptx).
+        const status = /Failed to fetch document: (\d+)/.exec(m)?.[1];
         setErrorMsg(
           m.startsWith('Failed to fetch')
-            ? 'Couldn’t load this file.'
+            ? previewFailure(status !== undefined ? Number(status) : null, 'document')
             : kind
-              ? `This ${kind.toUpperCase()} couldn’t be read — the file may be corrupt or not a valid Office document.`
-              : m || 'Unsupported document.',
+              ? `This ${kind.toUpperCase()} could not be read — it may be damaged or not a real Office document. Use Open above to try its app.`
+              : 'This kind of document cannot be previewed here. Use Open above to see it in its app.',
         );
         setResult(null);
         setStatus('error');
@@ -267,7 +269,7 @@ export function DocSurface({
     <div className={rootClass}>
       {status === 'error' ? (
         <div className="pd-media-error" role="alert">
-          <p className="pd-media-error-title">{errorMsg ?? 'Failed to load file content'}</p>
+          <p className="pd-media-error-title">{errorMsg ?? previewFailure(null, 'document')}</p>
           <Button size="sm" variant="secondary" onClick={retry}>
             Try again
           </Button>

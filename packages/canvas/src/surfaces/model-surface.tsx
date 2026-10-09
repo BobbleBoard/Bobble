@@ -11,6 +11,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
+import { previewFailure } from './preview-failure';
 
 /** Formats we can decode; everything else resolves to the error state. */
 type ModelFormat = 'GLB' | 'GLTF' | 'OBJ' | 'STL' | 'PLY';
@@ -199,6 +200,8 @@ export function ModelSurface({
 }: ModelSurfaceProps) {
   const canvasHostRef = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<ModelStatus>('loading');
+  /** The server's status when the fetch failed: 404 moved, 403 outside its folders. */
+  const [failStatus, setFailStatus] = useState<number | null>(null);
   // `attempt` re-runs the effect on retry without changing src/reloadNonce.
   const [attempt, setAttempt] = useState(0);
 
@@ -293,7 +296,10 @@ export function ModelSurface({
         if (!format) throw new Error(`Unsupported model type: ${type || '(none)'}`);
 
         const response = await fetch(src, { signal: controller.signal });
-        if (!response.ok) throw new Error(`Failed to fetch model: ${response.status}`);
+        if (!response.ok) {
+          setFailStatus(response.status);
+          throw new Error(`Failed to fetch model: ${response.status}`);
+        }
         const buffer = await response.arrayBuffer();
         if (disposed) return;
 
@@ -344,7 +350,7 @@ export function ModelSurface({
         ) : null}
         {status === 'error' ? (
           <div className="pd-media-error" role="alert">
-            <p className="pd-media-error-title">Failed to load model</p>
+            <p className="pd-media-error-title">{previewFailure(failStatus, 'model')}</p>
             <Button size="sm" variant="secondary" onClick={retry}>
               Try again
             </Button>

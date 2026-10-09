@@ -158,7 +158,7 @@ export function Canvas({
         byline="Content is generated and may be inaccurate"
         controls={controls}
         state={state}
-        errorMessage={`No canvas surface is registered for “${artifact.content.kind}”.`}
+        errorMessage={`This kind of content (${artifact.content.kind}) cannot be shown in the canvas yet.`}
       >
         {body}
       </ArtifactPanel>

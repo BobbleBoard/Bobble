@@ -8,7 +8,9 @@
  * the same: nothing happened. Main now says WHY in one sentence
  * (electron/canvas/os-open.ts); this names the file and puts it on screen.
  */
+import { plainError as sayError } from '@pi-desktop/shared';
 import { usePiStore } from '../../state/pi-slice';
+import { locateChatFile } from './file-tabs';
 
 /** What main answers for every hand-to-the-OS request. */
 export interface OpenOutcome {
@@ -25,6 +27,12 @@ export interface OpenContext {
   readonly path: string;
   /** The app picked from Open with, when one was. */
   readonly appName?: string;
+  /**
+   * The same hand-off at another path: a file that is not where the control
+   * thinks is looked for in the chat's folders (fs:locate) and, found, opened
+   * there instead of reported missing.
+   */
+  readonly retryAt?: (path: string) => Promise<OpenOutcome>;
 }
 
 function baseName(p: string): string {
@@ -48,8 +56,16 @@ export function openFailureMessage(context: OpenContext, outcome: OpenOutcome): 
     context.verb === 'reveal'
       ? `Couldn't show ${name} in Finder.`
       : `Couldn't open ${name}${context.appName !== undefined && context.appName !== '' ? ` in ${context.appName}` : ''}.`;
-  const why = plainError(outcome.error ?? '');
-  return `${head} ${why === '' ? 'The Mac did not say why.' : why}`;
+  const raw = plainError(outcome.error ?? '');
+  // Main's reasons are mostly sentences already; a raw one (an errno, a quoted
+  // path, a stack's first line) is said in words instead.
+  const why =
+    raw === ''
+      ? 'The Mac did not say why.'
+      : /\b(E[A-Z]{3,}|errno)\b|[{}]|^[A-Z]\w*Error\b|\(\w*Error/.test(raw)
+        ? sayError(raw, 'open')
+        : raw;
+  return `${head} ${why}`;
 }
 
 let toastSeq = 0;
@@ -81,6 +97,22 @@ export async function reportOpen(
     outcome = await run();
   } catch (error) {
     outcome = { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+  if (
+    !outcome.ok &&
+    context.retryAt !== undefined &&
+    /not there any more|no longer there|cannot be found|not a file|ENOENT|no such file/i.test(
+      outcome.error ?? '',
+    )
+  ) {
+    const found = await locateChatFile(context.path).catch(() => null);
+    if (found !== null && found !== context.path) {
+      try {
+        outcome = await context.retryAt(found);
+      } catch (error) {
+        outcome = { ok: false, error: error instanceof Error ? error.message : String(error) };
+      }
+    }
   }
   const message = openFailureMessage(context, outcome);
   if (message !== null) report(message);

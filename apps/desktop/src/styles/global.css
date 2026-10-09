@@ -4653,8 +4653,11 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   color: var(--pd-text-muted);
   pointer-events: none;
 }
+/* A model that could not be shown says so plainly — not in red (2026-10-08). */
 .pd-media-model-note[data-error="true"] {
-  color: var(--pd-status-danger-fg, #e5484d);
+  max-width: 80%;
+  text-align: center;
+  color: var(--pd-text-secondary);
 }
 /*
  * THE FEW CONTROLS UNDER A 3D CARD. the user (2026-09-17): "below the card itself

@@ -6,11 +6,40 @@
  * separately at each call site, which is how one of them quietly ends up with a
  * hand-built `pd-file://` URL that 404s (it happened; see `pdFileUrl`).
  */
+import { plainError } from '@pi-desktop/shared';
+import { reportOpen } from '../chat/canvas/open-outcome';
 import { markSystemClipboard } from '../chat/composer/clipboard-epoch';
+import { usePiStore } from '../state/pi-slice';
+
+/**
+ * A media action that did not work says so — these used to fail in silence
+ * (a moved file, a full disk). The words come from main where it gave a
+ * sentence, else from plainError; a moved file is looked for first.
+ */
+function sayFailed(what: string, error: unknown): void {
+  const raw = typeof error === 'string' ? error : error instanceof Error ? error.message : '';
+  if (/cancel/i.test(raw)) return;
+  usePiStore.setState((st) => ({
+    notifications: [
+      ...st.notifications.slice(-3),
+      {
+        id: `media-${Date.now()}`,
+        level: 'error' as const,
+        message: `Couldn't ${what}. ${plainError(raw, what.startsWith('save') ? 'save' : 'open')}`,
+        timestamp: Date.now(),
+      },
+    ],
+  }));
+}
 
 /** Ask main for a Save-As sheet. Never throws — a cancelled sheet is not an error. */
 export function exportFile(path: string, suggestedName: string): void {
-  void window.piDesktop.invoke('canvas:save-as', { path, suggestedName }).catch(() => undefined);
+  void window.piDesktop
+    .invoke('canvas:save-as', { path, suggestedName })
+    .then((r) => {
+      if (!r.ok && r.error !== undefined && r.error !== '') sayFailed('save a copy', r.error);
+    })
+    .catch((e: unknown) => sayFailed('save a copy', e));
 }
 
 /**
@@ -26,14 +55,22 @@ export function copyFile(path: string): Promise<boolean> {
     .then((r) => {
       const ok = (r as { ok?: boolean }).ok === true;
       if (ok) markSystemClipboard();
+      else sayFailed('copy it', (r as { error?: string }).error);
       return ok;
     })
-    .catch(() => false);
+    .catch((e: unknown) => {
+      sayFailed('copy it', e);
+      return false;
+    });
 }
 
-/** Show it in Finder. */
+/** Show it in Finder — looked for first if it moved (open-outcome). */
 export function revealFile(path: string): void {
-  void window.piDesktop.invoke('canvas:reveal', { path }).catch(() => undefined);
+  void reportOpen(() => window.piDesktop.invoke('canvas:reveal', { path }), {
+    verb: 'reveal',
+    path,
+    retryAt: (p) => window.piDesktop.invoke('canvas:reveal', { path: p }),
+  });
 }
 
 /**

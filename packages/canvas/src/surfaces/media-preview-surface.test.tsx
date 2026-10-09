@@ -78,10 +78,11 @@ describe('MediaPreviewSurface (body-only)', () => {
     expect(container.querySelector('.pd-media-status')).toBeTruthy();
     expect(container.querySelector('.pd-media-error')).toBeNull();
 
-    // Element error → error panel with the exact copy + Try again.
+    // Element error → error panel saying what happened + Try again (in jsdom
+    // the server cannot be asked why, so it is the plain "just now" case).
     await fire(container.querySelector('img'), 'error');
     expect(container.querySelector('.pd-media-error-title')?.textContent).toBe(
-      'Failed to load file content',
+      'This file could not be loaded just now.',
     );
 
     // Try again → back to loading, a fresh img mounts.
@@ -100,7 +101,7 @@ describe('MediaPreviewSurface (body-only)', () => {
       <MediaPreviewSurface src="a.pdf" type="PDF" status="error" />,
     );
     expect(container.querySelector('.pd-media-error-title')?.textContent).toBe(
-      'Failed to load file content',
+      'This document could not be loaded just now.',
     );
   });
 
@@ -108,7 +109,7 @@ describe('MediaPreviewSurface (body-only)', () => {
     const { container } = await render(<MediaPreviewSurface type="PNG" />);
     expect(container.querySelector('.pd-media-status')).toBeNull();
     expect(container.querySelector('.pd-media-error-title')?.textContent).toBe(
-      'Failed to load file content',
+      'This file could not be loaded just now.',
     );
   });
 
@@ -129,7 +130,7 @@ describe('MediaPreviewSurface (body-only)', () => {
     const { container } = await render(<MediaPreviewSurface src="clip.webm" type="WEBM" />);
     await fire(container.querySelector('video'), 'error');
     expect(container.querySelector('.pd-media-error-title')?.textContent).toBe(
-      'Failed to load file content',
+      'This video could not be loaded just now.',
     );
   });
 
@@ -143,5 +144,15 @@ describe('MediaPreviewSurface (body-only)', () => {
     // Bump the nonce → back to loading (fresh element).
     await rerender(<MediaPreviewSurface src="a.png" type="PNG" reloadNonce={1} />);
     expect(container.querySelector('.pd-media-status')).toBeTruthy();
+  });
+});
+
+describe('previewFailure — why a preview did not load, in words', () => {
+  it('names each case the server can tell apart', async () => {
+    const { previewFailure } = await import('./preview-failure');
+    expect(previewFailure(404, 'video')).toMatch(/not there any more/);
+    expect(previewFailure(403)).toMatch(/only previews files in its own folders/);
+    expect(previewFailure(200, 'model')).toMatch(/could not be shown here/);
+    expect(previewFailure(null)).toMatch(/could not be loaded just now/);
   });
 });

@@ -200,6 +200,10 @@ function chatRoots(cwd: string | undefined): string[] {
 }
 
 /** Where the file a turn named actually is (fs:locate), or null. */
+export async function locateChatFile(absPath: string, cwd?: string): Promise<string | null> {
+  return locateFile(absPath, cwd);
+}
+
 async function locateFile(absPath: string, cwd: string | undefined): Promise<string | null> {
   try {
     const res = await window.piDesktop.invoke('fs:locate', {

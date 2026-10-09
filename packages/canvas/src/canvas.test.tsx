@@ -30,7 +30,7 @@ describe('Canvas', () => {
     const { container } = await render(
       <Canvas artifact={{ id: 'z', content: { kind: 'hologram', text: 'x' } }} />,
     );
-    expect(container.textContent).toContain('No canvas surface is registered');
+    expect(container.textContent).toContain('cannot be shown in the canvas yet');
   });
 
   it('emits onCopy and onPopOut', async () => {
