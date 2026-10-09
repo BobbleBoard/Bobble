@@ -42,7 +42,8 @@ export function SelectCard({
         disabled && 'cursor-not-allowed opacity-50',
         selected
           ? 'border-border-focus bg-accent-subtle'
-          : 'border-border-default bg-bg-raised hover:border-border-strong hover:bg-bg-hover',
+          : // Hover only lifts the fill: a border change read as "selected".
+            'border-border-default bg-bg-raised hover:bg-bg-hover',
       )}
     >
       {icon != null ? (

@@ -13,28 +13,24 @@ import type {
   OnboardingChoices,
 } from '../../electron/import/import-contract';
 import type { ComputerUseSettings } from '../../electron/settings/settings-contract';
+import { loadInstalledApps } from '../computer-use/AppGrid';
 import { useSettingsStore } from '../state/settings-store';
 import { useThemeStore } from '../store/theme';
+import { useFirstRunSetup } from './first-run-setup';
 import {
   DEFAULT_CAPABILITIES,
   type ExperienceLevel,
   flavorForSource,
+  hasSomethingToImport,
   mapExperience,
+  type OnboardingStepId,
   preselectSource,
   resolveMode,
   type SourceChoice,
+  visibleSteps,
 } from './onboarding-logic';
 
-export const ONBOARDING_STEPS = [
-  'source',
-  'import',
-  'theme',
-  'experience',
-  'capabilities',
-  'computer-use',
-  'setup',
-] as const;
-export type OnboardingStepId = (typeof ONBOARDING_STEPS)[number];
+export { ONBOARDING_STEPS, type OnboardingStepId } from './onboarding-logic';
 
 export interface ImportToggles {
   mcp: boolean;
@@ -44,7 +40,7 @@ export interface ImportToggles {
 }
 
 interface OnboardingStore {
-  step: number;
+  step: OnboardingStepId;
   loading: boolean;
   finishing: boolean;
 
@@ -71,6 +67,8 @@ interface OnboardingStore {
   setExperience: (level: ExperienceLevel) => void;
   toggleCapability: (key: keyof GenerationCapabilities) => void;
   setComputerUse: (next: ComputerUseSettings) => void;
+  /** The pages this person walks: the import page only when there is something to bring. */
+  steps: () => OnboardingStepId[];
   next: () => void;
   back: () => void;
   canProceed: () => boolean;
@@ -118,7 +116,7 @@ function defaultToggles(
 }
 
 export const useOnboardingStore = create<OnboardingStore>((set, get) => ({
-  step: 0,
+  step: 'welcome',
   loading: true,
   finishing: false,
   claudeInstalled: false,
@@ -137,6 +135,11 @@ export const useOnboardingStore = create<OnboardingStore>((set, get) => ({
   computerUse: { enabled: true, apps: [] },
 
   load: async () => {
+    // Start the slow lookups now so their pages open full: the computer-use
+    // grid's app icons (the helper walks /Applications) and the last page's
+    // engine and model check. Both cache; the pages read the same promise.
+    void loadInstalledApps();
+    void useFirstRunSetup.getState().check();
     const [detect, claude, codex, sessions] = await Promise.all([
       window.piDesktop.invoke('import:detect', undefined),
       window.piDesktop.invoke('import:claude', undefined),
@@ -207,12 +210,24 @@ export const useOnboardingStore = create<OnboardingStore>((set, get) => ({
     set((s) => ({ capabilities: { ...s.capabilities, [key]: !s.capabilities[key] } })),
   setComputerUse: (computerUse) => set({ computerUse }),
 
-  next: () => set((s) => ({ step: Math.min(s.step + 1, ONBOARDING_STEPS.length - 1) })),
-  back: () => set((s) => ({ step: Math.max(s.step - 1, 0) })),
+  steps: () => {
+    const s = get();
+    return visibleSteps(hasSomethingToImport(s.source, s.claude, s.codex, s.sessions.length));
+  },
+  next: () => {
+    const steps = get().steps();
+    const i = steps.indexOf(get().step);
+    set({ step: steps[Math.min(i + 1, steps.length - 1)] ?? 'welcome' });
+  },
+  back: () => {
+    const steps = get().steps();
+    const i = steps.indexOf(get().step);
+    set({ step: steps[Math.max(i - 1, 0)] ?? 'welcome' });
+  },
 
   canProceed: () => {
     const s = get();
-    if (ONBOARDING_STEPS[s.step] === 'experience') return s.experience !== null;
+    if (s.step === 'hands-on') return s.experience !== null;
     return true;
   },
 

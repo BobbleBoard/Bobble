@@ -71,6 +71,7 @@ import { CanvasTabsPanel } from './canvas/CanvasTabsPanel';
 import { trackChromeCorner } from './chrome-corner';
 import { CorpDebugHud } from './corp/CorpDebugHud';
 import { EngineMenu } from './EngineMenu';
+import { FirstModelCard } from './FirstModelCard';
 import { GuardianBanner } from './GuardianBanner';
 import { useHarnessTitleSync } from './harness-title';
 import { InputNeededBanner } from './InputNeededBanner';
@@ -909,6 +910,8 @@ export function ChatApp({
                         Restored an earlier session; some history was truncated.
                       </div>
                     ) : null}
+                    {/* No chat model on this Mac yet: the one download that fixes it. */}
+                    <FirstModelCard />
                     {/* A generation the model asked for that this Mac cannot make
                   yet: the Download button, right where the reply is waited for. */}
                     <ModuleNotice />

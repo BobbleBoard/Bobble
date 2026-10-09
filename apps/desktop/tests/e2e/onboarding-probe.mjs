@@ -118,38 +118,24 @@ const commonEnv = {
     await page.click('[data-testid="import-skills"]');
     await page.click('[data-testid="onboarding-next"]');
 
-    // Step 3 — theme.
+    // Step 3 — the look.
     await page.waitForSelector('[data-testid="theme-preview"]', { timeout: 8000 });
     await page.click('[data-testid="onboarding-next"]');
 
-    // Step 4 — experience (gates Continue until chosen).
+    // Step 4 — how hands-on: guidance (gates Continue until chosen) and computer
+    // use (on, and one app ticked in the grid of real icons) on one page.
     await page.waitForSelector('[data-testid="experience-new"]', { timeout: 8000 });
     await page.click('[data-testid="experience-new"]');
-    await page.click('[data-testid="onboarding-next"]');
-
-    // Step 5 — capabilities.
-    await page.waitForSelector('[data-testid="capability-image"]', { timeout: 8000 });
-    await page.click('[data-testid="capability-image"]');
-    await page.click('[data-testid="onboarding-next"]');
-
-    // Step 6 — computer use: on, and one app ticked in the grid of real icons.
     await page.waitForSelector('[data-testid="onboarding-computer-use"]', { timeout: 8000 });
     await page.waitForSelector('[data-testid^="app-tile-"]', { timeout: 20_000 });
     const firstTile = await page.getAttribute('[data-testid^="app-tile-"]', 'data-testid');
     await page.click(`[data-testid="${firstTile}"]`);
     await page.click('[data-testid="onboarding-next"]');
 
-    /*
-     * Step 7 — SETUP, which this probe predates.
-     *
-     * The wizard grew a sixth step ("Getting you running" — it picks a model for
-     * the machine), so `capabilities` stopped being the last one and stopped
-     * showing Finish. The probe kept clicking a button that had moved a screen
-     * further on, and waited out its full timeout on a wizard that was working.
-     * Nothing here has to DO the setup — that is its own probe's job — only get
-     * past it to the finish.
-     */
-    await page.waitForSelector('[data-testid="onboarding-setup"]', { timeout: 15_000 });
+    // Step 5 — get running, with the generation switches. Nothing here
+    // downloads: `onboarding-finish` is "Skip for now".
+    await page.waitForSelector('[data-testid="capability-image"]', { timeout: 15_000 });
+    await page.click('[data-testid="capability-image"]');
     await page.click('[data-testid="onboarding-finish"]');
 
     // Landed in chat: the composer is the tell.

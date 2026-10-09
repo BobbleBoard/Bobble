@@ -1,10 +1,12 @@
 /**
- * Step 4 — experience gauge. Three levels that set the tutorial flag + the pi
- * permission mode the harness starts in (see mapExperience).
+ * Guidance — three levels that set the tutorial flag + the permission mode the
+ * agent starts in (see mapExperience). Each title says what it changes; the
+ * old ones were about the person ("I know what llama.cpp is"), which left
+ * them to guess what picking it would do.
  */
 import { IconCompass, IconGauge, IconSpeed } from '@pi-desktop/ui';
 import type { ReactNode } from 'react';
-import { type ExperienceLevel, mapExperience } from '../onboarding-logic';
+import type { ExperienceLevel } from '../onboarding-logic';
 import { SelectCard } from '../SelectCard';
 import { useOnboardingStore } from '../useOnboarding';
 
@@ -16,8 +18,8 @@ const OPTIONS: Array<{
 }> = [
   {
     value: 'new',
-    title: "I've never run a local model",
-    description: 'Show me the tutorial and review every action before it runs.',
+    title: 'Show me around',
+    description: 'A short tour, and you approve each action before it runs.',
     /* A compass — this card asks to be guided. Its two siblings are a gauge and
        a speedometer, so the trio reads as one scale; a sparkle read as "the
        special one". */
@@ -25,52 +27,35 @@ const OPTIONS: Array<{
   },
   {
     value: 'knows-llamacpp',
-    title: 'I know what llama.cpp is',
-    description: 'Skip the tutorial. Flag risky commands, but keep things moving.',
+    title: 'Ask only when it is risky',
+    description: 'No tour. Bobble asks before anything risky and runs the rest.',
     icon: <IconGauge />,
   },
   {
     value: 'no-tutorial',
-    title: 'Leave me alone, no tutorial',
-    description: 'No hand-holding. Run actions without asking (you can dial this back later).',
+    title: 'Just do it',
+    description: 'No tour, no questions. Dial it back anytime in Settings.',
     icon: <IconSpeed />,
   },
 ];
-
-const PERMISSION_LABEL: Record<ReturnType<typeof mapExperience>['permissionMode'], string> = {
-  'review-all': 'review every action',
-  reviewer: 'flag risky commands',
-  bypass: 'run without asking',
-};
 
 export function ExperienceStep() {
   const experience = useOnboardingStore((s) => s.experience);
   const setExperience = useOnboardingStore((s) => s.setExperience);
 
   return (
-    <div className="flex flex-col gap-3" role="radiogroup" aria-label="Experience level">
-      {OPTIONS.map((opt) => {
-        const mapping = mapExperience(opt.value);
-        return (
-          <SelectCard
-            key={opt.value}
-            data-testid={`experience-${opt.value}`}
-            selected={experience === opt.value}
-            onSelect={() => setExperience(opt.value)}
-            icon={opt.icon}
-            title={opt.title}
-            description={
-              <>
-                {opt.description}
-                <span className="mt-1 block text-caption text-text-muted">
-                  Permissions: {PERMISSION_LABEL[mapping.permissionMode]}
-                  {mapping.tutorial ? ' · tutorial on' : ' · tutorial off'}
-                </span>
-              </>
-            }
-          />
-        );
-      })}
+    <div className="flex flex-col gap-2" role="radiogroup" aria-label="How much Bobble asks">
+      {OPTIONS.map((opt) => (
+        <SelectCard
+          key={opt.value}
+          data-testid={`experience-${opt.value}`}
+          selected={experience === opt.value}
+          onSelect={() => setExperience(opt.value)}
+          icon={opt.icon}
+          title={opt.title}
+          description={opt.description}
+        />
+      ))}
     </div>
   );
 }

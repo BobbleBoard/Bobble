@@ -16,20 +16,24 @@ import { SegmentedControl } from '@pi-desktop/ui';
 import { AppGrid } from '../../computer-use/AppGrid';
 import { useOnboardingStore } from '../useOnboarding';
 
-export function ComputerUseStep() {
+export function ComputerUseStep({
+  gridMaxHeight = 'min(46vh, 440px)',
+}: {
+  /** The app grid's own scroll height; the hands-on page shares its room. */
+  readonly gridMaxHeight?: string;
+}) {
   const computerUse = useOnboardingStore((s) => s.computerUse);
   const setComputerUse = useOnboardingStore((s) => s.setComputerUse);
 
   return (
     <div className="flex flex-col gap-4" data-testid="onboarding-computer-use">
-      <div className="flex items-center justify-between gap-4 rounded-lg border border-border-default bg-bg-raised p-4">
+      <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
           <span className="block text-body font-medium text-text-primary">
             Let Bobble use your Mac
           </span>
           <span className="mt-0.5 block text-footnote text-text-muted">
-            Bobble can click and type in apps for you, in the background, while you keep working.
-            You can watch it and stop it at any time.
+            It clicks and types in apps for you, in the background. Watch or stop it anytime.
           </span>
         </div>
         <SegmentedControl
@@ -44,21 +48,15 @@ export function ComputerUseStep() {
         />
       </div>
       <div className="flex flex-col gap-2">
-        <div className="flex items-baseline justify-between gap-3">
-          <span className="text-body font-medium text-text-primary">
-            Apps Bobble may use without asking
-          </span>
-        </div>
         <p className="text-footnote text-text-muted">
-          Tick the apps you are happy for Bobble to drive. Any other app asks you first, each time.
-          Change this later in Settings → Computer use.
+          Tick the apps it may use without asking. Any other app asks you first, each time.
         </p>
         <AppGrid
           selected={computerUse.apps}
           onChange={(apps) => setComputerUse({ ...computerUse, apps })}
           disabled={!computerUse.enabled}
           size="lg"
-          maxHeight="min(46vh, 440px)"
+          maxHeight={gridMaxHeight}
           testid="onboarding-app-grid"
         />
       </div>

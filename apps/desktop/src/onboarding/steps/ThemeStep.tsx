@@ -43,19 +43,9 @@ export function ThemeStep() {
         />
       </div>
 
-      <div
-        className="rounded-lg border border-border-default bg-bg-raised p-4"
-        data-testid="theme-preview"
-      >
-        <div className="flex items-center gap-2">
-          <span className="h-3 w-3 rounded-full bg-accent-primary" />
-          <span className="text-body text-text-primary">Live preview</span>
-        </div>
-        <p className="mt-1 text-footnote text-text-muted">
-          The whole app is already using the {flavor} · {mode} theme. You can change it anytime from
-          the top bar or Settings.
-        </p>
-      </div>
+      <p className="text-footnote text-text-muted" data-testid="theme-preview">
+        The whole app is already wearing it. Change it anytime from Settings → Appearance.
+      </p>
     </div>
   );
 }

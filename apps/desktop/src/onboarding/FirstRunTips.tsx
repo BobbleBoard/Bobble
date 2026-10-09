@@ -11,6 +11,7 @@
  */
 import { Button, IconChevronRight, IconClose, IconInfo } from '@pi-desktop/ui';
 import { useEffect, useState } from 'react';
+import { useNoModelYet } from './first-run-setup';
 
 const DISMISS_KEY = 'pi.desktop.tips.dismissed';
 
@@ -33,16 +34,16 @@ function isDismissed(): boolean {
 
 const TIPS: Array<{ title: string; body: string }> = [
   {
-    title: 'Pick a local model',
-    body: 'Open the model chip in the composer to download and run an on-device model.',
+    title: 'Switch models',
+    body: 'The model chip in the composer lists the models on this Mac and finds more.',
   },
   {
     title: 'Add context with @',
     body: 'Type @ in the composer to attach files, or drop them onto the window.',
   },
   {
-    title: 'Give Pi tools & skills',
-    body: 'Open Extensions to enable MCP tools and saved skill playbooks.',
+    title: 'Give Bobble tools and skills',
+    body: 'Extensions adds tools (MCP servers) and saved skills.',
   },
 ];
 
@@ -66,7 +67,10 @@ export function FirstRunTips() {
     };
   }, []);
 
-  if (!visible) return null;
+  // With no model on the Mac the empty chat's download card is the first
+  // thing to do; the tips wait until there is something to answer with.
+  const noModel = useNoModelYet();
+  if (!visible || noModel) return null;
 
   const dismiss = () => {
     try {

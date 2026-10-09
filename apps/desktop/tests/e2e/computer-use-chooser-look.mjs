@@ -24,20 +24,14 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const next = () => page.click('[data-testid="onboarding-next"]');
 
 try {
-  // Walk to the computer-use step: neither app → theme → experience → capabilities.
+  // Walk to the hands-on page: neither app (no import page) → the look → hands-on.
   await page.waitForSelector('[data-testid="source-neither"]', { timeout: 8000 });
   await page.click('[data-testid="source-neither"]');
-  await next();
-  // The import step still shows for "neither" (it says there is nothing to bring).
-  await sleep(300);
   await next();
   await page.waitForSelector('[data-testid="theme-preview"]', { timeout: 8000 });
   await next();
   await page.waitForSelector('[data-testid="experience-no-tutorial"]', { timeout: 8000 });
   await page.click('[data-testid="experience-no-tutorial"]');
-  await next();
-  await page.waitForSelector('[data-testid="capability-image"]', { timeout: 8000 });
-  await next();
 
   await page.waitForSelector('[data-testid="onboarding-computer-use"]', { timeout: 8000 });
   await page.waitForSelector('[data-testid^="app-tile-"]', { timeout: 30_000 });
