@@ -8,12 +8,17 @@
  * function, so the words the model reads are testable and cannot drift between
  * the places that send.
  *
- * Three things come out:
+ * What comes out:
  *
  *   display       the bubble — what the person typed, or the action they
  *                 pressed ("Explain the selection"). Never the folded context.
- *   agentMessage  what pi receives: a line per picture saying what it is, the
- *                 text context in fences, then the request.
+ *   attachments   the context as the chat composer's own attachments — a saved
+ *                 picture by its path, text folded in, Finder's files by path —
+ *                 so the renderer folds them with the composer's own
+ *                 `buildAgentMessage`, and the thread opened in the main window
+ *                 shows the same cards a chat's attachments do.
+ *   tail          the rest of what pi reads: the app to act in, anything with
+ *                 no file behind it, then the request.
  *   images        the pictures as data URIs, in chip order.
  *
  * Pure: no electron, no DOM. The renderer imports it.
@@ -154,43 +159,47 @@ export function contextLabel(c: QuickContext): string {
   }
 }
 
-function pictureLine(c: QuickContext): string | null {
+/** A picture's few words for its attachment line — no brackets or line breaks. */
+function lineSafeDetail(s: string): string {
+  return s
+    .replace(/[()\r\n]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** What a picture is, in words. */
+function pictureWords(c: QuickContext): string | null {
   switch (c.kind) {
     case 'window':
-      return `Attached: a screenshot of the ${c.app} window${c.title !== '' ? ` “${c.title}”` : ''} (${c.width}×${c.height}).`;
+      return `a screenshot of the ${c.app} window${c.title !== '' ? ` “${c.title}”` : ''}, ${c.width}×${c.height}`;
     case 'region':
-      return `Attached: a screenshot of an area of the screen the user selected (${c.width}×${c.height}).`;
+      return `a screenshot of an area of the screen the user selected, ${c.width}×${c.height}`;
     case 'screen':
-      return `Attached: a screenshot of the whole screen (${c.display}, ${c.width}×${c.height}).`;
+      return `a screenshot of the whole screen, ${c.display}, ${c.width}×${c.height}`;
     case 'clipboard':
-      return c.image !== undefined ? 'Attached: the picture on the clipboard.' : null;
+      return c.image !== undefined ? 'the picture on the clipboard' : null;
     default:
       return null;
   }
 }
 
-function textBlock(c: QuickContext): string | null {
-  switch (c.kind) {
-    case 'selection':
-      return `Selected text in ${c.app}:\n${fenced(capText(c.text, MAX_SELECTION_CHARS))}`;
-    case 'clipboard':
-      return c.text !== undefined && c.text !== ''
-        ? `Clipboard text:\n${fenced(capText(c.text, MAX_CLIPBOARD_CHARS))}`
-        : null;
-    case 'files': {
-      const shown = c.paths.slice(0, MAX_LISTED_FILES);
-      const more = c.paths.length - shown.length;
-      return `Selected in Finder:\n${shown.map((p) => `- ${p}`).join('\n')}${more > 0 ? `\n- … and ${more} more` : ''}`;
-    }
-    case 'browser': {
-      const head = `Open in ${c.app}: “${c.title}” ${c.url}`;
-      return c.text !== undefined && c.text !== ''
-        ? `${head}\nPage text:\n${fenced(capText(c.text, MAX_PAGE_CHARS))}`
-        : head;
-    }
-    default:
-      return null;
-  }
+/** One attachment, in the shape the chat composer folds (src/chat/composer/agent-message.ts). */
+export interface QuickAttachmentEntry {
+  readonly kind: 'image' | 'text' | 'file' | 'folder';
+  readonly name: string;
+  readonly text?: string;
+  readonly path?: string;
+  readonly detail?: string;
+}
+
+function baseName(p: string): string {
+  const trimmed = p.replace(/\/+$/, '');
+  return trimmed.split('/').pop() || trimmed;
+}
+
+/** A name that can sit inside the fold's backticks. */
+function foldName(s: string): string {
+  return s.replace(/[`\r\n]+/g, ' ').trim();
 }
 
 function appPreamble(c: Extract<QuickContext, { kind: 'app' }>): string {
@@ -250,7 +259,14 @@ function defaultQuestion(contexts: readonly QuickContext[]): string | null {
 
 export interface AssembledMessage {
   readonly display: string;
-  readonly agentMessage: string;
+  /**
+   * The attachments, in the chat composer's own shape: the renderer folds them
+   * with `buildAgentMessage`, so the thread reopened in the main window shows
+   * them as the same cards a chat's own attachments are.
+   */
+  readonly attachments: readonly QuickAttachmentEntry[];
+  /** What follows them: the app to act in, anything with no file behind it, the request. */
+  readonly tail: string;
   readonly images: readonly string[];
   /** The answer is meant to replace the selection it was asked about. */
   readonly replacesSelection: boolean;
@@ -260,6 +276,13 @@ export interface AssembledMessage {
  * The message for a send, or null when there is nothing to send (no words, no
  * action, and nothing attached that a question could be asked of — an app to
  * act in needs to be told what to do).
+ *
+ * A picture with a saved file (`imagePaths`, keyed by context id) goes as an
+ * attachment line naming the file, so the model can hand it to a tool and the
+ * main window draws it as the chat would; one without stays a sentence in the
+ * tail. Text goes as a folded attachment, unless it carries a code fence of its
+ * own, which would end the fold early — then it goes in the tail behind a
+ * longer fence.
  */
 export function assembleQuickMessage(input: {
   readonly text: string;
@@ -267,11 +290,13 @@ export function assembleQuickMessage(input: {
   readonly action?: QuickTextAction;
   /** For `translate`: the language to translate into, as a person names it. */
   readonly language?: string;
+  readonly imagePaths?: Readonly<Record<string, string>>;
 }): AssembledMessage | null {
   const typed = input.text.trim();
   const language = input.language?.trim() || 'English';
   const contexts = input.contexts;
   const action = input.action;
+  const paths = input.imagePaths ?? {};
   const app = contexts.find((c): c is Extract<QuickContext, { kind: 'app' }> => c.kind === 'app');
 
   let request: string;
@@ -291,14 +316,70 @@ export function assembleQuickMessage(input: {
     display = fallback;
   }
 
-  const pictures = contexts.map(pictureLine).filter((l): l is string => l !== null);
-  const blocks = contexts.map(textBlock).filter((b): b is string => b !== null);
-  const parts = [
+  const attachments: QuickAttachmentEntry[] = [];
+  const looseLines: string[] = [];
+  const looseBlocks: string[] = [];
+  const addText = (name: string, text: string, max: number): void => {
+    const capped = capText(text, max);
+    if (capped.includes('```')) looseBlocks.push(`${name}:\n${fenced(capped)}`);
+    else attachments.push({ kind: 'text', name: foldName(name), text: capped });
+  };
+
+  for (const c of contexts) {
+    const words = pictureWords(c);
+    if (words !== null) {
+      const path = paths[c.id];
+      if (path !== undefined && path !== '') {
+        attachments.push({
+          kind: 'image',
+          name: baseName(path),
+          path,
+          detail: lineSafeDetail(words),
+        });
+      } else {
+        looseLines.push(`Attached: ${words}.`);
+      }
+    }
+    switch (c.kind) {
+      case 'selection':
+        addText(`Selected text in ${c.app}`, c.text, MAX_SELECTION_CHARS);
+        break;
+      case 'clipboard':
+        if (c.text !== undefined && c.text !== '')
+          addText('Clipboard text', c.text, MAX_CLIPBOARD_CHARS);
+        break;
+      case 'files': {
+        for (const p of c.paths.slice(0, MAX_LISTED_FILES)) {
+          const folder = p.endsWith('/');
+          const clean = folder ? p.replace(/\/+$/, '') : p;
+          attachments.push(
+            folder
+              ? { kind: 'folder', name: baseName(clean), path: clean }
+              : { kind: 'file', name: baseName(clean), path: clean, detail: 'selected in Finder' },
+          );
+        }
+        const more = c.paths.length - MAX_LISTED_FILES;
+        if (more > 0) looseLines.push(`… and ${more} more selected in Finder.`);
+        break;
+      }
+      case 'browser':
+        looseLines.push(`Open in ${c.app}: “${c.title}” ${c.url}`);
+        if (c.text !== undefined && c.text !== '')
+          addText(`Page text from ${c.app}`, c.text, MAX_PAGE_CHARS);
+        break;
+      default:
+        break;
+    }
+  }
+
+  const tail = [
     app !== undefined ? appPreamble(app) : '',
-    pictures.join('\n'),
-    blocks.join('\n\n'),
+    looseLines.join('\n'),
+    looseBlocks.join('\n\n'),
     request,
-  ].filter((p) => p !== '');
+  ]
+    .filter((p) => p !== '')
+    .join('\n\n');
 
   const images: string[] = [];
   for (const c of contexts) {
@@ -309,7 +390,8 @@ export function assembleQuickMessage(input: {
   const selection = contexts.find((c) => c.kind === 'selection');
   return {
     display,
-    agentMessage: parts.join('\n\n'),
+    attachments,
+    tail,
     images,
     replacesSelection:
       action !== undefined &&

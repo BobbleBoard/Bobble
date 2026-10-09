@@ -98,7 +98,13 @@ import {
   imageDataUrl,
   type QuickMac,
 } from './quick-mac';
-import { cropInImage, type DisplayGeometry, displayForPoint, localToGlobal } from './region-math';
+import {
+  cropInImage,
+  type DisplayGeometry,
+  displayForPoint,
+  isClickNotDrag,
+  localToGlobal,
+} from './region-math';
 import { type OverlayMode, type OverlayRun, openRegionOverlays } from './region-overlay';
 
 const log = createLogger('desktop:quick');
@@ -142,6 +148,19 @@ let previous: QuickFrontApp | null = null;
 let hotkeyStatus: QuickHotkeyStatus[] = [];
 const registered = new Set<string>();
 let overlay: OverlayRun | null = null;
+/**
+ * An area or window pick is under way — set the moment it starts, before its
+ * overlays have even loaded, so a key pressed in that gap still counts.
+ */
+let picking = false;
+/** "Never mind", said before the overlays were up: they close as they arrive. */
+let pickCancelled = false;
+
+/** Cancel the pick under way (a quick key pressed over it, or a probe). */
+function cancelPick(): void {
+  pickCancelled = true;
+  overlay?.close();
+}
 /** Test runs: the last hand-off to the main window, for a probe to read. */
 let lastMainAction: QuickMainAction | null = null;
 
@@ -324,6 +343,11 @@ async function dismiss(reason: DismissReason): Promise<void> {
 async function summon(action: QuickAction): Promise<void> {
   const settings = readSettings().quickPanel;
   if (!settings.enabled) return;
+  // A key pressed while an overlay is up means "never mind": the overlay goes.
+  if (picking) {
+    cancelPick();
+    return;
+  }
   if (action === 'summon' && visible) {
     await dismiss('escape');
     return;
@@ -484,7 +508,9 @@ async function captureScreen(): Promise<QuickResult> {
 
 async function captureWithOverlay(mode: OverlayMode): Promise<QuickResult> {
   if (capture.grant() !== 'granted') return noScreenRecording();
-  if (overlay !== null) return { ok: false, cancelled: true };
+  if (picking) return { ok: false, cancelled: true };
+  picking = true;
+  pickCancelled = false;
   const wasVisible = visible;
   busy += 1;
   send('quick:capturing', { kind: mode, active: true });
@@ -507,6 +533,7 @@ async function captureWithOverlay(mode: OverlayMode): Promise<QuickResult> {
           }
         : {}),
     });
+    if (pickCancelled) overlay.close();
     const answer = await overlay.answer;
     overlay = null;
     if (answer.kind === 'cancel') return { ok: false, cancelled: true };
@@ -515,7 +542,7 @@ async function captureWithOverlay(mode: OverlayMode): Promise<QuickResult> {
       return captureWindowById(answer.windowId, w?.app ?? 'the window');
     }
     const display = displays.find((d) => d.id === answer.displayId);
-    if (display === undefined) return { ok: false, cancelled: true };
+    if (display === undefined || isClickNotDrag(answer.rect)) return { ok: false, cancelled: true };
     if (!background()) await sleep(SETTLE_MS);
     protectOwnWindows(true);
     const img = await capture.displayImage(display);
@@ -532,6 +559,7 @@ async function captureWithOverlay(mode: OverlayMode): Promise<QuickResult> {
   } finally {
     overlay?.close();
     overlay = null;
+    picking = false;
     protectOwnWindows(false);
     send('quick:capturing', { kind: mode, active: false });
     if (wasVisible) present();
@@ -752,6 +780,12 @@ const handlers: IpcHandlers<QuickInvokeMap> = {
     await dismiss(req.reason);
     return { ok: true };
   },
+  'quick:reveal': () => {
+    if (visible || !readSettings().quickPanel.enabled) return { ok: true };
+    send('quick:revealed', { at: Date.now() });
+    present();
+    return { ok: true };
+  },
   'quick:resize': (req) => {
     size = req.size;
     if (req.height !== undefined) fitHeight = req.height;
@@ -879,7 +913,7 @@ const handlers: IpcHandlers<QuickInvokeMap> = {
             pinned,
             size,
             busy,
-            overlay: overlay !== null,
+            overlay: picking,
             overlayShownOnScreen:
               overlay?.windows.some((w) => !w.isDestroyed() && w.isVisible()) ?? false,
             lastMainAction,
@@ -908,7 +942,7 @@ const handlers: IpcHandlers<QuickInvokeMap> = {
         onBlur();
         return { ok: true };
       case 'cancel-overlay':
-        overlay?.close();
+        cancelPick();
         return { ok: true };
       default:
         return { ok: false, error: `unknown op ${req.op}` };

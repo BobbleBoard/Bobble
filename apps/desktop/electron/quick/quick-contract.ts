@@ -103,6 +103,12 @@ export type QuickSystemPane = 'screen-recording' | 'accessibility' | 'automation
 export type QuickInvokeMap = {
   /** Put the panel away. Main decides whether the keyboard needs handing back. */
   'quick:dismiss': { request: { reason: DismissReason }; response: { ok: boolean } };
+  /**
+   * Bring the panel back, as it was, because its thread needs the person — a
+   * computer-use run asking whether it may use an app, after Esc put the panel
+   * away mid-run. Nothing is read from the Mac for it.
+   */
+  'quick:reveal': { request: undefined; response: { ok: boolean } };
   /** `height` (compact only): what the content measures, so the panel hugs it. */
   'quick:resize': {
     request: { size: PanelSize; height?: number };
@@ -189,6 +195,8 @@ export type QuickEventMap = {
     capture?: QuickResult;
     at: number;
   };
+  /** The panel came back by itself because its thread needs the person (quick:reveal). */
+  'quick:revealed': { at: number };
   /** The panel was put away (by Esc, a click outside, or the hotkey again). */
   'quick:hidden': { reason: DismissReason };
   /** The main window's half: do this (open a chat, go to a studio…). */
@@ -199,6 +207,7 @@ export type QuickEventMap = {
 
 export const QUICK_INVOKE_CHANNELS = [
   'quick:dismiss',
+  'quick:reveal',
   'quick:resize',
   'quick:set-pinned',
   'quick:capture',

@@ -4,14 +4,11 @@
  */
 import {
   Glyph,
-  IconAppWindow,
-  IconAreaSelect,
   IconClipboard,
   IconClose,
   IconFile,
   IconFolderOpen,
   IconGlobe,
-  IconMonitor,
   IconQuill,
 } from '@pi-desktop/ui';
 import type { JSX, ReactNode } from 'react';
@@ -157,10 +154,3 @@ export function ContextChips(): JSX.Element | null {
     </div>
   );
 }
-
-/** Icons for the things the panel can attach, shared by the rows and the palette. */
-export const CONTEXT_ICONS = {
-  window: IconAppWindow,
-  region: IconAreaSelect,
-  screen: IconMonitor,
-} as const;

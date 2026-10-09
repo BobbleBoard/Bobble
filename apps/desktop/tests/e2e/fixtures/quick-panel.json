@@ -2744,7 +2744,7 @@
       }
     },
     {
-      "match": "Selected in Finder",
+      "match": "selected in Finder",
       "steps": [
         {
           "emit": {

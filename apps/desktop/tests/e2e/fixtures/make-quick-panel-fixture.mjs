@@ -253,7 +253,7 @@ const prompts = [
     ),
   },
   {
-    match: 'Selected in Finder',
+    match: 'selected in Finder',
     steps: textTurn(
       'You selected two files: **budget-2026.numbers**, a spreadsheet, and **offsite-plan.pdf**, a document. Ask me to open either and I can go through it.',
     ),

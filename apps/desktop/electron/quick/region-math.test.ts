@@ -5,13 +5,10 @@ import {
   cropInImage,
   type DisplayGeometry,
   displayForPoint,
-  displayForRect,
   isClickNotDrag,
   localToGlobal,
-  normalizeDrag,
+  pickableWindowsOn,
   type ScreenWindow,
-  selectionLabel,
-  windowAtPoint,
 } from './region-math';
 
 /*
@@ -37,21 +34,6 @@ const above: DisplayGeometry = {
 const desk = [laptop, left, above];
 
 describe('drag rects', () => {
-  it('normalises a drag in any direction', () => {
-    expect(normalizeDrag({ x: 300, y: 200 }, { x: 100, y: 50 })).toEqual({
-      x: 100,
-      y: 50,
-      width: 200,
-      height: 150,
-    });
-    expect(normalizeDrag({ x: 10, y: 90 }, { x: 40, y: 20 })).toEqual({
-      x: 10,
-      y: 20,
-      width: 30,
-      height: 70,
-    });
-  });
-
   it('a tiny drag is a click', () => {
     expect(isClickNotDrag({ x: 0, y: 0, width: 3, height: 200 })).toBe(true);
     expect(isClickNotDrag({ x: 0, y: 0, width: 40, height: 40 })).toBe(false);
@@ -92,11 +74,6 @@ describe('which display', () => {
     expect(displayForPoint({ x: 1000, y: -1 }, desk)?.id).toBe(3);
     // Off every display, below the laptop: the laptop is nearest.
     expect(displayForPoint({ x: 700, y: 2000 }, desk)?.id).toBe(1);
-  });
-
-  it('a window straddling two displays belongs to the bigger share', () => {
-    expect(displayForRect({ x: -300, y: 100, width: 1000, height: 600 }, desk)?.id).toBe(1);
-    expect(displayForRect({ x: -900, y: 100, width: 1000, height: 600 }, desk)?.id).toBe(2);
   });
 });
 
@@ -179,15 +156,23 @@ describe('picking a window', () => {
     },
   ];
 
-  it('skips Bobble and non-document layers, taking the frontmost under the point', () => {
-    expect(windowAtPoint({ x: 100, y: 60 }, windows, [100])?.app).toBe('TextEdit');
-    // Above TextEdit's top edge the point is on Safari.
-    expect(windowAtPoint({ x: 100, y: 20 }, windows, [100])?.app).toBe('Safari');
-    expect(windowAtPoint({ x: 1000, y: 800 }, windows, [100])?.app).toBe('Safari');
-    expect(windowAtPoint({ x: 3000, y: 3000 }, windows, [100])).toBeNull();
-  });
-
-  it('labels a selection in points', () => {
-    expect(selectionLabel({ x: 0, y: 0, width: 640.4, height: 479.6 })).toBe('640 × 480');
+  it("offers ordinary windows, never Bobble's or a menu, in the overlay's own points", () => {
+    expect(pickableWindowsOn(laptop, windows, [100]).map((w) => w.app)).toEqual([
+      'TextEdit',
+      'Safari',
+    ]);
+    // A window on the display to the left, seen by that display's overlay.
+    const onLeft: ScreenWindow = {
+      windowId: 2,
+      pid: 500,
+      app: 'Notes',
+      bounds: { x: -1800, y: 0, width: 400, height: 300 },
+      layer: 0,
+    };
+    expect(pickableWindowsOn(left, [onLeft], [100])).toEqual([
+      { windowId: 2, app: 'Notes', rect: { x: 120, y: 120, width: 400, height: 300 } },
+    ]);
+    // …and not by the laptop's.
+    expect(pickableWindowsOn(laptop, [onLeft], [100])).toEqual([]);
   });
 });

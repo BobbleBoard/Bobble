@@ -21,10 +21,10 @@ import {
 } from '../../electron/quick/context';
 import type { PanelSize } from '../../electron/quick/placement';
 import type { QuickMainAction, QuickResult } from '../../electron/quick/quick-contract';
-import { buildAgentMessage } from '../chat/composer/agent-message';
 import { newSession, sendPrompt, startPi, switchSession } from '../state/pi-connect';
 import { usePiStore } from '../state/pi-slice';
 import { useSettingsStore } from '../state/settings-store';
+import { composeAgentMessage } from './compose';
 import { computerUseGate } from './computer-use-gate';
 import { markInputActivity } from './input-activity';
 import type { ProblemFix } from './quick-problem';
@@ -168,21 +168,37 @@ function gateFor(contexts: readonly QuickContext[]): boolean {
  */
 export async function sendFromPanel(text: string, action?: QuickTextAction): Promise<boolean> {
   const q = useQuickStore.getState();
-  const assembled = assembleQuickMessage({
+  const dropped = q.attachments;
+  const probe = assembleQuickMessage({
     text,
     contexts: q.contexts,
     ...(action !== undefined ? { action } : {}),
     language: q.language,
   });
-  const attachments = q.attachments;
-  if (assembled === null && attachments.length === 0) return false;
+  if (probe === null && dropped.length === 0) return false;
   if (!gateFor(q.contexts)) return false;
+  /*
+   * Pictures get a file of their own first (~/Bobble/attachments, by content
+   * hash, as a pasted picture does): the model can then hand one to a tool by
+   * its path, and the thread opened in the main window draws it like a chat's.
+   */
+  const imagePaths = await savePictures(q.contexts);
+  const assembled =
+    assembleQuickMessage({
+      text,
+      contexts: q.contexts,
+      ...(action !== undefined ? { action } : {}),
+      language: q.language,
+      imagePaths,
+    }) ?? probe;
   const display = assembled?.display ?? (text.trim() !== '' ? text.trim() : 'Have a look at this');
-  const base = assembled?.agentMessage ?? display;
-  const agentMessage = attachments.length > 0 ? buildAgentMessage(base, attachments) : base;
+  const agentMessage = composeAgentMessage(
+    assembled ?? { attachments: [], tail: display },
+    dropped,
+  );
   const images = [
     ...(assembled?.images ?? []),
-    ...attachments.flatMap((a) => (a.image !== undefined ? [a.image] : [])),
+    ...dropped.flatMap((a) => (a.image !== undefined ? [a.image] : [])),
   ];
   const selection = q.contexts.find((c) => c.kind === 'selection');
   // The app chip stays: a follow-up is still "in that app".
@@ -218,6 +234,23 @@ export async function sendFromPanel(text: string, action?: QuickTextAction): Pro
   }
   void rememberThread();
   return true;
+}
+
+/** Each picture in the chips saved once, by context id; a picture that will not save is left out. */
+async function savePictures(contexts: readonly QuickContext[]): Promise<Record<string, string>> {
+  const out: Record<string, string> = {};
+  for (const c of contexts) {
+    const dataUrl =
+      c.kind === 'window' || c.kind === 'region' || c.kind === 'screen'
+        ? c.image
+        : c.kind === 'clipboard'
+          ? c.image
+          : undefined;
+    if (dataUrl === undefined) continue;
+    const res = await invoke('attachments:save-image', { dataUrl }).catch(() => null);
+    if (res?.ok === true && res.path !== undefined) out[c.id] = res.path;
+  }
+  return out;
 }
 
 /** Put the panel's thread in its history, once pi has named the file. */
@@ -343,6 +376,27 @@ export function connectQuickPanel(): () => void {
         useQuickStore.getState().set({ talkRequests: useQuickStore.getState().talkRequests + 1 });
       }
       void ensurePi();
+    }),
+  );
+  offs.push(
+    window.piDesktop.onEvent('quick:revealed', () => {
+      const q = useQuickStore.getState();
+      q.set({ shown: true, summons: q.summons + 1, view: 'home' });
+    }),
+  );
+  /*
+   * A question from the thread while the panel is away — computer use asking
+   * whether it may use an app, after Esc put the panel away mid-run — brings
+   * the panel back, or the run would wait on a card nobody can see.
+   */
+  let asked = usePiStore.getState().uiRequests.length;
+  offs.push(
+    usePiStore.subscribe((s) => {
+      const now = s.uiRequests.length;
+      if (now > asked && !useQuickStore.getState().shown) {
+        void invoke('quick:reveal', undefined).catch(() => undefined);
+      }
+      asked = now;
     }),
   );
   offs.push(

@@ -48,13 +48,6 @@ export interface Size {
   readonly height: number;
 }
 
-/** A drag from `a` to `b`, in whichever direction it went, as a rect. */
-export function normalizeDrag(a: Point, b: Point): Rect {
-  const x = Math.min(a.x, b.x);
-  const y = Math.min(a.y, b.y);
-  return { x, y, width: Math.abs(b.x - a.x), height: Math.abs(b.y - a.y) };
-}
-
 /** Smaller than this in either direction is a click, not a selection. */
 export const MIN_SELECTION_POINTS = 6;
 
@@ -74,14 +67,6 @@ export function clampRect(r: Rect, within: Rect): Rect {
 /** An overlay-local rect (points from the display's corner) in global points. */
 export function localToGlobal(r: Rect, display: DisplayGeometry): Rect {
   return { x: r.x + display.bounds.x, y: r.y + display.bounds.y, width: r.width, height: r.height };
-}
-
-export function rectArea(r: Rect): number {
-  return Math.max(0, r.width) * Math.max(0, r.height);
-}
-
-function overlap(a: Rect, b: Rect): number {
-  return rectArea(clampRect(a, b));
 }
 
 export function containsPoint(r: Rect, p: Point): boolean {
@@ -107,23 +92,6 @@ export function displayForPoint<D extends DisplayGeometry>(
     }
   }
   return best;
-}
-
-/** The display a rect is mostly on (a window straddling two belongs to the bigger share). */
-export function displayForRect<D extends DisplayGeometry>(
-  r: Rect,
-  displays: readonly D[],
-): D | null {
-  let best: D | null = null;
-  let bestArea = 0;
-  for (const d of displays) {
-    const a = overlap(r, d.bounds);
-    if (a > bestArea) {
-      bestArea = a;
-      best = d;
-    }
-  }
-  return best ?? displayForPoint({ x: r.x + r.width / 2, y: r.y + r.height / 2 }, displays);
 }
 
 /**
@@ -179,24 +147,32 @@ export interface ScreenWindow {
 }
 
 /**
- * The window a click lands on in "pick a window" mode: the frontmost ordinary
- * window under the point that is not Bobble's own. Null on the desktop.
+ * The windows an overlay offers in "pick a window" mode, in ITS points: the
+ * ordinary windows (layer 0 — not menus, the Dock or overlays), never Bobble's
+ * own, that reach onto this display — front to back, as listed.
  */
-export function windowAtPoint<W extends ScreenWindow>(
-  p: Point,
-  windows: readonly W[],
+export function pickableWindowsOn(
+  display: DisplayGeometry,
+  windows: readonly ScreenWindow[],
   ownPids: readonly number[],
-): W | null {
-  for (const w of windows) {
-    if (w.layer !== 0) continue;
-    if (ownPids.includes(w.pid)) continue;
-    if (w.bounds.width < 40 || w.bounds.height < 40) continue;
-    if (containsPoint(w.bounds, p)) return w;
-  }
-  return null;
-}
-
-/** "640 × 480" — the size label beside a selection, in points. */
-export function selectionLabel(r: Rect): string {
-  return `${Math.round(r.width)} × ${Math.round(r.height)}`;
+): Array<{ windowId: number; app: string; rect: Rect }> {
+  return windows
+    .filter((w) => w.layer === 0 && !ownPids.includes(w.pid))
+    .map((w) => ({
+      windowId: w.windowId,
+      app: w.app,
+      rect: {
+        x: w.bounds.x - display.bounds.x,
+        y: w.bounds.y - display.bounds.y,
+        width: w.bounds.width,
+        height: w.bounds.height,
+      },
+    }))
+    .filter(
+      (w) =>
+        w.rect.x < display.bounds.width &&
+        w.rect.y < display.bounds.height &&
+        w.rect.x + w.rect.width > 0 &&
+        w.rect.y + w.rect.height > 0,
+    );
 }

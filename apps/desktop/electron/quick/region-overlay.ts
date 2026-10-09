@@ -20,7 +20,13 @@
  * change through its title, which main relays to the other displays.
  */
 import { BrowserWindow } from 'electron';
-import type { DisplayGeometry, Rect, ScreenWindow } from './region-math';
+import {
+  type DisplayGeometry,
+  MIN_SELECTION_POINTS,
+  pickableWindowsOn,
+  type Rect,
+  type ScreenWindow,
+} from './region-math';
 
 export type OverlayMode = 'region' | 'pick';
 
@@ -159,7 +165,7 @@ const OVERLAY_HTML = `<!doctype html>
     const r = norm(start, { x: e.clientX, y: e.clientY });
     start = null;
     document.body.classList.remove('dragging');
-    if (r.width < 6 || r.height < 6) { $('sel').style.display = 'none'; $('size').style.display = 'none'; return; }
+    if (r.width < ${MIN_SELECTION_POINTS} || r.height < ${MIN_SELECTION_POINTS}) { $('sel').style.display = 'none'; $('size').style.display = 'none'; return; }
     finish({ kind: 'region', displayId: cfg.displayId, rect: r });
   });
   addEventListener('keydown', (e) => {
@@ -215,9 +221,19 @@ export async function openRegionOverlays(input: {
 }): Promise<OverlayRun> {
   const overlays: Overlay[] = [];
   let closed = false;
+  /*
+   * Closing IS an answer — "cancel". A page torn down mid-`executeJavaScript`
+   * leaves that promise pending for good, so the race below would never settle
+   * on its own and the pick would stay "under way" forever.
+   */
+  let closedAnswer: (a: OverlayAnswer) => void = () => undefined;
+  const whenClosed = new Promise<OverlayAnswer>((resolve) => {
+    closedAnswer = resolve;
+  });
   const close = (): void => {
     if (closed) return;
     closed = true;
+    closedAnswer({ kind: 'cancel' });
     for (const o of overlays) if (!o.win.isDestroyed()) o.win.destroy();
   };
 
@@ -256,25 +272,7 @@ export async function openRegionOverlays(input: {
 
   const pageReady = overlays.map(async ({ display, win }) => {
     await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(OVERLAY_HTML)}`);
-    const local = input.windows
-      .filter((w) => w.layer === 0 && !input.ownPids.includes(w.pid))
-      .map((w) => ({
-        windowId: w.windowId,
-        app: w.app,
-        rect: {
-          x: w.bounds.x - display.bounds.x,
-          y: w.bounds.y - display.bounds.y,
-          width: w.bounds.width,
-          height: w.bounds.height,
-        },
-      }))
-      .filter(
-        (w) =>
-          w.rect.x < display.bounds.width &&
-          w.rect.y < display.bounds.height &&
-          w.rect.x + w.rect.width > 0 &&
-          w.rect.y + w.rect.height > 0,
-      );
+    const local = pickableWindowsOn(display, input.windows, input.ownPids);
     const backdrop = input.backdropFor === undefined ? undefined : await input.backdropFor(display);
     const setup: OverlaySetup = {
       displayId: display.id,
@@ -317,7 +315,7 @@ export async function openRegionOverlays(input: {
       .then((a) => a as OverlayAnswer)
       .catch((): OverlayAnswer => ({ kind: 'cancel' })),
   );
-  const answer = Promise.race(answers).then((a) => {
+  const answer = Promise.race([...answers, whenClosed]).then((a) => {
     close();
     return a;
   });

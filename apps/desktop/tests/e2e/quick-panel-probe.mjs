@@ -301,6 +301,27 @@ try {
   await idle();
   await shoot(panel, '09-region-answer');
 
+  // Any quick key while an overlay is up means "never mind".
+  await panel.keyboard.press('Escape');
+  await waitShown(false);
+  await press('region');
+  await overlayPage('region');
+  await press('summon');
+  {
+    let s = await state();
+    for (let i = 0; i < 40 && s.overlay; i++) {
+      await sleep(100);
+      s = await state();
+    }
+    record(
+      'a quick key pressed over the overlay cancels it, opening nothing',
+      !s.overlay && !s.visible,
+      `overlay=${s.overlay} visible=${s.visible}`,
+    );
+  }
+  await press('summon');
+  await waitShown(true);
+
   // ── 4. the whole screen ───────────────────────────────────────────────────
   await fresh();
   await panel.click('[data-testid="quick-act-screen"]');
@@ -451,6 +472,9 @@ try {
     record('…and its button turns it on', s.computerUse.enabled === true);
   }
   await panel.press('[data-testid="quick-input"]', 'Enter');
+  // Put the panel away mid-run: the consent question must bring it back.
+  await panel.keyboard.press('Escape');
+  const putAway = await waitShown(false, 3000);
   const confirm = await panel
     .waitForSelector('[data-testid="confirm-card"]', { timeout: 12_000 })
     .then(
@@ -458,6 +482,10 @@ try {
       () => false,
     );
   record('an app not on the allowed list is asked about, in the panel', confirm);
+  record(
+    'the question brings back a panel that Esc put away mid-run',
+    putAway && (await waitShown(true, 5000)),
+  );
   await sleep(200);
   await shoot(panel, '18-computer-use-ask');
   if (confirm) await panel.click('[data-testid="confirm-card"] button:has-text("Confirm")');
