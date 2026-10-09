@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assembleEngineLaunch } from './engine-launch.js';
+import { assembleEngineLaunch, enginePatchEnv } from './engine-launch.js';
 
 const base = {
   command: '/venv/bin/tool',
@@ -138,5 +138,19 @@ describe('rapid-mlx vision lane (the user 2026-09-23: vision on by default)', ()
     expect(l.args).toContain('--mllm');
     expect(l.args).not.toContain('--speculative-config');
     expect(l.args).not.toContain('--no-spec-decode');
+  });
+});
+
+describe('enginePatchEnv — the thinking-end patch rides in on PYTHONPATH for rapid-mlx only', () => {
+  it('puts the rapid-mlx patch first on PYTHONPATH, with the message', () => {
+    expect(enginePatchEnv('rapid-mlx', '/res/engine-patches/', 'msg', '/x')).toEqual({
+      PYTHONPATH: '/res/engine-patches/rapid-mlx:/x',
+      BOBBLE_THINK_END_MESSAGE: 'msg',
+    });
+  });
+
+  it('adds nothing for other engines or without the folder', () => {
+    expect(enginePatchEnv('mlx-lm', '/res/engine-patches', 'msg')).toEqual({});
+    expect(enginePatchEnv('rapid-mlx', undefined, 'msg')).toEqual({});
   });
 });

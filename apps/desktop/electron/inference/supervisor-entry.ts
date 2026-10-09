@@ -58,6 +58,7 @@ import {
   detectHardware,
   downloadModel,
   effectiveLaunchConfig,
+  enginePatchEnv,
   ensureChatTemplate,
   ensureEngineFor,
   ensureGgufChatTemplate,
@@ -92,6 +93,7 @@ import {
   powerBudgetGB,
   probeServerFeatures,
   profileOf,
+  REASONING_BUDGET_MESSAGE,
   recommend,
   resolveTierModels,
   type SpecMethod,
@@ -1862,6 +1864,16 @@ async function startExternalEngine(
            a fresh HOME — so give every engine one that does, under the app's
            root rather than the user's. */
         HF_HOME: engineHfHome(),
+        /* THE THINKING-END MESSAGE (rapid-mlx). Its own cap closes the thought
+           with no words and skips tool turns; Bobble's start-up patch makes it
+           end in the same message llama.cpp's --reasoning-budget-message does.
+           The app sends the per-request budget (`reasoning_max_tokens`). */
+        ...enginePatchEnv(
+          engine,
+          process.env.PI_ENGINE_PATCHES_DIR,
+          REASONING_BUDGET_MESSAGE,
+          process.env.PYTHONPATH,
+        ),
       },
     });
     supervisor.on((event) => {

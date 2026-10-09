@@ -334,7 +334,11 @@ function clampAdvanced(value: unknown): AdvancedSettings {
     reasoning: {
       preserve: bool(r.preserve, dr.preserve),
       budget: Math.round(num(r.budget, dr.budget, -1, 1_000_000)),
-      budgetMessage: str(r.budgetMessage, dr.budgetMessage),
+      // The old default line is a saved copy of a default, not a choice.
+      budgetMessage:
+        str(r.budgetMessage, dr.budgetMessage) === LEGACY_REASONING_BUDGET_MESSAGE
+          ? dr.budgetMessage
+          : str(r.budgetMessage, dr.budgetMessage),
     },
   };
 }
@@ -350,6 +354,11 @@ function effortMap(value: unknown): Record<string, EffortLevel> {
   }
   return out;
 }
+
+/** The end message's wording before 2026-10-09; settings files saved with it
+ * carry it as a copy of the default. */
+export const LEGACY_REASONING_BUDGET_MESSAGE =
+  "I've been thinking too long, let me try to act on something now, before I decide if I should keep thinking.";
 
 /** Normalize an untrusted parsed object into a fully-valid DesktopSettings. */
 export function clampSettings(raw: unknown): DesktopSettings {
@@ -593,4 +602,39 @@ export function seedFromOnboarding(
     ...(choices.computerUse === undefined ? {} : { computerUse: choices.computerUse }),
     ...(mcpMode === null ? {} : { mcpMode }),
   });
+}
+
+/**
+ * What the pi child's per-request sidecar carries: the sampling overrides, plus
+ * the user's OWN thinking cap and end message when they set one.
+ *
+ * The chat sends an automatic cap on every reasoning request (sized to what is
+ * left of the window — see @pi-desktop/inference/reasoning-budget). A cap the
+ * user typed wins over it: `--reasoning-budget` in the llama.cpp engine flags,
+ * or the advanced setting when it is 0 or more. `-1` typed as a flag means "no
+ * cap" and is carried as such; the advanced setting's -1 is its default and
+ * means "automatic", so it is left out. The message is carried only when it is
+ * not Bobble's own.
+ */
+export function samplingSidecar(settings: DesktopSettings): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...settings.advanced.sampling };
+  const flags = settings.engineLaunch.llamacpp?.flags ?? {};
+  const flagBudget = Number(flags['--reasoning-budget']);
+  if (flags['--reasoning-budget'] !== undefined && Number.isFinite(flagBudget)) {
+    out.reasoningBudget = Math.trunc(flagBudget);
+  } else if (settings.advanced.reasoning.budget >= 0) {
+    out.reasoningBudget = Math.trunc(settings.advanced.reasoning.budget);
+  }
+  const flagMessage = flags['--reasoning-budget-message'];
+  const message =
+    typeof flagMessage === 'string' && flagMessage.trim().length > 0
+      ? flagMessage
+      : settings.advanced.reasoning.budgetMessage;
+  if (
+    message.trim().length > 0 &&
+    message.trim() !== DEFAULT_ADVANCED.reasoning.budgetMessage.trim()
+  ) {
+    out.reasoningBudgetMessage = message;
+  }
+  return out;
 }

@@ -191,3 +191,27 @@ export function assembleEngineLaunch(
       throw new Error(`no launcher for engine ${String(profile.engine)}`);
   }
 }
+
+/**
+ * Environment for an engine's Python start-up patch, when Bobble has one.
+ *
+ * rapid-mlx: its thinking cap force-closes the thought with no words, and skips
+ * tool turns while its tool grammar is off (as Bobble runs it). The patch at
+ * `<patchesDir>/rapid-mlx/sitecustomize.py` makes the cap end with the message
+ * and apply to tool turns; Python imports it at start-up from PYTHONPATH.
+ * Every other engine: nothing.
+ */
+export function enginePatchEnv(
+  engine: LaunchProfile['engine'],
+  patchesDir: string | undefined,
+  message: string,
+  existingPythonPath?: string,
+): Record<string, string> {
+  if (engine !== 'rapid-mlx' || patchesDir === undefined || patchesDir.length === 0) return {};
+  const dir = `${patchesDir.replace(/\/$/, '')}/rapid-mlx`;
+  const rest =
+    existingPythonPath !== undefined && existingPythonPath.length > 0
+      ? `:${existingPythonPath}`
+      : '';
+  return { PYTHONPATH: `${dir}${rest}`, BOBBLE_THINK_END_MESSAGE: message };
+}

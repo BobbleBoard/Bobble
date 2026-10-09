@@ -577,3 +577,35 @@ describe('rapid-mlx: a picture in a conversation too long for its vision lane', 
     expect(String(calls[0]?.body)).toContain('image_url');
   });
 });
+
+describe('the thinking cap on the MLX engines', () => {
+  const capped = {
+    messages: [],
+    thinking_budget_tokens: 4000,
+    reasoning_budget_message: '\n\nok\n',
+  };
+
+  it('hands rapid-mlx the budget as reasoning_max_tokens, and no llama.cpp fields', async () => {
+    const { shapeForOpenAiServer } = await import('./stream.js');
+    const out = shapeForOpenAiServer(capped, { engine: 'rapid-mlx' });
+    expect(out.reasoning_max_tokens).toBe(4000);
+    expect(out.thinking_budget_tokens).toBeUndefined();
+    expect(out.reasoning_budget_message).toBeUndefined();
+  });
+
+  it('gives an engine without a cap nothing it would not understand', async () => {
+    const { shapeForOpenAiServer } = await import('./stream.js');
+    const out = shapeForOpenAiServer(capped, { engine: 'mlx-lm' });
+    expect(out.reasoning_max_tokens).toBeUndefined();
+    expect(out.thinking_budget_tokens).toBeUndefined();
+  });
+
+  it('leaves the cap off rapid-mlx when the user lifted it', async () => {
+    const { shapeForOpenAiServer } = await import('./stream.js');
+    const out = shapeForOpenAiServer(
+      { messages: [], reasoning_budget_message: 'x' },
+      { engine: 'rapid-mlx' },
+    );
+    expect(out.reasoning_max_tokens).toBeUndefined();
+  });
+});

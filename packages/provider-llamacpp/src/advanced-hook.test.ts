@@ -106,3 +106,34 @@ describe('createSamplingReader', () => {
     expect(read()).toBeNull();
   });
 });
+
+describe('the user’s own thinking cap', () => {
+  const thinkingBody = () => ({
+    messages: [],
+    thinking_budget_tokens: 9000,
+    reasoning_budget_message: 'ours',
+  });
+
+  it('replaces the automatic cap when the user set one', () => {
+    const body = applySamplingOverride(thinkingBody(), { reasoningBudget: 2048 });
+    expect(body.thinking_budget_tokens).toBe(2048);
+  });
+
+  it('lifts the cap for an explicit -1', () => {
+    const body = applySamplingOverride(thinkingBody(), { reasoningBudget: -1 });
+    expect(body.thinking_budget_tokens).toBeUndefined();
+    expect(body.reasoning_budget_message).toBe('ours');
+  });
+
+  it('puts the user’s own end message on its own paragraph', () => {
+    const body = applySamplingOverride(thinkingBody(), {
+      reasoningBudgetMessage: 'Enough, acting now.',
+    });
+    expect(body.reasoning_budget_message).toBe('\n\nEnough, acting now.\n');
+  });
+
+  it('never adds a cap to a request that does not think', () => {
+    const body = applySamplingOverride({ messages: [] }, { reasoningBudget: 2048 });
+    expect(body.thinking_budget_tokens).toBeUndefined();
+  });
+});

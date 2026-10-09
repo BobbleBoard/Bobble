@@ -3,7 +3,9 @@ import type { OnboardingChoices } from '../import/import-contract';
 import {
   clampSettings,
   DEFAULT_SETTINGS,
+  LEGACY_REASONING_BUDGET_MESSAGE,
   mergeSettingsPatch,
+  samplingSidecar,
   seedFromOnboarding,
 } from './settings-logic';
 import { effectiveMcpMode } from './settings-main';
@@ -399,5 +401,39 @@ describe('code appearance', () => {
     expect(clampSettings({ codeFont: 'x'.repeat(200) }).codeFont).toHaveLength(80);
     const withFont = clampSettings({ codeFont: 'Menlo' });
     expect(mergeSettingsPatch(withFont, { codeFont: '' }).codeFont).toBe('');
+  });
+});
+
+describe('samplingSidecar — the thinking cap the user set, and only that', () => {
+  const base = clampSettings({});
+
+  it('carries no cap or message by default (the chat sends its automatic one)', () => {
+    const out = samplingSidecar(base);
+    expect(out.reasoningBudget).toBeUndefined();
+    expect(out.reasoningBudgetMessage).toBeUndefined();
+  });
+
+  it('carries a --reasoning-budget typed into the engine flags, -1 included', () => {
+    const withFlag = (v: number | string) =>
+      samplingSidecar(
+        clampSettings({
+          engineLaunch: { llamacpp: { flags: { '--reasoning-budget': v }, rawArgs: [] } },
+        }),
+      );
+    expect(withFlag(2048).reasoningBudget).toBe(2048);
+    expect(withFlag('-1').reasoningBudget).toBe(-1);
+  });
+
+  it('carries a custom end message, never Bobble’s own', () => {
+    const custom = clampSettings({ advanced: { reasoning: { budgetMessage: 'Acting now.' } } });
+    expect(samplingSidecar(custom).reasoningBudgetMessage).toBe('Acting now.');
+  });
+
+  it('reads the old default line saved in a settings file as the default', () => {
+    const old = clampSettings({
+      advanced: { reasoning: { budgetMessage: LEGACY_REASONING_BUDGET_MESSAGE } },
+    });
+    expect(old.advanced.reasoning.budgetMessage).not.toBe(LEGACY_REASONING_BUDGET_MESSAGE);
+    expect(samplingSidecar(old).reasoningBudgetMessage).toBeUndefined();
   });
 });

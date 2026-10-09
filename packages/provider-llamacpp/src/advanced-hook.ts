@@ -22,6 +22,7 @@
  */
 import { appendFileSync, readFileSync, statSync } from 'node:fs';
 import type { ExtensionAPI } from '@mariozechner/pi-coding-agent';
+import { thinkingEndMessage } from '@pi-desktop/inference/reasoning-budget';
 
 /**
  * setStatus key the panel reads (via pi-slice `extensionStatus`). Kept in sync
@@ -39,6 +40,14 @@ export interface SamplingOverride {
   presencePenalty?: number;
   /** 0 / absent = leave `max_tokens` unset (use the model/server default). */
   maxTokens?: number;
+  /**
+   * The user's own thinking cap, present only when they set one: N >= 0 caps
+   * thinking at N tokens, -1 lifts the cap. Absent = the automatic cap the
+   * request already carries (buildChatCompletionsRequest).
+   */
+  reasoningBudget?: number;
+  /** The user's own thinking-end message, present only when it is not Bobble's. */
+  reasoningBudgetMessage?: string;
 }
 
 /** The captured ground-truth shape pushed to the renderer (JSON-stringified). */
@@ -66,6 +75,17 @@ export function applySamplingOverride(
   if (o.repetitionPenalty !== undefined) body.repeat_penalty = o.repetitionPenalty;
   if (o.presencePenalty !== undefined) body.presence_penalty = o.presencePenalty;
   if (o.maxTokens !== undefined && o.maxTokens > 0) body.max_tokens = o.maxTokens;
+  // Only on a request that thinks (it already carries the end message).
+  if ('reasoning_budget_message' in body) {
+    if (o.reasoningBudget !== undefined && o.reasoningBudget >= 0) {
+      body.thinking_budget_tokens = Math.trunc(o.reasoningBudget);
+    } else if (o.reasoningBudget !== undefined && o.reasoningBudget < 0) {
+      delete body.thinking_budget_tokens;
+    }
+    if (o.reasoningBudgetMessage !== undefined) {
+      body.reasoning_budget_message = thinkingEndMessage(o.reasoningBudgetMessage);
+    }
+  }
   return body;
 }
 

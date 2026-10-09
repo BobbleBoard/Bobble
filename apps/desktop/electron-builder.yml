@@ -60,6 +60,12 @@ extraResources:
   - from: resources/mermaid
     to: mermaid
     filter: ['mermaid.min.js', 'LICENSE', 'README.md']
+  # Python start-up patches for the engines Bobble launches, put on PYTHONPATH by
+  # supervisor-entry.ts (llm-main hands the worker this folder). rapid-mlx's
+  # sitecustomize.py makes its thinking cap end in words, as llama.cpp's does.
+  - from: resources/engine-patches
+    to: engine-patches
+    filter: ['**/*.py']
   # The vendored GenOffice EDITORS — the live docx/xlsx/pptx/pdf tabs in the
   # canvas. office-manager.ts resolves <Resources>/genoffice when packaged
   # (vendorRoot), and until this entry existed nothing put anything there: an

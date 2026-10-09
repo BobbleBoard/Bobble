@@ -8,6 +8,7 @@ import {
   type Model,
   Type,
 } from '@mariozechner/pi-ai';
+import { REASONING_BUDGET_MESSAGE } from '@pi-desktop/inference/reasoning-budget';
 import { describe, expect, it, vi } from 'vitest';
 import {
   buildChatCompletionsRequest,
@@ -1232,5 +1233,26 @@ describe('vision state is read live', () => {
 
   it('tolerates a trailing newline', () => {
     expect(serverCanSeeImages({ [VISION_STATE_FILE_ENV]: '/tmp/v' }, () => '1\n')).toBe(true);
+  });
+});
+
+describe('the thinking cap on every reasoning request', () => {
+  const thinking = (): Model<'openai-completions'> => ({ ...makeModel(), reasoning: true });
+  const ctx = {
+    systemPrompt: 'sys',
+    messages: [{ role: 'user' as const, content: 'hi', timestamp: 0 }],
+  };
+
+  it('sends a budget that leaves the reply room, and the end message, for a thinking model', () => {
+    const body = buildChatCompletionsRequest(thinking(), ctx) as Record<string, unknown>;
+    expect(typeof body.thinking_budget_tokens).toBe('number');
+    expect(body.thinking_budget_tokens as number).toBeLessThan(4096);
+    expect(body.reasoning_budget_message).toBe(REASONING_BUDGET_MESSAGE);
+  });
+
+  it('leaves a model that does not think alone', () => {
+    const body = buildChatCompletionsRequest(makeModel(), ctx) as Record<string, unknown>;
+    expect(body.thinking_budget_tokens).toBeUndefined();
+    expect(body.reasoning_budget_message).toBeUndefined();
   });
 });

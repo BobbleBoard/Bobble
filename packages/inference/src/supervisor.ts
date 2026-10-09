@@ -21,7 +21,7 @@ import { spawn as spawnCb } from 'node:child_process';
 import { createServer } from 'node:net';
 import { basename } from 'node:path';
 import type { LaunchMode } from './catalog.js';
-import { REASONING_BUDGET_MESSAGE } from './reasoning-budget.js';
+import { THINKING_BUDGET_CEILING, thinkingEndMessage } from './reasoning-budget.js';
 import type { WatchdogHandle } from './watchdog.js';
 
 /** llama.cpp per-request `timings` block (subset we read). */
@@ -108,16 +108,16 @@ export interface LaunchConfig {
    */
   readonly reasoningPreserve?: boolean;
   /**
-   * Thinking-token budget (`--reasoning-budget`). -1 = unrestricted (default),
-   * 0 = end thinking immediately, N>0 = cap reasoning at N tokens. Power-user
-   * knob; a launch arg, so changing it needs a server relaunch.
+   * Thinking-token budget (`--reasoning-budget`). Default
+   * THINKING_BUDGET_CEILING; -1 = no cap, 0 = end thinking immediately, N>0 =
+   * cap reasoning at N tokens. The chat sends a tighter per-request budget on
+   * top. A launch arg, so changing it needs a server relaunch.
    */
   readonly reasoningBudget?: number;
   /**
    * Message injected before the end-of-thinking tag when the reasoning budget is
-   * exhausted (`--reasoning-budget-message`). Default
-   * {@link REASONING_BUDGET_MESSAGE} so the model acts rather than being cut
-   * mid-token.
+   * exhausted (`--reasoning-budget-message`). Always set: blank falls back to
+   * REASONING_BUDGET_MESSAGE, so the model acts rather than being cut mid-token.
    */
   readonly reasoningBudgetMessage?: string;
   /**
@@ -289,15 +289,17 @@ export function assembleServerArgs(cfg: LaunchConfig): string[] {
   }
 
   // Thinking-budget guardrail (llama.cpp `--reasoning-budget`, env
-  // LLAMA_ARG_THINK_BUDGET): -1 = unrestricted (default, current behaviour),
-  // 0 = end thinking immediately, N>0 = cap the reasoning at N tokens. Exposed
-  // so a power user can bound runaway chain-of-thought. When the budget is
-  // exhausted the server injects `--reasoning-budget-message` just before the
-  // end-of-thinking tag so the model wraps up cleanly instead of being cut mid
-  // word. These are LAUNCH args (a change needs a server relaunch), unlike the
-  // per-request sampling params.
-  args.push('--reasoning-budget', String(cfg.reasoningBudget ?? -1));
-  args.push('--reasoning-budget-message', cfg.reasoningBudgetMessage ?? REASONING_BUDGET_MESSAGE);
+  // LLAMA_ARG_THINK_BUDGET): 0 = end thinking immediately, N>0 = cap the
+  // reasoning at N tokens, -1 = no cap. The default is the ceiling
+  // (THINKING_BUDGET_CEILING), a safety net for every caller that does not send
+  // its own per-request `thinking_budget_tokens` (the chat provider does, sized
+  // to the window — see reasoning-budget.ts). When a budget runs out the server
+  // injects `--reasoning-budget-message` just before the end-of-thinking tag so
+  // the model acts instead of being cut mid-word; that message is always set.
+  // These are LAUNCH args (a change needs a server relaunch), unlike the
+  // per-request fields.
+  args.push('--reasoning-budget', String(cfg.reasoningBudget ?? THINKING_BUDGET_CEILING));
+  args.push('--reasoning-budget-message', thinkingEndMessage(cfg.reasoningBudgetMessage));
 
   if (cfg.launchMode === 'fast-text') {
     // Single slot by default; the OOM-aware corp launcher may request K slots

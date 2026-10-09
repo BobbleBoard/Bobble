@@ -298,9 +298,9 @@ describe('registerSandboxFileTools gating', () => {
  */
 describe('a dropped leading slash is not a relative path', () => {
   it('repairs the exact shape the user found', () => {
-    expect(
-      resolveWorkspacePath('Users/user/Desktop/platformer_game', '/Users/user/Desktop'),
-    ).toBe('/Users/user/Desktop/platformer_game');
+    expect(resolveWorkspacePath('Users/user/Desktop/platformer_game', '/Users/user/Desktop')).toBe(
+      '/Users/user/Desktop/platformer_game',
+    );
   });
 
   it('covers the other root-only directories', () => {

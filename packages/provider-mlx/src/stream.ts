@@ -231,6 +231,19 @@ export function shapeForOpenAiServer(
     else out.logit_bias = kept;
   }
   delete out.return_progress;
+  /*
+   * THE THINKING CAP, in each engine's own words. The body arrives with
+   * llama.cpp's `thinking_budget_tokens` + `reasoning_budget_message`.
+   * rapid-mlx takes the number as `reasoning_max_tokens` (an int of 1 or
+   * more), and the message comes from its launch (BOBBLE_THINK_END_MESSAGE,
+   * resources/engine-patches). The other MLX engines have no cap to give it.
+   */
+  const budget = out.thinking_budget_tokens;
+  if (target.engine === 'rapid-mlx' && typeof budget === 'number' && budget >= 1) {
+    out.reasoning_max_tokens = Math.floor(budget);
+  }
+  delete out.thinking_budget_tokens;
+  delete out.reasoning_budget_message;
   return out;
 }
 

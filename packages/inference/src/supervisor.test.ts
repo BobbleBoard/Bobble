@@ -1,5 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { describe, expect, it, vi } from 'vitest';
+import { REASONING_BUDGET_MESSAGE, THINKING_BUDGET_CEILING } from './reasoning-budget.js';
 import {
   assembleServerArgs,
   findFreePort,
@@ -191,12 +192,19 @@ describe('assembleServerArgs', () => {
     );
   });
 
-  it('defaults reasoning budget to unrestricted (-1) with the wrap-up message', () => {
+  it('defaults the reasoning budget to the ceiling, always with the end message', () => {
     const args = assembleServerArgs({ ...base, launchMode: 'fast-text' });
-    expect(args[args.indexOf('--reasoning-budget') + 1]).toBe('-1');
-    expect(args[args.indexOf('--reasoning-budget-message') + 1]).toBe(
-      "I've been thinking too long, let me try to act on something now, before I decide if I should keep thinking.",
-    );
+    expect(args[args.indexOf('--reasoning-budget') + 1]).toBe(String(THINKING_BUDGET_CEILING));
+    expect(args[args.indexOf('--reasoning-budget-message') + 1]).toBe(REASONING_BUDGET_MESSAGE);
+  });
+
+  it('never launches with an empty end message', () => {
+    const args = assembleServerArgs({
+      ...base,
+      launchMode: 'fast-text',
+      reasoningBudgetMessage: ' ',
+    });
+    expect(args[args.indexOf('--reasoning-budget-message') + 1]).toBe(REASONING_BUDGET_MESSAGE);
   });
 
   it('honours an explicit reasoning budget + custom budget message', () => {
@@ -207,7 +215,8 @@ describe('assembleServerArgs', () => {
       reasoningBudgetMessage: 'wrap it up',
     });
     expect(args[args.indexOf('--reasoning-budget') + 1]).toBe('2048');
-    expect(args[args.indexOf('--reasoning-budget-message') + 1]).toBe('wrap it up');
+    // on its own paragraph: the server splices it in wherever the budget runs out
+    expect(args[args.indexOf('--reasoning-budget-message') + 1]).toBe('\n\nwrap it up\n');
   });
 
   it('carries the projector on a fast-text launch (vision is always on)', () => {

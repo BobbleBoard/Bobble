@@ -27,6 +27,7 @@ import type { DesktopSettings, McpMode, SettingsInvokeMap } from './settings-con
 import {
   clampSettings,
   mergeSettingsPatch,
+  samplingSidecar,
   seedFromOnboarding,
   settingsChangedAt,
 } from './settings-logic';
@@ -155,14 +156,14 @@ function applyMcpMode(mode: McpMode): void {
 /**
  * Mirror the per-request sampling overrides into the sidecar the pi child reads
  * (camelCase mirror of {@link AdvancedSamplingSettings} == the provider's
- * SamplingOverride shape). Rewritten on every change so a slider takes effect on
+ * SamplingOverride shape, plus the user's own thinking cap — samplingSidecar). Rewritten on every change so a slider takes effect on
  * the child's NEXT request (it mtime-caches the file), no relaunch. Best-effort:
  * a write failure just leaves the server CLI defaults in force.
  */
 function writeSamplingSidecar(settings: DesktopSettings): void {
   try {
     fs.mkdirSync(path.dirname(SAMPLING_PATH), { recursive: true });
-    fs.writeFileSync(SAMPLING_PATH, `${JSON.stringify(settings.advanced.sampling)}\n`, 'utf8');
+    fs.writeFileSync(SAMPLING_PATH, `${JSON.stringify(samplingSidecar(settings))}\n`, 'utf8');
   } catch (error) {
     log.warn('sampling sidecar write failed', { error: String(error) });
   }

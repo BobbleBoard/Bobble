@@ -333,10 +333,22 @@ function broadcast<K extends keyof AppEventMap & string>(
   }
 }
 
+/** Beside the asar when packaged, in the repo in dev (like the bundled Mermaid). */
+function enginePatchesDir(): string {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, 'engine-patches')
+    : path.join(app.getAppPath(), 'resources', 'engine-patches');
+}
+
 function ensureChild(): UtilityProcess {
   if (child !== null) return child;
   const entry = path.join(__dirname, 'inference-supervisor.js');
-  const proc = utilityProcess.fork(entry, [], { serviceName: 'inference-supervisor' });
+  const proc = utilityProcess.fork(entry, [], {
+    serviceName: 'inference-supervisor',
+    // The worker has no `app`: tell it where the engine patches are (the
+    // rapid-mlx thinking-end message, resources/engine-patches).
+    env: { ...process.env, PI_ENGINE_PATCHES_DIR: enginePatchesDir() },
+  });
   // A fresh worker starts on its own default; tell it what the user chose. Done
   // on the next tick so `child` is set before the request goes out.
   setTimeout(() => {
