@@ -1,6 +1,6 @@
 # Bobble — status
 
-Updated: 2026-10-09 02:20 · the user: approvals and decisions on the "waiting on you" list; the repo without personal details; a universal hotkey UI; keep it modular; review onboarding
+Updated: 2026-10-09 10:20 · real app icons in the chat (shipped app); earlier today: approvals and decisions on the "waiting on you" list; the repo without personal details; a universal hotkey UI; keep it modular; review onboarding
 
 ## Where we are (refreshed at the end of every task)
 
@@ -63,9 +63,9 @@ The living page has this in full (source `deliverables/status/where-we-are.html`
 
 **Waiting on the user (§2).** Whether to rewrite git history (the name is still in old commits, some already pushed), CI, and a try of the quick panel on screen.
 
-**Open (§7, §8, §9).** 8 reliability gaps, 9 smaller bugs, the onboarding list.
+**Open (§7, §8, §9).** 8 reliability gaps, 8 smaller bugs, the onboarding list.
 
-**Changed this update.** The repo carries no personal details; thinking capped with a mandatory end message (llama.cpp and rapid-mlx); idle unload with load + prefill on the first keystroke (and the MLX prime that never worked); the guard keeps a model in use; the quick panel; Blender scene building verified; onboarding reviewed. Installed.
+**Changed this update.** The chat's computer-use rows show each app's real icon in the shipped app: they asked the test-only `mac:debug` channel, so only test runs ever had icons; a real `mac:app-icon` channel answers now, also for apps that are not running and the model's shorthand (`279732eb` on `fix/chat-area-polish`, not merged or installed yet). Separately, `git filter-repo` rewrote this checkout's history at 10:08 (not part of that task): every commit sha changed (main is now `fdc31157`) and the `origin` remote is gone, so shas quoted here from before then are the old ones. Earlier today: The repo carries no personal details; thinking capped with a mandatory end message (llama.cpp and rapid-mlx); idle unload with load + prefill on the first keystroke (and the MLX prime that never worked); the guard keeps a model in use; the quick panel; Blender scene building verified; onboarding reviewed. Installed.
 
 ## Backlog — everything discussed and not yet done (consolidated 2026-10-08)
 
@@ -150,7 +150,7 @@ Decided 2026-10-09 (the user): the 27B is no longer parked between turns — eve
 - "What time is it" sometimes runs `date` instead of the connector.
 
 ### 8. Smaller known bugs
-The office chip flicker (1 of 15 probe runs) · the composer prime on rapid-mlx works now (a chat-endpoint prime, `0b4c361c`); an attachment prefix on it is unmeasured · the chat's app icons are fetched through `mac:debug`, which exists only in test runs, so the shipped chat never shows real app icons (found by the quick-panel agent) · a short answer in the quick panel sits in a mostly empty panel · img2img edits are subtle (the instruction editor needs the 3D engine) · a finished card remounts into the chain when the next tool call starts · a picture embedded in the reply shows twice · ⌘Z into a turn already answering keeps the partial reply · an image-only message can't be rewound · the Ladle build in the bundle (excluded `68cf0219`, unconfirmed) · ~60 unused old icon files in the design artifact's storage.
+The office chip flicker (1 of 15 probe runs) · the composer prime on rapid-mlx works now (a chat-endpoint prime, `0b4c361c`); an attachment prefix on it is unmeasured · a short answer in the quick panel sits in a mostly empty panel · img2img edits are subtle (the instruction editor needs the 3D engine) · a finished card remounts into the chain when the next tool call starts · a picture embedded in the reply shows twice · ⌘Z into a turn already answering keeps the partial reply · an image-only message can't be rewound · the Ladle build in the bundle (excluded `68cf0219`, unconfirmed) · ~60 unused old icon files in the design artifact's storage.
 
 
 ### 9. Onboarding — specifics to work on (walked headless 2026-10-09, light and dark: `tests/e2e/onboarding-look.mjs`)
@@ -166,6 +166,14 @@ The office chip flicker (1 of 15 probe runs) · the composer prime on rapid-mlx 
 10. **"Installs happen later" never says when.** Say "when you first use it" and queue nothing silently.
 11. **Seven steps.** Proposed four: Welcome (+ import when there is something) → Look → How hands-on (guidance + computer use) → Get running (model + engine, with the capabilities as switches).
 12. **Landing.** A fresh Mac with the download skipped lands on an empty chat with a "Getting started" popover over the sidebar; the first message is then held ("There is no model on this Mac"). A one-click "Download Qwen3.5 4B (5 GB)" in the empty chat would replace both.
+
+## Report — 2026-10-09: real app icons in the chat's computer-use rows
+
+| Asked | Done | Checked |
+|---|---|---|
+| The chat's app icons go through test-only `mac:debug`, so the shipped app shows none: add a real, sender-gated channel, keep the probe op, no permission prompt, no `app.getFileIcon` | `mac:app-icon` in the contract, handled next to `mac:list-apps`: the long-lived helper's `appIcon` first, then the installed-apps list (an app not running yet, or "textedit"/"chrome"); a per-app cache in main (`electron/mac/app-icon-source.ts`); `src/chat/app-icons.ts` points at it; `mac:debug`'s `app-icon` op unchanged | Unit tests for the store (3 of 6 fail on the old code), the source and the matcher; `app-icon-probe.mjs` refuses `mac:debug` in main and sees all three rows draw real icons, no window shown, focus guard held; the TCC log over the run shows only preflight checks from the helper. Before/after shots in `deliverables/app-icons-2026-10-09/` |
+
+Checks: desktop unit tests 3,773/3,773, `biome check` clean, typecheck clean. Committed `279732eb` on `fix/chat-area-polish` (one ahead of main); not merged or installed.
 
 ## Report — 2026-10-09: decisions applied, the repo anonymised, thinking capped, idle unload, the quick panel, Blender building scenes
 

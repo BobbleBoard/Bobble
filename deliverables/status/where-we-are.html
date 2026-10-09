@@ -162,8 +162,8 @@
   <h1>Where we are</h1>
   <p class="lede">The whole project on one page: the ideas we build by, the limits we work inside, every goal with its state, what is waiting on you, and what changed. Refreshed at the end of every task.</p>
   <div class="meta">
-    <span class="chip">Updated <b>2026-10-09, 02:30</b></span>
-    <span class="chip">main <b>14e54bf9</b></span>
+    <span class="chip">Updated <b>2026-10-09, 10:20</b></span>
+    <span class="chip">main <b>fdc31157</b></span>
     <span class="chip">Installed in <b>/Applications/Bobble.app</b></span>
     <span class="chip">Detail: <b>STATUS.md</b> · <b>ROADMAP-LATEST.md</b></span>
   </div>
@@ -172,18 +172,16 @@
     <div class="stat"><div class="k">Roadmap</div><div class="v">Step 1 of 6</div><div class="n">The corp harness has never run the 3D-game prompt end to end</div></div>
     <div class="stat"><div class="k">Waiting on you</div><div class="v">3 items</div><div class="n">Rewrite git history?, CI, try the quick panel on screen</div></div>
     <div class="stat"><div class="k">Reliability gaps</div><div class="v">8 open</div><div class="n">Loops, the 27B's cold start, compaction, swap</div></div>
-    <div class="stat"><div class="k">Smaller bugs</div><div class="v">9 known</div><div class="n">None that blocks a task</div></div>
+    <div class="stat"><div class="k">Smaller bugs</div><div class="v">8 known</div><div class="n">None that blocks a task</div></div>
     <div class="stat"><div class="k">Roadmap step 4</div><div class="v">Built</div><div class="n">The quick panel, ⌥⇧Space, installed</div></div>
   </div>
 
   <div class="changed">
     <h3>What changed in this update</h3>
     <ul>
-      <li>The repo carries no personal details: the name is "the user" everywhere, home paths and machine names are generic, and 125 screenshots were painted over.</li>
-      <li>Thinking is capped on every step and always ends in words: "I've been thinking about this for a long while now … I'll stop here and act." Works on llama.cpp and, through a start-up patch, on rapid-mlx.</li>
-      <li>Models unload after five minutes without input and load back on the first keystroke. 27B: first token 0.6 s after Enter following an unload.</li>
-      <li>The guard no longer pauses or parks a model you are using. The 27B was paused mid-turn: 87 s to the first token.</li>
-      <li>The quick panel (roadmap step 4) is merged and installed. A model built a Blender scene through the command. Onboarding was reviewed: 12 specifics.</li>
+      <li>The chat's computer-use rows now show each app's real icon in the shipped app. They used to ask a channel that exists only in test runs, so only probes ever saw icons. A real <code>mac:app-icon</code> channel answers now, for running apps, apps not yet open, and the model's shorthand ("textedit"). Proven headless with the test channel refused. Committed <code>279732eb</code> on <code>fix/chat-area-polish</code>; not merged or installed yet.</li>
+      <li><code>git filter-repo</code> rewrote this checkout's history at 10:08, separately from that fix: every commit sha changed (main is now <code>fdc31157</code>) and the <code>origin</code> remote is gone. Older shas quoted on this page are the pre-rewrite ones.</li>
+      <li>Earlier today: no personal details in the repo; thinking capped and always ending in words; idle unload with the load on the first keystroke; the guard keeps a model in use; the quick panel merged and installed; a model built a Blender scene; onboarding reviewed (12 specifics).</li>
     </ul>
   </div>
 
@@ -313,10 +311,9 @@
         </ul>
       </div>
       <div class="list">
-        <h3>Smaller known bugs (9)</h3>
+        <h3>Smaller known bugs (8)</h3>
         <ul>
           <li><span class="x">The office chip flickers (1 of 15 probe runs).</span></li>
-          <li><span class="x">The chat never shows real app icons in the shipped app (fetched through a test-only channel).</span></li>
           <li><span class="x">Image-to-image edits come out too subtle.</span></li>
           <li><span class="x">A finished card remounts into the chain when the next tool starts.</span></li>
           <li><span class="x">A picture embedded in a reply shows twice.</span></li>
@@ -387,8 +384,8 @@
       <div class="list">
         <h3>State</h3>
         <ul>
-          <li><span class="x">main</span><span class="w"><code>14e54bf9</code></span></li>
-          <li><span class="x">Working branch <code>fix/chat-area-polish</code></span><span class="w">equals main</span></li>
+          <li><span class="x">main</span><span class="w"><code>fdc31157</code>, history rewritten 10:08</span></li>
+          <li><span class="x">Working branch <code>fix/chat-area-polish</code></span><span class="w">1 ahead of main (the app-icon fix)</span></li>
           <li><span class="x">Installed build</span><span class="w"><code>6ac999c5</code>, later commits are docs only</span></li>
           <li><span class="x">Lint, typecheck, unit suites</span><span class="w">clean</span></li>
         </ul>
