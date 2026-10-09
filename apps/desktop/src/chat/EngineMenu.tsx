@@ -149,7 +149,9 @@ function CandidateRow({
           {active && !chosen ? <span className="pd-engine-chip">running</span> : null}
         </span>
         {done !== null && !done.ok ? (
-          <span className="pd-engine-row-sub pd-engine-row-sub--error">{done.error}</span>
+          <span className="pd-engine-row-sub pd-engine-row-sub--error">
+            {sayIfRaw(done.error, 'engine')}
+          </span>
         ) : null}
       </span>
       <span className="pd-engine-row-side">
@@ -165,7 +167,7 @@ function CandidateRow({
             <span className="pd-engine-nums-dim"> · prefill {tps(done.prefillTps)}</span>
           </span>
         ) : (
-          <span className="pd-engine-row-sub pd-engine-row-sub--error">failed</span>
+          <span className="pd-engine-row-sub pd-engine-row-sub--error">did not run</span>
         )}
       </span>
     </button>
@@ -266,7 +268,7 @@ function CalibrationSection({
           className="pd-engine-row-sub pd-engine-row-sub--error"
           data-testid="engine-calibration-error"
         >
-          {rows.error}
+          {sayIfRaw(rows.error, 'engine')}
         </div>
       ) : null}
       {rows.list.map((r) => (

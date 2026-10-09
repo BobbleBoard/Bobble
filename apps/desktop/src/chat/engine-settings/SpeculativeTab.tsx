@@ -16,7 +16,9 @@
  * default". Every `--spec-*` / draft flag of the engine follows below, from
  * the engine's own help.
  */
+
 import { MANAGED_LLAMA_FLAGS } from '@pi-desktop/inference/engine-flags';
+import { sayIfRaw } from '@pi-desktop/shared';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@pi-desktop/ui';
 import { useEffect, useMemo, useState } from 'react';
 import type {
@@ -190,7 +192,9 @@ function CustomDraftPicker({
           </form>
           {hf.searchStatus === 'searching' ? <p className="pd-engine-row-sub">Searching…</p> : null}
           {hf.searchError !== null ? (
-            <p className="pd-engine-row-sub pd-engine-row-sub--error">{hf.searchError}</p>
+            <p className="pd-engine-row-sub pd-engine-row-sub--error">
+              {sayIfRaw(hf.searchError, 'search')}
+            </p>
           ) : null}
           <div className="pd-draft-rows">
             {hf.results.map((hit: HfModelHitDTO) => (

@@ -2866,7 +2866,9 @@ export function ModelsView() {
                             <Spinner size={12} /> Loading model card…
                           </p>
                         ) : card.error !== undefined ? (
-                          <p className="text-footnote text-text-muted">{card.error}</p>
+                          <p className="text-footnote text-text-muted">
+                            {sayIfRaw(card.error, 'search')}
+                          </p>
                         ) : (
                           // Markdown renders its own .pd-prose container; do not
                           // double-wrap it.

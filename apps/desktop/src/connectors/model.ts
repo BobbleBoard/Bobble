@@ -181,7 +181,9 @@ export function failureReason(f: Pick<ToolFailure, 'error' | 'stderr'>): string 
   if (timeout?.[1] !== undefined) {
     return `No answer within ${Math.round(Number(timeout[1]) / 1000)} seconds.`;
   }
-  return f.error;
+  // The server's own last line is kept above (it often names the missing key);
+  // anything else from the spawn is said in words.
+  return sayIfRaw(f.error, 'connect');
 }
 
 /** A failing server's ledger line: the failure, dated, in place of what it touches. */

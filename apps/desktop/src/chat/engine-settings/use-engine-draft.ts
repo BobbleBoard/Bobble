@@ -9,8 +9,10 @@
  * the panel fingerprints its draft the same way. Different → Apply lights up;
  * the same → it does not, whatever was clicked on the way.
  */
+
 import { configFingerprint } from '@pi-desktop/inference/engine-flags';
 import { effectiveLaunchConfig } from '@pi-desktop/inference/portable-knobs';
+import { sayIfRaw } from '@pi-desktop/shared';
 import { useEffect, useMemo, useState } from 'react';
 import type {
   EngineFlagValue,
@@ -119,7 +121,9 @@ export function useEngineDraft() {
       if (status.serverRunning) {
         const res = await relaunch();
         setNote(
-          res.success ? 'Restarted with the new settings.' : (res.error ?? 'the restart failed'),
+          res.success
+            ? 'Restarted with the new settings.'
+            : `The model did not restart with them. ${sayIfRaw(res.error, 'engine')}`,
         );
       } else {
         setNote('Saved — they apply when a model starts.');
@@ -161,7 +165,8 @@ export function useEngineDraft() {
     const imported = await window.piDesktop
       .invoke('llm:import-chat-template', { path: chosen })
       .catch((err: unknown) => ({ path: chosen as string, error: String(err) }));
-    if (imported.error !== undefined) setNote(`Could not copy the template: ${imported.error}`);
+    if (imported.error !== undefined)
+      setNote(`Could not copy the template. ${sayIfRaw(imported.error, 'read')}`);
     else setNote('Template copied into Bobble’s storage.');
     return imported.path;
   };
