@@ -430,6 +430,15 @@ export type DictationInvokeMap = {
     request: { readonly sessionId: string };
     response: { readonly ok: boolean };
   };
+  /**
+   * Open System Settings at Privacy › Microphone — the fix for a denied
+   * microphone. The grant itself is the person's; opening the pane is all an
+   * app can do.
+   */
+  'audio:open-mic-settings': {
+    request: Record<string, never>;
+    response: { readonly ok: boolean };
+  };
 };
 
 export const DICTATION_INVOKE_CHANNELS = [
@@ -438,6 +447,7 @@ export const DICTATION_INVOKE_CHANNELS = [
   'audio:dictation-chunk',
   'audio:dictation-stop',
   'audio:dictation-cancel',
+  'audio:open-mic-settings',
 ] as const satisfies readonly (keyof DictationInvokeMap)[];
 
 export const GEN3D_INVOKE_CHANNELS = [

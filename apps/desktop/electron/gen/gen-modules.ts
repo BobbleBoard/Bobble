@@ -44,10 +44,16 @@
  * release fetched and quantized here, once), known to the manager the first
  * time a job asks.
  */
-export type GenRuntimeModuleId = 'image' | 'audio' | 'comfy' | '3d';
+export type GenRuntimeModuleId = 'image' | 'audio' | 'comfy' | '3d' | 'dictation';
 export type GenModuleId = GenRuntimeModuleId | `weights:${string}`;
 
-export const GEN_MODULE_IDS: readonly GenRuntimeModuleId[] = ['image', 'audio', 'comfy', '3d'];
+export const GEN_MODULE_IDS: readonly GenRuntimeModuleId[] = [
+  'image',
+  'audio',
+  'comfy',
+  '3d',
+  'dictation',
+];
 
 /** The weights module of a catalog entry, or nothing when it neither lists
  * files nor prepares any. */
@@ -129,7 +135,51 @@ export const GEN_MODULE_META: Record<GenRuntimeModuleId, GenModuleMeta> = {
     approxGB: 3,
     noun: '3D generation',
   },
+  /*
+   * DICTATION HAD NO WAY IN. Its environment was only ever made as a side
+   * effect of the 3D sidecar provisioning the audio stack, and its speech
+   * model downloaded on the first dictation — so a fresh Mac answered the mic
+   * with "the dictation model is not installed yet" and no button anywhere put
+   * it there (the user, 2026-10-08). This is that button: the recogniser's
+   * environment and its model, 2.3 GB of it, once.
+   */
+  dictation: {
+    label: 'Dictation',
+    blurb: 'Speech to text by NVIDIA Parakeet on MLX, already punctuated.',
+    approxGB: 2.5,
+    noun: 'Dictation',
+  },
 };
+
+/**
+ * AN INSTALL THAT STOPPED, SAID SO THE PERSON CAN ACT ON IT. The card under a
+ * failed install used to print uv's or Python's last line ("error: Failed to
+ * fetch: https://…", a traceback's tail). What a person can do about a failed
+ * download is short: get back online, make room, or try again — so that is
+ * what this says; the raw line goes to the log (`onInstallError`). Pure.
+ */
+export function plainInstallError(raw: string): string {
+  if (/ENOSPC|no space left/i.test(raw)) {
+    return 'The disk is full. Free some space (Models › Storage), then Try again.';
+  }
+  if (
+    /ENOTFOUND|EAI_AGAIN|getaddrinfo|ECONNREFUSED|ECONNRESET|ETIMEDOUT|fetch failed|failed to fetch|connection (refused|reset|error|aborted)|timed? ?out|network|max retries|name ?resolution|connecterror|offline|dns/i.test(
+      raw,
+    )
+  ) {
+    return 'Could not reach the download server. Check the internet connection, then Try again.';
+  }
+  if (/\b(401|403)\b|unauthori[sz]ed|forbidden|gated|restricted/i.test(raw)) {
+    return 'The download server refused the files (they may need a sign-in). Try again later.';
+  }
+  if (/EACCES|EPERM|permission denied|read-only file system/i.test(raw)) {
+    return 'Bobble could not write its files. Restart Bobble, then Try again.';
+  }
+  if (/no solution found|could not resolve|resolution|incompatible|requires-python/i.test(raw)) {
+    return 'The packages it needs could not be put together for this Mac. Try again after updating Bobble.';
+  }
+  return 'The download stopped part-way. Try again — it carries on from where it got to.';
+}
 
 /** The side effects, injected. */
 export interface GenModulePorts {
@@ -145,6 +195,8 @@ export interface GenModulePorts {
   /** A job of this module succeeded: persist that (a marker), so the next
    * launch does not hold a job on a probe that cannot see a uv cache. */
   readonly remember?: (id: GenModuleId) => void;
+  /** An install failed: its raw words, for the log (the card shows plainInstallError). */
+  readonly onInstallError?: (id: GenModuleId, raw: string) => void;
   /** What a weights module is called and costs (from the catalog). A module
    * the ports cannot name is one the manager will not hold a job for. */
   readonly meta?: (id: GenModuleId) => GenModuleMeta | undefined;
@@ -332,7 +384,8 @@ export class GenModulesManager {
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        this.#error.set(id, message);
+        this.#ports.onInstallError?.(id, message);
+        this.#error.set(id, plainInstallError(message));
         this.#detail.delete(id);
         const arm = this.#ports.setTimeout ?? ((fn, ms) => setTimeout(fn, ms));
         for (const w of this.#waiters.get(id) ?? []) {

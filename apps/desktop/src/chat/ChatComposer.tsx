@@ -27,6 +27,7 @@ import type { SerializedEditorState } from 'lexical';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFeatureTipAt } from '../intro/FeatureTip';
 import { ExpandedScrim } from '../media/ExpandedScrim';
+import { ModuleCard } from '../media/ModuleCard';
 import { usePictureViewer } from '../media/picture-viewer';
 import { IconMic, IconPause, IconPlay, IconStop } from '../settings/icons';
 import { useConnectorsStore } from '../state/connectors-store';
@@ -483,7 +484,8 @@ export function ChatComposer({
     // and then reached for the mic means "and also this", not "throw that away".
     applyDictated(dictationBaseRef.current, spoken);
   });
-  const dictating = dictation.phase !== 'idle' && dictation.phase !== 'error';
+  const dictating =
+    dictation.phase !== 'idle' && dictation.phase !== 'error' && dictation.phase !== 'needs-module';
   // Words appear in the composer WHILE you speak. They are provisional — the
   // final full-context transcript replaces them wholesale when you confirm.
   //
@@ -1747,13 +1749,53 @@ export function ChatComposer({
             </div>
           ) : null}
 
-          {/* A refusal has to be VISIBLE. useDictation can fail before any
-              recording exists — a denied microphone, no device, a transcription
-              that came back empty — and with only the waveform rendered those
-              all looked like a button that does nothing. */}
-          {dictation.phase === 'error' && dictation.error !== null ? (
-            <div className="pd-dictation-error" role="alert" data-testid="dictation-error">
-              {dictation.error}
+          {/* Dictation that cannot run yet: the Dictation module's Download
+              card, in place of an error — and the dictation starts by itself
+              once it is in (useDictation). */}
+          {dictation.phase === 'needs-module' ? (
+            <div className="pd-dictation-module" data-testid="dictation-needs-module">
+              <ModuleCard
+                id="dictation"
+                place="chat"
+                why="Speak instead of typing; nothing leaves this Mac."
+              />
+            </div>
+          ) : null}
+          {/* A dictation that could not happen says why and carries its fix —
+              a denied microphone opens the switch in System Settings; anything
+              else is one press of Try again. Never red: nothing here is an
+              alarm, and the button is the way on. */}
+          {dictation.phase === 'error' && dictation.problem !== null ? (
+            <div className="pd-dictation-problem" role="status" data-testid="dictation-error">
+              <span className="pd-dictation-problem-text">{dictation.problem.text}</span>
+              <span className="pd-dictation-problem-actions">
+                {dictation.problem.fix === 'mic-settings' ? (
+                  <button
+                    type="button"
+                    className="pd-dictation-problem-fix pd-focusable"
+                    data-testid="dictation-fix-mic-settings"
+                    onClick={() => void window.piDesktop.invoke('audio:open-mic-settings', {})}
+                  >
+                    Open Microphone settings
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="pd-dictation-problem-fix pd-focusable"
+                  data-testid="dictation-fix-retry"
+                  onClick={startDictation}
+                >
+                  Try again
+                </button>
+                <IconButton
+                  aria-label="Dismiss"
+                  size="sm"
+                  onClick={dictation.cancel}
+                  data-testid="dictation-problem-dismiss"
+                >
+                  <IconClose size={12} />
+                </IconButton>
+              </span>
             </div>
           ) : null}
           {/* The editor STAYS VISIBLE while dictating — it is where the words

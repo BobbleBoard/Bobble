@@ -2857,12 +2857,42 @@ h2.text-heading {
     transition: none;
   }
 }
-/* A dictation refusal (denied mic, no device, empty transcript). Sits where the
- * waveform would be, so the answer appears where the user was looking. */
-.pd-dictation-error {
-  padding: 6px 10px;
+/* A dictation that could not happen (denied mic, no device, nothing heard):
+ * what happened and its fix, where the waveform would be, so the answer
+ * appears where the user was looking. Quiet text and plain buttons — never
+ * red (the user, 2026-10-08). */
+.pd-dictation-problem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px 4px 12px;
   font-size: var(--pd-font-size-caption);
-  color: var(--pd-status-danger-fg);
+  color: var(--pd-text-secondary);
+}
+.pd-dictation-problem-text {
+  flex: 1;
+  min-width: 0;
+}
+.pd-dictation-problem-actions {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+}
+.pd-dictation-problem-fix {
+  padding: 3px 8px;
+  border-radius: var(--pd-radius-sm);
+  font-size: var(--pd-font-size-caption);
+  font-weight: 500;
+  color: var(--pd-text-primary);
+  background: var(--pd-bg-hover);
+}
+.pd-dictation-problem-fix:hover {
+  background: var(--pd-bg-active);
+}
+/* The Dictation module's Download card, inside the composer's top edge. */
+.pd-dictation-module {
+  padding: 8px 8px 0;
 }
 
 /* The state dot on a nested subagent row — same vocabulary and same colours as

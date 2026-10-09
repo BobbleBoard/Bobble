@@ -54,7 +54,13 @@ import {
 } from '@pi-desktop/model-store';
 import { createLogger } from '@pi-desktop/shared';
 import { ensureUv } from '@pi-desktop/web-tools';
-import { gen3dModuleReady, warmGen3dModule } from '../gen3d/gen3d-main';
+import {
+  dictationModelDir,
+  dictationPaths,
+  dictationReady,
+  gen3dModuleReady,
+  warmGen3dModule,
+} from '../gen3d/gen3d-main';
 import { installEngine } from '../inference/engines-main';
 import { comfyEngineInstalled } from '../studio/studio-main';
 import {
@@ -353,6 +359,114 @@ function runUv(
   });
 }
 
+/** What the recogniser needs to import (audio_worker.py's live path). */
+const DICTATION_IMPORTS = ['parakeet_mlx', 'numpy', 'huggingface_hub'];
+/** The speech model's size, for the bar while it downloads. */
+const DICTATION_MODEL_BYTES = 2_300_000_000;
+
+/** Does `python` import every one of `mods`? */
+function importsOk(python: string, mods: readonly string[]): Promise<boolean> {
+  return new Promise((resolve) => {
+    const child = spawn(python, ['-c', `import ${mods.join(', ')}`], { stdio: 'ignore' });
+    child.on('error', () => resolve(false));
+    child.on('exit', (code) => resolve(code === 0));
+  });
+}
+
+/** Bytes under a folder, best-effort (the bar's numerator). */
+async function folderBytes(dir: string): Promise<number> {
+  let total = 0;
+  const walk = async (d: string): Promise<void> => {
+    let entries: import('node:fs').Dirent[];
+    try {
+      entries = await readdir(d, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      const p = path.join(d, e.name);
+      if (e.isDirectory()) await walk(p);
+      else if (e.isFile()) {
+        try {
+          total += statSync(p).size;
+        } catch {
+          /* gone mid-walk */
+        }
+      }
+    }
+  };
+  await walk(dir);
+  return total;
+}
+
+/**
+ * DICTATION, PUT THERE ON PURPOSE: the recogniser's environment (uv, a
+ * Python 3.12 venv, parakeet-mlx) and its speech model in the cache the worker
+ * reads (huggingface_hub, the worker's HF_HOME — so a token saved there is
+ * used, and nothing is fetched twice). Each step is skipped when already done,
+ * so a Mac that had the environment from the 3D studio only downloads the model.
+ */
+async function installDictation(report: (detail: string, percent?: number) => void): Promise<void> {
+  const p = dictationPaths();
+  report('Fetching the package manager…');
+  const uv = await ensureUv({
+    onProgress: (prog) => {
+      if (prog.total !== undefined && prog.total > 0)
+        report('Fetching the package manager…', prog.received / prog.total);
+    },
+  });
+  if (!existsSync(p.python)) {
+    report('Creating the dictation environment…');
+    mkdirSync(path.dirname(p.venv), { recursive: true });
+    await runUv(uv.uvPath, ['venv', p.venv, '--python', '3.12'], report);
+  }
+  if (!(await importsOk(p.python, DICTATION_IMPORTS))) {
+    report('Installing the recogniser…');
+    await runUv(
+      uv.uvPath,
+      ['pip', 'install', '--python', p.python, 'parakeet-mlx', 'numpy'],
+      report,
+    );
+  }
+  if (dictationModelDir() === null) {
+    const repoDir = path.join(p.hfHome, 'hub', `models--${p.repo.replace('/', '--')}`);
+    report('Downloading the speech model…', 0);
+    const ticker = setInterval(() => {
+      void folderBytes(repoDir).then((b) =>
+        report('Downloading the speech model…', Math.min(0.99, b / DICTATION_MODEL_BYTES)),
+      );
+    }, 1000);
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const child = spawn(
+          p.python,
+          [
+            '-c',
+            'import sys\nfrom huggingface_hub import snapshot_download\nsnapshot_download(sys.argv[1])',
+            p.repo,
+          ],
+          {
+            env: { ...process.env, HF_HOME: p.hfHome, HF_HUB_DISABLE_PROGRESS_BARS: '1' },
+            stdio: ['ignore', 'ignore', 'pipe'],
+          },
+        );
+        let tail = '';
+        child.stderr?.on('data', (c: Buffer) => {
+          tail = (tail + c.toString('utf8')).slice(-1500);
+        });
+        child.on('error', reject);
+        child.on('exit', (code) => {
+          if (code === 0) resolve();
+          else reject(new Error(tail.trim().split('\n').at(-1) ?? `exited with code ${code}`));
+        });
+      });
+    } finally {
+      clearInterval(ticker);
+    }
+  }
+  if (!dictationReady()) throw new Error('the speech model did not land where dictation reads it');
+}
+
 export function createGenModulePorts(
   emit: (states: readonly GenModuleState[]) => void,
   deps: GenModulePortsDeps = {},
@@ -370,6 +484,8 @@ export function createGenModulePorts(
           return comfyEngineInstalled();
         case '3d':
           return gen3dModuleReady();
+        case 'dictation':
+          return dictationReady();
         default:
           return hasMarker(id);
       }
@@ -414,11 +530,16 @@ export function createGenModulePorts(
           await warmGen3dModule(report);
           return;
         }
+        case 'dictation': {
+          await installDictation(report);
+          return;
+        }
       }
     },
     remember: (id) => {
       if (id === 'image' || id === 'audio') writeMarker(id, 'succeeded');
     },
+    onInstallError: (id, raw) => log.warn('module install failed', { id, raw: raw.slice(0, 2000) }),
     emit,
   };
 }

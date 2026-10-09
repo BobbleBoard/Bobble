@@ -28,8 +28,36 @@
  * that leaves that on after you stop dictating looks like it is listening.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useGenModulesStore } from '../state/gen-modules-store';
 
-export type DictationPhase = 'idle' | 'starting' | 'recording' | 'transcribing' | 'error';
+/**
+ * `needs-module`: the recogniser runs on the Dictation module and it is not on this
+ * Mac yet. The composer shows the module's Download card in place of an error
+ * (the user, 2026-10-08: "'the voice model is not installed' … just can't exist
+ * anymore"), and dictation starts by itself the moment the install lands.
+ */
+export type DictationPhase =
+  | 'idle'
+  | 'needs-module'
+  | 'starting'
+  | 'recording'
+  | 'transcribing'
+  | 'error';
+
+/** What fixes a dictation that could not happen — a button on its notice. */
+export type DictationFix = 'retry' | 'mic-settings';
+
+export interface DictationProblem {
+  /** One plain sentence: what happened. */
+  readonly text: string;
+  /** The button that fixes it. */
+  readonly fix: DictationFix;
+}
+
+/** Main's answer when the Dictation module is missing. */
+const NOT_INSTALLED_RE = /not installed/i;
+/** Main's answers for a recording with no speech in it. */
+const NOTHING_HEARD_RE = /no speech|nothing was recorded/i;
 
 /** How many bars the waveform keeps. ~3s of history at the sample rate below,
  * and enough of them to span the composer rather than huddle by the button. */
@@ -47,7 +75,8 @@ export interface DictationState {
   readonly levels: readonly number[];
   /** The transcript so far. Provisional — later audio revises earlier words. */
   readonly partial: string;
-  readonly error: string | null;
+  /** Why the last attempt could not happen, and its fix; null when it did. */
+  readonly problem: DictationProblem | null;
   readonly start: () => void;
   /** Stop and keep the text. */
   readonly stop: () => void;
@@ -70,7 +99,7 @@ export function useDictation(onText: (text: string) => void): DictationState {
   const [phase, setPhase] = useState<DictationPhase>('idle');
   const [levels, setLevels] = useState<readonly number[]>([]);
   const [partial, setPartial] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [problem, setProblem] = useState<DictationProblem | null>(null);
 
   const streamRef = useRef<MediaStream | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -122,22 +151,38 @@ export function useDictation(onText: (text: string) => void): DictationState {
   }, [teardownAudio]);
 
   const fail = useCallback(
-    (message: string): void => {
+    (next: DictationProblem): void => {
       teardownAudio();
       sessionRef.current = null;
       setPhase('error');
-      setError(message);
+      setProblem(next);
     },
     [teardownAudio],
   );
+  /** The Dictation module is missing: show its Download card, and start once it lands. */
+  const needModule = useCallback((): void => {
+    teardownAudio();
+    sessionRef.current = null;
+    setProblem(null);
+    setPhase('needs-module');
+  }, [teardownAudio]);
 
   const start = useCallback((): void => {
-    if (phase !== 'idle' && phase !== 'error') return;
-    setError(null);
+    if (phase !== 'idle' && phase !== 'error' && phase !== 'needs-module') return;
+    setProblem(null);
     setLevels([]);
     setPartial('');
     setPhase('starting');
     void (async () => {
+      // The recogniser runs on the Dictation module. Asking for the microphone
+      // first and then failing would be a prompt for nothing.
+      const modules = useGenModulesStore.getState();
+      if (!modules.loaded) await modules.refresh().catch(() => undefined);
+      const module = useGenModulesStore.getState().modules.find((m) => m.id === 'dictation');
+      if (module !== undefined && !module.ready) {
+        needModule();
+        return;
+      }
       let stream: MediaStream;
       try {
         stream = await navigator.mediaDevices.getUserMedia({
@@ -146,11 +191,19 @@ export function useDictation(onText: (text: string) => void): DictationState {
           audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
         });
       } catch (err) {
-        setPhase('error');
-        setError(
-          err instanceof DOMException && err.name === 'NotAllowedError'
-            ? 'Microphone access denied. Allow it in System Settings › Privacy.'
-            : 'No microphone available.',
+        const name = err instanceof DOMException ? err.name : '';
+        fail(
+          name === 'NotAllowedError' || name === 'SecurityError'
+            ? {
+                text: 'Bobble is not allowed to use the microphone. Turn it on in System Settings, then try again.',
+                fix: 'mic-settings',
+              }
+            : name === 'NotFoundError' || name === 'OverconstrainedError'
+              ? { text: 'No microphone is connected. Plug one in, then try again.', fix: 'retry' }
+              : {
+                  text: 'The microphone is busy or could not be opened. Close other apps using it, then try again.',
+                  fix: 'retry',
+                },
         );
         return;
       }
@@ -161,7 +214,15 @@ export function useDictation(onText: (text: string) => void): DictationState {
       // silently — the user would speak the first few words to nothing.
       const started = await window.piDesktop.invoke('audio:dictation-start', {}).catch(() => null);
       if (started === null || !started.ok || started.sessionId === undefined) {
-        fail(started?.error ?? 'Could not start the recogniser.');
+        for (const track of stream.getTracks()) track.stop();
+        if (NOT_INSTALLED_RE.test(started?.error ?? '')) {
+          needModule();
+          return;
+        }
+        fail({
+          text: 'The speech recogniser did not start — it may still be downloading its model. Try again in a moment.',
+          fix: 'retry',
+        });
         return;
       }
       // Cancelled while the model was loading: honour it rather than opening
@@ -233,7 +294,7 @@ export function useDictation(onText: (text: string) => void): DictationState {
 
       setPhase('recording');
     })();
-  }, [phase, fail]);
+  }, [phase, fail, needModule]);
 
   const stop = useCallback((): void => {
     const sessionId = sessionRef.current;
@@ -256,9 +317,28 @@ export function useDictation(onText: (text: string) => void): DictationState {
         .invoke('audio:dictation-stop', { sessionId })
         .catch(() => null);
       sessionRef.current = null;
-      if (res === null || !res.ok || res.text === undefined || res.text.trim() === '') {
+      // Main answers an empty recording with ok:false ("no speech was
+      // recognised", "nothing was recorded"): that is nothing heard, not a fault.
+      const heardNothing =
+        res !== null &&
+        (res.ok ? (res.text ?? '').trim() === '' : NOTHING_HEARD_RE.test(res.error ?? ''));
+      if (!heardNothing && (res === null || !res.ok || res.text === undefined)) {
         setPhase('error');
-        setError(res?.error ?? 'Could not transcribe that.');
+        setProblem({
+          text: 'That recording could not be turned into text. Try saying it again.',
+          fix: 'retry',
+        });
+        return;
+      }
+      if (heardNothing || res === null || res.text === undefined) {
+        // The live preview guessed at a sound; with nothing heard, the
+        // composer goes back to what was there before the mic opened.
+        onTextRef.current('');
+        setPhase('error');
+        setProblem({
+          text: 'Nothing was heard. Speak a little closer to the microphone and try again.',
+          fix: 'retry',
+        });
         return;
       }
       onTextRef.current(res.text.trim());
@@ -275,7 +355,7 @@ export function useDictation(onText: (text: string) => void): DictationState {
     setPhase('idle');
     setLevels([]);
     setPartial('');
-    setError(null);
+    setProblem(null);
     if (sessionId !== null) {
       void window.piDesktop.invoke('audio:dictation-cancel', { sessionId }).catch(() => {
         /* the session dies with the process anyway */
@@ -283,5 +363,24 @@ export function useDictation(onText: (text: string) => void): DictationState {
     }
   }, [teardownAudio]);
 
-  return { phase, levels, partial, error, start, stop, cancel };
+  /*
+   * DOWNLOAD, THEN CONTINUE. While the Download card is up, the install
+   * landing starts the dictation the person asked for; closing the card puts
+   * the mic back to rest.
+   */
+  const moduleReady = useGenModulesStore(
+    (st) => st.modules.find((m) => m.id === 'dictation')?.ready === true,
+  );
+  const closed = useGenModulesStore((st) => st.closed);
+  const closedAtAsk = useRef(closed);
+  useEffect(() => {
+    if (phase !== 'needs-module') closedAtAsk.current = closed;
+  }, [phase, closed]);
+  useEffect(() => {
+    if (phase !== 'needs-module') return;
+    if (moduleReady) start();
+    else if (closed !== closedAtAsk.current && closed.includes('dictation')) cancel();
+  }, [phase, moduleReady, closed, start, cancel]);
+
+  return { phase, levels, partial, problem, start, stop, cancel };
 }

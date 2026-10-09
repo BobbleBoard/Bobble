@@ -14,7 +14,7 @@
  * pd-file fence — while model weights live in ~/.cache/pi-desktop/gen3d/.
  */
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import * as path from 'node:path';
 import { default3dModel, type GenEvent, getModel } from '@pi-desktop/gen-service';
@@ -46,7 +46,7 @@ import {
   registerIpcHandlers,
 } from '@pi-desktop/shared';
 import { ensureUv } from '@pi-desktop/web-tools';
-import { app, BrowserWindow, type IpcMain, type WebContents } from 'electron';
+import { app, BrowserWindow, type IpcMain, shell, type WebContents } from 'electron';
 import type { Run3dFn } from '../gen/gen-manager';
 import { GenModuleMissingError, moduleMissingMessage } from '../gen/gen-modules';
 import { guardRun } from '../gen/guardian-main';
@@ -159,10 +159,59 @@ function workerEnv(): NodeJS.ProcessEnv {
   };
 }
 
+/** Where macOS keeps the Microphone switch (Privacy & Security). */
+const MIC_PRIVACY_PANE =
+  'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone';
+
 function audioPaths(): { python: string; worker: string } {
-  const python = path.join(cacheRoot(), 'src', 'audio', '.venv', 'bin', 'python');
+  const python = dictationPaths().python;
   const worker = path.join(path.dirname(sidecarScriptPath()), 'workers', 'audio_worker.py');
   return { python, worker };
+}
+
+/** The speech model dictation loads (audio_worker.py ASR_MODEL). */
+export const DICTATION_MODEL_REPO = 'mlx-community/parakeet-tdt-0.6b-v3';
+
+/**
+ * Where dictation's environment and speech model live: the audio venv the
+ * worker runs in, and the Hugging Face cache it reads the model from (the
+ * worker's HF_HOME). One place, so the check, the install and the worker
+ * cannot disagree.
+ */
+export function dictationPaths(): { venv: string; python: string; hfHome: string; repo: string } {
+  const venv = path.join(cacheRoot(), 'src', 'audio', '.venv');
+  return {
+    venv,
+    python: path.join(venv, 'bin', 'python'),
+    hfHome: path.join(cacheRoot(), 'hf'),
+    repo: DICTATION_MODEL_REPO,
+  };
+}
+
+/** The speech model's snapshot folder in the cache, or null when it is not all there. */
+export function dictationModelDir(): string | null {
+  const { hfHome, repo } = dictationPaths();
+  const snapshots = path.join(hfHome, 'hub', `models--${repo.replace('/', '--')}`, 'snapshots');
+  let revs: string[];
+  try {
+    revs = readdirSync(snapshots);
+  } catch {
+    return null;
+  }
+  for (const rev of revs) {
+    const dir = path.join(snapshots, rev);
+    if (
+      existsSync(path.join(dir, 'config.json')) &&
+      existsSync(path.join(dir, 'model.safetensors'))
+    )
+      return dir;
+  }
+  return null;
+}
+
+/** Dictation can run: its environment and its speech model are both on this Mac. */
+export function dictationReady(): boolean {
+  return existsSync(dictationPaths().python) && dictationModelDir() !== null;
 }
 
 /**
@@ -1110,7 +1159,7 @@ const handlers: IpcHandlers<Gen3dInvokeMap & DictationInvokeMap> = {
   /** Dictation. Not a job — see dictation-main.ts for why. */
   'audio:transcribe': async (req) => {
     const { python, worker } = audioPaths();
-    if (!existsSync(python)) {
+    if (!dictationReady()) {
       return { ok: false, error: 'the dictation model is not installed yet' };
     }
     const bytes = Buffer.from(req.audioBase64, 'base64');
@@ -1120,7 +1169,7 @@ const handlers: IpcHandlers<Gen3dInvokeMap & DictationInvokeMap> = {
   /** Live dictation. Partials arrive as `audio:dictation` events; the reply to
    * `stop` is the accurate full-context transcript. */
   'audio:dictation-start': async () => {
-    if (!existsSync(audioPaths().python)) {
+    if (!dictationReady()) {
       return { ok: false, error: 'the dictation model is not installed yet' };
     }
     return await liveDictation().start();
@@ -1133,6 +1182,23 @@ const handlers: IpcHandlers<Gen3dInvokeMap & DictationInvokeMap> = {
   'audio:dictation-cancel': async (req) => {
     liveDictation().cancel(req.sessionId);
     return { ok: true };
+  },
+  'audio:open-mic-settings': async () => {
+    // A probe asking must not open System Settings over someone's work.
+    if (process.env.PI_E2E === '1') {
+      const g = globalThis as { __pdOsOpens?: unknown[] };
+      g.__pdOsOpens = [
+        ...(g.__pdOsOpens ?? []),
+        { channel: 'audio:open-mic-settings', ran: false, at: Date.now() },
+      ];
+      return { ok: true };
+    }
+    try {
+      await shell.openExternal(MIC_PRIVACY_PANE);
+      return { ok: true };
+    } catch {
+      return { ok: false };
+    }
   },
 
   /*

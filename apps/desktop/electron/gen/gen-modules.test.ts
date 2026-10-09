@@ -7,6 +7,7 @@ import {
   MODULE_WAIT_MS,
   moduleForBackend,
   moduleMissingMessage,
+  plainInstallError,
   uvLineToDetail,
   weightsModelId,
   weightsModuleFor,
@@ -151,8 +152,9 @@ describe('the gate — a job waits for the button, then continues', () => {
     await new Promise((r) => setTimeout(r, 0));
     await expect(m.install('image')).rejects.toThrow('no network');
     const shown = emitted.at(-1) as Array<{ id: string; error?: string; wanted: boolean }>;
+    // Said so the person can act on it — not the raw line.
     expect(shown.find((s) => s.id === 'image')).toMatchObject({
-      error: 'no network',
+      error: 'Could not reach the download server. Check the internet connection, then Try again.',
       wanted: true,
     });
     m.dismiss('image');
@@ -186,7 +188,7 @@ describe('what the model reads', () => {
     expect(moduleForBackend('mlx-audio')).toBe('audio');
     expect(moduleForBackend('comfyui')).toBe('comfy');
     expect(moduleForBackend('hyperframes')).toBeUndefined();
-    expect(GEN_MODULE_IDS).toEqual(['image', 'audio', 'comfy', '3d']);
+    expect(GEN_MODULE_IDS).toEqual(['image', 'audio', 'comfy', '3d', 'dictation']);
   });
 
   it("tidies uv's progress into one line", () => {
@@ -324,5 +326,28 @@ describe("a model's weights are a module of their own", () => {
       meta('weights:ltx-2.5-distilled'),
     );
     expect(err.message).toContain('[[bobble-module:weights:ltx-2.5-distilled]]');
+  });
+});
+
+describe('plainInstallError — a failed install says what the person can do', () => {
+  it('names the cause they can act on, never the raw line', () => {
+    expect(
+      plainInstallError('error: Failed to fetch: https://pypi.org/simple/mlx (ENOTFOUND)'),
+    ).toMatch(/internet connection/);
+    expect(plainInstallError('OSError: [Errno 28] No space left on device')).toMatch(
+      /disk is full/,
+    );
+    expect(plainInstallError('huggingface_hub.errors.GatedRepoError: 401 Client Error')).toMatch(
+      /refused/,
+    );
+    expect(plainInstallError('PermissionError: [Errno 13] Permission denied')).toMatch(
+      /could not write/,
+    );
+    expect(plainInstallError('× No solution found when resolving dependencies')).toMatch(
+      /could not be put together/,
+    );
+    const other = plainInstallError('Traceback (most recent call last): KeyError: x');
+    expect(other).toMatch(/Try again/);
+    expect(other).not.toMatch(/Traceback|KeyError/);
   });
 });
