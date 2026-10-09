@@ -1,6 +1,6 @@
 # Bobble — status
 
-Updated: 2026-10-08 late (on AC) · the user: "for the connectors I would imagine we want a prominent card … for the chat area i'm noticing a bunch of ui ux issues"
+Updated: 2026-10-09 (on AC) · the user: "anything like this … red text that's just a real unknown error or something that doesn't have handling attached to it … just can't exist anymore" + the picture hover and lightbox slivers
 
 ## Backlog — everything discussed and not yet done (consolidated 2026-10-08)
 
@@ -89,6 +89,24 @@ Still to check before dropping (not merged): `claude/practical-dhawan-bf1d62` (0
 ### 8. Smaller known bugs
 The office chip flicker (1 of 15 probe runs) · rapid-mlx never lands the paste prime (~4.5k tokens re-read) · img2img edits are subtle (the instruction editor needs the 3D engine) · a finished card remounts into the chain when the next tool call starts · a picture embedded in the reply shows twice · ⌘Z into a turn already answering keeps the partial reply · an image-only message can't be rewound · the Ladle build in the bundle (excluded `68cf0219`, unconfirmed) · ~60 unused old icon files in the design artifact's storage.
 
+
+## Report — 2026-10-09: no more raw red errors, a way in for dictation, and the pictures' hover card and lightbox slivers
+
+An audit (an agent read the whole app) found the four named examples' causes and about sixty places that put an exception's own words on screen. Every one now says what happened in plain words and carries its fix; the ones the app can fix itself, it does.
+
+| Asked | Done | Checked on screen |
+|---|---|---|
+| "The local model server returned an error. Please try again." (red, no way on) | A turn that did not finish gets a card instead of red text: the cause in words (out of memory, too long for the model, stalled, engine not running, engine error, unexpected) and the fix as a button — Try again, Restart the model and try again, Choose a smaller model / one that reads more (opens the model menu), Continue in a new chat; the engine's words under Details with Copy | turn-problem-look: a real HTTP 500 through real pi → the card, no red text; Try again → the answer; every kind draws its own card |
+| "fetch failed" | The main cause was systemic: a model that failed to start was never reported and the message went to a server that was not there. Now the send HOLDS the message under its bubble with why (no model on this Mac, short of memory, offline, engine or files missing, slow load) and Try again / Choose another model / Open Models; a model coming up sends it by itself. The MLX engine now waits for a server on its way back, as llama.cpp did. A refused send and a picture no model can see are held the same way (Send without the picture) | held-send-look: a fresh Mac with no model → "hello" held under "There is no model on this Mac", Open Models goes there; each reason draws its card |
+| "the voice model is not installed" | Dictation had NO way in — nothing anywhere installed it. A Dictation module now does (uv, a Python venv with parakeet-mlx, the speech model, each step skipped when done); the mic shows its Download card and starts listening when it lands. A denied mic opens Privacy › Microphone; no mic, busy mic, nothing heard each say so with Try again | dictation-look: card on a fresh Mac; REAL_INSTALL=1 pressed Download for real (environment built in ~5 s here — the model was already in your library), dictation started by itself, listened, "Nothing was heard" |
+| "this file couldn't be found" (a file that is there) | The reasons it happened, each fixed: a path under a folder the chat no longer uses (fs:locate finds it by name in the chat's folders), `cd x && … > out.md` (read under the cd), `~/…` joined onto the chat folder, a file still being written (watched for a minute; the tab fills when it lands). Open with / Show in Finder look too. What is left says which case (not there after looking / macOS did not allow / a folder / held by another app) | file-locate-look: a read of /old/place/reports/summary.md opens the real file; a file not yet written fills in by itself |
+| "anything of that sort … red text that's just a real unknown error" | plainError (@pi-desktop/shared) turns an error's raw words into what to do (offline, disk full, busy, refused, missing, not allowed, too slow, damaged, not installed); applied on the Models page, the model menu, Storage, the tray, engines, onboarding, connectors (an add that failed was silent), skills (silent), the studios, image edits, the 3D studio (a failed stage now says why; weights downloads say why and offer Try again), previews (moved vs outside Bobble's folders vs unreadable), charts, office editors (Open in its app), crash screens (details folded). Toasts are amber with a title and a line, and can carry a button (Try again on a chat that would not open, a failed delete). Error text is no longer red anywhere it was a status | unit tests on the real strings; turn-problem-look photographs the toasts; the full lint/typecheck/test run |
+| Hover a chain picture: a larger version "like shown in the image" | A floating card under the thumbnail, right edges lined up, up to 520×380, swapping at once between thumbnails | chain-visuals-look: 520 px card against a 44 px thumbnail, right edges equal, below |
+| Lightbox: the pictures either side, greyed and cut off, a sliver; hover highlights; click scrolls to it like the arrow | A track: the picture centred, each neighbour pushed out until 64 px shows, greyed; a hovered sliver lifts; a click slides it to the middle; the track stops at the ends (› off) | chain-visuals-look: slivers 64 px each side at 0.4 opacity, 0.62 on hover; click → slides (measured mid-way) → 3 of 3 |
+
+Kept on purpose: a failed tool step inside an expanded chain stays red with its raw output — your earlier spec ("expanded tool calls show fails as red … copy raw"), and the model reads and handles those itself.
+
+Checks: lint clean in every package, typecheck, every unit suite (the all-packages run's failures were load timeouts — each file passes alone), the build, nine probes on the final build (chain-visuals, turn-problem, held-send, file-locate, dictation, chart-reentry, connector-demo, inline-move, canvas-edges), `ship:local` (installed). Images: deliverables/errors-and-pictures-2026-10-08/.
 
 ## Report — 2026-10-08 late: a connector demo card, tool chains collapsed, pictures beside the chain, and the chat-area fixes
 
