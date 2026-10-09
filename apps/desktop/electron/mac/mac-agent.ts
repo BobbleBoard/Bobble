@@ -47,9 +47,10 @@ import { resolveBundledPackageAsset } from '../app-paths';
 import { isBackgroundMode } from '../background-mode';
 import { readSettings } from '../settings/settings-main';
 import { isTrustedIpcEvent } from '../trusted-senders';
+import { createAppIconSource } from './app-icon-source';
 import { createDriverRegistry, type DriverId } from './drivers';
 import { userLaunchEnv } from './launch-env';
-import { listInstalledApps, sameApp } from './mac-apps';
+import { installedAppIcon, listInstalledApps, sameApp } from './mac-apps';
 import {
   macMonitor,
   registerMacMonitorIpc,
@@ -187,6 +188,17 @@ export function macHelperRequest<T>(
   }
   return getHelper().request<T>(method, params);
 }
+
+/**
+ * One app's real icon, cached per app, for the computer-use rows in the chat
+ * (`mac:app-icon`). The running helper first, then the installed apps — see
+ * app-icon-source.ts. Neither needs a permission.
+ */
+const appIcons = createAppIconSource({
+  helperIcon: (app) =>
+    getHelper().request<{ base64?: string; mimeType?: string }>('appIcon', { app, size: 64 }),
+  installedIcon: (app) => installedAppIcon(HELPER_PATH, app),
+});
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => {
@@ -920,6 +932,12 @@ export function registerMacAgentIpc(): void {
     if (!isSupportedPlatform() || !existsSync(HELPER_PATH)) return { apps: [] };
     return { apps: await listInstalledApps(HELPER_PATH, req?.refresh === true) };
   });
+  // One app's real icon, for the computer-use rows in the chat (src/chat/app-icons.ts).
+  ipcMain.handle('mac:app-icon', async (event, req: { app?: unknown } | undefined) => {
+    if (!isTrustedIpcEvent(event)) throw new Error('[mac-agent] rejected mac:app-icon');
+    if (!isSupportedPlatform() || !existsSync(HELPER_PATH)) return { icon: null };
+    return { icon: await appIcons(typeof req?.app === 'string' ? req.app : '') };
+  });
   // The overlay is a SECOND pi-mac process (`--overlay`) — same binary, same
   // wire format, its own NSApplication runloop — so it needs the same resolved
   // path the `--serve` bridge uses.
@@ -1195,10 +1213,9 @@ function registerE2eDebugChannel(): void {
              grant. The user: "if I move the map around the cursor does not move
              with it" — reproducing that needs a real move, and a probe's own
              shell cannot make one (System Events refuses without the grant). */
-          /* The app's REAL icon, as a data URL — the user: "you can get the real
-             app icon of any program being used right? so just use that no
-             emoji." Cached by the renderer; this is the only place that knows
-             how to ask macOS. */
+          /* The helper's raw `appIcon` answer, for probes. The chat's rows ask
+             through `mac:app-icon`, which also knows apps that are not running
+             and caches per app (app-icon-source.ts). */
           case 'app-icon': {
             const res = await getHelper().request<{ base64?: string; mimeType?: string }>(
               'appIcon',

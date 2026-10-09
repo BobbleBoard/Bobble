@@ -6,6 +6,10 @@
  * "Snapshotted Google Chrome" can show Chrome rather than a glyph that looks
  * the same for every app.
  *
+ * Main answers over `mac:app-icon` (electron/mac/app-icon-source.ts). This used
+ * to ask the probes' `mac:debug` channel, which has no handler outside a test
+ * run — so in the shipped app every ask failed and no row ever had its icon.
+ *
  * A module cache plus a version counter, because the icon arrives long after
  * the row that wants it is first rendered: the chain asks synchronously, gets
  * `undefined`, and the store's bump re-renders it with the picture. Failures
@@ -28,13 +32,8 @@ export const useAppIconStore = create<AppIconState>((set, get) => ({
     inFlight.add(key);
     void (async () => {
       try {
-        const res = await window.piDesktop.invoke('mac:debug', {
-          op: 'app-icon',
-          params: { app: key },
-        });
-        const r = (res as { result?: { base64?: string; mimeType?: string } } | undefined)?.result;
-        const src =
-          r?.base64 === undefined ? null : `data:${r.mimeType ?? 'image/png'};base64,${r.base64}`;
+        const res = await window.piDesktop.invoke('mac:app-icon', { app: key });
+        const src = typeof res?.icon === 'string' && res.icon !== '' ? res.icon : null;
         set((s) => ({ icons: { ...s.icons, [key]: src } }));
       } catch {
         set((s) => ({ icons: { ...s.icons, [key]: null } }));
@@ -47,8 +46,9 @@ export const useAppIconStore = create<AppIconState>((set, get) => ({
 
 /** The icon for `app`, asking for it the first time it is wanted. */
 export function appIconSrc(app: string | undefined): string | undefined {
-  if (app === undefined || app === '') return undefined;
+  const key = app?.trim() ?? '';
+  if (key === '') return undefined;
   const store = useAppIconStore.getState();
-  store.ensure(app);
-  return store.icons[app] ?? undefined;
+  store.ensure(key);
+  return store.icons[key] ?? undefined;
 }

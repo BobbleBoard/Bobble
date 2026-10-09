@@ -1210,7 +1210,8 @@ export const CANVAS_INVOKE_CHANNELS = [
 ] as const satisfies readonly (keyof CanvasInvokeMap)[];
 
 // ---------------------------------------------------------------------------
-// Mac computer-use channels (E2E-only debug/introspection)
+// Mac computer-use channels (the chooser's app list, app icons, and the
+// E2E-only debug/introspection seam)
 // ---------------------------------------------------------------------------
 
 export type MacInvokeMap = {
@@ -1237,11 +1238,24 @@ export type MacInvokeMap = {
       apps: { id: string; name: string; path: string; icon: string | null }[];
     };
   };
+  /**
+   * One app's real icon as a `data:image/png;base64,…` URL, or null when macOS
+   * has none for that name — what a computer-use row in the chat draws next to
+   * the app it acted on. `app` is whatever the row names: a running app's name,
+   * a bundle id, or the model's own shorthand ("chrome"). Answered by the
+   * `pi-mac` helper through NSWorkspace, which needs no permission, and cached
+   * per app in main.
+   */
+  'mac:app-icon': {
+    request: { app: string };
+    response: { icon: string | null };
+  };
 };
 
 export const MAC_INVOKE_CHANNELS = [
   'mac:debug',
   'mac:list-apps',
+  'mac:app-icon',
 ] as const satisfies readonly (keyof MacInvokeMap)[];
 
 // The computer-use monitor's own channels live in mac/mac-monitor-contract.ts

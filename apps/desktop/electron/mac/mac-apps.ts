@@ -147,6 +147,8 @@ async function iconFor(helperPath: string, app: RawApp): Promise<string | null> 
 }
 
 let listing: Promise<InstalledAppInfo[]> | null = null;
+/** The bare list (no icons) the chat's icon lookup searches; see installedAppIcon. */
+let rawListing: Promise<RawApp[]> | null = null;
 
 /**
  * The installed apps with their icons, familiar ones first. One listing per
@@ -158,6 +160,7 @@ export function listInstalledApps(
   refresh = false,
 ): Promise<InstalledAppInfo[]> {
   if (listing === null || refresh) {
+    if (refresh) rawListing = null;
     listing = (async () => {
       const apps = orderApps(await rawApps(helperPath));
       // Icons a few at a time: a hundred helper spawns at once would be a
@@ -177,6 +180,52 @@ export function listInstalledApps(
     });
   }
   return listing;
+}
+
+/**
+ * The installed app a name means — the name a chat row carries, which may be
+ * Finder's ("Google Chrome"), a bundle id, or the model's shorthand ("chrome").
+ * An exact name or id wins; then an app whose name holds the asked one (the
+ * shortest, so "chrome" is Google Chrome rather than Chrome Remote Desktop);
+ * then one whose name the asked one holds (the longest). Neither side of a
+ * partial match may be under three letters — "X" is inside "textedit".
+ */
+export function findInstalledApp<T extends { readonly id: string; readonly name: string }>(
+  apps: readonly T[],
+  asked: string,
+): T | undefined {
+  const q = asked.trim().toLowerCase();
+  if (q === '') return undefined;
+  const lower = (a: T) => a.name.toLowerCase();
+  const exact = apps.find((a) => lower(a) === q || a.id.toLowerCase() === q);
+  if (exact !== undefined) return exact;
+  if (q.length < 3) return undefined;
+  const holding = apps
+    .filter((a) => lower(a).includes(q))
+    .sort((a, b) => a.name.length - b.name.length);
+  if (holding[0] !== undefined) return holding[0];
+  return apps
+    .filter((a) => a.name.length >= 3 && q.includes(lower(a)))
+    .sort((a, b) => b.name.length - a.name.length)[0];
+}
+
+/**
+ * The real icon of the installed app `asked` names, as a data URL, or null.
+ * The chat's computer-use rows come here when the running helper cannot place
+ * the name (see app-icon-source.ts). The list is read once per process (the
+ * chooser's refresh reads it again) and the icon is the chooser's own cached
+ * 128 px render, so an app the chooser has drawn costs a file read.
+ */
+export async function installedAppIcon(helperPath: string, asked: string): Promise<string | null> {
+  if (rawListing === null) {
+    rawListing = rawApps(helperPath).catch((err: unknown) => {
+      rawListing = null;
+      log.warn('app list for an icon failed', { error: String(err) });
+      return [];
+    });
+  }
+  const app = findInstalledApp(await rawListing, asked);
+  return app === undefined ? null : iconFor(helperPath, app);
 }
 
 /**
