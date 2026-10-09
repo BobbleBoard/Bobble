@@ -12,6 +12,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../chat/auto-router', () => ({
+  lastServerProblem: vi.fn(() => null),
+  chatServerReady: vi.fn(() => true),
   maybeRouteAuto: vi.fn(async () => undefined),
   ensureChatServerReady: vi.fn(async () => undefined),
 }));

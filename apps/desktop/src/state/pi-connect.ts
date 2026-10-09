@@ -14,12 +14,18 @@ import {
 import { createResumeSplitter, type ResumeEvent } from '@pi-desktop/provider-llamacpp/resume';
 import { conversationNameFrom } from '../../electron/workspace/project-dir';
 import { instructionsPreamble } from '../chat/attached-files';
-import { ensureChatServerReady, maybeRouteAuto } from '../chat/auto-router';
+import {
+  chatServerReady,
+  ensureChatServerReady,
+  lastServerProblem,
+  maybeRouteAuto,
+} from '../chat/auto-router';
 import { ADVANCED_GROUNDTRUTH_KEY } from './advanced-store';
 import { resetCanvasForNewSession, restoreCanvas, snapshotCanvas } from './canvas-store';
 import { ownerOfJob } from './chat-jobs';
 import { deleteChat, renameChat } from './chat-org';
 import { isChatDeleted, useDeletedChats } from './deleted-chats';
+import { useHeldSendStore } from './held-send-store';
 import { ensureVisionMode } from './local-model';
 import {
   type BgRun,
@@ -712,6 +718,48 @@ export async function sendPrompt(
       return;
     }
 
+    /*
+     * THE MODEL DID NOT START: HOLD THE MESSAGE. The wait above can end with
+     * no server — a launch that failed, nothing downloaded, a load past five
+     * minutes. Dispatching anyway sent the message to nobody and it came back
+     * as a red "fetch failed" (the user, 2026-10-08). It is held instead, exactly
+     * as pi would get it, and the card under the bubble says why and sends it
+     * on Try again (HeldSendCard → retryHeldSend). `lastServerProblem` is set
+     * only when the wait ran and gave up, so a run with no local server at all
+     * (`?piNoServer`, a remote endpoint) dispatches as before.
+     */
+    const problem = lastServerProblem();
+    if (problem !== null && !visionUnavailable && !chatServerReady()) {
+      usePiStore.setState({ promptInFlight: false });
+      useHeldSendStore.getState().hold({
+        sessionFile: usePiStore.getState().session?.sessionFile ?? null,
+        echoId: mine.echoId,
+        message: withPendingInstructions(agentMessage ?? message),
+        images: imageDataUris
+          .map(dataUriToImage)
+          .filter((img): img is ImageContent => img !== null),
+        problem,
+        retrying: false,
+      });
+      return;
+    }
+    /*
+     * A message already held for this chat goes first: the model is up now, and
+     * leaving it unanswered above this one would be a question skipped.
+     */
+    const carried = useHeldSendStore.getState().held;
+    if (
+      carried !== null &&
+      carried.echoId !== mine.echoId &&
+      carried.sessionFile === (usePiStore.getState().session?.sessionFile ?? null)
+    ) {
+      useHeldSendStore.getState().clear();
+      await window.piDesktop.invoke('pi:prompt', {
+        message: carried.message,
+        ...(carried.images.length > 0 ? { images: [...carried.images] } : {}),
+      });
+    }
+
     if (visionUnavailable) {
       usePiStore.setState({ promptInFlight: false });
       const detail = visionReason !== undefined && visionReason !== '' ? ` (${visionReason})` : '';
@@ -833,6 +881,44 @@ export function reportRejectedSend<T extends { success?: boolean; error?: string
       `That message wasn't sent. The agent refused it (${reason}). Nothing has been lost; send it again. If this keeps happening, check Settings → Models that a model is loaded and there is memory free for it.`,
     );
   return ack;
+}
+
+/**
+ * TRY AGAIN, FOR A HELD MESSAGE: start the model again (or wait for the one
+ * coming up), then send the message exactly as it was held. If the model still
+ * does not start, the message stays held with the new reason.
+ */
+export async function retryHeldSend(): Promise<void> {
+  const held = useHeldSendStore.getState().held;
+  if (held === null || held.retrying) return;
+  useHeldSendStore.getState().setRetrying(true);
+  usePiStore.setState({ promptInFlight: true });
+  try {
+    await ensurePiOnViewedSession();
+    await ensureChatServerReady();
+    const problem = lastServerProblem();
+    if (problem !== null && !chatServerReady()) {
+      useHeldSendStore.getState().hold({ ...held, problem, retrying: false });
+      usePiStore.setState({ promptInFlight: false });
+      return;
+    }
+    useHeldSendStore.getState().clear();
+    const delivery = deliveryForSend(agentInFlight());
+    const ack = await window.piDesktop.invoke('pi:prompt', {
+      message: held.message,
+      ...(held.images.length > 0 ? { images: [...held.images] } : {}),
+      ...delivery.body,
+    });
+    if (delivery.clearsInFlight) usePiStore.setState({ promptInFlight: false });
+    reportRejectedSend(ack);
+  } catch (error) {
+    usePiStore.setState({ promptInFlight: false });
+    useHeldSendStore.getState().hold({
+      ...held,
+      problem: { kind: 'failed', detail: error instanceof Error ? error.message : String(error) },
+      retrying: false,
+    });
+  }
 }
 
 export async function abortPi() {

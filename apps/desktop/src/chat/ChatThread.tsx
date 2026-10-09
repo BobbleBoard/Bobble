@@ -58,6 +58,7 @@ import { pathOfFile } from './composer/file-paths';
 import { attachPlan } from './composer/incoming-files';
 import { corpChatView } from './corp/corp-thread-view';
 import { HarnessChecklistPanel, ThreadStatusIndicator } from './HarnessStatus';
+import { HeldSendCard } from './HeldSendCard';
 import { HistoryPole } from './HistoryPole';
 import { effectiveToolName } from './long-job';
 import { MessageErrorBoundary } from './MessageErrorBoundary';
@@ -1170,6 +1171,10 @@ export function ChatThread() {
                 reasons and "Working" while it acts, with the harness stage folded
                 in subtly. No duplicate label, no footer status, no stray spinner. */}
           <ThreadStatusIndicator />
+
+          {/* A message waiting for a model that did not start: why, and the
+              way on (HeldSendCard) — in place of a red "fetch failed". */}
+          <HeldSendCard />
 
           {/* Messages the user sent while this turn was still in-flight — held
               and shown as dimmed pending bubbles BELOW the live reply, so they

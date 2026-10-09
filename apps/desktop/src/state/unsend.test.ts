@@ -25,6 +25,8 @@ vi.mock('./local-model', async (importOriginal) => ({
 }));
 
 vi.mock('../chat/auto-router', () => ({
+  lastServerProblem: vi.fn(() => null),
+  chatServerReady: vi.fn(() => true),
   maybeRouteAuto: vi.fn(async () => undefined),
   ensureChatServerReady: vi.fn(
     () =>

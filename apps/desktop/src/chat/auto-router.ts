@@ -538,6 +538,40 @@ let ensureServerPromise: Promise<void> | null = null;
  * activation). No-op under `?piE2E` (probes must not launch a real llama-server).
  * Best-effort — a failed ensure is no worse than before.
  */
+/**
+ * WHY THE LAST WAIT FOR A SERVER ENDED WITHOUT ONE. `ensureChatServerReady`
+ * used to give up in silence — a launch that failed, nothing downloaded, a load
+ * that never finished — and the send went on to a server that was not there:
+ * the "fetch failed" under a reply (the user, 2026-10-08). It now records the
+ * reason here, and the send holds the message and shows it (HeldSendCard)
+ * instead. Null when the last wait found a ready server, or did not run.
+ */
+export interface ServerProblem {
+  readonly kind: 'no-model' | 'failed' | 'timeout';
+  /** The model it tried to start, by its display name. */
+  readonly modelName?: string;
+  /** The supervisor's or the launch's own words, for Details. */
+  readonly detail?: string;
+}
+let serverProblem: ServerProblem | null = null;
+export function lastServerProblem(): ServerProblem | null {
+  return serverProblem;
+}
+/** For tests: forget the last outcome. */
+export function resetServerProblem(): void {
+  serverProblem = null;
+}
+
+function displayNameOf(modelId: string | undefined): string | undefined {
+  if (modelId === undefined) return undefined;
+  return useLlmStore.getState().catalog.find((c) => c.id === modelId)?.displayName ?? modelId;
+}
+
+/** The chat server is up, loaded and not mid-switch. */
+export function chatServerReady(): boolean {
+  return serverIsReady() && !switchInProgress();
+}
+
 function serverIsReady(): boolean {
   const s = useLlmStore.getState().status;
   // llama `/health` returns 503 while the model loads, so the supervisor only
@@ -600,6 +634,7 @@ export function ensureChatServerReady(): Promise<void> {
   }
   if (serverIsReady() && !switchInProgress()) {
     diag('ensureChatServerReady: server already ready — no-op');
+    serverProblem = null;
     return Promise.resolve();
   }
   if (ensureServerPromise !== null) return ensureServerPromise;
@@ -641,8 +676,24 @@ export function ensureChatServerReady(): Promise<void> {
             `recommendation=${fresh.recommendation ? 'loaded' : 'MISSING'} ` +
             `→ target=${JSON.stringify(target)}`,
         );
-        if (target !== null) await activateLocalModel(target.modelId, target.quant);
-        else diag('ensureChatServerReady: NO model to start — nothing downloaded');
+        if (target !== null) {
+          const started = await activateLocalModel(target.modelId, target.quant);
+          if (!started.success) {
+            serverProblem = {
+              kind: 'failed',
+              ...(displayNameOf(target.modelId) !== undefined
+                ? { modelName: displayNameOf(target.modelId) as string }
+                : {}),
+              detail: started.error ?? useLlmStore.getState().status.error ?? '',
+            };
+            diag(`ensureChatServerReady: the launch failed — ${serverProblem.detail}`);
+            return;
+          }
+        } else {
+          diag('ensureChatServerReady: NO model to start — nothing downloaded');
+          serverProblem = { kind: 'no-model' };
+          return;
+        }
       } else {
         diag(`ensureChatServerReady: phase=${phase} (coming up/ready) — waiting, not restarting`);
       }
@@ -654,18 +705,32 @@ export function ensureChatServerReady(): Promise<void> {
       while (Date.now() < deadline) {
         if (serverIsReady() && !switchInProgress()) {
           diag('ensureChatServerReady: server READY');
+          serverProblem = null;
           return;
         }
-        const p = useLlmStore.getState().status.phase;
+        const st = useLlmStore.getState().status;
+        const p = st.phase;
         if ((p === 'error' || p === 'idle') && !switchInProgress()) {
           diag(`ensureChatServerReady: giving up — phase=${p}`);
+          const name = displayNameOf(st.model?.id);
+          serverProblem =
+            st.downloadedModelIds.length === 0
+              ? { kind: 'no-model' }
+              : {
+                  kind: 'failed',
+                  ...(name !== undefined ? { modelName: name } : {}),
+                  detail: st.error ?? '',
+                };
           return;
         }
         await new Promise((r) => setTimeout(r, 500));
       }
       diag('ensureChatServerReady: timed out waiting for ready');
+      const name = displayNameOf(useLlmStore.getState().status.model?.id);
+      serverProblem = { kind: 'timeout', ...(name !== undefined ? { modelName: name } : {}) };
     } catch (e) {
       diag(`ensureChatServerReady ERROR: ${e instanceof Error ? e.message : String(e)}`);
+      serverProblem = { kind: 'failed', detail: e instanceof Error ? e.message : String(e) };
     }
   })().finally(() => {
     ensureServerPromise = null;
