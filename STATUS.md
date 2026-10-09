@@ -1,6 +1,6 @@
 # Bobble — status
 
-Updated: 2026-10-09 10:20 · real app icons in the chat (shipped app); earlier today: approvals and decisions on the "waiting on you" list; the repo without personal details; a universal hotkey UI; keep it modular; review onboarding
+Updated: 2026-10-09 10:45 · onboarding redone (four pages, one download, the first model from the empty chat); git history rewritten without personal details; no Electron ghosts in the Dock; the five prototypes redrawn in the design language; two image models and a one-model Mac engine pinned
 
 ## Where we are (refreshed at the end of every task)
 
@@ -57,15 +57,22 @@ The living page has this in full (source `deliverables/status/where-we-are.html`
 - Visual quality: math, SVG, charts and office renderers done. HyperFrames and widgets partly. Websites, 3D-for-games and mixes not started.
 - Studios: working; the editors are still to come (image editor A chosen, with a new input bar; deep research as a plan card above the input).
 - Models: working.
-- Onboarding: works, needs a pass (§9 below).
-- Design language: mostly wired. The Made card and the toolbar are left; the prototypes predate it.
+- Onboarding: redone 2026-10-09 (§9): four pages, one download, and the first model one click from the empty chat. Installed.
+- Design language: mostly wired. The Made card and the toolbar are left. The five design prototypes are redrawn in it.
 - Big-push tracks: mostly prototypes or plans.
 
-**Waiting on the user (§2).** Whether to rewrite git history (the name is still in old commits, some already pushed), CI, and a try of the quick panel on screen.
+**Waiting on the user (§2).** Whether to force-push the rewritten history to GitHub (it still holds the old history from 2026-08-14), CI, and a try of the quick panel on screen.
 
-**Open (§7, §8, §9).** 8 reliability gaps, 8 smaller bugs, the onboarding list.
+**Open (§7, §8).** 8 reliability gaps, 8 smaller bugs.
 
-**Changed this update.** The chat's computer-use rows show each app's real icon in the shipped app: they asked the test-only `mac:debug` channel, so only test runs ever had icons; a real `mac:app-icon` channel answers now, also for apps that are not running and the model's shorthand (the "chat app icons" commit on `fix/chat-area-polish`, not merged or installed yet). Separately, `git filter-repo` rewrote this checkout's history at 10:08 (not part of that task): every commit sha changed (main is now `fdc31157`) and the `origin` remote is gone, so shas quoted here from before then are the old ones. Earlier today: The repo carries no personal details; thinking capped with a mandatory end message (llama.cpp and rapid-mlx); idle unload with load + prefill on the first keystroke (and the MLX prime that never worked); the guard keeps a model in use; the quick panel; Blender scene building verified; onboarding reviewed. Installed.
+**Pinned (the user, 2026-10-09).** Image models to support and suggest: SenseNova-U1.5-8B-MoT and Qwen-Image-2.1-Turbo. One inference engine hyper-optimized for one model on the Mac (as NInfer is for a 5090): wait for Qwen4 27B (announced, hoped to bring the attention upgrades and native drafters) and start the day it lands; Qwen3.8 27B at Q4 is the fallback target.
+
+**Changed this update.**
+- **Onboarding is four pages that hold still:** welcome, look, how hands-on, get running. One "Download and finish · 6.2 GB" button starts the engine and the 4B in the background, or "Skip for now". The empty chat then offers the same download in one click and shows its progress.
+- **Git history is rewritten:** no personal name, email, home path, host or session trace in any of the 1,708 commits, and the repository went from 6.5 GB to 381 MB. GitHub still has the old history until you approve a force-push.
+- **No more ghost Electron tiles in the Dock.** 99 were cleared, and dev Electron is now marked as an agent app so it never shows a tile.
+- **The five design prototypes are redrawn as agreed.**
+- Installed, with the app-icons fix from the parallel session; main is `91d6bf79`.
 
 ## Backlog — everything discussed and not yet done (consolidated 2026-10-08)
 
@@ -90,7 +97,7 @@ Still to check before dropping (not merged): `claude/practical-dhawan-bf1d62` (0
 ### 2. Waiting on the user's decision
 | Decision | Options / note | From |
 |---|---|---|
-| Rewrite git history? | The working tree and every tracked file are clean (5556b7a1, 1bc2e885), but old commits still hold the name, home paths and tailnet addresses; origin/main (2026-08-14) is already pushed, ~1,000 newer commits are not. Options: rewrite the unpushed history before the next push (git filter-repo), or leave history and only push from here on | 10-09 |
+| Force-push the rewritten history? | Done locally 2026-10-09 (the user: "remove the history that contains names and information"): all 1,708 commits rewritten, every object scanned clean. GitHub (origin/main, 2026-08-14) still serves the old history until a force-push, which publishes the ~1,000 newer commits too. Don't `git fetch origin` before then; it brings the old objects back. A private backup of the old history sits outside the repo, for the user to delete | 10-09 |
 | CI | needs a push to the public GitHub repo (XP-03/04) | 09-23 |
 | The quick panel on a real screen | the global hotkey, captures, selection replace and full-screen apps can only be judged by a person; everything else is verified headless | 10-09 |
 
@@ -153,19 +160,33 @@ Decided 2026-10-09 (the user): the 27B is no longer parked between turns — eve
 The office chip flicker (1 of 15 probe runs) · the composer prime on rapid-mlx works now (a chat-endpoint prime, `0b4c361c`); an attachment prefix on it is unmeasured · a short answer in the quick panel sits in a mostly empty panel · img2img edits are subtle (the instruction editor needs the 3D engine) · a finished card remounts into the chain when the next tool call starts · a picture embedded in the reply shows twice · ⌘Z into a turn already answering keeps the partial reply · an image-only message can't be rewound · the Ladle build in the bundle (excluded `68cf0219`, unconfirmed) · ~60 unused old icon files in the design artifact's storage.
 
 
-### 9. Onboarding — specifics to work on (walked headless 2026-10-09, light and dark: `tests/e2e/onboarding-look.mjs`)
-1. **Two different models are recommended.** Step 5 says "Gemma 4 12B Instruct (16 GB) … set it up in Model Manager"; step 7 says Qwen3.5 4B is "the model Bobble starts you with". One rule should decide both (onboarding presets' `planPreset`).
-2. **Old names.** "Model Manager" (it is Models); the first-run tips say "Give **Pi** tools & skills"; "Settings → Harness".
-3. **Jargon on the last step.** "MLX DFlash · around 1.4-1.6x · its drafter arrives with the model", "pi, plus 2 agents found". A new person needs "the fastest engine for this Mac" and "a 5 GB model to start with".
-4. **The last step's controls read wrong.** Its rows carry empty circles that look unselected, and it has two buttons ("Set up now" and "Finish setup"). One primary ("Download and finish · 5 GB") and a quiet "Skip for now".
-5. **A step with nothing in it.** "Start fresh" still shows step 2, "Bring your setup … Nothing to import". Skip it (and step 3 says "Matched to your app" when there is none).
-6. **The page jumps.** Every step is centred vertically, so the dots, title and buttons move up and down between steps. Anchor to the top.
-7. **Pre-design-language colours.** Step 5's recommendation box is the old blue; titles are not Fraunces; the experience cards' hover reads as selected.
-8. **The computer-use grid arrives empty.** Grey placeholder tiles while the helper walks /Applications for icons. Start the listing at step 1 so it is ready by step 6.
-9. **"I know what llama.cpp is."** An in-joke as an option label; say what it changes ("Flag risky commands, no tutorial").
-10. **"Installs happen later" never says when.** Say "when you first use it" and queue nothing silently.
-11. **Seven steps.** Proposed four: Welcome (+ import when there is something) → Look → How hands-on (guidance + computer use) → Get running (model + engine, with the capabilities as switches).
-12. **Landing.** A fresh Mac with the download skipped lands on an empty chat with a "Getting started" popover over the sidebar; the first message is then held ("There is no model on this Mac"). A one-click "Download Qwen3.5 4B (5 GB)" in the empty chat would replace both.
+### 9. Onboarding — DONE 2026-10-09 (the user: "agreed on all your onboarding points, you can fix them as you see necessary")
+All twelve points from the 2026-10-09 walk are done. `tests/e2e/onboarding-look.mjs` now asserts them.
+- Four pages starting fresh: welcome, look, how hands-on (guidance and computer use), get running (engine, model and the generation switches). The import page appears only when there is something to bring.
+- The head is anchored to the top and the buttons to the bottom, with a stable scrollbar gutter, so nothing moves between pages.
+- One model: the 4B. The contradicting Gemma box is gone.
+- Plain words throughout:
+  - the engine is "The fastest engine for this Mac";
+  - sizes come from the catalog;
+  - a download glyph replaces the empty circles;
+  - other agents are named, without Bobble's own pi;
+  - the guidance titles say what they change ("Ask only when it is risky");
+  - the generation switches say "downloads the first time you use it, not now".
+- One primary, "Download and finish · 6.2 GB", next to a quiet "Skip for now". Nothing waits: the engines install and the model downloads in the background. If an engine fails, the model still downloads; it runs on llama.cpp.
+- The empty chat offers the same download in one click and becomes its progress, pause and failure. The tips popover waits until a model is on the Mac.
+- Fraunces titles; teal and neutral colours; card hover no longer looks selected; the app list starts loading on page one, so the grid is full when its page opens.
+
+## Report — 2026-10-09: Dock ghosts, history rewritten, onboarding redone, prototypes redrawn
+
+| Asked | Done | Checked |
+|---|---|---|
+| ">50 'not responding' electron processes in the dock … remove them and ensure this doesn't happen again" | Cleared 99 ghost tiles, with no Electron process left. Dev Electron is now marked an agent app (`LSUIElement`, re-signed), set on install and before every probe, so it never gets a tile. A probe that is killed takes its app with it, and the next probe reaps orphans (`fdc31157`) | 0 tiles during a probe; a probe killed mid-run leaves no process |
+| "remove the history that contains names and information" | `git filter-repo` in two passes over all 1,708 commits: capture and ledger paths removed; the name, email, home paths, hosts, tailnet addresses, session paths and artifact links replaced; every author set to Lavanukee; images with the name redacted; the prebuilt wheels patched (same-length, re-signed). The second pass ran in a mirror, and the refs were swapped in one checked transaction, so the shared checkout was never reset. Size 6.5 GB → 381 MB. The repo now has its own neutral git identity | Every object scanned: 0 hits (one random byte run inside the app icon). The patched wheels import with torch 2.14. Untouched: GitHub, pending a force-push |
+| "agreed on all your onboarding points, you can fix them" | All twelve (§9) | onboarding-look light and dark (four pages, nothing moves, Fraunces, sized button, model card, no tips); onboarding-probe; unit tests for the rules, the card's seven states and the start order |
+| "same on the design opinions, agreed" | Image editor A: the chat composer as the input, one "Picture settings" chip, a six-tool rail, History and Layers behind one toggle. Deep research: B's plan card docked 8px above the input. Devices A plus B's "on linux-workstation" marker. Memory A. Help: A's real Settings rows, safe changes applied at once with Undo, risky ones confirmed. All in the design language | Each agent rendered every screen light and dark at two sizes and looked at them; key screens checked again here |
+| Pinned: SenseNova-U1.5-8B-MoT and Qwen-Image-2.1-Turbo; a one-model hyper-optimized Mac engine (Qwen4 27B when it lands, else Qwen3.8 27B Q4) | Recorded under "Pinned" above | — |
+
+**Checks.** Full desktop typecheck and lint, and 3,789 tests in 329 files. `ship:local` installed `91d6bf79` (the packaged probe and smoke passed), and main was fast-forwarded to it. The prototypes still show "Model management" in their sidebars (the app says "Models"); that is left for their next pass.
 
 ## Report — 2026-10-09: real app icons in the chat's computer-use rows
 
@@ -173,7 +194,7 @@ The office chip flicker (1 of 15 probe runs) · the composer prime on rapid-mlx 
 |---|---|---|
 | The chat's app icons go through test-only `mac:debug`, so the shipped app shows none: add a real, sender-gated channel, keep the probe op, no permission prompt, no `app.getFileIcon` | `mac:app-icon` in the contract, handled next to `mac:list-apps`: the long-lived helper's `appIcon` first, then the installed-apps list (an app not running yet, or "textedit"/"chrome"); a per-app cache in main (`electron/mac/app-icon-source.ts`); `src/chat/app-icons.ts` points at it; `mac:debug`'s `app-icon` op unchanged | Unit tests for the store (3 of 6 fail on the old code), the source and the matcher; `app-icon-probe.mjs` refuses `mac:debug` in main and sees all three rows draw real icons, no window shown, focus guard held; the TCC log over the run shows only preflight checks from the helper. Before/after shots in `deliverables/app-icons-2026-10-09/` |
 
-Checks: desktop unit tests 3,773/3,773, `biome check` clean, typecheck clean. Committed as "chat app icons: a real mac:app-icon channel …" on `fix/chat-area-polish` (ahead of main); not merged or installed.
+Checks: desktop unit tests 3,773/3,773, `biome check` clean, typecheck clean. Committed as "chat app icons: a real mac:app-icon channel …" on `fix/chat-area-polish`; merged to main and installed with `91d6bf79` (later the same day).
 
 ## Report — 2026-10-09: decisions applied, the repo anonymised, thinking capped, idle unload, the quick panel, Blender building scenes
 

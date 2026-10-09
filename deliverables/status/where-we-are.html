@@ -84,6 +84,10 @@
   .changed { background: var(--surface); box-shadow: var(--shadow); border-radius: 14px; padding: 16px 18px; margin-top: 16px; border-left: 3px solid var(--accent); }
   .changed ul { margin: 6px 0 0; padding-left: 18px; }
   .changed li { margin: 3px 0; }
+  .shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 12px; margin-top: 14px; }
+  .shots figure { margin: 0; }
+  .shots img { display: block; width: 100%; height: auto; border-radius: 8px; box-shadow: var(--shadow); }
+  .shots figcaption { font-size: 12.5px; color: var(--muted); margin-top: 6px; }
 
   .north { background: var(--accent-soft); border-radius: 16px; padding: 20px 22px; margin-bottom: 16px; }
   .north p { font-family: Fraunces, Georgia, serif; font-size: 21px; line-height: 1.35; font-weight: 500; }
@@ -162,15 +166,15 @@
   <h1>Where we are</h1>
   <p class="lede">The whole project on one page: the ideas we build by, the limits we work inside, every goal with its state, what is waiting on you, and what changed. Refreshed at the end of every task.</p>
   <div class="meta">
-    <span class="chip">Updated <b>2026-10-09, 10:20</b></span>
-    <span class="chip">main <b>fdc31157</b></span>
+    <span class="chip">Updated <b>2026-10-09, 10:45</b></span>
+    <span class="chip">main <b>91d6bf79</b></span>
     <span class="chip">Installed in <b>/Applications/Bobble.app</b></span>
     <span class="chip">Detail: <b>STATUS.md</b> · <b>ROADMAP-LATEST.md</b></span>
   </div>
 
   <div class="glance">
     <div class="stat"><div class="k">Roadmap</div><div class="v">Step 1 of 6</div><div class="n">The corp harness has never run the 3D-game prompt end to end</div></div>
-    <div class="stat"><div class="k">Waiting on you</div><div class="v">3 items</div><div class="n">Rewrite git history?, CI, try the quick panel on screen</div></div>
+    <div class="stat"><div class="k">Waiting on you</div><div class="v">3 items</div><div class="n">Push the rewritten history?, CI, try the quick panel on screen</div></div>
     <div class="stat"><div class="k">Reliability gaps</div><div class="v">8 open</div><div class="n">Loops, the 27B's cold start, compaction, swap</div></div>
     <div class="stat"><div class="k">Smaller bugs</div><div class="v">8 known</div><div class="n">None that blocks a task</div></div>
     <div class="stat"><div class="k">Roadmap step 4</div><div class="v">Built</div><div class="n">The quick panel, ⌥⇧Space, installed</div></div>
@@ -179,10 +183,21 @@
   <div class="changed">
     <h3>What changed in this update</h3>
     <ul>
-      <li>The chat's computer-use rows now show each app's real icon in the shipped app. They used to ask a channel that exists only in test runs, so only probes ever saw icons. A real <code>mac:app-icon</code> channel answers now, for running apps, apps not yet open, and the model's shorthand ("textedit"). Proven headless with the test channel refused. Committed as "chat app icons" on <code>fix/chat-area-polish</code>; not merged or installed yet.</li>
-      <li><code>git filter-repo</code> rewrote this checkout's history at 10:08, separately from that fix: every commit sha changed (main is now <code>fdc31157</code>) and the <code>origin</code> remote is gone. Older shas quoted on this page are the pre-rewrite ones.</li>
-      <li>Earlier today: no personal details in the repo; thinking capped and always ending in words; idle unload with the load on the first keystroke; the guard keeps a model in use; the quick panel merged and installed; a model built a Blender scene; onboarding reviewed (12 specifics).</li>
+      <li><b>Onboarding is four pages that hold still:</b> welcome, look, how hands-on, get running. One "Download and finish · 6.2 GB" button starts the fastest engine for this Mac and the 4B in the background, or you can skip. Nothing makes you wait. The empty chat then offers the same download in one click and shows how far it has got. All twelve review points are done, and the look probe checks them.</li>
+      <li><b>Git history is rewritten:</b> no name, email, home path, host or session trace in any of the 1,708 commits. Every object was scanned, and the repo went from 6.5 GB to 381 MB. GitHub still has the old history until you say to force-push.</li>
+      <li><b>No ghost Electron tiles in the Dock.</b> 99 were cleared, and the dev Electron is now an agent app, so it never gets a tile. A probe that is killed takes its app with it.</li>
+      <li><b>The five design prototypes are redrawn as you agreed:</b> image editor A with the chat composer and one settings chip; the deep-research plan card docked just above the input; Devices A with B's remote marker; Memory A; help that applies safe changes at once with Undo.</li>
+      <li><b>Pinned:</b> two image models to support (SenseNova-U1.5-8B-MoT, Qwen-Image-2.1-Turbo), and a one-model, hyper-optimized Mac engine for Qwen4 27B when it lands.</li>
+      <li>Installed, together with the app-icons fix from the parallel session.</li>
     </ul>
+    <div class="shots">
+      <figure><a href="images/onboarding-4-get-running.png" target="_blank" rel="noopener"><img src="images/onboarding-4-get-running.png" alt="Onboarding's last page: the engine and the 4B with their sizes, the generation switches, Skip for now and Download and finish 6.2 GB"></a><figcaption>Get running: one download, a real size, or skip</figcaption></figure>
+      <figure><a href="images/onboarding-first-chat.png" target="_blank" rel="noopener"><img src="images/onboarding-first-chat.png" alt="The empty chat with a Download a model to start card above the input"></a><figcaption>The first model, one click from the empty chat</figcaption></figure>
+      <figure><a href="images/onboarding-3-hands-on-dark.png" target="_blank" rel="noopener"><img src="images/onboarding-3-hands-on-dark.png" alt="How hands-on page in dark mode: three guidance cards and the computer-use app grid with real icons"></a><figcaption>Guidance and computer use on one page</figcaption></figure>
+      <figure><a href="images/proto-research-plan.png" target="_blank" rel="noopener"><img src="images/proto-research-plan.png" alt="Deep research plan card docked 8px above the chat input"></a><figcaption>Deep research: the plan card above the input</figcaption></figure>
+      <figure><a href="images/proto-image-editor.png" target="_blank" rel="noopener"><img src="images/proto-image-editor.png" alt="Image editor with a six-tool rail and the chat composer with a Picture settings chip"></a><figcaption>Image editor A: the chat composer, one settings chip</figcaption></figure>
+      <figure><a href="images/proto-help-instant.png" target="_blank" rel="noopener"><img src="images/proto-help-instant.png" alt="Bobble help applying light mode and a bigger sidebar with an Undo button"></a><figcaption>Help: safe changes at once, with Undo</figcaption></figure>
+    </div>
   </div>
 
   <nav class="toc" aria-label="Sections">
@@ -268,12 +283,12 @@
     <div class="table pillars">
       <div class="row"><div><div class="t">Chat and harness</div><span class="pill" data-s="done">Daily use</span></div><div class="d">Thinking capped on every step, ending in words. Idle models unload after five minutes and load back on the first keystroke. Streaming, queued sends, per-chat state, background runs, child agents, projects, cooperative Stop. Since 10-08: a send that can't go out is held with the reason and a fix; a turn that doesn't finish gets a card with a fix button; tool chains are collapsed with picture thumbnails, a hover card and a lightbox. Still open: the reliability gaps below.</div></div>
       <div class="row"><div><div class="t">Quick panel</div><span class="pill" data-s="done">New</span></div><div class="d">⌥⇧Space over any app: ask with context (window, area, screen, selection, clipboard, Finder, browser), computer use on the app in front, a command palette, recent threads. Installed; needs a try on a real screen.</div></div>
-      <div class="row"><div><div class="t">Onboarding</div><span class="pill" data-s="partly">Needs a pass</span></div><div class="d">Seven steps that work. Reviewed 10-09 with 12 specifics: two different recommended models, old names, jargon on the last step, a step with nothing in it, the page jumping between steps, old blue, an empty app grid. Proposed: four steps and a one-click model download on landing.</div></div>
+      <div class="row"><div><div class="t">Onboarding</div><span class="pill" data-s="done">Redone 10-09</span></div><div class="d">Four pages that hold still: welcome, look, how hands-on (guidance and computer use), get running. One "Download and finish" with the real size starts the engine and the 4B in the background; "Skip for now" lands on an empty chat that offers the same download in one click. Fraunces titles, plain words, one model.</div></div>
       <div class="row"><div><div class="t">Visual quality</div><span class="pill" data-s="partly">Pinned 09-24</span></div><div class="d"><b>Done:</b> maths pages that play themselves (the <code>math</code> extension); SVG (OmniSVG pictures plus VFIG figures); inline charts in twelve looks; office renderers fixed. <b>Partly:</b> HyperFrames animations; widgets (built, never run by the model). <b>Not started:</b> websites and UI screens, 3D for games, mixes (a deck with diagrams, data and images), Ming design models, and one generation of each kind we're proud of.</div></div>
-      <div class="row"><div><div class="t">Studios</div><span class="pill" data-s="partly">Editors to come</span></div><div class="d">Image (Qwen-Image 2.1 by default), 3D Studio (generate, rig, retopo, texture, Finish in Grey, Color or PBR), audio. Studios as editors with click-to-comment are prototyped. Image editor direction A chosen, with a new input bar.</div></div>
+      <div class="row"><div><div class="t">Studios</div><span class="pill" data-s="partly">Editors to come</span></div><div class="d">Image (Qwen-Image 2.1 by default), 3D Studio (generate, rig, retopo, texture, Finish in Grey, Color or PBR), audio. Studios as editors with click-to-comment are prototyped; image editor A is redrawn with the chat composer as its input and one "Picture settings" chip. Not built in the app yet.</div></div>
       <div class="row"><div><div class="t">Connectors and tools</div><span class="pill" data-s="partly">Growing</span></div><div class="d">Connectors as CLI commands, the Blender command, <code>office</code>, <code>chart</code>, <code>math</code>, <code>svg</code>, the new dictation module, and computer use (background, by app, with an app chooser). Next: a Godot connector, an explore demo for every connector, and one-click injection (roadmap 3).</div></div>
       <div class="row"><div><div class="t">Models</div><span class="pill" data-s="done">Working</span></div><div class="d">The Models page (This Mac, Filters, Recommended, Hub), a library in <code>~/Bobble/Models</code>, Manage Storage, the engine menu (llama.cpp, MLX) with calibration, onboarding presets, and the quick model menu.</div></div>
-      <div class="row"><div><div class="t">Design language</div><span class="pill" data-s="partly">Mostly wired</span></div><div class="d">Wired on 10-08: teal, Fraunces, hue tags, intro cards, the pop-out, the quick tour, Try-it demos. Still to do: the Made card, the toolbar, and tables, office documents and inline cards brought to the same level.</div></div>
+      <div class="row"><div><div class="t">Design language</div><span class="pill" data-s="partly">Mostly wired</span></div><div class="d">Wired on 10-08: teal, Fraunces, hue tags, intro cards, the pop-out, the quick tour, Try-it demos. The five prototypes are redrawn in it. Still to do: the Made card, the toolbar, and tables, office documents and inline cards brought to the same level.</div></div>
       <div class="row"><div><div class="t">Keeping the Mac well</div><span class="pill" data-s="done">Working</span></div><div class="d">The guardian, the memory guard (pause, resume, terminate), low-power pacing, the orphan-server reaper, the stream-stall watchdog, a stable signing identity so computer-use permission survives updates.</div></div>
       <div class="row"><div><div class="t">The 09-23 big-push tracks</div><span class="pill" data-s="partly">Mixed</span></div><div class="d"><b>Training UI:</b> parity study with Unsloth Studio done (133 rows), prototypes not built. <b>Tailscale Devices:</b> backend merged, no UI. <b>Linux and Windows:</b> installer only. <b>Hindsight memory, bobble help, workflows:</b> prototypes only. <b>Ming:</b> an engine spike. <b>Harness LoRA:</b> plan only.</div></div>
     </div>
@@ -285,11 +300,11 @@
     <p class="sub">Decisions only you can make. Nothing else is blocked on you.</p>
     <div class="table decide">
       <div class="row head"><span>Decision</span><span>Options</span><span>Since</span></div>
-      <div class="row"><span class="t">Rewrite git history?</span><span class="d">Every tracked file is clean now, but old commits still hold the name, home paths and tailnet addresses. origin/main (08-14) is already pushed; about 1,000 newer commits are not. Rewrite the unpushed part before the next push, or leave history as it is.</span><span class="d">10-09</span></div>
+      <div class="row"><span class="t">Push the rewritten history?</span><span class="d">History is rewritten locally and scanned clean. GitHub still serves the old history (main from 08-14) until a force-push, which also publishes the ~1,000 newer commits. A private backup of the old history sits outside the repo, for you to delete when you like.</span><span class="d">10-09</span></div>
       <div class="row"><span class="t">CI</span><span class="d">Needs a push to the public GitHub repo</span><span class="d">09-23</span></div>
       <div class="row"><span class="t">Try the quick panel on screen</span><span class="d">⌥⇧Space over any app. Only a person can judge the real hotkey, captures, replacing a selection and full-screen apps.</span><span class="d">10-09</span></div>
     </div>
-    <p class="sub" style="margin-top:12px">Decided 10-09: no parking between turns (idle unload instead), thinking capped with an end message, Blender may be touched (verified), "Got it" stays, deep research is the plan card docked above the input, image editor A with a new input bar.</p>
+    <p class="sub" style="margin-top:12px">Decided 10-09: no parking between turns (idle unload instead), thinking capped with an end message, Blender may be touched (verified), "Got it" stays, deep research is the plan card docked above the input, image editor A with a new input bar. Later: rewrite the history, fix all twelve onboarding points, apply the design opinions to the prototypes.</p>
   </section>
 
   <!-- ============ GAPS ============ -->
@@ -332,6 +347,8 @@
     <p class="sub">From the strategy talks: things to build when their turn comes, and outside work to keep an eye on.</p>
     <div class="table ideas">
       <div class="row head"><span>Idea</span><span>Where it stands</span><span></span></div>
+      <div class="row"><span class="t">One model, one engine, made fast on the Mac</span><span class="d">An inference engine hyper-optimized for a single model, as NInfer is for a 5090. Wait for Qwen4 27B (announced; hoped to bring the attention upgrades and native drafters) and start the day it lands. Qwen3.8 27B at Q4 is the fallback: likely better than the 4B across the board if it can be made fast enough.</span><span class="pill" data-s="watch">Pinned</span></div>
+      <div class="row"><span class="t">Two image models</span><span class="d">Support and suggest SenseNova-U1.5-8B-MoT and Qwen-Image-2.1-Turbo.</span><span class="pill" data-s="todo">Pinned</span></div>
       <div class="row"><span class="t">Godot through code</span><span class="d">The Blender command is the model for it (UE5 doesn't fit in 24 GB). A Godot connector isn't started.</span><span class="pill" data-s="todo">Idea</span></div>
       <div class="row"><span class="t">Hot-swapping LoRAs</span><span class="d">llama.cpp loads adapters at launch and switches between them per request. Not built.</span><span class="pill" data-s="todo">Idea</span></div>
       <div class="row"><span class="t">Semantic search over long video</span><span class="d">Embed a 2-hour film with a multimodal embedding model (embeddinggemma2) and search it, instead of tokenizing it.</span><span class="pill" data-s="todo">Idea</span></div>
@@ -347,6 +364,9 @@
     <h2>Recently done</h2>
     <p class="sub">Each item below is verified on screen by a probe, merged to main and installed.</p>
     <div class="log">
+      <div class="e"><div class="when">2026-10-09</div><div class="what">Onboarding redone</div><div class="det">Four pages, a footer and head that never move, one download in the background, and the first model one click from the empty chat. Look probe in light and dark, the functional probe, and 3,789 unit tests. <code>91d6bf79</code></div></div>
+      <div class="e"><div class="when">2026-10-09</div><div class="what">History without personal details</div><div class="det">Two filter-repo passes over 1,708 commits; every object scanned clean; 6.5 GB to 381 MB. The repo has its own neutral git identity.</div></div>
+      <div class="e"><div class="when">2026-10-09</div><div class="what">No Electron ghosts in the Dock</div><div class="det">99 cleared. Dev Electron is an agent app from install, and a killed probe takes its app with it. <code>fdc31157</code></div></div>
       <div class="e"><div class="when">2026-10-09</div><div class="what">The quick panel</div><div class="det">Roadmap step 4, built by a subagent, reviewed, rebased and merged. Its input wakes an unloaded model. 63/63 headless checks. <code>5f61926a</code></div></div>
       <div class="e"><div class="when">2026-10-09</div><div class="what">Idle unload, and the guard keeps a model in use</div><div class="det">Five minutes without input unloads. The first keystroke loads the model back and re-reads the conversation, so the 27B's first token comes 0.6 s after Enter. The composer's prime now works on rapid-mlx. <code>0b4c361c</code></div></div>
       <div class="e"><div class="when">2026-10-09</div><div class="what">Thinking capped, ending in words</div><div class="det">The budget is sized to the window and always ends with the message; on rapid-mlx through a start-up patch, tool turns included. <code>17fe7e49</code></div></div>
@@ -384,9 +404,9 @@
       <div class="list">
         <h3>State</h3>
         <ul>
-          <li><span class="x">main</span><span class="w"><code>fdc31157</code>, history rewritten 10:08</span></li>
-          <li><span class="x">Working branch <code>fix/chat-area-polish</code></span><span class="w">ahead of main (the app-icon fix and this update)</span></li>
-          <li><span class="x">Installed build</span><span class="w"><code>6ac999c5</code>, later commits are docs only</span></li>
+          <li><span class="x">main</span><span class="w"><code>91d6bf79</code>, history rewritten 10:08 and 10:20</span></li>
+          <li><span class="x">Working branch <code>fix/chat-area-polish</code></span><span class="w">same as main</span></li>
+          <li><span class="x">Installed build</span><span class="w"><code>91d6bf79</code></span></li>
           <li><span class="x">Lint, typecheck, unit suites</span><span class="w">clean</span></li>
         </ul>
       </div>
