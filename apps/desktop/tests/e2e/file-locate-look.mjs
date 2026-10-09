@@ -96,6 +96,12 @@ try {
     'the file is opened where it really is',
   );
   check(!t1.some((t) => t.kind === 'notice'), 'no notice for a file that exists');
+  const canvasOpen = await page.evaluate(
+    () =>
+      document.querySelector('[data-testid="canvas-tabs-panel"]')?.getAttribute('data-open') ===
+      'true',
+  );
+  check(canvasOpen, 'and the canvas stays open on it');
   await shot('1-found');
 
   // 2. A file not written yet.

@@ -569,9 +569,10 @@ export async function openFileInCanvas(
           controller.updateTab(tabId, { artifact: fileArtifact(absPath, found) });
           return;
         }
-        // Found under another folder: open it there, in this tab's place.
-        controller.closeTab(tabId);
-        void openFileInCanvas(controller, path, cwd);
+        // Found under another folder: open it there, in this tab's place —
+        // the new tab first, so the canvas never reaches zero tabs and folds
+        // away (SEEN: the found file opened into a closed canvas).
+        void openFileInCanvas(controller, path, cwd).then(() => controller.closeTab(tabId));
       },
       () => controller.getState().tabs.some((t) => t.id === tabId),
     );
