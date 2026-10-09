@@ -1,7 +1,7 @@
 /**
  * THE SIDEBAR LIGHTS WHAT IS ON SCREEN — however you got there.
  *
- * the user (2026-10-09): "ensure the sidebar highlight applies correctly to
+ * the user (2026-10-08): "ensure the sidebar highlight applies correctly to
  * whatever's actually selected, currently I think it gets stuck on chats,
  * doesn't show connectors and such if they're selected maybe also something to
  * do with if they're not directly selected given there's multiple ways to get

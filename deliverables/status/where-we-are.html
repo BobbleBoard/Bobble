@@ -1,0 +1,404 @@
+<title>Bobble Status</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f7f7f5;
+    --surface: #ffffff;
+    --inset: #f0f0ed;
+    --text: #1c1c1e;
+    --muted: #69696e;
+    --faint: #8e8e93;
+    --line: #e3e3df;
+    --accent: #0f8a8a;
+    --accent-soft: #e2f2f1;
+    --done: #0f8a8a;      --done-bg: #e2f2f1;
+    --prog: #2d6fd1;      --prog-bg: #e5eefb;
+    --part: #a5660c;      --part-bg: #fbf0dc;
+    --todo: #6b6b70;      --todo-bg: #eeeeeb;
+    --wait: #b4541a;      --wait-bg: #fbe9de;
+    --watch: #5d6b78;     --watch-bg: #e9edf1;
+    --shadow: 0 1px 2px rgba(20,20,20,.05), 0 0 0 1px var(--line);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #141416; --surface: #1c1c1f; --inset: #232327;
+      --text: #ececee; --muted: #a1a1a7; --faint: #7c7c82; --line: #2e2e33;
+      --accent: #16a3a3; --accent-soft: #123332;
+      --done: #3cc0bd; --done-bg: #123332;
+      --prog: #79a8f0; --prog-bg: #17263d;
+      --part: #e0a54a; --part-bg: #33270f;
+      --todo: #a1a1a7; --todo-bg: #26262a;
+      --wait: #ee9a62; --wait-bg: #3a2416;
+      --watch: #a3b2c0; --watch-bg: #222a31;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #141416; --surface: #1c1c1f; --inset: #232327;
+    --text: #ececee; --muted: #a1a1a7; --faint: #7c7c82; --line: #2e2e33;
+    --accent: #16a3a3; --accent-soft: #123332;
+    --done: #3cc0bd; --done-bg: #123332;
+    --prog: #79a8f0; --prog-bg: #17263d;
+    --part: #e0a54a; --part-bg: #33270f;
+    --todo: #a1a1a7; --todo-bg: #26262a;
+    --wait: #ee9a62; --wait-bg: #3a2416;
+    --watch: #a3b2c0; --watch-bg: #222a31;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 15px/1.55 Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 40px 16px 96px; }
+  h1, h2, h3 { font-family: Fraunces, Georgia, serif; font-weight: 600; letter-spacing: -0.01em; margin: 0; }
+  h1 { font-size: 40px; line-height: 1.1; }
+  h2 { font-size: 24px; line-height: 1.2; margin-bottom: 4px; }
+  h3 { font-size: 16px; font-family: Inter, sans-serif; font-weight: 600; letter-spacing: 0; }
+  p { margin: 0; }
+  a { color: var(--accent); }
+  .eyebrow { font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; }
+  .lede { color: var(--muted); margin-top: 12px; max-width: 64ch; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+  .chip { font-size: 12.5px; color: var(--muted); background: var(--surface); box-shadow: var(--shadow); border-radius: 999px; padding: 4px 10px; }
+  .chip b { color: var(--text); font-weight: 600; }
+
+  nav.toc { display: flex; flex-wrap: wrap; gap: 6px; margin: 28px 0 8px; }
+  nav.toc a { font-size: 13px; text-decoration: none; color: var(--text); background: var(--inset); border-radius: 8px; padding: 5px 10px; }
+  nav.toc a:hover { background: var(--accent-soft); color: var(--accent); }
+
+  section { margin-top: 48px; scroll-margin-top: 16px; }
+  .sub { color: var(--muted); font-size: 14px; margin-bottom: 16px; max-width: 70ch; }
+
+  .glance { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-top: 28px; }
+  .stat { background: var(--surface); box-shadow: var(--shadow); border-radius: 14px; padding: 14px 16px; }
+  .stat .k { font-size: 12.5px; color: var(--muted); }
+  .stat .v { font-family: Fraunces, Georgia, serif; font-size: 26px; font-weight: 600; margin-top: 2px; line-height: 1.15; }
+  .stat .n { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+
+  .changed { background: var(--surface); box-shadow: var(--shadow); border-radius: 14px; padding: 16px 18px; margin-top: 16px; border-left: 3px solid var(--accent); }
+  .changed ul { margin: 6px 0 0; padding-left: 18px; }
+  .changed li { margin: 3px 0; }
+
+  .north { background: var(--accent-soft); border-radius: 16px; padding: 20px 22px; margin-bottom: 16px; }
+  .north p { font-family: Fraunces, Georgia, serif; font-size: 21px; line-height: 1.35; font-weight: 500; }
+  .north .by { font-family: Inter, sans-serif; font-size: 13px; color: var(--muted); margin-top: 8px; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+  .card { background: var(--surface); box-shadow: var(--shadow); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 6px; }
+  .card .num { font-size: 12px; font-weight: 600; color: var(--accent); font-variant-numeric: tabular-nums; }
+  .card p { color: var(--muted); font-size: 14px; }
+  .card .how { font-size: 13px; color: var(--text); border-top: 1px solid var(--line); padding-top: 8px; margin-top: auto; }
+
+  .table { background: var(--surface); box-shadow: var(--shadow); border-radius: 14px; overflow: hidden; }
+  .row { display: grid; gap: 4px 16px; padding: 13px 16px; border-top: 1px solid var(--line); }
+  .row:first-child { border-top: 0; }
+  .row.head { background: var(--inset); font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; padding: 9px 16px; }
+  .limits .row { grid-template-columns: 1.1fr 1.6fr 1.6fr; }
+  .road .row { grid-template-columns: 36px 1fr 130px; align-items: start; }
+  .pillars .row { grid-template-columns: 1fr 2.4fr; }
+  .decide .row { grid-template-columns: 1.5fr 1.5fr 70px; }
+  .row .t { font-weight: 600; }
+  .row .d { color: var(--muted); font-size: 14px; }
+  .row .d b { color: var(--text); font-weight: 600; }
+  .road .idx { font-family: Fraunces, Georgia, serif; font-size: 22px; font-weight: 600; color: var(--faint); line-height: 1.1; }
+  .road .row.now { background: linear-gradient(90deg, var(--accent-soft), transparent 70%); }
+  .road .row.now .idx { color: var(--accent); }
+  .road .milestone { font-size: 13px; color: var(--accent); font-weight: 500; padding: 8px 16px 8px 68px; border-top: 1px dashed var(--line); }
+
+  .pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; border-radius: 999px; padding: 3px 9px; white-space: nowrap; justify-self: start; align-self: start; }
+  .pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .pill[data-s="done"] { color: var(--done); background: var(--done-bg); }
+  .pill[data-s="progress"] { color: var(--prog); background: var(--prog-bg); }
+  .pill[data-s="partly"] { color: var(--part); background: var(--part-bg); }
+  .pill[data-s="todo"] { color: var(--todo); background: var(--todo-bg); }
+  .pill[data-s="waiting"] { color: var(--wait); background: var(--wait-bg); }
+  .pill[data-s="watch"] { color: var(--watch); background: var(--watch-bg); }
+
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .list { background: var(--surface); box-shadow: var(--shadow); border-radius: 14px; padding: 6px 0; }
+  .list h3 { padding: 10px 16px 6px; }
+  .list ul { list-style: none; margin: 0; padding: 0; }
+  .list li { padding: 9px 16px; border-top: 1px solid var(--line); font-size: 14px; display: flex; gap: 10px; align-items: baseline; }
+  .list li .x { flex: 1; }
+  .list li .w { color: var(--muted); font-size: 12.5px; white-space: nowrap; }
+
+  .ideas .row { grid-template-columns: 1.4fr 2fr 100px; }
+
+  .log { border-left: 2px solid var(--line); margin-left: 6px; padding-left: 20px; display: grid; gap: 18px; }
+  .log .e { position: relative; }
+  .log .e::before { content: ""; position: absolute; left: -26px; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: var(--surface); box-shadow: 0 0 0 2px var(--accent); }
+  .log .when { font-size: 12.5px; color: var(--muted); font-weight: 500; }
+  .log .what { font-weight: 600; margin-top: 2px; }
+  .log .det { color: var(--muted); font-size: 14px; margin-top: 2px; }
+
+  .rules { columns: 2 280px; column-gap: 24px; background: var(--surface); box-shadow: var(--shadow); border-radius: 14px; padding: 14px 18px; margin: 0; list-style: none; }
+  .rules li { break-inside: avoid; padding: 6px 0; font-size: 14px; border-bottom: 1px solid var(--line); }
+  .rules li b { font-weight: 600; }
+
+  code { font: 12.5px ui-monospace, "SF Mono", Menlo, monospace; background: var(--inset); padding: 1px 5px; border-radius: 5px; }
+  footer { margin-top: 56px; color: var(--faint); font-size: 13px; }
+
+  @media (max-width: 720px) {
+    h1 { font-size: 32px; }
+    .wrap { padding-top: 28px; }
+    .limits .row, .pillars .row, .decide .row, .ideas .row { grid-template-columns: 1fr; }
+    .road .row { grid-template-columns: 28px 1fr; }
+    .road .row .pill { grid-column: 2; }
+    .road .milestone { padding-left: 16px; }
+    .row.head { display: none; }
+    .split { grid-template-columns: 1fr; }
+    .list li { flex-wrap: wrap; }
+  }
+</style>
+
+<div class="wrap">
+  <div class="eyebrow">Bobble · living status</div>
+  <h1>Where we are</h1>
+  <p class="lede">The whole project on one page: the ideas we build by, the limits we work inside, every goal with its state, what is waiting on you, and what changed. Refreshed at the end of every task.</p>
+  <div class="meta">
+    <span class="chip">Updated <b>2026-10-08, 23:00</b></span>
+    <span class="chip">main <b>31a4ce4d</b></span>
+    <span class="chip">Installed in <b>/Applications/Bobble.app</b></span>
+    <span class="chip">Detail: <b>STATUS.md</b> · <b>ROADMAP-LATEST.md</b></span>
+  </div>
+
+  <div class="glance">
+    <div class="stat"><div class="k">Roadmap</div><div class="v">Step 1 of 6</div><div class="n">The corp harness has never run the 3D-game prompt end to end</div></div>
+    <div class="stat"><div class="k">Waiting on you</div><div class="v">6 decisions</div><div class="n">Park policy, thinking cap, Blender edits, prototypes, CI, "Got it!"</div></div>
+    <div class="stat"><div class="k">Reliability gaps</div><div class="v">9 open</div><div class="n">Loops, the 27B's cold start, compaction, swap</div></div>
+    <div class="stat"><div class="k">Smaller bugs</div><div class="v">9 known</div><div class="n">None that blocks a task</div></div>
+    <div class="stat"><div class="k">Shipped since 10-07</div><div class="v">5 batches</div><div class="n">Design language, chat area, errors, pictures, sidebar</div></div>
+  </div>
+
+  <div class="changed">
+    <h3>What changed in this update</h3>
+    <ul>
+      <li>This page is new, along with a "Where we are" overview at the top of <code>STATUS.md</code>. Both are refreshed after every task.</li>
+      <li>Last task: the sidebar now lights whatever is on screen, however you got there (<code>aa2478e0</code>). Installed.</li>
+    </ul>
+  </div>
+
+  <nav class="toc" aria-label="Sections">
+    <a href="#ideas">Core ideas</a>
+    <a href="#limits">Hard limits</a>
+    <a href="#roadmap">Roadmap</a>
+    <a href="#pillars">Product today</a>
+    <a href="#waiting">Waiting on you</a>
+    <a href="#gaps">Open gaps</a>
+    <a href="#watch">Ideas and watch items</a>
+    <a href="#recent">Recently done</a>
+    <a href="#how">How we work</a>
+    <a href="#house">Housekeeping</a>
+  </nav>
+
+  <!-- ============ CORE IDEAS ============ -->
+  <section id="ideas">
+    <h2>Core ideas</h2>
+    <p class="sub">The ideas every decision is checked against. Most came out of our brainstorms, and several were measured.</p>
+    <div class="north">
+      <p>Large, high-quality work from small models running on your own Mac, and nowhere else.</p>
+      <div class="by">The harness's job is to squeeze the model to its limit through directed refinement. Random retries ("monkeys at typewriters") are not the method.</div>
+    </div>
+    <div class="cards">
+      <div class="card"><span class="num">01</span><h3>Local, and only local</h3><p>No cloud model, no fallback, no bring-your-own-key, no hosted tier, even where local can't match frontier quality.</p><div class="how">Gaps are closed with local levers: harness reliability, renderers, MoE models, effort limits, local tool channels, LoRA on the Mac.</div></div>
+      <div class="card"><span class="num">02</span><h3>Prompt pressure is a finished fix</h3><p>The system is non-deterministic. A well-aimed prompt that moves the odds beats task-specific machinery that narrows what the harness can do.</p><div class="how">Hard rules are reserved for the harness's own honesty: refuse unparseable writes, refuse commands that never return, keep paths in the workspace, report what is true.</div></div>
+      <div class="card"><span class="num">03</span><h3>Aim at the moment of action</h3><p>Measured on the 4B: a guideline line in the system prompt changed nothing. The same point made in a tool's result, at the moment of the call, worked.</p><div class="how">"Don't do X" goes in the tool's answer. The system prompt only says which tool to reach for. Re-run the same task to see whether a line moved the model.</div></div>
+      <div class="card"><span class="num">04</span><h3>Every role is an agent with tools</h3><p>Never a bare completion. Running bare, qwen overthinks: about 15,400-token turns, against about 1,300 inside a harness.</p><div class="how">The agent mesh: any role can talk to any peer. Robustness checks (import graph, verify) become tools that agents call, not gates.</div></div>
+      <div class="card"><span class="num">05</span><h3>Per-step reliability is the lever</h3><p>A 30-step task where each step succeeds 95% of the time finishes 21% of the time. At 99% per step it finishes 74% of the time.</p><div class="how">Long tasks are won by making each step dependable: catch loops, recover empty replies, keep files true.</div></div>
+      <div class="card"><span class="num">06</span><h3>The corporation shape</h3><p>A hierarchy that grows with the task: the CEO holds the vision, managers write contracts, engineers build, specialists review.</p><div class="how">Scope sets the depth, memory sets the width, effort sets how much review. The hierarchy only runs at the top two efforts.</div></div>
+      <div class="card"><span class="num">07</span><h3>CLI over MCP, code over screenshots</h3><p>Models are trained on bash and <code>--help</code>. In bash-CLI mode the prompt prefix is 1,770 tokens instead of 8,185.</p><div class="how">Every connector is a command. Blender and Godot are driven through code, not by clicking screenshots.</div></div>
+      <div class="card"><span class="num">08</span><h3>The machine comes first</h3><p>A generation once froze your Mac. Now the guardian admits each job by its real memory footprint, and holds or sheds jobs before the machine suffers.</p><div class="how">Low power slows a job down instead of stopping it. Heavy workers run behind the pointer at QoS tiers 5/5.</div></div>
+      <div class="card"><span class="num">09</span><h3>Prefill is the number people feel</h3><p>The wait for the first token is what makes a chat feel slow or fast. Warming the prompt when a model is selected took turn-1 first token from 2,021 ms to 101 ms.</p><div class="how">No chat or harness change is done until its time to first token is logged and every re-prefill fixed.</div></div>
+      <div class="card"><span class="num">10</span><h3>No raw red errors</h3><p>Every failure is said in plain words with its fix as a button. Where the app can fix it itself, it does.</p><div class="how"><code>plainError</code>, turn-problem cards, held sends, amber toasts with actions.</div></div>
+      <div class="card"><span class="num">11</span><h3>Reference-quality UI, Bobble's own language</h3><p>Teal accent, Fraunces titles, Hugeicons at 1px, grounded shadows. No emoji anywhere. Never a hand-drawn brand logo.</p><div class="how">Components are built from reference specs on one shared core, so one fix lands everywhere.</div></div>
+      <div class="card"><span class="num">12</span><h3>Your attention is the scarce resource</h3><p>You judge only feel and first impressions. Everything an agent can verify, an agent verifies.</p><div class="how">Headless by default, reports with images, decisions batched for you below.</div></div>
+    </div>
+  </section>
+
+  <!-- ============ HARD LIMITS ============ -->
+  <section id="limits">
+    <h2>Hard limits</h2>
+    <p class="sub">The real constraints we design inside, with the measured numbers and what we do about each one.</p>
+    <div class="table limits">
+      <div class="row head"><span>Limit</span><span>The number</span><span>What we do about it</span></div>
+      <div class="row"><span class="t">Memory</span><span class="d">M5 Pro, <b>24 GB unified</b>, shared by the chat model, the generation models and macOS. An image model listed at 4.3 GB actually uses about 19 GB at 1024².</span><span class="d">Jobs are admitted by real footprint (the drop in free memory). One heavy job at a time. The guardian parks idle models.</span></div>
+      <div class="row"><span class="t">The 27B's start-up</span><span class="d">First send waits <b>~122 s</b>. A parked 27B reloads cold every turn: <b>17–26 s</b> to the first token.</span><span class="d">The park policy is waiting on your decision. Warming on select doesn't cover the first send yet.</span></div>
+      <div class="row"><span class="t">Context window</span><span class="d"><b>32k</b> locally. pi's compaction is tuned for 200k: it fired at half the window and freed nothing.</span><span class="d">Compaction is now sized from the live window. Summarizing on a small window still costs a model call (open gap).</span></div>
+      <div class="row"><span class="t">Prompt prefix</span><span class="d"><b>~9,400 tokens</b> with tool schemas, an 11.5 s warm-up. <b>1,770</b> in bash-CLI mode.</span><span class="d">Bash-CLI mode, warm-up on model select, and a price kept per tool.</span></div>
+      <div class="row"><span class="t">One decode slot</span><span class="d">One conversation decodes at a time. The prompt cache reuses <b>92–99%</b> when a chat comes back, but it is a cliff: below ~1.5 GiB of cache, reuse drops to 0%.</span><span class="d">Never shrink <code>--cache-ram</code>. Keep background calls off the chat's slot: any call with a different prefix evicts it.</span></div>
+      <div class="row"><span class="t">Vision</span><span class="d">The vision projector loads on demand, which means a relaunch when a picture arrives.</span><span class="d">Text chats pay nothing for vision. When it isn't available, a held send offers to send without the picture.</span></div>
+      <div class="row"><span class="t">Apple GPU</span><span class="d">MPS refuses fp8, so <b>GGUF is the only quant path</b> for ComfyUI. MLX "fp32" matmul is off by ~8e-4. Background QoS (<code>-b</code>) means E-cores only, <b>12× slower</b>.</span><span class="d">GGUF text encoders, QoS tiers 5/5, and the Metal precision flag where it matters.</span></div>
+      <div class="row"><span class="t">Generation time</span><span class="d">Image <b>97 s</b> at 1024² (Qwen-Image 2.1). 3D <b>225 s</b> (TRELLIS 512, 82 s of that is loading). Video <b>521 s</b> (512², 49 frames). Music 6 s.</span><span class="d">Low power paces a job and never stops it. Step previews run only when they fit in memory.</span></div>
+      <div class="row"><span class="t">Small models</span><span class="d">The 4B is the default. Below 12B: Q8 by default, Q6 as the floor, never Q4. The 27B can spend its whole output budget thinking (20k characters).</span><span class="d">Quant policy in the catalog. A thinking cap is waiting on your decision.</span></div>
+      <div class="row"><span class="t">Non-determinism</span><span class="d">Every fix changes the odds. Some failures always remain.</span><span class="d">Judge a change by re-running the same task, not by a single success.</span></div>
+      <div class="row"><span class="t">Hardware we can't test</span><span class="d">AMD, NVIDIA and Intel GPUs. Windows and Linux.</span><span class="d">Lemonade behind <code>baseUrl</code> (roadmap 2). A per-platform uv installer.</span></div>
+      <div class="row"><span class="t">The Hub</span><span class="d">A catalog repo can disappear. OmniSVG 1.1's GGUF is not on the Hub, so a fresh install can't fetch it.</span><span class="d">Offline-first uv launches and mirror support. The OmniSVG entry still needs a working source.</span></div>
+      <div class="row"><span class="t">Sleep</span><span class="d">With the lid closed, a headless run stalls (the Mac only DarkWakes).</span><span class="d">Check clamshell, keep-awake, battery and other model servers before any heavy run.</span></div>
+    </div>
+  </section>
+
+  <!-- ============ ROADMAP ============ -->
+  <section id="roadmap">
+    <h2>The roadmap</h2>
+    <p class="sub">The order you set in <code>ROADMAP-LATEST.md</code>. Fine-tuning comes strictly last.</p>
+    <div class="table road">
+      <div class="row now"><span class="idx">1</span><div><div class="t">Corp harness</div><div class="d">Done only when <b>the full 3D-game prompt runs end to end, autonomously, without collapse</b>. That has never happened yet. Built: the agent mesh, phases 1 and 2a–c (every role a persistent agent, one CEO↔manager channel, gated to the top efforts), the preflight gate, submit verification. Open: phase 3 (emergent concurrency, injecting messages mid tool call, file attachments), coarser decomposition at xhigh/max, inter-agent Q&A with KV caching, and the acceptance run itself.</div></div><span class="pill" data-s="progress">In progress</span></div>
+      <div class="row"><span class="idx">2</span><div><div class="t">Lemonade (AMD) as a backend</div><div class="d">An alternative inference server behind the existing <code>baseUrl</code> seam: the fastest route to hardware we can't test.</div></div><span class="pill" data-s="todo">Not started</span></div>
+      <div class="row"><span class="idx">3</span><div><div class="t">Connectors with zero instructions</div><div class="d">Done so far: connectors are named in the prompt and shaped as CLI commands, with switches under + › Connectors. Blender works as a command (read-only verified), and every connector page has a demo card. Not designed yet: one click that installs an add-on into Blender or Unity.</div></div><span class="pill" data-s="partly">Partly</span></div>
+      <div class="row"><span class="idx">4</span><div><div class="t">Access from anywhere, universal hotkey UI</div><div class="d">Not designed yet.</div></div><span class="pill" data-s="todo">Not started</span></div>
+      <div class="milestone">After step 4, the original vision of the project is fulfilled.</div>
+      <div class="row"><span class="idx">5</span><div><div class="t">Ubuntu and Windows, then clustering over Tailscale</div><div class="d">Groundwork only: a per-platform uv installer, and a Tailscale Devices backend (safe reads, adapter, pairing, tokens, trust) with no UI yet.</div></div><span class="pill" data-s="partly">Groundwork</span></div>
+      <div class="row"><span class="idx">6</span><div><div class="t">Autonomous fine-tuning</div><div class="d">Planned in <code>deliverables/research/PLAN.md</code>, including the harness LoRA of the 4B. Starts only after step 5.</div></div><span class="pill" data-s="todo">Plan only</span></div>
+    </div>
+  </section>
+
+  <!-- ============ PILLARS ============ -->
+  <section id="pillars">
+    <h2>The product today</h2>
+    <p class="sub">What each part of Bobble can do now, and what is still open in it.</p>
+    <div class="table pillars">
+      <div class="row"><div><div class="t">Chat and harness</div><span class="pill" data-s="done">Daily use</span></div><div class="d">Streaming, queued sends, per-chat state, background runs, child agents, projects, cooperative Stop. Since 10-08: a send that can't go out is held with the reason and a fix; a turn that doesn't finish gets a card with a fix button; tool chains are collapsed with picture thumbnails, a hover card and a lightbox. Still open: the reliability gaps below.</div></div>
+      <div class="row"><div><div class="t">Visual quality</div><span class="pill" data-s="partly">Pinned 09-24</span></div><div class="d"><b>Done:</b> maths pages that play themselves (the <code>math</code> extension); SVG (OmniSVG pictures plus VFIG figures); inline charts in twelve looks; office renderers fixed. <b>Partly:</b> HyperFrames animations; widgets (built, never run by the model). <b>Not started:</b> websites and UI screens, 3D for games, mixes (a deck with diagrams, data and images), Ming design models, and one generation of each kind we're proud of.</div></div>
+      <div class="row"><div><div class="t">Studios</div><span class="pill" data-s="partly">Editors to come</span></div><div class="d">Image (Qwen-Image 2.1 by default), 3D Studio (generate, rig, retopo, texture, Finish in Grey, Color or PBR), audio. Studios as editors with click-to-comment are prototyped; the image viewer part is partly built.</div></div>
+      <div class="row"><div><div class="t">Connectors and tools</div><span class="pill" data-s="partly">Growing</span></div><div class="d">Connectors as CLI commands, the Blender command, <code>office</code>, <code>chart</code>, <code>math</code>, <code>svg</code>, the new dictation module, and computer use (background, by app, with an app chooser). Next: a Godot connector, an explore demo for every connector, and one-click injection (roadmap 3).</div></div>
+      <div class="row"><div><div class="t">Models</div><span class="pill" data-s="done">Working</span></div><div class="d">The Models page (This Mac, Filters, Recommended, Hub), a library in <code>~/Bobble/Models</code>, Manage Storage, the engine menu (llama.cpp, MLX) with calibration, onboarding presets, and the quick model menu.</div></div>
+      <div class="row"><div><div class="t">Design language</div><span class="pill" data-s="partly">Mostly wired</span></div><div class="d">Wired on 10-08: teal, Fraunces, hue tags, intro cards, the pop-out, the quick tour, Try-it demos. Still to do: the Made card, the toolbar, and tables, office documents and inline cards brought to the same level.</div></div>
+      <div class="row"><div><div class="t">Keeping the Mac well</div><span class="pill" data-s="done">Working</span></div><div class="d">The guardian, the memory guard (pause, resume, terminate), low-power pacing, the orphan-server reaper, the stream-stall watchdog, a stable signing identity so computer-use permission survives updates.</div></div>
+      <div class="row"><div><div class="t">The 09-23 big-push tracks</div><span class="pill" data-s="partly">Mixed</span></div><div class="d"><b>Training UI:</b> parity study with Unsloth Studio done (133 rows), prototypes not built. <b>Tailscale Devices:</b> backend merged, no UI. <b>Linux and Windows:</b> installer only. <b>Hindsight memory, bobble help, workflows:</b> prototypes only. <b>Ming:</b> an engine spike. <b>Harness LoRA:</b> plan only.</div></div>
+    </div>
+  </section>
+
+  <!-- ============ WAITING ============ -->
+  <section id="waiting">
+    <h2>Waiting on you</h2>
+    <p class="sub">Decisions only you can make. Nothing else is blocked on you.</p>
+    <div class="table decide">
+      <div class="row head"><span>Decision</span><span>Options</span><span>Since</span></div>
+      <div class="row"><span class="t">The guardian parks the 27B between turns, so every turn reloads it cold (17–26 s)</span><span class="d">(a) keep it; (b) keep an idle chat model loaded unless memory runs short or the machine stalls; (c) a smaller 27B quant; (d) run fewer apps</span><span class="d">10-02</span></div>
+      <div class="row"><span class="t">Thinking can use up the whole output budget</span><span class="d">Cap thinking at the output limit minus room for the reply (llama.cpp ships with this off)</span><span class="d">10-01</span></div>
+      <div class="row"><span class="t">A model-driven Blender run that changes a scene</span><span class="d">Needs your OK to touch your open Blender. The read-only path is verified.</span><span class="d">10-07</span></div>
+      <div class="row"><span class="t">The 10 design prototypes</span><span class="d">Image editor with click-to-comment, Devices, Workflows and Deep research, Memory, Bobble help. Open <code>deliverables/gallery.html</code>.</span><span class="d">09-23</span></div>
+      <div class="row"><span class="t">CI</span><span class="d">Needs a push to the public GitHub repo</span><span class="d">09-23</span></div>
+      <div class="row"><span class="t">"Got it" or "Got it!"</span><span class="d">The voice rule bans exclamation marks. Changing it is one word.</span><span class="d">10-08</span></div>
+    </div>
+  </section>
+
+  <!-- ============ GAPS ============ -->
+  <section id="gaps">
+    <h2>Open gaps</h2>
+    <p class="sub">What still fails or feels wrong. The reliability gaps matter most to the corp harness.</p>
+    <div class="split">
+      <div class="list">
+        <h3>Reliability gaps (9)</h3>
+        <ul>
+          <li><span class="x">A 2B looped for 26 minutes with no identical calls. The loop guard needs a wall-clock "no progress" budget.</span></li>
+          <li><span class="x">The guardian ping-pongs the 27B (park, resume, swap). It should back off after two parks.</span></li>
+          <li><span class="x">The 27B's first send waits ~122 s on "starting up".</span></li>
+          <li><span class="x">Compaction summarizes nothing on a small window and still costs a model call.</span></li>
+          <li><span class="x">"Thought for 1m 28s" shown over ~20 minutes of thinking.</span></li>
+          <li><span class="x">The renderer page was replaced mid-turn under swap (10–13% memory free).</span></li>
+          <li><span class="x">An inline maths page isn't rebuilt after an app restart.</span></li>
+          <li><span class="x">The 4B writes research into <code>notes.md</code> instead of answering (3 of 4 runs).</span></li>
+          <li><span class="x">"What time is it" sometimes runs <code>date</code> instead of the connector.</span></li>
+        </ul>
+      </div>
+      <div class="list">
+        <h3>Smaller known bugs (9)</h3>
+        <ul>
+          <li><span class="x">The office chip flickers (1 of 15 probe runs).</span></li>
+          <li><span class="x">rapid-mlx never lands the paste prime (~4.5k tokens read again).</span></li>
+          <li><span class="x">Image-to-image edits come out too subtle.</span></li>
+          <li><span class="x">A finished card remounts into the chain when the next tool starts.</span></li>
+          <li><span class="x">A picture embedded in a reply shows twice.</span></li>
+          <li><span class="x">⌘Z into a turn that is already answering keeps the partial reply.</span></li>
+          <li><span class="x">A message with only a picture can't be rewound.</span></li>
+          <li><span class="x">Ladle build in the bundle (excluded, unconfirmed).</span></li>
+          <li><span class="x">~60 unused old icon files in the design artifact.</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ WATCH ============ -->
+  <section id="watch">
+    <h2>Ideas and watch items</h2>
+    <p class="sub">From the strategy talks: things to build when their turn comes, and outside work to keep an eye on.</p>
+    <div class="table ideas">
+      <div class="row head"><span>Idea</span><span>Where it stands</span><span></span></div>
+      <div class="row"><span class="t">Godot through code</span><span class="d">The Blender command is the model for it (UE5 doesn't fit in 24 GB). A Godot connector isn't started.</span><span class="pill" data-s="todo">Idea</span></div>
+      <div class="row"><span class="t">Hot-swapping LoRAs</span><span class="d">llama.cpp loads adapters at launch and switches between them per request. Not built.</span><span class="pill" data-s="todo">Idea</span></div>
+      <div class="row"><span class="t">Semantic search over long video</span><span class="d">Embed a 2-hour film with a multimodal embedding model (embeddinggemma2) and search it, instead of tokenizing it.</span><span class="pill" data-s="todo">Idea</span></div>
+      <div class="row"><span class="t">d1 decision models</span><span class="d">d1-3B untuned: grid zoom 9 of 20, directional moves 0 of 20. Tuning not started. d1-omni-600M (audio-visual) noted for later.</span><span class="pill" data-s="partly">Tested</span></div>
+      <div class="row"><span class="t">Memory via Hindsight</span><span class="d">You called it "a good pick". There is a Memory prototype in the gallery.</span><span class="pill" data-s="partly">Prototype</span></div>
+      <div class="row"><span class="t">Context Language Models (arXiv 2609.37725)</span><span class="d">The model edits its own context as a file. Suffix Cache Reuse keeps the KV cache valid after edits. Zero-shot works on Qwen3.6-27B, weaker on 9B without RL. Could ease our memory and window limits.</span><span class="pill" data-s="watch">Watch</span></div>
+      <div class="row"><span class="t">Sublinear attention, 5–10× faster decoding</span><span class="d">Expected in the next Qwen and Gemma releases (DeepSeek-style attention). It could give us a much better base model by the end of the year.</span><span class="pill" data-s="watch">Watch</span></div>
+    </div>
+  </section>
+
+  <!-- ============ RECENT ============ -->
+  <section id="recent">
+    <h2>Recently done</h2>
+    <p class="sub">Each item below is verified on screen by a probe, merged to main and installed.</p>
+    <div class="log">
+      <div class="e"><div class="when">2026-10-08 night</div><div class="what">The sidebar lights what is on screen</div><div class="det">Extensions, Models, Scheduled, a studio or the chat, whichever way you got there. Exactly one row is lit across ten visits through rows and other routes. <code>aa2478e0</code></div></div>
+      <div class="e"><div class="when">2026-10-08 night</div><div class="what">No more raw red errors</div><div class="det">Turn-problem cards with fix buttons, held sends (the cause behind "fetch failed"), a dictation module (before, nothing could install it), files found where they actually are, plain words at about sixty other places, amber toasts with actions.</div></div>
+      <div class="e"><div class="when">2026-10-08 night</div><div class="what">Pictures: hover card and lightbox slivers</div><div class="det">A 520×380 hover card. In the lightbox, 64 px greyed slivers of the neighbouring pictures that light up on hover and slide in when clicked.</div></div>
+      <div class="e"><div class="when">2026-10-08 late</div><div class="what">Chat area</div><div class="det">A connector demo card on every connector page, tool chains collapsed by default, pictures beside the chain, a smoother inline⇄canvas move, and the "Done" circle that had turned square.</div></div>
+      <div class="e"><div class="when">2026-10-08</div><div class="what">Design language in the app, Models page, quick tour</div><div class="det">Also lint clean in every package, one icon family (Hugeicons at 1px), and the seven finished branches merged.</div></div>
+    </div>
+  </section>
+
+  <!-- ============ HOW ============ -->
+  <section id="how">
+    <h2>How we work</h2>
+    <p class="sub">The standing agreements. All of them are in force.</p>
+    <ul class="rules">
+      <li><b>Headless by default.</b> I never take your screen or focus. Probes run unseen.</li>
+      <li><b>Reproduce, fix, reproduce again, look.</b> Before and after images in every report.</li>
+      <li><b>Report only when done</b>, with images. No "next step" handed back to you.</li>
+      <li><b>This summary at the end of every task</b>, plus a STATUS table each time it is updated.</li>
+      <li><b>Install after milestones.</b> Bobble is quit gracefully, never killed.</li>
+      <li><b>Prefill logged</b> for every chat or harness change.</li>
+      <li><b>Your benchmark prompts, word for word.</b> I never invent a brief.</li>
+      <li><b>No time limit</b> unless you set one.</li>
+      <li><b>Never touch your settings file or pasteboard</b> from a probe. Never print the HF token.</li>
+      <li><b>Your open Blender scene</b> is changed only with your OK.</li>
+      <li><b>A branch is not done until it is on main.</b></li>
+      <li><b>Don't stop for "context".</b> Long tasks keep going.</li>
+    </ul>
+  </section>
+
+  <!-- ============ HOUSE ============ -->
+  <section id="house">
+    <h2>Housekeeping</h2>
+    <p class="sub">Where the code is, and what is still loose.</p>
+    <div class="split">
+      <div class="list">
+        <h3>State</h3>
+        <ul>
+          <li><span class="x">main</span><span class="w"><code>31a4ce4d</code></span></li>
+          <li><span class="x">Working branch <code>fix/chat-area-polish</code></span><span class="w">equals main</span></li>
+          <li><span class="x">Installed build</span><span class="w">matches main</span></li>
+          <li><span class="x">Lint, typecheck, unit suites</span><span class="w">clean</span></li>
+        </ul>
+      </div>
+      <div class="list">
+        <h3>Branches to check before dropping</h3>
+        <ul>
+          <li><span class="x"><code>claude/practical-dhawan-bf1d62</code>: the 09-17 code-block frame (later work may supersede it)</span></li>
+          <li><span class="x"><code>claude/loving-driscoll-74b4e8</code>: fixed differently on main</span></li>
+          <li><span class="x"><code>push/vq-office-w1</code>, <code>push/w0-b</code>, <code>push/wf-00b</code>, <code>bench/bench-1</code>: unverified work in progress from 09-23</span></li>
+          <li><span class="x">Four agent branches whose fixes are already on main in another form: safe to drop</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <footer>Built from STATUS.md, ROADMAP-LATEST.md and our notes. Republished to this same link after every task.</footer>
+</div>

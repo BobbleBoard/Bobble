@@ -1,6 +1,67 @@
 # Bobble — status
 
-Updated: 2026-10-09 (on AC) · the user: "ensure the sidebar highlight applies correctly to whatever's actually selected … given there's multiple ways to get to different places"
+Updated: 2026-10-08 23:00 · the user: "at the end of any task going forward … totally sum up where we are and status on all the goals big and small"
+
+## Where we are (refreshed at the end of every task)
+
+The living page has this in full: (private link) (source `deliverables/status/where-we-are.html`, republished to the same link each time).
+
+**North star.** Large, high-quality work from small models running on your own Mac, and nowhere else. The harness squeezes the model to its limit through directed refinement, not random retries.
+
+**Core ideas.**
+1. Local and only local: no cloud model, fallback, key or hosted tier.
+2. Prompt pressure is a finished fix. Hard rules are only for the harness's own honesty.
+3. Aim the pressure at the moment of action: a tool's result moves the 4B, a guideline line doesn't.
+4. Every role is an agent with tools (the mesh). Robustness checks are tools, not gates.
+5. Per-step reliability is the lever: 30 steps finish 21% of the time at 95% per step, 74% at 99%.
+6. The corporation shape: scope sets the depth, memory the width, effort the review.
+7. CLI over MCP, code over screenshots.
+8. The machine comes first (the guardian).
+9. Prefill is the number people feel.
+10. No raw red errors.
+11. Reference-quality UI in Bobble's own language.
+12. the user's attention is the scarce resource.
+
+**Hard limits.**
+| Limit | Detail |
+|---|---|
+| Memory | 24 GB unified, shared by every model and macOS |
+| 27B | Cold first send ~122 s; a parked reload takes 17–26 s |
+| Context | 32k window. pi's compaction is tuned for 200k |
+| Prompt prefix | 9.4k tokens, or 1.8k in bash-CLI mode |
+| Decode slot | One decode slot. The prompt cache has a cliff below ~1.5 GiB |
+| Vision | Loads on demand |
+| MPS | No fp8, so GGUF only |
+| Generation time | Image 97 s, 3D 225 s, video 521 s |
+| Quants | Q6 floor under 12B |
+| Determinism | Non-deterministic: judge by re-runs |
+| Hardware | No AMD, Windows or Linux to test on |
+| Hub | Repos can vanish |
+| Sleep | A closed lid stalls runs |
+
+**Goals.**
+| # | Roadmap | State |
+|---|---|---|
+| 1 | Corp harness: the full 3D-game prompt end to end, autonomously | in progress. Mesh phases 1 and 2a–c built; phase 3 and the acceptance run open. Never completed end to end |
+| 2 | Lemonade (AMD) backend | not started |
+| 3 | Connectors with zero instructions | partly: CLI connectors, + › Connectors, Blender command, demo cards. One-click injection undesigned |
+| 4 | Access from anywhere / hotkey UI | not started |
+| 5 | Ubuntu + Windows, Tailscale clustering | groundwork: uv installer, Devices backend, no UI |
+| 6 | Autonomous fine-tuning | plan only, strictly after 5 |
+
+**Product today.**
+- Chat and harness: in daily use.
+- Visual quality: math, SVG, charts and office renderers done. HyperFrames and widgets partly. Websites, 3D-for-games and mixes not started.
+- Studios: working; the editors are still to come.
+- Models: working.
+- Design language: mostly wired. The Made card and the toolbar are left.
+- Big-push tracks: mostly prototypes or plans.
+
+**Waiting on the user (§2, 6 items).** The 27B park policy, a thinking cap, Blender scene edits, the 10 prototypes, CI, and "Got it!".
+
+**Open (§7, §8).** 9 reliability gaps and 9 smaller bugs.
+
+**Changed this update.** The living page and this overview. Last task: the sidebar lights what is on screen (`aa2478e0`), installed.
 
 ## Backlog — everything discussed and not yet done (consolidated 2026-10-08)
 
@@ -90,7 +151,7 @@ Still to check before dropping (not merged): `claude/practical-dhawan-bf1d62` (0
 The office chip flicker (1 of 15 probe runs) · rapid-mlx never lands the paste prime (~4.5k tokens re-read) · img2img edits are subtle (the instruction editor needs the 3D engine) · a finished card remounts into the chain when the next tool call starts · a picture embedded in the reply shows twice · ⌘Z into a turn already answering keeps the partial reply · an image-only message can't be rewound · the Ladle build in the bundle (excluded `68cf0219`, unconfirmed) · ~60 unused old icon files in the design artifact's storage.
 
 
-## Report — 2026-10-09: no more raw red errors, a way in for dictation, and the pictures' hover card and lightbox slivers
+## Report — 2026-10-08 night: no more raw red errors, a way in for dictation, and the pictures' hover card and lightbox slivers
 
 An audit (an agent read the whole app) found the four named examples' causes and about sixty places that put an exception's own words on screen. Every one now says what happened in plain words and carries its fix; the ones the app can fix itself, it does.
 
