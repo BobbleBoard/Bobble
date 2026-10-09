@@ -76,6 +76,11 @@ import {
 import { PI_INVOKE_CHANNELS, type PiEventMap, type PiInvokeMap } from './pi/contract';
 import { PROJECT_INVOKE_CHANNELS, type ProjectInvokeMap } from './project/project-contract';
 import {
+  QUICK_INVOKE_CHANNELS,
+  type QuickEventMap,
+  type QuickInvokeMap,
+} from './quick/quick-contract';
+import {
   SCHEDULED_INVOKE_CHANNELS,
   type ScheduledEventMap,
   type ScheduledInvokeMap,
@@ -1283,7 +1288,8 @@ export type AppInvokeMap = CoreInvokeMap &
   TrainingInvokeMap &
   DevicesInvokeMap &
   EditorInvokeMap &
-  WorkflowsInvokeMap;
+  WorkflowsInvokeMap &
+  QuickInvokeMap;
 
 /** Runtime allowlist for the preload's invoke passthrough: only channels in
  * the contract ever reach ipcMain (see preload.ts). `satisfies` checks
@@ -1334,6 +1340,7 @@ export const APP_INVOKE_CHANNELS = [
   ...DEVICES_INVOKE_CHANNELS,
   ...EDITOR_INVOKE_CHANNELS,
   ...WORKFLOWS_INVOKE_CHANNELS,
+  ...QUICK_INVOKE_CHANNELS,
 ] as const satisfies readonly (keyof AppInvokeMap)[];
 
 type MissingChannels = Exclude<keyof AppInvokeMap, (typeof APP_INVOKE_CHANNELS)[number]>;
@@ -1462,7 +1469,8 @@ export type AppEventMap = {
   TrainingEventMap &
   DevicesEventMap &
   EditorEventMap &
-  WorkflowsEventMap;
+  WorkflowsEventMap &
+  QuickEventMap;
 
 /** Shape of `window.piDesktop` as exposed by the preload script. */
 export interface PiDesktopBridge {

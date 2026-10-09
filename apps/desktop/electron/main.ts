@@ -78,6 +78,7 @@ import { notifyDecision } from './notify-gate';
 import { registerOfficeIpc } from './office/office-ipc';
 import { createScheduledRunBridge, registerPiIpc } from './pi/pi-main';
 import { registerProjectIpc } from './project/project-main';
+import { registerQuickPanel } from './quick/quick-main';
 import { createRendererRecovery } from './renderer-recovery';
 import { registerScheduledHandlers } from './scheduled/scheduled-main';
 import {
@@ -455,8 +456,21 @@ function createMainWindow(): BrowserWindow {
 
   win.on('closed', () => {
     if (mainWindow === win) mainWindow = null;
+    /*
+     * The hidden quick panel is a window too, so `window-all-closed` no longer
+     * fires when the main window closes. Off the Mac that event was the quit;
+     * it is made here instead. On the Mac the app stays up, as it always has —
+     * and with it the quick panel's hotkeys.
+     */
+    if (process.platform !== 'darwin') app.quit();
   });
   return win;
+}
+
+/** The main window, made again if it was closed — the quick panel's "Open in Bobble". */
+function ensureMainWindow(): BrowserWindow {
+  if (mainWindow === null || mainWindow.isDestroyed()) mainWindow = createMainWindow();
+  return mainWindow;
 }
 
 /**
@@ -1106,7 +1120,10 @@ if (!hasSingleInstanceLock) {
   });
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
+    // The MAIN window specifically: the quick panel is always there (hidden),
+    // so "no windows at all" never happens any more — and a Dock click with
+    // the main window closed must still bring it back.
+    if (app.isReady() && (mainWindow === null || mainWindow.isDestroyed())) {
       mainWindow = createMainWindow();
     }
   });
@@ -1230,6 +1247,15 @@ if (!hasSingleInstanceLock) {
     mainWindow = createMainWindow();
     log.info('main window created', {
       dev: !app.isPackaged && Boolean(process.env.VITE_DEV_SERVER_URL),
+    });
+    /* The quick panel: a global hotkey brings Bobble up over any app. Its
+       window is made hidden, after the main window has had its start. */
+    registerQuickPanel(ipcMain, (event) => isTrustedIpcEvent(event as ValidatableIpcEvent), {
+      webPreferences: SHARED_WEB_PREFERENCES,
+      loadRenderer,
+      attachRecovery: attachRendererRecovery,
+      getMainWindow: () => mainWindow,
+      ensureMainWindow,
     });
   });
 }

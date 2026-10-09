@@ -172,6 +172,22 @@ function getHelper(): MacHelperClient {
   return helper;
 }
 
+/**
+ * One request to the same long-lived helper, for the quick panel
+ * (electron/quick): the app in front, its selected text, the windows on screen.
+ * Sharing the one process keeps the panel's reads as fast as the agent's and
+ * keeps the Accessibility grant attributed to one identity.
+ */
+export function macHelperRequest<T>(
+  method: string,
+  params: Record<string, unknown> = {},
+): Promise<T> {
+  if (!isSupportedPlatform() || !existsSync(HELPER_PATH)) {
+    return Promise.reject(new Error('the Mac helper is not available'));
+  }
+  return getHelper().request<T>(method, params);
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => {
     const t = setTimeout(r, ms);

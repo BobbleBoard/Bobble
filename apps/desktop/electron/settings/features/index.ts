@@ -13,6 +13,7 @@ import { type DevicesSettings, devicesSettings } from './devices-settings';
 import { type EditorSettings, editorSettings } from './editor-settings';
 import type { FeatureSettingsGroup } from './feature-group';
 import { type MemorySettings, memorySettings } from './memory-settings';
+import { type QuickPanelSettings, quickPanelSettings } from './quick-panel-settings';
 import { type TrainingSettings, trainingSettings } from './training-settings';
 import { type WorkflowsSettings, workflowsSettings } from './workflows-settings';
 
@@ -22,6 +23,7 @@ export type {
   DevicesSettings,
   EditorSettings,
   MemorySettings,
+  QuickPanelSettings,
   TrainingSettings,
   WorkflowsSettings,
 };
@@ -34,6 +36,7 @@ export interface FeatureSettings {
   design: DesignSettings;
   workflows: WorkflowsSettings;
   editor: EditorSettings;
+  quickPanel: QuickPanelSettings;
 }
 
 /** A patch names the groups it changes, and within a group the fields. */
@@ -53,6 +56,7 @@ export const FEATURE_SETTINGS: {
   design: designSettings,
   workflows: workflowsSettings,
   editor: editorSettings,
+  quickPanel: quickPanelSettings,
 };
 
 export const FEATURE_SETTINGS_KEYS = Object.keys(FEATURE_SETTINGS) as FeatureSettingsKey[];
@@ -65,6 +69,7 @@ export const DEFAULT_FEATURE_SETTINGS: FeatureSettings = {
   design: designSettings.defaults,
   workflows: workflowsSettings.defaults,
   editor: editorSettings.defaults,
+  quickPanel: quickPanelSettings.defaults,
 };
 
 /** Each group of an untrusted document, clamped; an absent group reads as its defaults. */
@@ -76,6 +81,7 @@ export function clampFeatureSettings(o: Record<string, unknown>): FeatureSetting
     design: designSettings.clamp(o.design),
     workflows: workflowsSettings.clamp(o.workflows),
     editor: editorSettings.clamp(o.editor),
+    quickPanel: quickPanelSettings.clamp(o.quickPanel),
   };
 }
 
@@ -91,5 +97,6 @@ export function mergeFeatureSettings(
     design: designSettings.merge(current.design, patch.design),
     workflows: workflowsSettings.merge(current.workflows, patch.workflows),
     editor: editorSettings.merge(current.editor, patch.editor),
+    quickPanel: quickPanelSettings.merge(current.quickPanel, patch.quickPanel),
   };
 }

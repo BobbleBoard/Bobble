@@ -9,6 +9,9 @@ import {
   mergeFeatureSettings,
 } from './index';
 
+/** The six groups the W0-A pre-wire planned, all shipped off. */
+const PUSH_KEYS = FEATURE_SETTINGS_KEYS.filter((k) => k !== 'quickPanel');
+
 describe('the feature settings groups (W0-A pre-wire)', () => {
   it('are the six planned groups, each keyed as it appears in DesktopSettings', () => {
     expect(FEATURE_SETTINGS_KEYS).toEqual([
@@ -18,17 +21,19 @@ describe('the feature settings groups (W0-A pre-wire)', () => {
       'design',
       'workflows',
       'editor',
+      'quickPanel',
     ]);
     for (const key of FEATURE_SETTINGS_KEYS) expect(FEATURE_SETTINGS[key].key).toBe(key);
   });
 
   it('default to everything off', () => {
-    for (const key of FEATURE_SETTINGS_KEYS) {
+    // The quick panel ships on (see quick-panel-settings.test.ts).
+    for (const key of PUSH_KEYS) {
       expect(DEFAULT_FEATURE_SETTINGS[key].enabled, key).toBe(false);
       expect(DEFAULT_SETTINGS[key]).toEqual(DEFAULT_FEATURE_SETTINGS[key]);
     }
     // Groups whose lanes have not added keys yet are the bare switch.
-    for (const key of FEATURE_SETTINGS_KEYS.filter((k) => k !== 'design')) {
+    for (const key of PUSH_KEYS.filter((k) => k !== 'design')) {
       expect(DEFAULT_FEATURE_SETTINGS[key]).toEqual({ enabled: false });
     }
     expect(DEFAULT_SETTINGS.design).toEqual(DEFAULT_DESIGN_SETTINGS);

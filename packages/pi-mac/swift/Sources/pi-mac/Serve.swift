@@ -857,6 +857,9 @@ private func dispatchInner(method: String, params: [String: Any]) -> [String: An
   case "tabNew": return doTabAct(params, act: "new")
   case "recordStart": return recordStart(params)
   case "recordStop": return recordStop()
+  case "selection": return doSelection(params)
+  case "replaceSelection": return doReplaceSelection(params)
+  case "screenWindows": return doScreenWindows(params)
   default: return nil
   }
 }
