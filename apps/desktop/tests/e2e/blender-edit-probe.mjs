@@ -115,7 +115,16 @@ const START_SERVER = [
   '    return None',
   'bpy.app.timers.register(_bobble_probe_start, first_interval=3.0, persistent=True)',
 ].join('\n');
-await run('open', ['-g', '-a', 'Blender', '--args', '--online-mode', '--python-expr', START_SERVER, SCENE]);
+await run('open', [
+  '-g',
+  '-a',
+  'Blender',
+  '--args',
+  '--online-mode',
+  '--python-expr',
+  START_SERVER,
+  SCENE,
+]);
 let up = false;
 for (let i = 0; i < 120 && !up; i += 1) {
   try {
