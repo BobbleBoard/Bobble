@@ -883,7 +883,8 @@ function DefaultSurface({
 function SurfaceMissing({ kind }: { kind: string }) {
   return (
     <div className="pd-canvas-empty">
-      This kind of content ({kind}) cannot be shown in the canvas yet. Open it from the chat instead.
+      This kind of content ({kind}) cannot be shown in the canvas yet. Open it from the chat
+      instead.
     </div>
   );
 }
