@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { useHeldSendStore } from './held-send-store';
 import { reportRejectedSend } from './pi-connect';
 import { usePiStore } from './pi-slice';
 
@@ -34,7 +35,20 @@ describe('reportRejectedSend', () => {
     expect(msgs).toHaveLength(1);
     expect(msgs[0]?.kind).toBe('assistant');
     expect(assistantText(msgs[0])).toContain("wasn't sent");
-    expect(assistantText(msgs[0])).toContain('model server unavailable');
+    // In words — the bridge's raw reason is not the message (the user, 2026-10-08).
+    expect(assistantText(msgs[0])).not.toContain('model server unavailable');
+  });
+
+  it('with the message in hand, holds it under its bubble with Try again', () => {
+    reportRejectedSend(
+      { success: false, error: 'pi is not running' },
+      { sessionFile: '/s/c.jsonl', echoId: 'u1', message: 'hello', images: [] },
+    );
+    expect(usePiStore.getState().messages).toEqual([]);
+    const held = useHeldSendStore.getState().held;
+    expect(held?.problem).toEqual({ kind: 'refused', detail: 'pi is not running' });
+    expect(held?.message).toBe('hello');
+    useHeldSendStore.getState().clear();
   });
 
   /* Nothing downstream will ever clear this — the turn never started — so the
@@ -51,7 +65,7 @@ describe('reportRejectedSend', () => {
 
   it('handles an ack that gives no reason at all', () => {
     reportRejectedSend({ success: false });
-    expect(assistantText(usePiStore.getState().messages[0])).toContain('no reason given');
+    expect(assistantText(usePiStore.getState().messages[0])).toContain("wasn't sent");
   });
 
   /* The overwhelmingly common path: costs nothing and says nothing. */

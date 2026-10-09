@@ -31,6 +31,7 @@ import type {
   ExerciseSessionView,
   OrgNodeView,
 } from '@pi-desktop/coordination';
+import { plainError } from '@pi-desktop/shared';
 import { ActivityRow, IconCheck, IconChevronDown, ShimmerText, Spinner } from '@pi-desktop/ui';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { ExercisePanel } from './exercise-panel.tsx';
@@ -93,7 +94,7 @@ function phaseLabel(state: SituationState): string {
     case 'aborted':
       return 'Stopped';
     case 'error':
-      return state.result?.error ?? 'Something went wrong';
+      return plainError(state.result?.error, 'run');
   }
 }
 

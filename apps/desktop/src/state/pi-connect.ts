@@ -25,7 +25,7 @@ import { resetCanvasForNewSession, restoreCanvas, snapshotCanvas } from './canva
 import { ownerOfJob } from './chat-jobs';
 import { deleteChat, renameChat } from './chat-org';
 import { isChatDeleted, useDeletedChats } from './deleted-chats';
-import { useHeldSendStore } from './held-send-store';
+import { type HeldSend, useHeldSendStore } from './held-send-store';
 import { ensureVisionMode } from './local-model';
 import {
   type BgRun,
@@ -761,13 +761,20 @@ export async function sendPrompt(
     }
 
     if (visionUnavailable) {
+      // A picture and no model that can see it: held, with the fixes — a model
+      // that can see, or the words on their own (HeldSendCard). Not a line of
+      // reply carrying the relaunch's raw reason.
       usePiStore.setState({ promptInFlight: false });
-      const detail = visionReason !== undefined && visionReason !== '' ? ` (${visionReason})` : '';
-      usePiStore
-        .getState()
-        .appendAssistantText(
-          `I can't see images right now${detail}. Download a vision-capable model in Settings → Models and resend, or send the message without the image.`,
-        );
+      useHeldSendStore.getState().hold({
+        sessionFile: usePiStore.getState().session?.sessionFile ?? null,
+        echoId: mine.echoId,
+        message: withPendingInstructions(agentMessage ?? message),
+        images: imageDataUris
+          .map(dataUriToImage)
+          .filter((img): img is ImageContent => img !== null),
+        problem: { kind: 'no-vision', detail: visionReason ?? '' },
+        retrying: false,
+      });
       return;
     }
 
@@ -802,9 +809,19 @@ export async function sendPrompt(
         streamingBehavior: 'steer',
       });
       usePiStore.setState({ promptInFlight: false });
-      return reportRejectedSend(retry);
+      return reportRejectedSend(retry, heldFor());
     }
-    return reportRejectedSend(ack);
+    return reportRejectedSend(ack, heldFor());
+
+    /** This send, as a held message (a refusal holds it under its bubble). */
+    function heldFor(): Pick<HeldSend, 'sessionFile' | 'echoId' | 'message' | 'images'> {
+      return {
+        sessionFile: usePiStore.getState().session?.sessionFile ?? null,
+        echoId: mine.echoId,
+        message: body.message,
+        images: images,
+      };
+    }
   }
 }
 
@@ -870,15 +887,28 @@ export function deliveryForSend(inFlight: boolean): {
  */
 export function reportRejectedSend<T extends { success?: boolean; error?: string } | undefined>(
   ack: T,
+  /**
+   * The message as pi would have got it. With it, the refusal holds the
+   * message under its bubble (HeldSendCard: what happened, Try again) instead
+   * of a line of reply text carrying the bridge's raw words.
+   */
+  held?: Pick<HeldSend, 'sessionFile' | 'echoId' | 'message' | 'images'>,
 ): T {
   if (ack?.success !== false) return ack;
   // The turn never started, so nothing downstream will ever clear this.
   usePiStore.setState({ promptInFlight: false });
-  const reason = ack.error !== undefined && ack.error !== '' ? ack.error : 'no reason given';
+  if (held !== undefined) {
+    useHeldSendStore.getState().hold({
+      ...held,
+      problem: { kind: 'refused', detail: ack.error ?? '' },
+      retrying: false,
+    });
+    return ack;
+  }
   usePiStore
     .getState()
     .appendAssistantText(
-      `That message wasn't sent. The agent refused it (${reason}). Nothing has been lost; send it again. If this keeps happening, check Settings → Models that a model is loaded and there is memory free for it.`,
+      "That message wasn't sent. Nothing has been lost; send it again. If this keeps happening, choose the model again from the model menu.",
     );
   return ack;
 }
@@ -888,13 +918,32 @@ export function reportRejectedSend<T extends { success?: boolean; error?: string
  * coming up), then send the message exactly as it was held. If the model still
  * does not start, the message stays held with the new reason.
  */
-export async function retryHeldSend(): Promise<void> {
-  const held = useHeldSendStore.getState().held;
-  if (held === null || held.retrying) return;
+export async function retryHeldSend(
+  opts: {
+    /** "Send without the picture": the words alone. */
+    readonly withoutImages?: boolean;
+  } = {},
+): Promise<void> {
+  const stored = useHeldSendStore.getState().held;
+  if (stored === null || stored.retrying) return;
+  const held = opts.withoutImages === true ? { ...stored, images: [] } : stored;
   useHeldSendStore.getState().setRetrying(true);
   usePiStore.setState({ promptInFlight: true });
   try {
     await ensurePiOnViewedSession();
+    if (held.images.length > 0) {
+      // A picture needs a model that can see it — the same relaunch a send makes.
+      const vision = await ensureVisionMode();
+      if (!vision.ok) {
+        useHeldSendStore.getState().hold({
+          ...held,
+          problem: { kind: 'no-vision', detail: vision.reason ?? '' },
+          retrying: false,
+        });
+        usePiStore.setState({ promptInFlight: false });
+        return;
+      }
+    }
     await ensureChatServerReady();
     const problem = lastServerProblem();
     if (problem !== null && !chatServerReady()) {
@@ -910,7 +959,7 @@ export async function retryHeldSend(): Promise<void> {
       ...delivery.body,
     });
     if (delivery.clearsInFlight) usePiStore.setState({ promptInFlight: false });
-    reportRejectedSend(ack);
+    reportRejectedSend(ack, held);
   } catch (error) {
     usePiStore.setState({ promptInFlight: false });
     useHeldSendStore.getState().hold({
@@ -2028,8 +2077,9 @@ export async function switchSession(
           {
             id: `switch-${Date.now()}`,
             level: 'error' as const,
-            message: 'Could not open that chat. Try again.',
+            message: 'Could not open that chat.',
             timestamp: Date.now(),
+            action: { label: 'Try again', run: () => void switchSession(target) },
           },
         ],
       }));

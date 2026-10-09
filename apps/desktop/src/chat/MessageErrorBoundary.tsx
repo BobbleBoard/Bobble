@@ -36,8 +36,9 @@ export class MessageErrorBoundary extends Component<
     if (error === null) return this.props.children;
     return (
       <div className="pd-message-crash" data-testid="message-crash">
+        {/* What happened, not the exception (it is in the console above). */}
         <span className="text-footnote text-text-muted">
-          This reply couldn't be drawn ({error.message.slice(0, 120)}).
+          Part of this reply could not be drawn, so here it is as plain text.
         </span>
         {this.props.fallbackText !== undefined && this.props.fallbackText !== '' ? (
           <pre className="whitespace-pre-wrap pt-1 text-code text-text-secondary">

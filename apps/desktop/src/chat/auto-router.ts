@@ -547,7 +547,9 @@ let ensureServerPromise: Promise<void> | null = null;
  * instead. Null when the last wait found a ready server, or did not run.
  */
 export interface ServerProblem {
-  readonly kind: 'no-model' | 'failed' | 'timeout';
+  /** `refused`: the model was up but the send was turned away (pi:prompt's ack). */
+  /** `no-vision`: the message has a picture and no model that can see it came up. */
+  readonly kind: 'no-model' | 'failed' | 'timeout' | 'refused' | 'no-vision';
   /** The model it tried to start, by its display name. */
   readonly modelName?: string;
   /** The supervisor's or the launch's own words, for Details. */

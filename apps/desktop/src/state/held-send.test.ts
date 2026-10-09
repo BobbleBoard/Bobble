@@ -20,6 +20,11 @@ vi.mock('../chat/auto-router', () => ({
   ensureChatServerReady: vi.fn(async () => undefined),
 }));
 
+let vision: { ok: boolean; reason?: string } = { ok: true };
+vi.mock('./local-model', () => ({
+  ensureVisionMode: vi.fn(async () => vision),
+}));
+
 const invoke = vi.fn(async (channel: string, req: unknown) => {
   sent.push({ channel, req });
   return { success: true };
@@ -40,6 +45,7 @@ beforeEach(() => {
   sent.length = 0;
   problem = null;
   ready = false;
+  vision = { ok: true };
   useHeldSendStore.getState().clear();
   usePiStore.setState({
     messages: [],
@@ -98,5 +104,22 @@ describe('a send whose model did not start', () => {
     ready = false;
     await sendPrompt('hello');
     expect(prompts()).toEqual([expect.stringMatching(/hello$/)]);
+  });
+
+  it('a picture no model can see is held, and "Send without the picture" sends the words', async () => {
+    vision = { ok: false, reason: 'no vision-capable model is downloaded' };
+    ready = true;
+    await sendPrompt('what is this?', ['data:image/png;base64,AAAA']);
+    expect(prompts()).toEqual([]);
+    const held = useHeldSendStore.getState().held;
+    expect(held?.problem.kind).toBe('no-vision');
+    expect(held?.images).toHaveLength(1);
+    await retryHeldSend({ withoutImages: true });
+    const last = sent.filter((x) => x.channel === 'pi:prompt').at(-1)?.req as {
+      message: string;
+      images?: unknown[];
+    };
+    expect(last.message).toMatch(/what is this\?$/);
+    expect(last.images).toBeUndefined();
   });
 });

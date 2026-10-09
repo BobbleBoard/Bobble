@@ -27,6 +27,8 @@ export interface PiNotification {
   level: NotifyLevel;
   message: string;
   timestamp: number;
+  /** The fix, as a button on the toast (ToastHost): Try again, Restart, … */
+  action?: { readonly label: string; readonly run: () => void };
 }
 
 export interface PiAgentStatus {

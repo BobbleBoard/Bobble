@@ -42,8 +42,10 @@
  * chats from here (connectTaskTray), studio generations from studio-jobs.ts,
  * 3D jobs from tripo/gen3d-client.ts.
  */
+
 import type { ChatMsg } from '@pi-desktop/engine';
 import { create } from 'zustand';
+import { describeTurnProblem } from '../chat/turn-problem';
 import { isChatDeleted, useDeletedChats } from './deleted-chats';
 import { useModalityStore } from './modality-store';
 import { usePiStore } from './pi-slice';
@@ -258,7 +260,9 @@ export function chatOutcome(
     if (m?.kind !== 'assistant') continue;
     if (m.stopReason === 'aborted') return 'stopped';
     if (m.stopReason === 'error' || (m.errorMessage !== undefined && m.errorMessage !== '')) {
-      return { state: 'failed', ...(m.errorMessage ? { error: m.errorMessage } : {}) };
+      // What happened in words (turn-problem.ts), not the engine's raw line.
+      const said = describeTurnProblem(m.errorMessage)?.title;
+      return { state: 'failed', ...(said !== undefined ? { error: said } : {}) };
     }
     return { state: 'done' };
   }

@@ -25,8 +25,10 @@
  * arrive via `fetchTranscript` (IPC in the app, the scripted mock in demos and
  * tests). Nothing here talks to stores or the engine directly.
  */
+
 import { contractProgress, formatEta, type SituationState, workingCount } from '@pi-desktop/canvas';
 import type { OrgNodeView, WorkerTranscriptView } from '@pi-desktop/coordination';
+import { plainError } from '@pi-desktop/shared';
 import { Button, IconCheck, IconChevronRight, IconEye, ShimmerText, Spinner } from '@pi-desktop/ui';
 import { useState } from 'react';
 import { useChildAgentStore } from '../../state/child-agent-store';
@@ -221,7 +223,8 @@ export function CorpInlineTurn({
       ? counted
         ? `Stopped after ${progress.done} of ${progress.total} tasks`
         : `Stopped, with ${teamPhrase}`
-      : (state.result?.error ?? 'Something went wrong');
+      : // What happened in words, not the run's raw error.
+        plainError(state.result?.error, 'run');
 
   return (
     <div

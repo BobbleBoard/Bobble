@@ -1402,7 +1402,9 @@ export function ChatComposer({
         .appendAssistantText(
           res.ok
             ? 'Compacted. The history so far is a summary.'
-            : `Not compacted: ${res.error ?? 'unknown reason'}.`,
+            : /busy|streaming|in progress|running/i.test(res.error ?? '')
+              ? 'Not compacted — a reply is still being written. Run /compact again when it finishes.'
+              : 'Not compacted — the model could not summarise it just now. Try /compact again in a moment.',
         );
       return;
     }
@@ -1745,7 +1747,9 @@ export function ChatComposer({
               className="px-3 pt-2 text-footnote text-text-muted"
               data-testid="composer-skipped-note"
             >
-              Couldn't attach {skipped.join(', ')}.
+              Couldn't attach {skipped.join(', ')} — {skipped.length > 1 ? 'they are' : 'it is'} not
+              saved on this Mac. Save {skipped.length > 1 ? 'them' : 'it'} to a folder first, then
+              drop {skipped.length > 1 ? 'them' : 'it'} in.
             </div>
           ) : null}
 

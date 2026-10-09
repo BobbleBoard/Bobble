@@ -233,8 +233,9 @@ describe('the chats', () => {
       state: 'done',
     });
     expect(
-      chatOutcome([user('hi', 1), reply({ stopReason: 'error', errorMessage: 'server died' })]),
-    ).toEqual({ state: 'failed', error: 'server died' });
+      chatOutcome([user('hi', 1), reply({ stopReason: 'error', errorMessage: 'fetch failed' })]),
+      // Said in words, never the engine's raw line.
+    ).toEqual({ state: 'failed', error: 'The model engine was not running when this was sent.' });
     expect(chatOutcome([user('hi', 1), reply({ stopReason: 'aborted' })])).toBe('stopped');
     // A reply from an EARLIER turn does not speak for this one.
     expect(chatOutcome([reply({ stopReason: 'error' }), user('again', 2)])).toEqual({

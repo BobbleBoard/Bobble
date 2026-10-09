@@ -10,12 +10,13 @@
  */
 import type { ServerProblem } from './auto-router';
 
-export type LaunchFix = 'retry' | 'other-model' | 'models';
+export type LaunchFix = 'retry' | 'other-model' | 'models' | 'without-picture';
 
 export const LAUNCH_FIX_LABEL: Readonly<Record<LaunchFix, string>> = {
   retry: 'Try again',
   'other-model': 'Choose another model',
   models: 'Open Models',
+  'without-picture': 'Send without the picture',
 };
 
 export interface LaunchProblem {
@@ -43,6 +44,29 @@ export function describeLaunchProblem(problem: ServerProblem): LaunchProblem {
       body: 'The Models page suggests one that fits this Mac; your message sends once it is in.',
       fix: 'models',
       also: [],
+      detail,
+    };
+  }
+  if (problem.kind === 'no-vision') {
+    const offline = OFFLINE.test(detail);
+    return {
+      title: `${problem.modelName ?? 'This model'} cannot look at pictures right now.`,
+      body: offline
+        ? 'Seeing pictures needs a part it could not download — check the connection, then Try again.'
+        : 'A model that can see will answer it; or send the words on their own.',
+      fix: offline ? 'retry' : 'other-model',
+      also: offline ? ['without-picture'] : ['without-picture', 'retry'],
+      detail,
+    };
+  }
+  if (problem.kind === 'refused') {
+    return {
+      title: 'That message did not reach the model.',
+      body: /not running|no model|not (loaded|ready)|unavailable/i.test(detail)
+        ? 'The model was not ready for it. Nothing was lost — Try again sends it.'
+        : 'Nothing was lost — Try again sends it.',
+      fix: 'retry',
+      also: ['other-model'],
       detail,
     };
   }

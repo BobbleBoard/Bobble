@@ -20,6 +20,8 @@
  *   3. the files go, in the background. A failure brings the row back, and
  *      says why on the error toast.
  */
+
+import { plainError } from '@pi-desktop/shared';
 import type { SessionSummary } from '../../electron/ipc-contract';
 import { cancelJobsOf } from './chat-jobs';
 import { deleteChat } from './chat-org';
@@ -45,7 +47,7 @@ export function deleteFailureMessage(title: string | undefined, error: string | 
         ? "Its file is not in Bobble's chat folder."
         : raw === ''
           ? 'The Mac did not say why.'
-          : raw;
+          : plainError(raw);
   return `Couldn't delete ${name}, so it is back in the list. ${why}`;
 }
 
@@ -53,13 +55,19 @@ let toastSeq = 0;
 
 /** The app's error toast (ToastHost) — raised the way open-outcome.ts and
  * pi-connect's "Could not open that chat" raise theirs. */
-function toast(message: string): void {
+function toast(message: string, action?: { label: string; run: () => void }): void {
   toastSeq += 1;
   const id = `delete-${Date.now()}-${toastSeq}`;
   usePiStore.setState((s) => ({
     notifications: [
       ...s.notifications.slice(-3),
-      { id, level: 'error' as const, message, timestamp: Date.now() },
+      {
+        id,
+        level: 'error' as const,
+        message,
+        timestamp: Date.now(),
+        ...(action !== undefined ? { action } : {}),
+      },
     ],
   }));
 }
@@ -99,7 +107,10 @@ export async function deleteChatNow(
     useDeletedChats.getState().restore(files);
     /* The row coming back is not an explanation. Every caller used to drop
        this result, so a refused delete put the chat back without a word. */
-    toast(deleteFailureMessage(chat.title, res.error));
+    toast(deleteFailureMessage(chat.title, res.error), {
+      label: 'Try again',
+      run: () => void deleteChatNow(chat),
+    });
     return res;
   }
   /* Once pi has let go of the file, delete once more: whatever the aborted turn

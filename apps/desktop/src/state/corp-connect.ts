@@ -202,7 +202,7 @@ export async function askCorpTask(taskId: string, question: string): Promise<str
   return window.piDesktop
     .invoke('corp:ask', { taskId, question })
     .then((r) => r.answer)
-    .catch(() => 'I hit a snag answering that. Give me a moment and try again.');
+    .catch(() => 'That answer did not come through. Ask again and I will pick it up.');
 }
 
 /** Answer a surfaced permission request. */

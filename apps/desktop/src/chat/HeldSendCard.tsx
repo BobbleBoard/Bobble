@@ -9,7 +9,7 @@
  * menu, finished loading — the message goes by itself.
  */
 import { Button, CopyButton, IconChevronRight, IconInfo, Spinner } from '@pi-desktop/ui';
-import { type JSX, useEffect, useState } from 'react';
+import { type JSX, useEffect, useRef, useState } from 'react';
 import { navigate } from '../state/app-nav-store';
 import { useHeldSendStore } from '../state/held-send-store';
 import { useLlmStore } from '../state/llm-store';
@@ -31,15 +31,23 @@ export function HeldSendCard(): JSX.Element | null {
   const mine = held !== null && held.sessionFile === sessionFile && echoShown;
 
   // A model came up another way (picked from the menu, a load that finished):
-  // the message goes by itself.
+  // the message goes by itself. Only on the change to ready, and only for a
+  // model that was not up — a picture held for a text model is held WITH the
+  // model up, and retrying it on every render would loop.
+  const wasReady = useRef(ready);
   useEffect(() => {
-    if (mine && ready && held !== null && !held.retrying) void retryHeldSend();
+    const cameUp = ready && !wasReady.current;
+    wasReady.current = ready;
+    if (!cameUp || !mine || held === null || held.retrying) return;
+    if (held.problem.kind === 'no-vision' || held.problem.kind === 'refused') return;
+    void retryHeldSend();
   }, [mine, ready, held]);
 
   if (!mine || held === null) return null;
   const p = describeLaunchProblem(held.problem);
   const run = (fix: LaunchFix): void => {
     if (fix === 'retry') void retryHeldSend();
+    else if (fix === 'without-picture') void retryHeldSend({ withoutImages: true });
     else if (fix === 'other-model') useModelMenuStore.getState().setOpen(true);
     else navigate({ kind: 'view', view: 'models' });
   };
