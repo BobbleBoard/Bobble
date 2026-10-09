@@ -1,6 +1,6 @@
 # Bobble — status
 
-Updated: 2026-10-09 (on AC) · the user: "anything like this … red text that's just a real unknown error or something that doesn't have handling attached to it … just can't exist anymore" + the picture hover and lightbox slivers
+Updated: 2026-10-09 (on AC) · the user: "ensure the sidebar highlight applies correctly to whatever's actually selected … given there's multiple ways to get to different places"
 
 ## Backlog — everything discussed and not yet done (consolidated 2026-10-08)
 
@@ -103,6 +103,7 @@ An audit (an agent read the whole app) found the four named examples' causes and
 | "anything of that sort … red text that's just a real unknown error" | plainError (@pi-desktop/shared) turns an error's raw words into what to do (offline, disk full, busy, refused, missing, not allowed, too slow, damaged, not installed); applied on the Models page, the model menu, Storage, the tray, engines, onboarding, connectors (an add that failed was silent), skills (silent), the studios, image edits, the 3D studio (a failed stage now says why; weights downloads say why and offer Try again), previews (moved vs outside Bobble's folders vs unreadable), charts, office editors (Open in its app), crash screens (details folded). Toasts are amber with a title and a line, and can carry a button (Try again on a chat that would not open, a failed delete). Error text is no longer red anywhere it was a status | unit tests on the real strings; turn-problem-look photographs the toasts; the full lint/typecheck/test run |
 | Hover a chain picture: a larger version "like shown in the image" | A floating card under the thumbnail, right edges lined up, up to 520×380, swapping at once between thumbnails | chain-visuals-look: 520 px card against a 44 px thumbnail, right edges equal, below |
 | Lightbox: the pictures either side, greyed and cut off, a sliver; hover highlights; click scrolls to it like the arrow | A track: the picture centred, each neighbour pushed out until 64 px shows, greyed; a hovered sliver lifts; a click slides it to the middle; the track stops at the ends (› off) | chain-visuals-look: slivers 64 px each side at 0.4 opacity, 0.62 on hover; click → slides (measured mid-way) → 3 of 3 |
+| (later) The sidebar highlight "gets stuck on chats", never shows Extensions and the rest, "multiple ways to get to different places" | The chat row stayed lit whenever its chat was current and no workspace or studio row ever lit. App now publishes what is on screen (a studio over anything, then a workspace screen, else the chat) and the sidebar lights that one row — the same state whichever door you came in by (row, composer +, model menu, deep link, Settings) | sidebar-selection-look: ten visits by rows and other doors, exactly one row lit each time and the right one; the old build lit "New chat" every time (images/8-sidebar-highlight.png) |
 
 Kept on purpose: a failed tool step inside an expanded chain stays red with its raw output — your earlier spec ("expanded tool calls show fails as red … copy raw"), and the model reads and handles those itself.
 
