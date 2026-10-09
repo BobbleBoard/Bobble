@@ -71,7 +71,6 @@ import PauseIcon from '@hugeicons/core-free-icons/PauseIcon';
 import PencilEdit01Icon from '@hugeicons/core-free-icons/PencilEdit01Icon';
 import PieChartIcon from '@hugeicons/core-free-icons/PieChartIcon';
 import Pin02Icon from '@hugeicons/core-free-icons/Pin02Icon';
-import PinOffIcon from '@hugeicons/core-free-icons/PinOffIcon';
 import PlayIcon from '@hugeicons/core-free-icons/PlayIcon';
 import Plug01Icon from '@hugeicons/core-free-icons/Plug01Icon';
 import QuillWrite01Icon from '@hugeicons/core-free-icons/QuillWrite01Icon';
@@ -604,10 +603,6 @@ export function IconSpellCheck(props: IconProps) {
 /** Put the answer where the selection was. */
 export function IconReplace(props: IconProps) {
   return <Huge icon={ReplaceIcon} {...props} />;
-}
-
-export function IconPinOff(props: IconProps) {
-  return <Huge icon={PinOffIcon} {...props} />;
 }
 
 /** Make smaller: the arrows of IconExpand, turned inward. */

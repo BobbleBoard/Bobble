@@ -632,6 +632,13 @@ try {
       await sleep(200);
       await shoot(panel, '25-talk-needs-module');
       await panel.keyboard.press('Escape');
+      await waitShown(false);
+      await press('summon');
+      await waitShown(true);
+      record(
+        'putting the panel away ends talking (the card does not follow into the next opening)',
+        (await panel.$('[data-testid="quick-dictation-module"]')) === null,
+      );
     } else {
       console.log('SKIP  talk: the Dictation module state could not be read safely');
     }

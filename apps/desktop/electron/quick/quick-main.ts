@@ -238,8 +238,9 @@ function createPanel(): BrowserWindow {
     hasShadow: true,
     roundedCorners: true,
     alwaysOnTop: true,
-    // Painted by the page at once; this only covers the first frame.
-    backgroundColor: nativeTheme.shouldUseDarkColors ? '#262624' : '#faf9f5',
+    // Painted by the page at once; this only covers the first frame (the
+    // theme's raised surface, which is what the panel paints).
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#1e1e21' : '#ffffff',
     webPreferences: { ...deps.webPreferences, backgroundThrottling: false },
   });
   // On every Space and over full-screen apps. Skipping the process-type
@@ -274,7 +275,12 @@ function createPanel(): BrowserWindow {
 }
 
 async function ensurePanel(): Promise<BrowserWindow> {
-  if (panel === null || panel.isDestroyed()) panel = createPanel();
+  if (panel === null || panel.isDestroyed()) {
+    panel = createPanel();
+    // Wake the Mac helper now, so the first hotkey's reads are not also its
+    // start-up (a no-op in a test run, whose Mac is a stand-in).
+    void mac.accessibility().catch(() => undefined);
+  }
   await panelLoaded;
   return panel;
 }
@@ -340,14 +346,28 @@ async function dismiss(reason: DismissReason): Promise<void> {
  * A hotkey (or a probe's press of one). `summon` toggles; the capture keys go
  * straight to their picture and open the panel with it attached.
  */
+/** A summon still reading the Mac: a second press in that beat is the same press. */
+let summoning = false;
+
 async function summon(action: QuickAction): Promise<void> {
-  const settings = readSettings().quickPanel;
-  if (!settings.enabled) return;
   // A key pressed while an overlay is up means "never mind": the overlay goes.
+  // (Checked first: the summon that opened the overlay is still in flight.)
   if (picking) {
     cancelPick();
     return;
   }
+  if (summoning) return;
+  summoning = true;
+  try {
+    await summonNow(action);
+  } finally {
+    summoning = false;
+  }
+}
+
+async function summonNow(action: QuickAction): Promise<void> {
+  const settings = readSettings().quickPanel;
+  if (!settings.enabled) return;
   if (action === 'summon' && visible) {
     await dismiss('escape');
     return;

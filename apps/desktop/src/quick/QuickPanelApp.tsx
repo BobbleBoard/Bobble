@@ -33,7 +33,6 @@ import {
   IconMonitor,
   IconPickWindow,
   IconPin,
-  IconPinOff,
   IconQuill,
   IconShrink,
   IconSpellCheck,
@@ -134,16 +133,26 @@ function Tool({
   onClick,
   children,
   testid,
+  on,
 }: {
   label: string;
   keys?: string;
   onClick: () => void;
   children: ReactNode;
   testid: string;
+  /** A toggle's state: on draws it in the accent, and says so to assistive tech. */
+  on?: boolean;
 }): JSX.Element {
   return (
     <Tooltip label={label} {...(keys !== undefined ? { kbd: keys } : {})}>
-      <IconButton aria-label={label} size="sm" onClick={onClick} data-testid={testid}>
+      <IconButton
+        aria-label={label}
+        size="sm"
+        onClick={onClick}
+        data-testid={testid}
+        {...(on !== undefined ? { 'aria-pressed': on, 'data-on': on ? 'true' : 'false' } : {})}
+        className={on === true ? 'qp-tool-on' : undefined}
+      >
         {children}
       </IconButton>
     </Tooltip>
@@ -424,6 +433,19 @@ function QuickPanel(): JSX.Element {
     markInputActivity('talk');
     dictation.start();
   }, [listening, dictation]);
+
+  /*
+   * PUT AWAY MEANS THE MICROPHONE IS OFF. A recording left running behind a
+   * hidden panel would keep the Mac's microphone light on with nothing on
+   * screen to stop it; a Download card or a problem from last time does not
+   * belong to the next opening either.
+   */
+  const shown = useQuickStore((s) => s.shown);
+  const dictationRef = useRef(dictation);
+  dictationRef.current = dictation;
+  useEffect(() => {
+    if (!shown && dictationRef.current.phase !== 'idle') dictationRef.current.cancel();
+  }, [shown]);
 
   // The global "talk" key: start listening, or stop if already listening.
   // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the request count
@@ -728,7 +750,8 @@ function QuickPanel(): JSX.Element {
                 <IconExternal size={15} />
               </Tool>
               <Tool
-                label={pinned ? 'Unpin' : 'Pin (stays open)'}
+                on={pinned}
+                label={pinned ? 'Pinned: stays open. Click to unpin' : 'Pin (stays open)'}
                 keys="⌘⇧P"
                 onClick={() => {
                   set({ pinned: !pinned });
@@ -736,7 +759,7 @@ function QuickPanel(): JSX.Element {
                 }}
                 testid="quick-pin"
               >
-                {pinned ? <IconPinOff size={15} /> : <IconPin size={15} />}
+                <IconPin size={15} />
               </Tool>
               <Tool
                 label={size === 'large' ? 'Smaller' : 'Bigger'}

@@ -364,6 +364,12 @@ html.qp-root #root {
   gap: 2px;
 }
 
+/* A toggle that is on (Pin): the accent, quietly. */
+.qp-head-tools .qp-tool-on {
+  background: var(--pd-accent-subtle);
+  color: var(--pd-accent-primary);
+}
+
 .qp-body {
   flex: 1;
   min-height: 0;
