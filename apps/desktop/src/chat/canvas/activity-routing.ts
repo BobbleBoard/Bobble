@@ -463,6 +463,7 @@ type ReadFileResult = {
   tooLarge: boolean;
   binary: boolean;
   bytes: number;
+  reason?: 'missing' | 'not-allowed' | 'folder' | 'unreadable';
 };
 
 /** True when a read carries something DISPLAYABLE — real text (an empty file
@@ -853,7 +854,9 @@ export function useActivityCanvasRouting(controller: CanvasController): void {
           ...(readHasContent(read)
             ? { artifact: fileArtifact(path, read) }
             : tab.artifact === undefined
-              ? { artifact: unreadableFileArtifact(path) }
+              ? {
+                  artifact: unreadableFileArtifact(path, (read as ReadFileResult | null)?.reason),
+                }
               : {}),
         });
       });

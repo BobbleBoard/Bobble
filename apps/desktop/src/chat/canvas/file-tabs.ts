@@ -122,6 +122,8 @@ type ReadFileResult = {
   tooLarge: boolean;
   binary: boolean;
   bytes: number;
+  /** Why `text` is null (fs:read-file): what the notice says. */
+  reason?: 'missing' | 'not-allowed' | 'folder' | 'unreadable';
 };
 
 /** Build the file surface's Artifact from a bounded read result. Too-large /
@@ -139,8 +141,32 @@ type ReadFileResult = {
  * it names the path it actually tried, because "not found" is only useful with
  * the string that was looked up.
  */
-export function unreadableFileArtifact(absPath: string): Artifact {
+export function unreadableFileArtifact(
+  absPath: string,
+  reason: ReadFileResult['reason'] = 'missing',
+): Artifact {
   const filename = basename(absPath);
+  /*
+   * WHAT HAPPENED, AND WHAT IS ALREADY BEING DONE ABOUT IT. the user (2026-10-08):
+   * "'this file couldn't be found' (when clicking on a file that should very
+   * much be there) … just can't exist anymore." Before this shows, the file
+   * was looked for in the chat's folders by name (fs:locate) and opened there
+   * if it was found; a missing file is still watched for a minute, and the tab
+   * fills the moment it lands (findOrWatch). What is left says which case it
+   * is, in words.
+   */
+  const text =
+    reason === 'not-allowed'
+      ? `macOS did not let Bobble read this file.\n\n${absPath}\n\n` +
+        'Allow Bobble in System Settings › Privacy & Security › Files and Folders, then open it again.'
+      : reason === 'folder'
+        ? `That is a folder, not a file.\n\n${absPath}\n\nIts files are in the tree beside this.`
+        : reason === 'unreadable'
+          ? `This file could not be read just now.\n\n${absPath}\n\n` +
+            'Another app may be holding it. It opens here as soon as it can be read.'
+          : `Not where the chat said it is.\n\n${absPath}\n\n` +
+            'Bobble looked through this chat’s folders and found nothing with that name. ' +
+            'If it is still being written, it appears here the moment it lands.';
   return {
     id: fileTabKey(absPath),
     title: filename,
@@ -151,14 +177,70 @@ export function unreadableFileArtifact(absPath: string): Artifact {
      * and read as the file's contents. The `notice` kind renders it as what it
      * is: a message about the file, with the path it looked up in mono.
      */
-    content: {
-      kind: 'notice',
-      text:
-        `Could not read this file.\n\n${absPath}\n\n` +
-        'It may have been written somewhere else, moved, or removed since it was ' +
-        'named. Nothing has been lost from the tab; there was nothing to show.',
-    },
+    content: { kind: 'notice', text },
   };
+}
+
+/** The folders a chat's files can be in: where its tools ran and its project. */
+function chatRoots(cwd: string | undefined): string[] {
+  const st = usePiStore.getState();
+  let workspace: string | undefined;
+  try {
+    workspace = (JSON.parse(st.extensionStatus.harness ?? '{}') as { workspaceRoot?: string })
+      .workspaceRoot;
+  } catch {
+    workspace = undefined;
+  }
+  return [
+    cwd,
+    workspace,
+    st.session?.cwd,
+    useProjectStore.getState().activePath ?? undefined,
+  ].filter((r): r is string => typeof r === 'string' && r !== '');
+}
+
+/** Where the file a turn named actually is (fs:locate), or null. */
+async function locateFile(absPath: string, cwd: string | undefined): Promise<string | null> {
+  try {
+    const res = await window.piDesktop.invoke('fs:locate', {
+      path: absPath,
+      roots: chatRoots(cwd),
+    });
+    return res.found;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A FILE THAT DID NOT READ IS LOOKED FOR, THEN WAITED FOR. First by name in the
+ * chat's folders (a path that missed by a folder, a `cd` before a redirect);
+ * then the path itself, every 1.5 s for a minute — a file still being written
+ * lands while the tab is open. `onFound` gets the first readable copy;
+ * `stillWanted` lets a closed tab stop the watch.
+ */
+async function findOrWatch(
+  absPath: string,
+  cwd: string | undefined,
+  onFound: (path: string, read: ReadFileResult) => void,
+  stillWanted: () => boolean,
+): Promise<void> {
+  const found = await locateFile(absPath, cwd);
+  if (found !== null && found !== absPath) {
+    const read = await readFile(found);
+    if (readHasContent(read)) {
+      onFound(found, read);
+      return;
+    }
+  }
+  for (let i = 0; i < 40 && stillWanted(); i += 1) {
+    await delay(1500);
+    const read = await readFile(absPath);
+    if (readHasContent(read)) {
+      onFound(absPath, read);
+      return;
+    }
+  }
 }
 
 export function fileArtifact(absPath: string, read: ReadFileResult): Artifact {
@@ -417,6 +499,12 @@ export async function openFileInCanvas(
   absPath: string,
   cwd?: string,
 ): Promise<void> {
+  // A preview streams its bytes straight from disk, so a path that missed by a
+  // folder would only ever say "failed to load": find it first.
+  if (previewKindForExt(extname(basename(absPath))) !== null) {
+    const found = await locateFile(absPath, cwd);
+    if (found !== null) absPath = found;
+  }
   const key = fileTabKey(absPath);
   const preview = previewKindForExt(extname(basename(absPath)));
   const existing = controller.getState().tabs.find((t) => t.key === key);
@@ -437,6 +525,8 @@ export async function openFileInCanvas(
   }
 
   const [read, tree] = await Promise.all([readFileSettled(absPath), readTree(root)]);
+  // Read before the content guard narrows `read` away.
+  const failedWhy = (read as ReadFileResult | null)?.reason;
   const tab = controller.getState().tabs.find((t) => t.key === key);
   if (tab === undefined) return;
   controller.updateTab(tab.id, {
@@ -459,10 +549,29 @@ export async function openFileInCanvas(
     ...(readHasContent(read)
       ? { artifact: fileArtifact(absPath, read) }
       : tab.artifact === undefined
-        ? { artifact: unreadableFileArtifact(absPath) }
+        ? { artifact: unreadableFileArtifact(absPath, failedWhy) }
         : {}),
   });
   void hydrateOpenApps(controller, key, absPath);
+  if (!readHasContent(read) && failedWhy !== 'folder') {
+    const tabId = tab.id;
+    void findOrWatch(
+      absPath,
+      cwd,
+      (path, found) => {
+        const now = controller.getState().tabs.find((t) => t.id === tabId);
+        if (now === undefined) return;
+        if (path === absPath) {
+          controller.updateTab(tabId, { artifact: fileArtifact(absPath, found) });
+          return;
+        }
+        // Found under another folder: open it there, in this tab's place.
+        controller.closeTab(tabId);
+        void openFileInCanvas(controller, path, cwd);
+      },
+      () => controller.getState().tabs.some((t) => t.id === tabId),
+    );
+  }
 }
 
 /**

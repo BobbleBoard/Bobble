@@ -263,6 +263,16 @@ export type FsInvokeMap = {
     request: { root: string; depth?: number };
     response: { root: string; tree: FsTreeNode[] };
   };
+  /**
+   * WHERE A NAMED FILE ACTUALLY IS. A path a turn reported can miss: relative
+   * to a folder the chat no longer uses, written after a `cd`, a `~` taken
+   * literally. Tries the path, then the path under each root, then the file's
+   * name inside the roots (closest match wins). Null when it is nowhere near.
+   */
+  'fs:locate': {
+    request: { path: string; roots: string[] };
+    response: { found: string | null };
+  };
   /** UTF-8 contents of a single file, size-capped, for the live canvas file
    * surface. `tooLarge`/`binary` gate streaming huge/binary payloads. */
   'fs:read-file': {
@@ -273,6 +283,8 @@ export type FsInvokeMap = {
       tooLarge: boolean;
       binary: boolean;
       bytes: number;
+      /** Why `text` is null when it is not binary: what the person can act on. */
+      reason?: 'missing' | 'not-allowed' | 'folder' | 'unreadable';
     };
   };
   /** Write UTF-8 contents back to a single file for live canvas editing.
@@ -327,6 +339,7 @@ export const FS_INVOKE_CHANNELS = [
   'fs:list-sessions',
   'fs:read-session',
   'fs:list-tree',
+  'fs:locate',
   'fs:read-file',
   'fs:write-file',
   'fs:delete-session',

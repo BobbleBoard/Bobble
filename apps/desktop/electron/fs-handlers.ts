@@ -48,6 +48,98 @@ function resolveUserPath(p: string): string {
   }
   return path.resolve(trimmed);
 }
+/** Folders a name search never walks into: big, generated, or not the person's. */
+const LOCATE_SKIP = new Set([
+  'node_modules',
+  '.git',
+  '.venv',
+  'venv',
+  '__pycache__',
+  '.cache',
+  'dist',
+  'build',
+  '.next',
+]);
+const LOCATE_MAX_DEPTH = 5;
+const LOCATE_MAX_DIRS = 3000;
+
+function isFileAt(p: string): boolean {
+  try {
+    return fs.statSync(p).isFile();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * WHERE A NAMED FILE ACTUALLY IS (fs:locate). The path itself (with `~`
+ * expanded); then, for a relative path, the path under each root; then the
+ * file's name anywhere in the roots, a few levels down — and of several, the
+ * one whose path ends most like the one asked for. Reads directory listings
+ * inside the roots only.
+ */
+export function locateFile(requested: string, roots: readonly string[]): string | null {
+  const asked = requested.trim();
+  if (asked === '') return null;
+  const direct = resolveUserPath(asked);
+  if (isFileAt(direct)) return direct;
+  const dirs = [...new Set(roots.filter((r) => r.trim() !== '').map(resolveUserPath))];
+  if (!path.isAbsolute(asked) && !asked.startsWith('~')) {
+    for (const root of dirs) {
+      const p = path.join(root, asked);
+      if (isFileAt(p)) return p;
+    }
+  }
+  const name = path.basename(asked);
+  if (name === '' || name === '.' || name === '..') return null;
+  const wanted = asked.replace(/\\/g, '/').split('/').filter(Boolean);
+  const tail = (p: string): number => {
+    const parts = p.split(path.sep);
+    let n = 0;
+    while (
+      n < parts.length &&
+      n < wanted.length &&
+      parts[parts.length - 1 - n] === wanted[wanted.length - 1 - n]
+    )
+      n += 1;
+    return n;
+  };
+  let best: string | null = null;
+  let bestScore = 0;
+  let walked = 0;
+  for (const root of dirs) {
+    const queue: Array<{ dir: string; depth: number }> = [{ dir: root, depth: 0 }];
+    while (queue.length > 0 && walked < LOCATE_MAX_DIRS) {
+      const { dir, depth } = queue.shift() as { dir: string; depth: number };
+      walked += 1;
+      let entries: fs.Dirent[];
+      try {
+        entries = fs.readdirSync(dir, { withFileTypes: true });
+      } catch {
+        continue;
+      }
+      for (const e of entries) {
+        const p = path.join(dir, e.name);
+        if (e.isFile() && e.name === name) {
+          const score = tail(p);
+          if (score > bestScore) {
+            best = p;
+            bestScore = score;
+          }
+        } else if (
+          e.isDirectory() &&
+          depth < LOCATE_MAX_DEPTH &&
+          !LOCATE_SKIP.has(e.name) &&
+          !e.name.startsWith('.')
+        ) {
+          queue.push({ dir: p, depth: depth + 1 });
+        }
+      }
+    }
+  }
+  return best;
+}
+
 const AGENT_DIR = path.join(HOME, '.pi', 'agent');
 const SESSIONS_DIR = path.join(AGENT_DIR, 'sessions');
 const PROJECTS_PATH = path.join(HOME, '.pi', 'desktop', 'projects.json');
@@ -645,14 +737,21 @@ function listTree(root: string, maxDepth: number): FsTreeNode[] {
  */
 const READ_FILE_DEFAULT_MAX = 512 * 1024;
 
-function readFileBounded(
-  file: string,
-  maxBytes: number,
-): { text: string | null; truncated: boolean; tooLarge: boolean; binary: boolean; bytes: number } {
+function readFileBounded(file: string, maxBytes: number): FsInvokeMap['fs:read-file']['response'] {
   const resolved = resolveUserPath(file);
   const st = statSafe(resolved);
   if (st === null || !st.isFile()) {
-    return { text: null, truncated: false, tooLarge: false, binary: false, bytes: 0 };
+    let reason: 'missing' | 'not-allowed' | 'folder' = 'missing';
+    if (st?.isDirectory() === true) reason = 'folder';
+    else if (st === null) {
+      try {
+        fs.statSync(resolved);
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException).code;
+        if (code === 'EACCES' || code === 'EPERM') reason = 'not-allowed';
+      }
+    }
+    return { text: null, truncated: false, tooLarge: false, binary: false, bytes: 0, reason };
   }
   const cap = Math.max(0, maxBytes);
   const tooLarge = st.size > cap;
@@ -671,8 +770,16 @@ function readFileBounded(
       binary,
       bytes: st.size,
     };
-  } catch {
-    return { text: null, truncated: false, tooLarge: false, binary: false, bytes: st.size };
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    return {
+      text: null,
+      truncated: false,
+      tooLarge: false,
+      binary: false,
+      bytes: st.size,
+      reason: code === 'EACCES' || code === 'EPERM' ? 'not-allowed' : 'unreadable',
+    };
   } finally {
     if (fd !== null) {
       try {
@@ -915,6 +1022,7 @@ export const fsHandlers: {
     root: req.root,
     tree: listTree(req.root, Math.min(req.depth ?? 3, TREE_MAX_DEPTH)),
   }),
+  'fs:locate': (req) => ({ found: locateFile(req.path, req.roots) }),
   'fs:read-file': (req) => readFileBounded(req.path, req.maxBytes ?? READ_FILE_DEFAULT_MAX),
   'fs:write-file': (req) => writeFileFenced(req.path, req.content),
   'fs:delete-session': (req) => deleteSession(req.file, req.chain ?? []),

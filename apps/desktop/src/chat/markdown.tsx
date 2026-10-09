@@ -65,6 +65,8 @@ export function localImagePath(src: string, cwd: string | undefined): string | n
   }
   if (/^[a-z][a-z0-9+.-]*:/i.test(s) || s.startsWith('//')) return null; // a real URL
   if (s.startsWith('/')) return s;
+  // The home folder is main's to expand; under the chat's folder it is nothing.
+  if (s === '~' || s.startsWith('~/')) return s;
   if (cwd !== undefined && s !== '' && !s.startsWith('#')) {
     return `${cwd.replace(/\/+$/, '')}/${s.replace(/^\.\//, '')}`;
   }

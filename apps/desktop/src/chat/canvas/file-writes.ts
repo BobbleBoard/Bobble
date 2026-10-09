@@ -139,6 +139,8 @@ export function dirname(p: string): string {
  * (main re-resolves with node:path.resolve before touching disk).
  */
 export function resolvePath(cwd: string | undefined, p: string): string {
+  // The home folder is main's to expand (fs-handlers resolveUserPath).
+  if (p === '~' || p.startsWith('~/')) return p;
   const raw = isAbsolutePath(p) || !cwd ? p : `${cwd.replace(/\/+$/, '')}/${p}`;
   const win = /^[a-zA-Z]:[\\/]/.test(raw);
   const normalizedSlashes = raw.replace(/\\/g, '/');
@@ -189,6 +191,41 @@ export function bashRedirectTarget(command: string): string | undefined {
     if (target && target !== '/dev/null' && looksLikePath(target)) last = target;
   }
   return last;
+}
+
+/**
+ * The folder a command's redirect lands in when it `cd`s first — the last
+ * unquoted `cd <dir>` chained before the redirect with `&&` or `;`. Undefined
+ * when there is none (the redirect is relative to where the command ran).
+ */
+export function bashWorkingDir(command: string): string | undefined {
+  const unquoted = shellUnquotedSpans(command);
+  const redirectAt = unquoted.search(/(?<![&\d])>>?|\btee\b/);
+  const end = redirectAt === -1 ? unquoted.length : redirectAt;
+  let dir: string | undefined;
+  // Find each unquoted `cd`, then read its argument from the real command
+  // (quotes and all), and keep it only if a chain operator follows.
+  for (const m of unquoted.slice(0, end).matchAll(/(?:^|&&|;)\s*cd(?=\s)/g)) {
+    // Skip the gap in the REAL command: in `unquoted` a quoted folder is
+    // blanked to spaces, which a pattern there would swallow as whitespace.
+    let i = (m.index ?? 0) + m[0].length;
+    while (command[i] === ' ' || command[i] === '\t') i += 1;
+    let arg = '';
+    const q = command[i];
+    if (q === '"' || q === "'") {
+      const close = command.indexOf(q, i + 1);
+      if (close === -1) continue;
+      arg = command.slice(i + 1, close);
+      i = close + 1;
+    } else {
+      const tok = /^[^\s'"|&;<>]+/.exec(command.slice(i));
+      if (tok === null) continue;
+      arg = tok[0];
+      i += arg.length;
+    }
+    if (/^\s*(&&|;)/.test(command.slice(i)) && arg !== '') dir = arg;
+  }
+  return dir;
 }
 
 /** A redirect target a shell would create a file for — not a fragment of code. */
@@ -273,7 +310,15 @@ function classifyWrite(
     const command = str(args.command);
     if (command === undefined) return undefined;
     const target = bashRedirectTarget(command);
-    return target === undefined ? undefined : { path: target };
+    if (target === undefined) return undefined;
+    // `cd reports && … > out.md` writes reports/out.md, not ./out.md.
+    const dir = bashWorkingDir(command);
+    return {
+      path:
+        dir !== undefined && !isAbsolutePath(target) && !target.startsWith('~')
+          ? `${dir.replace(/\/+$/, '')}/${target}`
+          : target,
+    };
   }
   return undefined;
 }

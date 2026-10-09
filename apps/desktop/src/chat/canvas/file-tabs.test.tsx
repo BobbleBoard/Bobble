@@ -19,7 +19,18 @@ describe('unreadableFileArtifact', () => {
     // the user (2026-09-17): the sentence used to land in the code editor, line
     // numbers and all, "as if the error is what's written to the file".
     expect(art.content.kind).toBe('notice');
-    expect((art.content as { text: string }).text).toContain('Could not read this file');
+    // In words, saying what was already tried (the user, 2026-10-08).
+    expect((art.content as { text: string }).text).toContain('Not where the chat said it is');
+    expect((art.content as { text: string }).text).toContain('looked through this chat’s folders');
+  });
+
+  it('names each other case for what it is', () => {
+    const text = (reason: 'not-allowed' | 'folder' | 'unreadable') =>
+      (unreadableFileArtifact('/a/b.md', reason).content as { text: string }).text;
+    expect(text('not-allowed')).toMatch(/macOS did not let Bobble read this file/);
+    expect(text('not-allowed')).toMatch(/Files and Folders/);
+    expect(text('folder')).toMatch(/folder, not a file/);
+    expect(text('unreadable')).toMatch(/opens here as soon as it can be read/);
   });
 
   it('names the PATH it actually tried — "not found" is useless without it', () => {
@@ -36,7 +47,7 @@ describe('unreadableFileArtifact', () => {
   it('does not claim the file was empty or that anything was lost', () => {
     const text = (art.content as { text: string }).text.toLowerCase();
     expect(text).not.toContain('empty file');
-    expect(text).toContain('nothing has been lost');
+    expect(text).not.toContain('lost');
   });
 
   it('shares the tab identity of the real artifact, so it REPLACES cleanly', () => {

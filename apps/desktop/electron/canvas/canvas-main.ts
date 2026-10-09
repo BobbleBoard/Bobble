@@ -227,7 +227,10 @@ export function registerFileProtocol(): void {
     try {
       const { host, pathname } = new URL(request.url);
       if (host !== PD_FILE_HOST) return new Response('not found', { status: 404, headers: cors });
-      target = path.resolve(decodeURIComponent(pathname));
+      const decoded = decodeURIComponent(pathname);
+      // `~` is the home folder (a model often names files that way).
+      const home = decoded.match(/^\/?~(\/.*)?$/);
+      target = home !== null ? path.join(homedir(), home[1] ?? '') : path.resolve(decoded);
     } catch {
       return new Response('bad request', { status: 400, headers: cors });
     }

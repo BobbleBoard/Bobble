@@ -59,7 +59,10 @@ function estimateThoughtMs(text: string, tps: number | undefined): number | unde
 /** Resolve a tool-arg path to an absolute one (join with the session cwd when it
  * arrived relative) so `openFileInCanvas`'s `fs:read-file` can find it. */
 function resolveAbsPath(path: string, cwd: string | undefined): string {
-  if (path.startsWith('/') || /^[A-Za-z]:[\\/]/.test(path)) return path;
+  // `~/…` is the home folder, which main expands; joined onto the chat's folder
+  // it named a file that does not exist ("this file couldn't be found").
+  if (path.startsWith('/') || path === '~' || path.startsWith('~/') || /^[A-Za-z]:[\\/]/.test(path))
+    return path;
   if (cwd !== undefined && cwd.length > 0) return `${cwd.replace(/\/+$/, '')}/${path}`;
   return path;
 }
