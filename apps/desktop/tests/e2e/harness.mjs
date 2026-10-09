@@ -75,6 +75,7 @@ import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { _electron as electron } from 'playwright-core';
+import { ensureElectronAgentMode } from '../../scripts/electron-agent-mode.mjs';
 import { acquire as acquireLock, heldByAncestor } from './_locks.mjs';
 
 export {
@@ -354,6 +355,54 @@ export async function refuseIpc(app, channels) {
   };
 }
 
+/** The open app's kill, for the signal and exit handlers below. */
+let killAppOnExit = null;
+function onProbeSignal(sig) {
+  killAppOnExit?.();
+  process.exit(sig === 'SIGINT' ? 130 : 143);
+}
+
+/**
+ * Close Electron apps an earlier probe left behind: a dev Electron whose
+ * --user-data-dir is one of this harness's `pd-*` temp profiles and whose
+ * parent has died (ppid 1). A probe still running — in any checkout, any
+ * session — has a live parent and is left alone.
+ */
+export function reapOrphanedProbeApps() {
+  let rows = '';
+  try {
+    rows = execFileSync('ps', ['-axo', 'pid=,ppid=,command='], { encoding: 'utf8' });
+  } catch {
+    return 0;
+  }
+  const tmp = tmpdir().replace(/\/$/, '');
+  let reaped = 0;
+  for (const line of rows.split('\n')) {
+    const m = /^\s*(\d+)\s+(\d+)\s+(.*)$/.exec(line);
+    if (m === null || m[2] !== '1') continue;
+    const command = m[3];
+    if (
+      !/node_modules\/(\.pnpm\/electron@[^/]+\/node_modules\/)?electron\/dist\/Electron\.app\/Contents\/MacOS\/Electron /.test(
+        command,
+      )
+    )
+      continue;
+    if (
+      !command.includes(`--user-data-dir=${tmp}/pd-`) &&
+      !/--user-data-dir=\S*\/pd-/.test(command)
+    )
+      continue;
+    try {
+      process.kill(Number(m[1]), 'SIGTERM');
+      reaped += 1;
+    } catch {
+      /* gone already */
+    }
+  }
+  if (reaped > 0) console.log(`harness: closed ${reaped} orphaned probe app(s) from earlier runs`);
+  return reaped;
+}
+
 export async function launchApp(name, options = {}) {
   const {
     fixture = TOOL_USE_FIXTURE,
@@ -402,6 +451,9 @@ export async function launchApp(name, options = {}) {
   // The user-data-dir is ours too (Chromium's caches, a few MB a run): 968 of
   // them were sitting in $TMPDIR on 2026-09-18 because only the home was removed.
   const userDataDir = mkdtempSync(path.join(tmpdir(), `pd-${name}-`));
+  // Never a Dock tile, and no orphan from an earlier run left behind (see both).
+  ensureElectronAgentMode();
+  reapOrphanedProbeApps();
   let app;
   let page;
   try {
@@ -427,6 +479,22 @@ export async function launchApp(name, options = {}) {
         ...env,
       },
     });
+
+    /*
+     * A PROBE THAT IS KILLED TAKES ITS APP WITH IT. `timeout`, Ctrl-C or a
+     * parent shell ending sends the probe a signal, `finish()` never runs, and
+     * the Electron app it launched lived on with no one to close it.
+     */
+    const appPid = app.process().pid;
+    killAppOnExit = () => {
+      try {
+        if (appPid !== undefined) process.kill(appPid, 'SIGTERM');
+      } catch {
+        /* already gone */
+      }
+    };
+    for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.once(sig, onProbeSignal);
+    process.once('exit', killAppOnExit);
 
     page = await app.firstWindow();
     if (waitFor !== null) await page.waitForSelector(waitFor, { timeout });
@@ -464,6 +532,8 @@ export async function launchApp(name, options = {}) {
   const finish = async () => {
     const during = frontmostApp();
     await app.close().catch(() => undefined);
+    for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.off(sig, onProbeSignal);
+    if (killAppOnExit !== null) process.off('exit', killAppOnExit);
     releaseSlot();
     const complaint = focusComplaint(before, during);
     if (complaint !== null) check(false, complaint);

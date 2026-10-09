@@ -139,6 +139,14 @@ const events = createIpcEventSender<AppEventMap>();
 if (process.platform === 'darwin' && isBackgroundMode()) {
   app.setActivationPolicy?.('accessory');
   app.dock?.hide();
+} else if (process.platform === 'darwin' && !app.isPackaged) {
+  /*
+   * The dev Electron.app is marked an agent (LSUIElement, scripts/
+   * electron-agent-mode.mjs) so a probe never puts a tile in the Dock — 99
+   * ghost tiles were left there by probes that ended badly. A dev run that is
+   * meant to be seen becomes a regular app again, Dock icon and menu bar.
+   */
+  app.setActivationPolicy?.('regular');
 }
 
 // The `pd-preview://` canvas harness scheme must be registered privileged

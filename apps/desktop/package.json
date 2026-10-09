@@ -6,6 +6,7 @@
   "license": "GPL-3.0-or-later",
   "main": "dist-electron/main.js",
   "scripts": {
+    "postinstall": "node scripts/electron-agent-mode.mjs",
     "dev": "vite",
     "build": "vite build",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.node.json --noEmit",

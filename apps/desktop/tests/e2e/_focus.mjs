@@ -12,6 +12,7 @@
  * never fail because it could not tidy up the desktop.
  */
 import { execFileSync } from 'node:child_process';
+import { ensureElectronAgentMode } from '../../scripts/electron-agent-mode.mjs';
 
 /** The frontmost application's name, or null if it cannot be read. */
 export function frontmostApp() {
@@ -50,6 +51,8 @@ export function restoreFocus(name) {
  * focus back). `FOCUS=1` opts out of the whole thing.
  */
 export function backgroundLaunch() {
+  // The dev Electron is never a Dock app (scripts/electron-agent-mode.mjs).
+  ensureElectronAgentMode();
   if (process.env.FOCUS === '1') return { env: {}, restore: () => {} };
   const was = frontmostApp();
   return {
