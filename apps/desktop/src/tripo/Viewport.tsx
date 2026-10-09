@@ -323,7 +323,7 @@ function RenderModeStrip(): JSX.Element {
 
 // ── bottom action pill: turntable + Export, nothing else ─────────────────
 /*
- * NO ACTION BAR. the user (2026-09-14): "remove lower 'turntable' and export
+ * NO ACTION BAR. The user (2026-09-14): "remove lower 'turntable' and export
  * buttons." Export lives in the app's top-right cluster (TopBar.tsx); the
  * turntable was a toggle nobody reached for under a strip that already
  * carries the modes.
@@ -522,7 +522,7 @@ export function Viewport(): JSX.Element {
   const imageStageView = (() => {
     // Shown on the Image tool as its result — and ALSO mid-generation on any
     // tool, because during a text->3D run this picture is the only thing that
-    // exists for the first minute or so. the user: "image and non textured model
+    // exists for the first minute or so. The user: "image and non textured model
     // should be shown as soon as ready during pipeline generations."
     if (imageVersions.length === 0) return null;
     if (imageTool !== 'image' && !generatingForImage) return null;

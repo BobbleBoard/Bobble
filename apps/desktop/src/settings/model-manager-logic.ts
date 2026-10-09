@@ -61,10 +61,10 @@ export interface QuantFitInput {
 /**
  * Will THIS quant actually run on THIS machine?
  *
- * the user: "it says things will fit I think without taking into account OS overhead
+ * The user: "it says things will fit I think without taking into account OS overhead
  * or unified memory or anything".
  *
- * He is right, and in a worse way than the wording suggests: the badge was
+ * The user is right, and in a worse way than the wording suggests: the badge was
  * {@link ramVerdict}(group.primary.minRamGB, totalRam) — a hand-set constant for
  * the whole MODEL, compared against the machine's TOTAL RAM. Two consequences:
  *
@@ -200,7 +200,7 @@ function qualityWeightedBytes(option: QuantOption): number {
 /**
  * Order the quant list so ROW 0 IS THE RECOMMENDATION.
  *
- * the user, describing what he liked in Unsloth Desktop: "they have a default
+ * The user, describing what the user liked in Unsloth Desktop: "they have a default
  * selection, the dropdown is clickable and then the download button, if you
  * press it immediately will do the recommended (which was already initially
  * selected)".
@@ -523,7 +523,7 @@ function quantRank(quant: string): number {
  * unchanged when no ladder was fetched, so the dropdown is deterministic without
  * the network.
  *
- * the user: "sort ggufs instead of alphabetically which as you can see might put all
+ * The user: "sort ggufs instead of alphabetically which as you can see might put all
  * the unsloth dynamics (labeled UD) below all the others, instead if we order by
  * file size".
  *
@@ -564,7 +564,7 @@ export function mergeQuantLadder(
   for (const f of fetched ?? []) {
     if (f.quant === undefined || f.quant.length === 0) continue;
     /*
-     * A PROJECTOR IS NOT A QUANT. the user: "lists mmproj's separately I think, as if
+     * A PROJECTOR IS NOT A QUANT. The user: "lists mmproj's separately I think, as if
      * it's its own standalone model". `mmproj-F16.gguf` parses to the quant label
      * "F16", so a vision repo grew a phantom 0.9 GB option that loads nothing on
      * its own. Callers filter it today; the shared helper should not depend on

@@ -89,7 +89,7 @@ export function previewFor(toolName: string, args: Record<string, unknown>): Pre
 
 /**
  * THE ASK, AS A CARD ABOVE THE COMPOSER — not a modal over a blurred app.
- * the user (2026-10-01): "let's put this sort of permission popup just as a little
+ * The user (2026-10-01): "let's put this sort of permission popup just as a little
  * card same width as the input bar floating directly above it (not on top of)".
  * It stands where the person is already looking, the conversation stays
  * readable above it, and Escape inside it is "Don't" (dismissing is not

@@ -29,7 +29,7 @@ export function ToastHost() {
         .map((n) => {
           /*
            * WHAT HAPPENED, NOT THE RAW LINE, AND NOT IN RED (toast-copy.ts).
-           * the user (2026-10-08): "red text that's just a real unknown error …
+           * The user (2026-10-08): "red text that's just a real unknown error …
            * just can't exist anymore." Amber: a failure here is something to
            * act on, not an alarm; the raw line goes to the console.
            */

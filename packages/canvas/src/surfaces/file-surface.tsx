@@ -170,7 +170,7 @@ export interface FileSurfaceProps {
   /**
    * A LIVE EDIT, ANIMATED AS AN EDIT.
    *
-   * the user: "Editing a file shouldn't show the diff being written in real time it
+   * The user: "Editing a file shouldn't show the diff being written in real time it
    * should show that file and then the text as the negative part of the diff is
    * written being deleted … and then of course the replace part writing
    * animation same as when it's writing just in the file wherever it is."
@@ -234,7 +234,7 @@ export function FileSurface({
   // Rendered view for the renderable kinds: markdown → rich prose, html → the
   // sandboxed live frame (same surface + containment as an html artifact tab),
   // svg → the sanitized inline draw. Raw (and every non-renderable kind, e.g. a
-  // .ts file) → the CodeMirror source viewer. (the user: html/svg files get the same
+  // .ts file) → the CodeMirror source viewer. (The user: html/svg files get the same
   // rendered↔raw toggle markdown already had; images stay always-rendered — they
   // never route here, they open on the media surface.)
   const rendered = view === 'rendered' && isRenderableKind(content.kind);

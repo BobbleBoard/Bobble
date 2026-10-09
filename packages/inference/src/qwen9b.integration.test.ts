@@ -1,7 +1,7 @@
 /**
  * Does the new balanced pick actually work — MTP and vision, on one launch?
  *
- * the user: "go download qwen3.5-9b (configure mtp to work still and ensure vision
+ * The user: "go download qwen3.5-9b (configure mtp to work still and ensure vision
  * works) replacing gemma4-12b as the standard balanced option."
  *
  * The unit tests prove the CATALOG and the tier table say the right things. That

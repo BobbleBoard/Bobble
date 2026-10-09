@@ -2,7 +2,7 @@
  * THE CANVAS'S EDGES, AT DEVICE PIXELS — the selected tab's flares and the
  * corner where the canvas meets the chat area.
  *
- * the user (2026-10-08): "there's a bit of wierdness around the edges of the tabs,
+ * The user (2026-10-08): "there's a bit of wierdness around the edges of the tabs,
  * the curve up a bit thicker or something than the rest and then the top of
  * the border between the canvas and chat area … there's an inexplicable rounded
  * corner". Opens two tabs, then photographs at 2x (CDP clip, scale 1 on the 2x

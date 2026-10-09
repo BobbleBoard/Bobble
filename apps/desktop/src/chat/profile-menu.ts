@@ -18,7 +18,7 @@ export interface ProfileMenuAction {
 }
 
 export const PROFILE_MENU_ACTIONS: readonly ProfileMenuAction[] = [
-  /* the user (2026-10-08): "a quick guided tour button that shows a
+  /* The user (2026-10-08): "a quick guided tour button that shows a
      highlighting/tutorial style guide of whatever's on screen right now". */
   { id: 'tour', label: 'Take a quick tour', testid: 'start-tour' },
   { id: 'settings', label: 'Settings', testid: 'open-settings' },

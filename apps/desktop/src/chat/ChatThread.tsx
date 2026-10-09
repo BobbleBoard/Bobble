@@ -165,7 +165,7 @@ const USER_CLAMP_LINES = 12;
 /**
  * A long user message, folded.
  *
- * the user: "some of these messages are really really long, keep user message
+ * The user: "some of these messages are really really long, keep user message
  * bubbles short with a 'show more'." A pasted spec can be hundreds of lines,
  * and it pushes the reply — the thing being looked for — off the screen.
  * Short ones are untouched: a fold on three lines is worse than no fold.
@@ -205,7 +205,7 @@ function ClampedText({ text }: { text: string }) {
 /**
  * A generation rate we are willing to print.
  *
- * the user, on a footer reading "~13888 tok/s": "suspiciously incorrect". It is — no
+ * The user, on a footer reading "~13888 tok/s": "suspiciously incorrect". It is — no
  * local model decodes at five figures. That number is a PROMPT-processing rate,
  * which llama.cpp reports in the same timing block and in the same units, so a
  * stray parse or a prefill-only request surfaces it as though it were throughput.
@@ -349,7 +349,7 @@ export function ChatThread() {
   };
 
   /*
-   * A DROP LANDS IN THE MESSAGE YOU ARE EDITING. the user: "drag and drop needs to
+   * A DROP LANDS IN THE MESSAGE YOU ARE EDITING. The user: "drag and drop needs to
    * be able to go into messages being edited."
    *
    * The window-level overlay accepts a drop anywhere and hands the files to
@@ -490,7 +490,7 @@ export function ChatThread() {
   // streaming re-renders can never yank the view back down while they read above.
   const pinnedRef = useRef(true);
   /*
-   * WHICH WAY THE USER LAST MEANT TO GO. the user (2026-09-12): "the slightest bit
+   * WHICH WAY THE USER LAST MEANT TO GO. The user (2026-09-12): "the slightest bit
    * of user scrolling up manually, I need to be freed from the auto scroll …
    * if they tap the bottom at all, then activate the auto scroll, but if they
    * ever go up, even the tiniest bit (manually) the auto scroll doesn't snap
@@ -506,7 +506,7 @@ export function ChatThread() {
    */
   const intentRef = useRef<'up' | 'down'>('down');
   /*
-   * WHERE WE LAST PUT THE THREAD OURSELVES. the user (2026-09-20), after a chat
+   * WHERE WE LAST PUT THE THREAD OURSELVES. The user (2026-09-20), after a chat
    * with the media tools: "new stuff seems to go above old stuff in the chat
    * rather than going below the old stuff" — the thread had stopped following,
    * so every later turn landed under the composer, out of sight, while the
@@ -604,7 +604,7 @@ export function ChatThread() {
     if (pinnedRef.current) follow();
   });
   /*
-   * …AND A SEND RE-PINS IT. the user (2026-09-24): "pressing enter on a chat should
+   * …AND A SEND RE-PINS IT. The user (2026-09-24): "pressing enter on a chat should
    * take you to the bottom". The same re-arm scrolling back down to the foot
    * gives — pinned, meaning down — so the reply is followed from here, and the
    * next wheel tick up releases it exactly as before (see thread-follow.ts).
@@ -662,7 +662,7 @@ export function ChatThread() {
   /*
    * THE ATTACHMENT SPINNER SURVIVES SEND.
    *
-   * the user: "they stop loading maybe even after sent, the loading spinner can
+   * The user: "they stop loading maybe even after sent, the loading spinner can
    * still be on them, it disapears when they are prefilled." The chips leave the
    * composer with the message and used to arrive here with no prefill state at
    * all, so the spinner vanished at the exact moment the wait became real.
@@ -693,7 +693,7 @@ export function ChatThread() {
    * message, or its turn edited away) has nowhere to sit and falls to the foot.
    */
   /*
-   * EVERY message of a row claims the row, not only its last one. the user
+   * EVERY message of a row claims the row, not only its last one. The user
    * (2026-09-12): "file cards pin themselves to the bottom of a chat rather
    * than the bottom of the message they were called in." The anchor is the
    * LAST message at the moment of the hand-over — mid-turn that is the
@@ -792,7 +792,7 @@ export function ChatThread() {
             /*
              * A PRESENTED ARTEFACT STAYS WHERE IT WAS HANDED OVER.
              *
-             * the user: "file presentation cards seem pinned to the bottom of the
+             * The user: "file presentation cards seem pinned to the bottom of the
              * chat for some time instead of staying at the position they were
              * created at." Every card ever presented used to render as one block
              * after the last message, so the picture from your first question was
@@ -894,7 +894,7 @@ export function ChatThread() {
                 /*
                  * THE PASTE CARD SURVIVES THE ROUND TRIP.
                  *
-                 * the user: "pasted content shows literally as 'pasted content' rather
+                 * The user: "pasted content shows literally as 'pasted content' rather
                  * than the already-designed paste card." Live, the bubble echoes
                  * only what was typed — but pi's copy of the message carries the
                  * attachments folded in as fenced blocks, and a chat REOPENED from
@@ -927,7 +927,7 @@ export function ChatThread() {
                     {/*
                       WHAT YOU BROUGHT IS NOT WHAT YOU SAID.
                       A pasted block, a dropped file and a pinned image sit
-                      BESIDE the message, not inside its bubble. the user:
+                      BESIDE the message, not inside its bubble. The user:
                       "pastes/images/files … should not be contained in the grey
                       box." They are already boxes in their own right — a card
                       inside a bubble is two containers saying the same thing,
@@ -1022,7 +1022,7 @@ export function ChatThread() {
                 const streaming = group.some((m) => m.isStreaming === true);
                 // Pre-first-token: an EMPTY streaming assistant would render a bare row
                 // with the copy/retry (+tps) action bar next to the processing ring
-                // (the user: no copy/tps bar by the ring). Skip it — the ProcessingRing IS
+                // (The user: no copy/tps bar by the ring). Skip it — the ProcessingRing IS
                 // this phase; the real row appears the moment a token lands.
                 const groupHasContent = group.some(
                   (m) =>
@@ -1044,7 +1044,7 @@ export function ChatThread() {
                       <MessageActions
                         onCopy={() => copyText(groupPlainText(group))}
                         onRetry={() => retryFrom(first.id)}
-                        /* No context chip. the user: "remove the context used one, just
+                        /* No context chip. The user: "remove the context used one, just
                          keep the copy reload and toks/s". It was also the least
                          trustworthy number on the row — a whole-conversation
                          total rendered under every individual message. */
@@ -1132,7 +1132,7 @@ export function ChatThread() {
               the solo CEO/root. The subagent NAVIGATOR + checklist live in the
               situation-room canvas tab, which opens when the model builds a team. */}
           {/*
-           * NO ROLE'S CHAT RENDERS HERE. EVER. the user, after three attempts at
+           * NO ROLE'S CHAT RENDERS HERE. EVER. The user, after three attempts at
            * this: "the embedded ceo-manager chat (not just the message bubble
            * the entire ceo-manager chat is shown there) just needs to be
            * removed. just remove that, not a complicated idea."
@@ -1151,7 +1151,7 @@ export function ChatThread() {
            * and nothing else.
            */}
           {corpTaskId !== null && corpView.kind === 'waiting' && corpSituation !== null ? /*
-           * NOTHING. the user: "this forming a plan bar just needs to go in it's
+           * NOTHING. The user: "this forming a plan bar just needs to go in it's
            * entirety aswell."
            *
            * The inline corp turn lived here — a status bar reading "Forming a
@@ -1211,7 +1211,7 @@ export function ChatThread() {
            */}
           {orphanPresented.length > 0 ? renderPresented(orphanPresented) : null}
           {/* Breathing room so the last message/thought is never jammed against
-              the composer. the user (2026-09-12): "reduce buffer space between
+              the composer. The user (2026-09-12): "reduce buffer space between
               stream and input bar" — it was 112px on top of the message's own
               action row, ~170px of nothing under a streaming reply. */}
           <div className="h-6 shrink-0" aria-hidden data-testid="thread-tail-space" />

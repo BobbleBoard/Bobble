@@ -48,7 +48,7 @@ export function pickMonitorSource(
 ): MonitorSource {
   if (!session.active) return 'none';
   /*
-   * PIXELS WIN, ALWAYS. the user: "when screen recording permissions are granted
+   * PIXELS WIN, ALWAYS. The user: "when screen recording permissions are granted
    * always use the real window visual."
    */
   if (frame?.bitmap != null) return 'pixels';
@@ -241,7 +241,7 @@ export function layoutAxScene(scene: MacMonitorAxScene): AxWindowLayout[] {
 /**
  * Where the phantom rests when nothing is happening.
  *
- * the user: "always show the fake cursor around there even if just idling, looks
+ * The user: "always show the fake cursor around there even if just idling, looks
  * nice and makes it feel like 'this is the model's computer'." So there is
  * always a point to draw at. The LAST place it actually was is the honest one —
  * a cursor that teleports home the instant a turn ends reads as a reset, not as

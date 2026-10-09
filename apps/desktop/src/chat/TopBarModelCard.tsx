@@ -1,7 +1,7 @@
 /**
  * WHAT IS ACTUALLY RUNNING, on hover of the status in the top bar.
  *
- * the user: "hover this pill at the top for a bit of model information, a little
+ * The user: "hover this pill at the top for a bit of model information, a little
  * popout of the model card, who it's by, a split line the engine being run on
  * (both with logos name quick description and then a Learn more <square with
  * top right arrow>> big blue button for both top and bottom parts."

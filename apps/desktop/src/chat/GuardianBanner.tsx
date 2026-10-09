@@ -2,7 +2,7 @@
  * THE MACHINE SPOKE — a pill at the top when the guardian stopped or is holding
  * a generation to keep the computer responsive.
  *
- * the user: "computer just became unusably laggy … needs monitoring for cpu and mem
+ * The user: "computer just became unusably laggy … needs monitoring for cpu and mem
  * pressure to ensure extremes like this absolutely never happen." The guardian
  * (electron/gen/guardian-main.ts) now cancels a heavy job before the OS gets to
  * that point. A generation that stops on its own, with no explanation, reads as
@@ -44,7 +44,7 @@ export function GuardianBanner({ fallback = null }: { fallback?: ReactNode } = {
       if (verdict === 'pause') {
         // The running work is stopped in place, not lost — say so, and what
         // is stopped, so the frozen progress bar reads as the guard and not
-        // as the app dying. the user (2026-09-16): pause rather than terminate.
+        // as the app dying. The user (2026-09-16): pause rather than terminate.
         const what = event.paused ?? [];
         setNotice({
           kind: 'pause',

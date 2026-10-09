@@ -3,7 +3,7 @@
  * flag — headless, real app, real cache (the installed MLX engines are what
  * make the engine select offer more than llama.cpp).
  *
- * the user: "ensure settings and such transfer between engines as seamlessly as
+ * The user: "ensure settings and such transfer between engines as seamlessly as
  * possible and are removed/greyed out if unsupported by engine, keeping
  * preferences saved."
  *

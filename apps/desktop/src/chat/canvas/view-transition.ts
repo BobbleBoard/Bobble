@@ -2,7 +2,7 @@
  * Run a DOM update inside a View Transition, so an element that exists before
  * and after it under the same `view-transition-name` MOVES rather than pops.
  *
- * the user: "with a smooth animation have an inline thing either resize and move
+ * The user: "with a smooth animation have an inline thing either resize and move
  * over smoothly leaving the inline chat to become the canvas … or a tab in
  * the canvas dropping out and becoming an inline card." Chromium's
  * `document.startViewTransition` is that animation: it snapshots the page,
@@ -30,7 +30,7 @@ export function withViewTransition(update: () => void): void {
     return;
   }
   /*
-   * THE LAYOUT IS FINAL WHEN IT IS CAPTURED. the user (2026-10-08): "the animation
+   * THE LAYOUT IS FINAL WHEN IT IS CAPTURED. The user (2026-10-08): "the animation
    * seems smooth mostly but theres some jitteriness both ways". MEASURED
    * (inline-move-film.mjs): the canvas rail animates its own width, so the
    * "after" snapshot caught it mid-way — into the canvas the morph aimed at the

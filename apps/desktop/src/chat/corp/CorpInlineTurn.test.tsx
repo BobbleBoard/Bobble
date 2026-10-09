@@ -231,7 +231,7 @@ describe('CorpInlineTurn — clicking a row selects that agent', () => {
   /*
    * This used to expand a small transcript feed INSIDE the panel, while the
    * sidebar's row for the same agent opened it as a full chat. Two viewers, two
-   * selections, neither aware of the other. the user: "the buttons in the situation
+   * selections, neither aware of the other. The user: "the buttons in the situation
    * room to check on a subagent and the buttons in the left sidebar showing
    * subagents as 'subchats' don't do the same thing?? why don't they?"
    *
@@ -308,7 +308,7 @@ describe('CorpInlineTurn — done state', () => {
 });
 
 describe('the summary counts who worked, not who was hired', () => {
-  /* the user, seeing "Stopped, with a team of 18" after a CEO wrote 19 files alone:
+  /* The user, seeing "Stopped, with a team of 18" after a CEO wrote 19 files alone:
    * "how can the contracts have been written if talk_to_manager … wasn't
    * called." They had not been. The chart lists the whole roster; every agent
    * shows until something moves it off `idle`. */
@@ -349,7 +349,7 @@ describe('the summary counts who worked, not who was hired', () => {
 
 describe('CorpInlineTurn — the delegated checklist is the default view', () => {
   /*
-   * the user, scrolling a live run: "as a user this is the most confusing chat
+   * The user, scrolling a live run: "as a user this is the most confusing chat
    * interface i've ever encountered in my life ... a special UI card for each
    * tool ... that's what should be shown by default at the top level, before the
    * user has clicked on any subagent."

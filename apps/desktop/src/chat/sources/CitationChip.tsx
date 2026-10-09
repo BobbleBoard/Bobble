@@ -1,7 +1,7 @@
 /**
  * A CITATION IN THE ANSWER: the chip after a claim, and the card it opens.
  *
- * the user's reference (Google's overview, 2026-09-24): "[icon] Harvard Medical
+ * The user's reference (Google's overview, 2026-09-24): "[icon] Harvard Medical
  * School +1" sitting after a sentence, and hovering it opens a card listing
  * that chip's sources. Here the chip is the site's icon and short name, "+N"
  * when several links sat together (rehype-citations merged them), and its card

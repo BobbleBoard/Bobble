@@ -1,7 +1,7 @@
 /**
  * WHAT THE MODEL CAN MAKE, LOOKED AT — one fresh chat per request, real model.
  *
- * the user (2026-09-24): "start working on the visuals (high priority) the model can
+ * The user (2026-09-24): "start working on the visuals (high priority) the model can
  * produce, websites, pptx, docx, slides, all sorts types of data visuals, images
  * (… observe+ improve loop ensurance), svg icons and artwork, UI, really clean,
  * intuitive interactive widgets inline/+canvas, eg. for math explanation NN
@@ -241,7 +241,7 @@ const TASKS = [
    * chemistry... practice problem requests, this falls into visual aswell …
    * having diagrams/visuals and animating them cleanly to go along with an
    * explanation when informative". The figure is a stand-in drawn after the
-   * kinetic-theory "Fig. 3.1" he sent (fixtures/stem/fig31.png), attached the
+   * kinetic-theory "Fig. 3.1" the user sent (fixtures/stem/fig31.png), attached the
    * way a paste attaches it.
    */
   {

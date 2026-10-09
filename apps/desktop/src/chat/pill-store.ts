@@ -1,7 +1,7 @@
 /**
  * THE PILL, AS A PLACE ANYTHING CAN SPEAK FROM.
  *
- * the user: "I like this floating pill idea and would like to extend it a bit. so
+ * The user: "I like this floating pill idea and would like to extend it a bit. so
  * let's go for making this modular."
  *
  * It started as a component that knew about exactly three things — a model

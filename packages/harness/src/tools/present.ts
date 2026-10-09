@@ -1,7 +1,7 @@
 /**
  * `present` — hand the finished thing to the user, and look at it one last time.
  *
- * the user's ask: "I want the model to have a 'present' tool, this is only for the
+ * The user's ask: "I want the model to have a 'present' tool, this is only for the
  * top level/original model, no subagent ever has this, that presents a file to
  * the user, shows a card and the file open or running in canvas, if it's a godot
  * game or whatever, that should show up as well in the canvas as well, able to

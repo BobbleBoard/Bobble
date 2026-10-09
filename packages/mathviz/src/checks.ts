@@ -2,7 +2,7 @@
  * THE CHECKS — what a person would wince at, measured, and said so the next
  * call can fix it.
  *
- * the user, on the page this replaces: "overlapping text, low contrast text …
+ * The user, on the page this replaces: "overlapping text, low contrast text …
  * emojis absolutely not, wall of text mixed with bullets neither with reference
  * to what the visual / interactiveness is, not tied in". Each of those is a
  * number here: label boxes that intersect (in every step's state, since a step

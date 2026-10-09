@@ -1,7 +1,7 @@
 /**
  * OPENING AN OLD CHAT SHOULD LOAD IT WHILE YOU TYPE.
  *
- * the user: "when I go to an existing chat and take some time, while I'm writing my
+ * The user: "when I go to an existing chat and take some time, while I'm writing my
  * prompt or waiting or whatever, it's getting loaded … so no time after pressing
  * send is wasted on that stuff."
  *

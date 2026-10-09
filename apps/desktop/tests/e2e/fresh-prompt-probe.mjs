@@ -1,7 +1,7 @@
 /**
  * THE SYSTEM PROMPT OF A FRESH, PROJECTLESS CHAT — verbatim, headless.
  *
- * the user, reading it in the Advanced panel: "there's so much explanation which
+ * The user, reading it in the Advanced panel: "there's so much explanation which
  * I can't figure out what it's explaining about and the working directory is
  * by default users/the user when in no project??? not a sandbox..."
  *

@@ -1,7 +1,7 @@
 /**
  * "FLAGGED TO THE USER TO MY FACE."
  *
- * the user: "flagged to the user to my face right there whenever anything threatens
+ * The user: "flagged to the user to my face right there whenever anything threatens
  * to cause a full re prefill (including model switches) at over 16k context."
  *
  * Almost everything this app does about first-token latency is about NOT

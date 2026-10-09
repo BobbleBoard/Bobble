@@ -36,11 +36,11 @@ Task content was never touched.
 Not a fence refusal, which is what I first reported. The fence refused the
 requested path and its error said *"use a relative path like `corp-run`"*. The
 model complied, that resolved against the working folder, and the whole project
-was built at `/Users/user/Desktop/corp-run` — eleven files, no error, and a reply
+was built at `~/Desktop/corp-run` — eleven files, no error, and a reply
 naming the path that had been asked for. One earlier run wrote to **both**
 locations (different roles, different roots): a project torn in half, which is
 why F5 does nothing even once you find the folder. Same mechanism produced
-`/Users/user/Desktop/Users/user/Desktop/platformer_game`.
+`~/Desktop~/Desktop/platformer_game`.
 
 `3e63fcb` — an absolute or `~`-anchored path under HOME is honoured; writing a
 path out in full is what intent looks like. Bare relative names stay fenced; a
@@ -149,7 +149,7 @@ fault, not the harness's. `~/bobble-testbed` is now archived to
 
 # Part two: runs 9–15, chasing an actually-working game
 
-the user's standing order: rerun until *I* have visually verified, as the user, that
+The user's standing order: rerun until *I* have visually verified, as the user, that
 the game was delivered. Everything below was found by doing that.
 
 ## What was wrong, in the order it was found
@@ -160,7 +160,7 @@ Desktop for most of the user's chats — so a task naming
 relative shell command landed there. The write fence had stopped this for the pi
 file tools, but bash is not fenced and sensibly cannot be. `ad184ec` puts the
 roles IN the directory the task names. It also closed the "vanished run-8 files"
-mystery: they were at `/Users/user/Desktop/platformer` the whole time.
+mystery: they were at `~/Desktop/platformer` the whole time.
 
 **My own instruction hung two runs.** Telling every role to "OPEN THE WORK IN IT"
 made the CEO run `godot --headless -e game` and `godot --path .` — both open the
@@ -181,7 +181,7 @@ error to STDERR and exits 0; `execFileSync` returns STDOUT only. So the harness
 read an empty stream, found no errors, and told the CEO **"It loaded with NO
 errors"** about a project with five parse errors. The CEO then reported "Project
 loads cleanly" — and I called that a model failure. It was not. It did exactly
-what the harness told it. the user pushed back ("did it attempt to get a screenshot
+what the harness told it. The user pushed back ("did it attempt to get a screenshot
 or compile and run the project at all?") and that is what found it.
 
 ## What the harness does now
@@ -362,7 +362,7 @@ does not make them a harness feature.
 
 ## And a UI bug that had nothing to do with any of it
 
-the user's window had its bottom bar and sidebar footer cut off, worse after
+The user's window had its bottom bar and sidebar footer cut off, worse after
 fullscreen. MEASURED: usable area 1512x868, window created at 1440x940 — 72px too
 tall, so Electron centred it to y=-31 and clipped both ends, on every launch.
 

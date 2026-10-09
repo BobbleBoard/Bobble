@@ -15,7 +15,7 @@ const machine = (usableMemoryGB: number, totalRamGB = usableMemoryGB) => ({
 
 describe('the quant floor', () => {
   it('never goes below IQ3_XS for a model under 100B', () => {
-    // the user: "don't go below Q3 xs on any model <100b".
+    // The user: "don't go below Q3 xs on any model <100b".
     const tiny = quantForBudget(27, 6, TEXT_LADDER);
     expect(tiny).toBeUndefined();
     expect(TEXT_LADDER.at(-1)?.quant).toBe('IQ3_XS');
@@ -50,7 +50,7 @@ describe('the quant floor', () => {
 });
 
 describe('text', () => {
-  it('picks Qwen3.8 27B whenever it fits — the user's standing instruction', () => {
+  it('picks Qwen3.8 27B whenever it fits — the user’s standing instruction', () => {
     const rec = recommendFor('text', machine(24, 32));
     expect(rec?.family.id).toBe('qwen3.8');
     expect(rec?.reason).toMatch(/strongest open model/i);
@@ -80,7 +80,7 @@ describe('text', () => {
 
 describe('image', () => {
   it('leads with Mage Flow, which is the point on a slow machine', () => {
-    // the user: "mage flow models are inevitably going to be like an order of
+    // The user: "mage flow models are inevitably going to be like an order of
     // magnitude faster than any flux 2 klien or even something like z image".
     expect(recommendFor('image', machine(12, 16))?.family.id).toBe('mage-flow');
     expect(recommendFor('image', machine(48, 64))?.family.id).toBe('mage-flow');
@@ -93,7 +93,7 @@ describe('image', () => {
 
 describe('video', () => {
   it('favours LTX over MiniMax-H3', () => {
-    // the user: "ltx 2.5 is significantly faster… I can tell virtually no quality
+    // The user: "ltx 2.5 is significantly faster… I can tell virtually no quality
     // difference in general side by sides, so favor ltx".
     expect(recommendFor('video', machine(18, 24))?.family.id).toBe('ltx');
   });

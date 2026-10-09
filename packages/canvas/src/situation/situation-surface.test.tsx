@@ -246,7 +246,7 @@ describe('SituationRoomSurface — live per-subagent timer (D4)', () => {
 
 describe('why a subagent row is still', () => {
   /*
-   * the user: "for each subagent, they are stopped for a reason, so the reason could
+   * The user: "for each subagent, they are stopped for a reason, so the reason could
    * be red error, green completed and waiting, and yellow paused… to the right
    * of them and a 'waiting, done, error' whatever's applicable."
    *

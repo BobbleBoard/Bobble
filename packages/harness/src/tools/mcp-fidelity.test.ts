@@ -1,7 +1,7 @@
 /**
  * ANY MCP TOOL, AS A COMMAND, WITH NOTHING LOST.
  *
- * the user: "any mcp can be translated into a cli tool that has the description on
+ * The user: "any mcp can be translated into a cli tool that has the description on
  * --help, auto error correction, and no capability loss from the mcp version."
  *
  * That is three claims, and this file is the proof of each. The schema below is

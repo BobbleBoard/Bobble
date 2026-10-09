@@ -1,7 +1,7 @@
 /**
  * Self-contained inline SVG marks for the connector gallery.
  *
- * the user (2026-09-18): "as much as you can, don't frankenstein or recreate
+ * The user (2026-09-18): "as much as you can, don't frankenstein or recreate
  * logos, find a catalog or official svgs". So a brand's mark is one of two
  * things, never a drawing of ours:
  *
@@ -145,7 +145,7 @@ function brandSvg(pathD: string, color: string): string {
 }
 
 /**
- * THE FIRST-PARTY MARKS HAVE A COLOUR EACH. the user (2026-09-17): "all the first
+ * THE FIRST-PARTY MARKS HAVE A COLOUR EACH. The user (2026-09-17): "all the first
  * party connector icons make a bit more colorful and exciting, not over the
  * top, they're icons, simple still but with a bit of color, not so simple thin
  * white lines only". Same line-art, two tones: the strokes in a hue, and the
@@ -222,7 +222,7 @@ const NEUTRAL_ICON_SVGS: Record<string, string> = {
   ),
   // The sidebar's own cube (SessionSidebar ModalityCube), in a hue: the top
   // face drawn as its own closed shape, so the two-tone fill lands on it
-  // twice and the cube reads as lit from above. the user (2026-09-18): "that 3d
+  // twice and the cube reads as lit from above. The user (2026-09-18): "that 3d
   // icon doesn't look nice" — the first cut had a stray diagonal across the
   // top and nothing to tell the faces apart.
   'bobble-3d': neutralSvg(

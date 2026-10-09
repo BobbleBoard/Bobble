@@ -102,7 +102,7 @@ DEST="/Applications/Bobble.app"
 # then resolve against the NEW asar (other hashes) and fail. Ask it to quit the
 # way a person would (it saves and stops its own model servers), wait, and stop
 # here rather than force it — the user may be mid-task. (2026-09-24: a ship ran with
-# the user's Bobble open because the running-check and the ship shared one command.)
+# The user's Bobble open because the running-check and the ship shared one command.)
 if pgrep -f "$DEST/Contents/MacOS/Bobble" >/dev/null; then
   echo "ship-local: Bobble is running — asking it to quit"
   # The Apple Event can go unheard (no Automation grant for whatever runs this

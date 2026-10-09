@@ -24,7 +24,7 @@ export interface AcItem {
    */
   path?: string;
   /**
-   * A connector's REAL brand mark, inline. the user: "the / should be able to show
+   * A connector's REAL brand mark, inline. The user: "the / should be able to show
    * installed connectors or reference specific capabilities and show REAL ICONS
    * to their left." Inline SVG from the in-repo catalog — the app is offline and
    * its CSP blocks remote images, so a URL would render nothing.

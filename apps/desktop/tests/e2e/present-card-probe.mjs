@@ -1,7 +1,7 @@
 /**
  * present-card-probe.mjs — LOOK at the presentation card.
  *
- * the user, twice: "are you taking screenshots?" and then a screenshot of the card
+ * The user, twice: "are you taking screenshots?" and then a screenshot of the card
  * showing four bugs I had not seen because I verified by tests. This drives the
  * real card so each claim about it can be backed by a picture:
  *
@@ -12,7 +12,7 @@
  */
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { _electron as electron } from 'playwright-core';
@@ -21,7 +21,7 @@ const require = createRequire(import.meta.url);
 const electronBinary = require('electron');
 const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const OUT = process.env.OUT ?? path.join(appRoot, '.corp-runs', 'present-card');
-const FILE = process.env.FILE ?? '/Users/user/bobble-testbed/chartdemo/chart.html';
+const FILE = process.env.FILE ?? `${homedir()}/bobble-testbed/chartdemo/chart.html`;
 if (!existsSync(OUT)) mkdirSync(OUT, { recursive: true });
 const udd = mkdtempSync(path.join(tmpdir(), 'pd-present-'));
 

@@ -1,5 +1,5 @@
 /**
- * DOES NEW STUFF LAND BELOW OLD STUFF? the user (2026-09-20), after trying the
+ * DOES NEW STUFF LAND BELOW OLD STUFF? The user (2026-09-20), after trying the
  * media tools in a chat: "new stuff seems to go above old stuff in the chat
  * rather than going below the old stuff".
  *

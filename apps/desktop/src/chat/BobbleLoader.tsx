@@ -74,7 +74,7 @@ export interface BobbleLoaderProps {
   /**
    * Take the whole box instead of a fixed square.
    *
-   * the user: "just that part that does all the animations … but scaled to a rounded
+   * The user: "just that part that does all the animations … but scaled to a rounded
    * corner large square/rect". The card the result will occupy is the frame, and
    * the mark plays at card scale inside it rather than as a stamp in the middle
    * of an empty plate. The MARK stays square whatever shape the box is — the
@@ -458,7 +458,7 @@ export function BobbleLoader({
             />
           </div>
           {/* The number, when there is an honest one. "Loading" otherwise —
-              the user: "show a progressbar at the bottom with % otherwise loading". */}
+              The user: "show a progressbar at the bottom with % otherwise loading". */}
           <span className="pd-bobble-pct" data-testid="bobble-pct">
             {pct === undefined ? (note ?? 'Loading') : `${pct}%`}
           </span>

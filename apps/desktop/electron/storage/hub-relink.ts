@@ -7,7 +7,7 @@
  * engine reads its weights through that link. The links live in the support
  * folder and the weights in the library, so the two can come apart: when the
  * engine's cache is recreated (a reset engine, a deleted `~/.cache/bobble/gen3d`
- * — the user's Mac since 2026-09-20), every byte is still on the shelves but the
+ * — The user's Mac since 2026-09-20), every byte is still on the shelves but the
  * engine sees none of it. Every 3D model reads "not downloaded", and Download
  * fetches again what is already on disk. For Mage-Flow it is worse: the old
  * `microsoft/Mage-Flow-*` copies on the shelves (35 GB on the user's Mac) come

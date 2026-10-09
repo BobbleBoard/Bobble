@@ -105,7 +105,7 @@ const NOTIFY_MIN_RUN_MS = 20_000;
  * (rail) or the full "Bobble · Local" row (expanded) — that opens a DROPUP
  * (side="top") holding Settings and Toggle theme.
  *
- * It used to end in a User / Power-user toggle. the user: "the power user/user toggle
+ * It used to end in a User / Power-user toggle. The user: "the power user/user toggle
  * has been completely broken, however I think it's a good idea for us to remove
  * that now that I think about it, so let's remove that toggle anyways." Removing
  * the control meant choosing a mode rather than leaving everyone on the 'user'
@@ -141,7 +141,7 @@ function SidebarProfileMenu({
       </button>
     ) : (
       /*
-       * the user: "the hover highlight needs to be full width, same margin on the
+       * The user: "the hover highlight needs to be full width, same margin on the
        * right as left, remove the down arrow, add an embedded settings button
        * that takes you straight to settings one click, this highlights
        * individually, just a gear on the right side of the button, clicking the
@@ -244,7 +244,7 @@ function slideMs(): number {
 const PROJECT_SLIDE_MS = 240;
 
 /**
- * A PROJECT'S CHATS SLIDE, they do not pop. the user (2026-09-23): "'projects'
+ * A PROJECT'S CHATS SLIDE, they do not pop. The user (2026-09-23): "'projects'
  * opening/closing animation needs to be cleaner and slide up and down the
  * chats in the project." The list was mounted and unmounted in one frame
  * while only the folder glyph animated. Now the rows stay mounted for the
@@ -379,7 +379,7 @@ export function SessionSidebar({
   const place = useActivePlace((s) => s.place);
   const onChat = place.kind === 'chat';
   /*
-   * THE SLIDE. the user: "left sidebar does not close cleanly, it's instant
+   * THE SLIDE. The user: "left sidebar does not close cleanly, it's instant
    * dissapear and then slide left rather than the correct slide in like the
    * canvas sidebar does."
    *
@@ -1051,7 +1051,7 @@ export function SessionSidebar({
             // No caret by default; a chat with agents swaps its bubble for a fold
             // caret ON HOVER (CSS) so nothing shifts (the user A4).
             /*
-             * NO BUBBLE ON A PLAIN CHAT. the user: "chat icon on the left felt very
+             * NO BUBBLE ON A PLAIN CHAT. The user: "chat icon on the left felt very
              * generic, do we even need that icon for each chat?" — and no: an
              * identical glyph on every row of a list of chats distinguishes
              * nothing, while costing ~24px of a column whose titles were all
@@ -1080,7 +1080,7 @@ export function SessionSidebar({
                 <span className="pd-chat-dot pd-chat-dot--needs-input" />
               ) : running ? (
                 // Sized + placed to land exactly on the hover 3-dot button
-                // (the user) — see .pd-chatrow-spinner.
+                // (The user) — see .pd-chatrow-spinner.
                 <span className="pd-chatrow-spinner">
                   <Spinner size={16} />
                 </span>
@@ -1301,7 +1301,7 @@ export function SessionSidebar({
   const workspaceNav = workspaceNavRows({ capabilities: caps });
 
   /*
-   * COLLAPSED: NOTHING — eventually. the user: "when we close the left sidebar now
+   * COLLAPSED: NOTHING — eventually. The user: "when we close the left sidebar now
    * it just completely closes, right border of the left sidebar just slides to
    * the left like a curtain and the whole thing dissapears, button stays fixed
    * up right next to the traffic light buttons."
@@ -1377,13 +1377,13 @@ export function SessionSidebar({
           grammar the project folders use for their chats — so the studios read
           as the contents of a folder called Modalities, and the header read as
           one more item (14px, the rows' own ink) between two real section labels
-          (the user 2026-09-24: "do you see the lack of hierarchy"). The header is now
+          (The user 2026-09-24: "do you see the lack of hierarchy"). The header is now
           the section label every other group wears, and the studios are the same
           rows as Workspace: places, side by side.
 
           NO ICON on the header. Three attempts — the 3D cube (which named one of
           the four things below it), three loose primitives, then a wand — and
-          the user rejected each: this is a disclosure for rows that each carry their
+          The user rejected each: this is a disclosure for rows that each carry their
           own icon, so any glyph here is a fifth medium or a decoration.
         */}
         <div className="pd-sidebar-section" data-testid="modalities">

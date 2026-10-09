@@ -3,7 +3,7 @@
  *
  * In tool-CLI mode every tool is a command on PATH — `mac snapshot`, `media
  * generate image "a fox"`, `file write notes.md` — and they all arrive through
- * the SAME `bash` tool call as a genuine `ls -la`. the user, on the Activity tab:
+ * the SAME `bash` tool call as a genuine `ls -la`. The user, on the Activity tab:
  * "bash command? (once verified they aren't a special cli tool, so if they
  * don't start with any registered tools) shows up in a terminal".
  *

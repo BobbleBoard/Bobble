@@ -2,7 +2,7 @@
  * THE REPO CARD — a Hugging Face model OR dataset README, for the hub's detail
  * pane.
  *
- * the user: "ensure you're rendering the model card/readme as nicely as unsloth
+ * The user: "ensure you're rendering the model card/readme as nicely as unsloth
  * does". The reference gives most of its detail pane to the rendered card;
  * ours was ~87% empty space.
  *

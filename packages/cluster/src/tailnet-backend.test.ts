@@ -8,10 +8,10 @@ import { chooseBackend, createTailnetAdapter, NOT_INSTALLED_REASON } from './tai
 import type { TailnetStatus } from './tailscale';
 import { createFakeLocalApi, type FakeLocalApi, STATUS_FIXTURE } from './testing/fake-localapi';
 
-/** The real fixture with linux-ms-7e59 switched offline — a change a watcher must report. */
+/** The real fixture with linux-MS-7E59 switched offline — a change a watcher must report. */
 function linuxOffline(): string {
   const doc = JSON.parse(STATUS_FIXTURE) as { Peer: Record<string, Record<string, unknown>> };
-  for (const p of Object.values(doc.Peer)) if (p.HostName === 'linux-ms-7e59') p.Online = false;
+  for (const p of Object.values(doc.Peer)) if (p.HostName === 'linux-MS-7E59') p.Online = false;
   return JSON.stringify(doc);
 }
 
@@ -34,7 +34,7 @@ async function until(cond: () => boolean, ms = 3000): Promise<void> {
   }
 }
 
-const linux = (s: TailnetStatus) => s.peers.find((p) => p.hostname === 'linux-ms-7e59');
+const linux = (s: TailnetStatus) => s.peers.find((p) => p.hostname === 'linux-MS-7E59');
 
 /** The four read-only LocalAPI calls — the only ones this package can make. */
 const ALLOWED =
@@ -126,7 +126,10 @@ describe('chooseBackend and the adapter', () => {
       reason: 'not-found',
     });
     expect(await adapter.ping('100.101.102.110')).toMatchObject({ ok: true, path: 'direct' });
-    expect(await adapter.ping('100.101.102.120')).toMatchObject({ ok: false, reason: 'key-expired' });
+    expect(await adapter.ping('100.101.102.120')).toMatchObject({
+      ok: false,
+      reason: 'key-expired',
+    });
     expect(await adapter.ping('100.64.9.9', { timeoutMs: 50 })).toMatchObject({
       ok: false,
       reason: 'timeout',

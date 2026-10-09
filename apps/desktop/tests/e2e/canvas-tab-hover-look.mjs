@@ -1,5 +1,5 @@
 /**
- * LOOK at a hovered canvas tab, at 3×. the user (2026-09-12): "raise the bottom
+ * LOOK at a hovered canvas tab, at 3×. The user (2026-09-12): "raise the bottom
  * bar of the hover animation for the canvas tabs."
  *
  *   OUT=/tmp/tab-hover node apps/desktop/tests/e2e/canvas-tab-hover-look.mjs

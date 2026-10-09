@@ -1,7 +1,7 @@
 /**
  * HANDING A FILE TO THE OS — one door for every "Open", "Open with" and "Show".
  *
- * the user: "open buttons in the canvas / file presentation cards don't work, even
+ * The user: "open buttons in the canvas / file presentation cards don't work, even
  * with selection of specific applications to open with." Part of why nobody
  * could see it: every caller dropped the answer on the floor (`void invoke`),
  * so a refusal and a success looked identical — nothing happened either way.

@@ -27,7 +27,7 @@ export const CONTENT_KEYS = ['content', 'file_text', 'contents'] as const;
  * accepts, so a running `bash` step can show what it is running before its
  * arguments have finished arriving.
  *
- * the user, watching a step sit at "Running a command · 1m 7s": "I want to know what
+ * The user, watching a step sit at "Running a command · 1m 7s": "I want to know what
  * that is, I can't click to expand and see it, even worse >1m." The row was not
  * expandable because the step had no command on it, and it had no command
  * because `block.arguments` is only populated once the call completes.

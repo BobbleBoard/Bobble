@@ -1,7 +1,7 @@
 /**
  * WHAT THIS MACHINE IS DOING RIGHT NOW — on every platform, not just this Mac.
  *
- * the user: "it's not about this machine only … you need to handle a range of
+ * The user: "it's not about this machine only … you need to handle a range of
  * hardware and a range of situations and bottlenecks."
  *
  * {@link accelerator.ts} answers what is IN the box, once, at startup. This

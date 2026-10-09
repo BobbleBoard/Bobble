@@ -198,7 +198,7 @@ try {
     await page.keyboard.type(msg);
     /*
      * TTFT, measured where the USER feels it: from pressing Enter to the first
-     * assistant character appearing. the user: "any oddities/non instant stuff we
+     * assistant character appearing. The user: "any oddities/non instant stuff we
      * would expect to be instant … this is really important to UX".
      *
      * Deliberately counted from the keypress, not from the provider request —

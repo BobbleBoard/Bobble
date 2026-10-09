@@ -3,7 +3,7 @@
  * to stand in for something that is still being made, the same three tiles
  * sliding around their own board.
  *
- * the user: "put text that says <app icon those three squares in the app icon>
+ * The user: "put text that says <app icon those three squares in the app icon>
  * Bobble, with the app icon in the top left above the search chats bar below
  * the traffic light buttons."
  *
@@ -66,7 +66,7 @@ export function BobbleMark({ size = 20 }: { size?: number }) {
 /**
  * THE WAIT, AS THE MARK SOLVING ITSELF.
  *
- * the user: "show the bobble logo as a loader with the squares sliding clockwise
+ * The user: "show the bobble logo as a loader with the squares sliding clockwise
  * like a sliding tile puzzle, until there is a diffusion step ready."
  *
  * So this is not a spinner wearing the brand colours — it is the icon's own

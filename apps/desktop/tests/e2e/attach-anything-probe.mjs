@@ -2,7 +2,7 @@
  * ANYTHING YOU CAN COPY OR DRAG IN, THE COMPOSER TAKES — and a picture you sent
  * opens in the image viewer.
  *
- * the user (2026-09-24): "why not handle this natively so that any image(s)/files/
+ * The user (2026-09-24): "why not handle this natively so that any image(s)/files/
  * folders... can be pasted into the input box", and "images clicked on/
  * fullscreened should have the new studio like ui with the left toolbar and
  * such and a centered bottom 'edit image' input bar aswell."

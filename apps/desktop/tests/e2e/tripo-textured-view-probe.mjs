@@ -1,7 +1,7 @@
 /**
  * Does Textured mode show the PBR maps TRELLIS actually baked?
  *
- * the user: "trellis should auto texture and it supports Base Color, Roughness,
+ * The user: "trellis should auto texture and it supports Base Color, Roughness,
  * Metallic, and Opacity for photoreal textures, so please ensure that that's
  * all well and working." Baking them is only half of it — the viewer used to
  * paint a procedural stand-in over every model, so a perfect bake looked

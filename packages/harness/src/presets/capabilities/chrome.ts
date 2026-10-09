@@ -13,7 +13,7 @@ import type { Capability } from './types.js';
 
 export const chrome: Capability = {
   /*
-   * the user: "instead of integrating into mac, add a chrome connector and have
+   * The user: "instead of integrating into mac, add a chrome connector and have
    * chrome be its own set." A browser is not just another app you click at.
    * It has tabs, an address bar, a page, and the user's own logged-in
    * session — and folding that into the generic Mac tools made a model asked

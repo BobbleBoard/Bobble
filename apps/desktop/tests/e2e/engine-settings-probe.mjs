@@ -1,7 +1,7 @@
 /**
  * ADVANCED → ENGINE, and calibration per model — headless, real app, real cache.
  *
- * the user: "calibration is per model, so if I switch to minicpm 5-2b from the
+ * The user: "calibration is per model, so if I switch to minicpm 5-2b from the
  * default qwen model, calibration should be an option again, switching back
  * to a ready calibrated model however should have its config cached and
  * should load with the calibrated optimal config" and "expand the advanced
@@ -140,8 +140,8 @@ try {
   log('menu on other model:', JSON.stringify(m2));
   // Per model: whatever the other model's verdict says, THIS one shows its own
   // state — either its own record (Recalibrate + its rows) or "not calibrated
-  // yet" with Calibrate live. the user calibrated MiniCPM5 himself on 2026-09-12,
-  // so on his cache the first branch is the one that runs.
+  // yet" with Calibrate live. The user calibrated MiniCPM5 themselves on 2026-09-12,
+  // so on their cache the first branch is the one that runs.
   const otherRec = await win.evaluate(
     (m) => window.piDesktop.invoke('llm:calibration-record', { modelId: m }),
     OTHER,

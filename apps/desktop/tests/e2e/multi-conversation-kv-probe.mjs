@@ -2,7 +2,7 @@
  * Do MANY conversations keep their KV prefix on ONE slot — or does every switch
  * between the CEO, the manager and each engineer cost a full re-prefill?
  *
- * the user: "if currently you can only hold one prefix at once, the build needs to be
+ * The user: "if currently you can only hold one prefix at once, the build needs to be
  * able to store KV for many instances… so if anything is ever sent as a follow up
  * that has been activated in the last hour already, it just gets to use cached kv
  * and doesn't have to reprefill."

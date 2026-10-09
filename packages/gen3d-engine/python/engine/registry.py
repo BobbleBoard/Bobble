@@ -442,7 +442,7 @@ class Registry:
     def ensure_tool_clone(self, name: str, log) -> Path:
         """The tool's source tree at its pinned commit — WITHOUT git.
 
-        the user (2026-09-15): "all basic stuff needs to work out of the box". A
+        The user (2026-09-15): "all basic stuff needs to work out of the box". A
         `git clone` on a Mac that has never installed the Command Line Tools is
         not a clone: it is the "would you like to install the developer tools?"
         dialog, and the sidecar hanging behind it. So a missing tree comes down

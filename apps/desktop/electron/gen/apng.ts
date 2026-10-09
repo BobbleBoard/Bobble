@@ -1,7 +1,7 @@
 /**
  * ANIMATED PNG, IN PLAIN TYPESCRIPT — the one file a HyperFrames render becomes.
  *
- * the user: "attempting a hyperframes animation generation, rendered 120 induvidual
+ * The user: "attempting a hyperframes animation generation, rendered 120 induvidual
  * frames, each of which was placed as it's own png card in the chat, severely
  * cluttering it." The renderer returned one output per frame, the tool listed
  * every path, and the thread mounted every path as a card. The frames are one

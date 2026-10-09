@@ -7,7 +7,7 @@ import { revealFile } from '../media/media-actions';
 /**
  * A text attachment, as a card you can open.
  *
- * the user, on the paste card: "make it clickable to show semi-fullscreen (centered,
+ * The user, on the paste card: "make it clickable to show semi-fullscreen (centered,
  * background blurred), the same for all input media (clicked inside chat input
  * or a user message log) and output media."
  *
@@ -34,7 +34,7 @@ export function AttachedFileCard({
    *
    * True in the composer while the prime runs, and — the part that was missing —
    * still true on the copy in the thread until the sent turn is past prefill.
-   * the user: "the loading spinner can still be on them, it disapears when they are
+   * The user: "the loading spinner can still be on them, it disapears when they are
    * prefilled." See chat/sent-prefill.ts for what decides it after send.
    */
   readonly prefilling?: boolean;
@@ -104,7 +104,7 @@ export function AttachedFileCard({
  * A file or folder the message named by its PATH — a PDF, a zip, a project
  * folder: nothing the prompt can carry, everything the model's tools can open.
  *
- * the user: "why not handle this natively so that any image(s)/files/folders...
+ * The user: "why not handle this natively so that any image(s)/files/folders...
  * can be pasted into the input box". The card says what it is the way Finder
  * would — the page with its extension on it, or the folder — its name, and
  * what it is. The whole face is a button that shows it in Finder: a reference

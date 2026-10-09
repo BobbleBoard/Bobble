@@ -125,11 +125,11 @@ describe('the llama.cpp stream puts them on the wire', () => {
   it('sends option headers and a bearer key', async () => {
     const h = await send(makeModel(), {
       apiKey: 'sk-remote',
-      headers: { 'X-Bobble-Device': 'linux-ms-7e59' },
+      headers: { 'X-Bobble-Device': 'linux-MS-7E59' },
     });
     expect(h).toEqual({
       'content-type': 'application/json',
-      'X-Bobble-Device': 'linux-ms-7e59',
+      'X-Bobble-Device': 'linux-MS-7E59',
       Authorization: 'Bearer sk-remote',
     });
   });
@@ -177,7 +177,7 @@ describe('end to end through pi’s own registry and models.json', () => {
             api: 'llamacpp-stream',
             apiKey: 'sk-remote-123',
             authHeader: true,
-            headers: { 'X-Bobble-Device': 'linux-ms-7e59' },
+            headers: { 'X-Bobble-Device': 'linux-MS-7E59' },
             models: [{ id: 'qwen3.6-27b', headers: { 'X-Model-Hint': 'max' } }],
           },
         },
@@ -188,7 +188,7 @@ describe('end to end through pi’s own registry and models.json', () => {
     expect(model.headers).toBeUndefined();
     const h = await send(model, options);
     expect(new Headers(h).get('authorization')).toBe('Bearer sk-remote-123');
-    expect(new Headers(h).get('x-bobble-device')).toBe('linux-ms-7e59');
+    expect(new Headers(h).get('x-bobble-device')).toBe('linux-MS-7E59');
     expect(new Headers(h).get('x-model-hint')).toBe('max');
     expect(new Headers(h).get('content-type')).toBe('application/json');
   });

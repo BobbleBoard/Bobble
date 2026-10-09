@@ -41,7 +41,7 @@ export interface DrawnWindow extends Rect {
  * Place `content` (in screen POINTS) inside `viewport` (canvas CSS px),
  * centred, at real size — scaled DOWN only when it does not fit.
  *
- * the user, verbatim: "show it in full but show the user's desktop background
+ * The user, verbatim: "show it in full but show the user's desktop background
  * wallpaper behind it (center the window and keep it sized exactly how it is in
  * reality)". So the scale is `min(1, fitX, fitY)` and never anything else: a
  * 600pt window in a 1200px tab stays 600px, floating on the wallpaper, rather
@@ -101,7 +101,7 @@ export function followWindow(
    * 0.45. Both halves were wrong, and the second hid the first. On a tall narrow
    * rail, cover is decided entirely by the height and crops a wide window to a
    * sliver: MEASURED, a 440pt rail against a 1024pt window covered at 0.85 and
-   * the video showed a giant cropped "oogle" for a whole run. the user: "the zoom
+   * the video showed a giant cropped "oogle" for a whole run. The user: "the zoom
    * and following is either not working or way too much, needs at least twice
    * less zoom."
    *
@@ -145,7 +145,7 @@ export function followWindow(
  *
  * Switching between fitting the window and following the action moves the
  * picture a long way, and doing it on one frame reads as the video jumping.
- * the user, watching it happen: "the zoom needs to be a smooth zoom if it's there
+ * The user, watching it happen: "the zoom needs to be a smooth zoom if it's there
  * at all". Both placements are the same four numbers plus a scale, so the
  * blend is a straight interpolation and the scale stays consistent with the
  * rect because it is interpolated with it.

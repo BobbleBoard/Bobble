@@ -4,7 +4,10 @@
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { _electron as electron } from 'playwright-core';
+
+const REPO_ROOT = fileURLToPath(new URL('../../../../', import.meta.url)).replace(/\/$/, '');
 
 const bundle = process.argv[2] ?? '/Applications/Bobble.app';
 const app = await electron.launch({
@@ -46,10 +49,7 @@ try {
     (shot.base64 ?? '').length,
   );
   if (shot.base64) {
-    writeFileSync(
-      '/Users/user/Desktop/OSS-harness/scratchpad/surface-probe.png',
-      Buffer.from(shot.base64, 'base64'),
-    );
+    writeFileSync(`${REPO_ROOT}/scratchpad/surface-probe.png`, Buffer.from(shot.base64, 'base64'));
     console.log('wrote scratchpad/surface-probe.png');
   }
 } finally {

@@ -2,7 +2,7 @@
  * ONBOARDING PRESETS — minimal / default / max, as a plan over what this
  * machine can actually hold.
  *
- * the user (2026-09-13, queued; 2026-09-15 "prep onboarding work"): "redo
+ * The user (2026-09-13, queued; 2026-09-15 "prep onboarding work"): "redo
  * onboarding with 'minimal' / 'default' / 'max' presets — minimal = just base
  * pi; default/max = more connectors and bigger default models/engines."
  *

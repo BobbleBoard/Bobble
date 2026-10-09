@@ -1,7 +1,7 @@
 /**
  * ROUND 2 — MEDIA HANDOFF INTO THE STUDIOS, AND EDITING.
  *
- * the user: "all types of media handoff into studios and editing will also be tested
+ * The user: "all types of media handoff into studios and editing will also be tested
  * in a second round."
  *
  * Before this round exactly one handoff existed and it carried nothing: a mesh

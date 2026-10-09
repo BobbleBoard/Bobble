@@ -5,7 +5,7 @@ WHY THIS EXISTS
 The studio had exactly two riggers and neither suits an arbitrary shape. The
 geometric one fits a FIXED 27-joint humanoid template, which is right for a
 person and nonsense for a horse. SkinTokens will rig anything but it is a 2.5 GB
-learned model the user has to download first. the user: "can you have an option to
+learned model the user has to download first. The user: "can you have an option to
 do medial axis rigging as a first choice before we ask the user to try
 skintokens?"
 

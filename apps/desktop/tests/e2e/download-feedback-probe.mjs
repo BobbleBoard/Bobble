@@ -2,7 +2,7 @@
  * A DOWNLOAD THAT CANNOT START SAYS SO — where it was pressed and in the top
  * bar — and a download that is running can be opened from the top bar.
  *
- * the user (2026-09-13): "clicking download on the model picker for the quick
+ * The user (2026-09-13): "clicking download on the model picker for the quick
  * ones, does not download them or show any user indication there like it
  * should either that there's not enough disk space or that it is downloading.
  * show download progress in the top bar clickable to show more details."

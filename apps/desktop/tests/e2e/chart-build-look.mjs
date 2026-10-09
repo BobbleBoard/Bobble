@@ -1,5 +1,5 @@
 /**
- * LOOK at a chart being made. the user (2026-09-17): "when a chart is generating
+ * LOOK at a chart being made. The user (2026-09-17): "when a chart is generating
  * show a skeleton card with shimmering items as a preview that builds live …
  * bar ones have bars go up, pie expand smoothly, radar charts show dots going
  * out from the center"; and the chain rows: "'<icon> Rendering <type> Chart'",

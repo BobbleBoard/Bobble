@@ -1,7 +1,7 @@
 /**
  * WHAT THIS MACHINE SHOULD RUN, PER MODALITY — the out-of-the-box decision.
  *
- * the user: "for each modaility based on hardware and OS select the optimal models
+ * The user: "for each modaility based on hardware and OS select the optimal models
  * (rank from reccomended catalog)… this is the core of the entire idea… you get
  * 99% of the way there on 99% of models on 99% of hardware to a person who knows
  * how to do their stuff and manually configures stuff for maximum performance."
@@ -10,7 +10,7 @@
  * through the code because they are judgements, and a judgement whose source is
  * invisible cannot be argued with later:
  *
- * TEXT — Qwen3.8 27B first whenever it fits. the user asked for it directly, and it
+ * TEXT — Qwen3.8 27B first whenever it fits. The user asked for it directly, and it
  * is independently the top open-weights model on Artificial Analysis
  * (intelligence 52, ahead of MiniMax-M3 at 45 and Muse Glimmer at 35). It wants
  * about 18 GB at Q4_K_M. Below that the ladder descends by MODEL SIZE, not by
@@ -21,7 +21,7 @@
  * 27B at Q2 is worse than a 9B at Q5 on every axis anyone notices, and slower.
  * See quant-ladder.ts.
  *
- * IMAGE — Mage Flow first on anything modest. the user: "for any generally 'slow'
+ * IMAGE — Mage Flow first on anything modest. The user: "for any generally 'slow'
  * machine, mage flow models are inevitably going to be like an order of
  * magnitude faster than any flux 2 klien or even something like z image is, so
  * those are my top pick". Our own measurement agrees on the direction:
@@ -29,7 +29,7 @@
  * Mage Flow on the PyTorch path — the family is fast because it is few-step, and
  * that advantage grows as the machine gets slower.
  *
- * VIDEO — LTX over MiniMax-H3. the user: "ltx 2.5 is significantly faster however
+ * VIDEO — LTX over MiniMax-H3. The user: "ltx 2.5 is significantly faster however
  * and it's really a style choice in my opinion, I can tell virtually no quality
  * difference in general side by sides, so favor ltx". H3 stays in the list
  * because it does jobs LTX does not (first+last frame, reference image) and
@@ -210,7 +210,7 @@ function reasonFor(
 /**
  * The best variant of ONE family for this machine — what "Quick Download" gets.
  *
- * the user asked for a Quick Download beside every collection, and the word quick is
+ * The user asked for a Quick Download beside every collection, and the word quick is
  * the specification: it must not open the family, it must not ask which quant,
  * and it must not fetch the biggest thing in there. It is the same judgement the
  * per-modality pick already makes, scoped to one family — so it must be handed

@@ -247,7 +247,7 @@ func typeTextToPid(_ pid: pid_t, _ text: String) {
  * honoured for any process. MEASURED: Chrome brought to the front by a ⌘L
  * delivered to its pid, and the user's app back in front within the act.
  *
- * the user, twice in one session: "chrome took focus right now again", and "opened
+ * The user, twice in one session: "chrome took focus right now again", and "opened
  * a tab, and switched to a different tab but it took focus again" — and later,
  * on the address bar: "chrome steals focus whenever the model attempts to do
  * something like click into the web address bar". So the rule is now: never

@@ -41,7 +41,7 @@ export function TripoWorkspace(): JSX.Element {
   /*
    * THE MODULE GATE. Without the 3D module the studio still MOUNTS and renders —
    * it is blurred behind a panel offering the download, and "View" lifts the
-   * blur so the UI can be inspected. the user: not "gatekeeping the UI from being
+   * blur so the UI can be inspected. The user: not "gatekeeping the UI from being
    * seen at all as if it's a paid service".
    */
   const engineReady = useGen3dStore((s) => s.engineReady);

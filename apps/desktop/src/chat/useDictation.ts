@@ -33,7 +33,7 @@ import { useGenModulesStore } from '../state/gen-modules-store';
 /**
  * `needs-module`: the recogniser runs on the Dictation module and it is not on this
  * Mac yet. The composer shows the module's Download card in place of an error
- * (the user, 2026-10-08: "'the voice model is not installed' … just can't exist
+ * (The user, 2026-10-08: "'the voice model is not installed' … just can't exist
  * anymore"), and dictation starts by itself the moment the install lands.
  */
 export type DictationPhase =

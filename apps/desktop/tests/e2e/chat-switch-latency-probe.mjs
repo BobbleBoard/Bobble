@@ -1,7 +1,7 @@
 /**
  * CLICKING ANOTHER CHAT SHOULD BE INSTANT.
  *
- * the user: "clicking onto a different chat has a ~2 second delay when it should be
+ * The user: "clicking onto a different chat has a ~2 second delay when it should be
  * totally instant."
  *
  * This times the click, and splits it, because "2 seconds" has at least four
@@ -139,7 +139,7 @@ try {
   }
   const median = [...times].sort((a, b) => a - b)[Math.floor(times.length / 2)];
   /*
-   * the user: "when swapping between chats with the same model, no reloading of the
+   * The user: "when swapping between chats with the same model, no reloading of the
    * model should occur." A restart shows up as the llm phase leaving `ready`,
    * so the probe watches for that across the whole run rather than trusting
    * that nobody wired one in.

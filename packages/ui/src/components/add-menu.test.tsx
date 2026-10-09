@@ -93,7 +93,7 @@ describe('joinGroups — a rule only ever appears BETWEEN two groups', () => {
    * THE BUG THIS EXISTS FOR. Every group in the "+" menu is conditional (a row
    * renders only when it has a handler) while the separators between them were
    * not — so a build with no project/GitHub/skills handlers rendered separator,
-   * nothing, separator. the user, looking at the shipped app: "this + menu has so
+   * nothing, separator. The user, looking at the shipped app: "this + menu has so
    * many double lines and confusion."
    *
    * These read as arithmetic because that is what they are: the shapes below are

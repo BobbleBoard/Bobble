@@ -378,7 +378,7 @@ async function laneB() {
     if (cancel !== undefined) await dbg('click', { pid, index: cancel.index });
 
     // ── the phantom at rest ────────────────────────────────────────────
-    // the user: "always show the fake cursor around there even if just idling."
+    // The user: "always show the fake cursor around there even if just idling."
     // The overlay hides its bubble after 15s of silence; the cursor must NOT
     // go with it. This is the only place that can be proven — the mock's
     // choreography re-arms the idle timer every couple of seconds.

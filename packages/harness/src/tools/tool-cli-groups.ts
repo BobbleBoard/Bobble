@@ -43,12 +43,12 @@ import { type CliGroupSpec, commandNameFor } from './tool-cli.js';
  * asking a colleague what they do and being told 'I can hold meetings and
  * delegate.'"
  *
- * the user, on the proposal to delete them: "don't remove these, but put them
+ * The user, on the proposal to delete them: "don't remove these, but put them
  * under a differently named cli eg. contract and communicate or something."
  *
  * That was a GROUPING instruction for this mode, and I first read it as
  * licence to build a hybrid — these four behind a CLI while everything else
- * stayed schemas. He corrected it: "the entire point of the bash cli *mode*
+ * stayed schemas. The user corrected it: "the entire point of the bash cli *mode*
  * is that it's a mode … it's not like this needs to be done for 2 tools but
  * keep some others as the always loaded schemas." The hybrid is reverted; the
  * grouping stands.
@@ -83,7 +83,7 @@ export const TOOL_CLI_COORDINATE_GROUP: CliGroupSpec = {
  *
  * Measured against a live session's registered tools: `python_run`,
  * `spotlight_search`, `create_scheduled_task` and `present` were runnable, were
- * offered as schemas, and were reachable from CLI mode by nothing. the user's
+ * offered as schemas, and were reachable from CLI mode by nothing. The user's
  * definition of the mode leaves no room for that — "cli mode has no capability
  * loss over regular, it simply makes everything cli based and accessible via
  * the bash tool, all tools are always available".

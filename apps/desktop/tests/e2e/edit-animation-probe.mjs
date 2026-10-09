@@ -1,7 +1,7 @@
 /**
  * AN EDIT ANIMATES AS AN EDIT, NOT AS A DIFF BEING WRITTEN.
  *
- * the user: "Editing a file shouldn't show the diff being written in real time it
+ * The user: "Editing a file shouldn't show the diff being written in real time it
  * should show that file and then the text as the negative part of the diff is
  * written being deleted (forward delete I suppose, but still deleting live just
  * like there's a live writing animation) and then of course the replace part

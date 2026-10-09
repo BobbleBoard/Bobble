@@ -2,7 +2,7 @@
 /**
  * TUNE THE PROMPT ENHANCER WITHOUT GENERATING ANYTHING.
  *
- * the user: "test without generation just prompt enhance until you think it's
+ * The user: "test without generation just prompt enhance until you think it's
  * good". The whole point is that the loop is seconds, not minutes: a diffusion
  * run would dominate the time and tell you almost nothing about the rewrite,
  * because you cannot separate "the prompt got better" from "the seed was kind".

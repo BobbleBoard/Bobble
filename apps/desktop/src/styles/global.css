@@ -197,7 +197,7 @@ body {
 .pd-canvas-rail[data-dragging="true"] {
   transition: none;
 }
-/* DOCKED, THE CANVAS HAS NO CORNER OF ITS OWN. the user (2026-10-08): "the top of
+/* DOCKED, THE CANVAS HAS NO CORNER OF ITS OWN. The user (2026-10-08): "the top of
    the border between the canvas and chat area … there's an inexplicable rounded
    corner". The canvas card keeps --pd-radius-surface for when it floats; docked
    in this rail it runs flush to the window's top and to the chat, and its
@@ -259,7 +259,7 @@ body {
   width: calc(var(--pd-sidebar-width) + 16px);
 }
 /*
- * A COLLAPSED SIDEBAR IS GONE, not a rail. the user: "when we close the left sidebar
+ * A COLLAPSED SIDEBAR IS GONE, not a rail. The user: "when we close the left sidebar
  * now it just completely closes… like a curtain and the whole thing dissapears".
  * The width animates to 0 so the right border slides left rather than the panel
  * popping out, and the slot clips so nothing bleeds over the chat mid-transition.
@@ -274,7 +274,7 @@ body {
 }
 
 /*
- * …AND THE PANEL RIDES THE CURTAIN DOWN. the user, on the round after: "left sidebar
+ * …AND THE PANEL RIDES THE CURTAIN DOWN. The user, on the round after: "left sidebar
  * does not close cleanly, it's instant dissapear and then slide left rather than
  * the correct slide in like the canvas sidebar does."
  *
@@ -533,7 +533,7 @@ body {
 }
 /* ── Attachment chips: a box, which opens to the right on hover ───────────
  *
- * the user: "no name shown, just a box … a bit bigger, and then slide to the right
+ * The user: "no name shown, just a box … a bit bigger, and then slide to the right
  * open when it's hovered over … this should be less colored in and have a more
  * visible border."
  *
@@ -564,7 +564,7 @@ body {
   background: var(--pd-bg-hover);
 }
 
-/* CLICKED: blue fill, blue border. the user: "clicking a file needs to highlight it
+/* CLICKED: blue fill, blue border. The user: "clicking a file needs to highlight it
  * blue and blue border and then allow for user to press ctrl c/x/v or shift
  * click other files to do so." */
 .pd-attach[data-selected] {
@@ -626,7 +626,7 @@ body {
 }
 
 /*
- * EXPANDS ON CLICK, NOT HOVER. the user: "i'm actually thinking not on hover but on
+ * EXPANDS ON CLICK, NOT HOVER. The user: "i'm actually thinking not on hover but on
  * click expand them."
  *
  * Right, and for a reason the hover version made obvious the moment there were
@@ -697,7 +697,7 @@ body {
 }
 
 /*
- * ABSOLUTELY POSITIONED, so it costs the resting box no width. the user wants "just
+ * ABSOLUTELY POSITIONED, so it costs the resting box no width. The user wants "just
  * a box" at rest, and an X that reserves 20px makes every box 20px wider than
  * the thing in it.
  */
@@ -970,7 +970,7 @@ body {
  * through the (translucent, active) dropzone (adversarial drop-overlay finding). */
 /* ── Dragging a file in: a blue edge, not a modal ─────────────────────────
  *
- * the user: "it should just highlight the border of the chat area in blue with a
+ * The user: "it should just highlight the border of the chat area in blue with a
  * little inward going blue glow." The covering card it replaces answered a
  * question nobody asked ("where can I drop this?" — anywhere) while hiding the
  * one thing you were looking at: the chat you are about to drop into.
@@ -1130,7 +1130,7 @@ body {
  * width over --pd-duration-slow; the padding below was applied and removed on
  * the class, which is to say instantly — so opening the sidebar dropped 124px
  * of padding in one frame while the slot was still 0 wide, and the title darted
- * LEFT before being carried back out. the user: "the top left text eg. 'image
+ * LEFT before being carried back out. The user: "the top left text eg. 'image
  * studio' snaps to the left briefly".
  *
  * MEASURED, per frame: 132 → 8 → 280 opening, and 280 → 404 → 132 closing — a
@@ -1154,7 +1154,7 @@ body {
    * 7px of air" back when the corner held one button. Then Chat|Work moved in
    * beside it and the number stayed, so with the sidebar collapsed the chat
    * title was drawn straight over the toggle: the user, with a screenshot of the
-   * pill with his chat's first letter sitting in it — "the title overlaps with
+   * pill with their chat's first letter sitting in it — "the title overlaps with
    * this chat/work buttons."
    *
    * A hand-copied width drifts the moment anything joins that corner, so
@@ -1175,7 +1175,7 @@ body {
   -webkit-app-region: no-drag;
 }
 /*
- * THE WORDMARK. the user: "the bobble in the top left should be some nice font and
+ * THE WORDMARK. The user: "the bobble in the top left should be some nice font and
  * a bit bigger."
  *
  * `ui-rounded` resolves to SF Pro Rounded on macOS — a system face, so nothing
@@ -1195,7 +1195,7 @@ body {
  * controls, not a claim about menus in general.
  */
 /*
- * THE QUANT MENU'S ROWS ARE TARGETS, not lines of a table. the user (2026-10-08):
+ * THE QUANT MENU'S ROWS ARE TARGETS, not lines of a table. The user (2026-10-08):
  * the hover "seems really thin … it should be a bit wider and a bunch taller".
  * They were 30px tall with the wash inset 5px from the panel — a strip under a
  * 13px label. Now a 36px row whose wash reaches 4px from the panel edge, with a
@@ -1347,7 +1347,7 @@ body {
   /*
    * CONTAINMENT, against a one-frame flash of the whole window.
    *
-   * the user, from a 30fps capture: once per denoise step the entire viewport went
+   * The user, from a 30fps capture: once per denoise step the entire viewport went
    * blank for a single frame with the preview drawn at the window's top-left.
    * The DOM was innocent — chat-denoise-preview-probe measured the image's
    * bounding rect as constant across every swap, and it was: getBoundingClientRect
@@ -1398,7 +1398,7 @@ body {
   /*
    * NO LATTICE. This was two repeating-linear-gradients crossing at +/-68deg,
    * which is a woven mesh however faint you make it — the user read it as a
-   * spiderweb, and he was describing exactly what it was. A crosshatch also
+   * spiderweb, and the user was describing exactly what it was. A crosshatch also
    * says "fabric", when what this moment should say is "a picture is coming".
    *
    * So: three broad, soft luminance fields drifting across each other at
@@ -1703,7 +1703,7 @@ body {
 /* ---------------------------------------------------------------------------
  * THE MARK AS A SLIDING-TILE PUZZLE (.pd-bobble-loader)
  *
- * the user: "show the bobble logo as a loader with the squares sliding clockwise
+ * The user: "show the bobble logo as a loader with the squares sliding clockwise
  * like a sliding tile puzzle, until there is a diffusion step ready."
  *
  * The board is the app icon's own 2x2 grid with the top-left cell empty, and the
@@ -1841,7 +1841,7 @@ body {
  * in that case: a single-line placeholder is never touched, a wrapping one melts
  * out at the bottom instead of being sliced. It's mutually exclusive with the
  * scrolled top-mask above (that needs typed content, which hides the placeholder),
- * so the two masks never fight. the user VISUALLY VERIFIES this fade.
+ * so the two masks never fight. The user VISUALLY VERIFIES this fade.
  */
 .pd-composer-editor[data-ph-clip="true"] {
   -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 22px), transparent 100%);
@@ -1963,7 +1963,7 @@ body {
      control each, and 600px made every row wrap. */
   width: min(860px, 94vw);
   max-width: 94vw;
-  /* ONE SIZE, whatever tab is open. the user (2026-09-13): "never change the size
+  /* ONE SIZE, whatever tab is open. The user (2026-09-13): "never change the size
      of the popup window area." The body scrolls inside it. */
   height: 85vh;
 }
@@ -2362,7 +2362,7 @@ h2.text-heading {
   max-width: 130px;
 }
 
-/* the user #13 — the folder chip's per-conversation SANDBOX state. When the selected
+/* The user #13 — the folder chip's per-conversation SANDBOX state. When the selected
  * project folder is missing and pi fell back to the conversation sandbox, the chip
  * reads "Sandbox" (see ProjectRegion) in a subtle warning tint instead of the
  * stale project name. Placed AFTER the base chip rules so it wins at equal
@@ -2379,7 +2379,7 @@ h2.text-heading {
 /*
  * FULL ACCESS — the one mode in the app that can touch anything on the machine.
  *
- * the user: "add a 'full access' mode — red, with an ! in a circle — that gives the
+ * The user: "add a 'full access' mode — red, with an ! in a circle — that gives the
  * model full reign and full access … no sandboxing." Red is the whole point: it
  * has to be impossible to leave on without noticing, so the chip itself carries
  * the colour and the warning glyph for as long as it is on, not just the menu
@@ -2556,7 +2556,7 @@ h2.text-heading {
 
 /* A chat row that hosts agents swaps its bubble glyph for a fold caret ON HOVER —
    the caret never occupies its own gutter, so it replaces (not shifts) the icon
-   (the user). Only rendered when the row has children, so childless rows never flip. */
+   (The user). Only rendered when the row has children, so childless rows never flip. */
 .pd-chat-icon-swap {
   position: relative;
   display: inline-flex;
@@ -2639,7 +2639,7 @@ h2.text-heading {
 /*
  * THE RUNNING SPINNER STANDS WHERE THE 3-DOT BUTTON WILL.
  *
- * the user: "centered, a bit larger, the exact same size and centering as the
+ * The user: "centered, a bit larger, the exact same size and centering as the
  * 3-dots button (on hover)." It was a bare 14px glyph in the meta slot, whose
  * right edge is the row's 8px padding — while the dots overlay sits 6px in. So
  * the spinner sat 2px left of where the button appeared under the pointer, and
@@ -2896,7 +2896,7 @@ h2.text-heading {
 }
 
 /* The state dot on a nested subagent row — same vocabulary and same colours as
-   the situation room's, so the two surfaces cannot disagree. the user: "very faint,
+   the situation room's, so the two surfaces cannot disagree. The user: "very faint,
    nothing complicated". Working keeps no dot: it has the spinner already. */
 .pd-child-row-status {
   display: inline-flex;
@@ -3094,7 +3094,7 @@ h2.text-heading {
 
 /* INTERACTIVE THINGS GET THE HAND CURSOR.
  *
- * the user: "the cursor doesn't change to the hand icon". Browsers default
+ * The user: "the cursor doesn't change to the hand icon". Browsers default
  * `<button>` to `cursor: default` and Tailwind's preflight does not override
  * it, so every button, tab, row and menu item in the app was silently
  * un-pointered — which reads as "not clickable" even when the hover wash is
@@ -3153,10 +3153,10 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
  * model card, nested inside the pane that already had one. Two meanings, one
  * class, and the collision only showed up as a box inside a box at 2x zoom.
  *
- * the user: "bordering of the card something like shown or like a shadow, reasonably
+ * The user: "bordering of the card something like shown or like a shadow, reasonably
  * noticable, apply to all the cards aswell." A `border-subtle` hairline is
  * genuinely invisible on the dark surfaces this app defaults to — the reference
- * he sent is a light theme, where the same hairline reads fine. So the border is
+ * the user sent is a light theme, where the same hairline reads fine. So the border is
  * the DEFAULT weight and there is a real shadow under it, which is what survives
  * both themes.
  */
@@ -3168,7 +3168,7 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   border-radius: 12px;
   background: var(--pd-bg-raised);
   /*
-   * LIGHT. the user: "lessen the shadows here, (all not just this type of card,
+   * LIGHT. The user: "lessen the shadows here, (all not just this type of card,
    * hover and regular)". The border does the separating now — a drop shadow
    * deep enough to be noticed on its own makes a list of eight cards look like
    * eight things hovering at different depths.
@@ -3221,7 +3221,7 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
    * THE HARD LINE UNDER THE ROW. `overflow-x: auto` forces `overflow-y: auto`,
    * so the bottom of this box is a CLIP — and the cards' shadows were reaching
    * exactly as far as the padding, which sliced them off at a dead-straight
-   * horizontal edge running the width of the row. the user caught it twice. The
+   * horizontal edge running the width of the row. The user caught it twice. The
    * shadows are lighter now and the padding clears them with room to spare.
    */
   padding: 8px 16px 28px;
@@ -3293,7 +3293,7 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
 }
 .pd-carousel-arrow:hover {
   /*
-   * the user: "maybe it's translucency" — and it was. `--pd-bg-hover` is an OVERLAY
+   * The user: "maybe it's translucency" — and it was. `--pd-bg-hover` is an OVERLAY
    * colour (rgba(255,255,255,0.06), measured), meant to be laid ON a surface,
    * not to be one. Assigning it to `background` replaced the opaque
    * `--pd-bg-raised` outright, so the card behind showed straight through the
@@ -3328,7 +3328,7 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
 }
 /* ── The task tray (beside the sidebar toggle) — chat/TaskTray.tsx ─────────
  *
- * the user's reference for this was a stack of flat task cards with oversized
+ * The user's reference for this was a stack of flat task cards with oversized
  * titles, a status pill AND the same status as text, and a blue "View" link.
  * This is the opposite on each count: one firm sheet (the shared .pd-menu
  * surface), a list-sized ink ladder, the status once, and the row itself as the
@@ -3574,7 +3574,7 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
 }
 
 /* ── The tray's downloads and loads (state/tray-transfers.ts) ─────────────────
- * the user (2026-09-24): "headers for 'Downloads' 'Loading' … a sort of clean thin
+ * The user (2026-09-24): "headers for 'Downloads' 'Loading' … a sort of clean thin
  * blue progressbar w/ % or ngb/rgb red X on the side below some white text that
  * says the running operation". The groups are split by the sheet's own hairline;
  * each row's words start where the header's do (the menu label's 10px). */
@@ -3747,7 +3747,7 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   height: 6px;
   border-radius: 999px;
   overflow: hidden;
-  /* the user: "the unfilled part of the bar isn't blue enough it seems grey it
+  /* The user: "the unfilled part of the bar isn't blue enough it seems grey it
      should read very blue still just unfilled." 22% against a dark surface
      desaturates into grey; the solid hue thinned keeps it blue (see .pd-transfer-bar). */
   background: color-mix(in oklab, var(--pd-status-info-solid) 35%, transparent);
@@ -3856,7 +3856,7 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
  * whose whole job is to show them all would be the wrong trade.
  *
  * It used to open INSIDE the quick menu, below a separator, which is why it
- * carried a top border and margin. the user: "I need to hover on the more models >
+ * carried a top border and margin. The user: "I need to hover on the more models >
  * and then have the stuff popup on the right side, not click and have a menu
  * within a menu." As a submenu it IS the surface, so the divider would be a
  * line across the top of a panel with nothing above it; the width belongs here
@@ -4059,7 +4059,7 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
 /*
  * THE MODEL CARD IS A PANEL, NOT A CARD.
  *
- * the user: "the model card, come to think of it, it doesn't at all need to be in a
+ * The user: "the model card, come to think of it, it doesn't at all need to be in a
  * floating card, just have it use as much area as is there. just put a border
  * between the 'more' area and the model card and fade out on the top edge."
  *
@@ -4098,7 +4098,7 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
 /*
  * GENERATED MEDIA, IN THE THREAD THAT MADE IT.
  *
- * the user: "all are delivered and embedded cleanly and in full quality into the
+ * The user: "all are delivered and embedded cleanly and in full quality into the
  * chat aswell as with a file presentation card(s) to export/reveal."
  *
  * The sizing rule throughout: bounded by the COLUMN, never by a fixed pixel
@@ -4173,7 +4173,7 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
      handover does not change the card's size. A plain length, not
      `min(330px, 100%)`: inside a shrink-to-fit figure that percentage is
      cyclic and the frame came out the width of the caption's text (MEASURED:
-     288px waiting, 330px finished — a 42px step at the handover). the user: "a
+     288px waiting, 330px finished — a 42px step at the handover). The user: "a
      little embedded viewport rotatable". */
   width: 330px;
   max-width: 100%;
@@ -4183,7 +4183,7 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   /* A transport is as wide as its own controls, and it has them immediately —
      there is nothing to wait for, so nothing to hold space for. */
   min-width: 0;
-  /* the user (2026-09-14): "shorten this card vertically". The frame IS the
+  /* The user (2026-09-14): "shorten this card vertically". The frame IS the
      transport's box now — no padding around a bordered box inside a bordered
      box; the transport below drops its own border and ground when it is in
      one of these frames. */
@@ -4191,7 +4191,7 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
 }
 
 /*
- * NO LETTERBOX BARS. the user: "no grey bars… (eg. in fox screenshot there's bars)".
+ * NO LETTERBOX BARS. The user: "no grey bars… (eg. in fox screenshot there's bars)".
  *
  * The picture was forced to `width: 100%` and then `object-fit: contain`'d
  * inside it, so a square render in a full-width frame painted the 4% tint down
@@ -4205,7 +4205,7 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
 /* ONE cap for the picture and for the pending frame that stands in for it —
    the handover must not change the card's size (see .pd-media-card--pending). */
 :root {
-  /* the user (2026-09-14): "make the card ~25% smaller" — 480 → 360, and the
+  /* The user (2026-09-14): "make the card ~25% smaller" — 480 → 360, and the
      pending width below with it. */
   --pd-media-max-h: 360px;
 }
@@ -4239,7 +4239,7 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   width: 38px;
   justify-content: center;
   /*
-   * NO PILL AT REST. the user: "no circle… circle on hover", for the fullscreen
+   * NO PILL AT REST. The user: "no circle… circle on hover", for the fullscreen
    * corner as well as the play button. A glyph lying directly on the picture is
    * quieter than a glyph in a box, and the box was doing legibility work a drop
    * shadow does just as well — see the filter below.
@@ -4661,7 +4661,7 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   color: var(--pd-text-secondary);
 }
 /*
- * THE FEW CONTROLS UNDER A 3D CARD. the user (2026-09-17): "below the card itself
+ * THE FEW CONTROLS UNDER A 3D CARD. The user (2026-09-17): "below the card itself
  * show some basic controls eg. coloring/normals/grey, if rig, skeleton and if
  * segment, then explode." The app's own segmented control, sized down to the
  * caption's scale, as wide as the viewport above it; a toggle stands in its
@@ -4686,7 +4686,7 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
 /* ── the expanded view ───────────────────────────────────────────────────── */
 
 /*
- * NOT FULLSCREEN. the user: "large and centered and blurs background like settings
+ * NOT FULLSCREEN. The user: "large and centered and blurs background like settings
  * panel". So it borrows the dialog's own scrim tokens rather than inventing a
  * treatment — the transcript stays visible behind it and this reads as looking
  * closer, not as leaving the room.
@@ -4786,7 +4786,7 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
 /*
  * A RESULT FILED IN THE CHAIN IS A STEP OF THE WORK, not the answer.
  *
- * the user (2026-09-24): the iterations of an edit "should be embedded in thinking
+ * The user (2026-09-24): the iterations of an edit "should be embedded in thinking
  * blocks" — they are how the model got there, and the chain around them is set
  * a size below the reply for exactly that reason (activity-chain.css: "process
  * sits one step below the answer"). The same card at two-thirds the height:
@@ -4799,7 +4799,7 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   --pd-media-max-h: 120px;
 }
 /*
- * …AND NOT YET HANDED OVER. the user (2026-09-24): "still clickable within the
+ * …AND NOT YET HANDED OVER. The user (2026-09-24): "still clickable within the
  * thought process embed it smaller than full inside the work/think block where
  * it was generated, just no hover buttons and such when it's not presented and
  * shown in the full big card." A click still opens it (the picture → the
@@ -4921,7 +4921,7 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
 /* ---------------------------------------------------------------------------
  * A SOUND BEING MADE (.pd-audio-pending)
  *
- * the user: "for audio you can show some pulsing waveforms that eventually at the
+ * The user: "for audio you can show some pulsing waveforms that eventually at the
  * end form into a real waveform that's playable."
  *
  * It wears `.pd-thread-audio`'s own classes on purpose — same bar count, same
@@ -5100,7 +5100,7 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
  * THE STUDIO IS CONTENT NOW, NOT A WINDOW.
  *
  * It used to take the whole window: its own header with a back pill, its own
- * traffic-light drag inset, `height: 100vh`. the user asked for the opposite —
+ * traffic-light drag inset, `height: 100vh`. The user asked for the opposite —
  * "just appear in the chat area as if they are just replacing the current chat"
  * — so it fills its PARENT, wears the app's top bar, and the sidebar slides in
  * over its left edge exactly as it does for a conversation. Everything the old
@@ -5264,7 +5264,7 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
  * the option row under the box shares it.
  */
 /*
- * NO PANEL. the user: "no 'seperate area' for the input bar and settings on the
+ * NO PANEL. The user: "no 'seperate area' for the input bar and settings on the
  * bottom". This was a filled strip with a hairline above it, holding the field
  * and a row of labelled pill groups — a settings panel that happened to contain
  * a prompt, and the tallest thing in every studio. It is now just padding: the
@@ -5360,7 +5360,7 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
  * THE RAIL SHAPE OF THE SAME PICKER — full width, opening downward.
  *
  * The rail used to hold native `<select>` elements with a chevron drawn on top.
- * the user: "stylize dropdowns the same as the rest of the app, not macos native,
+ * The user: "stylize dropdowns the same as the rest of the app, not macos native,
  * there's a uniform dropdown style that needs reusing." A native select cannot
  * be styled past its box — the popup is the platform's, the highlight is the
  * platform's, and it opens in a different place from every other menu in the
@@ -5418,7 +5418,7 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
 /*
  * THE SPEECH BOX STARTS THE SAME HEIGHT AS THE OTHERS.
  *
- * the user: "why is the input box for audio taller than the rest" — and the honest
+ * The user: "why is the input box for audio taller than the rest" — and the honest
  * answer was that it is a <textarea> with a 52px floor, because speech is the
  * one studio where you paste a paragraph. But an EMPTY paragraph field is just a
  * taller empty field: it made the audio composer 73px against everyone else's
@@ -5466,7 +5466,7 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   height: 32px;
 }
 /*
- * THE CHEVRON HAD NO ROOM. the user: "there's drop down arrows hitting the sides of
+ * THE CHEVRON HAD NO ROOM. The user: "there's drop down arrows hitting the sides of
  * their container." A native macOS <select> draws its own arrow hard against
  * the right edge of the box, and no amount of padding moves it — the platform
  * owns that glyph. So the native appearance is dropped and the chevron is drawn
@@ -5529,7 +5529,7 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
  * the outer edge to the selected pill was 4px on the left and 2px top and
  * bottom, because `.pd-seg--inline` pinned the height to 32px and the item did
  * not fit inside the padding. The height comes from the item now, so the
- * padding is the gap, all the way round. the user: "ensure the border on the left…
+ * padding is the gap, all the way round. The user: "ensure the border on the left…
  * is even all around and the curve is the same on the edge and selection pill".
  */
 .pd-seg {
@@ -5555,7 +5555,7 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   border-radius: 999px;
   background: var(--pd-bg-raised);
   /*
-   * A HAIRLINE, NOT JUST A SHADOW. the user: "more clearness in dark mode on the
+   * A HAIRLINE, NOT JUST A SHADOW. The user: "more clearness in dark mode on the
    * selected pill". The fill is `--pd-bg-raised` on `--pd-bg-inset`, which is a
    * real step in a light theme and almost none in a dark one — and the drop
    * shadow that carries it in light does nothing against a dark ground.
@@ -5803,7 +5803,7 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
 /*
  * THE PROMPT READS AS THE MESSAGE THAT ASKED FOR THIS.
  *
- * the user: "place the prompt up and right as if this is a chat". It used to be a
+ * The user: "place the prompt up and right as if this is a chat". It used to be a
  * flat line of text sharing a row with the model/seed footnote, above a
  * full-width card — a caption on a slab. A run IS a small conversation: you
  * asked for something and the room answered, so the ask sits where an ask sits,
@@ -6012,7 +6012,7 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
  * This was `color-mix(… 26%, transparent)`. A translucent stroke composites with
  * whatever is under it, so every place two separate elements in a glyph overlap
  * painted twice and came out brighter than the rest of the drawing: the rect's
- * edge under the mountain path, a circle sitting on a stem. the user: "some
+ * edge under the mountain path, a circle sitting on a stem. The user: "some
  * translucency and brightness where spots overlap they don't look crisp".
  *
  * Mixing toward the SURFACE instead of toward transparent lands on the same
@@ -6565,7 +6565,7 @@ body[data-media-expanded="true"] .pd-studio-compose {
 }
 
 /* The Chat | Work toggle beside the traffic lights lived here until
-   2026-09-21 (the user: "just leave it on 'work'"); the ledge is always open. */
+   2026-09-21 (The user: "just leave it on 'work'"); the ledge is always open. */
 /* ── The working ledge, sliding ───────────────────────────────────────────
  *
  * In chat mode the bar slides UP behind the composer card and stops taking
@@ -6589,7 +6589,7 @@ body[data-media-expanded="true"] .pd-studio-compose {
   /*
    * `overflow: hidden` is what makes the collapse work, and it clips ALL FOUR
    * sides — including the ledge's own drop shadow and the antialiasing on its
-   * rounded bottom corners. the user, looking at it: "bottom bar is cut off
+   * rounded bottom corners. The user, looking at it: "bottom bar is cut off
    * literally at the bottom, come on." It was: the bar's bottom edge sat exactly
    * on the clip, so the shadow under it was sliced off and the corners came out
    * square.
@@ -6641,7 +6641,7 @@ body[data-media-expanded="true"] .pd-studio-compose {
 /*
  * THE APP'S OWN STATE, in the middle of the top bar.
  *
- * the user: "remove the 'starting up' pill and put it instead in the top bar
+ * The user: "remove the 'starting up' pill and put it instead in the top bar
  * centered." Quieter than the composer pill it replaces — it is on screen for
  * every route now, so it has to sit in the bar rather than announce itself
  * over it: no border, no raised background, just the spinner and the words in
@@ -6685,7 +6685,7 @@ body[data-media-expanded="true"] .pd-studio-compose {
 /*
  * THE CARD UNDER THE STATUS: two halves and a rule between them.
  *
- * the user: "a little popout of the model card, who it's by, a split line the
+ * The user: "a little popout of the model card, who it's by, a split line the
  * engine being run on (both with logos name quick description and then a Learn
  * more <square with top right arrow>> big blue button for both top and bottom
  * parts."
@@ -6793,7 +6793,7 @@ body[data-media-expanded="true"] .pd-studio-compose {
 
 /*
  * THE ASK CARD — every question to the person, just above the composer
- * (chat/AskCard.tsx). the user (2026-10-01): "a little card same width as the input
+ * (chat/AskCard.tsx). The user (2026-10-01): "a little card same width as the input
  * bar floating directly above it (not on top of)". The composer's own surface —
  * raised, hairline + md shadow, the surface radius — in the flow, so it never
  * covers the composer and the conversation above it stays readable.
@@ -6937,7 +6937,7 @@ body[data-media-expanded="true"] .pd-studio-compose {
 
 /* ── Pills in the input ───────────────────────────────────────────────────
  *
- * the user: "add blue pills with icons and X buttons for embedded files and such,
+ * The user: "add blue pills with icons and X buttons for embedded files and such,
  * not just typing them, including for buttons in the + menu no raw text."
  *
  * Everything inserted rather than typed takes this shape. The point is not
@@ -6952,7 +6952,7 @@ body[data-media-expanded="true"] .pd-studio-compose {
 }
 
 /*
- * NO BORDER. the user: "these pills: no border, no X." A bordered pill reads as a
+ * NO BORDER. The user: "these pills: no border, no X." A bordered pill reads as a
  * control you are meant to press; a filled one reads as a word that happens to
  * be blue, which is what it is — the sentence still parses when you read past it.
  */
@@ -6992,7 +6992,7 @@ body[data-media-expanded="true"] .pd-studio-compose {
 }
 
 /*
- * A CONNECTOR WEARS ITS OWN MARK. the user: "show REAL ICONS to their left shown in
+ * A CONNECTOR WEARS ITS OWN MARK. The user: "show REAL ICONS to their left shown in
  * gmail example."
  *
  * The catalog's SVGs are full-bleed 24×24 marks with no width attribute of their
@@ -7033,7 +7033,7 @@ body[data-media-expanded="true"] .pd-studio-compose {
  *
  * It used the `--pd-bg-overlay` token bare, which is 85% in the bobble flavors
  * and had no blur behind it — so the greeting and the privacy line read straight
- * through the list. the user, reporting it a second time: "same transparency issue
+ * through the list. The user, reporting it a second time: "same transparency issue
  * as there was on the context ring menu earlier." Compositing the overlay colour
  * over a solid base keeps the intended tint and makes it readable wherever it
  * opens.
@@ -7058,7 +7058,7 @@ body[data-media-expanded="true"] .pd-studio-compose {
 /*
  * The hover ZONE, not the pole: a strip down the right edge of the CHAT column
  * only (it is a child of the thread, so the canvas rail beside it is untouched —
- * the user: "the right side of the chat area, not the canvas"). Wider than the line
+ * The user: "the right side of the chat area, not the canvas"). Wider than the line
  * it reveals, because an affordance you have to hit before it appears is one
  * nobody finds.
  */
@@ -7129,7 +7129,7 @@ body[data-media-expanded="true"] .pd-studio-compose {
 }
 
 /*
- * A DOT IS A HOLE IN THE LINE. the user: "just like holes on the line of a graph
+ * A DOT IS A HOLE IN THE LINE. The user: "just like holes on the line of a graph
  * looking." So the fill is the surface behind it, not a colour of its own — the
  * line genuinely stops at the dot instead of passing behind a lozenge.
  */
@@ -7206,7 +7206,7 @@ body[data-media-expanded="true"] .pd-studio-compose {
 
 /* ─── The generation loader (BobbleLoader.tsx) ──────────────────────────────
  *
- * the user: "change the app icon's squares to be totally white". The ink is a token
+ * The user: "change the app icon's squares to be totally white". The ink is a token
  * so a pale surface can override it, but white is the default and the intent —
  * the loader always sits on the dark generation plate.
  *
@@ -7219,7 +7219,7 @@ body[data-media-expanded="true"] .pd-studio-compose {
  *
  * Same `pd-media-card` and `pd-media-frame` as the finished thing — these rules
  * only give the frame a box to be before there is anything to fit, and put a
- * bare bar under it. the user: "just the same final video card, same final image
+ * bare bar under it. The user: "just the same final video card, same final image
  * card, same final 3d card … and then below it, just floating, a white progress
  * bar."
  */
@@ -7360,7 +7360,7 @@ body[data-media-expanded="true"] .pd-studio-compose {
 /*
  * THE CARD THAT IS STILL BEING MADE IS A CARD — distinct, raised, borderless.
  *
- * the user (2026-09-24), with ChatGPT's generating card beside ours: "I don't
+ * The user (2026-09-24), with ChatGPT's generating card beside ours: "I don't
  * actually think there is a difference between the background color of the
  * generation card and the chat area, what I want here is for there to be a
  * distinct black background card that makes it feel raised, not lowered, but
@@ -7492,7 +7492,7 @@ body[data-media-expanded="true"] .pd-studio-compose {
   left: 12px;
 }
 /*
- * THE NUMBER. the user (2026-09-24): "a little bordered pill at the bottom right of
+ * THE NUMBER. The user (2026-09-24): "a little bordered pill at the bottom right of
  * the image card that says n% and smoothly goes up". Tabular figures so a digit
  * turning over does not shift the pill; it fades in with the first real step
  * and out a moment after the result is complete, so 100 is seen.
@@ -7532,7 +7532,7 @@ body[data-media-expanded="true"] .pd-studio-compose {
   /*
    * WHITE, AND ON SOMETHING DARK ENOUGH TO SEE IT.
    *
-   * the user: "change the app icon's squares to be totally white". They are — but
+   * The user: "change the app icon's squares to be totally white". They are — but
    * SEEN in the light theme, white tiles on the pale loading plate were barely
    * there. So the mark keeps its colour and brings its own ground: a soft dark
    * scrim, sized to the blocks, that is a no-op on the dark plates it already
@@ -7662,7 +7662,7 @@ body[data-media-expanded="true"] .pd-studio-compose {
 /* ---------------------------------------------------------------------------
  * ENGINE MENU — the speedometer right of the chat name (chat/EngineMenu.tsx).
  *
- * the user: "a little icon … a dropdown that shows a little scrollable list of the
+ * The user: "a little icon … a dropdown that shows a little scrollable list of the
  * inference engines with a 'calibrate' button at the top, during generation
  * this should also live show tps numbers." The dropdown is the shared .pd-menu
  * surface; what is here is its inner layout. Hues come from the status tokens
@@ -8541,7 +8541,7 @@ body[data-media-expanded="true"] .pd-studio-compose {
 
 /* ── Manage Storage (Model management → Manage Storage) ─────────────────── */
 /*
- * the user on the first cut: "these buttons you only know are buttons when you
+ * The user on the first cut: "these buttons you only know are buttons when you
  * hover (because they're just floating text) don't seem nice to me, I don't
  * want to make everything a card either though." So: three button voices,
  * each visible at rest. Reveal is a rounded rectangle in the theme's INVERSE
@@ -8803,7 +8803,7 @@ body[data-media-expanded="true"] .pd-studio-compose {
 }
 /* The size is the point of the page; it is the loudest text in the row and
    says what it means by colour: green under a gigabyte, yellow under ten, red
-   above. the user: "make file size more prominent … color the NGB text". */
+   above. The user: "make file size more prominent … color the NGB text". */
 .pd-storage-size {
   flex: none;
   min-width: 64px;
@@ -9085,7 +9085,7 @@ body[data-media-expanded="true"] .pd-studio-compose {
 }
 
 /* ── generation module cards (media/ModuleCard) ─────────────────────────────
- * the user: "a popup/prominent button that has something like 'download module'
+ * The user: "a popup/prominent button that has something like 'download module'
  * for image/audio/3d/video". One card, in the studio above the composer and
  * in the chat above the input while a request waits on it. Prominent by
  * being the only filled control in its column; opaque, on the raised ground. */
@@ -9409,7 +9409,7 @@ body[data-media-expanded="true"] .pd-studio-compose {
   min-height: 24px;
 }
 
-/* the user (2026-09-18, looking at 28px): "much much larger logo and text, and
+/* The user (2026-09-18, looking at 28px): "much much larger logo and text, and
    less space between the text and input bar". */
 .pd-home-lead {
   display: flex;
@@ -9507,7 +9507,7 @@ body[data-media-expanded="true"] .pd-studio-compose {
 }
 
 /* ── The Models page's header (ModelsView) ──────────────────────────────────
- * the user (2026-10-08): the hub read as "a thing for technical users … a mess of
+ * The user (2026-10-08): the hub read as "a thing for technical users … a mess of
  * filters and options all dumped there". The three places are the first,
  * largest control; the machine's specs and the power filters fold away behind
  * quiet pill buttons and open in place. */

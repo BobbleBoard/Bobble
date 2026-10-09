@@ -1,7 +1,7 @@
 /**
  * Settings: a FLOATING, CENTERED panel over whatever view is behind it.
  *
- * It used to be a full-window surface that replaced the chat entirely. the user,
+ * It used to be a full-window surface that replaced the chat entirely. The user,
  * with a screenshot of Unsloth's settings dialog: "I want the settings to be a
  * not full window taking over thing, but instead floating panel center." So the
  * chat (or the models view) stays visible behind a dimmed backdrop, and closing

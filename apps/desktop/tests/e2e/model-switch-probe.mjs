@@ -1,7 +1,7 @@
 /**
  * PICKING A MODEL BY NAME HAS TO ACTUALLY LOAD IT.
  *
- * the user, with the picker open: "lfm selected, but also qwen3.5-4b still selected
+ * The user, with the picker open: "lfm selected, but also qwen3.5-4b still selected
  * in the input bar." Two surfaces disagreeing was the symptom. The cause was
  * that `selectModel` persisted the pin and stopped — where its sibling
  * `selectTier` ends in a real switch (start the server, respawn pi on the same

@@ -1,7 +1,7 @@
 /**
  * A DOWNLOAD IN FLIGHT: a bar, and a way to stop it. Nothing else.
  *
- * the user: "when something is downloading: download button, blue download button
+ * The user: "when something is downloading: download button, blue download button
  * changes to a blue bar that is most of the width of the button, however with
  * some space left on the right for a red X button, the blue bar highlights and
  * hovers showing downloaded/total size n%. the X hovers specifically with a red
@@ -15,15 +15,15 @@
  * gone — which is a different trade from either always showing it or never
  * having it.
  *
- * AND THE BAR STAYS A BAR. the user, correcting a first attempt that put the caption
+ * AND THE BAR STAYS A BAR. The user, correcting a first attempt that put the caption
  * inside the track and grew it to fit: "the blue bar is a progressbar that just
  * is a solid blue color for progress. the hover shows a little extension card
  * popup thing above the bar nothing goes inside the bar it does not change
- * thickness." He is right — a progress indicator that changes SHAPE under the
+ * thickness." The user is right — a progress indicator that changes SHAPE under the
  * pointer is reporting on the pointer, not on the download. So the popup floats
  * above and the bar never moves.
  *
- * THE X IS DRAWN HERE rather than taken from the icon set. the user asked for
+ * THE X IS DRAWN HERE rather than taken from the icon set. The user asked for
  * "nothing but a vertical+horizontal symmetrical red X", and a shared close
  * glyph is drawn to sit in a chrome row — optically balanced, not geometrically
  * symmetric. Two equal strokes through one centre is a different mark, and it is

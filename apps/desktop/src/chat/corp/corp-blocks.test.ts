@@ -349,7 +349,7 @@ describe('transcriptToAssistantView — streaming + running control', () => {
 
 describe('a corp step carries its measured duration', () => {
   /*
-   * the user: "'worked' block… doesn't have the time next to it for some reason?"
+   * The user: "'worked' block… doesn't have the time next to it for some reason?"
    * The collapsed chain SUMS per-step durations, and corp steps had none — so a
    * forty-step corp turn read a bare "Worked" while the identical chain in the
    * ordinary chat read "Worked for 2m 5s". The number is measured at the process

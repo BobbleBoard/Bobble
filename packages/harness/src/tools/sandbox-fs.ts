@@ -205,9 +205,9 @@ const ROOT_LEVEL_DIRS = new Set([
 ]);
 
 /**
- * `Users/the user/Desktop/game` → `/Users/user/Desktop/game`.
+ * `Users/user/Desktop/game` → `/Users/user/Desktop/game`.
  *
- * the user found the damage this does: "an earlier godot max effort run left a folder
+ * The user found the damage this does: "an earlier godot max effort run left a folder
  * on my desktop that is called 'users' and has a hilarious path in it:
  * /Users/user/Desktop/Users/user/Desktop/platformer_game".
  *
@@ -260,7 +260,7 @@ const HOME_DIRS_OFF_LIMITS = new Set(['Library']);
  * instructions going to the folder and the file and pressing f5, won't do
  * anything." The same mechanism built a duplicate tree at
  * `/Users/user/Desktop/bobble-testbed/platformer` and the absurd
- * `/Users/user/Desktop/Users/user/Desktop/platformer_game` he reported earlier.
+ * `/Users/user/Desktop/Users/user/Desktop/platformer_game` the user reported earlier.
  *
  * Silently relocating a user's files is worse than either writing them or
  * refusing. So an ABSOLUTE (or `~`-anchored) path under the user's home is

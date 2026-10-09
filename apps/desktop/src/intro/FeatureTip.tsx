@@ -4,7 +4,7 @@
  * the side facing that control, a small demo above, a title, a line, and a small
  * "Got it".
  *
- * the user (2026-10-07): "pop out cards like rectangles rounded corners a little <
+ * The user (2026-10-07): "pop out cards like rectangles rounded corners a little <
  * poking out wherever it's coming from on a hover maybe and then the top half
  * has the little animation with a bottom right button that says 'Got it'".
  *

@@ -22,7 +22,7 @@
 #      and the job's resident size every --interval seconds into memory.csv.
 #   5. WATCHDOG: if free memory falls below --floor (30% by default), the whole
 #      job — its process group and every descendant — is stopped (TERM, then
-#      KILL). A frozen Mac costs the user his machine; a killed job costs a rerun.
+#      KILL). A frozen Mac costs the user their machine; a killed job costs a rerun.
 #   6. Sweeps orphans again, writes summary.json, appends a line to the run
 #      index, and exits with the job's own exit code (or 137 when the watchdog
 #      stopped it, 75 when the lock or the memory wait timed out).

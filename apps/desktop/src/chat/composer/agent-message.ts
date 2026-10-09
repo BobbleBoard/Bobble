@@ -9,7 +9,7 @@ import { formatBytes } from './attachment-view';
  * draft is BYTE-IDENTICAL to the sent message — that exact match is what lets the
  * real turn reuse the prefill's KV instead of re-prefilling.
  *
- * EVERYTHING WITH A FILE BEHIND IT IS NAMED BY ITS PATH (2026-09-24). the user: "why
+ * EVERYTHING WITH A FILE BEHIND IT IS NAMED BY ITS PATH (2026-09-24). The user: "why
  * not handle this natively so that any image(s)/files/folders... can be pasted
  * into the input box". A PDF, a zip or a folder cannot be folded into a prompt,
  * but the model has tools that can open them — all it lacked was where they are.
@@ -88,7 +88,7 @@ function escapeRegExp(v: string): string {
  * The one line that tells the model a connector is live — appended to THIS
  * message, deliberately, and never added to the system prompt.
  *
- * the user: "not in the system prompt redoing prefill just right here append to the
+ * The user: "not in the system prompt redoing prefill just right here append to the
  * message new cli tool activated by the user 'gmail', <others> this/these
  * tool(s) is/are now ready for use." The system prompt is the cached prefix; a
  * word added to it re-prefills the entire conversation, which is the exact cost

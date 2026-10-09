@@ -35,7 +35,7 @@ export function BrowserSurface({
     <div className={rootClass}>
       <div className="pd-browser-content">
         <div ref={slotRef} className="pd-browser-slot" data-native-slot="browser" />
-        {/* NO "Pi is browsing" chip. the user: "I'd like that 'Pi is browsing' and
+        {/* NO "Pi is browsing" chip. The user: "I'd like that 'Pi is browsing' and
             blue dot stuff to be gone." It floated over the page's own top-right
             corner — exactly where a site puts its account menu and its sign-in
             controls — to narrate something the user can already see happening.

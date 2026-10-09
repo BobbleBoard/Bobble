@@ -1,5 +1,5 @@
 /**
- * A FILE A TURN WROTE IS LOOKED UP WHERE IT IS. the user (2026-10-08): "'this file
+ * A FILE A TURN WROTE IS LOOKED UP WHERE IT IS. The user (2026-10-08): "'this file
  * couldn't be found' (when clicking on a file that should very much be
  * there)". Two of the misses: a `cd` before the redirect, and `~` taken as a
  * folder inside the chat's.

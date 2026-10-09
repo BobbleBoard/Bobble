@@ -39,6 +39,7 @@
  */
 import { execFileSync } from 'node:child_process';
 import { chmodSync, cpSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { launchApp, probeHome } from '../../../tests/e2e/harness.mjs';
@@ -90,7 +91,7 @@ function fixtureHome(name, { fresh = false, githubReady = false } = {}) {
           id: 'filesystem',
           name: 'Filesystem',
           command: 'npx',
-          args: ['-y', '@modelcontextprotocol/server-filesystem', '/Users/user/Projects'],
+          args: ['-y', '@modelcontextprotocol/server-filesystem', `${homedir()}/Projects`],
           enabled: true,
         },
         {
@@ -106,7 +107,7 @@ function fixtureHome(name, { fresh = false, githubReady = false } = {}) {
           id: 'weather',
           name: 'Weather',
           command: 'node',
-          args: ['/Users/user/tools/weather-mcp/index.js'],
+          args: [`${homedir()}/tools/weather-mcp/index.js`],
           enabled: true,
         },
         // Added and switched OFF, never run: the ledger's "Off" group and the

@@ -61,7 +61,7 @@ try {
    * AUTO-FOLDERS WERE REMOVED, AND THAT IS THE POINT NOW.
    *
    * This probe asserted that a chat's working directory sprouts a folder named
-   * after it. the user asked for the opposite, and chat-org.ts records why: "Every
+   * after it. The user asked for the opposite, and chat-org.ts records why: "Every
    * cwd used to sprout its own folder, so the sidebar filled with
    * run5/run6/run7/corp-probe2… — one folder per experiment, none of them asked
    * for. A project is a thing the user decides to make; unassigned chats simply

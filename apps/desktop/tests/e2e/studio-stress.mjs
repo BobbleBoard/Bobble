@@ -1,7 +1,7 @@
 /**
  * TRYING TO BREAK THE STUDIOS.
  *
- * the user: "you play with it, try to break some animations/visuals clicking a
+ * The user: "you play with it, try to break some animations/visuals clicking a
  * bunch hovering a bunch lots of visual review."
  *
  * The three things that actually break a control strip: a narrow window (does

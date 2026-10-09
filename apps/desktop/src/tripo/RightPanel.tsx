@@ -450,7 +450,7 @@ export function RightPanel(): JSX.Element {
         </button>
         {/* No History tab: the asset's stages are the rail on the viewport
             (HistoryRail.tsx) — hover previews, click goes back, the next op
-            branches. the user: "replace history tab with something like shown". */}
+            branches. The user: "replace history tab with something like shown". */}
         <button
           type="button"
           className="tp-right-tab"

@@ -197,7 +197,7 @@
   margin: 0 -12px;
 }
 
-/* the user (2026-09-17): the same drawn border and subtle wash as a Connectors
+/* The user (2026-09-17): the same drawn border and subtle wash as a Connectors
    card; the template's + tall on the right. */
 .sd-row {
   position: relative;
@@ -287,7 +287,7 @@
 .sd-row:has(> .sd-row-plus) {
   padding-right: 60px;
 }
-/* the user (2026-09-18): "+ buttons on connectors and scheduled and such must be
+/* The user (2026-09-18): "+ buttons on connectors and scheduled and such must be
    square and not bordered, just a rounded-corner box on hover" — the same
    square the connectors' add is (connectors.css .pdc-ctl--add), centred on
    the card's right, the glyph alone at rest. */

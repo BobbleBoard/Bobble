@@ -1,5 +1,5 @@
 /**
- * THE MONITOR RIDES THE ACTIVITY TAB (2026-09-13). the user: "activity tab should be
+ * THE MONITOR RIDES THE ACTIVITY TAB (2026-09-13). The user: "activity tab should be
  * computer use page if the latest command is something like 'mac snapshot'".
  * The tab no longer opens on a session by itself — it opens on the model's own
  * `mac …` call, newest wins. A probe that only starts the mock session has to

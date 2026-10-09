@@ -259,7 +259,7 @@ export function buildOpenWrapper(presentCommand: string | null = null): string {
      * the model's shell does not: a probe's throwaway HOME is inherited by
      * anything bash starts, so `open -g -a "Google Chrome"` brings up a Chrome
      * with no profile and no keychain — the picker and the "A keychain cannot be
-     * found" prompt the user reported, both in front of him. Same bug, other route.
+     * found" prompt the user reported, both in front of them. Same bug, other route.
      */
     `HOME=${shellQuote(userHome())}`,
     'export HOME',
@@ -309,7 +309,7 @@ export function buildOpenWrapper(presentCommand: string | null = null): string {
     // A URL is the OTHER form that takes the screen: `open <url>` hands the page
     // to the user's default browser and activates it. MEASURED — a run asked to
     // use Chrome ran `open chrome://new-tab`, which put a browser in front of
-    // the user for the rest of the run. Same shape as `open -a`: right intent, wrong
+    // The user for the rest of the run. Same shape as `open -a`: right intent, wrong
     // verb, and there is a command that does it properly.
     '    [a-z]*://*) url="$arg"; flagged=1 ;;',
     '    --application=*) app="${arg#--application=}"; flagged=1 ;;',
@@ -388,7 +388,7 @@ export function buildOpenWrapper(presentCommand: string | null = null): string {
     /*
      * ...AND THEN SHOW IT THE WHOLE TOOLKIT.
      *
-     * the user: "always ... after a terminal command for 'open -a' anything or just
+     * The user: "always ... after a terminal command for 'open -a' anything or just
      * that open command give a tidbit as if it ran mac --help give the full
      * thing and tell it 'this app is best controlled with the cli tools above'.
      * that should bias it away from writing these files and attempting to do

@@ -1,8 +1,8 @@
 /**
  * THE WAY OUT OF THE CRASH CARD, AND ⌘R.
  *
- * the user, on the "Bobble hit a rendering error" screen: the two buttons "do not
- * work", he has to press ⌘R, and ⌘R "clears really everything".
+ * The user, on the "Bobble hit a rendering error" screen: the two buttons "do not
+ * work", the user has to press ⌘R, and ⌘R "clears really everything".
  *
  * Both were true. `window.location.reload()` and `window.location.search = ''`
  * are renderer-initiated navigations, which main refuses on purpose

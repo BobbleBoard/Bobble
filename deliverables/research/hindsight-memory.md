@@ -7,7 +7,7 @@ Numbers marked **MEASURED** were produced for this doc (dependency resolution ag
 
 ## 1. Goal
 
-the user, verbatim: *"memory (hindsight) integration, one click turn this on and off in settings, Memory tab in settings, uses Hindsight https://github.com/vectorize-io/hindsight"*.
+The user, verbatim: *"memory (hindsight) integration, one click turn this on and off in settings, Memory tab in settings, uses Hindsight https://github.com/vectorize-io/hindsight"*.
 
 Restated precisely:
 
@@ -240,7 +240,7 @@ Hindsight issues its own model calls from its own worker: retain extraction, con
   <memory>
   Automatic memory lookup for this message — not something the user just said. Use only what is relevant; don't announce it.
   - The user prefers answers without emojis. (about the user · Sep 20)
-  - You made q3-report.docx for The user in ~/Bobble/q3. (your own past action · Sep 12)
+  - You made q3-report.docx for the user in ~/Bobble/q3. (your own past action · Sep 12)
   More: `memory recall "<what to look for>"`
   </memory>
   ```
@@ -398,7 +398,7 @@ The status line walks through these states, each with its own copy and test id:
 | Recall injected into the system prompt, or prefixed to the user message | The first invalidates the warmed prefix every turn. The second breaks the composer prime at the first user token. |
 | Recall via reflect | An LLM call before every turn. |
 | Renderer-side injection (like custom instructions) | Adds renderer→main→Hindsight latency before send. Misses subagents and scheduled runs. Duplicates harness logic. |
-| Own SQLite + vector memory (the RemotePi approach) or mem0/Letta/Zep | the user chose Hindsight. None of them brings Hindsight's entity/temporal graph, delta retain, curation API or benchmark record for less runtime. |
+| Own SQLite + vector memory (the RemotePi approach) or mem0/Letta/Zep | The user chose Hindsight. None of them brings Hindsight's entity/temporal graph, delta retain, curation API or benchmark record for less runtime. |
 
 ---
 

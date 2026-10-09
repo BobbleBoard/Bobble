@@ -2,7 +2,7 @@
  * `office` — a real .pptx / .docx / .xlsx / .pdf, made and edited by the
  * document pipeline rather than by hand.
  *
- * the user: "model should not be using python-pptx, there is a dedicated subagent
+ * The user: "model should not be using python-pptx, there is a dedicated subagent
  * for each pptx/docx/xlsx creation and editing right?" There was one — the
  * corp mesh's document specialist — and it was reachable from a corp run only;
  * a plain chat asked for a deck had bash and a habit, and the canvas assessment

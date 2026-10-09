@@ -11,7 +11,7 @@ recommended design, §5 is the ordered work, §6 is what could stop it and what 
 
 ## 1. Goal
 
-**the user, verbatim:** "image video and audio studios shouldn't actually be a chat interface, users
+**The user, verbatim:** "image video and audio studios shouldn't actually be a chat interface, users
 wanting that experience can have it via just asking model to call media tools in a regular chat,
 studios are like professional but very simple editors with the specialized model integrations eg.
 image studio image generation w/ inpainting, editing, click to comment, remove bg, make a character
@@ -121,7 +121,7 @@ the audio editor's lanes can use this directly.
    `packages/gen3d-engine/python/engine/registry.py` `mflux_edit_cli()` (a Mage-Flow mflux branch
    venv; "9 s for a 1024 px edit at 4 steps, 14.76 GB peak"), reached by `gen3d:generate
    {imageOnly, editFrom}` and by the chat tool `edit_image`
-   (`packages/harness/src/tools/image-tools.ts`). the user's library has it at
+   (`packages/harness/src/tools/image-tools.ts`). The user's library has it at
    `~/Bobble/Models/Image/Editing/microsoft__mage-flow-edit-turbo`. **Risk found:** the HF API now
    returns 401 for `microsoft/Mage-Flow-Turbo`, `-Edit-Turbo` and `-Edit` without auth (so does
    `microsoft/Lens`, whose originals mflux's own README calls withdrawn), while `Comfy-Org/Mage-Flow` (MIT,

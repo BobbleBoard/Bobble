@@ -1,7 +1,7 @@
 /**
  * Collapse the editors' ribbon by default and offer a "Show toolbar" button.
  *
- * the user: "allow the entire toolbar at the top to be not shown at all to start
+ * The user: "allow the entire toolbar at the top to be not shown at all to start
  * and just don't show it unless a button that you show called 'show toolbar' at
  * the top is clicked. the user can still edit it via clicking, dragging items,
  * typing in text boxes deleting things etc."

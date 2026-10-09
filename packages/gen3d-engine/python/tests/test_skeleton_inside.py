@@ -1,6 +1,6 @@
 """Fitted joints must sit INSIDE the body, not on or past its surface.
 
-the user saw the skeleton overlay poking out through a generated character's hands.
+The user saw the skeleton overlay poking out through a generated character's hands.
 It is not cosmetic — this fit is what ARDY's motion drives, so a joint outside
 a limb swings that limb about the wrong pivot.
 

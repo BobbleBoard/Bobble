@@ -139,7 +139,7 @@ interface LlmStoreState {
   /**
    * Why the last download did not start or did not finish — "Not enough
    * space: …", a 401 on a gated repo — kept until the next attempt, so every
-   * Download button can say it where it was pressed. the user: "clicking download
+   * Download button can say it where it was pressed. The user: "clicking download
    * … does not download them or show any user indication … either that
    * there's not enough disk space or that it is downloading."
    */
@@ -528,7 +528,7 @@ export const useLlmStore = create<LlmStoreState>((set, get) => ({
   },
 
   /*
-   * CANCEL IS ACKNOWLEDGED BEFORE IT IS OBEYED. the user: "clicking x cancels
+   * CANCEL IS ACKNOWLEDGED BEFORE IT IS OBEYED. The user: "clicking x cancels
    * (immediate feedback even if download doesn't cancel immediately it shows up
    * that way — progress bar removes and download button restored, partial
    * download auto cleaned and deleted)".
@@ -664,7 +664,7 @@ export function connectLlm(): void {
 /**
  * THE FIRST-RUN ENGINE SET, fetched in the background once the app is up.
  *
- * the user: "download a few generally good engines at the start of downloading the
+ * The user: "download a few generally good engines at the start of downloading the
  * app". Which ones is the catalogue's per-platform answer (`defaultEngineSet`);
  * main installs whatever of them is missing, one after another, and the
  * engine menu's rows fill in as they land. Skipped offline (there is nothing

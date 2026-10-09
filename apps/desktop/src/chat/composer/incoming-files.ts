@@ -1,7 +1,7 @@
 /**
  * WHAT A PASTED OR DROPPED FILE BECOMES IN THE COMPOSER.
  *
- * the user (2026-09-24): "why not handle this natively so that any image(s)/files/
+ * The user (2026-09-24): "why not handle this natively so that any image(s)/files/
  * folders... can be pasted into the input box". The composer took two kinds of
  * thing — a picture (read into a data URI, with no file behind it) and a small
  * text file (read into the prompt) — and turned everything else away into a

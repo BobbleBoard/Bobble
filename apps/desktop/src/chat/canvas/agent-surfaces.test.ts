@@ -58,7 +58,7 @@ describe('a mirror only ever grows', () => {
   });
 
   it('presses Enter the moment the command is complete and executing', () => {
-    // the user (2026-09-17): "when the model's command finishes streaming in the
+    // The user (2026-09-17): "when the model's command finishes streaming in the
     // terminal move the cursor down a line … as if the user pressed enter".
     const typing = mirrorCommandText('npm test', '', true, '/w/proj');
     const entered = mirrorCommandText('npm test', '', true, '/w/proj', { executing: true });
@@ -89,7 +89,7 @@ describe('a mirror only ever grows', () => {
 });
 
 describe('the mirror is colour-coded like the shell it mirrors', () => {
-  // the user (2026-09-12): "need color coded text in the terminal in the canvas."
+  // The user (2026-09-12): "need color coded text in the terminal in the canvas."
   it('paints the prompt: user green, folder blue, a dim $, the command bold', () => {
     const out = mirrorCommandText('ls', 'a', false, '/w/proj');
     expect(out).toContain('\x1b[1m\x1b[32mbobble\x1b[0m');
@@ -140,7 +140,7 @@ describe('the short title', () => {
 
 describe('the terminal mirror shows where the command ran', () => {
   /*
-   * the user: "would be appreciated if you can show in the terminal something like
+   * The user: "would be appreciated if you can show in the terminal something like
    * the user being 'bobble' and the directory ... this removes confusion about
    * the initial working directory."
    *

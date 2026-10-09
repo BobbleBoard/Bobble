@@ -1,7 +1,7 @@
 /**
  * WHAT WENT WRONG WITH A TURN, AND WHAT TO DO ABOUT IT.
  *
- * the user (2026-10-08): "anything like this including but absolutely not limited
+ * The user (2026-10-08): "anything like this including but absolutely not limited
  * to 'the voice model is not installed' our dreaded 'fetch failed' 'this file
  * couldn't be found' … red text that's just a real unknown error or something
  * that doesn't have handling attached to it or can be easily done something

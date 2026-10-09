@@ -1,7 +1,7 @@
 /**
  * WHICH CHAT STARTED WHICH JOB — so deleting the chat can stop them.
  *
- * the user (2026-09-23): "clicking delete on a chat should instantly terminate any
+ * The user (2026-09-23): "clicking delete on a chat should instantly terminate any
  * generation of any kind happening". A picture, a clip, a sound, a drawing or
  * a mesh runs in the MAIN process, not in the chat's pi: aborting the chat's
  * turn kills the command that asked for it and leaves the job itself running

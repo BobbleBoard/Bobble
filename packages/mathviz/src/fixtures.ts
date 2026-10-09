@@ -1,7 +1,7 @@
 /**
  * Specs as a model would write them for the lessons the visual suite asks
  * for — and the one the user held up (a Fourier series, 2026-09-25) and the
- * kinetic-theory figure he attached (a cube, a molecule, its velocity).
+ * kinetic-theory figure the user attached (a cube, a molecule, its velocity).
  */
 export const FOURIER = {
   title: 'Building a square wave from sine waves',

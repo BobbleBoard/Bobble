@@ -2,7 +2,7 @@
  * THE DOWNLOAD TRAY'S NEWS: what finished and what could not start, kept
  * until the user has seen it.
  *
- * the user (2026-09-13): the downloads live in the top-left, "under a down arrow
+ * The user (2026-09-13): the downloads live in the top-left, "under a down arrow
  * with half square outline below it, with the progressbar and x inside it
  * shown on click, show a tiny ! on the top right of that icon when download
  * finished." The two downloaders (the inference supervisor for GGUFs, the

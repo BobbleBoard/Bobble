@@ -16,7 +16,7 @@ import type { OffscreenProbe } from './use-edit-animation.ts';
  * This surface was token-driven throughout EXCEPT its highlighting, which used
  * CodeMirror's `defaultHighlightStyle` — a palette designed for a LIGHT editor.
  * Rendered on the app's near-black code background, its navy and dark purple
- * became close to invisible. the user: "these text colors on this color scheme is
+ * became close to invisible. The user: "these text colors on this color scheme is
  * not viable, why all so dark, especially the dark blue, absolutely not."
  *
  * Every colour is a --pd-syntax-* variable now, so light, dark and all three
@@ -74,7 +74,7 @@ const codeTheme = EditorView.theme({
    * CodeMirror pins the line-number gutter with `position: sticky; left: 0`, so
    * on a horizontal scroll the code slides UNDER it. Transparent, the two draw
    * on top of each other and the line numbers sit in the middle of the source —
-   * the user, looking at a wide file: "the line numbers on the left side seem to
+   * The user, looking at a wide file: "the line numbers on the left side seem to
    * have transparent background and overlap with real text if hscroll occurs."
    *
    * The editor's own background is the right fill: it matches at rest, so this
@@ -99,7 +99,7 @@ const codeTheme = EditorView.theme({
    * THE RULE BESIDE THE NUMBERS — the visible edge of the gutter, and the thing
    * you actually see when the code slides under it.
    *
-   * the user: "for line nums, need a vertical line a little to the right connected
+   * The user: "for line nums, need a vertical line a little to the right connected
    * from first line to last line not top to bottom of them that acts as the
    * better border when hscrolling."
    *

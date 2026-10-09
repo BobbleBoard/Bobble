@@ -1,7 +1,7 @@
 /**
  * A ZOOMED VISUAL AUDIT of the model hub.
  *
- * the user: "UI oddities should be visually verified with zoom… on any visual
+ * The user: "UI oddities should be visually verified with zoom… on any visual
  * verification you need to notice everything, not just fixate on something, even
  * if it's completely out of the scope of the task."
  *
@@ -120,7 +120,7 @@ try {
   console.log('DETAIL:', JSON.stringify(detail, null, 1));
 
   /*
-   * THE LAST CARD AT THE BOTTOM OF THE LIST. the user: "I scrolled to the bottom
+   * THE LAST CARD AT THE BOTTOM OF THE LIST. The user: "I scrolled to the bottom
    * here and the stable 3 audio is cut off on the bottom." The scroll area
    * paints a 16px bottom fade, so the final card has to clear the fold by more
    * than that or it lands half inside a gradient.

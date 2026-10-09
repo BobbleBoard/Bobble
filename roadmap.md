@@ -140,7 +140,7 @@ different speed characteristics under one label.
 Assessment: **do the generalisable half, skip the specific half for now.** A
 single-GPU NVIDIA fast path is real work aimed at hardware this app does not
 otherwise target, and `perf-args.ts` already notes that nvidia-smi / rocm-smi
-probing does not exist yet. the user's own instinct is the valuable part: if a piece
+probing does not exist yet. The user's own instinct is the valuable part: if a piece
 of hardware-specific work can be done once and pay off across every Apple
 Silicon Mac, do it that way. The Apple-Silicon-shaped version of this is (4).
 
@@ -159,7 +159,7 @@ excluded by request.
 
 ## Optimal out of the box — the picker and the recommender (the user 2026-08-23)
 
-the user: "this is paramount to the whole out of the box experience on any users
+The user: "this is paramount to the whole out of the box experience on any users
 machine, this is paramount to the whole backend idea of this app out of the box
 optimized, you get 99% of the way there on 99% of models on 99% of hardware to a
 person who knows how to do their stuff and manually configures stuff for maximum
@@ -191,7 +191,7 @@ performance… this is the core of the entire idea."
    we are leaving on the table, so the wiring gap is visible rather than hidden.
 
 4. **`models/model-recommender.ts` + `quant-ladder.ts`** — per modality, the
-   model AND the quant. the user's rules, encoded and tested:
+   model AND the quant. The user's rules, encoded and tested:
    - Qwen3.8 27B first whenever it fits (independently #1 on Artificial
      Analysis among open weights, intelligence 52 vs MiniMax-M3's 45).
    - **The floor: never below IQ3_XS under 100B.** When it is hit the
@@ -222,7 +222,7 @@ integrated — ExLlamaV3 and Nunchaku both outrank what we have on an NVIDIA box
 
 ## Engines are a MATRIX, not a ranking (the user 2026-08-21)
 
-the user, correcting a Mac-shaped answer of mine: "this thing about targeting an m5
+The user, correcting a Mac-shaped answer of mine: "this thing about targeting an m5
 is not correct. remember we're working on this mac, but we target all major OS
 and all major hardware eventually in a modular fashion such that we have a
 boatload of alternatives that we know of and can get working quick to get max
@@ -275,7 +275,7 @@ CUDA that needs the ComfyUI path — which is the argument for the baseline agai
 
 ## Perceived speed — instant window, snappy UI (the user 2026-08-21)
 
-the user: "because this runs locally we want users to feel absolutely instant
+The user: "because this runs locally we want users to feel absolutely instant
 startup and general UI snappiness (especially when it doesn't actually matter to
 the end user whether the functionality was as snappy as the UI suggested — such
 as the app window immediately showing up is infinitely better than a slow 10
@@ -314,7 +314,7 @@ one animation.
 
 ## Power modes — brainstorm (not built)
 
-the user: run everything slower and lighter so the fans stay off and the machine
+The user: run everything slower and lighter so the fans stay off and the machine
 stays usable — for long unattended work (a corp harness run, a 3D generation)
 where wall-clock does not matter but being blocked does.
 

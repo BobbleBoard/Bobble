@@ -1,7 +1,7 @@
 /**
  * A SPECIALIST CHILD RUNS ON THE CLI — with its own kit, and nothing lost.
  *
- * the user: "ensure there is a cli connector for the specialists that is by default
+ * The user: "ensure there is a cli connector for the specialists that is by default
  * there and enabled, cli tools are a good context saver so it's important that
  * they're just the same power as schemas."
  *

@@ -1,7 +1,7 @@
 /**
  * Corp roles ARE subagents — one implementation for viewing both.
  *
- * the user: "the corp things need to appear as subagents (subchats in the left
+ * The user: "the corp things need to appear as subagents (subchats in the left
  * sidebar just like regular subagents do...) and they don't."
  *
  * They half did. The sidebar rendered a `pd-child-row` per org-chart node, so
@@ -46,7 +46,7 @@ function blocksToMessages(childId: string, run: string, blocks: readonly CorpBlo
    * (CorpChatStream) and THIS, the sidebar chat you get by clicking the role —
    * and only the first learned to show briefings. So the manager's own chat still
    * opened straight into "Thought, edited a file" with the instruction that
-   * caused it nowhere on screen. the user: "the top of this chat should show the blue
+   * caused it nowhere on screen. The user: "the top of this chat should show the blue
    * bubble on the left. RIGHT THERE… WHERES THE MESSAGE BUBBLE."
    *
    * Same shape as transcriptToAssistantView: a brief closes the current assistant
@@ -193,7 +193,7 @@ export function syncCorpChildren(parentId: string): void {
     child.setRunning(id, running);
     /*
      * The SAME lifecycle word the situation room shows, on the sidebar row.
-     * the user had a run where the sidebar showed a blue dot and the situation room
+     * The user had a run where the sidebar showed a blue dot and the situation room
      * showed "queued" for the same agent — two panes describing one thing in two
      * vocabularies, so neither could be trusted. Once the run is over the chart's
      * `working` is stale (see above), so a still-`working` node reads as the run
@@ -206,7 +206,7 @@ export function syncCorpChildren(parentId: string): void {
      *
      * The CEO calling talk_to_manager is the moment the run becomes a team, and
      * the user was left in the main conversation looking at a card ABOUT the
-     * manager instead of at the manager. the user: "act as if the user clicked onto
+     * manager instead of at the manager. The user: "act as if the user clicked onto
      * the newly created manager chat instead, route away from the main
      * conversation automatically."
      *

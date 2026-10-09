@@ -1,13 +1,13 @@
 /**
  * PULL THE ATTACHMENTS BACK OUT OF A SENT MESSAGE.
  *
- * the user: "pasted content shows literally as 'pasted content' rather than the
+ * The user: "pasted content shows literally as 'pasted content' rather than the
  * already-designed paste card."
  *
  * The composer folds text attachments into pi's copy of the message as fenced
  * blocks (`buildAgentMessage`), and echoes only the typed text into the bubble —
  * so live, the card is right. But pi's copy is what lands in the session file,
- * and a chat reopened from disk rebuilds its user bubbles from THAT. His real
+ * and a chat reopened from disk rebuilds its user bubbles from THAT. Their real
  * transcript shows the result: a chat titled
  *
  *     Attached file `pasted content`: ``` we're going to work on the chat…

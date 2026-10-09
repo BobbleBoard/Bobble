@@ -16,7 +16,7 @@ const PORT = 9333;
 
 await run('osascript', ['-e', 'tell application "Bobble" to quit']).catch(() => {});
 await sleep(2000);
-// -g: open without bringing it to the front (the user's screen stays his).
+// -g: open without bringing it to the front (the user's screen stays their).
 /*
  * LaunchServices, with the E2E env carried through `open --env` — so the app
  * gets the same debug channel and background behaviour as the spawned probes,

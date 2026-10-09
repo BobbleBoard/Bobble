@@ -1,7 +1,7 @@
 /**
  * A LOWERED NATIVE VIEW LEAVES A HOLE — so leave the last frame in it.
  *
- * the user: "browser tabs go blank when the + button is pressed?" They did, and for
+ * The user: "browser tabs go blank when the + button is pressed?" They did, and for
  * a real reason: a native WebContentsView paints above every DOM element in the
  * window, so the `+` menu is invisible under the page unless the page is taken
  * down first. The page coming down is correct; the page coming down and leaving

@@ -3,8 +3,8 @@
  *
  * The crash card is the screen nobody can test by waiting for it: it appears
  * only when something else is broken, which is precisely when you are not in a
- * position to check that its buttons work. the user found out they did not the hard
- * way — twice, on a screen he reached because the app had already failed him.
+ * position to check that its buttons work. The user found out they did not the hard
+ * way — twice, on a screen the user reached because the app had already failed them.
  *
  * So a probe can ask for it: with `?piE2E=1` (the same opt-in the store and
  * theme accessors use), `window.__pi_crash()` makes the next render throw, the

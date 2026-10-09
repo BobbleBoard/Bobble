@@ -326,7 +326,7 @@ describe('offline first', () => {
 
 describe('the worker says what it is doing', () => {
   /*
-   * the user: the image studio "won't work at all". MEASURED on his Mac with the
+   * The user: the image studio "won't work at all". MEASURED on their Mac with the
    * weights already cached: 94 seconds between pressing Generate and step 1,
    * with the room showing "Starting…" throughout. Everything the worker said in
    * that window went into a buffer that was only read if the job FAILED.

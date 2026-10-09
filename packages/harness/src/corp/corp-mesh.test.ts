@@ -20,7 +20,7 @@ describe('buildCorpRoster', () => {
     const roster = buildCorpRoster({ task: 'build a game', engineerCount: 3 });
     const ids = roster.map((a) => a.id);
     /*
-     * the user: "don't spawn a fake CEO clone for the corp harness. the ceo, the only
+     * The user: "don't spawn a fake CEO clone for the corp harness. the ceo, the only
      * ceo, ... is the original one that originally talked to the [user]." The mesh
      * used to open with its own CEO holding a builder's toolkit; measured, it
      * called `write` ten times and `talk_to` zero, building the whole thing while
@@ -127,7 +127,7 @@ describe('corp-mesh tool names', () => {
   });
 });
 
-describe('the producing specialists (the user's presets)', () => {
+describe('the producing specialists (the user’s presets)', () => {
   // Four specialists whose output is an ARTIFACT rather than an answer: an
   // improved image, a rendered clip, a critique, a research deliverable. They
   // needed their own spine — the measuring spine forbids the very thing they are
@@ -198,11 +198,11 @@ describe('the producing specialists (the user's presets)', () => {
 
 describe('the CEO is the chat you were already talking to', () => {
   /*
-   * the user: the initial model IS the CEO — it just becomes one the moment it calls
+   * The user: the initial model IS the CEO — it just becomes one the moment it calls
    * talk_to_manager. It is NOT a mesh agent and never was one honestly: the mesh
    * used to build a second `ceo` seeded with the real CEO's brief, and that clone
    * (holding a full builder's toolkit) did the whole job itself rather than hand
-   * it on. the user: "don't spawn a fake CEO clone for the corp harness."
+   * it on. The user: "don't spawn a fake CEO clone for the corp harness."
    *
    * So the assertion is now the absence: no seat in the mesh is a CEO, and the
    * real one keeps the ordinary chat tool surface because nothing here touches it.
@@ -223,7 +223,7 @@ describe('the CEO is the chat you were already talking to', () => {
 });
 
 describe('the real CEO’s brief matches the tools it actually has', () => {
-  // the user: "the CEO should have all the tools ... it should be able to write and
+  // The user: "the CEO should have all the tools ... it should be able to write and
   // work and do small things itself ... it needs to call the manager of its own
   // volition when it's a project that needs it, not a single html file." This is
   // the prompt the CHAT model reads — the only CEO there is.
@@ -242,13 +242,13 @@ describe('the real CEO’s brief matches the tools it actually has', () => {
 
   it('does not MANDATE delegating — it is a judgement call', () => {
     expect(p()).not.toContain('YOUR FIRST ACTION IS TO');
-    // the user's wording for the same judgement call.
+    // The user's wording for the same judgement call.
     expect(p()).toContain('*genuinely* quick you are still free to do without this tool');
   });
 
   it('tells it the manager knows only what it is told', () => {
     // The brief IS the hand-off: the manager has never spoken to the user.
-    // Same intent in his wording: you supply the vision, they build from it.
+    // Same intent in their wording: you supply the vision, they build from it.
     expect(p()).toContain('you just tell the manager what you want');
   });
 });
@@ -256,7 +256,7 @@ describe('the real CEO’s brief matches the tools it actually has', () => {
 /*
  * THE MANAGER'S SUBMIT CONTRACT.
  *
- * the user, predicting the failure before the run: "the manager will fail to
+ * The user, predicting the failure before the run: "the manager will fail to
  * commission a tester that actually drives the product … that needs to be baked
  * into the system prompt just like the engineers get their one submit contract".
  *
@@ -368,7 +368,7 @@ describe('the CEO presents', () => {
 });
 
 describe('the runtime must exist', () => {
-  /* the user: "it hasn't installed godot or looked for an installation or run any
+  /* The user: "it hasn't installed godot or looked for an installation or run any
    * visual tests." No corp role could have: the mesh preamble is separate from
    * the capability prompt, so the clause telling an agent to check its runtime
    * never reached the building at all. */

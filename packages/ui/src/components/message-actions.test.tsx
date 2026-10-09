@@ -18,7 +18,7 @@ function render(ui: ReactElement): string {
 
 describe('MessageActions bar (Wave B)', () => {
   it('scales the action glyphs 1.2× — 14 → 17px, none left at an older size', () => {
-    // Wave B scaled the bar 1.5× (21px). the user has since asked for it 20% smaller:
+    // Wave B scaled the bar 1.5× (21px). The user has since asked for it 20% smaller:
     // "shrink this whole bottom thing by 20%". The glyph literal has to move with
     // the CSS scale or the icons stop fitting their targets.
     const html = render(<MessageActions onCopy={noop} onRetry={noop} onShare={noop} />);

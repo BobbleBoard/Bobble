@@ -19,7 +19,7 @@ llama-server on 64507
   (idling 6 min…)
 ttft-matrix-probe: page.waitForTimeout: Target page, context or browser has been closed
 page.waitForTimeout: Target page, context or browser has been closed
-    at /Users/user/Desktop/OSS-harness/apps/desktop/tests/e2e/ttft-matrix-probe.mjs:505:15
+    at apps/desktop/tests/e2e/ttft-matrix-probe.mjs:505:15
 
 ──────────────── TTFT matrix ────────────────
   case                        ttft      reused / prompt   verdict

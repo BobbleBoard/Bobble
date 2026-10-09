@@ -1,7 +1,7 @@
 /**
  * WHAT KIND OF FILE IS THIS — as a colour and a glyph, not a word.
  *
- * the user, on the presented-file cards: "these file cards need to have more color
+ * The user, on the presented-file cards: "these file cards need to have more color
  * and unique icons for file types, not just the generic and not anything that
  * just has the generic with 'pptx' under it."
  *

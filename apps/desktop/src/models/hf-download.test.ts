@@ -52,7 +52,7 @@ const QWEN38_27B: HfGgufFileDTO[] = [
   f('mmproj-F16.gguf', 927_607_488, 'F16', { mmproj: true }),
 ];
 
-/** the user's machine: what the hub's picker is given on it (`hw.ramGiB`). */
+/** The user's machine: what the hub's picker is given on it (`hw.ramGiB`). */
 const MAC_24GB = { totalRamGB: 24, mmprojBytes: 931_146_432 };
 
 /** The file a pick names, or why there is none — what the tests read. */

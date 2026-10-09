@@ -65,9 +65,9 @@
 }
 
 /*
- * THE ANATOMY, WITH A HIERARCHY. the user (2026-09-20), on the task dialog: "that
+ * THE ANATOMY, WITH A HIERARCHY. The user (2026-09-20), on the task dialog: "that
  * modal and all similar look incredibly generic and lack hierarchy in the
- * slightest". What he was looking at: a 22px title, then five labels, a
+ * slightest". What the user was looking at: a 22px title, then five labels, a
  * field, three selects and a summary all in the same grey at the same size
  * with the same 16px between them — nothing dominant, nothing grouped, no
  * step between "the thing" and "its settings" and "what will happen".

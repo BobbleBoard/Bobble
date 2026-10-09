@@ -111,14 +111,14 @@ export const ALWAYS_ACTIVE_TOOLS: readonly string[] = [
    * answers 'cannot be called this way'." MEASURED on a real turn: the model
    * discovered the capability, activated it, called `use`, and was refused.
    *
-   * the user's requirement stands — "from the chat interface, these backends should
+   * The user's requirement stands — "from the chat interface, these backends should
    * be connected. I should be able to go to a new chat and ask for any of these
    * types of media" — and it is now met the way it was always meant to be: the
    * model activates `generation` and uses it in the SAME turn. Five names come
    * off every prefix in every conversation that never asks for media.
    */
   /*
-   * A CEO COMMISSIONS. the user: "it should always have the commission tools…
+   * A CEO COMMISSIONS. The user: "it should always have the commission tools…
    * that's what we wanted right, clean context ceo, until really needed for
    * testing, no clutter with browser tools or anything (it can have the basic
    * tools + search though always) and then it calls subagents to do browser use
@@ -160,7 +160,7 @@ export const ALWAYS_ACTIVE_TOOLS: readonly string[] = [
  * loop shares the live tool array), so a capability turned on during a task is
  * usable during that task — which is the whole reason to have one.
  *
- * the user: "in regular mode some base tools are loaded … then there's the
+ * The user: "in regular mode some base tools are loaded … then there's the
  * capability tool that loads toolsets needed for tasks … classification has no
  * place here anymore."
  */

@@ -1,7 +1,7 @@
 /**
  * AN OFFICE FILE WRITTEN BY SCRIPT WHILE THE DOCUMENT PIPELINE IS INSTALLED.
  *
- * the user, reading the canvas assessment: "model should not be using python-pptx,
+ * The user, reading the canvas assessment: "model should not be using python-pptx,
  * there is a dedicated subagent for each pptx/docx/xlsx creation and editing
  * right?" There is — tools/office-gen, driven by the `office` tool — and the
  * model reached past it for `from pptx import Presentation` inside a heredoc

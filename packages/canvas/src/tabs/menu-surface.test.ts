@@ -7,13 +7,13 @@ import { describe, expect, it } from 'vitest';
 /**
  * ONE dropdown surface, app-wide.
  *
- * the user, from a screenshot of the canvas operation bar: "I notice the styling of
+ * The user, from a screenshot of the canvas operation bar: "I notice the styling of
  * the dropdowns and animations for opening them varies, can you please
  * standardize the one used for ... the new tab in the canvas dropdown ... such
  * that you can change one and it changes all of them" — and then "that dropdown
  * also has nice bordering that the others don't."
  *
- * He was looking at two dropdowns in the SAME bar: "Open with" rendered the
+ * The user was looking at two dropdowns in the SAME bar: "Open with" rendered the
  * shared `.pd-menu` (frosted, blurred, 0.5px hairline ring, reveal animation)
  * and the media-download caret one control to its right rendered a private
  * `.pd-canvas-menu` (opaque, `1px solid`, no blur, no animation). Nothing was

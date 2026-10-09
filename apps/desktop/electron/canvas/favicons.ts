@@ -2,7 +2,7 @@
  * Site icons for the web-search results card, fetched in MAIN and handed to the
  * renderer as a `data:` URI.
  *
- * the user, looking at a results list of grey letter chips: "I would like real
+ * The user, looking at a results list of grey letter chips: "I would like real
  * website icons/logos instead of the single letters."
  *
  * Why main and not an `<img src="https://…">`: the renderer's CSP is

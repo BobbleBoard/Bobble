@@ -100,7 +100,7 @@ export const BUNDLED_SKILLS: readonly BundledSkill[] = [
 
   // ── MIT, authored in-house for Bobble ───────────────────────────────────
   {
-    /* the user (2026-09-25): "test some math/physics/chemistry... practice problem
+    /* The user (2026-09-25): "test some math/physics/chemistry... practice problem
        requests … find some teaching guidelines somewhere and add a teach
        skill.md". The harness also attaches it to a chat that asks to learn
        something (packages/harness teach-skill.ts), installed or not. */

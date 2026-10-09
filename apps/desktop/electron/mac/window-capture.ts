@@ -6,7 +6,7 @@
  * the Screen Recording grant to the binary that calls it. The helper is signed
  * as its own identity, so it is its own TCC client: a user who enables
  * **Bobble** in System Settings — the only name they would ever look for — has
- * granted the wrong binary and the monitor stays blind. the user hit exactly this:
+ * granted the wrong binary and the monitor stays blind. The user hit exactly this:
  * "I notice a lot of permission re-popups in bobble even after I totally have
  * provided the permissions and double checked and restarted the app."
  *

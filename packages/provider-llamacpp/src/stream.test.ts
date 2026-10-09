@@ -1101,7 +1101,7 @@ describe('images on a text-only server', () => {
   });
 
   /*
-   * THE REASON, NOT "TEXT-ONLY MODE". the user (2026-09-23) read "this model is
+   * THE REASON, NOT "TEXT-ONLY MODE". The user (2026-09-23) read "this model is
    * currently running in TEXT-ONLY mode" on a Mac where vision was never off:
    * the engine (rapid-mlx on its MTP lane) could not take images. The host
    * writes `0:<reason>` and the model is told that reason.
@@ -1208,7 +1208,7 @@ describe('images on a text-only server', () => {
  * PI_DESKTOP_VISION is fixed when a process starts. A child spawns mid-turn,
  * normally before anything has asked for vision, so it inherited '0' and kept it
  * for life — reporting "text only mode" long after the server relaunched
- * multimodal. the user caught one doing exactly that.
+ * multimodal. The user caught one doing exactly that.
  */
 describe('vision state is read live', () => {
   it('prefers the state file over the spawn-time env', () => {

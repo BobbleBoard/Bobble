@@ -43,7 +43,7 @@ reading the header of the shipped GGUF (§2.4). Base commit `c9fe7098`.
 
 ## 1. Goal
 
-the user, verbatim: *"specialized model (lora of qwen3.5 4b i'm thinking) tuned to out of
+The user, verbatim: *"specialized model (lora of qwen3.5 4b i'm thinking) tuned to out of
 the box work with our cli based harness really really well."*
 
 ### What that means precisely
@@ -278,7 +278,7 @@ with the source memory note or code comment named.
 | 19 | Whole answer inside `<think>`, no `</think>` | 4B on rapid-mlx, `pi-desktop-calibration-engines` | `settle-reply.ts` promotes it | clean think/answer separation, concise thinking |
 | 20 | 28 edits trying to get an 8-slide deck back to 4, no reply | 4B, deep tasks "deck" | office `CHECK_LINE`, slide counting | a correct brief first time |
 | 21 | `read` on a `.docx` (raw zip bytes); emptied `letter.docx` | canvas assessment | office-aware read/write | `office inspect` / `office edit` |
-| 22 | Used the user's Chrome or computer use for ordinary web tasks | the user 2026-09-13 | capability summaries | `browser` / `web` by default; `chrome` only when named |
+| 22 | Used the user's Chrome or computer use for ordinary web tasks | The user 2026-09-13 | capability summaries | `browser` / `web` by default; `chrome` only when named |
 | 23 | Drove apps with temp files, AppleScript, `pkill -9 Maps`; did Calculator sums in its head | `buildOpenWrapper` comments | `open -a` → `mac launch` + `mac --help` dump | `mac launch` → `mac snapshot` → act |
 | 24 | Never weighed delegating a large build (1 of 5 runs delegated) | `capability-prompt.ts` comment (improved to 3/5) | the "YOU HAVE A MANAGER" clause | the delegation decision at the start of large asks (never for trivia) |
 
@@ -376,7 +376,7 @@ matters on **llama.cpp** (and so on Linux/Windows, Track 4) far more than on MLX
 - **No hosting.** The HF token on disk is read-only; this is the same block the OmniSVG
   connector hit.
 - **Roadmap conflict.** `ROADMAP-LATEST.md` puts fine-tuning "strictly after" Linux/
-  Windows and clustering. the user's request now asks for it (open question Q1).
+  Windows and clustering. The user's request now asks for it (open question Q1).
 
 ---
 
@@ -704,12 +704,12 @@ hardware".
   compare against real app captures (`dump-system-prompt.mjs`, `PI_DIAG_PROMPTS_FULL`),
   not against a hand-written prompt.
 - **No per-model harness.** The tuned model gets the prompt every model gets. Guards
-  stay. (the user: "a rule that fires 80% of the time on everything beats one that fires
+  stay. (The user: "a rule that fires 80% of the time on everything beats one that fires
   100% of the time on Godot.")
 - **Licence-clean.** Only Apache-2.0 / MIT / CC-BY teachers and data for anything
   shipped. No frontier-API outputs. No NC datasets.
 - **No personal data.** the user's ~380 pi sessions (32 MB) may be *mined for failure
-  patterns* with his consent (Q8), never used as training text. Personal connectors run
+  patterns* with their consent (Q8), never used as training text. Personal connectors run
   on mock data. Computer use runs on apps without personal content, or under a dedicated
   macOS user.
 - **Never on the user's screen, never on battery.** Every Mac-side run uses `launchApp`
@@ -1366,7 +1366,7 @@ WP-02 can start now and baselines the stock model from existing probe output.
 2. **Publishing needs a Hugging Face write token.** The token at `$HF_HOME/token` is
    read-only; this is the same block the OmniSVG connector is waiting on.
 3. **The roadmap says fine-tuning comes "strictly after" Linux/Windows and clustering**
-   (`ROADMAP-LATEST.md` §6). the user's request implies a reorder; he needs to confirm it.
+   (`ROADMAP-LATEST.md` §6). The user's request implies a reorder; the user needs to confirm it.
 4. **Upstream:** `convert_lora_to_gguf.py` is broken for Qwen3.5 (llama.cpp #21125, open).
    Adapter-only distribution is blocked; the merged path is not.
 5. **Computer-use data needs real macOS apps and TCC grants.** Keeping personal data out

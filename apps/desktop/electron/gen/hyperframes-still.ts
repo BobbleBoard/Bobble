@@ -1,7 +1,7 @@
 /**
  * HYPERFRAMES — the still-frame motion-graphics renderer.
  *
- * the user: "you can ignore video generation (not motion graphics, hyperframes has
+ * The user: "you can ignore video generation (not motion graphics, hyperframes has
  * to be in still renderer and all)."
  *
  * WHAT WAS HERE BEFORE. `hyperFramesRenderUnavailable` in ./video-dispatch.ts —
@@ -29,7 +29,7 @@
  * are exported and unit-tested; the Electron window is injected so none of that
  * needs a display.
  *
- * ONE ANIMATION, ONE FILE. the user: "rendered 120 induvidual frames, each of which
+ * ONE ANIMATION, ONE FILE. The user: "rendered 120 induvidual frames, each of which
  * was placed as it's own png card in the chat, severely cluttering it." The
  * stills still land one by one — in a `frames/` folder, each shown live as it
  * arrives — and are then joined into ONE animated PNG (./apng.ts: no encoder, no
@@ -263,7 +263,7 @@ export function createStillRenderer(deps: StillRendererDeps): HyperFramesRender 
         await deps.writeFile(file, png);
         frames.push(file);
         /*
-         * SHOW THE FRAME AS IT LANDS. the user: "ensure we can see hyperframes stuff
+         * SHOW THE FRAME AS IT LANDS. The user: "ensure we can see hyperframes stuff
          * being generated and iterating in the canvas."
          *
          * The canvas renders `previewPath` off a progress event (see

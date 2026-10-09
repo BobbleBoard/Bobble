@@ -48,17 +48,17 @@ import UniformTypeIdentifiers
 
 // ── the pointer glyph ────────────────────────────────────────────────────────
 //
-// the user, on the old frosted send-dart: "downsize and extra extra smooth and round
+// The user, on the old frosted send-dart: "downsize and extra extra smooth and round
 // the fake cursor … it's tiny and it has a noticable glow around it. we don't
 // need such glow I don't think, but sizing down and making ours cleaner and more
 // rounded without such protruding 'fins'".
 //
-// THE GLYPH IS THE USER'S ARTWORK NOW, not a polygon we tuned. He sent the SVG —
+// THE GLYPH IS THE USER'S ARTWORK NOW, not a polygon we tuned. The user sent the SVG —
 // a single path, a blue body (#78BFE5) under a white keyline, with a teal glow
 // behind it — so the shape lives in pointerGlyph() as his own curves and these
 // constants only say how big it is drawn and how it is painted.
-/// THE PAINT CHANGED, THE SHAPE DID NOT. the user (2026-09-15): "make the computer
-/// use fake cursor have a black fill, and a subtle blue edge glow". His curves
+/// THE PAINT CHANGED, THE SHAPE DID NOT. The user (2026-09-15): "make the computer
+/// use fake cursor have a black fill, and a subtle blue edge glow". Their curves
 /// stay; the body is near-black under a thin white keyline (the way the Mac's
 /// own pointer is drawn, so it reads as a pointer on a white page), and the
 /// glow behind the edge is the pill's blue at a low opacity — subtle, and the
@@ -70,7 +70,7 @@ private let GLYPH_GLOW = cgColor(0.153, 0.412, 0.937, 1)
 /// His stroke width, in the 291-wide viewBox the path is written in — so it
 /// scales WITH the glyph rather than going fat as the cursor shrinks.
 private let GLYPH_STROKE_W: CGFloat = 13.79
-/// How tall the drawn cursor is, in points. the user, after seeing it on screen:
+/// How tall the drawn cursor is, in points. The user, after seeing it on screen:
 /// "size cursor up maybe 15%" — 22.0 x 1.15.
 private let OVERLAY_GLYPH_HEIGHT: CGFloat = 25.3
 
@@ -235,7 +235,7 @@ private func pointerGlyph() -> (path: CGPath, box: CGSize, tip: CGPoint, strokeW
 /**
  * THE ONE PART OF THE OVERLAY THAT TAKES A CLICK.
  *
- * the user: "hovering the pill should show an X on the right red circle highlight
+ * The user: "hovering the pill should show an X on the right red circle highlight
  * on hover, a pause button to the left of it, and a hide button to the left of
  * that, blurring whatever's actually in the pill."
  *
@@ -283,7 +283,7 @@ final class OverlayControlsView: NSView {
   /**
    * Two round buttons at the right end, and Hide taking everything else.
    *
-   * the user: "i'd like the hide button to literally just be a button taking up the
+   * The user: "i'd like the hide button to literally just be a button taking up the
    * rest of the left space no [icon] ... just shows 'Hide' no icon and then the
    * pause button and X next to it." So Hide is not a third circle competing for
    * a glance — it is the wide, obvious, word-labelled way out, and the two
@@ -415,7 +415,7 @@ final class OverlayControlsView: NSView {
 /*
  * WATCHING THE TARGET INSTEAD OF ASKING IT.
  *
- * the user: "why can't you pin it literally one level on top of the window you want
+ * The user: "why can't you pin it literally one level on top of the window you want
  * to target and pin it such that dragging the window ... mirrors the movements
  * of the target at all times and mirroring the layering so it's always one level
  * above the target."
@@ -440,7 +440,7 @@ private let axChanged: AXObserverCallback = { _, element, _, _ in
   /*
    * RIDE THE DRAG HERE, NOT IN NODE.
    *
-   * the user, after the layering was fixed: "dragging/resizing still has a little
+   * The user, after the layering was fixed: "dragging/resizing still has a little
    * lag and cursor snappying". Same disease as the mask was: the notification
    * went to Node, Node polled the frame back over the pipe, then pushed a shift
    * — three hops behind the window, and the shift's delta was computed against
@@ -519,8 +519,8 @@ func watchActivationChanges() {
 /*
  * SITTING EXACTLY ONE ABOVE THE APP, which turns out to be possible.
  *
- * the user: "there's no way it's impossible to do this overlay window stacking
- * thing, oai were able to do it so we can too." He was right and I was wrong —
+ * The user: "there's no way it's impossible to do this overlay window stacking
+ * thing, oai were able to do it so we can too." The user was right and I was wrong —
  * I had reasoned that ordering relative to a window we do not own needs a
  * privilege we lack, and never measured it. MEASURED, on this Mac:
  *
@@ -593,7 +593,7 @@ func slsOrderAbove(_ ours: Int, _ target: Int) -> Bool {
 /**
  * THE UNION OF THE HOLES, AS RECTS THAT DO NOT OVERLAP.
  *
- * the user, 2026-09-12, with a screenshot of the phantom drawn over Bobble while
+ * The user, 2026-09-12, with a screenshot of the phantom drawn over Bobble while
  * Notes sat behind it: "can confirm visually that the bug is NOT FIXED. fake
  * cursor frequently appears on top of undesired apps." The mask was one path —
  * the whole panel plus one rect per covering window — filled EVEN-ODD. Even-odd
@@ -704,11 +704,11 @@ final class OverlayPanel: NSPanel {
 // ── the controller ───────────────────────────────────────────────────────────
 
 /// HEADLESS: the panel exists and is driven — cursor, pill, mask, renders —
-/// and is NEVER ordered onto a screen. the user (2026-09-15): "always on top
+/// and is NEVER ordered onto a screen. The user (2026-09-15): "always on top
 /// errors in the computer use overlay in your test harness/leaking somewhere,
 /// always check and fix these as they come up." Every probe launches the real
 /// app, the real app spawns this real panel, and `show()` put a phantom cursor
-/// and a pill on his display each time one ran. The app passes `--headless`
+/// and a pill on their display each time one ran. The app passes `--headless`
 /// whenever it is itself running unnoticed (background-mode.ts), so nothing
 /// a test does can reach the screen; the renders a probe judges come off the
 /// layer tree, which never needed the screen.
@@ -744,7 +744,7 @@ final class OverlayController: NSObject {
   /*
    * THE WINDOW THE PILL BELONGS TO, in AX (top-left) screen points.
    *
-   * the user: "always on top isuse is not solved" — with a screenshot of the pill
+   * The user: "always on top isuse is not solved" — with a screenshot of the pill
    * sitting on top of a DIFFERENT app. It was parked below-right of the cursor
    * and only flipped at the edge of the SCREEN, so a cursor near the controlled
    * window's right edge threw the pill clean over whatever was beside it. The
@@ -833,7 +833,7 @@ final class OverlayController: NSObject {
        so the controls panel sat BEHIND the phantom's pill — its tracking area
        still took the hover, the pill hid its words and showed its solid body,
        and the ✕ / pause / Hide drawn underneath never reached the screen.
-       the user (2026-09-13): "the pill when hovered should show hide/pause/stop
+       The user (2026-09-13): "the pill when hovered should show hide/pause/stop
        buttons however currently it just makes it solid blue". The probe's
        render never caught it because it composites the controls view into the
        image itself. Mirrored again in syncControls, since the phantom's level
@@ -954,7 +954,7 @@ final class OverlayController: NSObject {
     // 101), so a cursor aimed at a context-menu item disappeared behind the
     // menu it was pointing at. Every other app's window above the target, at
     // any level, is cut out by the mask — the user: the cursor is on top of the
-    // controlled app only, never of what he is using while it works.
+    // controlled app only, never of what the user is using while it works.
     panel.level = NSWindow.Level(rawValue: NSWindow.Level.popUpMenu.rawValue + 1)
     // `.transient` is the whole point of going native: it is what excludes the
     // panel from Mission Control and Exposé, so the overlay stops being laid
@@ -1037,10 +1037,10 @@ final class OverlayController: NSObject {
     glyphGlowSoft.path = glyph.path
     glyphGlowSoft.fillColor = GLYPH_GLOW
     glyphGlowSoft.strokeColor = GLYPH_GLOW
-    // the user: "more subtle further reaching edge glow" — fainter, and blurred
+    // The user: "more subtle further reaching edge glow" — fainter, and blurred
     // wider: the blur radius carries the reach, the opacity the subtlety.
     // The band barely peeks past the keyline; the blur is what reaches.
-    // the user, on the render: "just less initial glow, same falloff" — so the
+    // The user, on the render: "just less initial glow, same falloff" — so the
     // opacity comes down and the radius stays.
     glyphGlowSoft.lineWidth = glyph.strokeWidth * 1.1
     glyphGlowSoft.lineJoin = .round
@@ -1052,7 +1052,7 @@ final class OverlayController: NSObject {
     cursorGroup.addSublayer(glyphGlowSoft)
 
     /*
-     * MORE GLOW ON DARK, NONE ADDED ON WHITE. the user: "slightly more glow on
+     * MORE GLOW ON DARK, NONE ADDED ON WHITE. The user: "slightly more glow on
      * dark, keep white as is." A screen blend is exactly that arithmetic —
      * 1 − (1−a)(1−b): against white it adds nothing, against a dark ground it
      * adds the glow's own light. This layer draws no stroke of its own; its
@@ -1073,7 +1073,7 @@ final class OverlayController: NSObject {
     glyphGlowDark.compositingFilter = "screenBlendMode"
     cursorGroup.insertSublayer(glyphGlowDark, below: glyphGlowSoft)
 
-    // The body: black under his keyline AT HIS THICKNESS. the user, on the first
+    // The body: black under his keyline AT HIS THICKNESS. The user, on the first
     // cut of the black fill: "keep the thickness of the border" — the white
     // band is the SVG's own stroke width, centred on the path exactly as it
     // was over the blue body, and the thin keyline on top is unchanged too.
@@ -1101,7 +1101,7 @@ final class OverlayController: NSObject {
     /*
      * SOLID, NOT A GRADIENT, AND NO BORDER YOU CAN SEE.
      *
-     * the user, looking at it on his screen: "color should be styled, but solid
+     * The user, looking at it on their screen: "color should be styled, but solid
      * color no noticable border, eg. blue background white text grey % bar, just
      * not a purple gradient." It was a blue-to-purple gradient with a white
      * hairline; both are gone. The shadow stays — it is what separates the pill
@@ -1342,7 +1342,7 @@ final class OverlayController: NSObject {
   /*
    * THE CLICK IS THE CURSOR, NOT A RING AROUND IT.
    *
-   * the user: "remove the circle pulsa animation and instead have a quick scale down
+   * The user: "remove the circle pulsa animation and instead have a quick scale down
    * scale up for a click animation". The two expanding rings were also the last
    * purple left on this layer — stroke (0.478, 0.424, 1) — on a UI whose standing
    * rule is no purple, and they drew attention to a spot the cursor was already
@@ -1375,7 +1375,7 @@ final class OverlayController: NSObject {
   /// opening/reading); `text` is the already-prettified label the Node side
   /// built (a key-combo glyph run, a typing preview, an app name).
   ///
-  /// THE PILL SAYS THE ACTION, NOT ITS CONTENTS. the user (2026-09-13): "don't
+  /// THE PILL SAYS THE ACTION, NOT ITS CONTENTS. The user (2026-09-13): "don't
   /// show what it's typing or what it's clicking in the little pill just show
   /// the action or 'thinking'". So typing is "Typing" with no preview under
   /// it, a key press is "Pressing a key", a click is "Clicking". The text still
@@ -1447,8 +1447,8 @@ final class OverlayController: NSObject {
   /// The controlled window's frame, so the pill can stay inside it.
   /// Try to park directly above `targetWindowNumber` and report the truth.
   ///
-  /// the user: "there's no way it's impossible to do this overlay window stacking
-  /// thing, oai were able to do it so we can too." He is right that I asserted
+  /// The user: "there's no way it's impossible to do this overlay window stacking
+  /// thing, oai were able to do it so we can too." The user is right that I asserted
   /// it rather than measured it. This measures it, one step at a time, and
   /// reports which step the window server actually honoured — the first attempt
   /// HUNG the main thread for four seconds, which is itself a finding.
@@ -1634,10 +1634,10 @@ final class OverlayController: NSObject {
   /**
    * TRACK THE APP'S WINDOW AND CUT OUT WHATEVER COVERS IT.
    *
-   * the user: "why can't you pin it literally one level on top of the window you
+   * The user: "why can't you pin it literally one level on top of the window you
    * want to target ... mirroring the layering so it's always one level above
    * the target", and later "there's no way it's impossible to do this overlay
-   * window stacking thing, oai were able to do it so we can too." He was right
+   * window stacking thing, oai were able to do it so we can too." The user was right
    * to make me measure instead of assert, so I measured — and the window server
    * says no, in a way worth writing down because it looks like a yes:
    *
@@ -1654,7 +1654,7 @@ final class OverlayController: NSObject {
    *
    * So the layering stays a mask, and the thing that was actually WRONG with
    * the mask gets fixed instead: it was computed in Node, one poll and one pipe
-   * round trip away from the truth. the user: "when an app switches away from focus
+   * round trip away from the truth. The user: "when an app switches away from focus
    * there's a ~1s delay until the cursor disappears as well, this breaks the
    * immersion that it's actually part of, actually on the window." Reading the
    * z-order HERE, at display rate, turns that second into a frame — and no rule
@@ -1716,7 +1716,7 @@ final class OverlayController: NSObject {
   /// CHANGE rather than 30 times a second.
   private var unmaskedReason: String?
 
-  /// the user: "you need to log whenever that's happening". Reports on transition
+  /// The user: "you need to log whenever that's happening". Reports on transition
   /// only, and says which window is over the cursor so the next person does not
   /// have to guess.
   private func noteUnmasked(_ why: String) {
@@ -1797,7 +1797,7 @@ final class OverlayController: NSObject {
     /*
      * WHICH WINDOW THE PHANTOM SITS BEHIND — the app's, by PID, not by number.
      *
-     * the user, 2026-09-12: "the fake cursor … seems to be only drawn on the bobble
+     * The user, 2026-09-12: "the fake cursor … seems to be only drawn on the bobble
      * app window now instead of on top of the app being used … it's appearing
      * on the claude app and sometimes bobble." The anchor was the window NUMBER
      * the Node side handed over, and a number is only as good as the moment it
@@ -1915,7 +1915,7 @@ final class OverlayController: NSObject {
     /*
      * DID THE MASK ACTUALLY COVER THE CURSOR? — the symptom, checked directly.
      *
-     * the user, twice: the phantom draws on top of a window that is above the one
+     * The user, twice: the phantom draws on top of a window that is above the one
      * it belongs to. Everything else here is a proxy for that; this is the
      * thing itself. The cursor's own point is tested against every window that
      * is ABOVE the anchor in the z-order and belongs to someone else, and if
@@ -1956,7 +1956,7 @@ final class OverlayController: NSObject {
     /*
      * THE WINDOW IS ON ANOTHER DESKTOP, SO THE PHANTOM MUST NOT BE ON THIS ONE.
      *
-     * the user: "when I switch desktops I notice a new bug where the mouse cursor
+     * The user: "when I switch desktops I notice a new bug where the mouse cursor
      * follows instead of staying on the window in the other desktop and redoes
      * the on top of wrong window bug."
      *
@@ -2117,7 +2117,7 @@ final class OverlayController: NSObject {
     /*
      * THE WIDTH CHANGE IS THE ANIMATION.
      *
-     * the user: "it should be a smooth expanding and collapsing animation." Bounds
+     * The user: "it should be a smooth expanding and collapsing animation." Bounds
      * were set inside a disabled-actions transaction, so the pill used to snap
      * between sizes. Everything INSIDE it still moves without animating — text
      * sliding to a new x while the pill grows around it reads as jitter — so
@@ -2216,7 +2216,7 @@ final class OverlayController: NSObject {
     let p = local(ax)
     let w = bubble.bounds.width
     let h = bubble.bounds.height
-    /* the user: "bring pill a bit closer to it". */
+    /* The user: "bring pill a bit closer to it". */
     let dx: CGFloat = 11
     let dy: CGFloat = 15
     // The screen under the cursor, in panel-local coordinates.
@@ -2315,7 +2315,7 @@ final class OverlayController: NSObject {
   /// Paint a solid colour behind the overlay. Probe-only: a transparent PNG of
   /// a white-on-nothing pointer tells a human reviewer nothing, and the cursor
   /// has to be judged against BOTH a light and a dark app.
-  /// Largest a backdrop may ever be. the user's rule stands whatever the caller
+  /// Largest a backdrop may ever be. The user's rule stands whatever the caller
   /// asks for: "I just saw the whole screen turn blank for a second" — so an
   /// explicit rect is honoured up to a card-sized area and no further.
   private static let BACKDROP_MAX = CGSize(width: 900, height: 700)
@@ -2336,7 +2336,7 @@ final class OverlayController: NSObject {
     // would be judging the wrong colours.
     CATransaction.begin()
     CATransaction.setDisableActions(true)
-    /* NEVER the whole desktop. the user, mid-run: "I just saw the whole screen turn
+    /* NEVER the whole desktop. The user, mid-run: "I just saw the whole screen turn
        blank for a second, with no window change, what's that about?" — a probe
        had set a backdrop and the panel spans every display, so an opaque layer
        at root.bounds IS a blanked screen. Clamped to the pill's own
@@ -2710,8 +2710,8 @@ private func handleOverlay(
     /*
      * CAN WE SIT DIRECTLY ABOVE ANOTHER APP'S WINDOW?
      *
-     * the user: "there's no way it's impossible to do this overlay window stacking
-     * thing, oai were able to do it so we can too." He is right that I asserted
+     * The user: "there's no way it's impossible to do this overlay window stacking
+     * thing, oai were able to do it so we can too." The user is right that I asserted
      * this instead of measuring it, so this measures it: order our panel
      * relative to a window number we do not own, then read the real z-order back
      * out of the window server and report what actually happened.

@@ -1,7 +1,7 @@
 /**
  * edge-lines-probe.mjs — find every hairline that runs along a SCROLL EDGE.
  *
- * the user: "always and this goes for all borders generally where it would be
+ * The user: "always and this goes for all borders generally where it would be
  * applicable, eg. chat scroll and this tab scroll, probably not terminal
  * commands: border must have fade out".
  *

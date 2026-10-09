@@ -3,7 +3,7 @@
  *
  * The app's own vite.config.ts is the wrong tool for this: its electronSimple
  * plugin spawns a real Electron window the moment `vite serve` finishes
- * building main.ts — a window on the user's screen, running against his real
+ * building main.ts — a window on the user's screen, running against their real
  * $HOME. This config serves the SAME renderer (same root, same React + Tailwind
  * plugins) and nothing else; the probe (shots.mjs) launches its own hidden
  * Electron against it with VITE_DEV_SERVER_URL.

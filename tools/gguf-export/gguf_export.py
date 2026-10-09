@@ -2,7 +2,7 @@
 """
 A Hugging Face model → a GGUF the app runs, with Unsloth's per-tensor recipe.
 
-the user (2026-09-25): "make ggufs using unsloth dynamic ideally, run q6_k_m for all".
+The user (2026-09-25): "make ggufs using unsloth dynamic ideally, run q6_k_m for all".
 llama.cpp has no Q6_K_M — the Q6 K-quant is Q6_K — and Unsloth's own Q6 is
 UD-Q6_K_XL: mostly Q6_K, with the tensors that suffer most at 6 bits kept at a
 higher type. Unsloth does not publish the tool that chooses those tensors, but

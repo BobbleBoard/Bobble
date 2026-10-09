@@ -22,7 +22,7 @@ export interface GenActionPlan {
    *
    * It is now the PILL'S PAYLOAD rather than typed text — the words still reach
    * the model exactly as before, but in the box they are one object you can
-   * remove with a click. the user: "including for buttons in the + menu no raw text."
+   * remove with a click. The user: "including for buttons in the + menu no raw text."
    */
   readonly scaffold: string;
   /** The pill's own words in the box. Short: it is a token, not a sentence. */

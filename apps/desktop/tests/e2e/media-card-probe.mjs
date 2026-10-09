@@ -1,7 +1,7 @@
 /**
  * THE MEDIA CARD — the one the studios and the chat thread both draw.
  *
- * the user: "reasonably large inline cards… clear buttons for example top left
+ * The user: "reasonably large inline cards… clear buttons for example top left
  * fullscreen that isn't exactly fullscreen but large and centered and blurs
  * background like settings panel… all should have an export in the bottom
  * right, these buttons can be appear on hover on the card however still have

@@ -1,5 +1,5 @@
 /**
- * LOOK at the Activity terminal pressing Enter. the user (2026-09-17): "when the
+ * LOOK at the Activity terminal pressing Enter. The user (2026-09-17): "when the
  * model's command finishes streaming in the terminal move the cursor down a
  * line and stream in the response if it's slow at all as it would appear in a
  * terminal, this immediate moving down a line as if the user pressed enter is
@@ -14,6 +14,7 @@
  *   SHOT_DIR=/tmp/terminal-enter node apps/desktop/tests/e2e/terminal-enter-look.mjs
  */
 import { mkdirSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { launchApp } from './harness.mjs';
 
 const SHOT_DIR = process.env.SHOT_DIR ?? '/tmp/terminal-enter';
@@ -73,7 +74,7 @@ const shot = async (label) => {
 try {
   await page.waitForFunction(() => typeof window.__pi_store === 'function', { timeout: 20000 });
   await sleep(2000);
-  await set({ session: { cwd: '/Users/user/bobble-testbed/buggyapp' } });
+  await set({ session: { cwd: `${homedir()}/bobble-testbed/buggyapp` } });
 
   // 1. The command is still being typed (its arguments stream in).
   await set({

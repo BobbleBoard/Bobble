@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { bobbleHome, slug, uniqueName } from './bobble-paths.js';
 
 /*
- * the user: "no complicated var/askldfjh;lkh/asdjkgbm,3241/1324iu1b types of things."
+ * The user: "no complicated var/askldfjh;lkh/asdjkgbm,3241/1324iu1b types of things."
  * What the app produced: /var/folders/4h/nq1c73…/T/pi-generated/
  * gen_1785566138272_fc7490/frame_000.png
  */

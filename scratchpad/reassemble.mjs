@@ -3,14 +3,19 @@ import { execFile } from 'node:child_process';
 import { readdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { promisify } from 'node:util';
+import { fileURLToPath } from 'node:url';
+const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url)).replace(/\/$/, '');
 const run = promisify(execFile);
-const OUT = '/Users/user/Desktop/OSS-harness/scratchpad/demos';
+const OUT = `${REPO_ROOT}/scratchpad/demos`;
 for (const name of process.argv.slice(2)) {
   const dir = path.join(OUT, name, 'frames');
   const frames = readdirSync(dir)
     .filter((f) => f.endsWith('.jpg') || f.endsWith('.png'))
     .sort()
-    .map((f) => ({ file: path.join(dir, f), t: Number(f.split('-')[2]?.replace(/\.\w+$/, '') ?? 0) }));
+    .map((f) => ({
+      file: path.join(dir, f),
+      t: Number(f.split('-')[2]?.replace(/\.\w+$/, '') ?? 0),
+    }));
   if (frames.length === 0) continue;
   const lines = [];
   for (let i = 0; i < frames.length; i += 1) {
@@ -24,10 +29,33 @@ for (const name of process.argv.slice(2)) {
   const list = path.join(OUT, name, 'frames.txt');
   writeFileSync(list, lines.join('\n'));
   const video = path.join(OUT, name, `${name}.mp4`);
-  await run('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'concat', '-safe', '0', '-i', list,
-    '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2,fps=30', '-c:v', 'libx264', '-pix_fmt', 'yuv420p',
-    '-preset', 'veryfast', '-crf', '20', video]);
+  await run('ffmpeg', [
+    '-y',
+    '-loglevel',
+    'error',
+    '-f',
+    'concat',
+    '-safe',
+    '0',
+    '-i',
+    list,
+    '-vf',
+    'scale=trunc(iw/2)*2:trunc(ih/2)*2,fps=30',
+    '-c:v',
+    'libx264',
+    '-pix_fmt',
+    'yuv420p',
+    '-preset',
+    'veryfast',
+    '-crf',
+    '20',
+    video,
+  ]);
   const real = (frames[frames.length - 1].t - frames[0].t) / 1000;
-  const vid = lines.filter((l) => l.startsWith('duration ')).reduce((a, l) => a + Number(l.split(' ')[1]), 0);
-  console.log(`${name}: ${frames.length} frames, real ${real.toFixed(1)}s → video ${vid.toFixed(1)}s (${(vid / real).toFixed(2)}x)`);
+  const vid = lines
+    .filter((l) => l.startsWith('duration '))
+    .reduce((a, l) => a + Number(l.split(' ')[1]), 0);
+  console.log(
+    `${name}: ${frames.length} frames, real ${real.toFixed(1)}s → video ${vid.toFixed(1)}s (${(vid / real).toFixed(2)}x)`,
+  );
 }

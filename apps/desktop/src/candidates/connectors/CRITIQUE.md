@@ -2,7 +2,7 @@
 
 Written before touching a component. Every claim below is against an image re-taken on 2026-09-07
 between 08:33 and 08:51 with `shots.mjs` (`current`, `hub`, and `all`), not against last night's
-images or my memory of them. References are the 24 screenshots in `/Users/user/Desktop/refs/connectors/`,
+images or my memory of them. References are the 24 screenshots in `~/Desktop/refs/connectors/`,
 cited by their time stamp (`r0352` = `…12.03.52 AM.png`). Bobble's own bar is the model hub
 (`shots/hub-*.png`) and the shipping Connectors screen as of this morning (`shots/current-*.png`).
 
@@ -22,7 +22,7 @@ That design was never built and never rendered. I recommended a combination from
 parts, and the parts do not predict the whole:
 
 - Putting the reach sentence on installed cards and the description on the rest gives one grid two
-  kinds of second line — *"Reads and writes files under /Users/user/Projects"* beside *"Structured
+  kinds of second line — *"Reads and writes files under ~/Projects"* beside *"Structured
   step-by-step reasoning scratchpad."* — and nothing but the switch tells you which is which.
 - The Looks-up / Changes split in a 440px sheet, for GitHub's ~40 live tools, is two lists of ~20
   rows at 12px in a column the width of a phone. Reach shows the split at 900px wide, which is why

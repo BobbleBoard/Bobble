@@ -1,7 +1,7 @@
 /**
  * ONE REAL RESEARCH TURN — the sources UI on a real model and the real web.
  *
- * the user (2026-09-24): "source citing (for research and such, examples from
+ * The user (2026-09-24): "source citing (for research and such, examples from
  * google search summary shown)". sources-look.mjs stages the turn; this one
  * asks for it: the app's own model path (the settings' model, like
  * first-token-probe), a throwaway HOME with the real model cache, the real

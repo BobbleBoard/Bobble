@@ -61,7 +61,7 @@ const SubagentParams = Type.Object({
     }),
   ),
   /*
-   * THE SPECIALIST OPTION. the user: "these should be via a subagent tool that has
+   * THE SPECIALIST OPTION. The user: "these should be via a subagent tool that has
    * options for having it be a specific specialist workflow."
    *
    * Twelve written charters already existed in corp-mesh.ts and were reachable

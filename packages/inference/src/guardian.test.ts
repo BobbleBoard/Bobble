@@ -91,7 +91,7 @@ describe('judge', () => {
     expect(judge({ memoryFree: 0.25, sources: [] }, LOW).verdict).toBe('hold');
     // 12% free: PAUSED in both — the job keeps what it has and takes no more
     // until the machine breathes; it is stopped for good only where the OS
-    // itself would start killing. the user: "low can't stop image generation
+    // itself would start killing. The user: "low can't stop image generation
     // requests" — a pause is a wait, not a stop.
     expect(judge({ memoryFree: 0.12, sources: [] }, AUTO).verdict).toBe('pause');
     expect(judge({ memoryFree: 0.12, sources: [] }, LOW).verdict).toBe('pause');

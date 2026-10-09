@@ -1,7 +1,7 @@
 /**
  * THE SPINNER SURVIVES SEND.
  *
- * the user: "we also want loading on attachments as they are tokenized and prefilled
+ * The user: "we also want loading on attachments as they are tokenized and prefilled
  * (while we are still typing our prompt) they stop loading maybe even after
  * sent, the loading spinner can still be on them, it disapears when they are
  * prefilled."
@@ -25,7 +25,7 @@
  *
  * ## And why it cannot get stuck
  *
- * the user's other half of the rule is that an indicator which never clears is worse
+ * The user's other half of the rule is that an indicator which never clears is worse
  * than none. Two things bound it:
  *
  *  - the phase itself self-clears — the first token ends it, and so does the end

@@ -1,7 +1,7 @@
 /**
  * IS THERE ANY INTERNET? — answered by what actually happened, not by a probe.
  *
- * the user: "model still has search and web tools even when there's no internet, and
+ * The user: "model still has search and web tools even when there's no internet, and
  * gets confused looping in them."
  *
  * The looping is not a preference the model can be talked out of. llama-server

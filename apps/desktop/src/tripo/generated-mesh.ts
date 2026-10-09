@@ -58,7 +58,7 @@ export function hasTextureMaps(mat: AnyMaterial): boolean {
 /*
  * ── Normals ──────────────────────────────────────────────────────────────
  *
- * the user (2026-09-18): "recalculate / smooth normals help?" MEASURED, no. A
+ * The user (2026-09-18): "recalculate / smooth normals help?" MEASURED, no. A
  * bake is split at every chart edge — 52% of the mannequin's vertices and 49%
  * of the astronaut's are duplicates of a seam position — so per-index normals
  * (three's computeVertexNormals; trimesh's vertex_normals, which the engine

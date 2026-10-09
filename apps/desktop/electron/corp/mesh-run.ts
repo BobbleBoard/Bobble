@@ -143,10 +143,10 @@ function parentFor(agent: MeshAgent): string | undefined {
  * The roster is a POOL, built up front: four engineer slots and twelve specialty
  * seats that anyone may commission. Emitting all of it meant the situation room
  * opened with seventeen names sitting at `queued` before a single message had
- * been sent, which reads as a team that has been assembled and contracted. the user,
+ * been sent, which reads as a team that has been assembled and contracted. The user,
  * looking at exactly that: "the contracts had to have been premade by either you
  * or you hardcoded the godot contracts from an earlier run." Neither — but the
- * room gave him no way to tell, and the one agent that mattered (the manager)
+ * room gave them no way to tell, and the one agent that mattered (the manager)
  * looked hired when it had never been spoken to.
  *
  * So a seat appears when it is first engaged. The room now grows in the order

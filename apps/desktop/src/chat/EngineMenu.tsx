@@ -1,7 +1,7 @@
 /**
  * THE ENGINE MENU — a small speedometer right of the chat's name.
  *
- * the user: "at the top bar, to the right of the chat name, show a little icon,
+ * The user: "at the top bar, to the right of the chat name, show a little icon,
  * clicking this has a dropdown that shows a little scrollable list of the
  * inference engines with a 'calibrate' button at the top, during generation
  * this should also live show tps numbers. clicking calibrate pauses anything
@@ -307,7 +307,7 @@ function CalibrationSection({
 /**
  * MAKE EVERYTHING MEASURABLE — one little button under Calibrate.
  *
- * the user (2026-09-13): "we need the 'not measured' engines to all be measurable
+ * The user (2026-09-13): "we need the 'not measured' engines to all be measurable
  * by clicking a single button to install everything they need to measure
  * them, for all recommended models." So the button counts BOTH kinds of
  * missing thing for the running model: the engines this machine could install
@@ -484,7 +484,7 @@ function EngineRow({
 /**
  * VISION — ON UNLESS SAID OTHERWISE.
  *
- * the user (2026-09-23): "mmproj/vision should always be loaded and usable by
+ * The user (2026-09-23): "mmproj/vision should always be loaded and usable by
  * default unless explicitly turned off, put this in the engines option and
  * leave a setting to not load vision by default." The switch is the setting;
  * the line under it is what is TRUE of the running server — it reads images,

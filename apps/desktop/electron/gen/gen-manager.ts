@@ -380,7 +380,7 @@ export type Run3dFn = (
 
 export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
   /*
-   * ~/Bobble/generated, not the OS temp tree. the user: "no complicated
+   * ~/Bobble/generated, not the OS temp tree. The user: "no complicated
    * var/askldfjh;lkh/... types of things". A rendered animation used to land in
    * /var/folders/4h/nq1c73…/T/pi-generated/gen_1785566138272_fc7490/ — which
    * nobody can find, the model cannot usefully name back to the user, and the OS
@@ -436,7 +436,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
    * headless Chrome" — so every motion commission ended in that message and the
    * motion specialist's charter described a renderer that did not exist. Neither
    * dependency was real: Chromium is the process we are in, and ffmpeg was only
-   * for encoding, which is the part the user cut when he asked for stills.
+   * for encoding, which is the part the user cut when the user asked for stills.
    */
   const hyperframes = new HyperFramesRunner(
     opts.hyperFramesRender ??
@@ -820,7 +820,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
          * The pre-first-step phase is MOST of a cold run — MEASURED on the user's
          * Mac with the weights already cached: 94 seconds before step 1 — and
          * these are the only events that know what is happening in it. Both were
-         * being dropped, so the room said "Starting…" throughout and he reported
+         * being dropped, so the room said "Starting…" throughout and the user reported
          * the studio as not working at all.
          */
         const steps = event.event === 'log' ? parseTqdm(event.text) : undefined;
@@ -828,7 +828,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
           /*
            * A worker that only PRINTS its steps (tqdm on stderr — the image-edit
            * path) still has a counter: it becomes the same progress a structured
-           * event gives, and the line itself is never shown. the user (2026-09-24):
+           * event gives, and the line itself is never shown. The user (2026-09-24):
            * "that terminal logging style text below it needs to go". tqdm does
            * not say which candidate; the first one not yet done is being drawn.
            */

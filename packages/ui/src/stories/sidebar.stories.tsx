@@ -67,7 +67,7 @@ export const SessionList: Story = () => (
           />
         </SidebarSection>
       </SidebarScroll>
-      <SidebarFooter avatar="J" name="The user" plan="Local" />
+      <SidebarFooter avatar="J" name="the user" plan="Local" />
     </Sidebar>
   </div>
 );
@@ -99,7 +99,7 @@ function NavContents() {
           <SidebarRow icon={<IconChat size={16} />} label="MTP launch flags" meta="1d" />
         </SidebarSection>
       </SidebarScroll>
-      <SidebarFooter avatar="J" name="The user" plan="Local" />
+      <SidebarFooter avatar="J" name="the user" plan="Local" />
     </>
   );
 }

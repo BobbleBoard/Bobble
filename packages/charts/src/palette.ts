@@ -1,6 +1,6 @@
 /**
  * A palette read off a picture — "style it like this screenshot / this
- * poster / our brand page". the user: "styling from image etc."
+ * poster / our brand page". The user: "styling from image etc."
  *
  * Pure over an RGBA buffer (the app decodes the file). Median-cut into a
  * handful of boxes, then the boxes' mean colours ordered by how much of the

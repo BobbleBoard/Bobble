@@ -1,7 +1,7 @@
 /**
  * THE TASK TRAY, LOOKED AT — the button beside the sidebar toggle, and its card.
  *
- * the user (2026-09-24): "a little notifications button in the top left … always
+ * The user (2026-09-24): "a little notifications button in the top left … always
  * simply to the right of the collapse sidebar button, this only appears when
  * you leave a running task, eg. chat, generation etc. and clicking on it has a
  * quick little card".

@@ -1,7 +1,7 @@
 /**
  * WHERE THE KEYBOARD IS AFTER A DIALOG GOES AWAY.
  *
- * the user's standing rule is that anything visual gets confirmed by looking, and
+ * The user's standing rule is that anything visual gets confirmed by looking, and
  * focus is visual — it is where the caret is and where the next keystroke lands.
  * So this does not stop at reading `document.activeElement`: it dismisses the
  * dialog, TYPES, and photographs the words arriving in the composer.

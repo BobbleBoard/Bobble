@@ -1,7 +1,7 @@
 /**
  * THE SVG BEING DRAWN RIGHT NOW, for the card in the thread.
  *
- * the user (2026-09-21): "svgs created with the svg plugin don't show the model
+ * The user (2026-09-21): "svgs created with the svg plugin don't show the model
  * streaming the svg into an svg code block that'll render live as drawing".
  * OmniSVG's ids stream out of its llama-server and the app decodes the prefix a
  * few times a second (electron/gen/omnisvg.ts); this holds the latest drawing

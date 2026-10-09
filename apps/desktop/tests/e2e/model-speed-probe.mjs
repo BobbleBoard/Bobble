@@ -1,7 +1,7 @@
 /**
  * MEASURE a local model's generation speed, with and without its speed head.
  *
- * the user, on Qwen3.8-27B: "see if we can get mtp, dspark/dflash whatever the stuff
+ * The user, on Qwen3.8-27B: "see if we can get mtp, dspark/dflash whatever the stuff
  * is for speculative working, if we get reaonsbale speeds, ~30tps, then i'd like
  * you to try a run right after this one".
  *
@@ -238,4 +238,4 @@ if (without !== null) {
   );
   console.log(`speed head: ${gain}%`);
 }
-console.log(`\nuser's bar was ~30 tok/s — measured ${withSpec.avgTps.toFixed(1)}.`);
+console.log(`\nThe user's bar was ~30 tok/s — measured ${withSpec.avgTps.toFixed(1)}.`);

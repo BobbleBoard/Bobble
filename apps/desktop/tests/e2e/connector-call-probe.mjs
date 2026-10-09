@@ -1,5 +1,5 @@
 /**
- * DOES A CONNECTOR WORK, END TO END, WITH A REAL MODEL? (the user, 2026-10-06: "are
+ * DOES A CONNECTOR WORK, END TO END, WITH A REAL MODEL? (The user, 2026-10-06: "are
  * the connectors seamless and working at all?")
  *
  * The connectors probes before this one drive the Connectors SCREEN against a

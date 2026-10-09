@@ -1,7 +1,7 @@
 /**
  * THE CHAT QUALITY WAVE — the measurements behind the user's numbered chat list.
  *
- * Each block here is one item he reported, checked the only way that settles it:
+ * Each block here is one item the user reported, checked the only way that settles it:
  * drive the real app and read the real geometry / the real system clipboard.
  *
  *   #9  copy buttons don't actually copy
@@ -255,7 +255,7 @@ try {
   check(shape?.masked, 'the loader is not masked to a ring');
   await shot('sidebar-spinner-hovered');
   /* ------------------------------------------------ #7 the full-access mode */
-  // the user: "in projects, add a 'full access' mode — red, with an ! in a circle —
+  // The user: "in projects, add a 'full access' mode — red, with an ! in a circle —
   // that gives the model full reign and full access … no sandboxing."
   await page.evaluate(async (dir) => {
     await window.__pi_project().getState().selectPath(dir);

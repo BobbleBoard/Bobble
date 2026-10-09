@@ -1,7 +1,7 @@
 /**
  * CODE APPEARANCE, end to end — invisibly (harness.mjs).
  *
- * the user: "in terminal in the canvas in dark mode there's a dark red color
+ * The user: "in terminal in the canvas in dark mode there's a dark red color
  * that's a bit unreadable, for the color coding please add a list of text
  * coloring styles as claude does … a little preview in the appearance
  * settings menu … demo screenshot with a line of text in each color on light

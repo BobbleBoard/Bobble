@@ -39,7 +39,7 @@ and the model picker, with the MTP speed head kept.
 
 ## 1. Goal
 
-the user's words:
+The user's words:
 - "training dashboard/on device training w/ export quantization and such"
 - "training across devices/on device with UI parity to unsloth studio w/ easy gguf/other format exports and such."
 
@@ -75,7 +75,7 @@ pre-training on Mac.
 
 **Roadmap note.** `ROADMAP-LATEST.md` §6 puts fine-tuning "strictly after 5" (Linux/Windows
 + clustering), because "fine-tuning on one Mac is a much smaller idea than fine-tuning
-across connected machines". the user has now pulled it forward. On-device parts (WPs TR-0…TR-13)
+across connected machines". The user has now pulled it forward. On-device parts (WPs TR-0…TR-13)
 have no dependency on tracks 4/5. Cross-device parts (TR-14…TR-16) do.
 
 ---
@@ -818,7 +818,7 @@ Suggested order: TR-0 ∥ TR-1 → TR-2 → TR-3 ∥ TR-4 → TR-5 → TR-6 ∥ 
    2026-09-16 pause-deadlock lesson); training's terminate is checkpoint-first.
 4. **Battery/heat**: multi-hour runs. AC-only by default after today's 1% hibernation.
 5. **Disk**: a 4B export peaks at ~9.3 GB base + ~8.4 GB merged + ~8.4 GB bf16 GGUF + quants.
-   the user's disk has run to 7 GB free before; check up front and delete temps per step.
+   The user's disk has run to 7 GB free before; check up front and delete temps per step.
 6. **MTP acceptance** can drop after fine-tuning. Measure it and set `specDisabled`
    automatically; head re-alignment (FastMTP-style) is later work.
 7. **Unverifiable here**: CUDA/ROCm/XPU paths and multi-Mac need hardware this Mac doesn't

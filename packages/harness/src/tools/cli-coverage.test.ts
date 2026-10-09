@@ -5,7 +5,7 @@ import { toolCliGroups } from './tool-cli-groups';
 /**
  * CLI MODE MUST NOT LOSE A CAPABILITY.
  *
- * the user's definition, and the whole point of the mode: "cli mode has no
+ * The user's definition, and the whole point of the mode: "cli mode has no
  * capability loss over regular, it simply makes everything cli based and
  * accessible via the bash tool, all tools are always available, and their
  * information accessible via `<name> --help`."
@@ -52,7 +52,7 @@ function commandReachable(): Set<string> {
 const INTERFACE_TOOLS = new Set(['bash', 'capability', 'use']);
 
 /**
- * the user's round-20 decision: the fenced file tools stay advertised as schemas in
+ * The user's round-20 decision: the fenced file tools stay advertised as schemas in
  * CLI mode, because every accumulated write/edit safety fix hangs off them.
  * They ALSO have `file …` commands, so nothing is lost either way.
  */
@@ -132,7 +132,7 @@ describe('every schema tool is reachable as a command', () => {
 /**
  * SPECIALISTS RUN ON THE CLI BY DEFAULT, AND LOSE NOTHING BY IT.
  *
- * the user: "ensure there is a cli connector for the specialists that is by
+ * The user: "ensure there is a cli connector for the specialists that is by
  * default there and enabled, cli tools are a good context saver so it's
  * important that they're just the same power as schemas." The desktop spawns
  * every specialist child with PI_DESKTOP_TOOL_CLI=1 (its own setting), and

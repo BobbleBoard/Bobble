@@ -5,7 +5,7 @@
  * a skill is just something that prompt can reach. So there are no cabinets:
  * a task, a template and "new" are the same kind of card, on one board, and
  * each card says what it has actually reached (from its runs) beside where it
- * works. the user: separate menus for plugins / connectors / skills are confusing;
+ * works. The user: separate menus for plugins / connectors / skills are confusing;
  * this page never asks you to visit one.
  *
  * A card opens a sheet — the contract, the reach, the runs. Since round one

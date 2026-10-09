@@ -120,7 +120,7 @@ Whoever prompted you is waiting for YOUR reply — but do the work FIRST. Replyi
 /**
  * The manager's charter.
  *
- * Takes the VISION because the last line of it does. the user, predicting this run's
+ * Takes the VISION because the last line of it does. The user, predicting this run's
  * failure before it happened: "I highly doubt the corp harness will work here
  * first try … the manager will fail to commission a tester that actually drives
  * the product … that needs to be baked into the system prompt just like the
@@ -575,7 +575,7 @@ const VIDEO_TOOLS = ['generate_video'];
  * with a capability and no work for it will find work for it, so the capability
  * was removed.
  *
- * That fixed the symptom by breaking the thing underneath. the user: "the original
+ * That fixed the symptom by breaking the thing underneath. The user: "the original
  * model, initial one (which IS the CEO, it just turns into what we're calling
  * the CEO as soon as it calls the talk_to tool) — it has the ability for its
  * instance to have all the tools and wires." There is no separate CEO. There is
@@ -705,7 +705,7 @@ export function buildCorpRoster(opts: CorpMeshOptions): MeshAgent[] {
   const engIds = Array.from({ length: engineers }, (_, i) => engineerId(i + 1));
 
   /*
-   * THERE IS NO CEO IN THE MESH. the user: "don't spawn a fake CEO clone for the corp
+   * THERE IS NO CEO IN THE MESH. The user: "don't spawn a fake CEO clone for the corp
    * harness. the ceo, the only ceo, that does that final review is the original
    * one that originally talked to the [user]."
    *

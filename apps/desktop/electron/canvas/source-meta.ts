@@ -2,7 +2,7 @@
  * A SOURCE'S NAME, ICON AND PICTURE — fetched from the page itself, once, and
  * kept.
  *
- * the user (2026-09-24), asking for sources in answers the way Google's overview
+ * The user (2026-09-24), asking for sources in answers the way Google's overview
  * shows them: each row a site's icon and name, the page's title and a
  * thumbnail. The search result the model saw carries a title and a snippet and
  * nothing else, so the rest comes from the page's own `<head>` — `og:site_name`,

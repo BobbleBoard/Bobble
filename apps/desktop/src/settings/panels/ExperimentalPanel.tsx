@@ -2,7 +2,7 @@
  * Settings → Experimental — the switches that change how hard Bobble may
  * lean on this machine, and the engines that are not the default yet.
  *
- * the user (2026-09-16): "implement into bobble extensive memory guards,
+ * The user (2026-09-16): "implement into bobble extensive memory guards,
  * disable-able in settings under an experimental menu (place down here
  * alternative inference engine support by the way that's also experimental)."
  *

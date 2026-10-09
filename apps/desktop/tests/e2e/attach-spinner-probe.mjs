@@ -1,7 +1,7 @@
 /**
  * THE ATTACHMENT SPINNER SURVIVES SEND — and still knows how to stop.
  *
- * the user: "we also want loading on attachments as they are tokenized and prefilled
+ * The user: "we also want loading on attachments as they are tokenized and prefilled
  * (while we are still typing our prompt) they stop loading maybe even after
  * sent, the loading spinner can still be on them, it disapears when they are
  * prefilled."

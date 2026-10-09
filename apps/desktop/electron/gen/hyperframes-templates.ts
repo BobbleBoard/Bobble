@@ -5,7 +5,7 @@
  * REAL, twice: the user asked for "10-second animated title card with the text
  * 'Launch day' in bright yellow bold letters centered on a dark gradient
  * background with subtle pulse animation", and the card said exactly that —
- * the whole instruction, white on navy, "bright yellow" ignored. His radar
+ * the whole instruction, white on navy, "bright yellow" ignored. Their radar
  * request came out the same way. `buildSceneDocument` put any prompt that was
  * not HTML into an `<h1>` as it stood.
  *

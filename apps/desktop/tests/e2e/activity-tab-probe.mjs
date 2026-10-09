@@ -1,7 +1,7 @@
 /**
  * activity-tab-probe.mjs — ONE "Activity" tab, in the real app.
  *
- * the user's sequence, verbatim: "for example terminal, if it runs ls -la we get
+ * The user's sequence, verbatim: "for example terminal, if it runs ls -la we get
  * shown the result there then it writes a file, then it runs some other terminal
  * command we still see above this next one as it's being typed the ls -la output
  * and command from before, everything persists."
@@ -253,7 +253,7 @@ try {
   await page.waitForTimeout(600);
   const afterCli = await tabs();
   check(afterCli.length === 1, `a CLI-tool invocation opened no tab (got ${afterCli.length})`);
-  // the user (2026-09-13): a `mac …` call turns the one tab INTO the computer-use
+  // The user (2026-09-13): a `mac …` call turns the one tab INTO the computer-use
   // page — the model is driving an app, and that is what there is to watch.
   check(
     afterCli[0]?.kind === 'computer-use',

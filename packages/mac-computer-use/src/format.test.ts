@@ -1,7 +1,7 @@
 /**
  * A snapshot must always come back with something the model can act on.
  *
- * the user, on Mac computer-use: it "constantly will return something that just
+ * The user, on Mac computer-use: it "constantly will return something that just
  * isn't able to do anything, it also gives some useless information to the model
  * sometimes about it being AX opaque ... if there's really no other option it
  * just has to return an image of the app window and a blurb that says 'control
@@ -110,7 +110,7 @@ describe('an app that tells Accessibility nothing', () => {
 /*
  * A SAVE SHEET IS PART OF TEXTEDIT, NOT OF FINDER.
  *
- * the user's named failure: "the model clicks Open in TextEdit, a file dialog
+ * The user's named failure: "the model clicks Open in TextEdit, a file dialog
  * appears — that dialog is part of TextEdit, not Finder — and the model must be
  * able to see and drive it." A snapshot that folds a sheet's controls into the
  * window's list without saying so leaves the model guessing which surface an
@@ -712,7 +712,7 @@ describe('an app that exposes nothing USEFUL is treated like one that exposes no
    * The groups are the profiles. Nothing names them, so no index is worth
    * clicking; and because the list was not EMPTY the snapshot carried no
    * screenshot either. The model had neither a list nor a picture, on the exact
-   * screen standing between it and the browser. the user, watching: "the profile
+   * screen standing between it and the browser. The user, watching: "the profile
    * selection screen might be proving a bit challenging, perhaps visual control
    * is needed there?"
    */

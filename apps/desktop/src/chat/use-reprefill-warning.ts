@@ -1,7 +1,7 @@
 /**
  * SAY IT BEFORE IT COSTS THEM — the live half of prefill-risk.ts.
  *
- * the user: "flagged to the user to my face right there whenever anything threatens
+ * The user: "flagged to the user to my face right there whenever anything threatens
  * to cause a full re prefill (including model switches) at over 16k context."
  *
  * "Right there" is the pill above the composer, which is already where this app

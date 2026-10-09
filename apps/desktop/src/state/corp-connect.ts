@@ -127,7 +127,7 @@ export async function startCorpTask(prompt: string, ctx?: TaskContext): Promise<
    * product was writing everything to /var/folders.
    */
   /*
-   * THE DROPDOWN, VERBATIM. the user: "if they have a project selected that dropdown
+   * THE DROPDOWN, VERBATIM. The user: "if they have a project selected that dropdown
    * right there is the end all be all, everything is THAT DROPDOWN'S SELECTION.
    * always always always nothing competes with that."
    *

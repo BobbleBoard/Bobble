@@ -2,7 +2,7 @@
  * INTENT BIAS — read what the model just said it wanted to do, and make that the
  * easy thing to do next.
  *
- * the user: "it's still doing a lot of page reading repeating when it clearly intends
+ * The user: "it's still doing a lot of page reading repeating when it clearly intends
  * not to, can you attempt to do a quick semantic match of a thought to all the
  * tools between each tool call … and then not force but do a reasonably strong
  * bias toward the tools based on how the semantic match was? eg. so if it says as

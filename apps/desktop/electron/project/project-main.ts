@@ -25,7 +25,7 @@ const log = createLogger('desktop:project');
  * conversationId and, with no project selected, no cwd either — so every child
  * fell through to the SHARED `~/.pi/desktop/sandbox/default`. A role would then
  * be working in a different directory from the chat that created it, which is
- * the one thing the workspace rule exists to prevent. the user: the workspace covers
+ * the one thing the workspace rule exists to prevent. The user: the workspace covers
  * "all the model's write commands, terminal python etc ... including engineers
  * and subagents".
  */
@@ -119,7 +119,7 @@ function readDoc(): ProjectsDoc {
  * resolveSessionCwd restores the session's OWN recorded cwd — which is the
  * sandbox for any session first created outside a project — and the working dir
  * silently drops back to the sandbox even though the UI still shows the project
- * (the user: "!ls shows a sandbox even though I have Desktop selected").
+ * (The user: "!ls shows a sandbox even though I have Desktop selected").
  */
 export function activeProjectPath(): string | null {
   const doc = readDoc();
@@ -131,7 +131,7 @@ export function activeProjectPath(): string | null {
 /**
  * Is the ACTIVE project in full-access mode?
  *
- * the user asked for a project mode with "full reign and full access … no
+ * The user asked for a project mode with "full reign and full access … no
  * sandboxing". Read at pi spawn (see buildPiEnv), so the answer is whatever the
  * user last chose for the folder they are working in — and false whenever they
  * are not in a project at all, which is the sandboxed default.
@@ -286,7 +286,7 @@ const handlers: IpcHandlers<ProjectInvokeMap> = {
   },
 
   /*
-   * FULL ACCESS, per project. the user asked for a mode that "gives the model full
+   * FULL ACCESS, per project. The user asked for a mode that "gives the model full
    * reign and full access … no sandboxing", drawn in red with a ! in a circle.
    *
    * Persisted on the project rather than globally, because the whole point is

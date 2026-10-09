@@ -60,7 +60,7 @@ describe('corpToolEnabled', () => {
    * vanished between turns of one conversation — and since chat templates render
    * the tool list at the START of the prompt, every flip threw away the KV prefix.
    * The gate existed to avoid mid-run changes and was itself the mid-run change.
-   * the user: "yes if the talk to tool isn't loaded, load it."
+   * The user: "yes if the talk to tool isn't loaded, load it."
    */
   it('is true at EVERY effort — one prompt, one tool list', () => {
     for (const effort of ['low', 'medium', 'high', 'max'] as const) {
@@ -121,7 +121,7 @@ describe('create_production_hierarchy — normal-chat tool', () => {
 
 describe('talk_to_manager BLOCKS until the team delivers', () => {
   /*
-   * the user, watching a CEO answer "the manager has accepted the task" in eleven
+   * The user, watching a CEO answer "the manager has accepted the task" in eleven
    * seconds and then build the whole thing itself while the manager sat queued:
    * "the ceo calls the manager, this should stop the CEO cold, and run the
    * manager. the ceo should not get a tool result from the manager until the
@@ -322,7 +322,7 @@ describe('a failed production reports what is actually on disk', () => {
   });
 
   /*
-   * the user: "the most pragmatic thing to do is after the manager returns any talk
+   * The user: "the most pragmatic thing to do is after the manager returns any talk
    * to tool call, we put a lot of testing instructions." This branch carried
    * none — it was the one path back to the CEO with no testing pressure at all.
    */
@@ -407,7 +407,7 @@ describe('a delegation from a standing start is refused, once', () => {
    * either. A model that has decided at the top of a description does not read
    * the rest of it, whatever it says.
    *
-   * the user: "veto the first talk to tool call outright… maybe only do that if 0
+   * The user: "veto the first talk to tool call outright… maybe only do that if 0
    * tools have been called prior to the talk to." The `0 tools` clause is what
    * keeps it general: it fires on a fact about the RUN, never on the task.
    */

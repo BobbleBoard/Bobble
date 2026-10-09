@@ -3,7 +3,7 @@ Imagery and background systems.
 
 Two sources, deliberately in this order:
 
-1. STOCK PHOTOS, fetched once and cached on disk. the user's call, and the right
+1. STOCK PHOTOS, fetched once and cached on disk. The user's call, and the right
    one — generated imagery on a research deck invites the model to illustrate
    data, and a hallucinated chart drawn as a picture is worse than no picture.
    A photograph is decoration and reads as decoration.

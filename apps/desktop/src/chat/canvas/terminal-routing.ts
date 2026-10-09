@@ -121,7 +121,7 @@ export function useBashTerminalCanvasRouting(): void {
           data,
         });
         /*
-         * ...AND REVEAL THE PANEL. the user: "the canvas sidebar should just be
+         * ...AND REVEAL THE PANEL. The user: "the canvas sidebar should just be
          * opened itself on any of these tool calls, and it hasn't been for this
          * terminal command."
          *

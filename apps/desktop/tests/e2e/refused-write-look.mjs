@@ -1,5 +1,5 @@
 /**
- * LOOK at a refused write and at an edit's diff. the user (2026-09-17, two
+ * LOOK at a refused write and at an edit's diff. The user (2026-09-17, two
  * screenshots): a `sample.svg` write the guard refused showed "Could not write
  * the file · +88" over eighty-eight green lines ("failed what exactly?") and
  * the canvas opened a tab that set "Could not read this file" in a code editor

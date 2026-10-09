@@ -195,7 +195,7 @@
  * halo. The popover focuses the track the moment it opens, so that was not an
  * occasional state — it was how the control always looked: an empty rail
  * outlined and glowing blue along its entire length, which reads as the rail
- * being part of the value. the user: "no blue border or glow around the edge of the
+ * being part of the value. The user: "no blue border or glow around the edge of the
  * slider when unfilled."
  *
  * The knob keeps its focus ring (below), so keyboard focus is still visible —
@@ -292,7 +292,7 @@
 /*
  * A SWITCH, because it is now the only control on the panel when Auto is on and
  * it has to read as something with two states rather than a label that happens
- * to be tinted. the user: "restyle auto to be a toggle button that just removes the
+ * to be tinted. The user: "restyle auto to be a toggle button that just removes the
  * slider while toggled on."
  */
 .pd-effort-auto {

@@ -1,7 +1,7 @@
 /**
  * ROUND 2 — DOWNLOADING, UNDER STRESS.
  *
- * the user: "stress tests of downloading". The existing download probe pulls a real
+ * The user: "stress tests of downloading". The existing download probe pulls a real
  * 13 GB model from Hugging Face and watches the progress read sensibly, which is
  * the right test for the happy path and useless for every other one: you cannot
  * ask huggingface.co to drop a connection at 40%, and a run that costs eight

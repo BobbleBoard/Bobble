@@ -483,7 +483,7 @@ describe('loop detector — live wiring through tool_call / tool_execution_end',
     // the turn's single steer — this test is about the identical-call guard alone.
     const call = () => rig.fire('tool_call', TOOL_CALL({ command: 'npm run build' }));
 
-    // the user raised the repeat guard from 5 to 75: a handful of identical calls is
+    // The user raised the repeat guard from 5 to 75: a handful of identical calls is
     // a retry, and the yellow "nudging" bar firing on it was noise.
     for (let i = 1; i < DEFAULT_REPEAT_STEER_AFTER; i++) await call();
     expect(rig.steerMessages).toHaveLength(0);
@@ -496,7 +496,7 @@ describe('loop detector — live wiring through tool_call / tool_execution_end',
     });
     expect(rig.abort).not.toHaveBeenCalled();
 
-    // the user: the identical-call abort is now WALL-CLOCK (3 min), not a count — so a
+    // The user: the identical-call abort is now WALL-CLOCK (3 min), not a count — so a
     // fast burst of many more identical calls within seconds must NOT abort.
     for (let i = 0; i < 10; i++) await call();
     expect(rig.abort).not.toHaveBeenCalled();
@@ -1385,7 +1385,7 @@ describe('the per-tool rules hold at every door', () => {
 
 describe('no internet, no web tools (the user)', () => {
   /*
-   * the user: "model still has search and web tools even when there's no internet,
+   * The user: "model still has search and web tools even when there's no internet,
    * and gets confused looping in them." Asking it to stop cannot work —
    * llama-server pins the emitted tool name to the ADVERTISED list, so the fix
    * has to be that the tool is not there to call.
@@ -1442,7 +1442,7 @@ describe('no internet, no web tools (the user)', () => {
 /**
  * A TURN THAT ENDS WITH THE MODEL'S OWN CHECKLIST UNFINISHED.
  *
- * the user, round 3: "long running tasks where you can't accept an 'I can't do
+ * The user, round 3: "long running tasks where you can't accept an 'I can't do
  * this' needs to truly run until completion." The unit tests in
  * loop/unfinished-plan.test.ts pin WHEN this should fire; these pin that the
  * harness actually sends it, from a plan the model set through the real tool.
@@ -1570,7 +1570,7 @@ describe('unfinished-plan steer', () => {
 /**
  * THE CLI IS A MODE, AND ITS ADVERTISED SET NEVER MOVES.
  *
- * the user: "tool being appended mid conversation is fine, but not during cli mode,
+ * The user: "tool being appended mid conversation is fine, but not during cli mode,
  * because during cli mode a tool happening mid conversation is just a little
  * tidbit at the end of the message saying 'user activated <tools>, these are now
  * able to be used via bash'."

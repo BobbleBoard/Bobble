@@ -2,7 +2,7 @@
  * A MESSAGE SENT WITH NO MODEL TO ANSWER IT — held, explained, never "fetch
  * failed".
  *
- * the user (2026-10-08): "our dreaded 'fetch failed' … red text that's just a
+ * The user (2026-10-08): "our dreaded 'fetch failed' … red text that's just a
  * real unknown error or something that doesn't have handling attached to it
  * … just can't exist anymore." The commonest cause: the send waited for a
  * model that never came up and went on anyway.

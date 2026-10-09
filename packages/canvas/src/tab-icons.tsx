@@ -144,7 +144,7 @@ export function IconPanelRight(props: IconProps) {
  *
  * This used to be a box with an arrow leaving through the top-right corner,
  * which is the universal "opens outside the app" mark — and `IconExternal`, four
- * pixels away in the same bar, is that mark and does mean that. the user, with both
+ * pixels away in the same bar, is that mark and does mean that. The user, with both
  * of them screenshotted side by side: "why is there two variations of that
  * button with the square with top right arrow".
  *
@@ -292,7 +292,7 @@ export function IconTable(props: IconProps) {
 }
 
 /**
- * THE TWO DIRECTIONS, ONE ARROW. the user (2026-09-20): an arrow up and to the
+ * THE TWO DIRECTIONS, ONE ARROW. The user (2026-09-20): an arrow up and to the
  * right "for putting inline code blocks/data visuals in the canvas … and
  * then flip it 180 degrees for going canvas to inline". Both are the set's
  * glyphs (ui glyph.tsx), so they take the app's stroke and size tokens.

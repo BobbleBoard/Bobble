@@ -1,7 +1,7 @@
 /**
  * THE ICON SET: Hugeicons, one drawing system for the whole app.
  *
- * the user (2026-10-08): "I still like the hugeicons better than drawn". Every
+ * The user (2026-10-08): "I still like the hugeicons better than drawn". Every
  * icon here is a Hugeicons stroke-rounded drawing (MIT, Copyright (c) 2025
  * Hugeicons, from @hugeicons/core-free-icons, pinned) on the 24-grid, the same
  * family as the Glyph set (glyph.tsx); where an idea already has a glyph (chat,

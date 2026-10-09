@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 /**
  * THE APP'S "LOOK CLOSER AT THIS" GESTURE — one implementation.
  *
- * the user asked for the expanded view to cover input media too ("clicked inside
+ * The user asked for the expanded view to cover input media too ("clicked inside
  * chat input or a user message log"), not just the generated cards. Rather than
  * a second, slightly-different overlay for pasted text and attachments, the one
  * MediaCard already had is extracted here and both use it.
@@ -19,7 +19,7 @@ import { createPortal } from 'react-dom';
  *  - `role="dialog"` + `aria-modal` is not decoration: StudioShell's Escape
  *    handler skips when a dialog is up by looking for exactly this role. Without
  *    it, closing an expanded picture also walked you out of the studio.
- *  - The chrome stands down. the user: "no to this thing at the bottom and no to the
+ *  - The chrome stands down. The user: "no to this thing at the bottom and no to the
  *    top bar staying here aswell." Faded rather than unmounted, so the composer
  *    does not reflow and lose whatever was typed in it — hence a flag on <body>,
  *    since the two things to quieten live in other subtrees.

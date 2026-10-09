@@ -432,7 +432,7 @@ and were reaped by `withApp` (§25). `pnpm turbo run build --filter @pi-desktop/
 
 ## The position on connectors vs skills vs servers, second look
 
-the user's complaint is that ChatGPT and especially Claude give the same idea — "things I can add to my agent" — four
+The user's complaint is that ChatGPT and especially Claude give the same idea — "things I can add to my agent" — four
 doors: Connectors, Plugins, Skills, Extensions, plus a Directory modal that re-nests three of them with its own nav.
 The refs, looked at again: ChatGPT keeps Skills as a second tab (`r0240`) and shows a plugin's skills as pills inside
 it (`r0504`); Claude has Skills / Connectors / Plugins as three settings rows and the Directory repeats the three.

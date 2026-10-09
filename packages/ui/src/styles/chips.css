@@ -181,7 +181,7 @@ button.pd-chip:hover {
   /*
    * A shortcut is usually ONE string ("⌘N"), so the `gap` above never applies —
    * the modifier glyph and the letter sit as tight as the font sets them, and
-   * the user read the result as "the cmd is too close to N". Tracking is what
+   * The user read the result as "the cmd is too close to N". Tracking is what
    * separates characters inside a run; the trailing space keeps the last glyph
    * from looking pushed against whatever follows the chip.
    */

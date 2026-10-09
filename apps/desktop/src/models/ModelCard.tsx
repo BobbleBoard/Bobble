@@ -1,7 +1,7 @@
 /**
  * THE MODEL CARD, RENDERED PROPERLY.
  *
- * the user: "model card, come on, unsloth actually just totally renders it, links,
+ * The user: "model card, come on, unsloth actually just totally renders it, links,
  * html, code blocks, videos images, inline tables everything. we should match
  * that at minimum."
  *

@@ -127,7 +127,7 @@ describe('the per-message work budget is gone', () => {
    * coordinator multiple went on top; run 4 still reported a step-out — from a
    * message that only *assumed* one (see #74).
    *
-   * the user: "let's not have a tool call cap". A guard that has to be raised every
+   * The user: "let's not have a tool call cap". A guard that has to be raised every
    * time it fires is not measuring what it claims to. What it was protecting
    * against — a role that works forever and never reports — belongs where the
    * work actually is: a turn that ends with work outstanding waits rather than
@@ -197,7 +197,7 @@ describe('only one sentence means success', () => {
 
 describe('a run has no tool-call cap at all', () => {
   /*
-   * the user: "let's not have a tool call cap".
+   * The user: "let's not have a tool call cap".
    *
    * The cap existed to stop a role that never stops. It could never tell that
    * apart from a role doing a big job well, so it kept deciding the outcome of
@@ -828,7 +828,7 @@ describe('the custom communication tools survive the active-set narrowing', () =
 
 describe('a write whose path cannot be opened is refused, not relocated', () => {
   /*
-   * the user: "it just shows up blank in the canvas sidebar… ensure even if paths are
+   * The user: "it just shows up blank in the canvas sidebar… ensure even if paths are
    * malformed or something it gets written somewhere / reprompted to specify the
    * path if there's error." The write PARSED and the +N counter climbed, so
    * nothing looked wrong until the file was wanted an hour later.
@@ -947,7 +947,7 @@ describe('listProject — the briefing must describe the PRODUCT, not its depend
  * MEASURED COST, run 15: the manager's turn was cut off at the OUTPUT cap
  * (`stopReason: 'length'`). The CEO was handed a cause that had not happened,
  * went looking for a summary that did not exist, and told the user no code had
- * been produced — over 53 files. the user: "is that an automated harness line?
+ * been produced — over 53 files. The user: "is that an automated harness line?
  * again remove it if so."
  */
 describe('emptyReplyCause — say what was observed, or say nothing', () => {

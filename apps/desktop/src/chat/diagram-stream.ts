@@ -1,7 +1,7 @@
 /**
  * A DIAGRAM CALL, WHILE IT IS BEING TYPED — what the live card reads out of it.
  *
- * the user (2026-09-25): diagrams should "animate/build in real time smoothly". A
+ * The user (2026-09-25): diagrams should "animate/build in real time smoothly". A
  * `diagram` call is the model typing Mermaid a few characters at a time —
  * through the tool's own arguments (`{"title": …, "source": "flowchart TD\n
  * A --> B…"}`) or as a command line through bash (`diagram "Title" --source

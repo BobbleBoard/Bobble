@@ -1,7 +1,7 @@
 /**
  * THE CANVAS MAY FAIL; THE WINDOW MAY NOT.
  *
- * the user, on the renderer crash in the canvas assessment: "that cannot happen".
+ * The user, on the renderer crash in the canvas assessment: "that cannot happen".
  * Twice, mid-turn, a React update loop (error #185) inside the canvas took the
  * whole window to the app-level boundary — chat, composer, sidebar, all gone
  * behind "Bobble hit a rendering error", while the model was still working and

@@ -159,7 +159,7 @@ describe('the CEO check is a flat list, in the order that matters', () => {
 
   it('casts the CEO as the user about to try it', () => {
     /*
-     * the user: "the ceo is not the user, but they should test in the shoes of the
+     * The user: "the ceo is not the user, but they should test in the shoes of the
      * end user via automation and visually if applicable."
      *
      * The METHOD is what survives. This said "You are now THE USER" (roleplay —
@@ -182,7 +182,7 @@ describe('the CEO check is a flat list, in the order that matters', () => {
   });
 
   /*
-   * the user: "there will always be bias in the prompt, you want to ensure that the
+   * The user: "there will always be bias in the prompt, you want to ensure that the
    * bias is toward the safer option especially at the start… we especially at
    * the 4b class bias the attention mechanism an incredible degree away from
    * submitting that turn." A wrong "send feedback" costs a round; a wrong "it
@@ -232,7 +232,7 @@ describe('the CEO check is a flat list, in the order that matters', () => {
     expect(ceo()).not.toMatch(/make it true/);
   });
 
-  /* the user: "your guidelines should essentially be able to be put into a clean
+  /* The user: "your guidelines should essentially be able to be put into a clean
      bulleted list." Sections are where instructions go to be skimmed at 4B. */
   /* Findings go to a FILE as they are found, not held in context — a 4B that
      keeps a list in its head reports the first item and forgets the rest. */

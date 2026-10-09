@@ -2,7 +2,7 @@
  * RUNNING a scheduled task, headless.
  *
  * The run happens here in MAIN, in a throwaway pi bridge — not as a chat in the
- * renderer. the user: "a clean new temporary session that is started, conducts and
+ * renderer. The user: "a clean new temporary session that is started, conducts and
  * then is hidden/deleted/shown somewhere in a view past runs." So there is no
  * sidebar entry and no session file to find; the only trace is a run record,
  * which the past-runs view reads.

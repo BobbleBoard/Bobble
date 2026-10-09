@@ -1,7 +1,7 @@
 /**
  * App-local icon names for the Settings, Models and media surfaces.
  *
- * These used to be a second hand-drawn 16-grid set. the user (2026-10-08): "I
+ * These used to be a second hand-drawn 16-grid set. The user (2026-10-08): "I
  * still like the hugeicons better than drawn". Every one is now the shared
  * Hugeicons drawing from @pi-desktop/ui, so a Settings row and the sidebar draw
  * the same idea the same way, at the same `--pd-icon-stroke`. The names stay so

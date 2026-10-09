@@ -24,15 +24,18 @@ import {
 } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { _electron as electron } from 'playwright-core';
 import { probeHome } from './harness.mjs';
+
+const REPO_ROOT = fileURLToPath(new URL('../../../../', import.meta.url)).replace(/\/$/, '');
 
 const run = promisify(execFile);
 const osa = (s) => run('osascript', ['-e', s]).catch(() => undefined);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const BUNDLE = process.env.BOBBLE_APP ?? '/Applications/Bobble.app';
-const OUT = process.env.OUT_DIR ?? '/Users/user/Desktop/OSS-harness/scratchpad/mac-video-reminders';
+const OUT = process.env.OUT_DIR ?? `${REPO_ROOT}/scratchpad/mac-video-reminders`;
 const FPS = Number(process.env.FPS ?? 8);
 const MODEL_ID = process.env.MAC_CU_MODEL ?? 'qwen3.5-4b-mtp';
 const MARKER = process.env.MARKER ?? `Buy milk ${Date.now().toString(36).slice(-4)}`;
@@ -144,7 +147,7 @@ try {
   await sleep(2500);
 
   /*
-   * ONLY THE MAC COMMANDS. the user: "drive reminders given only the mac tools".
+   * ONLY THE MAC COMMANDS. The user: "drive reminders given only the mac tools".
    *
    * Reminders is also reachable through the `personal` connector, which is the
    * right product behaviour normally and the wrong thing to demonstrate here.
@@ -212,8 +215,8 @@ try {
     });
 
   /*
-   * THE FOCUS GUARD. the user's whole rule for this feature is that driving an app
-   * never takes his screen, and the last run broke it — the model shelled out
+   * THE FOCUS GUARD. The user's whole rule for this feature is that driving an app
+   * never takes their screen, and the last run broke it — the model shelled out
    * to `open -a`, which activates. Sample continuously and report every moment
    * TextEdit was in front, rather than claiming it never was.
    */

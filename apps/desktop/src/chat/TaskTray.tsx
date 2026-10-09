@@ -1,14 +1,14 @@
 /**
  * THE TASK TRAY — the button beside the sidebar toggle, and its card.
  *
- * the user (2026-09-24): "implement a little notifications button in the top left
+ * The user (2026-09-24): "implement a little notifications button in the top left
  * within the left sidebar or always simply to the right of the collapse sidebar
  * button, this only appears when you leave a running task, eg. chat,
  * generation etc. and clicking on it has a quick little card, examples shown,
  * examples are of course plagued by the similar design problems we have been
  * talking about."
  *
- * His example was a stack of task cards — a big title each, a status PILL, the
+ * Their example was a stack of task cards — a big title each, a status PILL, the
  * same status again as text with a duration, a blue "View" link, flat dark
  * panels. What this does instead, point for point:
  *   - status said ONCE: the loader for running, otherwise a 5px dot in the

@@ -1,7 +1,7 @@
 /**
  * THE FEW CONTROLS UNDER A 3D CARD, as state the viewport and the strip share.
  *
- * the user (2026-09-17): "the card should just be a little embedded viewport
+ * The user (2026-09-17): "the card should just be a little embedded viewport
  * rotatable, not all the controls but below the card itself show some basic
  * controls eg. coloring/normals/grey, if rig, skeleton and if segment, then
  * explode." So: three ways to shade, and two overlays that exist only when the

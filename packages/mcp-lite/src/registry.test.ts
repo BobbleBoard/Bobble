@@ -45,7 +45,9 @@ const sample: McpRegistryConfig = {
 
 describe('defaultRegistryPath', () => {
   it('lands under ~/.pi/desktop', () => {
-    expect(defaultRegistryPath('/home/the user')).toBe('/home/the user/.pi/desktop/mcp-connectors.json');
+    expect(defaultRegistryPath('/home/the user')).toBe(
+      '/home/the user/.pi/desktop/mcp-connectors.json',
+    );
   });
 });
 

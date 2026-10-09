@@ -98,7 +98,7 @@ interface SpawnOpts {
 /**
  * THE PROMPT SAYS BOBBLE AND WHERE IT IS.
  *
- * the user: "would be appreciated if you can show in the terminal something like
+ * The user: "would be appreciated if you can show in the terminal something like
  * the user being 'bobble' and the directory." Left alone, the pane inherits the
  * login shell's own prompt — `user@My-MacBook-Pro ~ %` — which names the
  * machine (never in question) and hides the only thing that matters here, which

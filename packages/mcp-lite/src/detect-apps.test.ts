@@ -108,7 +108,7 @@ describe('detectApps', () => {
   });
 
   it("wears the brand owner's own logo file where the catalog's one colour is not the logo", () => {
-    // the user (2026-09-18): "don't frankenstein or recreate logos, find a catalog
+    // The user (2026-09-18): "don't frankenstein or recreate logos, find a catalog
     // or official svgs" — and of the catalog Blender, "isn't correct (color)".
     // Each is the published file, verbatim: its own viewBox, its own colours.
     const expectations: Record<string, { viewBox: string; colours: string[] }> = {

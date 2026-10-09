@@ -70,7 +70,7 @@ try {
    * sidebar toggle, and the conversation title. The title's inset was written
    * against a 64px collapsed RAIL; the curtain change made that 0px and nothing
    * replaced the gap, so the title landed at x=46 — through the lights and
-   * under the toggle. the user: "the left sidebar expand/collapse button doesn't
+   * under the toggle. The user: "the left sidebar expand/collapse button doesn't
    * work at all anymore." It was there; clicks were landing on a title drawn on
    * top of it. Geometry, not appearance, is what makes that visible to a test.
    */
@@ -105,7 +105,7 @@ try {
   );
   check(corner.hitIsButton === true, 'a click at the toggle reaches the toggle, not the title');
   /*
-   * AND NOTHING DRAGGABLE MAY COVER IT. the user, after the first fix: "the left
+   * AND NOTHING DRAGGABLE MAY COVER IT. The user, after the first fix: "the left
    * sidebar button is NOT CLICKABLE doesn't have any hover or click." macOS
    * claims mouse events inside a `-webkit-app-region: drag` rect BEFORE the
    * renderer sees them, so a covered button loses hover as well as clicks — and
@@ -213,7 +213,7 @@ try {
       });
     });
     check(tiles.length >= 3, `harness rows present (${tiles.length})`);
-    /* the user: "can you seriously not find any chatgpt / openai logo?" Codex and
+    /* The user: "can you seriously not find any chatgpt / openai logo?" Codex and
        Hermes have real marks now, so a letter in either tile is a regression. */
     const marks = await page.evaluate(() =>
       ['codex', 'hermes'].map((id) => {

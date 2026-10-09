@@ -21,7 +21,7 @@
     "HomeDERP": 17,
     "Hostinfo": {
       "OS": "linux",
-      "Hostname": "linux-ms-7e59",
+      "Hostname": "linux-MS-7E59",
       "Services": [
         {
           "Proto": "peerapi4",

@@ -1,7 +1,7 @@
 /**
  * THE FILE GLYPH — a page with its extension written on it, in strokes.
  *
- * the user (2026-09-20): "all files with specific types [use this icon] … replace
+ * The user (2026-09-20): "all files with specific types [use this icon] … replace
  * XML text based on file type procedurally, e.g. WAV". So the letters are not
  * text: each is a stroked letterform on the same 24-grid as the page, five
  * units tall on the baseline at 19, set from a small alphabet and laid out

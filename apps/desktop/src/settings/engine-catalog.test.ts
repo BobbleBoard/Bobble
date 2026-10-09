@@ -33,7 +33,7 @@ const byId = (id: string): EngineSpec => {
 
 describe('support is a reason, not a boolean', () => {
   it('greys vLLM off macOS and Windows with the real reason', () => {
-    // the user's own example: "vllm is linux only so that greyed out on win/mac".
+    // The user's own example: "vllm is linux only so that greyed out on win/mac".
     expect(engineSupport(byId('vllm'), mac)).toEqual({ supported: false, reason: 'Linux only' });
     expect(engineSupport(byId('vllm'), windows)).toEqual({
       supported: false,
@@ -131,7 +131,7 @@ describe('what onboarding installs on its own', () => {
   });
 
   it('fetches the MLX set on Apple Silicon, vLLM on Linux, nothing extra elsewhere', () => {
-    // the user: "omlx rapidmlx and dflashmlx (always llamacpp also …) on some other
+    // The user: "omlx rapidmlx and dflashmlx (always llamacpp also …) on some other
     // machines like big linux boxes, vllm". llama.cpp is fetched by the launch.
     expect(defaultEngineSet(mac)).toEqual(['rapid-mlx', 'dflash-mlx', 'mlx-dspark', 'omlx']);
     expect(defaultEngineSet(linux)).toEqual(['vllm']);
@@ -172,7 +172,7 @@ describe('prerequisites', () => {
 });
 
 /**
- * THE PORTABILITY MATRIX. the user, correcting a Mac-shaped answer: "we target all
+ * THE PORTABILITY MATRIX. The user, correcting a Mac-shaped answer: "we target all
  * major OS and all major hardware eventually in a modular fashion such that we
  * have a boatload of alternatives that we know of and can get working quick to
  * get max out of the box no setup fast inference for any hardware on any OS."

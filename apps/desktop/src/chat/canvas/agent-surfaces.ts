@@ -2,7 +2,7 @@
  * The ONE definition of how an agent's live work is shown on a canvas surface —
  * shared by the normal chat's routers and the corp (multi-agent) router.
  *
- * the user, having watched a run: "make sure first and foremost that these are
+ * The user, having watched a run: "make sure first and foremost that these are
  * totally in sync, you can change something about one and it reflects on the
  * other ... use the regular chat thing, not the subagents thing, as the good
  * starting point." They were two implementations of the same idea that had
@@ -80,7 +80,7 @@ export function mirrorCommandText(
   opts: { failed?: boolean; executing?: boolean } = {},
 ): string {
   /*
-   * A REAL PROMPT LINE, not a bare `$`. the user: "would be appreciated if you can
+   * A REAL PROMPT LINE, not a bare `$`. The user: "would be appreciated if you can
    * show in the terminal something like the user being 'bobble' and the
    * directory ... this removes confusion about the initial working directory."
    *
@@ -90,7 +90,7 @@ export function mirrorCommandText(
    * command actually ran makes the answer visible instead of inferred.
    */
   /*
-   * COLOUR-CODED, like the shell it mirrors. the user (2026-09-12): "need color
+   * COLOUR-CODED, like the shell it mirrors. The user (2026-09-12): "need color
    * coded text in the terminal in the canvas." The mirror is an xterm, but
    * what reached it was flat text: a plain prompt, the command, and output
    * from tools that saw a pipe and printed no colour. So the prompt is the
@@ -116,7 +116,7 @@ export function mirrorCommandText(
    */
   if (running && output.length === 0 && opts.executing !== true) return line;
   /*
-   * ENTER, THE MOMENT THE COMMAND IS COMPLETE. the user (2026-09-17): "when the
+   * ENTER, THE MOMENT THE COMMAND IS COMPLETE. The user (2026-09-17): "when the
    * model's command finishes streaming in the terminal move the cursor down a
    * line and stream in the response … as it would appear in a terminal, this
    * immediate moving down a line as if the user pressed enter is purely

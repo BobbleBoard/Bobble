@@ -82,7 +82,7 @@ export interface KitReport {
   readonly issues: readonly KitIssue[];
 }
 
-/** the user's brief: no purple. The chart looks' test band, 255°–300° of HSV hue. */
+/** The user's brief: no purple. The chart looks' test band, 255°–300° of HSV hue. */
 export function isPurple(colour: Hex): boolean {
   const h = hue(colour);
   return h >= 255 && h <= 300;

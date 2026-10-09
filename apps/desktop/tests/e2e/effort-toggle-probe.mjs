@@ -1,7 +1,7 @@
 /**
  * AUTO IS A SWITCH, AND WITH IT ON THERE IS NO SLIDER.
  *
- * the user: "increase the size and restyle auto to be a toggle button that just
+ * The user: "increase the size and restyle auto to be a toggle button that just
  * removes the slider while toggled on."
  *
  * Both halves need a real app to check. The size is a computed box, not a

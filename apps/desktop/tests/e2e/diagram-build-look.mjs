@@ -2,7 +2,7 @@
  * LOOK at a diagram being made — the card building in the chat while the
  * model types its Mermaid, and the finished card taking over.
  *
- * the user (2026-09-25): "custom mermaid arrows and box styling and ensure those
+ * The user (2026-09-25): "custom mermaid arrows and box styling and ensure those
  * animate/build in real time smoothly". A `diagram` call's arguments arrive a
  * few characters at a time; this plays one into the store the way a turn does
  * (the call's argsText growing every 40 ms, ~75 tokens a second, then the

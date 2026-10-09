@@ -1,7 +1,7 @@
 /**
  * When a shell command opens something, say what to do next.
  *
- * the user: "the idea of whatever browser or app it opens something in via terminal
+ * The user: "the idea of whatever browser or app it opens something in via terminal
  * (which is a common issue I face) immediately give it the tools it needs and the
  * initial snapshot of whatever app or the browser snapshot of chrome."
  *
@@ -135,7 +135,7 @@ export function openedAppNote(
   const what = opened.target !== undefined ? ` (${opened.target})` : '';
   const head = `\n\n[This opened ${opened.app}${what} — a real Mac app, NOT the built-in browser.`;
   /*
-   * THE TOOLS ARE ALREADY YOURS. the user: "currently i'm seeing it open safari and
+   * THE TOOLS ARE ALREADY YOURS. The user: "currently i'm seeing it open safari and
    * chrome, and then just not be able to control the things it opened with bash
    * like that, it needs to be able to control it."
    *
@@ -157,7 +157,7 @@ export function openedAppNote(
     );
   }
   if (opened.strayWebPage === true) {
-    // the user: "bias it to use the built in browser instead of bash to open safari
+    // The user: "bias it to use the built in browser instead of bash to open safari
     // when no specific is requested." The page is now in a browser this app
     // cannot drive; say so, and point at the tool that would have worked.
     return (

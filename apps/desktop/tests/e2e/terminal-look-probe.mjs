@@ -58,7 +58,7 @@ await win.waitForTimeout(4000);
 await win.screenshot({ path: path.join(OUT, '02-terminal.png') });
 
 /*
- * BOTH CURSOR STATES. the user, after I reported the caret fixed having looked only
+ * BOTH CURSOR STATES. The user, after I reported the caret fixed having looked only
  * at the focused pane: "there's a bordered non filled blue rectangel you can see
  * as the cursor that still remains when we click off, even though the flickering
  * | is correct when we click onto it." xterm's default `cursorInactiveStyle` is

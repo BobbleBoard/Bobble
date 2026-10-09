@@ -297,7 +297,7 @@ describe('CorpWorkerFeed — A5: no lead briefing card, real subagent briefing k
   });
 
   /*
-   * THE CARD IS GONE, FOR EVERYONE. the user: "the card should not exist at all."
+   * THE CARD IS GONE, FOR EVERYONE. The user: "the card should not exist at all."
    *
    * It was a synthesized header — "Manager · Team" over "Live work by Manager." —
    * standing in front of the real thing. A role's actual brief now arrives in its
@@ -326,7 +326,7 @@ describe('CorpWorkerFeed — A5: no lead briefing card, real subagent briefing k
 
 describe('a subagent’s tool shows its RESULT, exactly as the chat does', () => {
   /*
-   * the user: "the web search opens duckduckgo and shows no results when the
+   * The user: "the web search opens duckduckgo and shows no results when the
    * subagents do it but regularly it shows actual results."
    *
    * Two causes. The browser hijack was one. This is the other, and the deeper

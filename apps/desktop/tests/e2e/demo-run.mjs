@@ -27,9 +27,12 @@ import {
 } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { chromium, _electron as electron } from 'playwright-core';
 import { probeHome } from './harness.mjs';
+
+const REPO_ROOT = fileURLToPath(new URL('../../../../', import.meta.url)).replace(/\/$/, '');
 
 const run = promisify(execFile);
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -38,7 +41,7 @@ const osa = (s) => run('osascript', ['-e', s]).catch(() => undefined);
 /**
  * Quit the app under test WITHOUT it asking to save.
  *
- * the user: "blender came back because of a 'save or not' popup when it got quit."
+ * The user: "blender came back because of a 'save or not' popup when it got quit."
  * A plain `quit` on an app with unsaved changes puts a modal on screen and
  * brings that app to the front — so the teardown itself takes the user's screen,
  * and the run reports a focus violation it caused on the way out.
@@ -139,8 +142,8 @@ export async function demoRun(o) {
         'sends the message early. Put it on one line.',
     );
   }
-  const OUT = path.join('/Users/user/Desktop/OSS-harness/scratchpad/demos', o.name);
-  /* the user: "please video at 30+ if possible ... earlier ones were low framerate".
+  const OUT = path.join(`${REPO_ROOT}/scratchpad/demos`, o.name);
+  /* The user: "please video at 30+ if possible ... earlier ones were low framerate".
      They were: capture ran at 5-6/s and ffmpeg then held each frame for ~5 output
      frames. The cost is the screenshot, so the frames are JPEG at CSS scale
      (1440x867, not the 2880x1734 backing store) — a quarter of the pixels and no
@@ -164,7 +167,7 @@ export async function demoRun(o) {
    * Quitting the target first makes a run repeatable, and for Maps or Blender
    * that is free. For Chrome it manufactured a bug: a cold start with five
    * profiles opens the profile chooser, so three runs measured a model's ability
-   * to get past a screen the user would never have been on. the user: "this allows
+   * to get past a screen the user would never have been on. The user: "this allows
    * attaching to an already open chrome session though too right we wouldn't
    * need it then right?" — right, and attaching is also the case the tools are
    * built for, with the user's logins and their session.
@@ -336,7 +339,7 @@ export async function demoRun(o) {
     /*
      * PREFILL, PER TURN, WHILE IT HAPPENS.
      *
-     * the user: "check that prefill makes sense on each turn ... when there's a >2
+     * The user: "check that prefill makes sense on each turn ... when there's a >2
      * second prefill in a turn check it out". The provider reports real
      * processed/total over the `harness-prefill` status channel, so the run can
      * time every ingest episode rather than inferring one from wall clock.
@@ -373,7 +376,7 @@ export async function demoRun(o) {
     /*
      * THIRTY FRAMES A SECOND NEEDS A PUSH, NOT A PULL.
      *
-     * the user: "please video at 30+ if possible ... it seems earlier ones were low
+     * The user: "please video at 30+ if possible ... it seems earlier ones were low
      * framerate". Asking for a screenshot per frame is a full CDP round trip
      * each time, and MEASURED it tops out between 15/s (while Blender is busy
      * on the GPU) and 27/s. Page.startScreencast has the browser PUSH frames
@@ -464,7 +467,7 @@ export async function demoRun(o) {
     /*
      * POWER=low runs the whole thing on the app's gentle profile.
      *
-     * the user: "run these on 'low power mode' that we have in the app and see if it
+     * The user: "run these on 'low power mode' that we have in the app and see if it
      * works also keeping things speedy and mem pressure low". It has to be set
      * BEFORE llm:start-server, because it decides how the server is launched —
      * setting it afterwards would describe a run that had already started.
@@ -499,7 +502,7 @@ export async function demoRun(o) {
     /*
      * AND MAKE THE SELECTOR SAY IT.
      *
-     * the user: "ensure model is selected via the UI and model selector accurately
+     * The user: "ensure model is selected via the UI and model selector accurately
      * at the start of each video is used and reflects the model being used."
      * Every video so far showed "Balanced" in the composer's model chip while a
      * named model was doing the work — because the run set the model through the
@@ -881,8 +884,8 @@ export async function demoRun(o) {
     }
     /*
      * DID THE RUN TAKE THE USER'S SCREEN? Say so, rather than leaving it to be
-     * noticed. the user, watching one: "it took focus again, that whole issue
-     * should be solved by now" — and I could not answer him, because the only
+     * noticed. The user, watching one: "it took focus again, that whole issue
+     * should be solved by now" — and I could not answer them, because the only
      * thing recorded was who was in front at the END, which is the same line
      * whether the run stole focus or simply found the app already there.
      */
@@ -1000,7 +1003,7 @@ export async function demoRun(o) {
        * The floor used to be 0.03s, which is invisible at 25/s and ruinous at
        * 70: the screencast pushes a frame every ~14ms, each one was then held
        * for 30ms, and MEASURED the video ran 2.28x slow — 376 seconds of run
-       * stretched into 856 seconds of video. the user, watching one: "a prefill
+       * stretched into 856 seconds of video. The user, watching one: "a prefill
        * timer ticking up in very much slower than real time so over a minute or
        * so it reports 14 seconds". That was this.
        *
@@ -1062,7 +1065,7 @@ export async function demoRun(o) {
          out the right LENGTH (321.8s captured, 323.7s of video), but ffmpeg's
          default frame-rate mode drops the slots where nothing changed, so the
          file reports 7,977 frames over 323.7s — 24.6/s — and reads as under
-         the user's "video at 30+" even though every moving second of it was 30.
+         The user's "video at 30+" even though every moving second of it was 30.
          Nothing is added by leaving that ambiguous. */
       '-fps_mode',
       'cfr',
@@ -1085,7 +1088,7 @@ export async function demoRun(o) {
    * Every run left its raw JPEGs behind: 781 MB of frames beside a 2.4 MB MP4
    * for a two-minute run, and 16-18 GB for each of the two runs that stalled.
    * MEASURED: 183 GB of `frames/` across the demos directory, 2.6 GB free on
-   * the user's disk, and a 15 GB model download dying with "No space left on
+   * The user's disk, and a 15 GB model download dying with "No space left on
    * device". The frames exist to be encoded; once the MP4 is on disk they are
    * kept only when someone asks to keep them (KEEP_FRAMES=1), for the case of
    * reading individual frames off a run.

@@ -2,7 +2,7 @@
  * The history pole: hover the right edge of a long conversation and a thin line
  * appears with a few marked places on it. Click anywhere on it to travel there.
  *
- * the user's description, which is also the spec: "a vertical line, around the
+ * The user's description, which is also the spec: "a vertical line, around the
  * thickness of a scrollbar, little thinner, that has circles on it … these
  * circles should be just like holes on the line of a graph looking, and bulge a
  * bit on hover … clicking takes them there (smooth scroll quickly to the point

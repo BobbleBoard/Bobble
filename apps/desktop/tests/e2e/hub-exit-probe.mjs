@@ -1,7 +1,7 @@
 /**
  * LEAVING THE MODEL HUB.
  *
- * the user: "from the model management tab clicking on to new chat or an existing
+ * The user: "from the model management tab clicking on to new chat or an existing
  * chat causes weird behavior that's very not expected." So: open the hub, then
  * take each exit a user actually has and photograph what lands.
  */

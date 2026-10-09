@@ -1,7 +1,7 @@
 /**
  * LOOK AT THE UI CHANGES, rather than asserting them.
  *
- * the user's standing rule: any visually-relevant fix is reproduce → fix →
+ * The user's standing rule: any visually-relevant fix is reproduce → fix →
  * re-reproduce → LOOK. This drives the real app headlessly and photographs the
  * four things this round changed:
  *
@@ -16,10 +16,12 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { mkdirSync } from 'node:fs';
 import { chromium } from '@playwright/test';
+import { fileURLToPath } from 'node:url';
+const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url)).replace(/\/$/, '');
 const run = promisify(execFile);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const PORT = 9431;
-const OUT = process.env.OUT ?? '/Users/user/Desktop/OSS-harness/scratchpad/ui-look';
+const OUT = process.env.OUT ?? `${REPO_ROOT}/scratchpad/ui-look`;
 mkdirSync(OUT, { recursive: true });
 
 await run('osascript', ['-e', 'tell application "Bobble" to quit']).catch(() => {});
@@ -43,9 +45,7 @@ await run('open', [
 ]);
 await sleep(9000);
 const browser = await chromium.connectOverCDP(`http://127.0.0.1:${PORT}`);
-const page = (browser.contexts()[0]?.pages() ?? []).find(
-  (p) => !p.url().startsWith('devtools://'),
-);
+const page = (browser.contexts()[0]?.pages() ?? []).find((p) => !p.url().startsWith('devtools://'));
 await page.waitForFunction(() => typeof window.piDesktop?.invoke === 'function', {
   timeout: 40_000,
 });

@@ -5,7 +5,7 @@
  * On macOS the Tailscale CLI IS the app binary, and it decides between GUI and
  * CLI mode from the environment (memory: devices doc §2.1, defect 1): a probe
  * that ran the real one could put Tailscale's window over the user's work, or
- * change his tailnet. Devices (track 5) points the app at this instead with
+ * change their tailnet. Devices (track 5) points the app at this instead with
  * `PI_CLUSTER_TAILSCALE_BIN`, and `readTailnet({ candidates: [fake.bin] })`
  * reads it in tests.
  *

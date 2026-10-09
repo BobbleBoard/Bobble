@@ -2,7 +2,7 @@
  * GENERATION MODULES — what has to be on this Mac before a picture, a clip, a
  * voice or a 3D model can be made, and the one button that puts it there.
  *
- * the user (2026-09-13), on the shipped app: "I just get a bunch of 'uv not
+ * The user (2026-09-13), on the shipped app: "I just get a bunch of 'uv not
  * installed' errors, we need a popup/prominent button that has something like
  * 'download module' for image/audio/3d/video."
  *
@@ -35,7 +35,7 @@
  * serves video, ComfyUI audio and 3D.
  *
  * `weights:<catalog id>` is a model's own files — the second thing a job
- * needs after the runtime. the user (2026-09-14): "one click download of any
+ * needs after the runtime. The user (2026-09-14): "one click download of any
  * of these modules … video image 3d and audio generation with an m1-m6 mac".
  * A runtime with no weights is not one click; it is one click and then an
  * error naming a file. So the weights are a module with the same button, the

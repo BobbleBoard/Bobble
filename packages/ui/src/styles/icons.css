@@ -21,7 +21,7 @@
 }
 
 /*
- * ONE THICKNESS, IN PIXELS. the user (2026-09-20): "have a consistent modifier to
+ * ONE THICKNESS, IN PIXELS. The user (2026-09-20): "have a consistent modifier to
  * all svgs for thickness and size and such so they can be easily edited."
  *
  * The stroke token above is in user units, and the set is drawn on two grids

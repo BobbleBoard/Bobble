@@ -4,7 +4,7 @@ Updated: 2026-10-08 23:00 · the user: "at the end of any task going forward …
 
 ## Where we are (refreshed at the end of every task)
 
-The living page has this in full: (private link) (source `deliverables/status/where-we-are.html`, republished to the same link each time).
+The living page has this in full (source `deliverables/status/where-we-are.html`, republished to the same private link each time).
 
 **North star.** Large, high-quality work from small models running on your own Mac, and nowhere else. The harness squeezes the model to its limit through directed refinement, not random retries.
 
@@ -20,7 +20,7 @@ The living page has this in full: (private link) (source `deliverables/status/wh
 9. Prefill is the number people feel.
 10. No raw red errors.
 11. Reference-quality UI in Bobble's own language.
-12. the user's attention is the scarce resource.
+12. The user's attention is the scarce resource.
 
 **Hard limits.**
 | Limit | Detail |
@@ -121,7 +121,7 @@ Still to check before dropping (not merged): `claude/practical-dhawan-bf1d62` (0
 - Done: the tokens (teal accent, muted `#69696e`, teal focus), Fraunces on screen titles, the three hues on "what it makes" tags, the intro card (3D Studio, Computer use), the pop-out (Segment on the 3D rail, Connectors on the composer's +), the tour on the pop-out's anatomy.
 - Done 2026-10-08 late: Try it plays on every connector's page (the connector demo card).
 - Still to do: the Made card, the toolbar.
-- the user's wider list (10-07): connector explore demos for each connector; the rendering of tables, visuals, office documents and inline cards at the same level.
+- The user's wider list (10-07): connector explore demos for each connector; the rendering of tables, visuals, office documents and inline cards at the same level.
 
 ### 6. Visual quality (pinned since 09-24), what is still open
 | Kind | State |
@@ -236,7 +236,7 @@ Checked: three full `pnpm test --force` runs back to back, 39/39 each, no unhand
 
 ## Report — 2026-10-08: example cards, in place on the real app
 
-**The ask.** Example cards and where they appear: centre-screen popups the first time a feature is used, a connector page showing a sample message sent and done with the tool, and pop-out cards with a "<" notch on hover, an animation on top and Got it bottom right. All of it is in the Design System artifact ((private link), v5) under **In the app** and **Anatomy**. Each in-app card sits over the real app, photographed headless at 2x by `apps/desktop/tests/e2e/design-moments-probe.mjs`. Evidence: `deliverables/design-language-in-app-2026-10-07/`.
+**The ask.** Example cards and where they appear: centre-screen popups the first time a feature is used, a connector page showing a sample message sent and done with the tool, and pop-out cards with a "<" notch on hover, an animation on top and Got it bottom right. All of it is in the Design System artifact (, v5) under **In the app** and **Anatomy**. Each in-app card sits over the real app, photographed headless at 2x by `apps/desktop/tests/e2e/design-moments-probe.mjs`. Evidence: `deliverables/design-language-in-app-2026-10-07/`.
 
 | Card | Where | What plays |
 |---|---|---|
@@ -256,7 +256,7 @@ Checked: three full `pnpm test --force` runs back to back, 39/39 each, no unhand
 
 ## Report — 2026-10-07: Bobble's design language (a Design System artifact)
 
-**The ask.** Bobble's own design language at Anthropic's level, its building blocks and anatomy, without the components yet. Built as a Design System artifact, private to the user: (private link) (source in `design/language/project/`, mirrored byte for byte). Evidence: `deliverables/design-language-2026-10-07/` (every card, light and dark, plus frame strips of each demo).
+**The ask.** Bobble's own design language at Anthropic's level, its building blocks and anatomy, without the components yet. Built as a Design System artifact, private to the user (source in `design/language/project/`, mirrored byte for byte). Evidence: `deliverables/design-language-2026-10-07/` (every card, light and dark, plus frame strips of each demo).
 
 ### What it holds
 | Part | What | Source |
@@ -298,9 +298,9 @@ Checked: three full `pnpm test --force` runs back to back, 39/39 each, no unhand
 | 2 | `pi-tool list` told a CLI model to use `mcp_call`/`mcp_schema`; `pi-tool time --help` was an error | CLI wording; `pi-tool <id>` / `--help` lists that connector's tools | `b0e2b584` | tests; live `pi-tool list` |
 | 3 | Finder PATH: `spawn npx ENOENT` for 27 of 29 catalog servers | look in Homebrew, `~/.local/bin`, cargo, Volta, Bun, newest nvm; that folder in front of the server's PATH; a missing `uvx` runs on the app's own uv; no Node → "This connector runs on Node.js (`npx`), which isn't installed on this Mac…" | `5e1f6599` | tests; the live run above **under the bare Finder PATH** |
 | 4 | The 4B called a tool named `time` ("Tool time not found") | a connector named as a tool runs as the `pi-tool` line it meant | `de91cffa` | tests (the 4B's exact calls); the rerun went straight to `pi-tool time` |
-| 5 | the user: "+ menu … turn (installed) on and off … their actual app / connector icon" | **+ › Connectors**: Browse, Manage, a rule, every installed connector with its real mark and a switch (`DropdownMenuSwitchItem`, one focus stop, stays open); a flip re-opens this chat's session once it is idle | `87d104b6` | `connectors-menu-look.mjs` OK (rows, marks, switch state = registry, flip lands in the file, Manage opens the screen) — `deliverables/connectors-2026-10-06/plus-menu-connectors-*.png` |
+| 5 | The user: "+ menu … turn (installed) on and off … their actual app / connector icon" | **+ › Connectors**: Browse, Manage, a rule, every installed connector with its real mark and a switch (`DropdownMenuSwitchItem`, one focus stop, stays open); a flip re-opens this chat's session once it is idle | `87d104b6` | `connectors-menu-look.mjs` OK (rows, marks, switch state = registry, flip lands in the file, Manage opens the screen) — `deliverables/connectors-2026-10-06/plus-menu-connectors-*.png` |
 | 6 | Blender: the catalog ran `uvx blender-mcp`, a third-party server whose messages Blender Lab's add-on (the one installed) rejects ("Unknown request type") — every call failed; it also carried telemetry and cloud asset tools | **`blender scene | run | render`** — a small command on the add-on's own wire (NUL-terminated `{"type":"execute"}`), registered only where Blender is installed; built-in card shown only where detected | `9f39811a`, `5a8919a5` | fake-add-on tests; the code in Blender 5.2 background (scene read; quick render 1 s, EEVEE 2.7 s at 25%); a **read-only** scene query against the user's running Blender: ok in 452 ms, errors come back as tracebacks |
-| 7 | the user: "standing no emoji's rule" (a wrench emoji on a custom server) | a connector without a mark gets the neutral connector glyph; rule saved | `c2093226` | menu look, zoomed |
+| 7 | The user: "standing no emoji's rule" (a wrench emoji on a custom server) | a connector without a mark gets the neutral connector glyph; rule saved | `c2093226` | menu look, zoomed |
 
 **State.** suites: desktop 3,566 (+1 known timing flake under the full parallel run, passes alone) · ui 431 · harness 1,907 · mcp-lite 110 · mac-connectors 81 · tool-bus 6 · inference 404 · providers 209 / 32 · typecheck clean.
 
@@ -338,7 +338,7 @@ Installed (`pnpm ship:local`, packaged smoke OK); the installed bundle carries t
 
 ## Report — 2026-10-01: a visual-learner student, Bobble × five local models vs ChatGPT (logged out)
 
-**the user's asks.** (1) "drive bobble visually as a user and go and ask for some explanation of some math problem, as a visual learner, maybe 1-3 turns … then … go to the chatgpt.com website and see if you think bobble does better … also test with a few others, gemma4-12b, ling 3 tiny, minicpm 2b and then feasibly comparable to oais model: qwen3.8-27b"; (2) mid-run: "explanation shoudl be inline and inline card should be at the bottom also!"; (3) on the reviewer's "Run this command?" modal: "put this sort of permission popup just as a little card same width as the input bar floating directly above it (not on top of), and make the 'ask user' question modals and any user inputs from the model or for the chat just appear there".
+**The user's asks.** (1) "drive bobble visually as a user and go and ask for some explanation of some math problem, as a visual learner, maybe 1-3 turns … then … go to the chatgpt.com website and see if you think bobble does better … also test with a few others, gemma4-12b, ling 3 tiny, minicpm 2b and then feasibly comparable to oais model: qwen3.8-27b"; (2) mid-run: "explanation shoudl be inline and inline card should be at the bottom also!"; (3) on the reviewer's "Run this command?" modal: "put this sort of permission popup just as a little card same width as the input bar floating directly above it (not on top of), and make the 'ask user' question modals and any user inputs from the model or for the chat just appear there".
 
 **How it was run.** One student, the same opening for every system: *"hi! im a really visual learner and i never got why the area of a circle is πr². like where does the r squared even come from?? can you show me so it actually makes sense"*, then follow-ups a confused student would really send, adapted to what each answer showed. Bobble was driven headless (`apps/desktop/tests/e2e/drive-server.mjs`) by clicks, typing and full-window screenshots only — the one thing read from the page is whether Stop is showing. ChatGPT in the built-in browser, logged out, no account.
 
@@ -370,9 +370,9 @@ Installed (`pnpm ship:local`, packaged smoke OK); the installed bundle carries t
 | 7 | Ling · "Done" over nothing after the loop guard's abort | after an abort, once idle: "You were stopped: … answer in words" | `983c600b` | wiring test |
 | 8 | MiniCPM · the window froze (126 % CPU, 1.7 GB; the inspector could not attach) | rows memoized on stable step data; a row's details made when first opened | `3d9c1ac1` | replayed offline: an update 130 ms → 1 ms at 183 steps, DOM 11.7k → 3.3k |
 | 9 | Qwen 27B · "fetch failed" ×2, "working" forever with 79 % free | the guardian resumes the model it parked; a parked model is woken before a send | `19b42a23` | test; rerun: the park was refused mid-request and the turn answered |
-| 10 | the user · "explanation should be inline" | the math command's page is an inline Explanation card (any size), its raw view the spec | `f38dbfb0` | Qwen 27B's turn 1 (screenshot) |
-| 11 | the user · "inline card should be at the bottom" | finished cards stand at the reply's foot, after its words | `483d1595` | test; Qwen 27B's turn 1 |
-| 12 | the user · permission modal → a card above the input | AskCard: permission, yes/no, ask_user, select/input — one card the composer's width, in the flow above it; Escape = Don't | `67733bbc` | ask-card-look (width = composer's, bottom above its top), 5 suite probes |
+| 10 | The user · "explanation should be inline" | the math command's page is an inline Explanation card (any size), its raw view the spec | `f38dbfb0` | Qwen 27B's turn 1 (screenshot) |
+| 11 | The user · "inline card should be at the bottom" | finished cards stand at the reply's foot, after its words | `483d1595` | test; Qwen 27B's turn 1 |
+| 12 | The user · permission modal → a card above the input | AskCard: permission, yes/no, ask_user, select/input — one card the composer's width, in the flow above it; Escape = Don't | `67733bbc` | ask-card-look (width = composer's, bottom above its top), 5 suite probes |
 | 13 | Ling · "Worked for 52s" over a sixteen-minute turn | "Worked for" is never less than the chain's wall-clock span (its first request to its last result) | `9c72996b` | test |
 | — | the drive tooling | drive-server (+ /quit stops the model first), fetch-models-probe | `1a179826` | used for every run |
 
@@ -393,7 +393,7 @@ Installed (`pnpm ship:local`, packaged smoke OK); the installed bundle carries t
 
 ## Report — 2026-09-26 day: maths explanations the model makes itself
 
-**the user's asks.** (1) "it should really feel like there's an explanation going on … like a 3b1b explanation … smooth move/scale/slide … it has to show direction … little nudges … visual cause and effect … a real teacher"; (2) on the SHM page and the proof: "focus on the math animations and explanations right now, generated by the model itself, everything should be clean and clear, there's some faded text … triangles could be a solid color".
+**The user's asks.** (1) "it should really feel like there's an explanation going on … like a 3b1b explanation … smooth move/scale/slide … it has to show direction … little nudges … visual cause and effect … a real teacher"; (2) on the SHM page and the proof: "focus on the math animations and explanations right now, generated by the model itself, everything should be clean and clear, there's some faded text … triangles could be a solid color".
 
 **How it was judged.** Only pages the 4B wrote itself (qwen3.5-4b-mtp, headless visual suite, 5-minute cap per task), filmed at 1 s … 48 s of their telling. Every failure became a general reader or harness fix — never a hand-made page — and the 4B's own specs were then redrawn with the new reader for before/after. A library of worked examples for the model to copy was considered and rejected: it would be my pages, not the model's.
 
@@ -440,7 +440,7 @@ Installed (`pnpm ship:local`, packaged smoke OK); the installed bundle carries t
 
 ## Report — 2026-09-26 00:30 (hard stop): the showcase, the math extension, OmniSVG 1.1, VFIG, the blue kit
 
-**the user's asks this round.** (1) the math extension: "a standard style and control such that we can deterministically have it iterate when things look off"; (2) "remove token limit on vfig"; (3) "are we using omnisvg 1.1? … check the 8b model @ q8"; (4) "this greenish/pale blue isn't that great … keep using [the app's blue]"; (5) "if asked for pythagorean theorem explanation visually, do you have text that appears side by side as the triangles are rearranged"; (6) wrap-up: one fresh prompt per visual kind, screenshots, this report.
+**The user's asks this round.** (1) the math extension: "a standard style and control such that we can deterministically have it iterate when things look off"; (2) "remove token limit on vfig"; (3) "are we using omnisvg 1.1? … check the 8b model @ q8"; (4) "this greenish/pale blue isn't that great … keep using [the app's blue]"; (5) "if asked for pythagorean theorem explanation visually, do you have text that appears side by side as the triangles are rearranged"; (6) wrap-up: one fresh prompt per visual kind, screenshots, this report.
 
 **State.** main `db67f548` (38 commits since `741d317d`), dist rebuilt at `db67f548` (headless launch checked) · installed build still `c034085d` — **not installed tonight** (hard stop; `pnpm ship:local` is the next step) · suites: harness 1,878 · mathviz 49 · gen-tools 64 · design-kit 41 · charts 130 · office-gen 184 (Python) · the desktop files touched 116 · top-level typecheck clean.
 
@@ -470,7 +470,7 @@ Sheet: `deliverables/visual-quality/showcase-2026-09-26.png` (the products, look
 | …the fixes: an unreadable view is **fitted to the shapes** (every slider setting and step); `[w, h, d]` boxes; title optional; the no-plot error shows a moving example; the result says what the page has ("Nothing on it moves — it has no sliders"); **a written `.math.json` is drawn in the write's own result**; a hand-drawn maths SVG is refused toward math; a maths-figure image prompt is answered with math | `7edd1ce5` | 27 harness + 45 gen-tools + 5 mathviz tests |
 | New checks: labels with no clear spot (on a point or a solid disc, crossed by a line) said as one list; two arrows on the same ends; labels keep off solid discs | `7edd1ce5` | the five fixtures stay clear; the 4B's circle at a 3.2-wide view names fewer labels |
 | Motion: `lerp`, `ease`, `between`, `clamp`; any part's `opacity` as an expression; dimming drawn as opacity; the **Pythagorean rearrangement** fixture (Next slides each triangle; c² fades out, a² and b² fade in) | `8a120df6` | tests (Node = page JS); steps 1/3/5 looked at |
-| the user's brief (2026-09-26): "like a 3b1b explanation … smooth move/scale/slide … show direction … little nudges … visual cause and effect … a real teacher" | `abe13463` | BUILT — the 2026-09-26 day report above |
+| The user's brief (2026-09-26): "like a 3b1b explanation … smooth move/scale/slide … show direction … little nudges … visual cause and effect … a real teacher" | `abe13463` | BUILT — the 2026-09-26 day report above |
 
 ### I. OmniSVG 1.1 — "fails this badly" was our image path
 | Finding | Fix | Evidence |
@@ -525,7 +525,7 @@ Sheet: `deliverables/visual-quality/showcase-2026-09-26.png` (the products, look
 
 **Prefill (the prompt changes):** the video guideline, the page-photos sentence and (since removed) the not-set-up line: the system prompt is 10,224 characters; first-token probe on the 4B: 372 ms, 3,571 of 3,689 prompt tokens from the warm prefix, no re-prefill. The teach skill never enters the system prompt (it rides beside the one message that asks, once per chat); its cost is measured on the STEM run.
 
-### G. the user's new asks (evening)
+### G. The user's new asks (evening)
 | Ask | State |
 |---|---|
 | "make ggufs using unsloth dynamic ideally, run q6_k_m for all" | ✅ `tools/gguf-export` (`4930c820`): llama.cpp has no Q6_K_M; Unsloth's Q6 is UD-Q6_K_XL — its per-tensor recipe read off Unsloth's own GGUF headers for each base (attention q/k/v at Q8_0 in every layer, ffn_down in 10 layers and gate/up in 5 at Q8_0, embeddings Q8_0, the rest Q6_K) and applied to the fine-tunes. VFIG-4B 3.66 GB and IntroSVG-7B 6.96 GB — exactly Unsloth's base sizes; HiVG-3B 3.03 GB (+0.26 GB: its own output head). Downloads deleted after; the training dashboard's export is design-only (TR-10/11), so this is the piece it will call |
@@ -605,7 +605,7 @@ Every row below was reproduced first (a failing test, or a probe/filmstrip on th
 | **The authors' own bf16 PyTorch pipeline, same 19 prompts** (their `generate` settings, run on this Mac, 17:00) | **loops 26% (ours 25%, with their sampler 17%); icons equal to ours; characters equally hit-and-miss** (it drew a clean avatar and the pink-✕ scene where ours missed, and missed the running figure and the silhouette where ours drew them) | **the conversion and our pipeline are at parity with theirs.** Their showcase characters are best-of-many picks. What is left is how the chat model uses it: caption-style prompts, and single icons/pictograms/marks + tracing (its strengths) over characters — the guidance change is next after the suite's baseline (with a prefill check) |
 
 ### E. The overall request, by request
-| the user asked | State |
+| The user asked | State |
 |---|---|
 | "omnisvg should be really good … figure this out" | ✅ figured out: our Q8 pipeline is at parity with the authors' own bf16 pipeline (loops 25% vs 26%, icons equal, characters equally hit-and-miss); the loops are cut and redrawn now, the sampler is theirs; the remaining lever is caption-style prompts from the chat model (queued after the suite) |
 | "why such a pale blue" | ✅ |

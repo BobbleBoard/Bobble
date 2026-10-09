@@ -68,7 +68,7 @@ export function tierRank(tier: ModelTier): number {
  * This used to classify every send, map the guessed task class to a tier, and
  * hard-restart llama-server whenever the tier moved — seconds of dead air in the
  * middle of a conversation, plus a full re-prefill, decided by which keywords
- * happened to be in one message. the user: "totally remove task classification, that
+ * happened to be in one message. The user: "totally remove task classification, that
  * should have been a deprecated feature so long ago."
  *
  * Auto now means "the best model this machine actually runs": the most capable
@@ -606,7 +606,7 @@ export function ensureChatServerReady(): Promise<void> {
    * THIS USED TO SKIP ON `?piE2E` — the SAME flag that unlocks `window.__pi_store`
    * for probes. So the moment a probe made the app observable, it also stopped it
    * ever starting a model: every turn answered "fetch failed", and every live
-   * probe in this repo has been driving a deliberately server-less app. the user,
+   * probe in this repo has been driving a deliberately server-less app. The user,
    * after I reported it as a possible inference bug: "the fetch failed thing has
    * always been something with your probes."
    *
@@ -762,7 +762,7 @@ export async function selectAuto(): Promise<void> {
  * the Auto router this is an explicit choice, so there's no hysteresis: switch
  * immediately when the model is downloaded.
  *
- * the user #4: a tier whose model ISN'T on disk can't become the active selection —
+ * The user #4: a tier whose model ISN'T on disk can't become the active selection —
  * picking it opens the friendly download flow WITHOUT pinning a model that isn't
  * present (so the chip never claims a non-downloaded tier is active, and the
  * checkmark never lies). The tier only becomes active after the download lands.
@@ -783,7 +783,7 @@ export async function selectAuto(): Promise<void> {
  * the same session and re-points the provider; picking a model by name did none
  * of that. So the choice was recorded, the picker drew its checkmark against
  * it, and the inference server carried on holding whatever was already resident
- * — which is why the user's composer chip kept saying "Qwen3.5 4B (MTP)" after he
+ * — which is why the user's composer chip kept saying "Qwen3.5 4B (MTP)" after the user
  * picked LFM (it was reporting the truth), and why the very next turn answered
  * "fetch failed": pi had been re-pointed at a provider model nobody had loaded.
  *

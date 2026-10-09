@@ -37,7 +37,7 @@ export interface ShellWrite {
    *
    * Without this the live canvas got a path and an empty string, and the tab
    * renders no artifact for empty content, so a file the agent had just written
-   * opened BLANK. the user: "when we clicked on a file it just wrote to it looked
+   * opened BLANK. The user: "when we clicked on a file it just wrote to it looked
    * blank". Tool `write`/`edit` already carried their body; a heredoc is how
    * these agents actually write, and it carried nothing.
    */

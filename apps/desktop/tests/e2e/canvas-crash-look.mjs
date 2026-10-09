@@ -1,7 +1,7 @@
 /**
  * THE CANVAS FAILS; THE WINDOW STAYS — and LOOK at it.
  *
- * the user: "renderer crash is what needs fixing immediately and most, that cannot
+ * The user: "renderer crash is what needs fixing immediately and most, that cannot
  * happen". The assessment saw the whole window vanish behind the app-level
  * boundary twice, mid-turn, from a loop inside the canvas rail.
  *

@@ -1,7 +1,7 @@
 /**
  * ROUND 2 — THE TWO MODALITIES A REAL RUN HAD NOT TOUCHED.
  *
- * the user: "stress tests of downloading, wrangling with settings models and such
+ * The user: "stress tests of downloading, wrangling with settings models and such
  * for ALL modalities". The settings probe drives every room's knobs offline and
  * image-edit-real-probe spends a GPU on the picture path; audio and 3D had been
  * checked as UI and never as work. This closes that: a real speech generation

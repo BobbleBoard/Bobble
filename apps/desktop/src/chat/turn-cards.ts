@@ -2,13 +2,13 @@
  * WHERE A FINISHED CARD SITS — inside the activity chain that made it, or
  * beneath it.
  *
- * the user (2026-09-24, first): "generations/inline cards of any kind always seem to
+ * The user (2026-09-24, first): "generations/inline cards of any kind always seem to
  * get pinned to the bottom of the chat for quite some time, including during
  * working/iteration … on each of it's iterations the full image cards are
  * presented at the very bottom of the chat as if totally finished, these should
  * be embedded in thinking blocks, not the generating card, that stays out".
  *
- * the user (2026-09-24, later): "have generated stuff go inside a thought process at
+ * The user (2026-09-24, later): "have generated stuff go inside a thought process at
  * first and only show outside the thought process if present is called on it,
  * still clickable within the thought process embed it smaller than full inside
  * the work/think block where it was generated, just no hover buttons and such

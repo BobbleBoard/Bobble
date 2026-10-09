@@ -357,7 +357,7 @@ describe('diagramLook / diagramLookCss — the Bobble look', () => {
     expect(css).toContain(`font-size: ${DIAGRAM_TYPE.group}px`);
     expect(DIAGRAM_TYPE.edge).toBeLessThan(themes.light.fontSize);
     // A step: the kit's flat surface and a solid border at the edges' weight
-    // (the user, 2026-09-25: "clean solid borders") — never the full ink.
+    // (The user, 2026-09-25: "clean solid borders") — never the full ink.
     expect(css).toContain(
       `.node path { fill: ${themes.light.surface}; stroke: ${diagramLook(themes.light).nodeEdge}; stroke-width: 1.5px;`,
     );
@@ -490,7 +490,7 @@ describe('PATH_TOOLS_JS — the look’s geometry, run as the page runs it', () 
   });
 
   it('draws an open ">" with its point where it is asked — never a closed triangle', () => {
-    // the user (2026-09-25): "arrows should not be triangles".
+    // The user (2026-09-25): "arrows should not be triangles".
     expect(P.openChevron(1, 0, 6, 4)).toBe('M-6,4L0,0L-6,-4');
     expect(P.openChevron(-1, 0, 6, 4)).toBe('M6,4L0,0L6,-4');
     expect(P.openChevron(1, 0, 6, 4)).not.toMatch(/Z/i);

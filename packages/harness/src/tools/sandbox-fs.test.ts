@@ -288,7 +288,7 @@ describe('registerSandboxFileTools gating', () => {
 });
 
 /*
- * the user: "an earlier godot max effort run left a folder on my desktop that is
+ * The user: "an earlier godot max effort run left a folder on my desktop that is
  * called 'users' and has a hilarious path in it:
  * /Users/user/Desktop/Users/user/Desktop/platformer_game".
  *
@@ -298,9 +298,9 @@ describe('registerSandboxFileTools gating', () => {
  */
 describe('a dropped leading slash is not a relative path', () => {
   it('repairs the exact shape the user found', () => {
-    expect(resolveWorkspacePath('Users/the user/Desktop/platformer_game', '/Users/user/Desktop')).toBe(
-      '/Users/user/Desktop/platformer_game',
-    );
+    expect(
+      resolveWorkspacePath('Users/user/Desktop/platformer_game', '/Users/user/Desktop'),
+    ).toBe('/Users/user/Desktop/platformer_game');
   });
 
   it('covers the other root-only directories', () => {
@@ -627,7 +627,9 @@ describe('outsideWorkspaceRefusal', () => {
 });
 
 describe('suggestWorkspaceRelative', () => {
-  const ROOT = '/Users/user/bobble-testbed/localconvert';
+  // Under the real home: `~/…` expands against os.homedir(), so a root anywhere
+  // else would share only `/Users` with it on some machines and not on others.
+  const ROOT = path.join(os.homedir(), 'bobble-testbed', 'localconvert');
 
   it('drops a leading segment that duplicates the workspace basename', () => {
     expect(suggestWorkspaceRelative('/localconvert/index.html', ROOT)).toBe('index.html');

@@ -1,7 +1,7 @@
 /**
  * THE TEACH SKILL, ATTACHED WHEN SOMEONE ASKS TO LEARN.
  *
- * the user (2026-09-25): "test some math/physics/chemistry... practice problem
+ * The user (2026-09-25): "test some math/physics/chemistry... practice problem
  * requests … having diagrams/visuals and animating them cleanly to go along
  * with an explanation when informative, find some teaching guidelines
  * somewhere and add a teach skill.md file that you can figure out how to work

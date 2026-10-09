@@ -87,7 +87,7 @@ export interface ProjectPickerProps {
   /**
    * FULL ACCESS, for the project currently selected.
    *
-   * the user: "in projects, add a 'full access' mode — red, with an ! in a circle —
+   * The user: "in projects, add a 'full access' mode — red, with an ! in a circle —
    * that gives the model full reign and full access … no sandboxing." It lives
    * at the foot of this menu because this is where "which project am I in" is
    * decided, and the mode belongs to that answer. Omit `onToggleFullAccess` and
@@ -119,7 +119,7 @@ export function ProjectPicker({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   /* "New project" used to fire immediately — in the app that opened a folder
-     picker, which registered a working directory the sidebar never showed. the user
+     picker, which registered a working directory the sidebar never showed. The user
      wants a project you NAME, that appears in both places. So the row becomes an
      input in place; nothing is created until it is given a name. */
   const [naming, setNaming] = useState(false);
@@ -315,7 +315,7 @@ export function ProjectPicker({
                 FULL ACCESS. Deliberately last, deliberately red, and deliberately
                 a switch rather than a row that "does something" — it is a mode you
                 leave on, so it has to read as on. The exclamation in a circle is
-                the user's, and it is the right glyph: this is the one control here
+                The user's, and it is the right glyph: this is the one control here
                 that can let a model touch anything on the machine.
               */}
               {onToggleFullAccess !== undefined ? (

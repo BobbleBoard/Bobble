@@ -1,7 +1,7 @@
 /**
  * The memory guard: refuse a model that would take the whole machine down.
  *
- * the user, while a 27B was coming up on a 24GB Mac: "whole computer now has lots of
+ * The user, while a 27B was coming up on a 24GB Mac: "whole computer now has lots of
  * lag and purple flashes on parts of the screen, stuttering of mouse cursor etc.
  * not good, checkerboardings..." — then: "we should have guards in place to
  * ensure based on available memory we're not straining anything to a dangerous

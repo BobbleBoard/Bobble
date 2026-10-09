@@ -1,7 +1,7 @@
 /**
  * Settings → Harness. Pick the coding agent, or connect an external one.
  *
- * the user: "add that harness swapping mechanism in full working easily… we want
+ * The user: "add that harness swapping mechanism in full working easily… we want
  * codex, claude code, hermes, pi, opencode, or other I guess? ideally easily
  * support for other dropping in any custom pi config somehow. system pi detected
  * and put in also."
@@ -277,7 +277,7 @@ function ToolInterfaceSection() {
       title="Tool interface"
       description="How the model reaches everything it can do."
     >
-      {/* the user: "ensure there is a cli connector for the specialists that is by
+      {/* The user: "ensure there is a cli connector for the specialists that is by
           default there and enabled". Specialists and subagents get their own
           switch, CLI by default, whatever the chat itself uses. */}
       <SettingRow

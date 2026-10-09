@@ -1,7 +1,7 @@
 /**
  * The warning mark: a circle with an exclamation in it.
  *
- * the user, on an image attached to a model that cannot read one: "show a yellow
+ * The user, on an image attached to a model that cannot read one: "show a yellow
  * circle + ! on images both in chat input and when sent." It is drawn here
  * rather than pulled from the icon set because the set has no filled warning
  * mark, and the badge has to read at 14px over a photograph — which needs the

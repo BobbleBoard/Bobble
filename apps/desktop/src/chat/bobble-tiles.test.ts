@@ -7,7 +7,7 @@ import { BOBBLE_CELLS, BOBBLE_TILES, bobbleLap, TILE_SCHEDULE, tileAt } from './
 /*
  * A SLIDING PUZZLE HAS A RULE, so it can be broken.
  *
- * the user asked for the app mark's three squares to slide clockwise "like a sliding
+ * The user asked for the app mark's three squares to slide clockwise "like a sliding
  * tile puzzle". What separates that from three squares orbiting a point is
  * exactly this: only the tile beside the hole moves, it moves into the hole, and
  * it moves to an ADJACENT cell. Two tiles in one cell, or a tile crossing the

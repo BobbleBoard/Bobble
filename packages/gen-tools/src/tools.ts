@@ -763,7 +763,7 @@ function registerSvgTool(pi: ExtensionAPI, bridge: GenBridge | null, engines: Sv
     name: GENERATE_SVG_TOOL,
     label: 'Generate: SVG',
     description:
-      /* the user (2026-09-24): "I feel like there's something wrong with omnisvg or
+      /* The user (2026-09-24): "I feel like there's something wrong with omnisvg or
          maybe just how it's used" — every graphic was routed here, including
          icon sets and logos with names, which OmniSVG cannot make; the model
          now writes those itself and checks them with present. */

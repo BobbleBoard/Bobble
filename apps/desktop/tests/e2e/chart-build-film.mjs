@@ -3,7 +3,7 @@
  * arrive, and the finished card taking over (chart-build-look.mjs photographs
  * the states; this films the moves between them).
  *
- * the user (2026-09-25): build "in real time smoothly … apply that to whatever
+ * The user (2026-09-25): build "in real time smoothly … apply that to whatever
  * possible generally". A bar chart's call is played into the store the way a
  * turn streams it (its argsText growing value by value), then presented and
  * answered; the CDP screencast films the thread and every animation frame's

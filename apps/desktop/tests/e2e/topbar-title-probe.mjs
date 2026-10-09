@@ -1,7 +1,7 @@
 /**
  * THE TOP-BAR TITLE RIDES THE SIDEBAR — it does not jump ahead of it.
  *
- * the user: "when clicking the open/collapse sidebar buttons the top left text eg.
+ * The user: "when clicking the open/collapse sidebar buttons the top left text eg.
  * 'image studio' snaps to the left briefly fix this flicker."
  *
  * The title's left edge is `sidebar slot width + the section's padding`, and the

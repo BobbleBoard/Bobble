@@ -114,7 +114,7 @@ describe('any form of verification is acceptable', () => {
 });
 
 describe('the first call is a last look, the second hands it over', () => {
-  // the user's shape. It puts one deliberate pause between "I think I am done" and
+  // The user's shape. It puts one deliberate pause between "I think I am done" and
   // the manager's time, and it gives the tool a terminal state again — which it
   // lost when the refusals went, after which run 21's engineer submitted the same
   // summary eleven times because "Recorded" reads as an acknowledgement.
@@ -240,7 +240,7 @@ describe('the pause is built from the claims just made', () => {
     return res.content[0]?.text ?? '';
   };
 
-  /* the user: "list out every claim that was just made about the final product state
+  /* The user: "list out every claim that was just made about the final product state
    * and verify it completely". The old pause had summary/verification in hand and
    * ignored both, which is how a run shipped four .svg files that did not exist. */
   it("lists the engineer's own claims back, numbered", async () => {

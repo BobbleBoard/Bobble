@@ -6,7 +6,7 @@
  * its own attachment list and calls `clear()`, mirroring the `composerText`
  * hand-off pattern.
  *
- * A MESSAGE BEING EDITED TAKES PRECEDENCE. the user: "drag and drop needs to be able
+ * A MESSAGE BEING EDITED TAKES PRECEDENCE. The user: "drag and drop needs to be able
  * to go into messages being edited." While an edit is open, that turn — not the
  * composer — is the message you are composing, and dropping a file into the box
  * you are typing in should attach it there. The claim is registered by whoever

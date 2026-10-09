@@ -1,7 +1,7 @@
 /**
  * THE CARD BEFORE THERE IS ANYTHING IN IT — which is the same card.
  *
- * the user, on the row this replaces (a thumbnail, a sentence about the engine, an
+ * The user, on the row this replaces (a thumbnail, a sentence about the engine, an
  * elapsed clock and a Stop button):
  *
  *   "no, but this type of card is not what I want, just the same final video
@@ -18,7 +18,7 @@
  * frame.
  *
  * ## The ground and the number (2026-09-24)
- * the user, with ChatGPT's image card beside ours: "I don't actually think there is
+ * The user, with ChatGPT's image card beside ours: "I don't actually think there is
  * a difference between the background color of the generation card and the chat
  * area, what I want here is for there to be a distinct black background card
  * that makes it feel raised, not lowered, but without a border, just quick but
@@ -46,7 +46,7 @@
  * The frame takes the job's aspect ratio as soon as anything knows it, and
  * transitions between shapes. A 16:9 clip that loaded in a square box would jump
  * the column under the reader at the exact moment they are looking at the result;
- * the user allowed "a quick smooth resize", and this is it.
+ * The user allowed "a quick smooth resize", and this is it.
  */
 import { type CSSProperties, type JSX, useEffect, useRef, useState } from 'react';
 import { idleWave, peaksOf, WAVE_BUCKETS } from '../chat/audio-peaks';
@@ -110,7 +110,7 @@ export const EDIT_PHASES: readonly string[] = [
 const IDLE_WAVE = idleWave(WAVE_BUCKETS);
 
 /**
- * THE AUDIO WAIT IS A WAVEFORM. the user (2026-09-11): "for audio you can show some
+ * THE AUDIO WAIT IS A WAVEFORM. The user (2026-09-11): "for audio you can show some
  * pulsing waveforms that eventually at the end form into a real waveform
  * that's playable." The mark's board never fitted a 50px strip; this is the
  * transport's own box with its bars pulsing at a stand-in shape and the phrase
@@ -287,7 +287,7 @@ function rememberPrior(kind: PendingKind, msPerUnit: number | undefined): void {
 /**
  * THE NUMBER, IN A PILL IN THE CARD'S CORNER.
  *
- * the user (2026-09-24): "that terminal logging style text below it needs to go,
+ * The user (2026-09-24): "that terminal logging style text below it needs to go,
  * maybe just drop the entirety of the bar and such, show a little bordered pill
  * at the bottom right of the image card that says n% and smoothly goes up". The
  * engine's steps are a staircase; `progress-estimate` turns them into a slope at

@@ -6,8 +6,8 @@ import { usePiStore } from './pi-slice';
 /**
  * A SEND THAT WAS REFUSED HAS TO SAY SO.
  *
- * the user, with a screenshot of a thread that stayed that way indefinitely: "it
- * looked like this by the way that whole time, blank screen" — his message on
+ * The user, with a screenshot of a thread that stayed that way indefinitely: "it
+ * looked like this by the way that whole time, blank screen" — their message on
  * screen, nothing beneath it, no reply, no error, no processing ring, no Stop
  * button. The app looked idle and willing; it had swallowed the rejection.
  *
@@ -88,7 +88,7 @@ describe('reportRejectedSend', () => {
 
 describe('a stale in-flight marker never survives a chat switch', () => {
   /*
-   * the user: "on the startup of the application I click anywhere and it shows me as
+   * The user: "on the startup of the application I click anywhere and it shows me as
    * if I sent a blank message... stays there indefinitely."
    *
    * `promptInFlight` draws the processing ring and is normally cleared by

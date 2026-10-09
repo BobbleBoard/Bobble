@@ -1,7 +1,7 @@
 /**
  * THE TWELVE RUNS, one after another, unattended.
  *
- * the user's matrix: Chrome x3, Maps x3, Blender x6, across the three models — the
+ * The user's matrix: Chrome x3, Maps x3, Blender x6, across the three models — the
  * spread that says what computer use costs on an app that publishes a real
  * Accessibility tree (Maps), one that publishes a page behind a browser
  * (Chrome), and one that publishes nothing at all (Blender, three elements).
@@ -14,9 +14,11 @@
 import { execFile } from 'node:child_process';
 import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url)).replace(/\/$/, '');
 
 const MODELS = ['qwen3.5-4b-mtp', 'qwen3.5-9b-mtp', 'qwen3.8-27b-mtp'];
-const OUT = process.env.MATRIX_OUT ?? '/Users/user/Desktop/OSS-harness/scratchpad/demos/matrix';
+const OUT = process.env.MATRIX_OUT ?? `${REPO_ROOT}/scratchpad/demos/matrix`;
 mkdirSync(OUT, { recursive: true });
 const LEDGER = path.join(OUT, 'ledger.jsonl');
 

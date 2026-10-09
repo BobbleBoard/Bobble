@@ -1,7 +1,7 @@
 /**
  * ATTACHMENT CHIPS: a box that opens, a selection you can copy, and an undo.
  *
- * the user's brief, in his order:
+ * The user's brief, in their order:
  *   "no name shown, just a box as shown, a bit bigger, and then slide to the
  *    right open when it's hovered over … show name a bit smaller and higher,
  *    truncate name if too long, show centered dot, file extension, then below
@@ -83,7 +83,7 @@ try {
 
   /* ── 2. CLICKED: it slides open to the right ──────────────────────────── */
   /*
-   * the user: "not on hover but on click expand them." Hover-to-expand meant that
+   * The user: "not on hover but on click expand them." Hover-to-expand meant that
    * dragging the pointer across a row of files opened and shut each one in turn,
    * so the row moved while you were trying to point at something in it.
    */
@@ -143,7 +143,7 @@ try {
   /* ── 5. Undo an accidental removal ────────────────────────────────────── */
   /*
    * The real flow now: click the chip to open it, then the X at the top right of
-   * the preview. the user: "put the X just at the top right of the preview shown on
+   * the preview. The user: "put the X just at the top right of the preview shown on
    * hover only."
    */
   const first = (await page.$$('[data-testid="attach-chip"]'))[0];

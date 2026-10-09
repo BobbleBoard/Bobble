@@ -53,7 +53,7 @@ describe('summarizeActivity', () => {
 
   it('collapses past TWO distinct actions rather than listing them', () => {
     /*
-     * the user: "if the message shown on tool call blocks exceeds 2 distinct
+     * The user: "if the message shown on tool call blocks exceeds 2 distinct
      * actions simply collapse it to say 'worked' for <time> rather than list
      * everything out." Two still reads as a sentence; three is a list.
      */
@@ -150,7 +150,7 @@ describe('formatDuration', () => {
     expect(formatDuration(45_000)).toBe('45s');
   });
 
-  /* the user: "'worked for ah nm rs' please. no 0s." */
+  /* The user: "'worked for ah nm rs' please. no 0s." */
   it('keeps the seconds on a long duration instead of truncating them', () => {
     expect(formatDuration(3600_000 + 20 * 60_000 + 5_000)).toBe('1h 20m 5s');
   });
@@ -305,7 +305,7 @@ describe('a rejected call is not work done', () => {
 
 describe('a prefilling turn is not a settled one', () => {
   /*
-   * the user, watching a run sit silent: "we can't see what the model is doing right
+   * The user, watching a run sit silent: "we can't see what the model is doing right
    * now at this moment… we need to have an idea of what's going on at all times."
    *
    * The chain's "Done" is inferred from quiet, and a long prompt ingest is quiet:
@@ -326,7 +326,7 @@ describe('a prefilling turn is not a settled one', () => {
 /**
  * EVERY TOOL ROW OPENS TO SOMETHING.
  *
- * the user: "find out all tool calls that are not able to be clicked on for an
+ * The user: "find out all tool calls that are not able to be clicked on for an
  * expansion." Two separate ways a row went dead, and both are pinned here:
  *
  *   1. kinds that fell through to `default: return false` — browser
@@ -488,7 +488,7 @@ describe('hasInlineContent — no tool row is a dead end', () => {
 
     for (const kind of ['tool', 'tool-search', 'connector'] as const) {
       it(`${kind} still opens on its RESULT only, never raw args`, () => {
-        // the user's earlier call: no schema-noise reveal for generic tool rows.
+        // The user's earlier call: no schema-noise reveal for generic tool rows.
         // Left deliberately untouched — args alone must not open an empty box.
         expect(hasInlineContent({ kind, label: 'x', output: 'done' })).toBe(true);
         expect(hasInlineContent({ kind, label: 'x', argsText: '{"a":1}' })).toBe(false);
@@ -515,7 +515,7 @@ describe('hasInlineContent — no tool row is a dead end', () => {
 /*
  * THE PREMATURE-DONE RULE, finally locked down.
  *
- * the user reported this three times — "why is there green here… premature done",
+ * The user reported this three times — "why is there green here… premature done",
  * "the premature done just needs to be fixed now though… it doesn't say done
  * until it's truly totally done", "done is a final thing. This tool chain is
  * DONE." Each fix was a one-line change to an expression inside a 200-line

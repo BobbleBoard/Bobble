@@ -1,12 +1,12 @@
 /**
  * THE BLUE/WHITE OUTLINE ON DROPDOWNS, BUTTONS AND MENUS.
  *
- * the user, twice now: a ring appears around controls he has only ever clicked.
+ * The user, twice now: a ring appears around controls the user has only ever clicked.
  * The stylesheet already gates every `--pd-*` ring behind `:focus-visible` and
  * additionally kills the UA outline on mouse `:focus`, so the CSS is not the
  * bug — something is making `:focus-visible` MATCH after a pointer interaction.
  *
- * This reproduces it the way he hits it, and reports the two things that
+ * This reproduces it the way the user hits it, and reports the two things that
  * distinguish the causes: whether the element matches `:focus-visible`, and
  * what outline it is actually painting. It screenshots each step so the
  * before/after is a picture rather than an assertion.
@@ -22,9 +22,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { launchApp } from './harness.mjs';
 
-const OUT =
-  process.env.OUT ??
-  '<session-scratchpad>/ring';
+const OUT = process.env.OUT ?? '<session-scratchpad>/ring';
 mkdirSync(OUT, { recursive: true });
 
 const home = mkdtempSync(path.join(tmpdir(), 'pd-ring-home-'));

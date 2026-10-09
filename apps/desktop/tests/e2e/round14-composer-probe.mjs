@@ -258,7 +258,7 @@ try {
   const effortBtn = page.locator('[data-testid="composer-effort"]');
   await effortBtn.waitFor({ timeout: 8000 });
   // In the default auto state the button reads the literal "Effort · Adaptive"
-  // (the user #12: a DISTINCT word from the model chip's "Auto" so the two never read
+  // (The user #12: a DISTINCT word from the model chip's "Auto" so the two never read
   // as duplicate "Auto"s) — NOT the resolved level, even though the balanced tier
   // is routed and the slider knob rests at the balanced tick.
   await page.waitForFunction(

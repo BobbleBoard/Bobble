@@ -27,7 +27,10 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { demoRun } from './demo-run.mjs';
+
+const REPO_ROOT = fileURLToPath(new URL('../../../../', import.meta.url)).replace(/\/$/, '');
 
 const MODEL = process.env.MAC_CU_MODEL ?? 'qwen3.5-9b-mtp';
 const MODE = process.env.TOOL_INTERFACE === 'schemas' ? 'schemas' : 'bash-cli';
@@ -58,7 +61,7 @@ const SHAPE = SHAPES[Math.floor(Math.random() * SHAPES.length)] ?? SHAPES[0];
  * seen" from "can you find a menu in a dense custom interface".
  */
 const NO_SPLASH = process.env.NO_SPLASH === '1';
-const SCENE = '/Users/user/Desktop/OSS-harness/scratchpad/demos/empty-scene.blend';
+const SCENE = `${REPO_ROOT}/scratchpad/demos/empty-scene.blend`;
 
 /**
  * Ask the running Blender what is in its scene.
@@ -125,7 +128,7 @@ await demoRun({
     let shotPath = null;
     if (shot?.base64) {
       const dir = path.join(
-        '/Users/user/Desktop/OSS-harness/scratchpad/demos',
+        `${REPO_ROOT}/scratchpad/demos`,
         process.env.RUN_NAME ?? `blender-${MODEL}-${MODE}`,
       );
       mkdirSync(dir, { recursive: true });

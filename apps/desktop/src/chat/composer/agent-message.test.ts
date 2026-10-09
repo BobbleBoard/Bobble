@@ -92,7 +92,7 @@ describe('buildAgentMessage', () => {
 });
 
 /*
- * PATHS (2026-09-24). the user: "why not handle this natively so that any
+ * PATHS (2026-09-24). The user: "why not handle this natively so that any
  * image(s)/files/folders... can be pasted into the input box". Everything with
  * a file behind it is named to the model by its path, so its tools can open it.
  */

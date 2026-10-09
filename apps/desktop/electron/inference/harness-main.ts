@@ -1,7 +1,7 @@
 /**
  * FINDING THE CODING HARNESSES ALREADY ON THIS MACHINE.
  *
- * the user: "system pi detected and put in also". A harness picker that lists agents
+ * The user: "system pi detected and put in also". A harness picker that lists agents
  * without checking whether they exist is a menu of future error messages, so the
  * panel only offers what this probe actually found.
  *

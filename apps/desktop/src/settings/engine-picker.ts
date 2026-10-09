@@ -1,7 +1,7 @@
 /**
  * FOR ANY MODEL, THE BEST ENGINE THIS MACHINE CAN RUN IT WITH.
  *
- * the user: "you need to detect for each model we ever download, what the optimal
+ * The user: "you need to detect for each model we ever download, what the optimal
  * inference engine we have available out of the whole catalog, that works on the
  * user's machine, to run with, suggest that as the optimal, but we need a ranking
  * of between everything that can run it we have in the catalog… this is paramount

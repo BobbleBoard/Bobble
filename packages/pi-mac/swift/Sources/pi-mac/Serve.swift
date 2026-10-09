@@ -258,7 +258,7 @@ private func doClickInner(_ params: [String: Any]) -> [String: Any] {
   /*
    * BRING IT INTO VIEW BEFORE PRESSING IT.
    *
-   * the user: "why don't you do something like scroll automatically such that the
+   * The user: "why don't you do something like scroll automatically such that the
    * button clicked is visible/reasonably centered as much as possible, and then
    * move the fake cursor, that helps with visual a lot."
    *
@@ -777,7 +777,7 @@ private func doFocus(_ params: [String: Any]) -> [String: Any] {
 // itself — ⌘L, ⌘T, ⌘W, a new-window button, a profile picker, whatever the
 // next app does — every act aimed at a pid is watched: if the TARGET is in
 // front afterwards and the user was somewhere else before, the user's app is
-// put back and the result says so. the user: "spend the time digging for root
+// put back and the result says so. The user: "spend the time digging for root
 // fixes rather than fixing a few specific keyboard shortcuts".
 //
 // The user's own choice is respected: if they were already in the target app,
@@ -864,7 +864,7 @@ private func dispatchInner(method: String, params: [String: Any]) -> [String: An
 /**
  * THE APP'S REAL ICON, as a PNG.
  *
- * the user: "you can get the real app icon of any program being used right? so just
+ * The user: "you can get the real app icon of any program being used right? so just
  * use that no emoji." macOS already has it — every bundle carries one and
  * NSWorkspace hands it over — so a row that says what was done to an app can
  * show the app, not a stand-in that looks the same for Chrome and Blender.

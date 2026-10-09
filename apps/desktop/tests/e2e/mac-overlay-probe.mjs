@@ -29,7 +29,7 @@
  * mode and spawns the panel `--headless` — created, driven, masked and
  * rendered from its own layer tree, never ordered in — so even the "show"
  * calls below put nothing in front of whoever is using this Mac. (They used
- * to: a phantom and a pill for the length of the visibility checks. the user,
+ * to: a phantom and a pill for the length of the visibility checks. The user,
  * 2026-09-15: "always on top errors in the computer use overlay in your test
  * harness/leaking somewhere".) The screenshots are renders of the layer tree,
  * which never needed the screen. PI_E2E_VISIBLE=1 puts the panel on screen for
@@ -232,11 +232,11 @@ try {
   }
   if (info.visible !== true) fail('panel not visible after overlay-show');
   /*
-   * NEVER ON THE SCREEN, under a probe. the user (2026-09-15): "always on top
+   * NEVER ON THE SCREEN, under a probe. The user (2026-09-15): "always on top
    * errors in the computer use overlay in your test harness/leaking
    * somewhere". This used to assert the opposite — that the window server had
    * the panel on screen — and every run put a phantom and a pill over whatever
-   * he was reading. The app now spawns the panel `--headless` in background
+   * the user was reading. The app now spawns the panel `--headless` in background
    * mode: created, driven, masked and rendered, and never ordered in. The
    * window-server assertion flips accordingly, and stays available for a
    * PI_E2E_VISIBLE=1 run, where being on screen is the point.
@@ -314,7 +314,7 @@ try {
   }
 
   // ── state: clicking (a quick press of the glyph itself) ───────────────────
-  /* the user asked for the expanding rings to go and the cursor to do the whole
+  /* The user asked for the expanding rings to go and the cursor to do the whole
      gesture, so the thing to assert on is the press, not a ripple count. The
      press is 150ms, so this has to look sooner than the old 430ms did. */
   const clickP = dbg('overlay-click', { x: RECT.x + 450, y: RECT.y + 300 });
@@ -331,7 +331,7 @@ try {
   await sleep(280);
   const typing = await native();
   await shotAt('04-typing.png', RECT.x + 450, RECT.y + 300, 620);
-  // the user (2026-09-13): the pill says the action, never what is being typed.
+  // The user (2026-09-13): the pill says the action, never what is being typed.
   if (typing.bubble?.text !== 'Typing' || (typing.bubble?.sub ?? '') !== '') {
     fail(`typing pill: ${JSON.stringify(typing.bubble)}`);
   }

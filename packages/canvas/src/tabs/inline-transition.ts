@@ -2,7 +2,7 @@
  * The shared name that lets a card in the chat and its tab in the canvas be
  * ONE element to the View Transitions API.
  *
- * the user: "a quick button in the canvas and on the inline items to with a
+ * The user: "a quick button in the canvas and on the inline items to with a
  * smooth animation have an inline thing either resize and move over smoothly
  * leaving the inline chat to become the canvas … or a tab in the canvas
  * dropping out and becoming an inline card". `document.startViewTransition`

@@ -7,7 +7,7 @@
  *   - `effortMode` + `effort` + `activeTier` → the RIGHT effort readout: "Effort ·
  *     Adaptive" in auto mode, or "Effort · <Level>" when an explicit level is
  *     pinned. The tier still drives the slider POSITION in auto so the knob rests
- *     where routing would land. (the user #12: the auto readout says "Adaptive", NOT
+ *     where routing would land. (The user #12: the auto readout says "Adaptive", NOT
  *     "Auto", so it never collides with the model chip's "Auto" — the two chips
  *     name clearly distinct axes, model vs effort, instead of two bare "Auto"s.)
  *

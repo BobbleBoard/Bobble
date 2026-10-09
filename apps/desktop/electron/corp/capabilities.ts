@@ -1,7 +1,7 @@
 /**
  * THE CAPABILITY LEDGER — what this machine can actually do, measured.
  *
- * NOT a permission system. the user's call is explicit: full capability, no
+ * NOT a permission system. The user's call is explicit: full capability, no
  * artificial constraints, guard destruction hard at the terminal layer. This
  * exists for a different reason — **planning**. A manager that writes twenty
  * pieces of work against Godot on a machine with no Godot has wasted the night,

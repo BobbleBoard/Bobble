@@ -1,7 +1,7 @@
 /**
  * SPECIALIST COMMISSIONS — the specialist charters, reachable from any chat.
  *
- * the user: "wire all the specialists, these should be via a subagent tool that has
+ * The user: "wire all the specialists, these should be via a subagent tool that has
  * options for having it be a specific specialist workflow. I think this is
  * partially implemented in the corp harness already."
  *
@@ -18,7 +18,7 @@
  * text, same effect on behaviour, no host protocol change; if the bridge ever
  * grows a systemPrompt field this composes into it unchanged.
  *
- * AND THE TOOLS IT NEEDS ARE ALREADY LOADED. the user: "with just these tools
+ * AND THE TOOLS IT NEEDS ARE ALREADY LOADED. The user: "with just these tools
  * loaded, those subagents are only for that purpose, we aren't putting any of
  * this as 'capability suites'." The kind rides an env var to the child, whose
  * harness pins the active set to exactly `specialistToolsFor(kind)` — see

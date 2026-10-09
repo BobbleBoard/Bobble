@@ -1,7 +1,7 @@
 """
 The palette comes from the MODEL, not from a hardcoded list.
 
-the user: "why is this color scheme always the same by the way? that shouldn't be
+The user: "why is this color scheme always the same by the way? that shouldn't be
 hardcoded, I hope it isn't."
 
 It was. Five named themes, and the model picked one by name, so every document

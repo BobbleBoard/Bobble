@@ -1,12 +1,12 @@
 /**
  * DRAGGING A FILE IN — a blue edge, not a modal.
  *
- * the user: "I don't like the drag and drop modal, it should just highlight the
+ * The user: "I don't like the drag and drop modal, it should just highlight the
  * border of the chat area in blue with a little inward going blue glow, if
  * hovering over any button on the left sidebar, act as if they were clicked on
  * and then the drag and drop occurred."
  *
- * He is right about the modal and for the reason this app keeps relearning: a
+ * The user is right about the modal and for the reason this app keeps relearning: a
  * covering card ANSWERS a question nobody asked ("where can I drop this?" — the
  * answer is "anywhere") while HIDING the one thing you were looking at, which is
  * the chat you are about to drop into. An edge glow says the same thing without

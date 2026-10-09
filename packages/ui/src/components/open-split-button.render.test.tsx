@@ -6,13 +6,13 @@ import { PresentCard } from './present-card.tsx';
 /**
  * ONE "Open" CONTROL, TWO SURFACES.
  *
- * the user, on the presentation card: "I want it to just be a rounded corner open
+ * The user, on the presentation card: "I want it to just be a rounded corner open
  * button that has the same thing as the 'open' button inside the canvas when you
  * have a file open. with the little dropdown also."
  *
  * The control used to live inline in the canvas operation bar, so the card could
  * only ever have had a COPY — and a copy is exactly what produced the dropdown
- * divergence he spent the evening pointing at. Both render this component now.
+ * divergence the user spent the evening pointing at. Both render this component now.
  */
 const VSCODE = { id: 'code', name: 'VS Code' };
 const APPS = [VSCODE, { id: 'zed', name: 'Zed' }];

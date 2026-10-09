@@ -117,7 +117,7 @@ export const useConnectorsStore = create<ConnectorsStoreState>((set, get) => ({
       /* A model connector's tool is registered at pi's spawn (PI_OMNISVG_READY),
          so the download has to be followed by a respawn for `svg` to exist in
          the running session — same reason the search panel restarts pi after
-         a key changes the env. the user: "download the connector and then have it
+         a key changes the env. The user: "download the connector and then have it
          used in a new chat" — this is what makes the new chat have it. A
          module connector (PI_BOBBLE_3D_READY) is gated the same way. */
       if (isSpawnGatedConnector(get(), id)) {

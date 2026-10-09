@@ -1,7 +1,7 @@
 /**
  * rail-look-probe.mjs — the COLLAPSED left sidebar, looked at properly.
  *
- * the user: "attempt to format/style the left sidebar (collapsed) to make it able to
+ * The user: "attempt to format/style the left sidebar (collapsed) to make it able to
  * look better and work better when collapsed) in a way that it fits better, and
  * does cenetering and all of icons properly".
  *

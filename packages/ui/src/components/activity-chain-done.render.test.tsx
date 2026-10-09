@@ -3,7 +3,7 @@
  * "Done" must not appear over a turn that is still working — and must not
  * SURVIVE one either.
  *
- * the user has now reported this FOUR times, the last with a screenshot: "premature
+ * The user has now reported this FOUR times, the last with a screenshot: "premature
  * done is showing while thoughts/tools are still being written." Every previous
  * fix was a one-line change to an expression, and the fourth cause was one no
  * pure-function test could reach: `everDone` latched one-way, so a chain that
@@ -102,7 +102,7 @@ describe('ActivityChain — Done never covers a live turn', () => {
 /*
  * COLLAPSING is a separate question from Done, and they were tangled: the chain
  * stayed expanded for as long as the TURN ran, so a finished chain sat open
- * through the model's reply and through the next chain's work. the user: "thinking
+ * through the model's reply and through the next chain's work. The user: "thinking
  * / tool chains need to collapse when they finish and the model starts typing
  * actual response, even if a new one starts right after, the old one is then
  * collapsed."
@@ -146,7 +146,7 @@ describe('ActivityChain — with autoExpandLive, a finished chain folds even whi
 });
 
 /*
- * the user's connector row: "<generic connectors icon> Used <connector app icon>
+ * The user's connector row: "<generic connectors icon> Used <connector app icon>
  * <connector app name> <action eg. read page or listed tabs>", and "the tiny
  * text to the right with the raw cli command is not shown, instead a '>' ...
  * clicking that expands the individual tool and shows the exact cli command and

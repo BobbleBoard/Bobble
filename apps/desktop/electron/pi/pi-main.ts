@@ -188,7 +188,7 @@ function buildPiEnv(cwd: string | undefined): Record<string, string | undefined>
     // `cwd` is undefined (a resumed session restores its own cwd; the override
     // falls back to pi's per-session ctx.cwd, still never HOME).
     /*
-     * …UNLESS THE USER ASKED FOR FULL ACCESS. the user: "in projects, add a 'full
+     * …UNLESS THE USER ASKED FOR FULL ACCESS. The user: "in projects, add a 'full
      * access' mode — red, with an ! in a circle — that gives the model full
      * reign and full access … no sandboxing." Off by default and per project,
      * so it applies only to the folder it was deliberately switched on for; the
@@ -218,7 +218,7 @@ function buildPiEnv(cwd: string | undefined): Record<string, string | undefined>
        there when either is on disk, and sends each job to the one that can do it. */
     PI_VFIG_READY: vfigFiles().ready ? '1' : '0',
     /* The 3D connector's tools: only once an engine that can make a mesh is on
-       this machine AND the connector is on (Connectors → Bobble 3D). the user
+       this machine AND the connector is on (Connectors → Bobble 3D). The user
        (2026-09-17): "3d should be a connector that gets recommended for
        install upon installing the 3d studio module". '0' — the app has 3D but
        it is off: `3d generate` is there and says how to turn it on (harness
@@ -280,7 +280,7 @@ const sessions = createPiSessions<WebContents>({
         // `--no-skills`: SAME discipline for skills. pi auto-discovers
         // `~/.pi/agent/skills/*` and injects an `<available_skills>` catalog into
         // EVERY turn's system prompt. That leaks a user's UNRELATED global skills
-        // (the user saw `coding` / `isaac` / `plan` / `unity` from other projects) into
+        // (The user saw `coding` / `isaac` / `plan` / `unity` from other projects) into
         // this app's chat — bloat the app never asked for, and skills aren't a
         // designed feature here yet. Off until we surface a curated set from our
         // own bundled dir on purpose.
@@ -394,7 +394,7 @@ function createChildBridge(
          */
         ...(opts.agentId !== undefined ? { PI_DESKTOP_AGENT_ID: opts.agentId } : {}),
         /*
-         * A SPECIALIST CHILD IS PINNED TO ITS OWN TOOLS. the user: "with just these
+         * A SPECIALIST CHILD IS PINNED TO ITS OWN TOOLS. The user: "with just these
          * tools loaded, those subagents are only for that purpose, we aren't
          * putting any of this as 'capability suites'." The child's harness reads
          * this and REPLACES its preset with exactly that role's kit — no
@@ -403,7 +403,7 @@ function createChildBridge(
          */
         ...(opts.specialist !== undefined ? { PI_DESKTOP_SPECIALIST: opts.specialist } : {}),
         /*
-         * A CHILD'S TOOL INTERFACE IS ITS OWN SETTING. the user: "ensure there is
+         * A CHILD'S TOOL INTERFACE IS ITS OWN SETTING. The user: "ensure there is
          * a cli connector for the specialists that is by default there and
          * enabled, cli tools are a good context saver". The chat may run
          * schemas; a specialist running one pinned job takes the CLI (the

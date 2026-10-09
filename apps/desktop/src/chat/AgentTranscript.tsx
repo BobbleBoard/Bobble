@@ -1,7 +1,7 @@
 /**
  * ONE renderer for "an agent's conversation", whoever the agent is.
  *
- * the user: "why don't we treat each subagent as a new individual chat exactly the
+ * The user: "why don't we treat each subagent as a new individual chat exactly the
  * same, allowing for easy both display of the chats and following the actions
  * they're taking just the same — it's the exact same thing in my eyes."
  *

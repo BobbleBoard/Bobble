@@ -87,7 +87,7 @@ describe('formatModuleSize', () => {
 
 describe('a runtime that is still starting is not a runtime that is missing', () => {
   /*
-   * the user: "3D studio shows 'runtime is not available' on every first open of the
+   * The user: "3D studio shows 'runtime is not available' on every first open of the
    * app even when previously installed." The first `gen3d:catalog` call after
    * launch ALWAYS finds the sidecar down: it kicks off the uv boot and answers
    * immediately with the disk-derived catalog, so `engineReady:false` arrived on

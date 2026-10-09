@@ -42,10 +42,10 @@ describe('the open wrapper', () => {
 
   it('does not open a Finder window for `open .`', () => {
     /*
-     * the user, twice, with no run in flight: "finder keeps on opening up to exactly
+     * The user, twice, with no run in flight: "finder keeps on opening up to exactly
      * /Users/user/Desktop/OSS-harness/packages/harness" — pi's own cwd, so the
      * line was `open .`. Only -a and URLs were flagged, so a bare path fell
-     * through to /usr/bin/open and put a Finder window in front of him.
+     * through to /usr/bin/open and put a Finder window in front of them.
      *
      * The static assertion comes FIRST and deliberately: if the guard is gone,
      * this test must fail without ever executing the line, because executing it
@@ -92,10 +92,10 @@ describe('the open wrapper', () => {
 
   it('treats a bare app name as a launch, not a missing file', () => {
     /*
-     * the user, mid-run: "keychain not found popup persists, chrome profile screen
+     * The user, mid-run: "keychain not found popup persists, chrome profile screen
      * taking focus". The line was `open -n "Google Chrome"` — /usr/bin/open reads
      * that as a PATH and fails, and `-n` asks for a SECOND Chrome, which comes up
-     * with no profile and no keychain and shows both prompts in front of him.
+     * with no profile and no keychain and shows both prompts in front of them.
      * Same intent as `open -a`, so it gets the same translation.
      */
     const res = run(['-n', 'Google Chrome']);
@@ -231,7 +231,7 @@ describe('a bare URL open is the OTHER way to take the screen', () => {
    *
    * which is not the `-a` form, so the wrapper passed it straight through — and
    * `open <url>` hands the page to the default browser AND brings it to the
-   * front. A browser sat in front of him for the rest of the run, from a run
+   * front. A browser sat in front of them for the rest of the run, from a run
    * that had asked for the background at every other step.
    *
    * Same shape as `open -a`, same answer: translate it to the command that does
@@ -276,7 +276,7 @@ describe('a bare URL open is the OTHER way to take the screen', () => {
 
 describe('reaching for an app the wrong way is answered with the whole toolkit', () => {
   /*
-   * the user: "after a terminal command for 'open -a' anything ... give a tidbit as
+   * The user: "after a terminal command for 'open -a' anything ... give a tidbit as
    * if it ran mac --help give the full thing and tell it 'this app is best
    * controlled with the cli tools above'. that should bias it away from writing
    * these files and attempting to do this directly."

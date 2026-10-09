@@ -262,7 +262,7 @@ flowchart TB
 | Q6 HF write token | LR-17, the Ming recipe publish (MING-5b), TR-11 HF push | W4–W5 |
 | Q8 workflows stance | the WF design basis (WF-01 onwards) | W1 (can start on the recommendation) |
 | Q9 `mac` → `desktop` vocabulary | XP-20a (Sweep A), LR-07/11 data generation | Sweep A |
-| Hand-started llama-server on linux-ms-7e59 (the user's action) | DEV-16, and DEV-10's live check | W4 |
+| Hand-started llama-server on linux-MS-7E59 (the user's action) | DEV-16, and DEV-10's live check | W4 |
 | Azure Artifact Signing account | XP-19 | W5 |
 | A separate macOS user for computer-use data (the user's action) | LR-12 | W3 |
 
@@ -368,7 +368,7 @@ worktree needs a plain `pnpm install` (never `-w`) and its own `npm run build` b
   public repo `Lavanukee/Pi-Desktop`, which needs the user's explicit approval — nobody pushes. A package whose
   acceptance says "CI" is judged on: the workflow passing `actionlint`, every job's OS-neutral commands run
   locally, and the unit tests with simulated hosts. The CI run itself is recorded as **DEFERRED (needs
-  the user's push)** in the report — verifiers treat it as deferred, not as a failure.
+  The user's push)** in the report — verifiers treat it as deferred, not as a failure.
 - **R17. One extractor (orchestrator note).** XP-04 ships a self-contained zip extractor at
   `packages/web-tools/src/unzip.ts` (built so `packages/platform` can lift it). XP-02a's `archive.ts` MUST
   lift that file (move it into `packages/platform`, re-export from web-tools) rather than write a second
@@ -378,7 +378,7 @@ worktree needs a plain `pnpm install` (never `-w`) and its own `npm run build` b
 
 **Preconditions**
 - The stray `hyperframes-window.ts` change is committed or handed over.
-- the user's answers to Q1–Q8 are requested; W0 does not wait for them.
+- The user's answers to Q1–Q8 are requested; W0 does not wait for them.
 
 **W0-A · Pre-wire scaffold · M · lane INT**
 
@@ -661,7 +661,7 @@ dependencies are merged.
 | DEV-8 Engine menu v2 ("Serve from" + XP-11's flavour/device line) | DEV | M | `src/chat/EngineMenu.tsx`, `QuickMenuPanel.tsx`, `TierPickerMenu.tsx`, `src/state/llm-store.ts` | DEV-5, DEV-6, XP-11a |
 | DEV-9 Two Bobbles on one Mac, end to end | DEV (BENCH) | M | — | DEV-5…DEV-8 |
 | DEV-12 Remote generation jobs | DEV | L | `electron/gen3d/gen3d-bridge.ts` (routing); new `gen/remote-route.ts`; a "Run on" component handed to EDIT | DEV-4, DEV-6, GEN-SEAM |
-| DEV-16 Real cross-device acceptance (BYO endpoint on linux-ms-7e59) | DEV (BENCH) | M | — | DEV-10; a llama-server the user starts on that box |
+| DEV-16 Real cross-device acceptance (BYO endpoint on linux-MS-7E59) | DEV (BENCH) | M | — | DEV-10; a llama-server the user starts on that box |
 | SEC-01 (optional, Q27) Local llama-server hardening | DEV | S | `packages/inference/src/supervisor.ts` | DEV-2, XP-14 |
 | LR-11 / LR-13 / LR-14 / LR-15 / LR-16 Data at scale, SFT, export (via TR-10), MTP re-tune, release gates | LORA | L / M / M / S / M | — | vocabulary freeze, Q4, TR-10 (LR-14) |
 | IMG-07 Erase | EDIT | M | — | TOOLS-01, IMG-03 |
@@ -833,7 +833,7 @@ only through the W0 registry, by feature files.
 | Real NVIDIA/AMD/Intel GPUs and NPUs | self-hosted machines over Tailscale, or paid GPU runners (Q5) | XP-24/25/26, TR-14, MING-10, SX-01 and Comfy video/audio on PCs |
 | Teacher rollouts and LoRA training | rented GPU or the user's CUDA box (Q4) | LR-10, 11, 13, 15, 18, 19, 21 |
 | Two real Macs | a second Mac online on the tailnet (none today) | TR-16 ring/JACCL; real Mac↔Mac latency |
-| linux-ms-7e59 (Linux, online, 7–10 ms direct) | the user starts a llama-server there, or grants SSH over Tailscale | DEV-10 live check, DEV-16 |
+| linux-MS-7E59 (Linux, online, 7–10 ms direct) | The user starts a llama-server there, or grants SSH over Tailscale | DEV-10 live check, DEV-16 |
 | PowerPoint/Keynote fidelity | one manual check by the user (no LibreOffice or PowerPoint here) | VQ-05, VQ-06 |
 | Local Linux containers | needs OrbStack/Colima (not installed; Q5) | faster XP-22 and engine-smoke loops |
 | Rust cross-target checks | needs rustup (Homebrew Rust 1.97.1 ships only the `aarch64-apple-darwin` std); otherwise CI | XP-21, XP-22 dev loop |
@@ -936,7 +936,7 @@ Order is by how much each job unblocks.
 
 - **Core downloads:** about **31 GB** (0.45 + 11 + ~3 + ~15.4 + ~1.2 for the training and export modules).
 - **Optional:** the Ming 8-bit weights (25 GB) and the bf16 release (53 GB), only if MING-5 needs them and
-  the user approves.
+  The user approves.
 - **Heavy run time:** roughly 50–60 hours across W1–W4 plus the per-job W4–W5 runs (estimate), about a
   third of it in overnight scorecard runs.
 
@@ -965,7 +965,7 @@ Order is by how much each job unblocks.
 
 Ranked by how much work each answer unblocks and how early. Each row lists its sources as `track:question#`.
 The **recommended default** is what proceeds if there is no answer. Q1–Q7 have none, because they need
-the user.
+The user.
 
 | # | Question | Sources | Unblocks | Recommended default |
 |---|---|---|---|---|
@@ -995,7 +995,7 @@ the user.
 | 24 | **Help details.** Hide help-only conversations from the sidebar? Help sees only app facts about the chat, not its text? An "Ask Bobble help" hand-off from the chat? A subagent drafts ~24 guide pages for your review; who owns them after that? | help:2, 5, 7, 8 | BH-3/7/12 | hide; facts only; yes; each lane owns its pages, HELP reviews |
 | 25 | **Cross-platform specifics.** Windows 11 only (24H2+) or also 10 22H2? Linux Ubuntu 22.04+/Debian 12+/Fedora/Arch on X11 and Wayland (no phantom cursor on Wayland; one portal "Allow")? Download PortableGit (59 MB) for bash? Background CUDA fetch after a Vulkan-first start? Windows computer use with a foreground SendInput fallback by policy? ROCm via upstream + pip runtime vs Lemonade builds? Windows-on-ARM and Linux arm64 in v1? Keep macOS on llama.cpp b10603 while PCs pin separately? | xp:1, 3, 4, 7, 8, 9, 10, 11 | XP-05/13/20/21/22 | Win 11 only; both display servers; PortableGit; background fetch; fallback by policy; upstream + pip; ARM later; keep b10603 on the Mac |
 | 26 | **Distribution.** Azure Artifact Signing? deb + rpm + AppImage (no Flatpak/Snap)? A one-click per-user NSIS installer? | xp:5 | XP-18/19 | yes, if eligible |
-| 27 | **Devices specifics.** linux-ms-7e59: a full desktop Bobble later, or a headless bobble-node? Is "Add a server by address" against a llama-server you start there the first real milestone? Does the serving computer's own user win on model switches? Prefer a remote device automatically on battery or low memory? Keep port 8765? Harden today's local llama-server (permissive CORS, no key) in this push (SEC-01)? | dev:3, 5, 7, 9, 10 | DEV-10/11/16, SEC-01 | headless node; yes; yes; ask, don't auto-switch; keep 8765; yes |
+| 27 | **Devices specifics.** linux-MS-7E59: a full desktop Bobble later, or a headless bobble-node? Is "Add a server by address" against a llama-server you start there the first real milestone? Does the serving computer's own user win on model switches? Prefer a remote device automatically on battery or low memory? Keep port 8765? Harden today's local llama-server (permissive CORS, no key) in this push (SEC-01)? | dev:3, 5, 7, 9, 10 | DEV-10/11/16, SEC-01 | headless node; yes; yes; ask, don't auto-switch; keep 8765; yes |
 | 28 | **Visual assets.** Bundle Mermaid (MIT, 3.5 MB) for `diagram`? Bundle OFL fonts (e.g. Inter plus a serif) so outputs match across OSes? Adopt HyperFrames' upstream conventions and a vetted subset of its Apache-2.0 catalog? | vq:4, 5, 6; xp XP-16 | VQ-10/11/12, XP-16 | yes to all |
 
 ---
@@ -1025,7 +1025,7 @@ the user.
 7. **`microsoft/Mage-Flow-*` answers HTTP 401.** Fresh installs of the 3D module's editor and the chat's
    `edit_image` may already fail to download. SPK-02 fixes it in W1.
 8. **Windows signing** needs an Azure Artifact Signing account (Q26).
-9. **The only online tailnet peer** (linux-ms-7e59, Linux) cannot run Bobble until track 4 lands, and no
+9. **The only online tailnet peer** (linux-MS-7E59, Linux) cannot run Bobble until track 4 lands, and no
    second Mac is online. Mac↔Mac is tested as two instances on this Mac. The BYO endpoint needs a
    llama-server that the user starts there.
 10. **Hindsight's binary-only install fails on macOS 13 and Intel Macs.** Memory shows "not available on
@@ -1045,11 +1045,11 @@ the user.
   identity, computer-use grants are silently revoked (memory `pi-desktop-tcc-signing`).
 - **Harness drift versus Bobble 4B.** The vocabulary freeze at the end of W3, the LR-20 drift ledger and
   `--help`-first behaviour mitigate it.
-- **Throughput.** BENCH serializes about 50–60 hours of heavy runs. If the user uses his Mac heavily in the
+- **Throughput.** BENCH serializes about 50–60 hours of heavy runs. If the user uses their Mac heavily in the
   daytime, W1–W3 measurements slip to overnight windows. The queue order (§4.4) keeps the most-unblocking
   jobs first.
 - **Office fidelity** is proxied (QuickLook plus the app's GenOffice editor). One manual PowerPoint check by
-  the user is needed (VQ-05/06).
+  The user is needed (VQ-05/06).
 - **Licensing:**
   - the current default image model is non-commercial;
   - SAM 3 and SAM-Audio use Meta's SAM License;

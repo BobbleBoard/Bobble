@@ -1,7 +1,7 @@
 /**
  * Settings → Computer use: the same choice onboarding makes, editable.
  *
- * the user (2026-09-15): "… this is editable later in settings via a similar UI."
+ * The user (2026-09-15): "… this is editable later in settings via a similar UI."
  * On/off, the grid of real app icons (the apps Bobble may drive without
  * asking — anything else asks first, each time), and the status pill toggle
  * that used to sit under Agent, because it is about the same thing.

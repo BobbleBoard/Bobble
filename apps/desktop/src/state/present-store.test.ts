@@ -79,7 +79,7 @@ describe('usePresentStore', () => {
     expect(items().map((i) => i.path)).toEqual(['/a/1.png', '/a/2.png']);
   });
 
-  /* the user (2026-09-12): cards from one conversation were falling to the foot of
+  /* The user (2026-09-12): cards from one conversation were falling to the foot of
    * every other, because there was one list for all of them. */
   it('keeps each chat’s cards to that chat', () => {
     const s = usePresentStore.getState();
@@ -101,7 +101,7 @@ describe('usePresentStore', () => {
 describe('a presented card remembers where it was handed over', () => {
   beforeEach(() => usePresentStore.getState().clear());
   /*
-   * the user: "file presentation cards seem pinned to the bottom of the chat for
+   * The user: "file presentation cards seem pinned to the bottom of the chat for
    * some time instead of staying at the position they were created at." The
    * record now carries the message it followed, and the thread draws it there.
    */
@@ -114,7 +114,7 @@ describe('a presented card remembers where it was handed over', () => {
     expect(usePresentStore.getState().add({ path: '/a/two.png' }).afterMessageId).toBeNull();
   });
 
-  /* the user (2026-09-12): "if the model presents the same file and it has an
+  /* The user (2026-09-12): "if the model presents the same file and it has an
    * update that's when a new file card appears below but they don't travel
    * through a user sent message." */
   it('a RE-present from a later message is a new card; the earlier one stays put', () => {
@@ -379,7 +379,7 @@ describe('a chart, or a small SVG, is shown IN the thread', () => {
 });
 
 /*
- * THE CARDS FOLLOW THE CHAT. the user (2026-09-17): "I just went back to a chat I
+ * THE CARDS FOLLOW THE CHAT. The user (2026-09-17): "I just went back to a chat I
  * earlier made some visuals in and it didn't have them there."
  */
 describe('the cards follow the chat', () => {
@@ -520,7 +520,7 @@ describe('the cards follow the chat', () => {
   });
 
   /*
-   * the user (2026-10-08): "I asked for a radar chart, it was made, then I asked
+   * The user (2026-10-08): "I asked for a radar chart, it was made, then I asked
    * about something else, it failed, but then going out and back into the chat,
    * it showed two radar charts at the bottom, not where they were originally".
    * MEASURED (chart-reentry-probe, PIRESTART=1): after pi restarted under the

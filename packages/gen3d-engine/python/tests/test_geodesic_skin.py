@@ -1,6 +1,6 @@
 """Skin weights must be measured ALONG THE SURFACE, not through the air.
 
-the user, on a preset that mangled the model: "so skintokens needed then."
+The user, on a preset that mangled the model: "so skintokens needed then."
 
 The tearing was real but the cause was ours. `skin_weights` measured straight-
 line distance from each vertex to each bone SEGMENT, and on a character modelled

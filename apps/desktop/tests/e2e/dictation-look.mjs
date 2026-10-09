@@ -1,7 +1,7 @@
 /**
  * DICTATION THAT CANNOT RUN — a way in, never red text.
  *
- * the user (2026-10-08): "'the voice model is not installed' … red text that's
+ * The user (2026-10-08): "'the voice model is not installed' … red text that's
  * just a real unknown error or something that doesn't have handling attached
  * to it or can be easily done something about just can't exist anymore."
  *

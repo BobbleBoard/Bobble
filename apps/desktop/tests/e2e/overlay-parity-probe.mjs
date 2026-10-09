@@ -3,7 +3,7 @@
  * mask PATH the compositor fills, not the rect arithmetic that lied for a
  * release.
  *
- * the user, 2026-09-12: "can confirm visually that the bug is NOT FIXED. fake
+ * The user, 2026-09-12: "can confirm visually that the bug is NOT FIXED. fake
  * cursor frequently appears on top of undesired apps." Root cause: the mask
  * was panel + one rect per covering window, filled even-odd, so a point under
  * TWO covering windows was painted; and the Dock's hollow screen-sized window
@@ -126,7 +126,7 @@ try {
   check(c3b.controls?.visible === true, 'the controls come back once the pill is clear');
   void shown;
 
-  // 2b. The buttons are IN FRONT of the pill they belong to. the user (2026-09-13):
+  // 2b. The buttons are IN FRONT of the pill they belong to. The user (2026-09-13):
   //     hovering the pill "just makes it solid blue" — the controls window sat
   //     at .floating, under the phantom at popUpMenu+1, and relative ordering
   //     cannot cross a level band. Two proofs: the levels the panel reports,
@@ -189,7 +189,7 @@ try {
   }
   serve.p.kill();
 
-  // 4. THE WINDOW BEHIND, ANOTHER OF THE SAME APP IN FRONT. the user: "the cursor
+  // 4. THE WINDOW BEHIND, ANOTHER OF THE SAME APP IN FRONT. The user: "the cursor
   //    being on top while the window is behind". Anchoring on the app's
   //    FRONTMOST window put every foreign window between the two below the
   //    anchor — no hole for it, phantom painted over it. MEASURED with Finder

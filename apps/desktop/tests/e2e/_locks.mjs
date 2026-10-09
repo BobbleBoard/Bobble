@@ -35,7 +35,7 @@
  * A heavy job also waits for (PLAN.md §4.3 and §4.5):
  *   - AC power. On battery nothing heavy starts, and a heavy job already
  *     running under `scripts/with-lock.mjs` is paused until AC (paceHeavy).
- *   - the user's own Bobble to have no model loaded and no generation running (a
+ *   - The user's own Bobble to have no model loaded and no generation running (a
  *     model server or a Python worker descended from /Applications/Bobble.app,
  *     or from a dev `electron .` in the main checkout).
  *   - no ORPHANED model server — `ppid == 1` and running out of the app's own
@@ -584,7 +584,7 @@ export function findOrphanServers(rows, opts = {}) {
 /**
  * Is this command the user's own Bobble — the installed app, or a dev `electron .`
  * run from the MAIN checkout? A probe's Electron runs from a worktree, or with
- * a throwaway `--user-data-dir` under the temp dir, and is never his.
+ * a throwaway `--user-data-dir` under the temp dir, and is never their.
  */
 export function isUserAppCommand(command, mainCheckout = MAIN_CHECKOUT) {
   if (command.includes('/Applications/Bobble.app/')) return true;
@@ -661,13 +661,13 @@ export function heavyBlockers(opts = {}) {
     /* ps unavailable: nothing to check */
   }
   if (rows !== null) {
-    const the user = busyInstalledApp(rows, opts);
-    if (the user.length > 0) {
-      const what = [...new Set(the user.map((r) => shortCommand(r.command)))].join(', ');
+    const busyApps = busyInstalledApp(rows, opts);
+    if (busyApps.length > 0) {
+      const what = [...new Set(busyApps.map((r) => shortCommand(r.command)))].join(', ');
       reasons.push({
         kind: 'user-app',
-        detail: `the user's Bobble is busy (${what}, pid ${the user.map((r) => r.pid).join(' ')})`,
-        pids: the user.map((r) => r.pid),
+        detail: `the user's Bobble is busy (${what}, pid ${busyApps.map((r) => r.pid).join(' ')})`,
+        pids: busyApps.map((r) => r.pid),
       });
     }
     const orphans = findOrphanServers(rows, opts);

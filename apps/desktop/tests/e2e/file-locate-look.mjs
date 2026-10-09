@@ -1,5 +1,5 @@
 /**
- * A FILE THE CHAT NAMED OPENS — even when the path missed. the user (2026-10-08):
+ * A FILE THE CHAT NAMED OPENS — even when the path missed. The user (2026-10-08):
  * "'this file couldn't be found' (when clicking on a file that should very
  * much be there)".
  *

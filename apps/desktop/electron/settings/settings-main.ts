@@ -117,7 +117,7 @@ function applySearchEnv(settings: DesktopSettings): void {
  * `mcpMode` and `toolInterface` were independent, so turning on the bash-CLI
  * interface left connectors on the JSON `mcp_call` proxy — the model was told
  * "these commands are your abilities", handed a shim per capability, and then
- * given MCP as a structured tool call. the user: "all capabilities / mcp when in
+ * given MCP as a structured tool call. The user: "all capabilities / mcp when in
  * bash mode should be translated."
  *
  * mcp-lite already has the translation — `pi-tool gmail search --query foo`,
@@ -175,9 +175,9 @@ function writeSamplingSidecar(settings: DesktopSettings): void {
  * headless probe launched without a throwaway HOME has set what it needed for
  * its run — `powerMode: 'full'` before the freeze of 2026-09-11, and
  * `toolInterface: 'schemas'` + `powerMode: 'full'` (gen-chat-capture) — and
- * left it there, so the user's Bobble came up in a mode he never chose: "cli should
+ * left it there, so the user's Bobble came up in a mode the user never chose: "cli should
  * be default mode, so why is it not in the shipped applications build?" It was;
- * his file said otherwise.
+ * their file said otherwise.
  *
  * So under PI_E2E the document is kept in memory only when HOME is the
  * account's real home — `os.userInfo().homedir` reads the passwd entry, which a

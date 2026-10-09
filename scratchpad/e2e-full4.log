@@ -6,7 +6,7 @@ $ export PI_E2E_BACKGROUND=1 && node tests/e2e/headless-probe.mjs && node tests/
 [headless] OK: a real screenshot of a window nobody can see → /var/folders/4h/nq1c73q107v594j4g0lq6bw00000gn/T/pd-shots/headless-probe/hidden-window.png
 [headless] OK: notifications are suppressed, and say why
 headless-probe OK
-probe OK — bobble/claude/codex flavor+mode combos verified; screenshot: /Users/user/Desktop/OSS-harness/apps/desktop/test-results/w0-window.png
+probe OK — bobble/claude/codex flavor+mode combos verified; screenshot: apps/desktop/test-results/w0-window.png
 pi-probe OK — mock-pi streamed a prompt end-to-end into the renderer store
 chat-ui-probe OK — streamed text + a COLLAPSED ActivityChain that expanded on click into steps, a step revealed its command, and `/` opened the command menu (B2)
 session-switch-probe OK — sidebar switch rehydrated the seeded session into the thread

@@ -1,7 +1,7 @@
 /**
  * MODEL HUB — model management as its own surface, in the Unsloth Studio shape.
  *
- * the user: "not be in the settings area, it's just a separate thing replacing the
+ * The user: "not be in the settings area, it's just a separate thing replacing the
  * chat area. and we totally copy the layout of unsloth studio and how they show
  * it, it's familiar, similar to lmstudio also and frankly it's really really
  * nice looking" — with screenshots.
@@ -378,7 +378,7 @@ function RowMenu({
 /**
  * MULTI-SELECT CAPABILITIES.
  *
- * the user: "have that capabilities dropdown be a checkbox that doesn't immediately
+ * The user: "have that capabilities dropdown be a checkbox that doesn't immediately
  * close dropdown so you can select multiple." So a tick does NOT dismiss the
  * menu — the whole point is picking several — and the trigger summarises the
  * selection rather than showing one value.
@@ -519,7 +519,7 @@ const NAME_SAYS_SIZE = /\d+(?:\.\d+)?\s*[BM]\b/i;
 
 /**
  * The download count's glyph: the shared tray-and-arrow (Hugeicons), not a bare
- * arrow. the user: "the down arrow feels out of place, maybe better with the bottom
+ * arrow. The user: "the down arrow feels out of place, maybe better with the bottom
  * half of a square's edge line below the down arrow and being slightly
  * thicker." So it keeps one step more weight than the 1px set beside a number.
  */
@@ -663,7 +663,7 @@ export function ModelsView() {
      this page is made against these numbers. */
   const [hw, setHw] = useState<{ ramGiB: number; cpus: number } | null>(null);
   /*
-   * FREE DISK, beside the RAM and the cores. the user: "show available storage
+   * FREE DISK, beside the RAM and the cores. The user: "show available storage
    * space in the top right as well as the other specs" — a download is decided
    * against this number as much as against memory. Re-read whenever this page
    * regains the eye (a tab switch, a finished download) rather than polled.
@@ -678,7 +678,7 @@ export function ModelsView() {
   /*
    * ONE FILTER SET PER KIND, both remembered.
    *
-   * the user: "searching for datasets seeming to not work because filters for gguf
+   * The user: "searching for datasets seeming to not work because filters for gguf
    * vision etc persist and obviously those files don't exist in datasets, save
    * those for when the user swaps back to the models tab, don't reset their
    * filters". So the two live side by side and the switch swaps which one is
@@ -709,7 +709,7 @@ export function ModelsView() {
   /*
    * THE STORE — everything that is not one GGUF out of a ladder.
    *
-   * the user: "we need to be able to download anything and store it properly in an
+   * The user: "we need to be able to download anything and store it properly in an
    * organized format… (eg say we add a video/image studio.)" So an image, video,
    * audio or 3D pick is a real download now, into `<cache>/store/<kind>/<slug>/`
    * with a manifest beside the weights, rather than a card explaining that the
@@ -1062,7 +1062,7 @@ export function ModelsView() {
   /*
    * RECOMMENDED IS A CURATED LIST, not a filtered search.
    *
-   * the user: "the newest is just clogged immediately with 10 bartowski ornith 1.5
+   * The user: "the newest is just clogged immediately with 10 bartowski ornith 1.5
    * quants from the different model sizes… we need to have reccomended section
    * and then have that by default that has good organization and such… but we
    * let people do from hf and deal with the messy default search if they want."
@@ -1122,7 +1122,7 @@ export function ModelsView() {
    * swaps the card, and main caches so going back and forth is instant.
    */
   /*
-   * ERRORS MUST EXPIRE. the user: "there's also this hanging unknown model text that
+   * ERRORS MUST EXPIRE. The user: "there's also this hanging unknown model text that
    * I don't know what prompted it but it isn't going away no matter what
    * either." A download failure set `error` and nothing ever unset it, so a
    * stale message about one model followed you across tabs, kinds and searches.
@@ -1287,7 +1287,7 @@ export function ModelsView() {
     }
     if (cardRepo === undefined) {
       /*
-       * THE PERMANENT SPINNER. the user: "why is this 'loading model card' sometimes
+       * THE PERMANENT SPINNER. The user: "why is this 'loading model card' sometimes
        * there and taking forever/not happening at all."
        *
        * This branch used to `setCard(null)` and return — and the pane reads a
@@ -1401,7 +1401,7 @@ export function ModelsView() {
    * reuse that store rather than reimplementing the adaptation.
    */
   /*
-   * ROOM FIRST. the user: "don't allow / warn of disk space issues when downloading
+   * ROOM FIRST. The user: "don't allow / warn of disk space issues when downloading
    * a model that there isn't enough space for." The main process refuses a
    * download that would not fit (`spaceRefusal`, with a margin kept back), but
    * a refusal that arrives after the click is a bar that never appears; so the
@@ -1580,7 +1580,7 @@ export function ModelsView() {
   /*
    * "USE" IS A REAL ACTION, not a second way to select a row.
    *
-   * the user replaced the on-disk badge with a button that says Use, which means the
+   * The user replaced the on-disk badge with a button that says Use, which means the
    * button IS the state — and a button that only re-selects what clicking the
    * card already selects would make that a lie. So a text model becomes the chat
    * model, and a generation model opens the studio that runs it. Both are the
@@ -1662,7 +1662,7 @@ export function ModelsView() {
   }, [storeProgress, progress, busyId]);
 
   /*
-   * CANCEL, ACKNOWLEDGED FIRST. the user: "immediate feedback even if download
+   * CANCEL, ACKNOWLEDGED FIRST. The user: "immediate feedback even if download
    * doesn't cancel immediately it shows up that way". Clearing `busyId` here
    * restores the Download button on the same frame as the click; the store
    * clears the progress record the same way, and the supervisor discards the
@@ -1726,7 +1726,7 @@ export function ModelsView() {
       {/*
        * THE HEADER, FOR SOMEONE WHO JUST WANTS A MODEL.
        *
-       * the user (2026-10-08): "'model hub' feels like a thing for technical users
+       * The user (2026-10-08): "'model hub' feels like a thing for technical users
        * when it's put like this, but it's placed by default on the sidebar … we
        * should make it more friendly", and the page was "a mess of filters and
        * options all dumped there". So: one plain title; the three places
@@ -1870,7 +1870,7 @@ export function ModelsView() {
         <>
           <div className="flex shrink-0 flex-wrap items-center gap-2 px-6 pb-3">
             {/*
-             * RECOMMENDED / ALL. the user: "by default, the 'newest' will show just a
+             * RECOMMENDED / ALL. The user: "by default, the 'newest' will show just a
              * bunch of random models, so if you could just have reputable
              * organizations shown, for example a 'reccomended/all' toggle".
              *
@@ -1907,7 +1907,7 @@ export function ModelsView() {
             </div>
 
             {/*
-             * OUTPUT — what a model MAKES. the user: "everything filterable by output
+             * OUTPUT — what a model MAKES. The user: "everything filterable by output
              * also".
              *
              * Pills rather than another dropdown, because this is the axis people
@@ -2078,7 +2078,7 @@ export function ModelsView() {
                   {/*
                    * THE LAYOUT SWITCH HAS NO LAYOUT TO SWITCH ON THE CURATED VIEW.
                    *
-                   * the user: "the layout buttons actually don't do anything except they
+                   * The user: "the layout buttons actually don't do anything except they
                    * oddly resize the model card." Exactly right — the curated grid is
                    * hardcoded to list-plus-420px-pane (a card list has nowhere to put a
                    * table), so the only thing these three buttons still reached was the
@@ -2193,7 +2193,7 @@ export function ModelsView() {
       ) : (
         <ScrollArea className="min-h-0 flex-1">
           {/*
-          MORE ROOM AT THE BOTTOM. the user: "I scrolled to the bottom here and the
+          MORE ROOM AT THE BOTTOM. The user: "I scrolled to the bottom here and the
           stable 3 audio is cut off on the bottom." At max scroll the last card
           cleared the fold by exactly the 40px of padding — and the scroll area
           paints a 16px bottom fade over that, so the final card was landing in
@@ -2311,7 +2311,7 @@ export function ModelsView() {
                     the panel's hairline and read as one crowded double line. */}
                   <div className={curated ? 'pr-6' : undefined}>
                     {/*
-                     * TWO HEADINGS ON THE CURATED TAB, not one. the user: "the little
+                     * TWO HEADINGS ON THE CURATED TAB, not one. The user: "the little
                      * 'recommended' text shouldn't be there, the 5 cards you show
                      * should say 'Top Recommended' much larger and then 'More'
                      * below."
@@ -2492,7 +2492,7 @@ export function ModelsView() {
                             {/* The compact table is the DEFAULT view and never
                               renders the detail pane, so without this the hub
                               had no download affordance at all on first open. */}
-                            {/* A real, prominent button. the user: "maybe a big blue
+                            {/* A real, prominent button. The user: "maybe a big blue
                               quick download button on the right". The faint
                               glyph read as decoration. */}
                             {/* biome-ignore lint/a11y/useSemanticElements: nested inside the row <button> — button-in-button is invalid */}
@@ -2532,7 +2532,7 @@ export function ModelsView() {
                               ) : busyId === mdl.id ? (
                                 'Starting…'
                               ) : (
-                                // the user: "the quick 'Get' buttons with the down arrow
+                                // The user: "the quick 'Get' buttons with the down arrow
                                 // should just be replaced with a no arrow 'Download'
                                 // button."
                                 'Download'
@@ -2636,7 +2636,7 @@ export function ModelsView() {
                   ) : null}
                   {(curated || view !== 'compact') && detail !== undefined ? (
                     /*
-                     * PINNED. the user: "the right item showing the model card needs
+                     * PINNED. The user: "the right item showing the model card needs
                      * to be pinned and not lost as we scroll down otherwise we
                      * scroll down through the list find something we like, click
                      * it and nothing appears on the right."
@@ -2763,7 +2763,7 @@ export function ModelsView() {
                             testid="detail-download"
                           />
                           {/*
-                           * the user: "that line about 'the whole repository in this
+                           * The user: "that line about 'the whole repository in this
                            * apps model store' or something is not needed and
                            * especially not true in this case above." It was both:
                            * noise on every card, and wrong wherever the variant is
@@ -2788,7 +2788,7 @@ export function ModelsView() {
                             no question asked. The ladder below is for the people
                             who want to answer that question anyway. */}
                           {/*
-                          NO "ON DISK" SLAB ABOVE THE LADDER. the user: "there's a
+                          NO "ON DISK" SLAB ABOVE THE LADDER. The user: "there's a
                           'on disk' and 'installed' greyed out here… 'on disk'
                           has no place there." The ladder below already answers
                           it per FILE, which is the answer that is true — the
@@ -2851,7 +2851,7 @@ export function ModelsView() {
                         ))}
                       </div>
 
-                      {/* No rule above the card. the user: "that top border with the
+                      {/* No rule above the card. The user: "that top border with the
                         fade out of the model card has no need to happen." The
                         README opens with its own heading, which separates it
                         from the chips better than a hairline that reads as the

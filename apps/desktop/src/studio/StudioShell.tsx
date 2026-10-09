@@ -98,7 +98,7 @@ export interface StudioShellProps {
   /**
    * Cancel the run in flight.
    *
-   * Stop used to live on the job card. the user asked for that card to be nothing
+   * Stop used to live on the job card. The user asked for that card to be nothing
    * but the frame and a bar, and a run still has to be stoppable — so it is on
    * the button that started it, which is where a reader's hand already is and
    * the one control that cannot be mistaken for part of the result.
@@ -111,7 +111,7 @@ export interface StudioShellProps {
   /**
    * Try the same thing again, offered on the error line.
    *
-   * the user: the image studio "isn't user-friendly to get working in a few clicks
+   * The user: the image studio "isn't user-friendly to get working in a few clicks
    * even when something has gone wrong." A generation fails for reasons that are
    * usually transient — a runtime still installing, a half-fetched weight, a
    * model swapped out from under it — and the only recovery was to find the run
@@ -297,7 +297,7 @@ export function StudioShell({
 
         {/*
           THE INPUT BAR — one box, and no panel around it.
-          the user: "no 'seperate area' for the input bar and settings on the
+          The user: "no 'seperate area' for the input bar and settings on the
           bottom, send button to the right of the input bar and fit options
           below compact and in dropups". It used to be a bordered, filled strip
           holding a field AND a row of labelled pill groups, which read as a
@@ -457,7 +457,7 @@ export function StudioShell({
  * of pills, three or four of them side by side, inside a panel with its own
  * border and background. That is a settings form sitting under the place you
  * type, and it made the bottom of every studio taller than the thing it was
- * attached to. the user, with the Claude composer as the reference: "no 'seperate
+ * attached to. The user, with the Claude composer as the reference: "no 'seperate
  * area' for the input bar and settings on the bottom, send button to the right
  * of the input bar and fit options below compact and in dropups or such".
  *
@@ -622,7 +622,7 @@ export function Knob({ label, children }: { label: string; children: ReactNode }
  *
  * WHY THE INDICATOR IS ONE ELEMENT AND NOT A BACKGROUND PER ITEM.
  *
- * the user: "have the animation actually slide the selected, slide the hover
+ * The user: "have the animation actually slide the selected, slide the hover
  * animation actaully and then just keep the same click one." Painting the
  * background on whichever button is `data-on` can only ever cross-fade — the
  * old one dims where it stands and the new one brightens where it stands, and

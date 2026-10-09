@@ -1,7 +1,7 @@
 /**
  * WHEN ONE ROUTE'S CODE WILL NOT LOAD, ONLY THAT ROUTE IS BROKEN.
  *
- * the user, on the full-window crash card: "rendering error self explanatory, that
+ * The user, on the full-window crash card: "rendering error self explanatory, that
  * simply can't happen anymore, it's totally unacceptable."
  *
  * One of the two ways to reach that card had nothing to do with a render bug at

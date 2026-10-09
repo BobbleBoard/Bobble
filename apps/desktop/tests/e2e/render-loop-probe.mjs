@@ -1,7 +1,7 @@
 /**
  * render-loop-probe.mjs — hunt React #185 ("Maximum update depth exceeded").
  *
- * the user's whole window was replaced by the crash card with `Minified React error
+ * The user's whole window was replaced by the crash card with `Minified React error
  * #185` in it. That error is a setState/effect LOOP, and a minified build tells
  * you nothing about which component. So this probe:
  *

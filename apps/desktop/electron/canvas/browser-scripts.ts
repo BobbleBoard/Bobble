@@ -34,7 +34,7 @@ export const DATA_IDX_ATTR = 'data-pi-idx';
 const IDX = DATA_IDX_ATTR;
 
 /*
- * THE SAME CURSOR AS ON THE SCREEN. the user: "cursor is an old version not the
+ * THE SAME CURSOR AS ON THE SCREEN. The user: "cursor is an old version not the
  * computer use cursor it should be in the inbuilt browser these should be
  * linked and the same, current computer use one is correct." The glyph, its
  * size, its press and its pill all come from @pi-desktop/shared's agent-cursor

@@ -1,13 +1,13 @@
 /**
  * THE TAB THAT IS ALREADY OPEN.
  *
- * the user: "on low power mode while i'm using the computer a video produced for
+ * The user: "on low power mode while i'm using the computer a video produced for
  * one of the models doing computer use, let's say using an already open chrome
  * session. here's a task, configure the apple product on screen with 2tb of
  * storage in the already open tab there."
  *
  * So this one deliberately does LESS than demo-chrome: it does not clear the
- * profile picker, does not navigate, and never quits Chrome. His session is the
+ * profile picker, does not navigate, and never quits Chrome. Their session is the
  * subject, and the run has to leave it exactly as it found it apart from the one
  * change it was asked to make.
  *
@@ -21,7 +21,10 @@
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { demoRun } from './demo-run.mjs';
+
+const REPO_ROOT = fileURLToPath(new URL('../../../../', import.meta.url)).replace(/\/$/, '');
 
 const MODEL = process.env.MAC_CU_MODEL ?? 'qwen3.8-27b-mtp';
 const MODE = process.env.TOOL_INTERFACE === 'schemas' ? 'schemas' : 'bash-cli';
@@ -53,7 +56,7 @@ await demoRun({
     const shot = await dbg('screenshot', { app: 'Google Chrome' }).catch(() => null);
     let shotPath = null;
     if (shot?.base64) {
-      const dir = path.join('/Users/user/Desktop/OSS-harness/scratchpad/demos', NAME);
+      const dir = path.join(`${REPO_ROOT}/scratchpad/demos`, NAME);
       mkdirSync(dir, { recursive: true });
       shotPath = path.join(dir, 'chrome-final.png');
       writeFileSync(shotPath, Buffer.from(shot.base64, 'base64'));

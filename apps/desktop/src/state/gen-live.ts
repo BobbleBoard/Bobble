@@ -1,7 +1,7 @@
 /**
  * THE GENERATION THAT IS HAPPENING RIGHT NOW, for the card in the thread.
  *
- * the user: "image/video/audio/media generation tools DO NOT GET SHOWN IN THE
+ * The user: "image/video/audio/media generation tools DO NOT GET SHOWN IN THE
  * CANVAS… they get shown inline, the large card, same as each studio would
  * show." So the live surface data the gen manager streams — step counts, the
  * worker's own status line, the decoded step previews, the finished clip — stops

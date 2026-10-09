@@ -1,7 +1,7 @@
 /**
  * WHAT THE ADDRESS BAR MEANS — a page to open, or something to look up.
  *
- * the user (2026-10-08): "searching in the search bar should google something not
+ * The user (2026-10-08): "searching in the search bar should google something not
  * show https://<typed thing>". Every entry without a scheme had `https://` put
  * in front of it, so "best pizza near me" went to `https://best pizza near me`
  * and "cats" to `https://cats`. And `localhost:3000` read as a URL whose scheme

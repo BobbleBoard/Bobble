@@ -39,13 +39,13 @@ export function isModelTier(v: unknown): v is ModelTier {
  *    gated on high/max — the corp system among them — was off unless the user
  *    dragged the slider by hand.
  *  - PINNING THE MODEL PINNED THE THINKING. With the model held on Fast, effort
- *    resolved to `low` however large the task was. the user asked, on Adaptive with
+ *    resolved to `low` however large the task was. The user asked, on Adaptive with
  *    Fast selected, for a manager to be given a Godot project, and the model
  *    replied that it had no way to contact a manager and offered to draft an
  *    email — because `talk_to_manager` needs high/max and low is what the loaded
  *    model tier produced. The team was not declining to help; it did not exist.
  *
- * the user: "adaptive should be able to be anything based on classifier". So the
+ * The user: "adaptive should be able to be anything based on classifier". So the
  * effort comes from the task class, spans the whole range, and says nothing
  * about model choice — a small model asked to build a game should still think
  * hard and still have its team.

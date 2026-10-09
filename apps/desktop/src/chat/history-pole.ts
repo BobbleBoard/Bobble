@@ -2,7 +2,7 @@
  * THE HISTORY POLE — a line down the right edge of a long conversation, with a
  * few marked places on it you can jump to.
  *
- * the user: "when hovering on the right side of the chat area, not the canvas, I
+ * The user: "when hovering on the right side of the chat area, not the canvas, I
  * want a long pole to appear … has circles on it, when the circles are hovered
  * they show a quick preview … these dots are (max 4), don't show a dot for every
  * message, only for sessions at least 5 screen heights of scroll … these circles
@@ -52,7 +52,7 @@ export interface PoleDot {
 /**
  * How many screens of scroll before the pole earns its place.
  *
- * the user guessed "at least 5 screen heights … or that's just a random thing I
+ * The user guessed "at least 5 screen heights … or that's just a random thing I
  * threw out because I don't have a sense for pixels, you do, use your sense,
  * have an objective measure."
  *

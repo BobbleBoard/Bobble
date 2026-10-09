@@ -1,7 +1,7 @@
 /**
  * MANAGE STORAGE, end to end, against a REPLICA of the real cache.
  *
- * the user (2026-09-12): "can we manage them ourselves and sort them in filesystem
+ * The user (2026-09-12): "can we manage them ourselves and sort them in filesystem
  * similarly to how their access is sorted in the interface … a page in the
  * model manager that says 'Manage Storage' … view and delete models, sorted
  * the same way, always with a 'Reveal' button".

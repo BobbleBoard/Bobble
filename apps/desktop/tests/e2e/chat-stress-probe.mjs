@@ -1,7 +1,7 @@
 /**
  * THE POWER-USER STRESS RUN.
  *
- * the user: "simulate yourself as a power user and do all the things — branch chats,
+ * The user: "simulate yourself as a power user and do all the things — branch chats,
  * make new chats send quick messages while it's running, pause and send a quick
  * message, add files, really wrestle with the context editing … change models
  * while it's doing something … huge stress test that you need to visually ensure

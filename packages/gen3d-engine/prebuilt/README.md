@@ -1,6 +1,6 @@
 # Prebuilt pieces of the 3D engine
 
-the user (2026-09-15): "all basic stuff needs to work out of the box". A fresh Mac
+The user (2026-09-15): "all basic stuff needs to work out of the box". A fresh Mac
 has no git, no C++ compiler and no `metal` compiler, and three parts of the
 engine used to need them:
 

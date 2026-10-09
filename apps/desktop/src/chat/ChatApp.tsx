@@ -94,7 +94,7 @@ import { WindowDropOverlay } from './WindowDropOverlay';
 /**
  * The studio's two openers, in the two places the app already puts them.
  *
- * the user: the settings rail should open from "the same place and icon as canvas",
+ * The user: the settings rail should open from "the same place and icon as canvas",
  * and the gears from "the same place and icon as advanced settings". So they
  * are literally that cluster, swapped in while a studio is the content — the
  * canvas has nothing to show in a studio, and two panel toggles fighting over
@@ -414,10 +414,10 @@ export function ChatApp({
     /*
      * NOTHING IS CREATED FOR A CHAT NOBODY HAS TYPED IN YET.
      *
-     * the user: "a bunch of project clutter even though there are literally no
+     * The user: "a bunch of project clutter even though there are literally no
      * projects", and "many duplicate chats … named the same thing". MEASURED on
-     * his machine: 199 folders named `~/Bobble/new-chat-2 … new-chat-199`, one
-     * per chat he had ever opened, each its own working directory and therefore
+     * their machine: 199 folders named `~/Bobble/new-chat-2 … new-chat-199`, one
+     * per chat the user had ever opened, each its own working directory and therefore
      * its own entry in the folder picker and its own row of "New chat" in the
      * sidebar. `resolveProjectDir` always mkdir's, and this effect ran the
      * moment a chat opened — before a single character was typed.
@@ -738,7 +738,7 @@ export function ChatApp({
                    * already lives.
                    *
                    * This briefly grew its own "‹ Back · <name>" route, which
-                   * the user rejected on sight: "you've got a duplicate back button
+                   * The user rejected on sight: "you've got a duplicate back button
                    * in subchats and the new top bar one doesn't actually work…
                    * revert that new top bar thing and just remove the 'engineer
                    * 1' text from right beside the back button and instead place
@@ -767,7 +767,7 @@ export function ChatApp({
                     )}
                     {/* Right of the name, on the chat and in the studios: the
                         running model is one thing for the whole app, and so is
-                        its speed. the user: "to the right of the chat name, show a
+                        its speed. The user: "to the right of the chat name, show a
                         little icon" — and, of the Model hub: "the starting up
                         and speed dial in the top bar is out of place here". A
                         content route (the hub, Scheduled, Connectors) is not
@@ -784,7 +784,7 @@ export function ChatApp({
                     ) : null}
                     {/* (The downloads icon that stood here now lists in the task
                         tray beside the sidebar toggle, under "Downloads" —
-                        the user, 2026-09-24. See state/tray-transfers.ts.) */}
+                        The user, 2026-09-24. See state/tray-transfers.ts.) */}
                   </>
                 }
                 /* The app's own state — starting up, getting ready — lives in
@@ -833,7 +833,7 @@ export function ChatApp({
               {/* A selected child agent (subagent / role) shows its own read-only chat
               view in place of the main thread + composer. `contentOverride` is the
               same seam for a full surface — the Model hub — so the SIDEBAR AND TOP
-              BAR STAY PUT. the user: "ensure that this keeps the left sidebar present
+              BAR STAY PUT. The user: "ensure that this keeps the left sidebar present
               when clicked". Replacing the whole window for it meant losing the
               chat list, the project chip and the collapse rail, which is a lot to
               give up to look at models. */}
@@ -851,7 +851,7 @@ export function ChatApp({
                   }`}
                 >
                   {/*
-                    THE EMPTY SCREEN SITS HIGH, NOT CENTRED. the user (2026-09-17):
+                    THE EMPTY SCREEN SITS HIGH, NOT CENTRED. The user (2026-09-17):
                     "move the chat area upward so it's ~45% height to the bottom
                     of the screen and then place just a single line larger than
                     currently that has the app logo and then 'Bobble'". Two
@@ -930,13 +930,13 @@ export function ChatApp({
             {/*
              * THE SIDEBAR TOGGLE LIVES HERE, not in the sidebar.
              *
-             * the user: "move the left sidebar button right to the right of the
+             * The user: "move the left sidebar button right to the right of the
              * traffic light buttons… button stays fixed up right next to the
              * traffic light buttons." A collapsed sidebar now unmounts entirely,
              * so a toggle rendered by it would vanish with it and leave no way
              * back.
              *
-             * WHY IT IS RENDERED LAST AND WRAPPED. the user: "the left sidebar
+             * WHY IT IS RENDERED LAST AND WRAPPED. The user: "the left sidebar
              * button is NOT CLICKABLE doesn't have any hover or click."
              *
              * `no-drag` on the button was not enough. macOS takes mouse events
@@ -960,7 +960,7 @@ export function ChatApp({
               tracks the lights instead of a hand-tuned `left-[78px]` that had no
               relationship to them. Centring the strip on the bar's own height
               puts the button on the cluster's centre line without anyone having
-              to state that line twice. the user: "vertically raise/align the
+              to state that line twice. The user: "vertically raise/align the
               open/close sidebar button and move it slightly to the right so the
               hover animation gives breathing room and doesn't overlap".
             */}
@@ -983,7 +983,7 @@ export function ChatApp({
               {/*
                 THE TASKS YOU LEFT, immediately right of the toggle and in the
                 same no-drag zone (a control outside it would lose its clicks to
-                the drag rect, like the toggle once did). the user (2026-09-24): "a
+                the drag rect, like the toggle once did). The user (2026-09-24): "a
                 little notifications button … always simply to the right of the
                 collapse sidebar button, this only appears when you leave a
                 running task". Here rather than in the sidebar so it is there
@@ -993,7 +993,7 @@ export function ChatApp({
               {/*
                 CHAT | WORK, in the corner Claude puts it in.
 
-                the user: "claude has this little thing in the top left that I think
+                The user: "claude has this little thing in the top left that I think
                 we can lift off of … and that toggles that bottom bar popping
                 out, left one being 'chat' and right being 'work'."
 

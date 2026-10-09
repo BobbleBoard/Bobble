@@ -1,7 +1,7 @@
 /**
  * The studio must not clip its own columns when the window is narrow or short.
  *
- * the user: "right side of the app seems cut off when resizing the window. and the
+ * The user: "right side of the app seems cut off when resizing the window. and the
  * same sort of thing happens to the bottom aswell".
  *
  * CAUSE: .tp-body is a flex row of rail (74) + genpanel (302) + viewport +

@@ -1,7 +1,7 @@
 /**
  * THE 3D MODULE GATE — what you see before the module is downloaded.
  *
- * the user: "their workspaces are blurred with a few buttons that say 'download
+ * The user: "their workspaces are blurred with a few buttons that say 'download
  * module (nGB)' and a separate 'View' button so they can see the UI removing the
  * blur (obviously can't use it without download but just so we're not
  * gatekeeping the UI from being seen at all as if it's a paid service)."
@@ -37,7 +37,7 @@ export function ModuleGate({ state, onView }: ModuleGateProps): JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   /*
-   * THE DOWNLOAD THAT NEEDS NOTHING BUILT. the user (2026-09-14): "one click
+   * THE DOWNLOAD THAT NEEDS NOTHING BUILT. The user (2026-09-14): "one click
    * download of any of these modules … any user on any mac device". The engine
    * below compiles Metal kernels, which wants Xcode; ComfyUI's native TRELLIS.2
    * does not, so when main reports that path it is the button — the ComfyUI
@@ -106,7 +106,7 @@ export function ModuleGate({ state, onView }: ModuleGateProps): JSX.Element {
   const size = formatModuleSize(state.remainingBytes);
   const runtimeMissing = state.status === 'no-runtime';
   /*
-   * the user: "3D studio shows 'runtime is not available' on every first open of the
+   * The user: "3D studio shows 'runtime is not available' on every first open of the
    * app even when previously installed." The engine's first catalog answer after
    * launch is always "not up yet" — it boots the Python sidecar behind itself —
    * so this panel offered to SET UP a module that was already installed and

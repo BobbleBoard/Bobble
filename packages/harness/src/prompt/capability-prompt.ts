@@ -77,7 +77,7 @@ export const CAPABILITY_PROMPT_MARKER = '# You are a local agent with real tools
  * trace of a team was a subordinate clause presupposing one the model had never
  * been told it had.
  *
- * the user, asked whether the CEO should be told it has a manager: "?? why wouldn't it
+ * The user, asked whether the CEO should be told it has a manager: "?? why wouldn't it
  * be" — and "yes if the talk to tool isn't loaded, load it."
  *
  * Both of his original objections are answered rather than reverted. It is said
@@ -133,7 +133,7 @@ export const CLI_MECHANISM_SWAPS: ReadonlyArray<readonly [string, string]> = [
 ];
 
 /**
- * SHOWING IS A TOOL CALL. the user (2026-09-15): "guide the model via system prompt
+ * SHOWING IS A TOOL CALL. The user (2026-09-15): "guide the model via system prompt
  * to always utilize the present tool to display files to the user."
  *
  * MEASURED the same day: asked to "present it" after making a picture, a 4B
@@ -186,8 +186,8 @@ ${PRESENT_RULE}
 /**
  * Cut the parts of pi's base prompt that are about PI, not about Bobble.
  *
- * the user: "there's a bunch about pi, about being a coding assistant all that can
- * go." He is right on both counts and they cost different things.
+ * The user: "there's a bunch about pi, about being a coding assistant all that can
+ * go." The user is right on both counts and they cost different things.
  *
  * The identity line ("You are an expert coding assistant operating inside pi, a
  * coding agent harness") tells the model it is a coding tool, and it answers
@@ -209,7 +209,7 @@ export function stripPiIdentity(base: string): string {
    * REMOVED, not replaced.
    *
    * It used to swap pi's "you are an expert coding assistant operating inside
-   * pi" for a Bobble sentence of the same shape. the user, cutting the prompt down:
+   * pi" for a Bobble sentence of the same shape. The user, cutting the prompt down:
    * "strip out the part about 'describing pi' and 'you are pi' just keep the
    * tool descriptions and simple guidelines they give." An identity paragraph is
    * not guidance — the model's behaviour comes from the rules and the commands,
@@ -324,7 +324,7 @@ const SCHEMA_ONLY_LINES: readonly RegExp[] = [
  * Longest name first: `update_plan` must not be rewritten by a `plan` entry.
  */
 /**
- * WHERE A SHELL COMMAND STARTS. the user (2026-09-13): "make it very clear to the
+ * WHERE A SHELL COMMAND STARTS. The user (2026-09-13): "make it very clear to the
  * model if their terminal is in their working directory always or they have
  * to type cd <working> && <command> on every command — it seems they sometimes
  * do that a lot." The fact (index.ts, the bash spawnHook): every command runs
@@ -451,7 +451,7 @@ export function augmentSystemPrompt(
 ): string {
   let trimmed = stripPiIdentity(stripToolCatalog((base ?? '').trim()));
   /*
-   * THE FOLDER BY NAME, NEVER BY ITS FULL PATH. the user (2026-09-17): the model
+   * THE FOLDER BY NAME, NEVER BY ITS FULL PATH. The user (2026-09-17): the model
    * "should only know the relative path from the chat workspace's root by
    * default" — it read the absolute folder off this line and repeated it in
    * replies ("The file is located at /Users/user/Bobble/…/sample.svg"). The

@@ -7,7 +7,7 @@
  * own extensions platform — listens on that port and accepts exactly one:
  * `{"type": "execute", "code": …}`, answering anything else "Unknown request
  * type". Every call failed, and the server brought telemetry and cloud asset
- * downloads with it. the user: "fix that to be a small cli tool".
+ * downloads with it. The user: "fix that to be a small cli tool".
  *
  * So: no server, no download. `blender run` sends Python (bpy) to the add-on and
  * prints what comes back — the `result` dict the code fills, its stdout, or its

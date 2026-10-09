@@ -1,7 +1,7 @@
 /**
  * ROUND 3 — A LONG TASK THAT HAS TO ACTUALLY FINISH.
  *
- * the user: "long running tasks where you can't accept an 'I can't do this' needs to
+ * The user: "long running tasks where you can't accept an 'I can't do this' needs to
  * truly run until completion."
  *
  * The task is deliberately dull and objectively checkable: eight small files,

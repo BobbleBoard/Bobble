@@ -237,7 +237,7 @@ describe('ActivityChain — "Done" gating (A3 flash fix)', () => {
 /**
  * THE ELAPSED COUNTER, WHICH WAS BUILT AND NEVER RENDERED.
  *
- * the user asked for it watching a command sit there: "some 'seconds' timer going on
+ * The user asked for it watching a command sit there: "some 'seconds' timer going on
  * here would be much appreciated, it's been going for a few minutes, seems like
  * it should be timing out by now." `RunningFor` was written, the CSS was written
  * — and nothing rendered it. A lint warning for an unused function was the only

@@ -33,7 +33,7 @@ export interface PresentedRecord {
    * The message this artefact was handed over AFTER, so the card can sit where
    * it was made instead of at the foot of the conversation.
    *
-   * the user: "file presentation cards seem pinned to the bottom of the chat for
+   * The user: "file presentation cards seem pinned to the bottom of the chat for
    * some time instead of staying at the position they were created at." They
    * were rendered as one block after the last message, so every card any turn
    * had ever produced slid down under whatever you said next — three questions
@@ -50,7 +50,7 @@ export interface PresentedRecord {
    * after pi restarted under a chat, or the chat was reopened, `afterMessageId`
    * named a message that no longer existed: the card fell to the foot of the
    * thread, under whatever was said next — and the transcript rebuild, matching
-   * on that dead id, added a second copy beside it. the user (2026-10-08): "it
+   * on that dead id, added a second copy beside it. The user (2026-10-08): "it
    * showed two radar charts at the bottom, not where they were originally".
    * A tool call's id is the provider's and is written into the session file,
    * so it is the same in both.
@@ -62,7 +62,7 @@ export interface PresentedRecord {
   /**
    * A chart's spec, when the presented .svg had the `chart` tool's sidecar
    * beside it: the thread renders the interactive card from this instead of a
-   * file row, and the canvas only on request. the user: "some items showing inline
+   * file row, and the canvas only on request. The user: "some items showing inline
    * cards like anthropic has here, while larger things go to the canvas still".
    */
   chart?: ChartSpec;
@@ -705,7 +705,7 @@ export async function openPresented(
    * This used to pass `artifact: { kind, path, title }`, so every surface that
    * reads `artifact.content.text` threw on `undefined`. React has no error
    * boundary above the thread, so the throw unmounted the entire tree: calling
-   * `present` BLANKED THE WHOLE APP. the user saw it happen — "complete blankscreen
+   * `present` BLANKED THE WHOLE APP. The user saw it happen — "complete blankscreen
    * after asked for the present tool to be called, I briefly saw the actual UI".
    *
    * It also explains a run of readings I could not make sense of: a document with

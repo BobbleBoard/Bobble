@@ -44,24 +44,24 @@
 @pi-desktop/canvas:test: $ vitest run
 @pi-desktop/gen-canvas:test: $ vitest run
 @pi-desktop/mac-computer-use:test: 
-@pi-desktop/mac-computer-use:test: [1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/Users/user/Desktop/OSS-harness/packages/mac-computer-use[39m
+@pi-desktop/mac-computer-use:test: [1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90mpackages/mac-computer-use[39m
 @pi-desktop/mac-computer-use:test: 
 @pi-desktop/pi-mac:test: 
-@pi-desktop/pi-mac:test: [1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/Users/user/Desktop/OSS-harness/packages/pi-mac[39m
+@pi-desktop/pi-mac:test: [1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90mpackages/pi-mac[39m
 @pi-desktop/pi-mac:test: 
 @pi-desktop/desktop:test: 
-@pi-desktop/desktop:test: [1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/Users/user/Desktop/OSS-harness/apps/desktop[39m
+@pi-desktop/desktop:test: [1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90mapps/desktop[39m
 @pi-desktop/desktop:test: 
 @pi-desktop/harness:test: 
-@pi-desktop/harness:test: [1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/Users/user/Desktop/OSS-harness/packages/harness[39m
+@pi-desktop/harness:test: [1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90mpackages/harness[39m
 @pi-desktop/harness:test: 
 @pi-desktop/coordination:test: 
-@pi-desktop/coordination:test: [1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/Users/user/Desktop/OSS-harness/packages/coordination[39m
+@pi-desktop/coordination:test: [1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90mpackages/coordination[39m
 @pi-desktop/coordination:test: 
 @pi-desktop/canvas:test: 
 @pi-desktop/gen-canvas:test: 
-@pi-desktop/canvas:test: [1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/Users/user/Desktop/OSS-harness/packages/canvas[39m
-@pi-desktop/gen-canvas:test: [1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/Users/user/Desktop/OSS-harness/packages/gen-canvas[39m
+@pi-desktop/canvas:test: [1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90mpackages/canvas[39m
+@pi-desktop/gen-canvas:test: [1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90mpackages/gen-canvas[39m
 @pi-desktop/gen-canvas:test: 
 @pi-desktop/canvas:test: 
 @pi-desktop/mcp-lite:typecheck: cache miss, executing fc1f743b7f785624
@@ -184,7 +184,7 @@
 @pi-desktop/harness:test:  [32m✓[39m src/subagent/subagent-tool.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 5[2mms[22m[39m
 @pi-desktop/desktop:test: [90mstderr[2m | electron/gen3d/image-jobs.test.ts[2m > [22m[2mImageJobTracker[2m > [22m[2mdoes not grow without bound when nobody claims outcomes
 @pi-desktop/desktop:test: [22m[39mPromise returned by `expect(actual).resolves.toEqual(expected)` was not awaited. Vitest currently auto-awaits hanging assertions at the end of the test, but this will cause the test to fail in the next Vitest major. Please remember to await the assertion.
-@pi-desktop/desktop:test:     at /Users/user/Desktop/OSS-harness/apps/desktop/electron/gen3d/image-jobs.test.ts:88:39
+@pi-desktop/desktop:test:     at apps/desktop/electron/gen3d/image-jobs.test.ts:88:39
 @pi-desktop/harness:test:  [32m✓[39m src/tools/image-tools.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 5[2mms[22m[39m
 @pi-desktop/desktop:test: 
 @pi-desktop/harness:test:  [32m✓[39m src/net/offline.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 2[2mms[22m[39m

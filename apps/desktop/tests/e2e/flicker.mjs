@@ -1,7 +1,7 @@
 /**
  * FLICKER GUARD — catch a flash on screen, keep the frames, say what moved.
  *
- * the user (2026-09-16): "i'm noticing some flickering of charts on the screen
+ * The user (2026-09-16): "i'm noticing some flickering of charts on the screen
  * when you're running headed testing. might be harness artifacts, but it
  * might not be, add visual flicker guarding to ensure you catch when there's
  * flickering and get a frame of the flicker before and after and logging

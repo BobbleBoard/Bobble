@@ -1,7 +1,7 @@
 /**
  * THE THREE STUDIOS, DRIVEN AND PHOTOGRAPHED.
  *
- * the user: "you need to iterate on the UI until you're very happy with it, you play
+ * The user: "you need to iterate on the UI until you're very happy with it, you play
  * with it, try to break some animations/visuals clicking a bunch hovering a
  * bunch lots of visual review."
  *

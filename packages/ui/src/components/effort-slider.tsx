@@ -186,7 +186,7 @@ export function EffortSlider({
 
       {/*
         THE SLIDER ONLY EXISTS WHEN THERE IS A LEVEL TO SET.
-        the user: "restyle auto to be a toggle button that just removes the slider
+        The user: "restyle auto to be a toggle button that just removes the slider
         while toggled on." It used to stay on screen in Auto, tracking the routed
         tier — a control that moved on its own and ignored you if you touched it,
         which is the worst of both: it looks settable and is not. With Auto on the
@@ -220,7 +220,7 @@ export function EffortSlider({
               THE DETENTS, DRAWN — after the fill, deliberately. Both are absolutely
               positioned siblings, so the later one wins: parked before the fill
               they were painted over by it, and every dot behind the knob simply
-              vanished. the user: "dots for levels aswell." Without them the
+              vanished. The user: "dots for levels aswell." Without them the
               track says only "somewhere between faster and smarter" — you cannot
               see that there are four settings, which one you are on, or how far
               the next one is. They are also where the knob lands, so they double

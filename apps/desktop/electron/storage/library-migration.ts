@@ -2,7 +2,7 @@
  * MOVING THE MODELS OUT OF `~/.cache` AND ONTO THE SHELVES — once, at boot,
  * by renaming, with every engine still able to find its weights.
  *
- * the user (2026-09-12): "all models and such are dumped in .cache … there is
+ * The user (2026-09-12): "all models and such are dumped in .cache … there is
  * currently 557gb in .cache." The library's shape is in
  * @pi-desktop/model-store's library.ts; this is how an existing machine gets
  * there.

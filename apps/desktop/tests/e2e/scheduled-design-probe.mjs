@@ -40,7 +40,7 @@ const SLOW_FIXTURE = path.join(HERE, 'fixtures', 'scheduled-slow.json');
 const PORTRAIT = path.join(APP_ROOT, 'src', 'candidates', 'schedule', 'fixtures', 'portrait.png');
 
 const THEMES = ['bobble-dark', 'bobble-light'];
-/** the user's window: 1512x868 work area clamps the 1440x940 default to this. */
+/** The user's window: 1512x868 work area clamps the 1440x940 default to this. */
 const WINDOW = { width: 1440, height: 868 };
 const WIDTHS = [
   ['laptop', { width: 1172, height: 800 }],

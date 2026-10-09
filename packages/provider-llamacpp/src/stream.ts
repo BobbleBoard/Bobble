@@ -220,7 +220,7 @@ export function serverCanSeeImages(
    * `PI_DESKTOP_VISION` is fixed when a process starts. A SUBAGENT spawns
    * mid-turn — usually before anything has asked for vision — so it inherited
    * `0` and kept it for its whole life, even after the server relaunched
-   * multimodal. the user, watching one: "the subagent says it's in 'text only mode'".
+   * multimodal. The user, watching one: "the subagent says it's in 'text only mode'".
    * It was telling the truth about a value that had gone stale.
    *
    * The host rewrites a one-byte file whenever the launch mode changes (same

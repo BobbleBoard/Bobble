@@ -57,10 +57,10 @@ import { InstructionsChip } from './InstructionsChip';
 /** LEFT: the relocated project (working-folder) chip, slimmed for the bar. When
  * the selected project folder is MISSING and pi fell back to the conversation
  * sandbox, the chip drops the stale name for a subtle "Sandbox" warn state
- * (the user #13) instead of pretending the dead folder is the working dir. */
+ * (The user #13) instead of pretending the dead folder is the working dir. */
 function ProjectRegion() {
   const activePath = useProjectStore((s) => s.activePath);
-  // the user #6: drive the sandbox/"No project" chip off the STORE FLAG, not a stale
+  // The user #6: drive the sandbox/"No project" chip off the STORE FLAG, not a stale
   // folder name. The project store already tracks `projectMissing` (the selected
   // project's folder is gone on disk → pi ran in the conversation sandbox); the
   // CRITICAL wave may also expose an explicit `usingSandbox`. Prefer the explicit
@@ -102,7 +102,7 @@ function ProjectRegion() {
    * every working folder the app had ever been pointed at — unioned with the
    * sidebar's manual projects. After a day of probe runs that meant eight
    * throwaway `unify-*` directories in the dropdown, none of them in the sidebar.
-   * the user: "nothing should be in this dropdown if it isn't in the left sidebar."
+   * The user: "nothing should be in this dropdown if it isn't in the left sidebar."
    * One derivation now, shared, so the two cannot drift apart again.
    */
   const visible = useVisibleProjects();
@@ -221,7 +221,7 @@ function ProjectRegion() {
       }}
       onClear={() => void clearProject()}
       /* "Sandbox" and "No project" were two labels for one state — a chat with
-         no working folder, whose files go to its own private folder. the user: call
+         no working folder, whose files go to its own private folder. The user: call
          it "No project". The distinction only ever mattered internally. */
       /* The chip must never name a different place from where the work lands.
        *
@@ -328,7 +328,7 @@ function EffortRegion() {
   /*
    * IT OPENS RIGHT ABOVE THE BUTTON.
    *
-   * the user: "effort bar shows all the way up there rather than right above where
+   * The user: "effort bar shows all the way up there rather than right above where
    * it should be." It was anchored to `.pd-composer-root` — the whole composer
    * CARD — so "above" meant above the text area too: with a few lines typed, or
    * an attachment row up, the panel floated a long way from the control that
@@ -354,7 +354,7 @@ function EffortRegion() {
         side="top"
         align="end"
         sideOffset={8}
-        // the user #14: land the popover's initial focus on the slider thumb (not the
+        // The user #14: land the popover's initial focus on the slider thumb (not the
         // "?" help button) so arrow keys nudge effort immediately. The help button
         // is already out of the tab order (EffortSlider), but focus the track
         // explicitly for determinism across Radix focus-scope versions.

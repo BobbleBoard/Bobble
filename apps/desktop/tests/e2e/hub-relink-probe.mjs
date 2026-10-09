@@ -1,7 +1,7 @@
 /**
  * A 3D CACHE THAT LOST ITS LINKS GETS THEM BACK AT BOOT — through the real app.
  *
- * the user's Mac since 2026-09-20: `~/.cache/bobble/gen3d` was recreated empty,
+ * The user's Mac since 2026-09-20: `~/.cache/bobble/gen3d` was recreated empty,
  * while the library still holds every 3D weight, including 35 GB of Mage-Flow
  * from the withdrawn `microsoft/*` repos that nobody can download again. The
  * engine reads its weights only through `gen3d/hf/hub/models--Org--Name`

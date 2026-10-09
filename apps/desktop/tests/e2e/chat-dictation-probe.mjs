@@ -2,17 +2,20 @@ import { mkdtempSync, realpathSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { _electron as electron } from 'playwright-core';
 
+const REPO_ROOT = fileURLToPath(new URL('../../../../', import.meta.url)).replace(/\/$/, '');
+
 const require = createRequire(import.meta.url);
-const appRoot = '/Users/user/Desktop/OSS-harness/apps/desktop';
+const appRoot = `${REPO_ROOT}/apps/desktop`;
 const app = await electron.launch({
   executablePath: require('electron'),
   args: [appRoot, `--user-data-dir=${mkdtempSync(path.join(tmpdir(), 'mic-udd-'))}`],
   env: {
     ...process.env,
     HOME: realpathSync(mkdtempSync(path.join(tmpdir(), 'mic-home-'))),
-    PI_BIN: '/Users/user/Desktop/OSS-harness/packages/engine/tools/mock-pi/mock-pi.mjs',
+    PI_BIN: `${REPO_ROOT}/packages/engine/tools/mock-pi/mock-pi.mjs`,
     PI_E2E: '1',
   },
 });

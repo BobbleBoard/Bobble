@@ -16,15 +16,18 @@ import { execFile } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { _electron as electron } from 'playwright-core';
 import { probeHome } from './harness.mjs';
+
+const REPO_ROOT = fileURLToPath(new URL('../../../../', import.meta.url)).replace(/\/$/, '');
 
 const run = promisify(execFile);
 const osa = (s) => run('osascript', ['-e', s]).catch(() => undefined);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const BUNDLE = process.env.BOBBLE_APP ?? '/Applications/Bobble.app';
-const OUT = process.env.OUT_DIR ?? '/Users/user/Desktop/OSS-harness/scratchpad/mac-video';
+const OUT = process.env.OUT_DIR ?? `${REPO_ROOT}/scratchpad/mac-video`;
 const FPS = Number(process.env.FPS ?? 8);
 const DOCNAME = `bobble-proof-${Date.now().toString(36)}`;
 const LINE = 'Bobble typed this line itself, in the background.';

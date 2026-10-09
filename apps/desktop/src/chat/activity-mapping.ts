@@ -319,7 +319,7 @@ const TOOL_REGISTRY: Record<string, ToolResolution> = {
    * of create_production_hierarchy + speak_to_manager into ONE bidirectional
    * `talk_to_manager` renamed the tool, and the registry still listed only the
    * pre-merge names — so the row that PROVES a run delegated rendered as the
-   * neutral "Running a tool" puzzle glyph. the user, looking at a live run: "I
+   * neutral "Running a tool" puzzle glyph. The user, looking at a live run: "I
    * thought we fixed this UI thing."
    *
    * The legacy name is kept because old session JSONLs replay through here and
@@ -570,7 +570,7 @@ export const PROSE_ARGS_KEY = '__prose';
  *
  * The collapsed chain sums per-step durations, and corp steps carried none — so a
  * forty-step corp turn read "Worked" with no time while the identical chain in the
- * ordinary chat read "Worked for 2m 5s". the user: "which doesn't have the time next
+ * ordinary chat read "Worked for 2m 5s". The user: "which doesn't have the time next
  * to it for some reason? 'worked for ah nm rs' please."
  */
 export const DURATION_ARG_KEY = '__durationMs';
@@ -578,7 +578,7 @@ export const DURATION_ARG_KEY = '__durationMs';
 /**
  * Pretty-print a tool call's arguments for the reveal (Input block).
  *
- * THE COORDINATION TOOLS GET PROSE, NOT JSON. the user: "the talk to, ready to
+ * THE COORDINATION TOOLS GET PROSE, NOT JSON. The user: "the talk to, ready to
  * delegate additionally need to be clickable to show case specific not generic
  * expansions of details of the tool call." A hand-off's content is one
  * recipient and one paragraph; rendering that as `{"recipient": "engineer:1",
@@ -711,7 +711,7 @@ function primaryArg(args: Record<string, unknown>): string | undefined {
  * They used to be "every line of old_string as a deletion, every line of
  * new_string as an addition" — and since a str_replace edit quotes surrounding
  * lines to make its match unique, that painted a one-word change as fifteen red
- * rows over fifteen green ones. the user read the result exactly as it looked:
+ * rows over fifteen green ones. The user read the result exactly as it looked:
  * "editing/writing tool calls a lot of the time show up as red."
  */
 function editDiff(args: Record<string, unknown>): DiffFileData[] | undefined {
@@ -1150,7 +1150,7 @@ function mapToolStepData(
    * `block.arguments` is only populated once a tool call completes, so a running
    * bash step had no `command` — which made the row un-expandable (see
    * `hasInlineContent`) exactly when someone most wants to know what is taking
-   * so long. the user, on a step at 1m 7s: "I want to know what that is, I can't
+   * so long. The user, on a step at 1m 7s: "I want to know what that is, I can't
    * click to expand and see it."
    *
    * The argument text IS streaming in the meantime, and this file already parses
@@ -1191,7 +1191,7 @@ function mapToolStepData(
       }
       /*
        * A BROWSER ACTION IS A BROWSER ROW, a drawing an image row, a document
-       * a file row — the same kinds and marks the native calls have. the user
+       * a file row — the same kinds and marks the native calls have. The user
        * (2026-09-21): "ensure all things have custom 'Clicking with browser'
        * 'Drawing SVG' rather than 'svg --prompt a smiley fac...'". The raw
        * line stays behind the disclosure as the command; the tool's answer as
@@ -1398,7 +1398,7 @@ function mapToolStepData(
       /*
        * A PICTURE THIS APP JUST MADE DOES NOT GO TO THE CANVAS.
        *
-       * the user: "image/video/audio/media generation tools DO NOT GET SHOWN IN THE
+       * The user: "image/video/audio/media generation tools DO NOT GET SHOWN IN THE
        * CANVAS… they get shown inline, the large card, same as each studio would
        * show." Video, speech, music and sfx already obeyed that (the arm below);
        * `generate_image` and `edit_image` did not, so of the five generate tools
@@ -1572,7 +1572,7 @@ function mapToolStepData(
 /*
  * CHAT-TEMPLATE MARKERS ARE NOT THOUGHTS.
  *
- * the user, from a screenshot of a live run: three "Thought" rows in a row whose
+ * The user, from a screenshot of a live run: three "Thought" rows in a row whose
  * entire visible content was `<|channel>thought`.
  *
  * MEASURED in that run's session log — the model prefixes its reasoning with a

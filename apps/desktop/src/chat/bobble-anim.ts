@@ -1,7 +1,7 @@
 /**
  * THE WAIT, AS THE APP'S OWN MARK TAKING ITSELF APART AND PUTTING ITSELF BACK.
  *
- * the user, asking for the generation loaders to be "a bit more fun":
+ * The user, asking for the generation loaders to be "a bit more fun":
  *
  *   "change the app icon's squares to be totally white, and then the sliding
  *    tile puzzle clockwise animation can be done, as well as smoothly
@@ -30,7 +30,7 @@
  * renderer that draws whatever it is handed.
  *
  * ## The arc, and why it is ONE arc
- * the user asked for several animations that "flow into each other". They are not
+ * The user asked for several animations that "flow into each other". They are not
  * separate loops that cross-fade — that is what a cross-fade looks like, and it
  * looks like two animations. They are ACTS of one continuous life:
  *
@@ -68,7 +68,7 @@ export const TOTAL = GRID * GRID;
 /**
  * THE FIELD IS AS WIDE AS THE CARD.
  *
- * the user (2026-09-23): "the animations need to be procedural and not locked to a
+ * The user (2026-09-23): "the animations need to be procedural and not locked to a
  * square aspect ratio or anything." The board is the icon's square, so a 16:9
  * clip or a wide 3D viewport got a large centred square with empty plate
  * either side. The grid acts now run on a FIELD: the icon's 8x8 plus `x` more
@@ -138,7 +138,7 @@ export interface Scene {
    * How far the board reaches across the box it fills: 0 = the mark's own
    * compressed size (the puzzle and the merge, where four big tiles enlarge and
    * reassemble), 1 = out to the edges and past them (the dot field and the
-   * cascade, whose wave should seem to run off the card). the user (2026-09-17):
+   * cascade, whose wave should seem to run off the card). The user (2026-09-17):
    * "dot/cascade need to go much closer to the edge and the cascade especially
    * needs to seem to go off of it, the enlarging can compress a bit more than
    * the others". The split ramps it up, the merge ramps it down, so the board
@@ -400,7 +400,7 @@ export const BAND = 11;
 export const DOT = 0.22;
 
 /**
- * the user's rule, exactly: the line is `y = x - t`, `t` lowers at a constant rate,
+ * The user's rule, exactly: the line is `y = x - t`, `t` lowers at a constant rate,
  * and a cell is scaled by how close it is to that line.
  *
  * Distance from (cx,cy) to `y = x - t`, i.e. to `x - y - t = 0`, is
@@ -445,7 +445,7 @@ export function cascadeT(progress: number, field: Field = NO_FIELD): number {
 /**
  * THE END OF THE WAIT IS NOT A FADE-OUT, IT IS THE LAST SWEEP.
  *
- * the user: "it can simply smoothly fade out with one of the animations eg. the
+ * The user: "it can simply smoothly fade out with one of the animations eg. the
  * diagonal cascade when it's ready can do it's thing, but as it goes reveal the
  * actual produced image/video/3d. seamless besides a quick smooth resize."
  *

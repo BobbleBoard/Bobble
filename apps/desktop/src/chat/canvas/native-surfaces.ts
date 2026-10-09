@@ -71,7 +71,7 @@ function xtermColor(name: string, fallback: string): string {
  * a chosen one. Read as COMPUTED values, so a theme change lands here by
  * re-reading rather than by mirroring a palette in TypeScript.
  *
- * the user: "in terminal in the canvas in dark mode there's a dark red color
+ * The user: "in terminal in the canvas in dark mode there's a dark red color
  * that's a bit unreadable" — xterm's own default red (#cd3131) on the app's
  * near-black ground, at 3:1. The house palette's red clears 5:1; every ANSI
  * colour of the house themes is held to 4.5:1 by test.
@@ -672,7 +672,7 @@ export class NativeSurfaces {
     /*
      * A LOWERED VIEW LEAVES A HOLE — so leave the last frame in it.
      *
-     * the user: "browser tabs go blank when the + button is pressed?" They did, and
+     * The user: "browser tabs go blank when the + button is pressed?" They did, and
      * for a real reason: a native WebContentsView paints above every DOM element
      * in the window, so the `+` menu is invisible under the page unless the page
      * is taken down first. The page coming down is correct; the page coming down

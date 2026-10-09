@@ -2,7 +2,7 @@
  * LOOK at the diagram card — every kind the `diagram` tool offers, in the chat,
  * light and dark, in each design kit.
  *
- * the user (2026-09-25): "custom mermaid arrows and box styling". The drawings are
+ * The user (2026-09-25): "custom mermaid arrows and box styling". The drawings are
  * made the way the app makes them — the repo's own diagram-page.ts (the
  * hidden window's page script and runDiagram) over the bundled Mermaid, in a
  * headless Chromium — and handed to the real app's thread as presented cards,
@@ -262,7 +262,7 @@ try {
         };
       });
       check(facts.texts > 0, `${d.kit}/${d.name} ${mode}: the card drew its words`);
-      // the user (2026-09-25): "clean and curved path eg. elbow arrows" — a class
+      // The user (2026-09-25): "clean and curved path eg. elbow arrows" — a class
       // or ER line (its UML mark, its crow's foot) meets its box square too.
       if (d.name === 'class' || d.name === 'er') {
         check(

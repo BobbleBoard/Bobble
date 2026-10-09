@@ -38,7 +38,7 @@
  * It used to be `useDenoisePreview`, holding the frames in React state. That put
  * a `setState` on the render path of every arriving frame, which re-rendered the
  * whole assistant group — markdown, the activity chain, everything — five times
- * per image, and remounted the frame elements each time. the user saw the result as
+ * per image, and remounted the frame elements each time. The user saw the result as
  * a flash across the window on every step. The frames now drive the DOM directly
  * (see ThreadImagePlaceholder), so nothing about a new frame reaches React.
  */

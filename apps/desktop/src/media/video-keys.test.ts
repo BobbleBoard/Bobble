@@ -1,5 +1,5 @@
 /**
- * the user's key map, written down as a test so it stays what he asked for:
+ * The user's key map, written down as a test so it stays what the user asked for:
  *
  *   "play button/pause for video l/r arrows skip 5 seconds directionally
  *    j and l 10s k and space pause for the videos"

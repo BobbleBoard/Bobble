@@ -2,7 +2,7 @@
 /**
  * A file you click must SHOW you something.
  *
- * the user, on a report a subagent wrote and handed back: "it just shows up blank in
+ * The user, on a report a subagent wrote and handed back: "it just shows up blank in
  * the canvas sidebar… it was unable to be read or clicked on or viewed by me."
  * The write parsed, the +N line counter climbed, and the tab opened empty —
  * because a failed read set no artifact at all. A blank pane is the worst answer
@@ -16,7 +16,7 @@ describe('unreadableFileArtifact', () => {
   const art = unreadableFileArtifact('/Users/user/bobble-testbed/run/report.md');
 
   it('says it could not read the file, rather than showing nothing — as a notice, not as source', () => {
-    // the user (2026-09-17): the sentence used to land in the code editor, line
+    // The user (2026-09-17): the sentence used to land in the code editor, line
     // numbers and all, "as if the error is what's written to the file".
     expect(art.content.kind).toBe('notice');
     // In words, saying what was already tried (the user, 2026-10-08).
@@ -65,7 +65,7 @@ describe('unreadableFileArtifact', () => {
 
 /**
  * HOW AN EDIT IS SHOWN — the motion whenever it can be played, the diff only
- * when it cannot. the user asked for the file with the edit happening in it, not a
+ * when it cannot. The user asked for the file with the edit happening in it, not a
  * diff being typed out; the diff is what is left when there is nowhere to stand
  * the caret.
  */

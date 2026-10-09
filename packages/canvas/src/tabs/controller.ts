@@ -154,7 +154,7 @@ export class CanvasController {
     }
     this.#commit({ ...this.#state, tabs, activeTabId });
     /*
-     * CLOSING THE LAST TAB CLOSES THE RAIL. the user: "clicking the X on the last tab
+     * CLOSING THE LAST TAB CLOSES THE RAIL. The user: "clicking the X on the last tab
      * in the canvas should close the canvas sidebar."
      *
      * Fired from HERE rather than at the call sites, because there are several

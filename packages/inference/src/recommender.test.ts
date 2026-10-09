@@ -203,7 +203,7 @@ describe('resolveTierModels (per-hardware 3-tier resolution)', () => {
       balanced: 'gemma-4-e4b-it',
       intel: 'gemma-4-12b-it',
     });
-    // the user, 2026-08-09: Qwen3.5-9B replaces Gemma-4-12B as the standard
+    // The user, 2026-08-09: Qwen3.5-9B replaces Gemma-4-12B as the standard
     // balanced pick. 16GB keeps the 12B as its step UP; 8GB cannot hold the 9B
     // at all, so its balanced stays the e4b.
     expect(id(16)).toEqual({

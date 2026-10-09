@@ -511,7 +511,7 @@ class JobManager:
                 # rig. The medial-axis rigger reads the skeleton off the mesh's
                 # own interior: no template, no download, a couple of seconds,
                 # and it has no opinion about how many limbs the subject has.
-                # the user asked for it as the first choice with SkinTokens offered
+                # The user asked for it as the first choice with SkinTokens offered
                 # after, which is what `rigger` carries when the user asks.
                 #
                 # `humanoid` is None for a probe run, which must always use the

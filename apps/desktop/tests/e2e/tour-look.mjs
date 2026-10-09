@@ -4,7 +4,7 @@
  * sits on the control the step names, the card is inside the window beside it,
  * Next walks to the end, Got it closes it, and Esc closes it early.
  *
- * the user (2026-10-08): "a quick guided tour button that shows a
+ * The user (2026-10-08): "a quick guided tour button that shows a
  * highlighting/tutorial style guide of whatever's on screen right now."
  *
  * Usage (build first): SHOT_DIR=… node apps/desktop/tests/e2e/tour-look.mjs

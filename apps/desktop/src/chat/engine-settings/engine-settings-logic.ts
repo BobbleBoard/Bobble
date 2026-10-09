@@ -70,7 +70,7 @@ export interface MethodAvailability {
 }
 
 /**
- * Which methods the bar offers for a model. the user: "only show models that are
+ * Which methods the bar offers for a model. The user: "only show models that are
  * supported and we have drafters picked out for already (in recommended)
  * custom is the place the user can have their own drafter picked".
  */

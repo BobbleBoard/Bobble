@@ -6,7 +6,7 @@ Track: "bobble help" settings assistant. Research only: no code was changed. Rep
 
 ## 1. Goal
 
-the user, verbatim: *"need a settings assistant that has tools to and is able to easily change settings and or inform the user about them, invoked in the chat by the + menu a 'bobble help' should be able to present working settings menus in the chat w/ links to open them and is able to communicate well about anything possibly about the app, doesn't have to do anything else."*
+The user, verbatim: *"need a settings assistant that has tools to and is able to easily change settings and or inform the user about them, invoked in the chat by the + menu a 'bobble help' should be able to present working settings menus in the chat w/ links to open them and is able to communicate well about anything possibly about the app, doesn't have to do anything else."*
 
 Restated as requirements:
 
@@ -412,7 +412,7 @@ Sources:
   - appearance and interface; memory guard and power; harness and tool interface; privacy and offline; keys and commands (today's `HELP_TEXT`); troubleshooting; what Bobble help can do.
 - **(c) Generated catalogues** from code: capability summaries (`presets/capabilities.ts`), engine blurbs and platform support (`settings/engine-catalog.ts`), connector catalogue names (`mcp-lite` builtin connectors), studio list.
 
-A subagent drafts (b) from code comments and the memory notes, **rewritten for users** (no internal quotes). the user reviews.
+A subagent drafts (b) from code comments and the memory notes, **rewritten for users** (no internal quotes). The user reviews.
 
 Build and search:
 

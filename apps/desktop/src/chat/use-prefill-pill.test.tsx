@@ -6,7 +6,7 @@ import { usePillStore } from './pill-store';
 import { PREFILL_PILL_DELAY_MS, usePrefillPill } from './use-prefill-pill';
 
 /**
- * the user's rule for the whole latency effort is "when I don't see anything I get
+ * The user's rule for the whole latency effort is "when I don't see anything I get
  * an instant response". These pin the two halves of the only window that was
  * silent: it stays silent while a prime is quick (the common case, on every
  * window return), and it speaks once the prime is long enough that pressing

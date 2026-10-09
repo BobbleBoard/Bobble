@@ -37,7 +37,7 @@ export type ActivityStepKind = ToolIconKind;
  * WHAT AN AGENT IS ACTUALLY DOING — five states, not two.
  *
  * This was `'running' | 'done'`, so everything that had not finished read as
- * running: it shimmered, it spun, and its elapsed clock ticked. the user, watching a
+ * running: it shimmered, it spun, and its elapsed clock ticked. The user, watching a
  * corp run: "timers can't keep ticking for waiting agents, it needs to be more
  * clear who is waiting, working, and waiting because stopped."
  *
@@ -68,7 +68,7 @@ export const STILL_STATUSES: ReadonlySet<ActivityStatus> = new Set<ActivityStatu
 export function statusWord(status: ActivityStatus): string | null {
   switch (status) {
     /*
-     * QUEUED — a call the model wrote that has not started yet. the user, on four
+     * QUEUED — a call the model wrote that has not started yet. The user, on four
      * chart rows each with a spinner and a ticking clock: "why is there a
      * seemingly bunch of command executing all at once". The model writes its
      * calls in one go and the harness runs them one after another; only the
@@ -103,7 +103,7 @@ interface ActivityStepCommon {
   detail?: string;
   /**
    * The Mac app this step acted on, when it acted on one — the row shows its
-   * REAL icon beside the verb. the user: "you can get the real app icon of any
+   * REAL icon beside the verb. The user: "you can get the real app icon of any
    * program being used right? so just use that no emoji." The renderer resolves
    * the name to a picture; the chain only has to carry the name.
    */
@@ -148,7 +148,7 @@ interface ActivityStepCommon {
    * WHAT THIS STEP MADE, filed under its row — a finished picture, clip or chart
    * the turn has since moved on from.
    *
-   * the user (2026-09-24), on a 4B iterating over its own pictures: "on each of it's
+   * The user (2026-09-24), on a 4B iterating over its own pictures: "on each of it's
    * iterations the full image cards are presented at the very bottom of the
    * chat as if totally finished, these should be embedded in thinking blocks".
    * The host decides WHICH results belong here (the app's turn-cards.ts); the
@@ -425,7 +425,7 @@ const KIND_ORDER: ActivityStepKind[] = [
 /**
  * Format a millisecond duration as "1h 20m 5s", dropping any ZERO component.
  *
- * the user: "'worked for ah nm rs' please. no 0s." So all three units appear when
+ * The user: "'worked for ah nm rs' please. no 0s." So all three units appear when
  * they carry information and none of them appear when they don't — "1h" rather
  * than "1h 0m", "2m 5s" rather than "0h 2m 5s". An hour-long turn also keeps its
  * seconds now; truncating them was hiding real precision on the long turns where
@@ -481,7 +481,7 @@ function phrase(
   const done = count - failed - stopped;
   const noun = done > 1 ? `${done} ${spec.plural}` : spec.singular;
   /*
-   * NO "(N failed)" TAIL. the user: "additionally, no (failed)." The count of what
+   * NO "(N failed)" TAIL. The user: "additionally, no (failed)." The count of what
    * WORKED is the honest headline; the failures are not hidden, they are red in
    * the expanded rows with their real error, which is where you can act on one.
    * A parenthetical in the summary was noise you could not click.
@@ -559,7 +559,7 @@ export function summarizeActivity(
   /*
    * PAST TWO DISTINCT ACTIONS, SAY "WORKED FOR <time>".
    *
-   * the user: "if the message shown on tool call blocks exceeds 2 distinct actions
+   * The user: "if the message shown on tool call blocks exceeds 2 distinct actions
    * simply collapse it to say 'worked' for <time> rather than list everything
    * out." A forty-step turn summarised as "Ran 12 commands, thought for 4m,
    * read 9 files, edited 5 files, listed 3 folders" is a paragraph where a
@@ -712,7 +712,7 @@ function ChainThought({ text, live = false }: { text: string; live?: boolean }) 
   const clamped = long && !showMore && !live;
   return (
     <div className="pd-chain-thought">
-      {/* the user UI#5: reasoning renders through the SAME Markdown pipeline as a
+      {/* The user UI#5: reasoning renders through the SAME Markdown pipeline as a
        * regular message (gfm, math, code chrome, hex swatches) — the scoped CSS
        * on `.pd-chain-thought .pd-markdown` just scales it to the footnote size +
        * secondary color of a thought. The clamp/fade lives on the wrapper. */}
@@ -817,7 +817,7 @@ function TerminalBlock({
 /**
  * The error body of a FAILED step: the real message, in red, with a copy button.
  *
- * the user: "clicking it shows the actual error and 'copy raw' button if it's an
+ * The user: "clicking it shows the actual error and 'copy raw' button if it's an
  * actual failed to parse error (this will be useful for debugging)."
  *
  * `copyRaw` appears only for the errors worth pasting somewhere — a parse /
@@ -1006,7 +1006,7 @@ function StepContent({ step, live = false }: { step: ActivityStepData; live?: bo
  * What a coordination row opens to: the MESSAGE that was sent, the files that
  * went with it, and the reply.
  *
- * the user: "just show the brief and some indented/smaller inline file presentation
+ * The user: "just show the brief and some indented/smaller inline file presentation
  * cards showing what files/folders got passed along." The brief is prose a
  * person reads, so it is rendered as text rather than the raw JSON these args
  * arrive as — the schema noise was the reason args stopped being shown at all.
@@ -1381,7 +1381,7 @@ export function hasInlineContent(step: ActivityStepData): boolean {
       // so args alone must not produce an empty reveal.
       return step.output !== undefined && step.output.length > 0;
     /*
-     * COORDINATION ROWS OPEN TOO. the user: "find out all tool calls that are not
+     * COORDINATION ROWS OPEN TOO. The user: "find out all tool calls that are not
      * able to be clicked on for an expansion eg. briefing manager, that's easy,
      * just show the brief and some indented/smaller inline file presentation
      * cards showing what files/folders got passed along."
@@ -1433,7 +1433,7 @@ export interface ActivityStepProps {
 /**
  * HOW LONG THIS STEP HAS BEEN GOING.
  *
- * the user, watching a command sit there: "some 'seconds' timer going on here would
+ * The user, watching a command sit there: "some 'seconds' timer going on here would
  * be much appreciated, it's been going for a few minutes, seems like it should
  * be timing out by now." Without it a step that is working and a step that is
  * wedged look identical — the same gap as the processing ring, one level down,
@@ -1457,7 +1457,7 @@ export function elapsedLabel(ms: number): string | null {
 /**
  * FIRST TIME WE EVER SAW THIS STEP RUNNING, keyed by its stable id.
  *
- * the user: "the timer for tool calls… just resets every time I go to a new chat
+ * The user: "the timer for tool calls… just resets every time I go to a new chat
  * and come back or check on anything else." The clock fell back to MOUNT time
  * whenever the caller had no `startedAt`, so every remount — switching chats,
  * opening a panel, a re-render that drops the subtree — restarted it at zero.
@@ -1538,7 +1538,7 @@ export const ActivityStep = forwardRef<HTMLDivElement, ActivityStepProps>(functi
   /*
    * A CONNECTOR ROW IS A DIFFERENT SENTENCE.
    *
-   * the user: "for connector usage, the icon shown in the left is not the app icon,
+   * The user: "for connector usage, the icon shown in the left is not the app icon,
    * but it shows as follows, left svg: <generic connectors icon> Used
    * <connector app icon> <connector app name> <action eg. read page or listed
    * tabs>". So the app's icon moves OUT of the leading slot — which now says
@@ -1602,7 +1602,7 @@ export const ActivityStep = forwardRef<HTMLDivElement, ActivityStepProps>(functi
       </span>
     ) : connectorRow ? (
       /*
-       * "Used <icon> <app> <action>", and NOTHING ELSE on the line. the user: "the
+       * "Used <icon> <app> <action>", and NOTHING ELSE on the line. The user: "the
        * tiny text to the right with the raw cli command is not shown, instead a
        * '>' is shown ... clicking that expands the individual tool and shows the
        * exact cli command and what was returned." The command is not lost — it
@@ -1656,7 +1656,7 @@ export const ActivityStep = forwardRef<HTMLDivElement, ActivityStepProps>(functi
       className="pd-chain-step"
       data-expanded={disclosable ? expanded : undefined}
       data-kind={data.kind}
-      /* A FAILED STEP IS RED, and only here. the user: "expanded tool calls show
+      /* A FAILED STEP IS RED, and only here. The user: "expanded tool calls show
        * fails as red and clicking it shows the actual error". The summary above
        * no longer carries a "(N failed)" tail, so this is where a failure is
        * visible — on the row you can open to see what actually went wrong. */
@@ -1850,7 +1850,7 @@ export interface ActivityChainProps extends Omit<HTMLAttributes<HTMLDivElement>,
    * and suppresses the terminal "Done".
    *
    * A long prefill is silence: no row is running, nothing is streaming, and the
-   * chain looks exactly like a finished one. the user: "we can't see what the model
+   * chain looks exactly like a finished one. The user: "we can't see what the model
    * is doing right now at this moment… that bottom item should say processing…
    * then completely replace it with the actual tool call / thinking once that's
    * done and generation resumes. we need to have an idea of what's going on at
@@ -1913,7 +1913,7 @@ const WAIT_ROW_FOLD_MS = 200;
  * result, and it went in and out at full height in one frame — so a card drawn
  * beneath the chain jumped 34px down at exactly the moment it was handed over
  * (the live diagram's filmstrip, 2026-09-25; charts the same), and jumped back
- * up when the reply started. the user asked for the building to be smooth.
+ * up when the reply started. The user asked for the building to be smooth.
  *
  * Growing in is CSS (`@starting-style`). Folding away needs the row to stay
  * mounted for the length of the fold, so this keeps the last wait on screen,
@@ -1971,7 +1971,7 @@ export const ActivityChain = forwardRef<HTMLDivElement, ActivityChainProps>(func
    * A LIVE CHAIN CAN BE COLLAPSED. It could not before: `isExpanded` ignored
    * `internalExpanded` while active AND `toggleChain` returned early, so clicking
    * the summary of a running step did nothing at all until the run finished.
-   * the user: "'working/thinking/using tool' expansion is not collapsable until it is
+   * The user: "'working/thinking/using tool' expansion is not collapsable until it is
    * complete". On a long turn that is the whole time it matters — a chain that
    * opens itself and then refuses to shut is a wall of text you cannot get past.
    *
@@ -1990,7 +1990,7 @@ export const ActivityChain = forwardRef<HTMLDivElement, ActivityChainProps>(func
 
   const running = steps.some((s) => s.status === 'running');
   /*
-   * IT STAYS OPEN UNTIL IT IS DONE. the user: "no expanding/closing tool / think
+   * IT STAYS OPEN UNTIL IT IS DONE. The user: "no expanding/closing tool / think
    * blocks it stays open until it says done". `active` dips between tool calls,
    * so keying the auto-open on it alone made the chain snap shut and reopen on
    * every gap. A live turn — `active`, or anything running, or a prefill in
@@ -2003,7 +2003,7 @@ export const ActivityChain = forwardRef<HTMLDivElement, ActivityChainProps>(func
    * `complete === false` was in here so a chain would not fold while the turn
    * was still going — but the turn is still going while the model TYPES ITS
    * REPLY, and while the NEXT chain runs, so a finished chain sat open through
-   * both. the user: "thinking / tool chains need to collapse when they finish and
+   * both. The user: "thinking / tool chains need to collapse when they finish and
    * the model starts typing actual response, even if a new one starts right
    * after, the old one is then collapsed."
    *
@@ -2028,7 +2028,7 @@ export const ActivityChain = forwardRef<HTMLDivElement, ActivityChainProps>(func
   /*
    * DONE IS FINAL, AND IT IS THE TURN THAT DECIDES IT — NOT QUIET ROWS.
    *
-   * the user, three rounds of this: "the premature done just needs to be fixed now
+   * The user, three rounds of this: "the premature done just needs to be fixed now
    * though… it doesn't say done until it's truly totally done." Then: "done is
    * a final thing. This tool chain is DONE."
    *
@@ -2050,7 +2050,7 @@ export const ActivityChain = forwardRef<HTMLDivElement, ActivityChainProps>(func
   const [everDone, setEverDone] = useState(false);
   const doneNow = chainIsDone({ complete, quiet, settledGuess });
   /*
-   * A FINISHED CHAIN FOLDS ITSELF AWAY. the user: "collapse thinking/tool chains
+   * A FINISHED CHAIN FOLDS ITSELF AWAY. The user: "collapse thinking/tool chains
    * after they are finished (user can always reopen manually)."
    *
    * It stays open for the whole turn — that is the rule above, and it is the
@@ -2079,7 +2079,7 @@ export const ActivityChain = forwardRef<HTMLDivElement, ActivityChainProps>(func
     /*
      * THE LATCH MUST NOT OUTLIVE THE TURN IT LATCHED ON.
      *
-     * the user, reporting this for the FOURTH time with a screenshot: "premature
+     * The user, reporting this for the FOURTH time with a screenshot: "premature
      * done is showing while thoughts/tools are still being written." A chain
      * that had legitimately settled — Done latched — then received more
      * thinking and another tool call, and went on showing Done underneath them

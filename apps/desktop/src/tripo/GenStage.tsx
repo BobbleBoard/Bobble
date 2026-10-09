@@ -2,7 +2,7 @@
  * The generating experience — a two-phase, WHOLE-VIEWPORT state (the user).
  *
  * What it replaces: a 440px card floating near the bottom edge while the entire
- * viewport sat empty. the user: "the progress bar is tiny, smooshed to the side and
+ * viewport sat empty. The user: "the progress bar is tiny, smooshed to the side and
  * the model doesn't appear immediately when generated, there's a whole viewport
  * that's just left blank rather than using the whole thing."
  *
@@ -47,7 +47,7 @@ import { useTripoStore } from './store';
 
 /**
  * The label over each chunk of the bar: what is happening while it runs, and
- * what it produced once it is green. the user: "show like 'texturing' while they're
+ * what it produced once it is green. The user: "show like 'texturing' while they're
  * going, and then 'textured' or 'modeled' above each after they finish" — the
  * word itself carries the state, so the row reads as a sentence about the run
  * rather than as a legend that has to be decoded.
@@ -118,7 +118,7 @@ function useElapsed(jobId: string | null, done: boolean, startedAt: number | nul
  *
  * The workers report in jumps — a tqdm step is several percent, and the gap
  * between two of them can be seconds — so a bar driven straight off the report
- * sits frozen and then lurches. the user: "why don't you interpolate the
+ * sits frozen and then lurches. The user: "why don't you interpolate the
  * progressbar". This walks toward whatever was last reported at a fixed rate,
  * so the movement is smooth and, crucially, still bounded by the truth: it
  * never runs past the reported value and never goes backwards inside a stage.
@@ -236,7 +236,7 @@ function Chunk({
  *
  * The percentage is derived FROM the chunks — (finished chunks + how far into
  * the active one) / total — rather than taken from the engine's own overall
- * figure. the user: "that progressbar makes no sense", and it didn't: the engine's
+ * figure. The user: "that progressbar makes no sense", and it didn't: the engine's
  * overall is weighted by expected stage cost, so the hero showed a Modeling
  * chunk filled to its last tick sitting next to "65%". One of those had to go,
  * and the chunks are the thing the user is actually looking at.
@@ -419,7 +419,7 @@ export function GenStage(): JSX.Element | null {
         {/*
           THE SAME MARK AS EVERY OTHER WAIT, in its 3D act.
 
-          the user: "for 3d maybe make it 3d and dramatically reveal it rotating
+          The user: "for 3d maybe make it 3d and dramatically reveal it rotating
           seamlessly from the 2d animation to 3d." This room is where that act
           belongs — it plays the shared puzzle → split → cascade opening and then
           the grid stands up into a field of rotating solids, which is the one

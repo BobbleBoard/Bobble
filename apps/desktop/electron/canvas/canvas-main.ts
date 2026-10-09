@@ -948,7 +948,7 @@ function appMeta(appPath: string): Promise<CanvasOpenApp> {
  * MEASURED on a machine without it: `defaultAppPath` threw, returned null, and
  * three separate symptoms followed — the Open button showed a generic glyph, the
  * dropdown filtered nothing (so every app including Terminal was listed), and
- * there was no default to open with. the user reported all three.
+ * there was no default to open with. The user reported all three.
  *
  * The two obvious alternatives are dead ends, both checked rather than assumed:
  *   - `osascript` asking Finder for the default application is refused with

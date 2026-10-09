@@ -56,7 +56,7 @@
 /*
  * THE RING COLOUR, AND THE ONE PLACE THAT TURNS IT OFF.
  *
- * the user, twice: a blue box appears around dropdowns and buttons he has only ever
+ * The user, twice: a blue box appears around dropdowns and buttons the user has only ever
  * clicked. Every ring here was already gated behind `:focus-visible`, so the
  * CSS was never the bug — `:focus-visible` itself matches in two cases that are
  * spec-correct and are not "the user is navigating by keyboard":
@@ -92,7 +92,7 @@
 }
 
 /*
- * the user round-8 #6: focus rings appear ONLY on keyboard focus. Every --pd-*
+ * The user round-8 #6: focus rings appear ONLY on keyboard focus. Every --pd-*
  * focus ring in this stylesheet is already gated behind :focus-visible; this
  * app-wide belt-and-suspenders rule additionally kills the browser/UA default
  * outline (and any host-supplied one) on MOUSE :focus for native/third-party
@@ -156,7 +156,7 @@
 /*
  * A HAIRLINE THAT FADES OUT AT ITS ENDS.
  *
- * the user: "always and this goes for all borders generally where it would be
+ * The user: "always and this goes for all borders generally where it would be
  * applicable, eg. chat scroll and this tab scroll, probably not terminal
  * commands: border must have fade out".
  *

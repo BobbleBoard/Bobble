@@ -1,7 +1,7 @@
 /**
  * A tool's description, cut to the one line the command list can afford.
  *
- * the user's spec for CLI mode: "the names and a quick description of what it is is
+ * The user's spec for CLI mode: "the names and a quick description of what it is is
  * there for each tool, with a tidbit at the end that says --help should be used
  * to get started with any." That is what a schema gives a model, and the mode
  * is supposed to lose nothing — a group summary alone told a model that `mac`

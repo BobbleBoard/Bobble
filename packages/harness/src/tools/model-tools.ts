@@ -1,6 +1,6 @@
 /**
  * `generate_3d` + `refine_3d` — the 3D studio's engine as ORDINARY CHAT TOOLS,
- * the Bobble 3D connector's two tools. the user (2026-09-17): "3d should be a
+ * the Bobble 3D connector's two tools. The user (2026-09-17): "3d should be a
  * connector that gets recommended for install upon installing the 3d studio
  * module, the card for during generation/texturing/segmentation/rigging …
  * should just be a little embedded viewport rotatable".
@@ -25,7 +25,7 @@
  * Only when the app says the connector is on AND an engine that can make a
  * mesh is on this Mac (`PI_BOBBLE_3D_READY=1`, decided at pi's spawn — see
  * pi-main.ts). Absent, nothing registers: the model never sees a capability
- * the machine cannot honour. the user's rule: prompt pressure, not enforcement —
+ * the machine cannot honour. The user's rule: prompt pressure, not enforcement —
  * the tool is either honestly there or honestly not.
  */
 import { homedir } from 'node:os';

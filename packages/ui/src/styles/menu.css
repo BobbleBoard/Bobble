@@ -19,7 +19,7 @@
   overflow-y: auto;
   overflow-x: hidden;
   /*
-   * THE WHEEL STOPS HERE. the user: "I scroll after i'm at the bottom of the
+   * THE WHEEL STOPS HERE. The user: "I scroll after i'm at the bottom of the
    * dropdown then I start acidently scrolling down the model card… I hover over
    * something, that's the thing I want to be scrolling, that's your guiding
    * light no matter what."
@@ -35,7 +35,7 @@
   padding: var(--pd-menu-padding);
   border-radius: var(--pd-radius-popover);
   /*
-   * SOLID, not frosted. the user: "why is this dropdown translucsent a bit and not
+   * SOLID, not frosted. The user: "why is this dropdown translucsent a bit and not
    * similarly styled to the others."
    *
    * MEASURED, both menus live: they were already byte-identical —
@@ -82,7 +82,7 @@
   /*
    * ===================== THE MENU MOTION SWITCH =====================
    *
-   * the user: every dropdown should share "the same master switch so that you change
+   * The user: every dropdown should share "the same master switch so that you change
    * the style and they all change… this includes instant open, bordering and
    * such." Currently: INSTANT.
    *
@@ -212,7 +212,7 @@
 /*
  * ONE ROW RECIPE, and the whole row is the target.
  *
- * the user: "the styling of the dropdowns and animations for opening them varies,
+ * The user: "the styling of the dropdowns and animations for opening them varies,
  * ... standardize the one used for the ... new tab in the canvas dropdown, that
  * one has the best bordering styling for button hover effects and selection."
  *
@@ -340,7 +340,7 @@
    * children. A DESCRIPTIVE item sets `align-items: flex-start` so its icon and
    * title line up with the first line of a two-line body — correct for those,
    * wrong for this, which is a control (a checkmark, a download button, a
-   * progress bar) belonging to the row rather than to its first line. the user, on
+   * progress bar) belonging to the row rather than to its first line. The user, on
    * the download bar sitting up against "Intelligent": "blue bar needs
    * centering vertically as does the download button".
    */
@@ -425,7 +425,7 @@
  *
  * It used to zero the menu padding, square off the row corners and stretch each
  * row edge-to-edge, which is what made it read as a different component sitting
- * next to every other dropdown. the user, on seeing it beside the rest:
+ * next to every other dropdown. The user, on seeing it beside the rest:
  * "consolidate, match everything else... the hover effects don't need to be
  * 'edge to edge' they just should have consistency on spacing and can still be
  * corner rounded". MEASURED before: rows at left=0 right=0 radius=0 here,

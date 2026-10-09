@@ -658,7 +658,7 @@ export async function runImageJob(
 
 /**
  * A 3D MODEL FOR THE CHAT — the studio's own pipeline, awaited like the image
- * tools await theirs. the user (2026-09-17): "3d should be a connector". The
+ * tools await theirs. The user (2026-09-17): "3d should be a connector". The
  * connector's tools reach here over the gen3d bridge (gen3d-bridge.ts): a
  * generation (a description, or a picture the model has) runs the same
  * `gen3d:generate` the 3D studio runs and resolves with the LAST `model-glb`
@@ -823,7 +823,7 @@ function liveDictation(): DictationSession {
  * The Bobble 3D engine (the sidecar above) is the fast one and the full one:
  * MLX TRELLIS.2 at 117s for 512³ with texture, then segment, retopo, rig,
  * motion. It is also the one that needs git and Xcode's Metal toolchain to
- * build its kernels, which a fresh Mac does not have. the user (2026-09-14): "any
+ * build its kernels, which a fresh Mac does not have. The user (2026-09-14): "any
  * user on any mac device can use video image 3d and audio generation with an
  * m1-m6 mac" — so the path a fresh Mac gets is ComfyUI's own TRELLIS.2 nodes
  * (0.35+, Comfy-Org int8 weights, no custom wheels): MEASURED 314s to a
@@ -1217,7 +1217,7 @@ const handlers: IpcHandlers<Gen3dInvokeMap & DictationInvokeMap> = {
      * Either path makes the studio usable, and the sidebar's number is the
      * path a fresh Mac will actually take: with none of the engine's core on
      * disk it quotes the ComfyUI module (10.5 GB), not the engine's 33 GB —
-     * the user's "download module (nGB)" is the button they will press.
+     * The user's "download module (nGB)" is the button they will press.
      */
     const comfy = comfy3dInfo();
     const engineUntouched = missing.length === CORE_MODULE_MODELS.length;
@@ -1271,7 +1271,7 @@ const handlers: IpcHandlers<Gen3dInvokeMap & DictationInvokeMap> = {
     /*
      * "STILL STARTING" IS NOT "NOT AVAILABLE".
      *
-     * the user: "3D studio shows 'runtime is not available' on every first open of
+     * The user: "3D studio shows 'runtime is not available' on every first open of
      * the app even when previously installed." That is this branch: the FIRST
      * catalog call after launch always finds `sidecar === null`, kicks off a uv
      * boot that takes seconds, and answers `engineReady:false` straight away so

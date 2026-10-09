@@ -76,7 +76,7 @@ const ALL_TOOLS = [
 
 describe('the base set — what every turn can reach', () => {
   /*
-   * THE BASELINE IS A CEO'S BASELINE. the user: "it should always have the
+   * THE BASELINE IS A CEO'S BASELINE. The user: "it should always have the
    * commission tools… clean context ceo… no clutter with browser tools or
    * anything (it can have the basic tools + search though always) and then it
    * calls subagents to do browser use screenshots extraction… it commissions,

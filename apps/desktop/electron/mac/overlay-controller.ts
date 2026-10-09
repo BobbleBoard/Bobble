@@ -194,10 +194,10 @@ class MacOverlayController {
         /* Headless under a probe: the panel is created and driven, and never
            ordered onto the screen — `showsMacOverlay` is the one switch for
            "may the phantom appear", and it was not wired to the native panel
-           (the user, 2026-09-15: the overlay leaking from the test harness). */
+           (The user, 2026-09-15: the overlay leaking from the test harness). */
         helperArgs: showsMacOverlay() ? ['--overlay'] : ['--overlay', '--headless'],
         /* The overlay child's stderr was piped and never read, so everything it
-           said about its own health was invisible. the user: "you need to log
+           said about its own health was invisible. The user: "you need to log
            whenever that's happening". A line starting `overlay:` is the panel
            reporting that it cannot mask itself — the exact condition behind the
            phantom drawing over the wrong window. */
@@ -609,7 +609,7 @@ class MacOverlayController {
   /**
    * An image is being ingested — 0...1, or null when it finishes.
    *
-   * the user: "when an image is prefilling it should expand horizontally and show a
+   * The user: "when an image is prefilling it should expand horizontally and show a
    * prefill % ring and 'processing' text". Ingesting a screenshot is the one
    * wait long enough to be worth explaining rather than hiding behind dots.
    */
@@ -715,7 +715,7 @@ class MacOverlayController {
    * Tell the watchers whenever the phantom's STATE changed — not just when it
    * appeared or disappeared.
    *
-   * the user, watching the Apple run: "you can see it finally has selected the 2tb
+   * The user, watching the Apple run: "you can see it finally has selected the 2tb
    * option, and yet, the mouse cursor didn't move at all, the click happened
    * invisibly." This was mine: the old BrowserWindow overlay pushed its state
    * continuously, and when the native panel replaced it I made the notification

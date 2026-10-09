@@ -1,7 +1,7 @@
 /**
  * HOW LONG A 3D STAGE WILL TAKE, BEFORE IT IS STARTED.
  *
- * the user's requirement for the studio: it should "give reasonable accurate
+ * The user's requirement for the studio: it should "give reasonable accurate
  * estimates if long times for generation". Several of these stages run for
  * minutes with a progress bar that cannot know its own length — a segment run
  * is ten minutes of diffusion — and a button that says only "Segment Parts"

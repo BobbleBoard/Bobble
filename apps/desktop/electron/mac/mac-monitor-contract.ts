@@ -304,7 +304,7 @@ export type MacMonitorInvokeMap = {
   /**
    * Bring the controlled app to the front, because the USER asked to see it.
    *
-   * the user: "have a prominent Open <app icon> <app name> <square with top right
+   * The user: "have a prominent Open <app icon> <app name> <square with top right
    * arrow> prominently in the top right of the computer use canvas area." This
    * is the one thing in this subsystem that is supposed to take the screen —
    * everything else goes out of its way not to — and it only ever runs from a

@@ -11,7 +11,7 @@
  * WHY THIS COSTS NOTHING TO SHIP. The old stub refused with "needs ffmpeg +
  * headless Chrome". We are running inside Chromium already, so the browser was
  * never missing; and ffmpeg was only ever for encoding, which is the part the user
- * cut when he asked for stills. So: no aux downloads, no codecs, no network.
+ * cut when the user asked for stills. So: no aux downloads, no codecs, no network.
  */
 
 import { BrowserWindow } from 'electron';

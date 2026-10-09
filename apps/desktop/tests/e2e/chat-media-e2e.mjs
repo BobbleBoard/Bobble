@@ -1,7 +1,7 @@
 /**
  * THE CLAIM THAT MATTERS: ask in a new chat, get media back.
  *
- * the user: "from the chat interface, these backends should be connected. I should
+ * The user: "from the chat interface, these backends should be connected. I should
  * be able to go to a new chat and ask for any of these types of media or files,
  * all are delivered and embedded cleanly and in full quality into the chat."
  *

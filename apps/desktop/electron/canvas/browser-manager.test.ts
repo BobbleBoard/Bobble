@@ -45,7 +45,7 @@ describe('which popups may open', () => {
 describe('what the browser calls itself', () => {
   /*
    * Google's sign-in refuses embedded user agents by policy, and Electron's
-   * default advertises both the app and the framework. the user's Google sign-in
+   * default advertises both the app and the framework. The user's Google sign-in
    * white-screens on accounts.google.com/gsi/* while the same flow completes in
    * Safari and Chrome — that string is why.
    */

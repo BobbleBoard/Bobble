@@ -122,7 +122,7 @@ describe('createChildAgents', () => {
 });
 
 /*
- * THE SPECIALIST HOP. the user: "the model should be able to spawn a subagent that
+ * THE SPECIALIST HOP. The user: "the model should be able to spawn a subagent that
  * can do any of these as specialist workflows, with just these tools loaded".
  *
  * The kind has to survive all the way to createChildBridge, because that is

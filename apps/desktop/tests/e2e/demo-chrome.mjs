@@ -26,10 +26,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  * keychain — so attaching to it measures nothing, and the run cannot recover
  * because dismissing the picker is a click the task never asked for.
  *
- * the user, on this exact screen: "i'm ok hardcoding this one case". The least
+ * The user, on this exact screen: "i'm ok hardcoding this one case". The least
  * presumptuous form of that is to reopen the profile CHROME ITSELF last used,
- * read out of its own Local State, rather than choosing one for him. Only ever
- * when the picker is the sole window — a Chrome he is actually using is left
+ * read out of its own Local State, rather than choosing one for them. Only ever
+ * when the picker is the sole window — a Chrome the user is actually using is left
  * alone.
  */
 async function clearProfilePicker() {

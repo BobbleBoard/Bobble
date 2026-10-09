@@ -2,7 +2,7 @@
  * OFFICE EMBED PROBE — a chart into a deck, a report, a workbook and a PDF,
  * through the real tools, with the document OPEN in the canvas the whole time.
  *
- * the user (2026-09-16): "ensure these can be embedded into docs or charts or
+ * The user (2026-09-16): "ensure these can be embedded into docs or charts or
  * whatever, that's mainly the use case, say you put a pdf in and ask the model
  * to slot a chart in with the data on the second page … and of course you
  * should be able to see the pdf or any xlsx pptx docx being edited live".
@@ -573,7 +573,7 @@ try {
     await shot('model-multi');
     flickerNote(multi.report, 'the model drew three charts');
 
-    // the user's PDF case: the data is on page 2; the chart goes there. The file
+    // The user's PDF case: the data is on page 2; the chart goes there. The file
     // is named by its absolute path — a new chat has no workspace of its own
     // until its first message, and this one's first message IS the ask.
     const modelPdf = path.join(dir, 'brief-model.pdf');

@@ -16,7 +16,7 @@ describe('parseWhois', () => {
       found: true,
       stableId: 'nbYS7qLqVy11CNTRL',
       nodeName: 'linux-ms-7e59',
-      hostName: 'linux-ms-7e59',
+      hostName: 'linux-MS-7E59',
       os: 'linux',
       userId: '3240365473728001',
       loginName: 'someone@github',

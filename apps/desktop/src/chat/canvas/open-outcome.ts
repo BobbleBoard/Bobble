@@ -1,7 +1,7 @@
 /**
  * SAYING WHY AN OPEN DID NOT HAPPEN.
  *
- * the user: "open buttons in the canvas / file presentation cards don't work, even
+ * The user: "open buttons in the canvas / file presentation cards don't work, even
  * with selection of specific applications to open with." Every Open, Open-with
  * and Show in the app was `void window.piDesktop.invoke(…)` — main answered
  * `{ ok: false, error }` and nobody read it, so a refusal and a success looked

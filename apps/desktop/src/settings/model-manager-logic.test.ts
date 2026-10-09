@@ -21,7 +21,7 @@ import {
   variantEntry,
 } from './model-manager-logic';
 
-/** the user's machine, and the one every "does it fit" claim has to survive. */
+/** The user's machine, and the one every "does it fit" claim has to survive. */
 const M5_PRO_24GB = { totalRamGB: 24, modelMaxContext: 65_536 };
 const GB = 1e9;
 
@@ -291,7 +291,7 @@ describe('mergeQuantLadder', () => {
 describe('quantFit — the verdict weighs the quant on screen', () => {
   /*
    * THE BUG THIS REPLACES. `ramVerdict(group.primary.minRamGB, totalRam)` was a
-   * per-MODEL constant, so the badge could not move when the quant did. the user:
+   * per-MODEL constant, so the badge could not move when the quant did. The user:
    * "it says things will fit I think without taking into account OS overhead or
    * unified memory or anything."
    */
@@ -426,7 +426,7 @@ describe('orderQuantsForDisplay — row 0 is the recommendation', () => {
 
 describe('mergeQuantLadder — size order, and a projector is not a quant', () => {
   /*
-   * the user: "sort ggufs instead of alphabetically which as you can see might put
+   * The user: "sort ggufs instead of alphabetically which as you can see might put
    * all the unsloth dynamics (labeled UD) below all the others".
    */
   it('does not strand UD- quants under plain ones of the same digit', () => {

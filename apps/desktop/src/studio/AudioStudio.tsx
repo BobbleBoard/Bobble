@@ -1,7 +1,7 @@
 /**
  * THE AUDIO STUDIO — speech, voice cloning, music and sound effects.
  *
- * the user: "any audio functions for example, sfx, music, TTS, voice cloning, would
+ * The user: "any audio functions for example, sfx, music, TTS, voice cloning, would
  * go in an audio studio."
  *
  * ONE ROOM, THREE MODES, because they share everything that matters — the same
@@ -171,7 +171,7 @@ export function AudioStudio(): JSX.Element {
    * The three cards ARE the room's three modes, which is the point: you could
    * not tell from looking at this studio that it clones voices or writes music
    * — the mode switch lives in the rail, behind a button, and a first visitor
-   * has no reason to open it. the user asked for exactly this ("these are like
+   * has no reason to open it. The user asked for exactly this ("these are like
    * 'Clone a voice'"), and cloning is the one that most needed saying out loud.
    */
   const starters: readonly StudioStarter[] = [

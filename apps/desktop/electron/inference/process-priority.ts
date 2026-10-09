@@ -1,7 +1,7 @@
 /**
  * ASK THE OS TO SCHEDULE THE USER FIRST.
  *
- * the user wants the machine usable while it generates. Most of that is memory —
+ * The user wants the machine usable while it generates. Most of that is memory —
  * see power-policy.ts — but there is one lever that costs nothing and helps on
  * every platform: telling the scheduler that the inference server is background
  * work. The user's window server, editor and browser then win contention instead
@@ -40,7 +40,7 @@ const LINUX_NICE_UTILITY = 5;
 /**
  * THE TIER A HEAVY GENERATION WORKER RUNS AT, ALWAYS.
  *
- * the user, after a generation froze his Mac: "trackpad unresponsive to clicks and
+ * The user, after a generation froze their Mac: "trackpad unresponsive to clicks and
  * movement, screen totally frozen". Memory was most of that (see guardian.ts),
  * but the other half is the CPU: a diffusion worker on a 12-core machine will
  * happily run twelve threads flat out, and the window server then queues

@@ -1,7 +1,7 @@
 /**
  * WHAT TURNING A CAPABILITY ON COSTS.
  *
- * the user, on a TWO-MESSAGE conversation: "there's a 10s prefill on a quick
+ * The user, on a TWO-MESSAGE conversation: "there's a 10s prefill on a quick
  * follow up." The turn before it had activated a capability — the model said so
  * out loud: "I've activated the browser capability. The Chrome-specific tools
  * aren't available yet — they'll appear in my next reply."

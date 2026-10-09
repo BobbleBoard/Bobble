@@ -515,7 +515,7 @@ export function roleStyling(roles: FlowRoles, theme: DiagramTheme): string[] {
 
 /**
  * The colours of Bobble's own diagram look, from a kit's diagram theme.
- * the user (2026-09-25): "custom mermaid arrows and box styling". Mermaid's stock
+ * The user (2026-09-25): "custom mermaid arrows and box styling". Mermaid's stock
  * look drew every step in a full ink border (a box of black lines on the
  * kit's paper), edge labels as a hard white patch, groups as a flat tinted
  * square with its name centred where an edge came in over it. This is the
@@ -527,7 +527,7 @@ export interface DiagramLook {
   /** A step's fill. */
   readonly node: string;
   /** A step's border: solid, most of the way from the surface to the ink
-   * (the user, 2026-09-25: "clean solid borders no shininess" — a third of the
+   * (The user, 2026-09-25: "clean solid borders no shininess" — a third of the
    * way, as a hairline, read as a soft white card, not an outlined box). */
   readonly nodeEdge: string;
   /** An edge label's pill, and the hairline round it. */
@@ -858,7 +858,7 @@ export const ROUND_GEOMETRY_JS = String.raw`(v) => v.replace(/-?(?:\d+\.?\d*|\.\
  *                      is (the vertex on the marker's axis at the far end)
  *   openChevron        Bobble's arrowhead: an open ">" stroked like its edge,
  *                      round-capped and round-joined — never a filled triangle
- *                      (the user, 2026-09-25: "arrows should not be triangles,
+ *                      (The user, 2026-09-25: "arrows should not be triangles,
  *                      beveled tip/tail clean"); with the short run of line
  *                      from the edge's end to the point when the point is ahead
  *   elbow              an edge re-routed as an elbow ("curved path eg. elbow

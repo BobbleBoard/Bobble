@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { editDiffFile, editDiffLines } from './edit-diff';
 
 /**
- * the user: "editing/writing tool calls a lot of the time show up as red."
+ * The user: "editing/writing tool calls a lot of the time show up as red."
  *
  * The old shape put every line of `old_string` in as a deletion and every line
  * of `new_string` in as an addition — so the ordinary str_replace, which quotes

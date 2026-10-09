@@ -1,7 +1,7 @@
 /**
  * THE MACHINE COMES FIRST — the part of the power policy that acts.
  *
- * the user, after his Mac locked up under a generation: "computer just became
+ * The user, after their Mac locked up under a generation: "computer just became
  * unusably laggy eg. trackpad unresponsive to clicks and movement, screen
  * totally frozen, needs monitoring for cpu and mem pressure to ensure extremes
  * like this absolutely never happen and low power mode certainly needs good
@@ -133,7 +133,7 @@ export interface GuardianLimits {
  * this computer for something else" — a hold is a wait for what has not
  * started. It does NOT shed earlier. It did (15%), and a first-run weights
  * download took the level through 15% while the picture was still to come:
- * the job was stopped for being in low power. the user: "low can't stop image
+ * the job was stopped for being in low power. The user: "low can't stop image
  * generation requests, it just has to lessen compute intensivity in some way
  * sacrificing speed to keep headroom" — the mode's levers are the pace, the
  * previews and the low-RAM run (power-policy.ts, ImageJobSpec); the shed line
@@ -334,7 +334,7 @@ export function settle(
      * A PAUSE THAT DOES NOT HELP IS A SHED. The job holds what it has; if
      * the machine is still on the pause line after this many readings, its
      * memory is what the machine needs back, and the only way to get it is
-     * to end the job. the user: "totally terminated if pausing fails for some
+     * to end the job. The user: "totally terminated if pausing fails for some
      * reason quickly".
      */
     const paused = pausedStreak + 1;

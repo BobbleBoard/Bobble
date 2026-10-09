@@ -32,7 +32,7 @@ five pills — All, Tools, Skills, On, Needs setup — at 1063–1415,139), wher
 same idea four doors and a modal directory
 with its own nav (`r0705`, `r0733`, `r0835`, `r0940`) and ChatGPT two tabs (`r0240`). Its resting
 pane answers "what is on" with a switch per row and the one needs-setup item first, its detail
-states the specific fact (*Reads and writes files under /Users/user/Projects*) where Claude
+states the specific fact (*Reads and writes files under ~/Projects*) where Claude
 prints the same trust paragraph on every page (`r0752`, `r0854`), and its setup card is a paste
 field the shipping screen does not have at all. It is below the references on the most common
 detail path: every installed-server detail in every candidate shows *Starting the server to
@@ -139,7 +139,7 @@ Connectors together afterwards, because all three inherit it and all three shoul
 ### 5. A custom server's card prints the launch path as its description
 
 **Seen.** `shelf-plus-bobble-dark.png`: the Weather card (510–986 × 297–372) reads *Added by
-you · runs node /Users/user/tools/weather-mcp/index.js*, wrapping at *weather-/mcp* — the only
+you · runs node ~/tools/weather-mcp/index.js*, wrapping at *weather-/mcp* — the only
 two-line second line in the Tools grid, and the only one that is a path. The pane's own ledger
 row for the same server says *Runs node · added by you* (1084,539), which is the right line;
 the pane header for it (`shelf-plus-detail-custom-bobble-dark.png` 1100,245) prints the path
@@ -289,7 +289,7 @@ Do not "fix" these.
   1040–1410 × 293–460). Claude offers *Configure* (`r0854`), ChatGPT *Connection → Connect ›*
   (`r0428`), and neither says where the secret goes. Only the button's emphasis is wrong (item 2).
 - **Specific facts instead of a trust paragraph.** *Touches — Reads and writes files under
-  /Users/user/Projects*, *Touches nothing: clocks and time zones*, *Edits video files with
+  ~/Projects*, *Touches nothing: clocks and time zones*, *Edits video files with
   ffmpeg*. Claude's identical warning box on every detail (`r0752`, `r0854`) is a warning on
   nothing.
 - **Caps that name what they hide.** *Show all — Playwright, Postman, Sentry and 16 more* with

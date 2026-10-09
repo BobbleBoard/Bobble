@@ -1,12 +1,12 @@
 /**
  * A PICTURE, OPENED — a small image studio around one image.
  *
- * the user: "clicking on a card (eg image once finished generating) does not
+ * The user: "clicking on a card (eg image once finished generating) does not
  * expand/open it", and then: "images clicked on/fullscreened should have the
  * new studio like ui with the left toolbar and such and a centered bottom 'edit
  * image' input bar aswell."
  *
- * The shape is the image editor he approved the direction of
+ * The shape is the image editor the user approved the direction of
  * (deliverables/ui-design/image-editor/proto-native), built from the app's own
  * parts rather than new ones: the tool rail is the 3D viewport's floating group
  * (`tp-float-group`), the history is its History card (`tp-history-rail`), the

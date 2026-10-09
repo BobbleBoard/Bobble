@@ -1,7 +1,7 @@
 /**
  * The test mode's own contract: run, see, and be unnoticeable.
  *
- * the user: "ideally headlessly … it doesn't take any focus away from me, I can use
+ * The user: "ideally headlessly … it doesn't take any focus away from me, I can use
  * the computer without any notice of any rapid test suites."
  *
  * Every other probe depends on this being true, so it is asserted once, here,

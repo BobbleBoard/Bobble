@@ -347,7 +347,7 @@ class MacMonitorFeedImpl implements MacMonitorFeed {
     return this.#takenOver;
   }
 
-  /* the user's Open button. The only thing in this file that intends to move the
+  /* The user's Open button. The only thing in this file that intends to move the
      user's focus, and it only ever runs from their click. */
   openApp(): void {
     void window.piDesktop.invoke('mac:monitor:open-app', {}).catch(() => undefined);
@@ -389,7 +389,7 @@ class MacMonitorFeedImpl implements MacMonitorFeed {
   }
 
   /*
-   * The pill toggle, read and written where the pill IS. the user asked for it "in
+   * The pill toggle, read and written where the pill IS. The user asked for it "in
    * the canvas as a toggle setting during computer use and in the settings
    * menu" — the same setting, reachable from both, because the moment you want
    * it gone is the moment you are looking at it.
@@ -470,7 +470,7 @@ export function macMonitorTabAction(
  * Whether the monitor tab may be OPENED right now — pure, so the rule that
  * keeps the tab in its own chat is testable without a canvas.
  *
- * the user (2026-09-12): "going to other chats, even when computer use is not
+ * The user (2026-09-12): "going to other chats, even when computer use is not
  * active in them after it previously has been in the current chat is pinning
  * a computer use tab in the canvas that reopens when closed". The session is
  * app-wide (one controlled app), but the TAB belongs to the chat whose turn is
@@ -529,7 +529,7 @@ export function useMacMonitor(controller: CanvasController): void {
         owner.current = { seq, chat: backgroundRun ? (pi.bgRun?.sessionFile ?? null) : viewed };
       }
       /*
-       * IN THE ORDINARY CHAT THE ACTIVITY TAB IS THE MONITOR. the user (2026-09-13):
+       * IN THE ORDINARY CHAT THE ACTIVITY TAB IS THE MONITOR. The user (2026-09-13):
        * "activity tab should be computer use page if the latest command is
        * something like 'mac snapshot'" — activity-routing morphs its one tab
        * into this feed on the model's own `mac …` call, newest wins, and a

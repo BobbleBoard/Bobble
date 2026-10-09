@@ -1,7 +1,7 @@
 /**
  * "More models" as a HOVER FLYOUT, photographed.
  *
- * the user: "I need to hover on the more models > and then have the stuff popup on
+ * The user: "I need to hover on the more models > and then have the stuff popup on
  * the right side, not click and have a menu within a menu."
  *
  * Two things have to be true and neither is visible from the markup alone: the

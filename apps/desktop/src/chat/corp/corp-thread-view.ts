@@ -54,7 +54,7 @@ export function corpChatView(input: CorpChatViewInput): CorpChatView {
    * is the manager, and the branch quietly rendered the CEO↔manager
    * conversation directly beneath the user's messages.
    *
-   * the user, twice: "no ceo-manager chat embedded into the ceo-user chat?
+   * The user, twice: "no ceo-manager chat embedded into the ceo-user chat?
    * ceo-manager is shown when clicked on the manager subchat just as
    * manager-subagent chat is shown when any subagent is clicked on" — and again
    * after run 6: "The ceo-manager chat is still embedded and shown right below

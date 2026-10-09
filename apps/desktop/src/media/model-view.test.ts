@@ -23,7 +23,7 @@ describe('a 3D card’s few controls', () => {
     expect(view.get().shading).toBe('grey');
   });
 
-  /* the user: "coloring/normals/grey, if rig, skeleton and if segment, then
+  /* The user: "coloring/normals/grey, if rig, skeleton and if segment, then
      explode" — the toggles exist only for a file that has the thing. */
   it('offers Skeleton only for a rigged file and Explode only for a segmented one', () => {
     const plain = createModelView();

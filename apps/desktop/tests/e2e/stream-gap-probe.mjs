@@ -2,7 +2,7 @@
  * THE GAP BETWEEN THE STREAM AND THE INPUT BAR — measured while a long list
  * streams, and after it ends.
  *
- * the user (2026-09-12, with a screenshot of ~250pt of nothing between the last
+ * The user (2026-09-12, with a screenshot of ~250pt of nothing between the last
  * streamed line and the composer): "reduce buffer space between stream and
  * input bar."
  *

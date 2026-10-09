@@ -1,9 +1,9 @@
 /**
  * The pill above the input bar.
  *
- * the user: "moving to a new chat shows this 'getting ready' thing that I'd like to
- * move to a pill that floats above the input bar we can use" — and then he uses
- * it again himself, for the image warning. So it is one component with one
+ * The user: "moving to a new chat shows this 'getting ready' thing that I'd like to
+ * move to a pill that floats above the input bar we can use" — and then the user uses
+ * it again themselves, for the image warning. So it is one component with one
  * position, not a status line that happens to be near the composer.
  *
  * FLOATS, and that is load-bearing: it is absolutely positioned above the card,
@@ -33,7 +33,7 @@ export function ComposerPill({
 }) {
   /*
    * The one thing in this app that CANNOT be made instant, said out loud before
-   * it costs you. the user: "flagged to the user to my face right there whenever
+   * it costs you. The user: "flagged to the user to my face right there whenever
    * anything threatens to cause a full re prefill (including model switches) at
    * over 16k context." It publishes into the slot below like anything else.
    */
@@ -51,7 +51,7 @@ export function ComposerPill({
   /*
    * THE BOOT WAITS ARE NOT HERE ANY MORE.
    *
-   * the user: "remove the 'starting up' pill and put it instead in the top bar
+   * The user: "remove the 'starting up' pill and put it instead in the top bar
    * centered." They are about the APP coming up, not about the message you are
    * typing, and a pill above the composer put them in the wrong place twice
    * over — it hovered over what you were writing, and it went away the moment

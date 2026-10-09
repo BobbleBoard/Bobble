@@ -232,7 +232,7 @@
 }
 
 /*
- * THE RAIL'S LADDER (Bobble). the user 2026-09-24: "do you see the lack of
+ * THE RAIL'S LADDER (Bobble). The user 2026-09-24: "do you see the lack of
  * hierarchy". Measured before: every navigation row, every studio and every chat
  * title at 14px/400 in the same secondary ink (6.6:1) — the pages you go to and
  * the list of things you made read as one list — with the icons in primary ink,
@@ -306,7 +306,7 @@
 /*
  * FOOTER: a full-width row, not a floating pill.
  *
- * the user: "the hover highlight needs to be full width, same margin on the right as
+ * The user: "the hover highlight needs to be full width, same margin on the right as
  * left… add an embedded settings button… this highlights individually, just a
  * gear on the right side". So the row owns the inset (equal both sides) and the
  * two children each own their own hover — the profile area and the gear light up
@@ -315,7 +315,7 @@
 /*
  * THE GEAR SITS ON TOP OF THE PROFILE BUTTON, NOT BESIDE IT.
  *
- * the user: "the 'bobble local' button to the left of it should have a clickable
+ * The user: "the 'bobble local' button to the left of it should have a clickable
  * area that stretches to the right more, through the settings button, so the
  * settings button is sitting on TOP of the bobble button."
  *

@@ -1,7 +1,7 @@
 /**
  * DOES THE POLICY ACTUALLY HOLD WHEN THE MACHINE IS IN TROUBLE?
  *
- * the user: "test everything monitor fans, power memory pressure etc. attempt to run
+ * The user: "test everything monitor fans, power memory pressure etc. attempt to run
  * reasonably heavy other processes, stress test system ensure no OOM and
  * graceful handling if too many resources are in use."
  *
@@ -192,7 +192,7 @@ try {
   /*
    * ── competition ───────────────────────────────────────────────────────────
    *
-   * the user: "attempt to run reasonably heavy other processes". Half the cores,
+   * The user: "attempt to run reasonably heavy other processes". Half the cores,
    * busy — what a build, an export or a video call actually looks like next to a
    * model. It matters for two reasons: the app has to stay responsive with the
    * machine genuinely contended, and the CPU signal has to MOVE, or the policy

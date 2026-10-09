@@ -193,7 +193,7 @@ const HIDE_AI_DOCK_CSS = `
 
   /* The slide navigator eats roughly half of a narrow canvas, which is why a
      deck opened in the sidebar was fitting to 20% — the stage had almost no
-     room left. the user: "this is absolutely tiny by the way in the UI by default,
+     room left. The user: "this is absolutely tiny by the way in the UI by default,
      that can't be acceptable." Below a tablet-ish width the rail is the first
      thing to go; the tab bar and the status bar still say which slide you are
      on, and it comes back the moment the canvas is widened. */
@@ -550,7 +550,7 @@ export function openLookView(
 /**
  * Watch the open file so an edit made OUTSIDE the editor — the model's
  * `office edit deck.pptx --chart …`, a save from another app — shows up in the
- * tab without anyone re-opening it. the user: "you should be able to see the pdf
+ * tab without anyone re-opening it. The user: "you should be able to see the pdf
  * or any xlsx pptx docx being edited live".
  *
  * The directory is watched and events filtered to the file's own name: the

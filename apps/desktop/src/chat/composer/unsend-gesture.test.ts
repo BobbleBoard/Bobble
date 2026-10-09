@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { claimsUndoForUnsend, isUndoKey, UNSEND_WINDOW_MS } from './unsend-gesture';
 
 /**
- * the user (2026-09-24): "pressing cmd z within 3 seconds of sending a message and
+ * The user (2026-09-24): "pressing cmd z within 3 seconds of sending a message and
  * before any text has been typed into the input box should unsend+rewind the
  * chat". Every other ⌘Z is ordinary undo and must stay exactly that.
  */

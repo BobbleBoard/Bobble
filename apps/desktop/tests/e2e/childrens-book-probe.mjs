@@ -31,12 +31,12 @@ const MODEL = process.env.MODEL ?? 'qwen3.5-4b-mtp';
 const MODE = process.env.MODE ?? 'schemas';
 const OUT = process.env.OUT ?? '/tmp/childrens-book';
 const MINUTES = Number(process.env.MINUTES ?? 45);
-const TARGET = '/Users/user/Pictures/childrens-book/';
+const TARGET = `${homedir()}/Pictures/childrens-book/`;
 mkdirSync(OUT, { recursive: true });
 const t0 = Date.now();
 const say = (m) => console.log(`${((Date.now() - t0) / 1000).toFixed(1)}s  ${m}`);
 
-// the user's brief, verbatim — or PROMPT, for a one-picture look at the same path.
+// The user's brief, verbatim — or PROMPT, for a one-picture look at the same path.
 const PROMPT =
   process.env.PROMPT ??
   "Create 8 high-quality illustrations for a children's book titled 'The Guardian of the Hidden Forest'. " +

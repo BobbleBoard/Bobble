@@ -2,7 +2,7 @@
  * The 3D studio's own two controls — Send To and Export.
  *
  * THIS USED TO BE A TOP BAR: a back-to-chat pill, a "Bobble 3D" wordmark, and
- * these two buttons, in a 46px strip above the workspace. the user: "remove the <
+ * these two buttons, in a 46px strip above the workspace. The user: "remove the <
  * chat button and instead still keep the sidebar open/collapse button. remove
  * 'bobble 3d' with blue cube also."
  *
@@ -46,7 +46,7 @@ export function TripoTopBarControls(): JSX.Element {
             <IcShare size={15} />
             Send To
             {/*
-              No caret. the user: "remove the little down arrow in the 'send to'
+              No caret. The user: "remove the little down arrow in the 'send to'
               button." A pill that opens a menu is found by pointing at it, and
               the chevron was a third of the control's width spent saying so.
             */}

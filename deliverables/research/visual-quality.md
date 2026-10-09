@@ -10,7 +10,7 @@
 
 ## 1. Goal
 
-the user, verbatim: *"improve quality of visual outputs app produces out of the box, eg. pptx, docx, svg, diagrams, charts. have subagents create some samples of their own on sample prompts and critique what makes theirs better. eg. website design and such when applicable utilizing image generation and refinement passes effectively to make high quality websites or presentations or pages or hyperframes animations … many tools are in place and perhaps most of the work is to now tune a model to use these tools effectively, [but] there is likely quite a ways to go … to better the whole system rather than putting more weight than we need to on the model."*
+The user, verbatim: *"improve quality of visual outputs app produces out of the box, eg. pptx, docx, svg, diagrams, charts. have subagents create some samples of their own on sample prompts and critique what makes theirs better. eg. website design and such when applicable utilizing image generation and refinement passes effectively to make high quality websites or presentations or pages or hyperframes animations … many tools are in place and perhaps most of the work is to now tune a model to use these tools effectively, [but] there is likely quite a ways to go … to better the whole system rather than putting more weight than we need to on the model."*
 
 Restated precisely:
 
@@ -209,7 +209,7 @@ The radar request, in a chat with the `chart` tool (whose types include `radar`)
 
 Prompt: a 6-second title card for the launch, "Tidewell" / "Stop leaks before they start", in brand teal.
 
-REAL evidence: the user's "10-second animated title card with the text 'Launch day'…" (121 frames) and his radar-chart request (121 frames, plus a GIF the model assembled). **Both rendered the prompt itself as the title**, white on navy, with "bright yellow" ignored ([title card](../visual-quality/_real-4b-evidence/renders/hyperframes-launch-day-title-card-real.png), [radar](../visual-quality/_real-4b-evidence/renders/hyperframes-radar-request-real.png)). The model then tried to write the "MP4" with PIL.
+REAL evidence: the user's "10-second animated title card with the text 'Launch day'…" (121 frames) and their radar-chart request (121 frames, plus a GIF the model assembled). **Both rendered the prompt itself as the title**, white on navy, with "bright yellow" ignored ([title card](../visual-quality/_real-4b-evidence/renders/hyperframes-launch-day-title-card-real.png), [radar](../visual-quality/_real-4b-evidence/renders/hyperframes-radar-request-real.png)). The model then tried to write the "MP4" with PIL.
 
 ![motion a](../visual-quality/motion-graphic/renders/a-text-prompt-title-card-sheet.png)
 ![motion b](../visual-quality/motion-graphic/renders/b-authored-scene-sheet.png)

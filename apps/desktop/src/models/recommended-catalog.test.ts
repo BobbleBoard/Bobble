@@ -33,7 +33,7 @@ describe('the curated recommended list', () => {
   });
 
   it('covers every output modality, not just text', () => {
-    // the user: "needs to include all modalities also not just -text".
+    // The user: "needs to include all modalities also not just -text".
     const want: OutputModality[] = ['text', 'image', 'video', 'audio', '3d'];
     expect([...availableOutputs()].sort()).toEqual([...want].sort());
   });
@@ -118,7 +118,7 @@ describe('the curated recommended list', () => {
   });
 
   it('says what this machine can do with the big ones', () => {
-    // the user: "of course all of these are vram dependent, show a not recommended
+    // The user: "of course all of these are vram dependent, show a not recommended
     // for this machine if it can't run".
     const ltx = RECOMMENDED_FAMILIES.find((f) => f.id === 'ltx');
     if (ltx === undefined) throw new Error('LTX is missing');

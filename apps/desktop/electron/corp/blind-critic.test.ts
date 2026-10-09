@@ -39,7 +39,7 @@ describe('what the critic is told', () => {
 
   it('names no task type — it must hold for every benchmark', () => {
     /*
-     * the user's rule for this cycle: a fix must hold across all tasks, never be
+     * The user's rule for this cycle: a fix must hold across all tasks, never be
      * shaped to the one in front of it. A critic prompt naming CSVs (the
      * benchmark it was built during) would be precisely that mistake.
      */

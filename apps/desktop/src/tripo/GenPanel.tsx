@@ -556,7 +556,7 @@ function ModelPanel(): JSX.Element {
             onChange={(v) => set('genResolution', v)}
           />
         </div>
-        {/* Grey / Color / PBR — how far the model is finished. the user
+        {/* Grey / Color / PBR — how far the model is finished. The user
             (2026-09-15): "add a setting for Grey/Color/PBR". Grey is the
             shape alone (what Auto-texture off used to mean), Color the
             painted base colour, PBR the full material. */}
@@ -1093,7 +1093,7 @@ function RetopoPanel(): JSX.Element {
   const retopoMode = useTripoStore((s) => s.retopoMode);
   const set = useTripoStore((s) => s.set);
   /*
-   * A QUICK MODE. the user (2026-09-15), watching a remesh pass eight minutes:
+   * A QUICK MODE. The user (2026-09-15), watching a remesh pass eight minutes:
    * "remeshing should be a quick process … attempt to find a faster
    * alternative for a 'quick mode'". The quad remesh is QuadriFlow on a closed
    * surface — 46 s on a 186k-face jet at full priority, 200 s at low power,

@@ -283,7 +283,7 @@
     "1001": {
       "ID": 1001,
       "LoginName": "someone@example.com",
-      "DisplayName": "The user",
+      "DisplayName": "the user",
       "ProfilePicURL": "",
       "Roles": []
     },

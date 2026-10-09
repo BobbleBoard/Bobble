@@ -1,7 +1,7 @@
 /**
  * LOOK AT THE PENDING CARD — the shape, the bar, and the reveal.
  *
- * the user's rule on anything visual: reproduce, fix, re-reproduce, and LOOK. So this
+ * The user's rule on anything visual: reproduce, fix, re-reproduce, and LOOK. So this
  * drives a real generation and screenshots the card at the three moments that
  * matter: empty and animating, mid-sweep, and after the handover.
  */

@@ -1,5 +1,5 @@
 /**
- * the user: "whatever browser or app it opens something in via terminal (which is a
+ * The user: "whatever browser or app it opens something in via terminal (which is a
  * common issue I face) immediately give it the tools it needs and the initial
  * snapshot of whatever app or the browser snapshot of chrome."
  *
@@ -91,7 +91,7 @@ describe('what the model is told afterwards', () => {
 });
 
 describe('a web page opened from the shell with no browser named', () => {
-  // the user: "bias it to use the built in browser instead of bash to open safari
+  // The user: "bias it to use the built in browser instead of bash to open safari
   // when no specific is requested."
   it('is redirected to browser_navigate, which it can actually drive', () => {
     const opened = detectOpenedApp('open https://example.com');

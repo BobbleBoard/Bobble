@@ -1,6 +1,6 @@
 /**
  * THE FLAGS TAB: every flag the engine has, organised — the search on top
- * (the user: "make a separate tab for Flags with the search bar at the top"),
+ * (The user: "make a separate tab for Flags with the search bar at the top"),
  * which engine beside it, the popular ones first, then the categories
  * (collapsible, counted). Nothing here is a curated subset — the list is the
  * engine's own `--help`, which is the only way the panel can honestly claim

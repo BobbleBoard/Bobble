@@ -141,7 +141,7 @@ def test_retopo_knobs_reach_the_worker() -> None:
 
 
 def test_retopo_quick_mode_reaches_the_worker_and_quads_is_the_default() -> None:
-    """the user (2026-09-15): a 'quick mode' for retopology — the decimation path."""
+    """The user (2026-09-15): a 'quick mode' for retopology — the decimation path."""
     _, mesh = _fixture()
     quick = _staged({"op": "retopo", "modelPath": str(mesh), "method": "quick"})
     assert quick[quick.index("--method") + 1] == "quick", quick
@@ -251,7 +251,7 @@ def test_non_humanoid_is_rigged_from_its_own_shape() -> None:
     rigger, which derives the skeleton from the mesh's own interior — even when
     SkinTokens is installed.
 
-    the user: "can you have an option to do medial axis rigging as a first choice
+    The user: "can you have an option to do medial axis rigging as a first choice
     before we ask the user to try skintokens?" The learned rigger is a 2.5 GB
     download that PREDICTS a skeleton, and sending someone there before anything
     has been tried is the wrong default.

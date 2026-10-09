@@ -48,7 +48,7 @@ describe('EffortSlider render', () => {
     expect(html).toContain('role="switch"');
     expect(html).toContain('aria-checked="true"');
     /*
-     * AND NO SLIDER AT ALL. the user: the Auto toggle "just removes the slider while
+     * AND NO SLIDER AT ALL. The user: the Auto toggle "just removes the slider while
      * toggled on". A slider that tracks the routed tier and refuses to be
      * dragged is a control lying about being one, so in Auto there is none —
      * which means no track, no thumb, no detents, and no end labels either.

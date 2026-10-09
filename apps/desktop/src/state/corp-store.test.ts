@@ -337,7 +337,7 @@ describe('trackChart per-node timing (STEP 1)', () => {
   /*
    * THE COUNTING-UP "worked" ROW.
    *
-   * the user, on the situation room: "even more silly it shows 'waiting', and then
+   * The user, on the situation room: "even more silly it shows 'waiting', and then
    * 'worked' in the situation room, (past tense) but the timer next to it is
    * still counting up."
    *

@@ -8,7 +8,7 @@ import type { ReactElement, ReactNode } from 'react';
  * renders when it has a handler) while the `<DropdownMenuSeparator />`s between
  * them were not. A build with no project/GitHub/skills handlers therefore
  * rendered separator, nothing, separator — two rules touching, plus one hanging
- * off the end. the user: "this + menu has so many double lines and confusion."
+ * off the end. The user: "this + menu has so many double lines and confusion."
  *
  * Filtering first makes that unrepresentable rather than merely fixed: there is
  * no arrangement of absent handlers that can produce two rules in a row.
@@ -300,8 +300,8 @@ export function ComposerAddMenu({
       */}
       {/*
         GROUPS, NOT A RIBBON OF SEPARATORS.
-        the user, looking at the shipped menu: "this + menu has so many double lines
-        and confusion." He was seeing two rules in a row and one hanging off the
+        The user, looking at the shipped menu: "this + menu has so many double lines
+        and confusion." The user was seeing two rules in a row and one hanging off the
         end — the separators were UNCONDITIONAL while every group between them
         was conditional, so a build with no project/GitHub/skills handlers
         rendered separator, nothing, separator.

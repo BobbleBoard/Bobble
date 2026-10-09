@@ -871,7 +871,7 @@ function trellis2MeshNodes(finish: ModelFinish): ComfyGraph {
     /*
      * Upstream's own post-processing, kept: REMESH the decoded surface first (512³ unsigned-distance dual
      * contouring, twenty Taubin passes), and only then decimate, unwrap and
-     * bake from THAT. the user (2026-09-14), on a mug baked straight off the
+     * bake from THAT. The user (2026-09-14), on a mug baked straight off the
      * decoded voxel surface: "this cup shows a lot of artifacting … 100%
      * fixable as trellis and pixal both produce much higher quality models
      * than that". LOOKED AT in the studio's own viewport, same mug: without

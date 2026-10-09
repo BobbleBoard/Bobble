@@ -1,7 +1,7 @@
 /**
  * The manager's two gates: THINK FIRST, and TOOLS ONLY WHEN YOU NEED THEM.
  *
- * the user, 2026-08-09, after reading the run-2 trace where the manager delegated
+ * The user, 2026-08-09, after reading the run-2 trace where the manager delegated
  * ten near-identical contracts and did the engineering itself:
  *
  *   "manager is asked to brainstorm contracts to text files and rigorously

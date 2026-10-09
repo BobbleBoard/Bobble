@@ -222,7 +222,7 @@ const noBlockers = fakeRun({});
 const HOME_CACHE = '/Users/user/.cache/bobble';
 const PS = [
   '    1     0 /sbin/launchd',
-  // the user's installed Bobble with a model loaded, through its helper.
+  // The user's installed Bobble with a model loaded, through its helper.
   '  500     1 /Applications/Bobble.app/Contents/MacOS/Bobble',
   '  510   500 /Applications/Bobble.app/Contents/Frameworks/Bobble Helper.app/Contents/MacOS/Bobble Helper --type=utility',
   `  520   510 ${HOME_CACHE}/llamacpp/b10603/llama-server -m /Users/user/Bobble/Models/q.gguf --port 8080`,
@@ -255,7 +255,7 @@ describe('processes', () => {
     );
   });
 
-  it("knows the user's installed app and his dev checkout from a probe's app", () => {
+  it("knows the user's installed app and their dev checkout from a probe's app", () => {
     const main = '/Users/user/Desktop/OSS-harness';
     expect(locks.isUserAppCommand('/Applications/Bobble.app/Contents/MacOS/Bobble', main)).toBe(
       true,

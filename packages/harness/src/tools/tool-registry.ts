@@ -2,7 +2,7 @@
  * Every tool's definition, captured as it is registered — including its
  * `execute`, which pi does not otherwise hand out.
  *
- * WHY THIS EXISTS. the user's design for capabilities: the advertised tool list never
+ * WHY THIS EXISTS. The user's design for capabilities: the advertised tool list never
  * changes (so the prompt prefix is never invalidated and no turn pays a
  * re-prefill), and a capability simply TELLS the model, in a tool result, which
  * tools it may now use. Two live probes against the running server settled how

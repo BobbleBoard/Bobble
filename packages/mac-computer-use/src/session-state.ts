@@ -1,7 +1,7 @@
 /**
  * The per-session CONTROLLED-APP state machine.
  *
- * the user's core computer-use requirement: once the model opens (or snapshots) an
+ * The user's core computer-use requirement: once the model opens (or snapshots) an
  * app, the session must KNOW that app is the controlled target — every
  * subsequent click/type/key/scroll routes to it unambiguously (pid-stamped, so
  * the helper resolves indices in the right namespace AND delivers fallback

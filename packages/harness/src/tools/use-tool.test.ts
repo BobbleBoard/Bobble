@@ -3,7 +3,7 @@
  *
  * The advertised tool list never changes, so the prompt prefix is never rewritten
  * and no turn pays a re-prefill; a capability just appends a result naming what
- * the model may now call, and `use` carries the call. the user, insisting on exactly
+ * the model may now call, and `use` carries the call. The user, insisting on exactly
  * this: "there's no way we *need* to pay a prefill of whole context when a new
  * capability is activated."
  *

@@ -1,7 +1,7 @@
 /**
  * A CHART, A FAILED TURN, AND THE CHAT OPENED AGAIN — how many charts, and where?
  *
- * the user (2026-10-08): "I asked for a radar chart, it was made, then I asked about
+ * The user (2026-10-08): "I asked for a radar chart, it was made, then I asked about
  * something else, it failed, but then going out and back into the chat, it
  * showed two radar charts at the bottom, not where they were originally".
  *

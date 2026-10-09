@@ -194,7 +194,7 @@ describe('the app URL and the path name ONE file', () => {
 });
 
 /*
- * the user: "attempting a hyperframes animation generation, rendered 120 induvidual
+ * The user: "attempting a hyperframes animation generation, rendered 120 induvidual
  * frames, each of which was placed as it's own png card in the chat, severely
  * cluttering it." The frames are now joined into one animated PNG and the tool
  * names that one file — and the frames only by their FOLDER, a path with no

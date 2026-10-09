@@ -47,7 +47,7 @@ function Pill({ data, nodeKey }: { data: PillData; nodeKey: NodeKey }) {
   const Icon = ICONS[data.icon] ?? IconFile;
 
   /*
-   * CLICKING A PILL SELECTS IT. the user: "clicking on any and clicking delete
+   * CLICKING A PILL SELECTS IT. The user: "clicking on any and clicking delete
    * should remove them."
    *
    * Lexical does not do this for you: a decorator's DOM swallows the click, so
@@ -103,7 +103,7 @@ function Pill({ data, nodeKey }: { data: PillData; nodeKey: NodeKey }) {
       )}
       <span className="pd-pill-label">{data.label}</span>
       {/*
-        NO X. the user: "these pills: no border, no X … clicking on any and clicking
+        NO X. The user: "these pills: no border, no X … clicking on any and clicking
         delete should remove them." A pill is a word in a sentence — an X on each
         one turns a typed line into a row of controls, and the key that removes a
         word is the one everybody already presses.

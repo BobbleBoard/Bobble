@@ -198,7 +198,7 @@ describe('resolveTargetModel', () => {
 });
 
 /*
- * the user: "I wanted while a model is loading now (not prefill) for messages to
+ * The user: "I wanted while a model is loading now (not prefill) for messages to
  * appear as queued." A model that has not finished coming up cannot answer, so
  * it is a reason in its own right — and it outranks "a turn is running",
  * because it is true whether or not one is.

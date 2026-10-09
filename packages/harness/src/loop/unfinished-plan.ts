@@ -1,7 +1,7 @@
 /**
  * A TURN THAT ENDS WITH THE MODEL'S OWN CHECKLIST UNFINISHED.
  *
- * the user, round 3: "long running tasks where you can't accept an 'I can't do this'
+ * The user, round 3: "long running tasks where you can't accept an 'I can't do this'
  * needs to truly run until completion."
  *
  * The two nudges beside this one catch a turn that stopped by ASKING

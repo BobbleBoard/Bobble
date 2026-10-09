@@ -86,7 +86,7 @@ function invalidateInFlightSend(): void {
   /*
    * Clear the in-flight MARKER too, not just the epoch.
    *
-   * the user: "on the startup of the application I click anywhere and it shows me as
+   * The user: "on the startup of the application I click anywhere and it shows me as
    * if I sent a blank message ... stays there indefinitely." `promptInFlight` is
    * what draws the processing ring, and it is normally cleared by
    * agent_start/agent_end. A send that never becomes a turn — refused by pi,
@@ -405,7 +405,7 @@ export async function newSession(): Promise<{ ok: boolean; cancelled?: boolean; 
   pendingNewSession = false;
 
   /*
-   * PAINT THE EMPTY CHAT, THEN TELL PI. the user: "clicking new chat still takes a
+   * PAINT THE EMPTY CHAT, THEN TELL PI. The user: "clicking new chat still takes a
    * few seconds."
    *
    * This used to `await pi:new-session` and `await get_state` before clearing a
@@ -495,7 +495,7 @@ async function abortTurn(): Promise<boolean> {
 /**
  * LEAVE A CHAT THAT IS BEING DELETED — at once — and stop its turn.
  *
- * the user (2026-09-23): "clicking delete on a chat should instantly terminate any
+ * The user (2026-09-23): "clicking delete on a chat should instantly terminate any
  * generation of any kind happening and immediately remove it from the user
  * interface". A chat can be alive here in two places:
  *
@@ -638,7 +638,7 @@ export async function sendPrompt(
   /*
    * A THROW MUST NOT LEAVE THE CHAT IN-FLIGHT FOREVER.
    *
-   * the user: "sending a message to steer mid-chat, or pause-then-send … often ends
+   * The user: "sending a message to steer mid-chat, or pause-then-send … often ends
    * in a never-sending message." This is how. Everything between here and the
    * dispatch can throw — moving pi onto the viewed session, a vision relaunch,
    * the Auto router, waiting for the server, and the `pi:prompt` invoke itself —
@@ -790,7 +790,7 @@ export async function sendPrompt(
     // server), so a turn may have started since this send was accepted. Dispatching
     // a bare prompt into a busy pi is REJECTED ("Agent is already processing…"),
     // which stranded the echo as a user bubble with no reply and raised a red toast
-    // (the user's blank-gap repro). See {@link deliveryForSend} for which queue it lands
+    // (The user's blank-gap repro). See {@link deliveryForSend} for which queue it lands
     // in and why.
     const delivery = deliveryForSend(agentInFlight());
     mine.body = body.message;
@@ -828,13 +828,13 @@ export async function sendPrompt(
 /**
  * WHICH QUEUE A MID-RUN MESSAGE LANDS IN — and who lowers the in-flight bridge.
  *
- * the user, after a mid-run message disappeared: "I attempted to ask a follow up /
+ * The user, after a mid-run message disappeared: "I attempted to ask a follow up /
  * steering prompt in the middle of the action which I assumed would be properly
  * queued greyed out sent, and then at the next tool result, my prompt would be
  * passed along and the following thinking block would address my prompt as it
  * would be in context then. however that was wrong."
  *
- * What he described is pi's STEERING queue, precisely. In pi-agent-core's
+ * What the user described is pi's STEERING queue, precisely. In pi-agent-core's
  * `agent-loop.js` the loop re-reads it immediately after every turn:
  *
  *     await emit({ type: "turn_end", message, toolResults });
@@ -869,8 +869,8 @@ export function deliveryForSend(inFlight: boolean): {
 /**
  * A SEND THAT WAS REFUSED HAS TO SAY SO.
  *
- * the user, with a screenshot of a thread that stayed like this indefinitely: "it
- * looked like this by the way that whole time, blank screen" — his message on
+ * The user, with a screenshot of a thread that stayed like this indefinitely: "it
+ * looked like this by the way that whole time, blank screen" — their message on
  * screen, nothing under it, no reply, no error, no processing ring, and no Stop
  * button in the composer. The app looked idle and willing. It had simply
  * swallowed the rejection.
@@ -1149,7 +1149,7 @@ export async function resumePausedChat(): Promise<void> {
   usePiStore.setState({ pausedChat: null });
 
   /*
-   * LET THE PAUSE LAND FIRST. the user: "I just pressed the pause button then
+   * LET THE PAUSE LAND FIRST. The user: "I just pressed the pause button then
    * immediately pressed again to resume and it stayed stopped and wasn't at all
    * instant or seamless because it didn't start again."
    *
@@ -1364,7 +1364,7 @@ export async function applyHarnessConfig(opts: {
  *
  * pi's cwd is fixed at spawn, but nothing here needs pi's cwd: our file tools
  * override pi's by name and resolve their root per call, and pi's bash takes a
- * spawnHook that rewrites cwd per command. the user: "it's not like functionally
+ * spawnHook that rewrites cwd per command. The user: "it's not like functionally
  * anything should need a restart just because we're essentially typing into a
  * terminal session cd '<changed working directory path>'."
  */
@@ -1400,7 +1400,7 @@ export function resolvedWorkspace(): string | null {
 /**
  * Make this chat's working folder AT THE MOMENT there is work to put in it.
  *
- * the user reported "a bunch of project clutter even though there are literally no
+ * The user reported "a bunch of project clutter even though there are literally no
  * projects" and "many duplicate chats … named the same thing". Both came from
  * the same place: the workspace was resolved (and `mkdir`'d) when a chat OPENED,
  * so every chat anyone ever clicked into left a folder behind — measured, 199 of
@@ -1543,7 +1543,7 @@ export async function forkAndReprompt(
 /**
  * ⌘Z JUST AFTER SENDING TAKES THE MESSAGE BACK.
  *
- * the user (2026-09-24): "pressing cmd z within 3 seconds of sending a message and
+ * The user (2026-09-24): "pressing cmd z within 3 seconds of sending a message and
  * before any text has been typed into the input box should unsend+rewind the
  * chat". The composer owns the gesture (the window, the empty box, what goes
  * back into it); this owns what "unsend" means for the conversation:
@@ -2035,7 +2035,7 @@ export async function switchSession(
   /*
    * ── Case D: the plain switch — PAINT FIRST, move pi behind it.
    *
-   * the user: "clicking onto a different chat has a ~2 second delay when it should
+   * The user: "clicking onto a different chat has a ~2 second delay when it should
    * be totally instant."
    *
    * It was structural, not slow code. This awaited `pi:switch-session` — an RPC

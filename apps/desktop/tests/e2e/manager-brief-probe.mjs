@@ -1,7 +1,7 @@
 /**
  * THE MANAGER PROMPT, ITERATED IN A MINUTE INSTEAD OF FORTY.
  *
- * the user's loop: hand the manager a real vision, look at the contracts it writes,
+ * The user's loop: hand the manager a real vision, look at the contracts it writes,
  * fix the prompt, repeat. A full corp run takes 30-40 minutes and confounds the
  * manager's decomposition with everything downstream of it; this runs ONE manager
  * turn and prints, verbatim, every message it sends to an engineer.

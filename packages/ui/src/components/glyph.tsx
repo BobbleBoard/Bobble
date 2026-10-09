@@ -1,7 +1,7 @@
 /**
  * GLYPHS — the 24-grid stroke icons, one component, one thickness token.
  *
- * the user (2026-09-20): "resize and have a consistent modifier to all svgs for
+ * The user (2026-09-20): "resize and have a consistent modifier to all svgs for
  * thickness and size and such so they can be easily edited." Every glyph here
  * is path data on a 24×24 grid in the Hugeicons stroke idiom (round caps and
  * joins, 1.5 at 24px), drawn through ONE `<Glyph>`:
@@ -16,7 +16,7 @@
  *
  * The paths: the ones the user handed over on 2026-09-20 (Hugeicons, MIT —
  * https://hugeicons.com, Copyright (c) 2025 Hugeicons) plus two from the same
- * set for what he did not paste (the puzzle piece he asked for, the waveform
+ * set for what the user did not paste (the puzzle piece the user asked for, the waveform
  * for Audio), and the 2026-09-23 batch for the push's new surfaces (see the
  * note above `memory`). No brand marks here — those stay in official-marks
  * (a connector's) and apps/desktop's brand-svg.ts (Tailscale's among them).
@@ -219,7 +219,7 @@ export const GLYPHS = {
    * Computer use — the user (2026-09-23): "the fake cursor svg outline but on the
    * bottom right ish of an icon for a window … added three circles to the top
    * left of that window to represent it as an app (the traffic light
-   * buttons)". The window and its title bar are from the Hugeicons drawing he
+   * buttons)". The window and its title bar are from the Hugeicons drawing the user
    * pasted; the pointer is the AGENT CURSOR's own outline (@pi-desktop/shared
    * agent-cursor — his artwork, the phantom every surface draws), placed in
    * the corner the window leaves open for it, tip at (12.9, 12.9).

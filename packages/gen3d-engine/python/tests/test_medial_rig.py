@@ -1,6 +1,6 @@
 """The medial-axis rigger must derive the skeleton the SHAPE has.
 
-the user asked for this as the first choice for anything that is not humanoid, so
+The user asked for this as the first choice for anything that is not humanoid, so
 that a creature gets a real rig without the 2.5 GB SkinTokens download. The
 things that can quietly go wrong are structural, and none of them show up in a
 joint count:

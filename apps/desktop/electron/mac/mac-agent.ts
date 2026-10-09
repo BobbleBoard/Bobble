@@ -279,7 +279,7 @@ async function frontmostAppName(): Promise<string | null> {
 /**
  * How long a launched app is watched for taking the front. It was 6 × 350 ms
  * — and Chrome's profile picker arrives after a cold start that takes longer
- * than that on its own, so the watch was over before the theft. the user, after
+ * than that on its own, so the watch was over before the theft. The user, after
  * that fix had shipped: "chrome I know for sure … steal focus upon computer
  * use launch." Ten seconds covers a cold start; the loop leaves the moment the
  * user goes somewhere else themselves.
@@ -655,7 +655,7 @@ async function dispatch(
       /*
        * PUT THE POINTER WHERE THE SCROLLING IS HAPPENING, FIRST.
        *
-       * the user: "move the cursor/scroll more proactively so that there's not delay
+       * The user: "move the cursor/scroll more proactively so that there's not delay
        * between the action being executed and the fake cursor moving around."
        * Click and type already glide the cursor to their target before firing;
        * scroll only changed the pill's text, so the content moved while the
@@ -829,7 +829,7 @@ function applyControl(mode: 'agent' | 'stopped' | 'user'): void {
  * Notes, 09-14 Chrome): a fresh chat's first `mac launch` answered "The user
  * pressed Stop, so Mac control is off … ask whether to carry on", the model
  * asked, and the user's "carry on" changed nothing, because nothing the
- * model does can clear it. the user: "despite it executing some command itself
+ * model does can clear it. The user: "despite it executing some command itself
  * [the thought is] 'The user closed <thing>' … it thinks since the user
  * closed something it should stop."
  *
@@ -991,7 +991,7 @@ export function registerMacAgentIpc(): void {
     await getHelper().request('focus', { app });
   });
   /*
-   * The pill's own buttons. the user asked for them back — an ✕, a pause and a
+   * The pill's own buttons. The user asked for them back — an ✕, a pause and a
    * hide, on the one surface that exists while the user is in another app
    * watching the thing being driven. They route to the SAME brake as the
    * surface's buttons and the global Escape; there is still only one.
@@ -1176,7 +1176,7 @@ function registerE2eDebugChannel(): void {
           // window at all: it can drive TextEdit and it can read the surface,
           // but nothing joins them.
           /* A window move, done by the process that HAS the Accessibility
-             grant. the user: "if I move the map around the cursor does not move
+             grant. The user: "if I move the map around the cursor does not move
              with it" — reproducing that needs a real move, and a probe's own
              shell cannot make one (System Events refuses without the grant). */
           /* The app's REAL icon, as a data URL — the user: "you can get the real
@@ -1226,7 +1226,7 @@ function registerE2eDebugChannel(): void {
           // any more, so the panel reports on itself.
           case 'overlay-native-info':
             return { ok: true, result: await macOverlay.nativeInfo() };
-          /* the user's challenge, measured: can we sit directly above another app's
+          /* The user's challenge, measured: can we sit directly above another app's
              window? See OverlayController.orderRelativeTest. */
           case 'overlay-order-test':
             return {

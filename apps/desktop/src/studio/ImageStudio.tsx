@@ -48,7 +48,7 @@ import { studioBlockedReason, useStudio } from './use-studio';
 /**
  * SHAPE × SIZE — as explicit pairs, not arithmetic.
  *
- * the user asked for res in the rail alongside the ratio, so it is there — but as
+ * The user asked for res in the rail alongside the ratio, so it is there — but as
  * SIZE crossed with the ratio rather than a pixel menu beside it. The old
  * "1024x1024 / 768x768 / 512x512" was three squares that differ only in
  * quality: a rendering decision wearing the clothes of a composition one. Pick
@@ -373,7 +373,7 @@ export function ImageStudio(): JSX.Element {
       {...(handoff.card !== undefined ? { input: handoff.card } : {})}
       onDropFiles={handoff.acceptFiles}
       /*
-       * EVERYTHING CORE IS DOWN HERE. the user: "move a bit more really core
+       * EVERYTHING CORE IS DOWN HERE. The user: "move a bit more really core
        * functionality to the bottom bar… you should be able to access all core
        * functionality and settings without even going into the right sidebar."
        *
@@ -671,7 +671,7 @@ function GlyphImage(): JSX.Element {
  *
  * The old one was a single narrow outline — at 26px it read as a sliver, a
  * stick with a bent end, and you could not tell what it was without the label
- * under it. the user: "these could be better."
+ * under it. The user: "these could be better."
  *
  * Redrawn with the three things that make a pencil legible small: a WIDE enough
  * body to be a shape rather than a line, a real sharpened point (the tip is its

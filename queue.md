@@ -1,7 +1,7 @@
 # Queue — round 21 (from the user, 2026-09-07 ~20:55)
 
 Everything here was queued while computer use was being finished. Order below is
-the user's, not mine. He said: "you have a whole night to do it and produce that
+The user's, not mine. The user said: "you have a whole night to do it and produce that
 video, you can take your time with all of it."
 
 **ALL EIGHT ITEMS ARE DONE.** The video was recorded first, then re-recorded on

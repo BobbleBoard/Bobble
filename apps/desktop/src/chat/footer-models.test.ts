@@ -106,7 +106,7 @@ describe('chipLabel (round-A #3)', () => {
 
 describe('the chip and the picker must agree', () => {
   /*
-   * the user, with a screenshot of the picker showing a checkmark on LFM while the
+   * The user, with a screenshot of the picker showing a checkmark on LFM while the
    * composer chip still read "Qwen3.5 4B (MTP)": "lfm selected, but also
    * qwen3.5-4b still selected in the input bar."
    *

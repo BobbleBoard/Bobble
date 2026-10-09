@@ -1,7 +1,7 @@
 /**
  * THE OFFICE PIPELINE, FROM A CHAT, WITH A REAL MODEL — and LOOK.
  *
- * the user: "model should not be using python-pptx, there is a dedicated subagent
+ * The user: "model should not be using python-pptx, there is a dedicated subagent
  * for each pptx/docx/xlsx creation and editing right?" This asks the app, as a
  * person would, for a deck (and then a change to it), and records what the
  * model reached for, what landed on disk, what the canvas shows, and how long

@@ -1,12 +1,12 @@
 # Connectors — design review
 
-Two surfaces, kept apart throughout: the **shipping screen** (`apps/desktop/src/connectors/`, what the user sees from the sidebar) and the **candidate**, Shelf+ (`apps/desktop/src/candidates/connectors/`, behind `?candidates=connectors`). References: the 24 screenshots in `/Users/user/Desktop/refs/connectors/` (cited as `r0705` = `Screenshot 2026-09-07 at 12.07.05 AM.png`). Frames cited as `ship-*` / `cand-*` are from **this review's own drive** — `src/candidates/connectors/review-probe.mjs`, run headless on 2026-09-07 against the renderer-only dev server with the same fixture home and MCP shims `shots.mjs` uses — and live in `src/candidates/connectors/shots/review/`, with the numbers the frames cannot carry (timings, focus order, computed sizes, measured hover lifts) in `measurements-*.json` beside them. The three earlier rounds' verdicts (`NOTES.md`, `JUDGEMENT-R3.md`, `JUDGEMENT-R4.md`) were read as claims and re-tested by driving, not by re-reading their images; where a claim did not survive, it is said in the relevant item.
+Two surfaces, kept apart throughout: the **shipping screen** (`apps/desktop/src/connectors/`, what the user sees from the sidebar) and the **candidate**, Shelf+ (`apps/desktop/src/candidates/connectors/`, behind `?candidates=connectors`). References: the 24 screenshots in `~/Desktop/refs/connectors/` (cited as `r0705` = `Screenshot 2026-09-07 at 12.07.05 AM.png`). Frames cited as `ship-*` / `cand-*` are from **this review's own drive** — `src/candidates/connectors/review-probe.mjs`, run headless on 2026-09-07 against the renderer-only dev server with the same fixture home and MCP shims `shots.mjs` uses — and live in `src/candidates/connectors/shots/review/`, with the numbers the frames cannot carry (timings, focus order, computed sizes, measured hover lifts) in `measurements-*.json` beside them. The three earlier rounds' verdicts (`NOTES.md`, `JUDGEMENT-R3.md`, `JUDGEMENT-R4.md`) were read as claims and re-tested by driving, not by re-reading their images; where a claim did not survive, it is said in the relevant item.
 
 Both surfaces were driven at Bobble's shell width (a 1440 window minus the 288px sidebar = 1152px of content; the candidate route renders full-window, so it was set to 1152 directly), plus 1440, ~900 and ~640, in the default Bobble flavour, light and dark. The focus guard in the e2e harness passed on every run: nothing took the screen.
 
 ### The ideal, before looking
 
-Written before opening any reference image, any screenshot, or any source file for either surface. Only the brief was known: Bobble is an offline local-AI desktop app; this surface is where a person manages what the assistant can reach (MCP servers, skills, plugins); the user's brief says no purple, and he dislikes "separate and convoluted menus for plugins/connectors/skills".
+Written before opening any reference image, any screenshot, or any source file for either surface. Only the brief was known: Bobble is an offline local-AI desktop app; this surface is where a person manages what the assistant can reach (MCP servers, skills, plugins); the user's brief says no purple, and the user dislikes "separate and convoluted menus for plugins/connectors/skills".
 
 **What the surface is for.** A person opens Connectors to answer one of four questions, in this order of frequency: *what can my assistant reach right now, and is any of it broken?* — *how do I give it one more thing?* — *why did that tool call fail?* — *turn this one off (for this chat / for good)*. The first answer should be readable in under a second from the list alone; the second should be one paste and one click; the third should be one click on the failing row; the fourth should be a switch on the row.
 
@@ -152,7 +152,7 @@ Ordered by impact, biggest first, within each category; categories ordered by im
 48. **"MCP server" as the label of the on/off switch** (`ship-detail-github-light.png`). Claude's `r0854` says *Enabled*. **Change:** *Enabled*.
 49. **"Developer: Official"** on the built-in's Information table (`ship-detail-builtin-dark.png`). **Change:** *Bobble*.
 50. **"Pi" and the "P" tile** in the permission dialog (item 3) — the rename rule.
-51. **The hand-added card's description is a path.** *Runs node /Users/user/tools/weather-mcp/index.js · added by you*, wrapping mid-path (`ship-list-light.png`). **Change:** *Runs node · added by you*; the path lives in the detail.
+51. **The hand-added card's description is a path.** *Runs node ~/tools/weather-mcp/index.js · added by you*, wrapping mid-path (`ship-list-light.png`). **Change:** *Runs node · added by you*; the path lives in the detail.
 
 #### I · Accessibility
 
@@ -266,7 +266,7 @@ So the next round does not "fix" it.
 - The setup card (`cand-detail-github-setup-light.png`): key name, masked field, where it is stored, one accent button, and the bad-key / change-key / recovered states all drawn (`cand-setup-bad-key-light.png`, `cand-setup-change-key-light.png`, `cand-not-responding-recovered-light.png`).
 - Failure on the row: *Did not answer · tried just now* in amber, the *Set up* / *Try again* pill, the *Needs setup N* count, the card's control changing to match (`cand-not-responding-ledger-dark.png`). Neither reference draws a failure at all.
 - The tool list: instant from cache with *listed just now*, humanised name + identifier + description, split by what it changes, capped at eight with *Show all 30* (`cand-detail-github-tools-light.png`). Above ChatGPT's `r0428` (no identifier, a chevron per row) and far above Claude's two chips (`r0752`).
-- Specific reach facts (*Reads and writes files under /Users/user/Projects*, *Touches nothing: clocks and time zones*) instead of Claude's identical trust paragraph on every detail.
+- Specific reach facts (*Reads and writes files under ~/Projects*, *Touches nothing: clocks and time zones*) instead of Claude's identical trust paragraph on every detail.
 - *Show all — Playwright, Postman, Sentry and 16 more* with a three-mark cluster: names three (ChatGPT) and counts (Claude) at once.
 - *Recommended for you* from a true signal (*Chrome is installed*) as compact chips — Claude's Popular strip with a local fact instead of popularity.
 - The empty search state names the query and clears itself (`cand-empty-light.png`); the category link searches for itself (`cand-search-category-light.png`).

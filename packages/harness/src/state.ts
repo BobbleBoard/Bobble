@@ -98,7 +98,7 @@ export interface HarnessStatus extends HarnessConfig {
    * Activating one appends tool schemas, and those render at the FRONT of the
    * prompt — so the very next request re-ingests the whole conversation. That
    * shows up as a long "Processing 12%" with no explanation, on a turn where the
-   * model has done nothing wrong. the user: "when there's a long prefill because a
+   * model has done nothing wrong. The user: "when there's a long prefill because a
    * capability is being loaded instead of 'processing' on that turn make the
    * prefill circle show 'loading <capability>'."
    *

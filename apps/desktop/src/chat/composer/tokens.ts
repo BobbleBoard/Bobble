@@ -3,7 +3,7 @@
  *  - `/foo` at the start of a line is a COMMAND (matches pi's TUI: a slash
  *    command owns the whole message, so it can only be the first thing in it).
  *  - `/foo` mid-sentence is a CONNECTOR reference — "check /gmail for the
- *    receipt". the user asked for `/gmail` to "just change to the blue thing with
+ *    receipt". The user asked for `/gmail` to "just change to the blue thing with
  *    the icon", and a reference is a word in a sentence, not a command. It is a
  *    separate mode rather than a widened slash because the two offer different
  *    things: a command list mid-sentence would be a menu of things that cannot

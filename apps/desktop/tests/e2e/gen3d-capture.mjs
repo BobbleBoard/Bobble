@@ -111,7 +111,7 @@ try {
    * SETTINGS FIRST — and 512 is the point.
    *
    * The room defaults to 1024, which is 8x the voxels of 512, and at 1024 the
-   * mesh decode outran the time available on this machine. the user: it has run at
+   * mesh decode outran the time available on this machine. The user: it has run at
    * 512 before. RES=512 drives the room's own rail, and TEXTURE=off drops the
    * texture pass so the proof is the geometry.
    */

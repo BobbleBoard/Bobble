@@ -3,8 +3,8 @@
  * this file is separate from brand-svg.ts, which `scripts/gen-brand-icons.mjs`
  * overwrites.
  *
- * the user: "can you seriously not find any chatgpt / openai logo? that's the codex
- * logo, and find something to use for hermes". He is right that the earlier
+ * The user: "can you seriously not find any chatgpt / openai logo? that's the codex
+ * logo, and find something to use for hermes". The user is right that the earlier
  * answer — a monogram for both — was a cop-out. Two different situations:
  *
  * OPENAI. Genuinely absent from simple-icons, but the mark itself is published

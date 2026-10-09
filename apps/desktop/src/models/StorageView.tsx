@@ -2,7 +2,7 @@
  * MANAGE STORAGE — what is on disk, where, and how big, sorted the way the
  * app is.
  *
- * the user (2026-09-12): "a page in the model manager that says 'Manage Storage'
+ * The user (2026-09-12): "a page in the model manager that says 'Manage Storage'
  * — this shows a UI that lets us visually navigate and see how much is being
  * taken up, and view and delete models, sorted the same way, always with a
  * 'Reveal' button easy to see and use if desired."
@@ -79,7 +79,7 @@ export function bytesLabel(n: number): string {
   return formatBytes(n);
 }
 
-/** the user: "<1gb green <10gb yellow otherwise red". */
+/** The user: "<1gb green <10gb yellow otherwise red". */
 export function sizeTone(bytes: number): 'green' | 'yellow' | 'red' {
   if (bytes < 1e9) return 'green';
   if (bytes < 10e9) return 'yellow';
@@ -186,7 +186,7 @@ export function uniqueTasks(tasks: readonly string[]): string[] {
 /**
  * Where something is, as a person would say it: `Models › 3D › Generation ›
  * microsoft/TRELLIS.2-4B` — the segments under the library (or the tools
- * folder), never the absolute path. the user: "no complex var/folders path,
+ * folder), never the absolute path. The user: "no complex var/folders path,
  * should be simple and readable". The real path stays one "Copy path" away.
  */
 export function breadcrumb(

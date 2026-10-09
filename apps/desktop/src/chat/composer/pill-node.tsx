@@ -1,7 +1,7 @@
 /**
  * A BLUE PILL IN THE INPUT, instead of raw text.
  *
- * the user: "add blue pills with icons and X buttons for embedded files and such,
+ * The user: "add blue pills with icons and X buttons for embedded files and such,
  * not just typing them, including for buttons in the + menu no raw text."
  *
  * Everything that used to arrive by TYPING now arrives as an object: a starter
@@ -40,7 +40,7 @@ export interface PillData {
   readonly icon: PillIcon;
   /**
    * A real brand mark, for the things that HAVE one — a connector picked from
-   * `/`. the user: "the / should be able to show installed connectors … and show
+   * `/`. The user: "the / should be able to show installed connectors … and show
    * REAL ICONS to their left."
    *
    * Inline SVG rather than a URL because the app is offline and under a CSP that

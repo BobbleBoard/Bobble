@@ -258,7 +258,7 @@ export class GenServiceClient {
          *
          * MEASURED on the user's Mac with the weights already cached: 94 seconds
          * between pressing Generate and the first diffusion step, with the room
-         * showing "Starting…" for all of it. He reported the studio as "won't
+         * showing "Starting…" for all of it. The user reported the studio as "won't
          * work at all", and from the outside that is exactly what it looked
          * like. Advisory only — never parsed, only shown.
          */

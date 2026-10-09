@@ -1,7 +1,7 @@
 /**
  * HOW HARD TO PUSH THIS MACHINE — decided from what it is actually doing.
  *
- * the user: "possibly generating/prefilling a bit slower, ensuring we leave a
+ * The user: "possibly generating/prefilling a bit slower, ensuring we leave a
  * certain amount of memory available as a buffer so the user can use computer as
  * normal while generation and such occurs … this could be dynamic even tracking
  * what the current user memory/cpu/gpu usage is and respecting limitations based
@@ -68,7 +68,7 @@ export interface PowerInputs {
   /** Logical cores, for the CPU-only thread decision. */
   readonly cpuCount?: number;
   /**
-   * GB the app promises never to take. the user's "leave a certain amount of memory
+   * GB the app promises never to take. The user's "leave a certain amount of memory
    * available as a buffer": a NUMBER, because that is what people mean, rather
    * than a fraction of a total they have to do arithmetic on. Undefined ⇒ derive
    * one from the machine's size (see {@link defaultReserveGB}).
@@ -107,7 +107,7 @@ export interface PowerDecision {
    * user first. macOS `taskpolicy` QoS tiers (never -b: the E-core clamp is 12× slower), Linux `nice`. */
   readonly backgroundPriority: boolean;
   /**
-   * NO "may a heavy job start" answer lives here. the user, correcting the first
+   * NO "may a heavy job start" answer lives here. The user, correcting the first
    * cut: "low can't stop image generation requests, it just has to lessen
    * compute intensivity in some way sacrificing speed to keep headroom."
    * Whether a job FITS is the guardian's question, answered by measurement per
@@ -339,7 +339,7 @@ export function decidePower(inputs: PowerInputs): PowerDecision {
    * Unified memory: there is no clock knob (MEASURED), so every lever is a
    * memory lever — but NOT the KV cache.
    *
-   * the user: "no quantizing kv that damages a lot especially at this model size."
+   * The user: "no quantizing kv that damages a lot especially at this model size."
    * He is talking about ANSWER QUALITY, and he is right that it is the wrong
    * thing to spend here: these are 2B-27B models whose attention is already the
    * fragile part, and the KV is what they remember of the conversation. I had

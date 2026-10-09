@@ -2,7 +2,7 @@
  * WHICH LIVE STREAM A RUNNING TOOL CALL BELONGS TO.
  *
  * The component that used to live here — a per-modality placeholder inside a
- * card with a title, a clock and a Cancel — is gone. the user: "just the same final
+ * card with a title, a clock and a Cancel — is gone. The user: "just the same final
  * video card, same final image card, same final 3d card … and then below it,
  * just floating, a white progress bar." The thread now mounts
  * media/PendingMediaCard, the same card the studios use, and this file keeps

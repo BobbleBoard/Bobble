@@ -122,7 +122,7 @@ export function ThreadActivityChain({
    * talking — pulling everything below it up, then pushing it back down at the
    * next tool call.
    *
-   * the user has reported this shape twice: "no expanding/closing tool / think
+   * The user has reported this shape twice: "no expanding/closing tool / think
    * blocks it stays open until it says done." The per-step running state is
    * rightly scoped to the live segment; whether the chain is DONE is a fact
    * about the turn. Defaults to `streaming` so a caller that knows no better
@@ -145,8 +145,8 @@ export function ThreadActivityChain({
    * group and segment (AssistantGroup). A thinking block has no id of its own,
    * and its slot (`thinking:0`) is the same in every chat, while the running
    * timer remembers the first time it saw an id for the life of the renderer:
-   * the user (2026-09-23), a new chat two seconds old reading "Thinking for 14m" —
-   * the start time of the first thought he saw that session.
+   * The user (2026-09-23), a new chat two seconds old reading "Thinking for 14m" —
+   * the start time of the first thought the user saw that session.
    */
   chainKey?: string;
   /**
@@ -214,7 +214,7 @@ export function ThreadActivityChain({
    * `firstToolResultTs - turnStartedAt` measures from the start of the whole
    * TURN, which is only this chain's own thinking time when the chain is the
    * first thing in the turn. For a chain eight minutes into a long turn it
-   * reports the entire turn. the user, on a three-second thought: "that thought
+   * reports the entire turn. The user, on a three-second thought: "that thought
    * block did not take 7 minutes? it was like 3 seconds" — the label read
    * "Thought for 7m 55s", off by more than a hundredfold.
    *
@@ -327,7 +327,7 @@ export function ThreadActivityChain({
              *
              * pi streams a tool's output while it runs; until now that stream was
              * discarded, so a command that had been going for a minute could show
-             * you nothing but a spinner. the user, on exactly that row: "nor the live
+             * you nothing but a spinner. The user, on exactly that row: "nor the live
              * output that I should be able to see."
              *
              * The real result still wins the moment it exists — this only fills
@@ -389,7 +389,7 @@ export function ThreadActivityChain({
        *
        * This read `turnStreaming ?? streaming`, which is a fact about the TURN,
        * so a chain stayed open while the model typed its reply underneath it,
-       * and stayed open again while the NEXT chain ran. the user: "thinking / tool
+       * and stayed open again while the NEXT chain ran. The user: "thinking / tool
        * chains need to collapse when they finish and the model starts typing
        * actual response, even if a new one starts right after, the old one is
        * then collapsed."
@@ -408,7 +408,7 @@ export function ThreadActivityChain({
        * PREFILL, as the chain's last row. A turn that is ingesting a long prompt
        * produces nothing — no running step, no tokens — so the chain looked
        * exactly like a finished one and printed "Done" over a working model.
-       * the user: "we need to have an idea of what's going on at all times."
+       * The user: "we need to have an idea of what's going on at all times."
        *
        * Conditions, deliberately strict: this run is streaming, NO step is
        * running, and llama is reporting a percent BELOW 100. A finished ingest
@@ -423,7 +423,7 @@ export function ThreadActivityChain({
       /*
        * AND THE GAPS WHERE NOTHING WAS SHOWN AT ALL.
        *
-       * the user, timing one: "from 1:00 when it initally shows the tool as
+       * The user, timing one: "from 1:00 when it initally shows the tool as
        * finished to 1:11, there is no user feedback, no processing % ring, no
        * thinking, nothing, then it finally at ~1:12 shows 99% instantly ...
        * the bunch of waits, especially times without any processing circle or
@@ -456,7 +456,7 @@ export function ThreadActivityChain({
         // upsertTab creates and FOCUSES the tab; it does not reveal the panel.
         // With the canvas collapsed that made clicking a media row look like it
         // did nothing at all — the tab was there, behind a closed drawer
-        // (the user: "clicking that focuses the image in the canvas but doesn't
+        // (The user: "clicking that focuses the image in the canvas but doesn't
         // slide it open if it's closed"). Every other path that puts something
         // in the canvas on the user's behalf opens it too (corp stream,
         // subagent routing, browser agent); this one was the exception.

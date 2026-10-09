@@ -204,7 +204,7 @@ function buildGeneratedTexture(): InstanceType<typeof THREE.CanvasTexture> {
 /*
  * THROUGH MAIN, NOT AN `<a download>`. In Electron a download link lands in
  * ~/Downloads with no panel and no word — the studio's Export "did nothing"
- * (the user, 2026-09-14: "send to and export buttons should be functional and
+ * (The user, 2026-09-14: "send to and export buttons should be functional and
  * work"). Export goes through the save panel; Send To writes the file under
  * ~/Bobble/generated/3d and opens it in the chosen app. Either way the person
  * is told where it went, in the studio's own status line.
@@ -378,7 +378,7 @@ export default function Viewer3D({ gizmoRef }: Viewer3DProps): JSX.Element {
     // some inconsistently-wound triangles (marching cubes emits them, and
     // quadric decimation flips more). Each one then renders as a hole onto the
     // dark background, so the model looks shot through with black specks — what
-    // the user has been calling the debris issue. It is NOT debris: the same preview
+    // The user has been calling the debris issue. It is NOT debris: the same preview
     // file measured 99.7% one connected component and renders perfectly clean in
     // an offline double-sided renderer. Showing the back of a triangle is the
     // right call for a modelling viewport anyway; showing the void is not.
@@ -454,7 +454,7 @@ export default function Viewer3D({ gizmoRef }: Viewer3DProps): JSX.Element {
      * The material a loaded file brought with it, per mesh.
      *
      * TRELLIS bakes real PBR — baseColorTexture, metallicRoughnessTexture (with
-     * roughness in G and metallic in B) and alphaMode BLEND, i.e. the user's four
+     * roughness in G and metallic in B) and alphaMode BLEND, i.e. The user's four
      * channels: "Base Color, Roughness, Metallic, and Opacity". Textured mode
      * used to throw all of that away and paint a procedural stand-in left over
      * from the demo build, so the bake was invisible no matter how well it ran.
@@ -1284,7 +1284,7 @@ export default function Viewer3D({ gizmoRef }: Viewer3DProps): JSX.Element {
      * It used to be a centre-crop of whatever the user's camera happened to be
      * pointing at when the model landed, so a tile could be a close-up of a
      * wingtip, or the model half out of frame, and two assets shot from
-     * different angles were hard to tell apart. the user: "it would be nice if the
+     * different angles were hard to tell apart. The user: "it would be nice if the
      * thumbnails were full in frame isometric views."
      *
      * Rendering to a target rather than reading the canvas keeps this off the
@@ -1383,7 +1383,7 @@ export default function Viewer3D({ gizmoRef }: Viewer3DProps): JSX.Element {
      * the hips travel 3.617 units over 5.95s on a 1-unit-tall model, so the
      * character clears the framed view in under two seconds and the viewport
      * goes empty while the asset row, thumbnail and face count all say it
-     * loaded. the user's rule for the presets — "letting it wander off across the
+     * loaded. The user's rule for the presets — "letting it wander off across the
      * grid is how you lose sight of the thing you asked to see" — is about
      * exactly that, and it is no less true of a walk the user typed.
      *

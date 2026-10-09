@@ -1,7 +1,7 @@
 /**
  * THE HUB'S TAG.
  *
- * the user: "each of the little like 'tags' i'm going to call them for like 'vision'
+ * The user: "each of the little like 'tags' i'm going to call them for like 'vision'
  * 'downloaded' etc that you have make these look really nice for example
  * bordered pill colored highlight and such."
  *

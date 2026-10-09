@@ -1,7 +1,7 @@
 /**
  * A MODEL FAMILY AS ONE CARD THAT OPENS.
  *
- * the user: "group by family in dropdown cards that are like regular cards but just
+ * The user: "group by family in dropdown cards that are like regular cards but just
  * expand down smoothly into showing the other cards".
  *
  * So the closed state is a normal row — org mark, name, what it is for, size —
@@ -178,7 +178,7 @@ export function FamilyCard({
          * looked permanently moused-over — and since that wash is LIGHTER than
          * the card, the child read as raised out of its own parent. The first
          * fix separated them with an accent rail and a 12% accent tint; the user
-         * did not like the blue, and he is right that it was doing too much:
+         * did not like the blue, and the user is right that it was doing too much:
          * accent in this app means "act on this", and a row you are merely
          * LOOKING at is not an action.
          *
@@ -251,7 +251,7 @@ export function FamilyCard({
             type="button"
             data-testid={`family-download-${v.repo}:${v.label}`}
             onClick={() => onDownload(v)}
-            /* ONE DOWNLOAD BUTTON IN THIS APP. the user: "those download buttons
+            /* ONE DOWNLOAD BUTTON IN THIS APP. The user: "those download buttons
                need to be the same as the others, blue background white text,
                exact same as the others." The tinted second rank made the
                variant rows read as a different, weaker kind of control — and a

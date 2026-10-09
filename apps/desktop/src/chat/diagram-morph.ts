@@ -1,7 +1,7 @@
 /**
  * A DIAGRAM THAT MOVES INTO ITS NEXT FRAME.
  *
- * the user (2026-09-25): "ensure those animate/build in real time smoothly". A
+ * The user (2026-09-25): "ensure those animate/build in real time smoothly". A
  * live diagram card is a run of whole drawings from main, each a fresh
  * Mermaid layout of a few more lines (electron/gen/diagram-live.ts). Swapped
  * in as they come, every frame jumps: a step lands, the others shift under

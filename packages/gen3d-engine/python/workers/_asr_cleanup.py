@@ -27,7 +27,7 @@ import difflib
 import re
 import time
 
-# the user asked for this one by name. Worth recording that it is a 3.58 GB Gemma-4
+# The user asked for this one by name. Worth recording that it is a 3.58 GB Gemma-4
 # (nvfp4, MLX) rather than the "<1 GB" originally scoped: MEASURED here, it
 # loads in 2.7s and corrects in 0.25-0.93s, which is fast enough that the size
 # costs memory rather than time. Swapping in a smaller model means changing

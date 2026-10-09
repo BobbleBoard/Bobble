@@ -2,7 +2,7 @@
  * ONE CARD FOR EVERYTHING A TURN MAKES — in a studio, and in the middle of a
  * conversation.
  *
- * the user: "design reasonably large inline cards now that make this appear as if
+ * The user: "design reasonably large inline cards now that make this appear as if
  * it's a chat interface but display videos images and audio in a clean way…
  * (these will all be reused from the same reference for drawing in regular
  * chat)". So there is ONE component, four surfaces, and the chat thread and the
@@ -17,7 +17,7 @@
  * animates on its own hover, because a control that appears and then does not
  * respond reads as a picture of a control.
  *
- * WHY EXPAND IS NOT FULLSCREEN. the user: "top left fullscreen that isn't exactly
+ * WHY EXPAND IS NOT FULLSCREEN. The user: "top left fullscreen that isn't exactly
  * fullscreen but large and centered and blurs background like settings panel."
  * Real fullscreen takes the window and loses the room you were in; this is the
  * app's own dialog treatment — large, centred, the transcript still visibly
@@ -144,7 +144,7 @@ function Controls({
         This was on the MESH alone, and even there it only switched the view —
         you arrived in an empty 3D studio standing next to the thing you had
         just been looking at. A picture, a clip and a sound offered nothing at
-        all. the user, round 2: "all types of media handoff into studios and
+        all. The user, round 2: "all types of media handoff into studios and
         editing." The prompt and seed ride along, because the first thing anyone
         does with a generated picture is ask for it again slightly differently.
       */}
@@ -170,7 +170,7 @@ function Controls({
       {/*
         COPY. The top-right corner used to send the result to the conversation
         (send-to-chat.ts still does that for the studios' "Use as input" flow);
-        the user (2026-09-17): "the 'take to a new chat' button in the top right of
+        The user (2026-09-17): "the 'take to a new chat' button in the top right of
         each card should just be replaced with a copy button that instantly
         copies it to clipboard." A picture goes as pixels, the rest as the file.
       */}
@@ -223,7 +223,7 @@ function Expanded({
   return (
     <ExpandedScrim label={item.name} onClose={onClose} stageKind={item.kind}>
       {/*
-        NO CAPTION BAR. the user: "no bottom bar for the image 'fox-real.png'
+        NO CAPTION BAR. The user: "no bottom bar for the image 'fox-real.png'
         bottom bar needs to go". It was a strip of chrome under a picture that
         had just taken the screen, saying a filename you already knew — and the
         card you opened it from says the same thing two inches away. The
@@ -281,7 +281,7 @@ export function MediaCard({ item }: MediaCardProps): JSX.Element {
    */
   const beside = item.kind === 'audio';
   /*
-   * CLICKING THE PICTURE OPENS IT. the user: "clicking on a card (eg image once
+   * CLICKING THE PICTURE OPENS IT. The user: "clicking on a card (eg image once
    * finished generating) does not expand/open it." Only the corner button did,
    * and only once you had found it on hover. A picture only — a clip's frame is
    * its transport, a model's is a viewport you drag to turn, a sound's is a
@@ -330,7 +330,7 @@ export function MediaCard({ item }: MediaCardProps): JSX.Element {
       ) : (
         frame
       )}
-      {/* the user: "below the card itself show some basic controls" — the strip
+      {/* The user: "below the card itself show some basic controls" — the strip
           sits between the viewport and the caption, as wide as the frame. */}
       {modelView !== undefined ? <ModelControls view={modelView} /> : null}
       <figcaption className="pd-media-caption">

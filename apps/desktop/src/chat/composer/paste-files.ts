@@ -1,7 +1,7 @@
 /**
  * WHICH HALF OF A PASTE IS THE THING BEING PASTED — its files, or its text.
  *
- * the user: "copy and then attempting pasting into our own apps input bar doesn't
+ * The user: "copy and then attempting pasting into our own apps input bar doesn't
  * work." The copy was fine — a card puts its picture on the clipboard as pixels
  * (media-actions.ts), which every other app pastes. The composer is a Lexical
  * PLAIN-TEXT editor, and its paste handler reads `text/plain` and nothing else,
@@ -25,7 +25,7 @@
  * win only when the text beside them says nothing of its own.
  *
  * FILES AND FOLDERS FROM FINDER ARRIVE WITH THE PASTE ITSELF (2026-09-24).
- * the user: "why not handle this natively so that any image(s)/files/folders...
+ * The user: "why not handle this natively so that any image(s)/files/folders...
  * can be pasted into the input box". The native read already happens, inside
  * the person's own ⌘V: the Edit menu's paste (`role: 'paste'`) is AppKit's
  * `paste:` action, and during it Chromium reads the pasteboard for the paste

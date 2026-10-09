@@ -1,7 +1,7 @@
 /**
  * ⌘Z JUST AFTER SENDING TAKES THE MESSAGE BACK — and is plain undo otherwise.
  *
- * the user (2026-09-24): "pressing cmd z within 3 seconds of sending a message and
+ * The user (2026-09-24): "pressing cmd z within 3 seconds of sending a message and
  * before any text has been typed into the input box should unsend+rewind the
  * chat".
  *

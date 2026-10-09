@@ -22,7 +22,7 @@ export const svg: Capability = {
      simple illustrations even without 'svg' mentioned". So the line names
      the cases where the word never comes up — a site's graphics, "a simple
      illustration" — and says where a site's file goes. */
-  /* the user (2026-09-24): "svg is a big and versatile thing" — and OmniSVG cannot
+  /* The user (2026-09-24): "svg is a big and versatile thing" — and OmniSVG cannot
      write a word or keep a set consistent (the visual suite's landing page lost
      fifteen minutes to it). The line now splits the work: OmniSVG for organic
      art and tracing; exact graphics are the model's own SVG, checked by

@@ -174,7 +174,7 @@ describe('isHtmlPath', () => {
 
 describe('a structured tool call streams its file into the canvas', () => {
   /*
-   * the user: "instead of live showing the edit streamed in canvas it showed the
+   * The user: "instead of live showing the edit streamed in canvas it showed the
    * file in the right sidebar, but without any content just: '(writing)...'
    * that's unacceptable."
    *

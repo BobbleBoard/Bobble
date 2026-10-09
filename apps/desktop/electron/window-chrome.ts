@@ -53,7 +53,7 @@ export const TRAFFIC_LIGHTS_RIGHT = TRAFFIC_LIGHTS.x + TRAFFIC_LIGHT_CLUSTER_WID
 /**
  * The gap between the last light and whatever the renderer puts next to it.
  *
- * the user: "move it slightly to the right so the hover animation gives breathing
+ * The user: "move it slightly to the right so the hover animation gives breathing
  * room and doesn't overlap". The sidebar toggle grows a rounded background on
  * hover, so the clearance has to be measured from that background's edge, not
  * from the glyph — 14px leaves the hover shape clear of the zoom button at every

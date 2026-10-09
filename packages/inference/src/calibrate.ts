@@ -2,7 +2,7 @@
  * CALIBRATION — which engine and which speculative method is fastest for THIS
  * model on THIS machine, decided by measurement rather than by a table.
  *
- * the user: "clicking calibrate pauses anything running in the current chat, then
+ * The user: "clicking calibrate pauses anything running in the current chat, then
  * runs the calibration and swaps to the proper engine and speculative method,
  * ensure this doesn't require internet to run".
  *

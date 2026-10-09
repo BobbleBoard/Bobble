@@ -2,7 +2,7 @@
  * PORTABLE KNOBS — the handful of engine settings that mean the same thing on
  * every engine, kept ONCE and spelled out in each engine's own flag at launch.
  *
- * the user (2026-09-13): "ensure settings and such transfer between engines as
+ * The user (2026-09-13): "ensure settings and such transfer between engines as
  * seamlessly as possible and are removed/greyed out if unsupported by engine,
  * keeping preferences saved."
  *

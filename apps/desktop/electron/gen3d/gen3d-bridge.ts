@@ -89,7 +89,7 @@ function fail(error: string): ImageJobResult {
 /**
  * A SMALL LOOK AT A FINISHED PICTURE, for the model that asked for it.
  *
- * the user (2026-09-24): images are "mainly observe + improve loop". The tools
+ * The user (2026-09-24): images are "mainly observe + improve loop". The tools
  * carried only a URL and a path — deliberately, so a 1024² picture never sat in
  * a small model's context or its saved chat as base64 — which left the model
  * blind to what it had made. A ~384 px JPEG (tens of KB) is the middle: enough

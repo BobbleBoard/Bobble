@@ -1,7 +1,7 @@
 /**
  * Does the office editor actually FILL its view?
  *
- * the user, from a screenshot of the running app: "blank space on the right when I
+ * The user, from a screenshot of the running app: "blank space on the right when I
  * assume you resized, and theming has a big seam from that canvas to the rest
  * of the app". Both are claims about geometry and colour that a screenshot can
  * only suggest, so this measures them instead: the view's bounds from the main

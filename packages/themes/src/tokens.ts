@@ -76,7 +76,7 @@ export interface ThemeTokens {
     inverse: string;
     /**
      * The chrome's ICONS — the rail, the top bar's buttons, the settings nav.
-     * the user (2026-09-20): "the svgs should be pure white not the current grayish
+     * The user (2026-09-20): "the svgs should be pure white not the current grayish
      * color" — so pure white on every dark theme, the primary text colour on
      * the light ones (where white would vanish). Consumed as --pd-text-icon.
      */
@@ -348,7 +348,7 @@ const codexFont: Omit<ThemeTokens['font'], 'response'> = {
   serif: "ui-serif, Georgia, 'Times New Roman', serif",
   mono: "ui-monospace, 'SFMono-Regular', 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace",
   // xs 11 / sm 12 / base 14 / lg 16 / heading-lg 24. Footnote bumped 12->13
-  // (the user round-2 THEME 5: still too small) for legible muted footnotes.
+  // (The user round-2 THEME 5: still too small) for legible muted footnotes.
   size: {
     caption: '11px',
     footnote: '13px',
@@ -576,7 +576,7 @@ const claudeLight: ThemeTokens = {
   },
   border: {
     subtle: '#0b0b0b1a', // CDS --border (neutral-900 @ 10%)
-    // the user round-5 #9: composer/divider/box borders read too dark — lighten the
+    // The user round-5 #9: composer/divider/box borders read too dark — lighten the
     // warm border ramp (25% -> 15%, 65% -> 38%) so boxes sit as light as the
     // sidebar/input hairline without washing out.
     default: '#706b5726', // --claude-border (warm 15%)
@@ -596,7 +596,7 @@ const claudeLight: ThemeTokens = {
     danger: { bg: '#fad6d6', fg: '#8e2626', border: '#f09595', solid: '#d93a3a' }, // red-100/600/250
   },
   bubble: {
-    // the user round-5 #10: the user bubble was clay/orange-tinted — swap to a
+    // The user round-5 #10: the user bubble was clay/orange-tinted — swap to a
     // NEUTRAL surface (text-primary @ ~8%), a subtle warm-gray card, no accent.
     bg: '#14141314', // neutral: text.primary @ ~8%
     fg: '#141413', // --ui-user-message-primary-text = text.primary
@@ -612,7 +612,7 @@ const claudeLight: ThemeTokens = {
     inlineFg: '#8e2626', // danger-tinted inline code — the claude signature
     inlineBorder: '#706b5740', // border-300 @ 25%, drawn at 0.5px
     blockBg: '#ffffff80', // bg-000 @ 50% translucent panel
-    // the user round-5 #6/#9: was border-strong (dark). Lightened to the input/box
+    // The user round-5 #6/#9: was border-strong (dark). Lightened to the input/box
     // hairline weight so tool boxes + code panels read light.
     blockBorder: '#706b5726', // warm border @ ~15% (= border.default)
   },
@@ -679,7 +679,7 @@ const claudeDark: ThemeTokens = {
   },
   border: {
     subtle: '#eaddd81a', // --claude-border dark hairline
-    // the user round-5 #9: lighten the dark border ramp too (25% -> 18%, 58% -> 38%).
+    // The user round-5 #9: lighten the dark border ramp too (25% -> 18%, 58% -> 38%).
     default: '#6c6a602e', // --claude-border-300 dark (controls) @ ~18%
     strong: '#6c6a6061', // --claude-border-300-more dark @ ~38%
     focus: '#74abe2',
@@ -697,7 +697,7 @@ const claudeDark: ThemeTokens = {
     danger: { bg: '#3c0e0e', fg: '#ec7e7e', border: '#641919', solid: '#e45c5c' }, // red-800/300/700
   },
   bubble: {
-    // the user round-5 #10: neutral (warm-white @ ~10%), no clay tint.
+    // The user round-5 #10: neutral (warm-white @ ~10%), no clay tint.
     bg: '#faf9f51a', // neutral: text.primary @ ~10% dark
     fg: '#faf9f5',
   },
@@ -710,7 +710,7 @@ const claudeDark: ThemeTokens = {
     inlineFg: '#ec7e7e', // danger-000 dark family
     inlineBorder: '#6c6a6040',
     blockBg: '#30302e80', // bg-000 dark @ 50%
-    // the user round-5 #6/#9: lightened from border-strong to the box hairline weight.
+    // The user round-5 #6/#9: lightened from border-strong to the box hairline weight.
     blockBorder: '#6c6a602e', // warm border @ ~18% dark (= border.default)
   },
   diff: {
@@ -1027,11 +1027,11 @@ const bobbleMotion: ThemeTokens['motion'] = {
 };
 
 /*
- * NATIVE DENSITY. the user (2026-09-24): "the size of the dropdowns and default
+ * NATIVE DENSITY. The user (2026-09-24): "the size of the dropdowns and default
  * scale/size of the app eg. the sidebar's buttons are like 1.5x as tall as the
  * ones I see in claude/chatgpt/other apps". The WEB references measure no
  * smaller than we were (claude.ai ~32px rows at 14px, chatgpt.com 36px at 16px),
- * so the gap he sees is to the Mac's own density — 13px system text in ~28px
+ * so the gap the user sees is to the Mac's own density — 13px system text in ~28px
  * rows, menus a step tighter — which is the Apple-like brief this flavor was
  * written to. Rows and controls come down a step (32 → 28, 26/32/40 → 24/28/36);
  * the sidebar and menus take 13px text (sidebar.css, menu.css). Settings ›
@@ -1067,7 +1067,7 @@ const bobbleSurface: ThemeTokens['surface'] = {
 };
 
 /*
- * Grounded elevation (light). the user 2026-09-24, on the 3D studio's History card:
+ * Grounded elevation (light). The user 2026-09-24, on the 3D studio's History card:
  * "it looks 'flimsy' not like it's a card firmly placed on top" — and before
  * that, "everything has the same softness". The old scale was one diffuse
  * blur per level (md was 0 4px 14px at 9%): a haze on all four sides and no
@@ -1116,7 +1116,7 @@ const bobbleLight: ThemeTokens = {
      * chatgpt.com 2.95x (#0d0d0d -> #5d5d5d). Sidebar rows, tool-chain step
      * labels and thought text are all set in this colour, so "secondary" and
      * "primary" rendered as the same ink and nothing on the screen was
-     * quieter than the reply. the user's "a lack of hierarchy" is this number.
+     * quieter than the reply. The user's "a lack of hierarchy" is this number.
      *
      * #55555a is 6.8:1 on the page (7.4:1 on a raised card): primary:secondary
      * 2.27x and secondary:muted 2.04x — an even ladder between the two

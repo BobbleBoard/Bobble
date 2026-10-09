@@ -39,7 +39,7 @@
 /*
  * The Bobble loader (Spinner component) — the app's standard spinner.
  *
- * the user: "a fading-out spinner with a rounded tip instead of the current one."
+ * The user: "a fading-out spinner with a rounded tip instead of the current one."
  * A ring whose tail fades to nothing, led by a rounded cap. SVG has no angular
  * gradient, so this is a conic gradient masked down to a ring; the cap is a
  * small round dot parked on the ring's centre-line at 12 o'clock, where the
@@ -265,7 +265,7 @@
 
 /* A CAPABILITY LOADING, rather than a conversation being read.
    Same ring, same provider-reported percentage, different cause — so it wears
-   the capability's own glyph and tint. the user: "make the prefill circle show
+   the capability's own glyph and tint. The user: "make the prefill circle show
    'loading <capability>' with of course the color and icon if applicable." */
 .pd-processing-cap {
   position: relative;

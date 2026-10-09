@@ -18,7 +18,7 @@ export const COPY_FEEDBACK_MS = 2000;
 /**
  * Write text to the system clipboard, reporting whether it actually landed.
  *
- * the user: "copy buttons don't actually copy to clipboard." The write itself was
+ * The user: "copy buttons don't actually copy to clipboard." The write itself was
  * being REJECTED (Electron's permission handler denied `clipboard-sanitized-write`
  * — fixed in electron/main.ts), but the reason it was invisible for so long is
  * this shape:

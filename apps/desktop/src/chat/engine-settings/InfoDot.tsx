@@ -1,7 +1,7 @@
 /**
  * The ⓘ beside a setting's name: hover (or focus) shows what the setting does
  * — the blurb that used to sit under every row — plus the literal flag the
- * engine is passed, for anyone checking. the user (2026-09-13): "show a circle
+ * engine is passed, for anyone checking. The user (2026-09-13): "show a circle
  * with i in it that shows the current blurb what this does."
  */
 import { Tooltip } from '@pi-desktop/ui';

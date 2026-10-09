@@ -5,7 +5,7 @@ import Foundation
 
 // ── every surface an app owns ────────────────────────────────────────────────
 //
-// the user's field report: "if it clicks open and a finder window pops up (but a
+// The user's field report: "if it clicks open and a finder window pops up (but a
 // dialog window not real finder app, still part of textedit) it needs to be
 // able to interact with and do that."
 //

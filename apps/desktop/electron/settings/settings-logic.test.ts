@@ -334,7 +334,7 @@ describe('quick menu settings', () => {
 });
 
 describe('the tool interface a fresh install gets', () => {
-  /* the user: "I want cli mode to be by default". Pinned so that changing it back
+  /* The user: "I want cli mode to be by default". Pinned so that changing it back
      has to be a decision someone makes on purpose, not a merge artefact. */
   it('is the bash CLI', () => {
     expect(DEFAULT_SETTINGS.toolInterface).toBe('bash-cli');

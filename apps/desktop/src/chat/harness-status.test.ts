@@ -167,7 +167,7 @@ describe('a prefill caused by a capability loading', () => {
    * conversation. That is a long wait with a real cause, and "Reading your
    * conversation" is actively wrong about it.
    *
-   * the user: "when there's a long prefill because a capability is being loaded
+   * The user: "when there's a long prefill because a capability is being loaded
    * instead of 'processing' on that turn make the prefill circle show 'loading
    * <capability>' with of course the color and icon if applicable."
    */

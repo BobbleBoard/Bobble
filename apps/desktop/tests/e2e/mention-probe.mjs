@@ -102,7 +102,7 @@ try {
     };
   });
   /*
-   * NO CHIP. the user: "at mentions should appear just the inline, no attachment
+   * NO CHIP. The user: "at mentions should appear just the inline, no attachment
    * shown above."
    *
    * The file is still folded into pi's copy of the message and still primed by
@@ -116,7 +116,7 @@ try {
     fail(`a mention should draw no chip above the box (chips ${beforeChips} → ${state.chips})`);
   } else console.log('[mention] OK: the mention is the pill, and nothing above the box');
   /*
-   * A MENTION IS A PILL NOW, not a typed path. the user: "add blue pills with icons
+   * A MENTION IS A PILL NOW, not a typed path. The user: "add blue pills with icons
    * and X buttons for embedded files and such, not just typing them."
    *
    * The invariant this line has always protected is unchanged and is now checked

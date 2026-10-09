@@ -46,7 +46,7 @@ describe('retain, list, recall', () => {
   it('extracts one fact per sentence, lists them newest first, recalls by words', async () => {
     hs = await startFakeHindsight();
     const r = await call('POST', `${B}/memories`, {
-      items: [retainItem('User: My name is The user. I prefer dark mode in every app. ok')],
+      items: [retainItem('User: My name is Sam. I prefer dark mode in every app. ok')],
     });
     expect(r.json).toMatchObject({
       success: true,
@@ -58,7 +58,7 @@ describe('retain, list, recall', () => {
     expect(list.json.total).toBe(2);
     const texts = (list.json.items as Unit[]).map((u) => u.text);
     expect(texts).toEqual(
-      expect.arrayContaining(['My name is The user.', 'I prefer dark mode in every app.']),
+      expect.arrayContaining(['My name is Sam.', 'I prefer dark mode in every app.']),
     );
     const rec = await call('POST', `${B}/memories/recall`, { query: 'what mode does he like?' });
     const results = rec.json.results as Array<{ text: string; scores: { final: number } }>;
@@ -97,7 +97,7 @@ describe('retain, list, recall', () => {
   it('queues async retains as operations, idempotent by operation_id', async () => {
     hs = await startFakeHindsight({ retainDelayMs: 80 });
     const body = {
-      items: [retainItem('The user works on a Mac with 24 GB of memory.')],
+      items: [retainItem('Sam works on a Mac with 24 GB of memory.')],
       async: true,
       operation_id: 'op-1',
     };
@@ -119,19 +119,19 @@ describe('retain, list, recall', () => {
 
   it('filters recall by type and tags with Hindsight’s modes', async () => {
     hs = await startFakeHindsight();
-    hs.seed('bobble', ['The user likes green tea in the morning.'], { tags: ['chat:a'] });
-    hs.seed('bobble', ['The user likes black coffee at night.'], { tags: ['chat:b'] });
-    hs.seed('bobble', ['The user likes jasmine tea too.']);
+    hs.seed('bobble', ['Sam likes green tea in the morning.'], { tags: ['chat:a'] });
+    hs.seed('bobble', ['Sam likes black coffee at night.'], { tags: ['chat:b'] });
+    hs.seed('bobble', ['Sam likes jasmine tea too.']);
     const q = (extra: Record<string, unknown>) =>
-      call('POST', `${B}/memories/recall`, { query: 'what does the user like', ...extra }).then((r) =>
+      call('POST', `${B}/memories/recall`, { query: 'what does sam like', ...extra }).then((r) =>
         (r.json.results as Array<{ text: string }>).map((x) => x.text).sort(),
       );
     expect(await q({ tags: ['chat:a'] })).toEqual([
-      'The user likes green tea in the morning.',
-      'The user likes jasmine tea too.', // `any` includes untagged
+      'Sam likes green tea in the morning.',
+      'Sam likes jasmine tea too.', // `any` includes untagged
     ]);
     expect(await q({ tags: ['chat:a'], tags_match: 'any_strict' })).toEqual([
-      'The user likes green tea in the morning.',
+      'Sam likes green tea in the morning.',
     ]);
     expect(await q({ types: ['experience'] })).toEqual([]);
   });
@@ -140,7 +140,7 @@ describe('retain, list, recall', () => {
 describe('curation', () => {
   it('invalidates (forget) and restores a memory, reversibly', async () => {
     hs = await startFakeHindsight();
-    const [id] = hs.seed('bobble', ['The user has a cat called Miso.']);
+    const [id] = hs.seed('bobble', ['Sam has a cat called Miso.']);
     const forgot = await call('PATCH', `${B}/memories/${id}`, {
       state: 'invalidated',
       reason: 'asked',
@@ -155,9 +155,9 @@ describe('curation', () => {
     await call('PATCH', `${B}/memories/${id}`, { state: 'valid' });
     expect((await call('GET', `${B}/memories/list`)).json.total).toBe(1);
     const edited = await call('PATCH', `${B}/memories/${id}`, {
-      text: 'The user has a cat called Mochi.',
+      text: 'Sam has a cat called Mochi.',
     });
-    expect(edited.json).toMatchObject({ text: 'The user has a cat called Mochi.' });
+    expect(edited.json).toMatchObject({ text: 'Sam has a cat called Mochi.' });
   });
 
   it('clears the bank, and deletes it', async () => {

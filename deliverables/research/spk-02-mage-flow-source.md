@@ -14,7 +14,7 @@ evidence:
 - The MIT code at `github.com/microsoft/Mage` is still public, and its README still links the dead repos.
 
 **The weights are still published, byte for byte.** I checked them against the original trees that were saved beside
-the user's copies (`~/Bobble/Models/Image/{Generation,Editing}/microsoft__mage-flow-*/trees/*.json`). The release has
+The user's copies (`~/Bobble/Models/Image/{Generation,Editing}/microsoft__mage-flow-*/trees/*.json`). The release has
 four parts:
 
 | Release path | Where it is now | Proof |

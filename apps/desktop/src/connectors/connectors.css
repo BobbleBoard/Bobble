@@ -182,7 +182,7 @@
 }
 
 /* ---- the Installed strip: marks only, 56px, and the way to add your own ----
-   the user (2026-09-18): "increase the size of this installed section, the button
+   The user (2026-09-18): "increase the size of this installed section, the button
    and text next to it" — 40 → 56 for the marks and the add tile, the line
    beside them at body size. */
 .pdc-strip {
@@ -325,7 +325,7 @@
    hover fill paints, so the list is rows and not hanging text (the user). The 8px
    the fill reaches past the column is a negative margin, so the mark's left
    edge sits on the heading's. */
-/* the user (2026-09-17): a DRAWN border, like the code block's (ink at 14%); the
+/* The user (2026-09-17): a DRAWN border, like the code block's (ink at 14%); the
    resting wash much subtler than the universal `.pd-row-rest`; and the add
    control tall on the right (below). */
 .pdc-row {
@@ -413,7 +413,7 @@
    so "9%" → "10%" does not jitter. */
 /* The add: a tall control on the card's right edge, nearly its full height,
    centred — a target, not a glyph in a corner (the user, 2026-09-17). */
-/* THE ADD. the user (2026-09-18): "+ buttons on connectors and scheduled and such
+/* THE ADD. The user (2026-09-18): "+ buttons on connectors and scheduled and such
    must be square and not bordered, just a rounded-corner box on hover." A
    square, larger than the row's other controls, drawn by nothing at rest —
    the glyph alone — and a rounded fill under the pointer. */

@@ -177,7 +177,7 @@ try {
     `the code block: type at the left, copy visible at rest: ${JSON.stringify(c.code)}`,
   );
   // A chart card in the same reply: the same drawn border as the other two.
-  // the user (2026-09-18): "same card borders for dataviz please".
+  // The user (2026-09-18): "same card borders for dataviz please".
   await page.evaluate(() => {
     window
       .__present_store()
@@ -280,7 +280,7 @@ try {
   const conn = await readAdd();
   await shot('6-connectors-light');
   check(conn.rows > 0, `connector rows on screen (${conn.rows})`);
-  /* the user (2026-09-18): "+ buttons … must be square and not bordered, just a
+  /* The user (2026-09-18): "+ buttons … must be square and not bordered, just a
      rounded-corner box on hover". */
   check(
     conn.addH !== null &&
@@ -347,7 +347,7 @@ try {
     `the + is a square, unbordered and unfilled at rest, centred: ${JSON.stringify(sched)}`,
   );
   /* Hovering the CARD must not light the +; hovering the + itself does
-     (the user, 2026-09-18: "separate hover than the whole card"). */
+     (The user, 2026-09-18: "separate hover than the whole card"). */
   await page.hover('.sd-row .sd-row-name');
   await sleep(400);
   const cardHover = await readPlus();

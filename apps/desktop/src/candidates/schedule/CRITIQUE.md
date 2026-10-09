@@ -114,7 +114,7 @@ third time as a **seven-day dot strip** on the right — 5 px dots with 9 px
 letters, illegible at 1168 and a grey smear at 900. I built a visualisation of
 a fact already written in words three inches to its left. Why: it looked like
 "information density" in the abstract; on the screen it is fiddly chrome, which
-is the thing the user said he dislikes and which I then flagged as a tradeoff
+is the thing the user said the user dislikes and which I then flagged as a tradeoff
 instead of removing.
 
 Beside it, a **green ✓ on every row**, meaning "last run ok" — which the green

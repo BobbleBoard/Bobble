@@ -1,7 +1,7 @@
 /**
  * A SMALL DRAWING, DRAWING ITSELF IN — once, when it arrives in the chat.
  *
- * the user (2026-09-25): "ensure those animate/build in real time smoothly apply
+ * The user (2026-09-25): "ensure those animate/build in real time smoothly apply
  * that to whatever possible generally". A diagram builds while it is typed and
  * a chart grows as its values land; an SVG the model wrote and presented just
  * appeared, whole, in one frame. Now its lines draw themselves along their

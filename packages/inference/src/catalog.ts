@@ -101,7 +101,7 @@ export interface ModelPublisher {
 /**
  * REPUTABLE-ORGANISATION ALLOWLIST, tagged by what each org is known for.
  *
- * the user: "the initial reccomended items should show verified organizations…
+ * The user: "the initial reccomended items should show verified organizations…
  * unsloth moonshot deepseek, qwen, nvidia, lighttricks, black forest etc. put a
  * list together starting with that that are the repuatable organizations."
  *
@@ -1056,7 +1056,7 @@ const QWEN36_27B_MTP: CatalogModel = {
  * NOT fit here despite being the family's usual default, which is exactly the
  * case the Model Manager's per-quant fit badge exists to show.
  *
- * CHAT TEMPLATE. the user: "use this chat template", froggeric's Qwen-Fixed set (v22,
+ * CHAT TEMPLATE. The user: "use this chat template", froggeric's Qwen-Fixed set (v22,
  * 2026-08-13, covers 3.5/3.6/3.8). It ships `chat_template.jinja` at the repo
  * root, which is precisely what `baseRepo` fetches — the field is documented as
  * "the repo that carries the authoritative chat_template.jinja", not necessarily
@@ -1081,7 +1081,7 @@ const QWEN38_27B_MTP: CatalogModel = {
   hfRepo: 'unsloth/Qwen3.8-27B-GGUF',
   baseRepo: 'froggeric/Qwen-Fixed-Chat-Templates',
   /*
-   * THINKING EFFORT: MEDIUM. the user (2026-10-02): "qwen3.8-27b comes with a built
+   * THINKING EFFORT: MEDIUM. The user (2026-10-02): "qwen3.8-27b comes with a built
    * in settable thinking effort, it's xhigh by default, set it to medium".
    * Qwen's own template reads `reasoning_effort` (xhigh — the default — medium,
    * low); xhigh writes "Reasoning effort is set to xhigh. Please think
@@ -1455,7 +1455,7 @@ const MLX_QWEN36_27B: CatalogModel = {
  * for small MoEs, and this is the current one.
  *
  * QUANTS from bloomer010 rather than unsloth, who have not published this repo
- * — the user checked: "no direct from unsloth but this seems to have everything
+ * — The user checked: "no direct from unsloth but this seems to have everything
  * ... dynamic 2.0 still". The UD- builds there are Unsloth Dynamic 2.0.
  */
 const LING3_TINY: CatalogModel = {

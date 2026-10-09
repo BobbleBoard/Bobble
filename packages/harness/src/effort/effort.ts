@@ -47,7 +47,7 @@ export interface EffortKnobs {
    * Off everywhere, for the same reason as {@link reviewPasses}. */
   readonly adversarialChecks: boolean;
   /*
-   * There is NO `maxTurnSteps` here any more. the user: "remove the tool call cap."
+   * There is NO `maxTurnSteps` here any more. The user: "remove the tool call cap."
    * It was the one knob that ended a turn purely for being long, and a long turn
    * is not a broken one — the loop detector's repeat guard and its wall clock
    * are what tell a stuck turn from a big one.

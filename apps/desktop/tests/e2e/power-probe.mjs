@@ -1,7 +1,7 @@
 /**
  * LOW POWER MODE, end to end.
  *
- * the user: "ensuring we leave a certain amount of memory available as a buffer so
+ * The user: "ensuring we leave a certain amount of memory available as a buffer so
  * the user can use computer as normal while generation and such occurs … this
  * could be dynamic even tracking what the current user memory/cpu/gpu usage
  * is", and then: "it's not about this machine only … you need to handle a range

@@ -6,7 +6,7 @@ beyond what it can read in the repo.
 
 | File | For |
 |---|---|
-| [`linux-peer.md`](./linux-peer.md) | A Linux box (the tailnet already has one: `linux-ms-7e59`) |
+| [`linux-peer.md`](./linux-peer.md) | A Linux box (the tailnet already has one: `linux-MS-7E59`) |
 | [`windows-peer.md`](./windows-peer.md) | A Windows machine |
 | [`mac-peer.md`](./mac-peer.md) | A second Mac — the easy case, and the one that proves the seam |
 

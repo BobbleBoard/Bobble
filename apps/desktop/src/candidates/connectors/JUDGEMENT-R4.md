@@ -90,7 +90,7 @@ The skill detail's *Developer* is the same blue (1164,426). The placeholder says
 skills and categories*. Category browsing with no new surface, as specified.
 
 **8.** Every tool row in the ledger is whole: *Signs in with your GitHub token* (1084,299),
-*Reads and writes files under /Users/user/Projects*, *Attaches to Google Chrome*
+*Reads and writes files under ~/Projects*, *Attaches to Google Chrome*
 (`shelf-plus-ix-chip-added-…` 1084,455), at 1440 and at 1152. The one row that still ends in an
 ellipsis is the skill: *Review a diff for correctness bugs and reuse / si…* at (1084,624) in
 `shelf-plus-bobble-dark.png`, (796,643) at 1152, *…/ sim…* in codex. The rule was written for

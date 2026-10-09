@@ -1,7 +1,7 @@
 /**
  * The CANDIDATE ROUTE — `?candidates=schedule` / `?candidates=connectors`.
  *
- * the user asked for candidate designs for the Scheduled and Connectors tabs that
+ * The user asked for candidate designs for the Scheduled and Connectors tabs that
  * do NOT replace what ships: "these UI's are not to immediately replace
  * anything but keep the current ones safe." So they live off a dev-only query
  * param with their own switcher, reachable and screenshot-able without any

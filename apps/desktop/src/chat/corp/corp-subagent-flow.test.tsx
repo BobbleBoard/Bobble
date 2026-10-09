@@ -319,7 +319,7 @@ describe('corp/subagent-run UX flow', () => {
 
 describe('the user thread never shows somebody else another agent is talking to', () => {
   /*
-   * the user, twice — and the second time is the one that counts:
+   * The user, twice — and the second time is the one that counts:
    *
    *   "no ceo-manager chat embedded into the ceo-user chat? ceo-manager is shown
    *    when clicked on the manager subchat just as manager-subagent chat is
@@ -380,7 +380,7 @@ describe('the user thread never shows somebody else another agent is talking to'
 
 describe('no role chat is ever embedded in the user thread', () => {
   /*
-   * the user asked for this three times. First: "no ceo-manager chat embedded into
+   * The user asked for this three times. First: "no ceo-manager chat embedded into
    * the ceo-user chat?" Then: "it's still embedded and shown right below the
    * user chat." Then, with a screenshot: "the embedded ceo-manager chat (not
    * just the message bubble the entire ceo-manager chat is shown there) just

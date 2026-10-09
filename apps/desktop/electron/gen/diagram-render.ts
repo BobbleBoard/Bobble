@@ -9,7 +9,7 @@
  * `<Resources>/mermaid` by electron-builder. Offline by construction, and the
  * same bytes in dev and in the packaged app (the test pins its sha256).
  *
- * THE WINDOW NEVER SHOWS AND NEVER TAKES FOCUS. the user, on every test run and
+ * THE WINDOW NEVER SHOWS AND NEVER TAKES FOCUS. The user, on every test run and
  * every background job: "I can use the computer without any notice". It is
  * created hidden, offscreen, unfocusable and out of the task switcher, lives
  * for one render (a parse and two draws, ~0.2 s once Mermaid is loaded) and

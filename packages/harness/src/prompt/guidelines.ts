@@ -8,7 +8,7 @@
  *   - Use it when the user describes work that repeats or should happen later …
  *   - Use it for a large, multi-part build that a single pass cannot do well …
  *
- * the user: "there's so much explanation which I can't figure out what it's
+ * The user: "there's so much explanation which I can't figure out what it's
  * explaining about." Every "it" was a different tool — present, the scheduler,
  * the manager — and two of them were not even in the model's list.
  *

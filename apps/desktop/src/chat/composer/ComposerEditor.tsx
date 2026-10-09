@@ -49,7 +49,7 @@ export interface ComposerEditorApi {
   setText: (value: string) => void;
   /**
    * Drop a PILL at the caret — the shape everything inserted rather than typed
-   * now takes. the user: "add blue pills with icons and X buttons for embedded files
+   * now takes. The user: "add blue pills with icons and X buttons for embedded files
    * and such, not just typing them … no raw text."
    */
   insertPill: (data: PillData) => void;
@@ -117,7 +117,7 @@ interface ComposerEditorProps {
  * Where the caret is, horizontally, inside the composer — published as
  * `--pd-ac-x` so the `@` / `/` panel can open under it.
  *
- * the user: "@ and / menus should show right above where the user is typing, not
+ * The user: "@ and / menus should show right above where the user is typing, not
  * later." A panel pinned to the left edge of the box is a panel you have to look
  * away to read, and the further right you have typed the further away it is.
  */

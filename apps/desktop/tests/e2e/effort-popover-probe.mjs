@@ -4,13 +4,13 @@
  * THIS PROBE USED TO ASSERT THE WRONG THING, and it is worth writing down why,
  * because it was red for months while the app was doing exactly what it was
  * asked to. An adversarial report (b5) measured 56.63px of the popover sitting
- * over the editor and called it a defect; this asserted zero overlap. the user then
+ * over the editor and called it a defect; this asserted zero overlap. The user then
  * looked at the alternative — the panel anchored to the composer CARD, so it
  * cleared the text by floating above the whole thing — and rejected it: "effort
  * bar shows all the way up there rather than right above where it should be."
  *
  * Above the trigger and clear of the editor are mutually exclusive: the trigger
- * is at the bottom of the composer and the editor is what is above it. the user
+ * is at the bottom of the composer and the editor is what is above it. The user
  * picked proximity. So the measurement that matters is not the intersection with
  * the editor, it is the distance to the BUTTON — the thing that was actually
  * wrong and the thing that could silently come back if the anchor ever slips

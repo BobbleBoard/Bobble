@@ -36,7 +36,7 @@
  * SOFT NEWLINES COLLAPSE, the way markdown says they should.
  *
  * This carried `white-space: pre-wrap`, so every newline the model happened to
- * type inside a paragraph became a visible line break. the user: "are you sure
+ * type inside a paragraph became a visible line break. The user: "are you sure
  * there's not any forced double spacing on any newline ... this doesn't look
  * natural or like regular model output here, I've used all these quite a bit,
  * they don't do this." He is right, and that rule is why: models wrap their
@@ -213,12 +213,12 @@
  * Panel chrome rides --pd-code-block-* tokens.
  */
 
-/* the user round-5 #6: the frame + radius live on this container (overflow clipped);
+/* The user round-5 #6: the frame + radius live on this container (overflow clipped);
  * the <pre> inside owns the horizontal scroll, so a real 1px border stays crisp
  * on ALL sides regardless of scroll — an outset box-shadow could be clipped by
  * an ancestor's own overflow.
  *
- * THE BORDER IS DRAWN. the user (2026-09-17, with a reference): "make borders more
+ * THE BORDER IS DRAWN. The user (2026-09-17, with a reference): "make borders more
  * defined as shown in the example code block" — the reference's frame is ~15%
  * of the ink on white; the token was 6%. Ink at 14% follows the flavour and
  * the mode without a token per theme. */

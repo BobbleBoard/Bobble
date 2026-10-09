@@ -49,7 +49,7 @@ import {
 import { conversationTokens } from './use-reprefill-warning';
 
 /*
- * NO GLYPHS ON THESE ROWS. the user: "model picker doesn't have to have icons."
+ * NO GLYPHS ON THESE ROWS. The user: "model picker doesn't have to have icons."
  *
  * He is right and it took three passes to see why: every icon here was a
  * decoration on a row whose LABEL already said the whole thing. "Fast" does not
@@ -61,7 +61,7 @@ import { conversationTokens } from './use-reprefill-warning';
  * THE DOWNLOAD CONTROL FOR ONE MENU ROW — the app's blue button, and the bar it
  * becomes.
  *
- * the user: "instead of the little dot and download put the blue download button
+ * The user: "instead of the little dot and download put the blue download button
  * that does the progressbar from the model manager." So this is the same
  * `DownloadBar` the Model hub uses, behind the same button, rather than a second
  * download affordance invented for a menu.
@@ -317,7 +317,7 @@ export function TierPickerMenu({
             /*
              * The model's name, and nothing else. It used to read
              * "qwen3.6 27b · download" — a word dressed as a link, in a grey
-             * caption, which is the least button-like place in the row. the user:
+             * caption, which is the least button-like place in the row. The user:
              * "instead of the little dot and download put the blue download
              * button that does the progressbar from the model manager." The
              * control moved to the hint slot below, where the checkmark for a
@@ -326,7 +326,7 @@ export function TierPickerMenu({
             /*
              * ...AND WHAT SWITCHING WOULD COST, when it would cost something.
              *
-             * the user: "flagged to the user to my face right there whenever
+             * The user: "flagged to the user to my face right there whenever
              * anything threatens to cause a full re prefill (including model
              * switches) at over 16k context." The moment of choice is the
              * honest place for it — a warning that arrives after the click is
@@ -334,7 +334,7 @@ export function TierPickerMenu({
              * because at that size the re-read reads as the model thinking.
              */
             description={
-              /* The refusal, where the button was pressed. the user: "clicking
+              /* The refusal, where the button was pressed. The user: "clicking
                  download on the model picker … does not download them or show
                  any user indication … that there's not enough disk space". The
                  bar flashed and vanished; the reason stayed in a log. */
@@ -393,7 +393,7 @@ export function TierPickerMenu({
           <>
             <DropdownMenuSeparator />
             {/*
-             * "More models" FLIES OUT TO THE SIDE. the user: "I need to hover on
+             * "More models" FLIES OUT TO THE SIDE. The user: "I need to hover on
              * the more models > and then have the stuff popup on the right
              * side, not click and have a menu within a menu."
              *

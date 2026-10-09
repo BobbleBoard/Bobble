@@ -1,7 +1,7 @@
 /**
  * text → image → EDIT → 3D, through the real UI.
  *
- * the user's requirement: the user has to be able to SEE the image and CHANGE it
+ * The user's requirement: the user has to be able to SEE the image and CHANGE it
  * before spending minutes turning it into geometry. So this walks the whole
  * decision loop rather than just checking a button exists — generate, look,
  * edit, step back to the original, and confirm Make 3D is offered on whichever

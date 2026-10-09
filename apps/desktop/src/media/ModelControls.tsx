@@ -1,5 +1,5 @@
 /**
- * THE STRIP UNDER A 3D CARD. the user (2026-09-17): "below the card itself show
+ * THE STRIP UNDER A 3D CARD. The user (2026-09-17): "below the card itself show
  * some basic controls eg. coloring/normals/grey, if rig, skeleton and if
  * segment, then explode."
  *

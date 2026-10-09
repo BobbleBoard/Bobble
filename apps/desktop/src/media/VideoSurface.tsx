@@ -154,7 +154,7 @@ export function VideoSurface({ src, large = false, testid }: VideoSurfaceProps):
       />
       {/*
         THE CENTRED PLAY BUTTON, and it does not hide while the clip is paused.
-        the user: "by default just a centered play button that still shows there even
+        The user: "by default just a centered play button that still shows there even
         on not hover when paused." A paused clip with no visible control is
         indistinguishable from a still image — the button IS the thing that says
         this one moves. Once it is running it gets out of the way and comes back
@@ -172,7 +172,7 @@ export function VideoSurface({ src, large = false, testid }: VideoSurfaceProps):
       </button>
 
       {/*
-        A SINGLE FLOATING TIMELINE — no transport bar under the picture. the user
+        A SINGLE FLOATING TIMELINE — no transport bar under the picture. The user
         struck the bar out: it was a slab of chrome the width of the card, and
         everything on it except the scrubber was already somewhere else (play is
         the button in the middle, fullscreen is the corner). What is left floats
@@ -209,7 +209,7 @@ export function VideoSurface({ src, large = false, testid }: VideoSurfaceProps):
 /*
  * A BIG ROUNDED TRIANGLE, not a glyph in a circle.
  *
- * the user: "no circle, large rounded tip play triangle circle on hover". So the
+ * The user: "no circle, large rounded tip play triangle circle on hover". So the
  * shape carries itself — the corners are rounded by stroking the same path in
  * the same colour with a fat round join, which is how you round a filled
  * triangle without hand-authoring six arc segments.

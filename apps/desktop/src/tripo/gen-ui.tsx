@@ -256,7 +256,7 @@ function ModelCard({ id }: { readonly id: Gen3dModelId }): JSX.Element | null {
 /**
  * The roles this studio has no use for.
  *
- * the user: "audio models are accidentally shown in the 3D studio." The catalog is
+ * The user: "audio models are accidentally shown in the 3D studio." The catalog is
  * shared with the audio studio (text-to-speech, sound effects, transcription all
  * ride the same Python sidecar), and this panel simply listed everything in it —
  * so the 3D download list offered voices. They are downloadable from the room

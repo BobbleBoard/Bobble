@@ -44,7 +44,7 @@ describe('stage estimates', () => {
     expect(large / small).toBeLessThan(18);
   });
 
-  /* the user (2026-09-15): the quick low-poly is seconds, and the button must say
+  /* The user (2026-09-15): the quick low-poly is seconds, and the button must say
      so instead of promising the remesh's minutes. MEASURED 7.6 s on a 186k jet. */
   it('the quick retopology is a seconds estimate, whatever the mesh', () => {
     const mem = 24 * GB;

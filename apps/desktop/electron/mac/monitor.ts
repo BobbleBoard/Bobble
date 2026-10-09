@@ -329,7 +329,7 @@ export function registerMacMonitorIpc(): void {
      * This used to prompt AND open System Settings, every time — so the happy
      * path (macOS has never asked about this app; `CGRequestScreenCaptureAccess`
      * puts up one Allow/Deny alert) buried the alert under a Settings window the
-     * user did not need. the user: "ideally those steps can just be 'click here and
+     * user did not need. The user: "ideally those steps can just be 'click here and
      * click allow' if you can just prompt the user to one button allow/deny."
      *
      * So: prompt, read the answer, and open the pane only when the answer is no
@@ -371,7 +371,7 @@ export function registerMacMonitorIpc(): void {
   /*
    * THE ONE THING HERE THAT IS MEANT TO TAKE THE SCREEN.
    *
-   * the user: "have a prominent Open <app icon> <app name> <square with top right
+   * The user: "have a prominent Open <app icon> <app name> <square with top right
    * arrow> prominently in the top right of the computer use canvas area."
    * Everything else in this subsystem works hard NOT to move the user's focus;
    * this exists because they asked to be put in front of the window they have

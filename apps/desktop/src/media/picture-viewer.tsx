@@ -1,7 +1,7 @@
 /**
  * ONE WAY TO OPEN A PICTURE, wherever it is drawn.
  *
- * the user (2026-09-24): "images clicked on/fullscreened should have the new studio
+ * The user (2026-09-24): "images clicked on/fullscreened should have the new studio
  * like ui with the left toolbar and such and a centered bottom 'edit image'
  * input bar aswell." The image viewer (ImageViewer.tsx) is that room, and it
  * works on a FILE: Copy, Export, Show in Finder and Edit all need a path. A

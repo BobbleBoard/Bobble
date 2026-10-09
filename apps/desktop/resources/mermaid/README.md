@@ -8,7 +8,7 @@ DOMPurify, KaTeX, roughjs, …) inline at the end of the file.
 
 **Why it is here.** The `diagram` tool (VQ-10, deliverables/research/visual-quality.md
 §2.2.3) draws the model's Mermaid in a hidden, sandboxed window in the app
-(`electron/gen/diagram-render.ts`). the user approved bundling it (deliverables/research/PLAN.md
+(`electron/gen/diagram-render.ts`). The user approved bundling it (deliverables/research/PLAN.md
 Q28: "Bundle Mermaid (MIT, 3.5 MB) for `diagram`? … yes"). Bundled, so diagrams draw
 offline and the bytes are the same in dev and in the packaged app
 (`electron-builder.yml` copies this folder to `<Resources>/mermaid`).

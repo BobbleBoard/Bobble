@@ -1,7 +1,7 @@
 /**
  * Which browser tab the agent drives.
  *
- * the user: with a page already open in the canvas browser, asking the model to look
+ * The user: with a page already open in the canvas browser, asking the model to look
  * at it opened a SECOND, blank "Pi Browser" tab and registered against that — so
  * `browser_snapshot` read about:blank and reported no interactive elements. "It
  * knows what tab I have open but the read call is reading the about blank???"

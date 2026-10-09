@@ -1,7 +1,7 @@
 /**
  * ONE KEYSTROKE REMOVES A PILL.
  *
- * the user: "at mentions should appear just the inline … deleted as if it's a single
+ * The user: "at mentions should appear just the inline … deleted as if it's a single
  * character if the delete key is pressed next to it."
  *
  * Lexical's default for a keyboard-selectable decorator is a two-step: the first

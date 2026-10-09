@@ -4,7 +4,7 @@ import { hardReload, softReload } from './app-reload';
 /**
  * THE LAST THING BETWEEN A RENDER THROW AND A BLANK WINDOW.
  *
- * the user, top of his chat list: "total blank screen."
+ * The user, top of their chat list: "total blank screen."
  *
  * There are two ways to get one, and only one of them was handled. When the
  * renderer PROCESS dies, main reloads the window (electron/renderer-recovery.ts).

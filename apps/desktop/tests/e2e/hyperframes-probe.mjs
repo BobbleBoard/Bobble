@@ -1,7 +1,7 @@
 /**
  * A HYPERFRAMES RENDER IS ONE ANIMATED CARD IN THE THREAD — this probe looks.
  *
- * the user: "attempting a hyperframes animation generation, rendered 120 induvidual
+ * The user: "attempting a hyperframes animation generation, rendered 120 induvidual
  * frames, each of which was placed as it's own png card in the chat, severely
  * cluttering it."
  *
@@ -207,7 +207,7 @@ try {
   });
 
   // ── 1. render: the real renderer in the app's Chromium ─────────────────────
-  // the user's clip: the app's own defaults (640x352, five seconds at 24 fps).
+  // The user's clip: the app's own defaults (640x352, five seconds at 24 fps).
   const progress = [];
   const renderStart = Date.now();
   const outputs = await src.createStillRenderer({

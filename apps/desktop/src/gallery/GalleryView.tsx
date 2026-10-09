@@ -489,7 +489,7 @@ export function GalleryView() {
                         <SidebarRow icon={<IconChat size={16} />} label="MTP flags" meta="1d" />
                       </SidebarSection>
                     </SidebarScroll>
-                    <SidebarFooter avatar="J" name="The user" plan="Local" />
+                    <SidebarFooter avatar="J" name="the user" plan="Local" />
                   </Sidebar>
                   <div className="pd-main-surface grid flex-1 place-items-center">
                     <span className="text-text-muted">main surface</span>

@@ -198,7 +198,7 @@ function firstRunClaudeBounds(): Pick<
    * This adopted Claude Desktop's saved size and position verbatim. When those
    * bounds are taller than the usable area — or low enough that the bottom falls
    * under the dock — Bobble opens with its bottom edge off-screen, and the two
-   * things pinned there go with it. the user: "odd UI bug squishing the should be
+   * things pinned there go with it. The user: "odd UI bug squishing the should be
    * pinned bottom left area to the bottom." The sidebar's profile footer and the
    * composer's model row were both cut off on the same line, which is the shape
    * of a window hanging off the display rather than of a layout squeezing (the
@@ -439,7 +439,7 @@ function createMainWindow(): BrowserWindow {
    * Electron centres what does not fit, so y came out at -31 — the title bar
    * behind the menu bar AND the bottom 8px below the usable area. Both ends
    * clipped, permanently, and resizing cannot recover it because the size is
-   * re-applied on every launch. the user: "the bottom left is cut off again … the
+   * re-applied on every launch. The user: "the bottom left is cut off again … the
    * whole chat input bar is cut off also when I try resizing."
    *
    * `firstRunClaudeBounds` already clamps the bounds it adopts; this clamps
@@ -518,7 +518,7 @@ function installAppMenu(): void {
   /*
    * ⌘R IS NOT A DOCUMENT RELOAD ANY MORE.
    *
-   * the user: "⌘R clears really everything." It does — Electron's stock `reload`
+   * The user: "⌘R clears really everything." It does — Electron's stock `reload`
    * role throws the document away, and with it the thread on screen, the canvas
    * tabs and where you were scrolled to. Almost none of that is the document's
    * to lose: the conversation lives in the pi child and on disk, and the app's
@@ -765,7 +765,7 @@ function registerAppIpc(): void {
   registerGen3dIpc(ipcMain, allowSender, () => mainWindow?.webContents ?? null);
 
   /*
-   * THE UNIFIED MODEL STORE. the user: "we need to be able to download anything and
+   * THE UNIFIED MODEL STORE. The user: "we need to be able to download anything and
    * store it properly in an organized format so that no matter what we add
    * either now or later we have an easy way to list relevant models and know
    * where their weights are stored their names relevant info etc."
@@ -793,7 +793,7 @@ function registerAppIpc(): void {
   });
 
   /*
-   * THE IMAGE & VIDEO STUDIO, on ComfyUI. the user: "let's have comfy as a
+   * THE IMAGE & VIDEO STUDIO, on ComfyUI. The user: "let's have comfy as a
    * downloadable inference engine and then wire up a primitive for now
    * image/video studio) and have those run through it."
    *
@@ -903,7 +903,7 @@ function registerAppIpc(): void {
       /*
        * Hold a heavy generation while the machine is struggling.
        *
-       * the user: "leave a certain amount of memory available as a buffer so the
+       * The user: "leave a certain amount of memory available as a buffer so the
        * user can use computer as normal while generation and such occurs." An
        * image or video job is gigabytes of extra resident memory beside an
        * already-resident chat model, and under real pressure it is the single
@@ -912,7 +912,7 @@ function registerAppIpc(): void {
        *
        */
       /*
-       * NOT A GATE ANY MORE. the user: "low can't stop image generation requests,
+       * NOT A GATE ANY MORE. The user: "low can't stop image generation requests,
        * it just has to lessen compute intensivity in some way sacrificing
        * speed to keep headroom." The policy's `allowHeavyJobs` used to refuse
        * every generation under 'low' with "the machine is under pressure";
@@ -1127,7 +1127,7 @@ if (!hasSingleInstanceLock) {
           callback(false);
           return;
         }
-        // COPY BUTTONS. the user: "copy buttons don't actually copy to clipboard."
+        // COPY BUTTONS. The user: "copy buttons don't actually copy to clipboard."
         // MEASURED: navigator.clipboard.writeText rejected with
         // "NotAllowedError: Write permission denied" in our own window, because
         // this handler denied every permission that was not 'media' — and every

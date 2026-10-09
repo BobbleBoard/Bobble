@@ -1,7 +1,7 @@
 /**
  * TRY IT, PLAYED — a connector's page shows its ask going through.
  *
- * the user (2026-10-08): "a prominent card that shows a little animation of an
+ * The user (2026-10-08): "a prominent card that shows a little animation of an
  * input text bubble sliding up, and then some model response that goes 'Sure
  * i'll use <the connector> to do this' the 'used <connector>' tool visual, a
  * sped up 'worked for nm ns' and then done".

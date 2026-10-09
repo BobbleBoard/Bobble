@@ -2,7 +2,7 @@
 /**
  * The `+` menu must not blank the page underneath it.
  *
- * the user: "browser tabs go blank when the + button is pressed?" They did — a
+ * The user: "browser tabs go blank when the + button is pressed?" They did — a
  * native WebContentsView paints above every DOM element, so the menu is
  * invisible until the page is taken down, and the page coming down left white.
  *

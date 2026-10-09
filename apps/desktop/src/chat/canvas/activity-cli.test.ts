@@ -2,7 +2,7 @@
  * THE BASH-vs-TOOL GATE the Activity terminal sits behind.
  *
  * In tool-CLI mode every tool is a command on PATH, so `mac snapshot` and
- * `ls -la` arrive through the SAME `bash` tool call. the user: "bash command? (once
+ * `ls -la` arrive through the SAME `bash` tool call. The user: "bash command? (once
  * verified they aren't a special cli tool, so if they don't start with any
  * registered tools) shows up in a terminal."
  *

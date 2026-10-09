@@ -1,7 +1,7 @@
 /**
  * THE DOWNLOAD BUTTON — one card per generation module.
  *
- * the user (2026-09-13): "in the shipped app I just get a bunch of 'uv not
+ * The user (2026-09-13): "in the shipped app I just get a bunch of 'uv not
  * installed' errors, we need a popup/prominent button that has something like
  * 'download module' for image/audio/3d/video."
  *

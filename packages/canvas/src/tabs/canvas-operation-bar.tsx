@@ -450,7 +450,7 @@ function RenderableOps({
 }
 
 /**
- * "Show in chat" — the way back for a card that was moved over. the user: "a tab
+ * "Show in chat" — the way back for a card that was moved over. The user: "a tab
  * in the canvas dropping out and becoming an inline card". The button is the
  * inverse of the card's corner control, in the same place a person looks for
  * the tab's own actions.

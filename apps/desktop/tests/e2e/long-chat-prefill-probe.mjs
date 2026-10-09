@@ -1,7 +1,7 @@
 /**
  * DOES A LONG CONVERSATION STAY CACHED?
  *
- * the user: "tell me why context is being re prefilled at each turn fully, is the
+ * The user: "tell me why context is being re prefilled at each turn fully, is the
  * conversation not prefix cached in its entirety, when I type something else
  * into a follow up on a long conversation I just want to have it instantly
  * work."

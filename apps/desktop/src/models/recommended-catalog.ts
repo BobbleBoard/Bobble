@@ -1,7 +1,7 @@
 /**
  * THE CURATED RECOMMENDED LIST — one card per FAMILY, every output modality.
  *
- * the user: "we need to curate for now, dropping the newest in favor of
+ * The user: "we need to curate for now, dropping the newest in favor of
  * 'recommended'. I notice you added bartowski (good pick) for reliable people,
  * but the newest is just clogged immediately with 10 bartowski ornith 1.5 quants
  * from the different model sizes, we don't want that there really. we need to
@@ -51,12 +51,12 @@ export const OUTPUT_LABEL: Record<OutputModality, string> = {
 };
 
 /**
- * AN IN→OUT JOB. the user: "ltx 2.5 and minimax I think have a lot of sub models or
+ * AN IN→OUT JOB. The user: "ltx 2.5 and minimax I think have a lot of sub models or
  * something complicated where you download one per like in-out you want eg.
  * video+text-video or image-video or start+endframe-video or text-video etc. so
  * these need good handling and communication to the user however you choose."
  *
- * He is right, and MiniMax-H3 is the clearest case: its repo has an `FL2VA`
+ * The user is right, and MiniMax-H3 is the clearest case: its repo has an `FL2VA`
  * tree (First+Last frame → Video+Audio) and a `Ref2VA` tree (Reference image →
  * Video+Audio), each published at eight quants, plus a shared text encoder and
  * VAE. "Do I have MiniMax-H3?" is therefore not a yes/no question, and a single
@@ -145,7 +145,7 @@ export interface RecommendedVariant {
   /**
    * Unified memory needed to actually RUN it, in GB.
    *
-   * the user: "of course all of these are vram dependent, show a not recommended for
+   * The user: "of course all of these are vram dependent, show a not recommended for
    * this machine if it can't run". Deliberately separate from download size:
    * weights on disk are not weights resident, and a 21 GB transformer needs room
    * for activations beside it.
@@ -181,7 +181,7 @@ export interface RecommendedFamily {
   readonly blurb: string;
   /**
    * Unusually fast for its class, and the reason it is here at all on a modest
-   * machine. the user on LTX-2.5 / MiniMax-H3 / Mage-Flow: "super reccomended (whole
+   * machine. The user on LTX-2.5 / MiniMax-H3 / Mage-Flow: "super reccomended (whole
    * family) for lower end devices because they're very fast and very good".
    */
   readonly fast?: boolean;
@@ -378,7 +378,7 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
     output: 'text',
     blurb: 'The strongest open model that fits a personal machine. The default when it does.',
     /*
-     * THE STANDING TOP PICK. the user: "qwen3.8 27b as the top choice always if the
+     * THE STANDING TOP PICK. The user: "qwen3.8 27b as the top choice always if the
      * user's machine can do it." Independently confirmed: Artificial Analysis
      * puts it first among open weights at an intelligence index of 52, ahead of
      * MiniMax-M3 (45) and Muse Glimmer (35) — and those two are 428B and 30B.
@@ -563,7 +563,7 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
     blurb: 'Few-step, so it stays quick on any machine. The default image model.',
     fast: true,
     /*
-     * the user's top image pick, and the reason is speed rather than fidelity: "for
+     * The user's top image pick, and the reason is speed rather than fidelity: "for
      * any generally 'slow' machine, mage flow models are inevitably going to be
      * like an order of magnitude faster than any flux 2 klien or even something
      * like z image is". Our own measurement points the same way — Mage-Flow-Turbo
@@ -687,7 +687,7 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
     fast: true,
     /*
      * QUANTS, NOT FULL PRECISION — and on a Mac that is not a preference, it is
-     * the only thing that works. the user: "comfyui supports quants however right?
+     * the only thing that works. The user: "comfyui supports quants however right?
      * so we never have to actually do the full things, we can go for 8 bit or
      * lower depending on hardware/user preference."
      *

@@ -117,7 +117,7 @@ export const WebSearchResultItem = forwardRef<HTMLElement, WebSearchResultItemPr
     );
     const shared = clsx('pd-websearch-row pd-focusable', className);
     /*
-     * A HANDLER MEANS THIS IS NOT A LINK. the user: "clicking them to show their
+     * A HANDLER MEANS THIS IS NOT A LINK. The user: "clicking them to show their
      * links in the browser" — the app's own browser, in the canvas beside the
      * conversation.
      *

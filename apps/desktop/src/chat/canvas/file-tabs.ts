@@ -147,7 +147,7 @@ export function unreadableFileArtifact(
 ): Artifact {
   const filename = basename(absPath);
   /*
-   * WHAT HAPPENED, AND WHAT IS ALREADY BEING DONE ABOUT IT. the user (2026-10-08):
+   * WHAT HAPPENED, AND WHAT IS ALREADY BEING DONE ABOUT IT. The user (2026-10-08):
    * "'this file couldn't be found' (when clicking on a file that should very
    * much be there) … just can't exist anymore." Before this shows, the file
    * was looked for in the chat's folders by name (fs:locate) and opened there
@@ -633,7 +633,7 @@ export function useFileWriteCanvasRouting(): void {
       const key = fileTabKey(ev.path);
 
       // ── str_replace-style EDIT → THE FILE, then the edit played into it ─────
-      // the user: "Editing a file shouldn't show the diff being written in real time
+      // The user: "Editing a file shouldn't show the diff being written in real time
       // it should show that file and then the text as the negative part of the
       // diff is written being deleted … and then of course the replace part
       // writing animation."

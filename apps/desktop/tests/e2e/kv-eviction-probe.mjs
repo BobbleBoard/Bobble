@@ -1,7 +1,7 @@
 /**
  * Does a background utility call EVICT the conversation's KV prefix?
  *
- * the user, for the fifth time: "the prefix caching for instant follow up prefills…
+ * The user, for the fifth time: "the prefix caching for instant follow up prefills…
  * I paused, sent a message, it took 90 seconds for this follow up to prefill
  * (likely whole context since it was a 12 word message)".
  *

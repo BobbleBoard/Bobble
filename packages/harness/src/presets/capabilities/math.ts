@@ -10,7 +10,7 @@ import type { Capability } from './types.js';
 
 export const math: Capability = {
   name: 'math',
-  /* the user (2026-09-25): "instead of it remaking these math things from scratch
+  /* The user (2026-09-25): "instead of it remaking these math things from scratch
      every time, let's give it a standard style and control". MEASURED the
      same night on a 4B: a physics figure went to `svg` with hand-written
      markup, an animation to video generation then a bar chart, a derivative

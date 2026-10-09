@@ -195,14 +195,14 @@ describe('createStillRenderer', () => {
   });
 
   /*
-   * the user: "rendered 120 induvidual frames, each of which was placed as it's own
+   * The user: "rendered 120 induvidual frames, each of which was placed as it's own
    * png card in the chat, severely cluttering it." One output per frame is what
    * became one card per frame. However many frames, the job returns ONE thing.
    */
   it('returns ONE output — the animated PNG — however many frames it rendered', async () => {
     const files = fakeFiles();
     const render = createStillRenderer({ openWindow: async () => makeWin(), ...files.deps });
-    // the user's clip: the app's defaults, five seconds at 24 fps.
+    // The user's clip: the app's defaults, five seconds at 24 fps.
     const out = await render({ ...spec, seconds: 5, fps: 24 }, '/out', () => {});
     expect(files.written()).toHaveLength(121);
     expect(out).toHaveLength(1);
@@ -275,7 +275,7 @@ describe('createStillRenderer', () => {
     ]);
   });
 
-  /* the user: "ensure we can see hyperframes stuff being generated and iterating in
+  /* The user: "ensure we can see hyperframes stuff being generated and iterating in
    * the canvas." The canvas renders `previewPath` off a progress event, so
    * without it a render is a spinner that resolves all at once at the end. */
   it('previews each frame as it lands, so the canvas fills in live', async () => {

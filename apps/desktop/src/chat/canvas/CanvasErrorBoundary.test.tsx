@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /**
- * the user, on the renderer crash in the canvas assessment: "that cannot happen".
+ * The user, on the renderer crash in the canvas assessment: "that cannot happen".
  * Twice a React update loop inside the canvas took the whole window to the
  * app-level boundary. These pin the containment: a canvas failure resets and
  * remounts the canvas once, stays down (with a Reset) if it fails again at

@@ -136,7 +136,7 @@ export function explainChromeFailure(stderr: string): string {
  * Is Chrome running? Asked BEFORE any `tell application "Google Chrome"`,
  * because AppleScript launches an app it addresses — and a Chrome launched that
  * way comes up in FRONT, profile picker and all, with nobody to hand the focus
- * back. the user: "chrome I know for sure … steal focus upon computer use launch."
+ * back. The user: "chrome I know for sure … steal focus upon computer use launch."
  * A Chrome that is not running is launched through the bridge's background
  * launch instead, which watches the focus and returns it.
  */
@@ -214,9 +214,9 @@ export function chromeActionJs(index: number, action: 'click' | 'focus', text?: 
  * THE FLAG ONLY GATES `execute javascript`. Everything else in Chrome's
  * AppleScript dictionary works without it.
  *
- * the user: "again remember this is totally possible (and for chrome possible
+ * The user: "again remember this is totally possible (and for chrome possible
  * without asking the user to download an extension, that's not an option)."
- * He was right, and the assumption in this file's own header — that the DOM
+ * The user was right, and the assumption in this file's own header — that the DOM
  * gate is the gate for all of it — is what hid it. MEASURED against a Chrome
  * with `AllowJavaScriptAppleEvents` OFF:
  *

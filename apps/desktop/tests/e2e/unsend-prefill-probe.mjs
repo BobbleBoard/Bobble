@@ -1,7 +1,7 @@
 /**
  * AFTER ⌘Z TAKES A MESSAGE BACK, DOES THE NEXT ONE STILL HIT THE PROMPT CACHE?
  *
- * the user's standing rule for chat work: it is not done until prefill/TTFT is
+ * The user's standing rule for chat work: it is not done until prefill/TTFT is
  * checked. Unsending stops a turn mid-flight and forks pi's session to before
  * the message (a new session file, a new harness wiring) — exactly the kind of
  * boundary that has silently cost a full re-prefill before (the system prompt

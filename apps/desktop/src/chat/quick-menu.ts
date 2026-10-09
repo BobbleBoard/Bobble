@@ -1,7 +1,7 @@
 /**
  * THE QUICK MENU, MADE THE USER'S.
  *
- * the user: "actually allow using favoriting, configuring the quick menu
+ * The user: "actually allow using favoriting, configuring the quick menu
  * (intelligent balanced fast, add more if you like, rename etc just do model
  * names), have the more models hover/show search bar if enough + show a
  * scrollable list of all downloaded models largest to smallest, include org

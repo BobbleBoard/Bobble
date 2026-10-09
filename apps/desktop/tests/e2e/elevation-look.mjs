@@ -1,7 +1,7 @@
 /**
  * LOOK at the 3D studio's floating surfaces, light and dark.
  *
- * the user (2026-09-24), on the studio's History card: "it looks 'flimsy' not like
+ * The user (2026-09-24), on the studio's History card: "it looks 'flimsy' not like
  * it's a card firmly placed on top" — after "everything has the same softness".
  * The fix is in the elevation tokens and the studio's panel material, and a
  * token change can only be judged on the page: the design audit's throwaway

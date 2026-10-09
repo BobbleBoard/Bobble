@@ -1,7 +1,7 @@
 /**
  * ROUND 2 — A REAL IMAGE-TO-IMAGE EDIT, THROUGH THE APP.
  *
- * the user: "all types of media handoff into studios and EDITING will also be
+ * The user: "all types of media handoff into studios and EDITING will also be
  * tested." Everything else about the handoff is proven offline in
  * media-handoff-probe. This is the one that costs a GPU: hand a real picture to
  * the Image studio the way "Open in studio" does, press Edit, and check that

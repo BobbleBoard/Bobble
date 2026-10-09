@@ -1,5 +1,5 @@
 /**
- * Capabilities replace tool_search. the user: "remove tool search entirely, and
+ * Capabilities replace tool_search. The user: "remove tool search entirely, and
  * instead replace with a 'capability' tool … the tools can be computer use,
  * mail, calendar, browser etc.", and separately "the tool search isn't great and
  * is a source of much looping right now."
@@ -35,7 +35,7 @@ describe('asking for a capability by name', () => {
 
 describe('the groups themselves', () => {
   it('bundles calendar, mail, reminders, contacts and messages as ONE thing', () => {
-    // the user: "bundle the calendar, email and reminders stuff also."
+    // The user: "bundle the calendar, email and reminders stuff also."
     const personal = findCapability('personal');
     expect(personal?.summary).toContain('Calendar');
     expect(personal?.summary).toContain('Mail');
@@ -130,7 +130,7 @@ describe('what the model is told', () => {
 /*
  * IN CLI MODE THERE IS NOTHING TO WAIT FOR.
  *
- * the user: "tool being appended mid conversation is fine, but not during cli mode,
+ * The user: "tool being appended mid conversation is fine, but not during cli mode,
  * because during cli mode a tool happening mid conversation is just a little
  * tidbit at the end of the message." The advertised set stays `['bash']` and
  * every tool is already a command on PATH, so the schemas wording — "not

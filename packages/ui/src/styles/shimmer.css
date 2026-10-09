@@ -6,7 +6,7 @@
  */
 
 /*
- * the user blind-test #2 — the glyphs must NEVER vanish. The old single-gradient
+ * The user blind-test #2 — the glyphs must NEVER vanish. The old single-gradient
  * shimmer (color:transparent painted by ONE base→highlight→base gradient at
  * background-size:200% with no-repeat) left the text UNPAINTED — hence invisible —
  * at the sweep's extremes, because the swept gradient no longer covered every
@@ -175,7 +175,7 @@
   -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
 }
 
-/* the user round-8 #9: a string thought renders through the shared Markdown
+/* The user round-8 #9: a string thought renders through the shared Markdown
  * component. The Markdown owns its own paragraph wrapping, so drop the
  * plain-text pre-wrap; and keep the body in the dim "secondary" thought voice —
  * .pd-prose would otherwise repaint it text-primary. Inline code / links /

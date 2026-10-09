@@ -1,7 +1,7 @@
 /**
  * A stuck agent can STOP AND SAY WHY, and its manager finds out.
  *
- * the user, watching a manager spend 32 minutes on "waiting for other subagents to
+ * The user, watching a manager spend 32 minutes on "waiting for other subagents to
  * finish" and then conclude the tool was broken: "give the manager a 'wait' tool
  * that will wait for a subagent to complete, or for a subagent to call its wait
  * tool with a reason, eg. needs help, something not working, please advise, etc.
@@ -219,7 +219,7 @@ export const PAUSE_TOOL = 'pause_subagent';
 /**
  * STAND SOMEBODY DOWN — the manager's side of waiting.
  *
- * the user: "maybe have the manager get a stop subagent tool call, that will pause it
+ * The user: "maybe have the manager get a stop subagent tool call, that will pause it
  * until the manager decides to message it again."
  *
  * The gap it fills: a manager could hand work out and wait for it, but had no way

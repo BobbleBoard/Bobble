@@ -18,7 +18,7 @@ const LOADER_PERIOD_MS = 1100;
  * The Bobble loader — the app's standard spinner. A ring that FADES OUT along
  * its tail, with a rounded tip leading the way round.
  *
- * the user: "made a fading-out spinner with a rounded tip instead of the current
+ * The user: "made a fading-out spinner with a rounded tip instead of the current
  * one." The previous loader was a fixed-length arc on a faint track whose sweep
  * breathed; at the small sizes it is actually used (13-16px in a sidebar row)
  * the breathing read as flicker and the track read as a smudge. A tail that

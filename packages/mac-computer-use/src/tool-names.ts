@@ -22,7 +22,7 @@ export const MAC_LAUNCH_TOOL = 'mac_launch';
 /**
  * The window AROUND the page.
  *
- * the user: "for chrome, we need tab handling so it can read open tabs, switch tab,
+ * The user: "for chrome, we need tab handling so it can read open tabs, switch tab,
  * make new tab and close tab — the dom wouldn't let it drive that." Right about
  * the DOM: a page's JavaScript sees its own document and nothing about the
  * browser holding it. These read the tab strip out of the Accessibility tree
@@ -55,7 +55,7 @@ export const MAC_COMPUTER_USE_TOOL_NAMES = [
 /**
  * THE BROWSER'S OWN SET.
  *
- * the user: "instead of integrating into mac, add a chrome connector and have chrome
+ * The user: "instead of integrating into mac, add a chrome connector and have chrome
  * be its own set." A browser is not just another app you click at — it has tabs,
  * a page, an address bar and a session that belongs to the user — and folding
  * that into the generic Mac tools made the model reach for `mac` when it wanted

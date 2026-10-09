@@ -1,5 +1,5 @@
 /**
- * THE SOUND ITSELF, through the app. the user (2026-09-17): "sfx and music work
+ * THE SOUND ITSELF, through the app. The user (2026-09-17): "sfx and music work
  * 0, nada, nothing random noise random amount of output."
  *
  * MEASURED before the fix: every Stable Audio 3 clip was broadband noise with a

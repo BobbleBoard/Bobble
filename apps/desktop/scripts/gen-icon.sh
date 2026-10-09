@@ -3,7 +3,7 @@
 #
 # THE BUG THIS FIXES. The committed icon.png had an OPAQUE WHITE canvas — alpha
 # at (0,0) was 1 — so macOS drew the full 1024x1024 square and the white showed
-# as a border ring around the dark squircle. the user, with a screenshot: "size the
+# as a border ring around the dark squircle. The user, with a screenshot: "size the
 # app icon to remove the white border currently present."
 #
 # `-b none` is the whole fix: render the SVG onto TRANSPARENT, so only the

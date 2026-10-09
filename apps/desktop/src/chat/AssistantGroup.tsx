@@ -214,7 +214,7 @@ export function AssistantGroup({
    * a fetched SNAPSHOT of its session (`transcriptToAssistantView`), so no
    * message carries it — `streaming` came out false, `active` reached the chain
    * as false, and the terminal "Done" row printed the moment the rows went
-   * quiet. the user, with the situation room saying "Engineer 1 working… 1:36"
+   * quiet. The user, with the situation room saying "Engineer 1 working… 1:36"
    * beside a chat reading Done: "premature 'done' in the UI while still
    * working… done is a final thing. This tool chain is DONE."
    *
@@ -320,7 +320,7 @@ export function AssistantGroup({
   /*
    * THE HANDOVER, IN THE THREAD.
    *
-   * the user: "just the same final video card, same final image card, same final 3d
+   * The user: "just the same final video card, same final image card, same final 3d
    * card … as it goes reveal the actual produced image/video/3d. seamless."
    * The pending card (PendingMediaCard) IS the finished card's frame; when the
    * tool result lands, the first file it produced is handed to that same card,
@@ -383,7 +383,7 @@ export function AssistantGroup({
   /*
    * WHAT THE TURN MADE. Generated images used to reach the thread only as a
    * 414px markdown embed and generated audio/video only as a path in prose;
-   * the user wants every produced file embedded at full quality with a card to
+   * The user wants every produced file embedded at full quality with a card to
    * reveal it. Keyed off the tool RESULT, so a card appears when the file
    * exists rather than when the model mentions one — a call that is still
    * running, or that failed, has made nothing, and a player mounted for it
@@ -478,7 +478,7 @@ export function AssistantGroup({
   let textN = 0;
   let activityN = 0;
   /*
-   * THE PAGES THIS TURN SAW, for its citations. the user (2026-09-24): "source
+   * THE PAGES THIS TURN SAW, for its citations. The user (2026-09-24): "source
    * citing (for research and such, examples from google search summary
    * shown)". Links to them become chips in the text, and a finished answer
    * that used the web ends with a Sources card (./sources). The corp feed
@@ -487,7 +487,7 @@ export function AssistantGroup({
    */
   const answered = segments.some((s) => s.kind === 'text');
   /*
-   * THE CARDS AT THE FOOT OF THE REPLY. the user (2026-10-01, a student's circle
+   * THE CARDS AT THE FOOT OF THE REPLY. The user (2026-10-01, a student's circle
    * reply with the page's card ABOVE the words that explained it): "inline card
    * should be at the bottom also!" A finished result — a presented file, a
    * chart, a drawing, a generated picture — stands after ALL of the reply's
@@ -551,7 +551,7 @@ export function AssistantGroup({
         // ways in one turn: this copy under "Done", the model embedding it in
         // its own reply (a model that has just made a picture says "I should
         // show it to the user" and puts it in the markdown), and the chain row
-        // itself, which opens it in the canvas. the user saw it twice at 360px and
+        // itself, which opens it in the canvas. The user saw it twice at 360px and
         // ~690px in the same turn.
         //
         // The row is the one that belongs to the tool and it opens the canvas,
@@ -637,7 +637,7 @@ export function AssistantGroup({
            * that is waiting and the card that replaces it hold one slot, and a
            * result never moves when it lands.
            *
-           * THE GENERATING CARD STAYS OUT. the user: "these should be embedded in
+           * THE GENERATING CARD STAYS OUT. The user: "these should be embedded in
            * thinking blocks, not the generating card, that stays out" — the
            * wait is the one thing the chain folding shut must never hide.
            *
@@ -721,7 +721,7 @@ export function AssistantGroup({
                       callArgsFor(group, handing.callId),
                     ) === 'edit_image'
                   }
-                  /* THE HANDOVER IS A RESIZE, NOT A JUMP. the user (2026-09-24): the
+                  /* THE HANDOVER IS A RESIZE, NOT A JUMP. The user (2026-09-24): the
                    waiting card and the result should be "the same sizes and if
                    not there's a smooth animation for resizing". An un-presented
                    result files into its chain row at the chain's size

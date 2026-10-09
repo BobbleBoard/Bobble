@@ -29,7 +29,7 @@ const card = (callId: string, path: string, kind: CardKind = 'image'): TurnCard 
 });
 
 describe('what the turn made is the work; what it presented is the answer', () => {
-  /* the user's iteration: one chain, each edit taking the previous result as input. */
+  /* The user's iteration: one chain, each edit taking the previous result as input. */
   const calls = [
     call('e1', 0, 'edit_image', { image_path: '/Users/j/Desktop/photo.png', instruction: 'x' }),
     call('e2', 0, 'edit_image', { image_path: V1, instruction: 'warmer' }),

@@ -17,14 +17,19 @@
  * because a candidate should be judged on what the app can actually do.
  */
 
-const REPO = '/Users/user/Desktop/OSS-harness';
+import { homedir } from 'node:os';
+import { fileURLToPath } from 'node:url';
+
+const REPO_ROOT = fileURLToPath(new URL('../../../../../', import.meta.url)).replace(/\/$/, '');
+
+const REPO = `${REPO_ROOT}`;
 
 /**
  * Where run folders live. The probe points this at the throwaway HOME's
  * `~/.pi/desktop/scheduled-runs` — a root pd-file:// will serve — and drops a
  * real PNG there, so the image a run "made" actually renders as a thumbnail.
  */
-let RUNS_DIR = '/Users/user/.pi/desktop/scheduled-runs';
+let RUNS_DIR = `${homedir()}/.pi/desktop/scheduled-runs`;
 export function withRunsDir(dir) {
   RUNS_DIR = dir;
 }

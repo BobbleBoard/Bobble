@@ -3,7 +3,7 @@
  * .html is presented (present-inline.ts), and the renderer decides it again
  * when a chat's cards are rebuilt from its transcript (present-store.ts).
  *
- * the user (2026-09-24): "really clean, intuitive interactive widgets
+ * The user (2026-09-24): "really clean, intuitive interactive widgets
  * inline/+canvas, eg. for math explanation NN inner working visualizations".
  * A widget is one self-contained file (it loads nothing of its own by a
  * relative path), small, with something to interact with or something drawn,

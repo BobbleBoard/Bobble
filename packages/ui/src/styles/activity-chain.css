@@ -287,7 +287,7 @@ button.pd-chain-step-row:hover {
 
 /*
  * The main button takes only its content's width — verb, filename, ±stat —
- * so the disclose chevron that follows sits right after them. the user
+ * so the disclose chevron that follows sits right after them. The user
  * (2026-09-13, three file rows with the > at the far edge): "move the >
  * arrows all the way next to the end of the tool calls, never pin them right
  * aligned." It still shrinks (and ellipsizes) on a long filename.
@@ -416,7 +416,7 @@ button.pd-chain-step-row:hover .pd-chain-step-detail {
 }
 
 /* Right after the row's text, like the chevron — never pinned to the far edge
- * (the user, 2026-09-13). The row itself is the click target either way. */
+ * (The user, 2026-09-13). The row itself is the click target either way. */
 .pd-chain-step-canvas {
   display: inline-flex;
   flex: none;
@@ -428,7 +428,7 @@ button.pd-chain-step-row:hover .pd-chain-step-detail {
 
 /* Trailing chevron on a disclosable row; rotates down when the reveal is open.
  * Pinned right so it never crowds the inline arg (which absorbs the row width). */
-/* the user: "the dropdown arrow should be just immediately to the right of the
+/* The user: "the dropdown arrow should be just immediately to the right of the
  * command." It was pinned to the far right by `margin-left: auto`, so on a short
  * command it floated in the middle of nowhere with no visible relationship to
  * what it discloses. */
@@ -518,7 +518,7 @@ button.pd-chain-step-row:hover .pd-chain-step-chevron {
   min-width: 0;
 }
 
-/* the user UI#5: an in-chain thought renders through the shared Markdown component
+/* The user UI#5: an in-chain thought renders through the shared Markdown component
  * (same pipeline as a regular message), so it lands in a `.pd-prose .pd-markdown`
  * container that re-asserts the primary text color + response font-size. Scope it
  * back down to the footnote size + secondary color of a thought; prose sizes
@@ -530,7 +530,7 @@ button.pd-chain-step-row:hover .pd-chain-step-chevron {
   line-height: var(--pd-leading-footnote);
 }
 
-/* the user UI#1: a numbered list inside a thought came out double-spaced.
+/* The user UI#1: a numbered list inside a thought came out double-spaced.
  *
  * Two margins stack. A list whose items are separated by blank lines is a LOOSE
  * list, so each item's content is wrapped in a `<p>` — which picks up
@@ -677,7 +677,7 @@ button.pd-chain-step-row:hover .pd-chain-step-chevron {
 /*
  * A FAILED STEP, in the one place it can be acted on.
  *
- * the user: "no (failed). expanded tool calls show fails as red and clicking it
+ * The user: "no (failed). expanded tool calls show fails as red and clicking it
  * shows the actual error and 'copy raw' button if it's an actual failed to
  * parse error (this will be useful for debugging). terminal stuff should show
  * the failed part (the error message) when expanded in red."
@@ -747,7 +747,7 @@ button.pd-chain-step-row:hover .pd-chain-step-chevron {
 /*
  * FIVE AGENT STATES, EACH ONE READABLE AT A GLANCE.
  *
- * the user, watching a corp run: "timers can't keep ticking for waiting agents, it
+ * The user, watching a corp run: "timers can't keep ticking for waiting agents, it
  * needs to be more clear who is waiting, working, and waiting because stopped
  * (orange) error (red) and done (green)."
  *
@@ -796,7 +796,7 @@ button.pd-chain-step-row:hover .pd-chain-step-chevron {
 
 /* DONE — NO TINT. A finished tool row is the ordinary case; colouring it made
    every settled step green, which reads as a status claim about work that is
-   simply over. the user: "the tool icons are green for some reason, they need to
+   simply over. The user: "the tool icons are green for some reason, they need to
    just be grey again… I meant for each running subagent." The colours live on
    the AGENT rows instead, where "why is this one stopped" is a real question. */
 

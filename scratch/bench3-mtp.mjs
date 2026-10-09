@@ -6,52 +6,112 @@
  */
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
+import { homedir } from 'node:os';
 
-const SERVER = '/Users/user/.cache/pi-desktop/llamacpp/b9934/llama-b9934/llama-server';
-const MODEL = '/Users/user/.cache/pi-desktop/models/qwen3.5-4b-mtp/Qwen3.5-4B-Q8_0.gguf';
+const SERVER = `${homedir()}/.cache/pi-desktop/llamacpp/b9934/llama-b9934/llama-server`;
+const MODEL = `${homedir()}/.cache/pi-desktop/models/qwen3.5-4b-mtp/Qwen3.5-4B-Q8_0.gguf`;
 const TRIALS = 3;
 const NVALUES = [2, 3, 4];
 
-const SAMPLING = ['--temp', '0.8', '--top-p', '0.9', '--top-k', '50', '--min-p', '0.0',
-  '--presence-penalty', '0.0', '--repeat-penalty', '1.0', '--dry-multiplier', '1.0',
-  '--dry-base', '1.75', '--dry-allowed-length', '70', '--dry-penalty-last-n', '4096'];
-const REASONING = ['--reasoning-preserve', '--reasoning-budget', '-1',
-  '--reasoning-budget-message', 'time limit for reasoning reached'];
+const SAMPLING = [
+  '--temp',
+  '0.8',
+  '--top-p',
+  '0.9',
+  '--top-k',
+  '50',
+  '--min-p',
+  '0.0',
+  '--presence-penalty',
+  '0.0',
+  '--repeat-penalty',
+  '1.0',
+  '--dry-multiplier',
+  '1.0',
+  '--dry-base',
+  '1.75',
+  '--dry-allowed-length',
+  '70',
+  '--dry-penalty-last-n',
+  '4096',
+];
+const REASONING = [
+  '--reasoning-preserve',
+  '--reasoning-budget',
+  '-1',
+  '--reasoning-budget-message',
+  'time limit for reasoning reached',
+];
 const CTX = ['-c', '8192', '--parallel', '1'];
 
 const PROMPTS = {
-  code: 'Write a Python function `quicksort(arr)` that sorts a list in place using the ' +
+  code:
+    'Write a Python function `quicksort(arr)` that sorts a list in place using the ' +
     'Lomuto partition scheme, with a docstring, then show a usage example.',
-  prose: 'Explain, in one clear paragraph, why speculative decoding speeds up LLM ' +
+  prose:
+    'Explain, in one clear paragraph, why speculative decoding speeds up LLM ' +
     'inference and what determines its acceptance rate.',
 };
 
 function freePort() {
   return new Promise((res, rej) => {
-    const s = createServer(); s.on('error', rej);
-    s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => res(p)); });
+    const s = createServer();
+    s.on('error', rej);
+    s.listen(0, '127.0.0.1', () => {
+      const p = s.address().port;
+      s.close(() => res(p));
+    });
   });
 }
 async function waitHealth(port) {
   const d = Date.now() + 90_000;
   while (Date.now() < d) {
-    try { const r = await fetch(`http://127.0.0.1:${port}/health`); if (r.ok) return true; } catch {}
+    try {
+      const r = await fetch(`http://127.0.0.1:${port}/health`);
+      if (r.ok) return true;
+    } catch {}
     await new Promise((r) => setTimeout(r, 200));
   }
   return false;
 }
 async function launch(perf, port) {
-  const child = spawn(SERVER, ['-m', MODEL, '--host', '127.0.0.1', '--port', String(port),
-    ...CTX, ...SAMPLING, ...REASONING, ...perf], { stdio: ['ignore', 'ignore', 'pipe'] });
-  let err = ''; child.stderr.on('data', (d) => { err += String(d); });
-  if (!(await waitHealth(port))) { child.kill('SIGKILL'); throw new Error(err.slice(-500)); }
+  const child = spawn(
+    SERVER,
+    [
+      '-m',
+      MODEL,
+      '--host',
+      '127.0.0.1',
+      '--port',
+      String(port),
+      ...CTX,
+      ...SAMPLING,
+      ...REASONING,
+      ...perf,
+    ],
+    { stdio: ['ignore', 'ignore', 'pipe'] },
+  );
+  let err = '';
+  child.stderr.on('data', (d) => {
+    err += String(d);
+  });
+  if (!(await waitHealth(port))) {
+    child.kill('SIGKILL');
+    throw new Error(err.slice(-500));
+  }
   return child;
 }
 async function decodeTps(port, content, maxTokens) {
   const r = await fetch(`http://127.0.0.1:${port}/v1/chat/completions`, {
-    method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ messages: [{ role: 'user', content }], max_tokens: maxTokens,
-      temperature: 0, cache_prompt: false, stream: false }),
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      messages: [{ role: 'user', content }],
+      max_tokens: maxTokens,
+      temperature: 0,
+      cache_prompt: false,
+      stream: false,
+    }),
   });
   const j = await r.json();
   return { tps: j.timings?.predicted_per_second, n: j.timings?.predicted_n };
@@ -75,7 +135,9 @@ async function main() {
         results[`n=${n} ${pname}`] = samples;
       }
     } finally {
-      child.kill('SIGTERM'); await new Promise((r) => setTimeout(r, 700)); child.kill('SIGKILL');
+      child.kill('SIGTERM');
+      await new Promise((r) => setTimeout(r, 700));
+      child.kill('SIGKILL');
     }
   }
   const rows = Object.entries(results).map(([k, s]) => ({
@@ -93,4 +155,7 @@ async function main() {
     console.log(`  n=${n}: ${mean(all).toFixed(1)} tps`);
   }
 }
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

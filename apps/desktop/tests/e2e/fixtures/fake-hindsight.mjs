@@ -41,7 +41,7 @@
  *
  *   const hs = await startFakeHindsight({ apiKey: 'k' });
  *   … PI_DESKTOP_MEMORY_FAKE_URL = hs.url …
- *   hs.log; hs.seed('bobble', ['The user prefers dark mode.']); await hs.close();
+ *   hs.log; hs.seed('bobble', ['the user prefers dark mode.']); await hs.close();
  *
  *   node tests/e2e/fixtures/fake-hindsight.mjs --port 8888 [--api-key k]
  */

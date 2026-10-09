@@ -97,7 +97,7 @@ export const STANDING_START_REFUSAL = [
  * away the KV prefix. The gate was bought to avoid mid-run changes and was itself
  * the mid-run change.
  *
- * AND A TOOL THAT COMES AND GOES CANNOT BE PLANNED AROUND. the user, after asking why
+ * AND A TOOL THAT COMES AND GOES CANNOT BE PLANNED AROUND. The user, after asking why
  * the CEO is not told it has a manager: "yes if the talk to tool isn't loaded,
  * load it." One prompt, one tool list, every effort — which is the property
  * f4c3f02 was after in the first place ("a prompt that never changes is the
@@ -330,7 +330,7 @@ export function registerCreateHierarchyTool(pi: ExtensionAPI, deps: PromoteToolD
       /*
        * BLOCK UNTIL THE TEAM DELIVERS.
        *
-       * the user: "the ceo calls the manager, this should stop the CEO cold ... the
+       * The user: "the ceo calls the manager, this should stop the CEO cold ... the
        * ceo should not get a tool result from the manager until the manager has
        * run everything and is ready to submit the whole working product. as far
        * as the ceo knows they call manager and receive the complete working
@@ -366,7 +366,7 @@ export function registerCreateHierarchyTool(pi: ExtensionAPI, deps: PromoteToolD
        * that has decided at the top of the description does not read the rest,
        * whatever it says.
        *
-       * the user: "veto the first talk to tool call outright no matter what and
+       * The user: "veto the first talk to tool call outright no matter what and
        * just paste these instructions in there as the tool result… maybe only
        * do that if 0 tools have been called prior to the talk to."
        *
@@ -415,7 +415,7 @@ export function registerCreateHierarchyTool(pi: ExtensionAPI, deps: PromoteToolD
           /*
            * THE FINAL REVIEW RIDES IN THE TOOL RESULT.
            *
-           * the user: "that final review does not have to be part of the mesh
+           * The user: "that final review does not have to be part of the mesh
            * harness, it's just part of the tool result that the talk to tool
            * gives it — e.g. from the manager 'I've built the requested game...'
            * — the harness then injects into that tool result 'now verify this

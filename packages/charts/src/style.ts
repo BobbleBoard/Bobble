@@ -1,7 +1,7 @@
 /**
  * How a chart LOOKS — a module of its own, so no two charts need to look alike.
  *
- * the user (2026-09-16), on the first inline charts: "square not rounded looks
+ * The user (2026-09-16), on the first inline charts: "square not rounded looks
  * bad. can it style them on its own? … this can be a lot better and more
  * modular, we CANNOT have 'all charts from bobble look the same generic'."
  *

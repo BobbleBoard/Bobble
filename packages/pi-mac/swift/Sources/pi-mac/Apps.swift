@@ -3,7 +3,7 @@ import Foundation
 
 // The apps on this Mac, and their icons, for the computer-use chooser.
 //
-// the user (2026-09-15): "a UI on onboarding for computer use on/off and then if on
+// The user (2026-09-15): "a UI on onboarding for computer use on/off and then if on
 // choose what apps to allow control of, show this as a grid of real app icons
 // w/ names below, this is editable later in settings via a similar UI."
 //

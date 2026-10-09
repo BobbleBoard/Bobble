@@ -312,7 +312,7 @@ export function App() {
    * is no chat shell in that window to put it inside. The MODALITY is not: it
    * goes through `contentOverride` with the other three studios (below), which
    * is what gives it the sidebar, the toggle beside the traffic lights, and a
-   * way out that is not a back button. the user: "remove the < chat button and
+   * way out that is not a back button. The user: "remove the < chat button and
    * instead still keep the sidebar open/collapse button."
    */
   if (IS_TRIPO) {
@@ -447,7 +447,7 @@ export function App() {
                    * meant entering one threw away the chat list, the top bar and
                    * every control on it — and the studio then had to reinvent a
                    * back button, a title bar and a traffic-light inset it had no
-                   * business owning. the user: they should "just appear in the chat
+                   * business owning. The user: they should "just appear in the chat
                    * area as if they are just replacing the current chat".
                    *
                    * Same seam the model hub and Scheduled already use. The
@@ -478,7 +478,7 @@ export function App() {
 
           {/*
            * Settings FLOATS over whatever is behind it rather than replacing it
-           * (the user: "not full window taking over thing, but instead floating
+           * (The user: "not full window taking over thing, but instead floating
            * panel center"), so it is rendered as a sibling of the view switch,
            * not a branch of it. The view underneath stays mounted, which is why
            * closing settings returns you to the same chat scroll position.

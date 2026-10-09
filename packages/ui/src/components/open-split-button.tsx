@@ -6,13 +6,13 @@ import { clipBounds, type MenuPlacement, menuPlacement } from './menu-placement.
 /*
  * THE "OPEN" CONTROL, IN ONE PLACE.
  *
- * the user, on the presentation card: "I want it to just be a rounded corner open
+ * The user, on the presentation card: "I want it to just be a rounded corner open
  * button that has the same thing as the 'open' button inside the canvas when you
  * have a file open. with the little dropdown also."
  *
  * "The same thing" is the operative phrase. This used to live inline in the
  * canvas operation bar, so the present card could only ever have a COPY — and a
- * copy is what produced the dropdown divergence he spent this evening pointing
+ * copy is what produced the dropdown divergence the user spent this evening pointing
  * at. It lives in the design system now, and both surfaces render this one
  * component: change the control here and every place that offers "Open" follows.
  *

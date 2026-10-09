@@ -23,7 +23,7 @@ describe('focusComplaint', () => {
 
   it('ignores the PERSON switching apps — only our own window counts', () => {
     // Seen live on a green probe: `was "Safari", became "Mail"`, because the user
-    // read his mail while it ran. That is not the app taking the screen.
+    // read their mail while it ran. That is not the app taking the screen.
     expect(focusComplaint('Safari', 'Mail')).toBeNull();
     // …but the packaged app coming to the front still is.
     expect(focusComplaint('Safari', 'Bobble')).toContain('Bobble');

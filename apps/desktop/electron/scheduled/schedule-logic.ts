@@ -218,7 +218,7 @@ export function describeNextRun(nextMs: number | undefined, nowMs: number): stri
 /**
  * Turn "every weekday at 9am, summarise what changed in the repo" into a task.
  *
- * the user asked for "somewhere here that just lets you prompt directly for a
+ * The user asked for "somewhere here that just lets you prompt directly for a
  * scheduled task". This is the DETERMINISTIC half of that: it reads the timing
  * words, strips them, and leaves the rest as the prompt. It never guesses at
  * meaning — anything it cannot parse simply keeps the default (daily, 9am) and

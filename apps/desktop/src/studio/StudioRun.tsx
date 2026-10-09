@@ -55,7 +55,7 @@ export function remainingMs(
  *
  * The studio already knows the shape the reader chose, so the pending card can
  * be the right rectangle from its first frame rather than a square that resizes
- * once the result lands. the user allowed "a quick smooth resize … in case of
+ * once the result lands. The user allowed "a quick smooth resize … in case of
  * necessity" — this is what makes it unnecessary in the common case.
  */
 export function aspectOf(size: string | undefined): number | undefined {
@@ -101,7 +101,7 @@ export function StudioJob({
   /*
    * THE CARD THE RESULT WILL OCCUPY, MOUNTED EARLY AND EMPTY.
    *
-   * the user, on the row that used to be here — a thumbnail, a sentence about the
+   * The user, on the row that used to be here — a thumbnail, a sentence about the
    * engine, an elapsed clock and a Stop button: "this type of card is not what I
    * want, just the same final video card, same final image card, same final 3d
    * card … just that container you have the animations in and then below it,
@@ -168,7 +168,7 @@ export function StudioJob({
  * you asked for.
  *
  * It used to print the model and the seed under the bubble with a blue "Edit
- * prompt" link that put the sentence back in the composer. the user (2026-09-17):
+ * prompt" link that put the sentence back in the composer. The user (2026-09-17):
  * "editing prompt isn't reusing the already good and same ui from the chat
  * interface" and "no showing model seed and blue edit prompt text below the
  * message". So the bubble is the chat's own MessageRow — hover for Copy and

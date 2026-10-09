@@ -1,7 +1,7 @@
 /**
  * Corp bridge client — the pi-child half of `talk_to_manager`.
  *
- * THE CALL BLOCKS. the user: "the ceo calls the manager, this should stop the CEO
+ * THE CALL BLOCKS. The user: "the ceo calls the manager, this should stop the CEO
  * cold, and run the manager; the ceo should not get a tool result from the
  * manager until the manager has run everything and is ready to submit the whole
  * working product — as far as the ceo knows they call manager and receive the

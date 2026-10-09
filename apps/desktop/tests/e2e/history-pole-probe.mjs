@@ -1,7 +1,7 @@
 /**
  * THE HISTORY POLE, looked at rather than asserted.
  *
- * the user asked for a line down the right edge of a long chat with up to four
+ * The user asked for a line down the right edge of a long chat with up to four
  * marked places on it, appearing on hover, "only when useful". Three things can
  * go wrong that a unit test cannot see: it shows up on a short thread, it never
  * shows up at all, or it draws over the canvas. So this drives a real thread of

@@ -122,7 +122,7 @@ export function CorpWorkerFeed({
    * standing in for a briefing that had not loaded, which is to say a card that
    * restated the role's name and said nothing. Now that a role's REAL brief
    * arrives as a blue bubble in its transcript, the card is a placeholder in
-   * front of the actual thing. the user: "the card should not exist at all."
+   * front of the actual thing. The user: "the card should not exist at all."
    */
   const showBriefing = false;
 

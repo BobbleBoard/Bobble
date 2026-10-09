@@ -76,7 +76,7 @@ function macConnector(
  * `@pi-desktop/mac-connectors/tool-names`.
  */
 /**
- * OmniSVG — a MODEL connector (`kind:'model'`). the user: "add a connector that's
+ * OmniSVG — a MODEL connector (`kind:'model'`). The user: "add a connector that's
  * for this model ... the connector can just be called OmniSVG, for making svgs,
  * and then a simple cli tool ... svg <optional prompt> --image <optional
  * reference image path(s)>".
@@ -193,7 +193,7 @@ const CLI_TOOLS_DESCRIPTION =
 export const BUILTIN_CONNECTORS: KnownConnector[] = [
   {
     /*
-     * THE CLI, AS A CONNECTOR CARD. the user: "ensure there is a cli connector for
+     * THE CLI, AS A CONNECTOR CARD. The user: "ensure there is a cli connector for
      * the specialists that is by default there and enabled, cli tools are a
      * good context saver so it's important that they're just the same power
      * as schemas." The mode itself is the harness's (tool-cli-bridge.ts) and
@@ -329,7 +329,7 @@ const BOBBLE_3D_DESCRIPTION =
 
 /**
  * Bobble 3D — a MODULE connector (`kind:'module'`): the 3D studio's engine,
- * offered to the CHAT. the user (2026-09-17): "3d should be a connector that gets
+ * offered to the CHAT. The user (2026-09-17): "3d should be a connector that gets
  * recommended for install upon installing the 3d studio module, the card for
  * during generation/texturing/segmentation/rigging … should just be a little
  * embedded viewport rotatable".

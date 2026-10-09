@@ -14,7 +14,7 @@ import {
 
 describe("the talk_to_manager tool description — the user's wording", () => {
   /*
-   * There is no promotion system prompt any more. the user: "max effort just adds
+   * There is no promotion system prompt any more. The user: "max effort just adds
    * this talk to manager tool", and what he wrote is the tool DESCRIPTION —
    * which is the only place it needs to be, because a description is how a
    * model learns when and how to use a tool. Pinned here because the wording is

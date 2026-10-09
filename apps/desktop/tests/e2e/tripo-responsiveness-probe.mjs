@@ -1,7 +1,7 @@
 /**
  * Bobble 3D studio — UI responsiveness during a real engine job.
  *
- * the user: "the app freezes completely when running trellis model and likely
+ * The user: "the app freezes completely when running trellis model and likely
  * anything as far as I could tell". This probe MEASURES rather than assumes,
  * and separates the two possible culprits:
  *

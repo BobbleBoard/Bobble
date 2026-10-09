@@ -64,7 +64,7 @@ export function wouldHang(command: string, cwd?: string): string | null {
    * NO LIST OF LAUNCHER NAMES HERE, ON PURPOSE.
    *
    * `electron .` killed run 7, and the first fix was a blocklist — electron,
-   * npm start, yarn dev, open -a. the user removed it: "the deterministic guard
+   * npm start, yarn dev, open -a. The user removed it: "the deterministic guard
    * here is again something we need to let go of, how can you make this general
    * and reliable."
    *

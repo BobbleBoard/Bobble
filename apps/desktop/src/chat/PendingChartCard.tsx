@@ -1,7 +1,7 @@
 /**
  * THE CHART, WHILE IT IS BEING MADE.
  *
- * the user (2026-09-17): "when a chart is generating show a skeleton card with
+ * The user (2026-09-17): "when a chart is generating show a skeleton card with
  * shimmering items as a preview that builds live like visual stuff in the
  * canvas builds live". A `chart` call is a few hundred bytes of arguments the
  * model types out — the type first, then the title, then the labels and the

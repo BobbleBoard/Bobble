@@ -8,7 +8,7 @@ import { IconWarning } from './icons-pill';
 /**
  * An image the USER attached, in their own message — click to look closer.
  *
- * the user asked for the expanded view on "all input media (clicked inside chat
+ * The user asked for the expanded view on "all input media (clicked inside chat
  * input or a user message log)", not only on generated output. A 128px-tall
  * thumbnail of a screenshot you sent is unreadable, and there was no way to open
  * it: the only way to see what you had actually attached was to find the file
@@ -37,7 +37,7 @@ export function UserImage({
   /*
    * A PICTURE THE MODEL COULD NOT READ SAYS SO, FOREVER.
    *
-   * the user: "a yellow circle + ! on images both in chat input and when sent." The
+   * The user: "a yellow circle + ! on images both in chat input and when sent." The
    * pill above the composer is gone a moment later; this is what is still there
    * when you scroll back a week from now and wonder why the answer ignored the
    * screenshot. Read live rather than stored on the message, so switching to a

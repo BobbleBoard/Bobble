@@ -1,7 +1,7 @@
 /**
  * EVERY WAY A PROMPT CAN BE SLOW, MEASURED IN ONE RUN.
  *
- * the user's bar: "no matter what order I press buttons in it's always clear to me
+ * The user's bar: "no matter what order I press buttons in it's always clear to me
  * when prefill still needs to happen and when I don't see anything I get an
  * instant response … if there's been enough time to prefill for my computer
  * since the text to be prefilled has existed 100% of the time I can be sure that
@@ -273,7 +273,7 @@ try {
     /*
      * DOES THE SCREEN SAY ANYTHING, at the moment of sending?
      *
-     * the user's rule is "when I don't see anything I get an instant response", so a
+     * The user's rule is "when I don't see anything I get an instant response", so a
      * route that is not instant has to be a route that was speaking. The two
      * that are not instant here — a first message sent into the app's opening
      * warm-up, and a send that waits out an attachment prime — are exactly the
@@ -555,7 +555,7 @@ try {
     await send('refocus', 'Name one animal.', 'after 30s hidden + a 4s re-prime window');
   }
 
-  // 8. Sitting idle. the user's case was an hour; the default is short enough to run
+  // 8. Sitting idle. The user's case was an hour; the default is short enough to run
   //    in a normal cycle and long enough to catch anything on a timer.
   if (wants('idle')) {
     console.log(`  (idling ${IDLE_MIN} min…)`);
@@ -595,7 +595,7 @@ for (const r of rows) {
  * SLOW AND SILENT is the only failure left worth a headline.
  *
  * Every route above can be at 100% reuse and still take seconds, because the KV
- * is not the only thing that has to be ready. the user's rule does not say every
+ * is not the only thing that has to be ready. The user's rule does not say every
  * send is instant — it says "when I don't see anything I get an instant
  * response". So the thing to flag is a route that took long enough to notice
  * with nothing on screen explaining it.

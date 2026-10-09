@@ -1,6 +1,6 @@
 """The skinned GLB writer must put the texture on the right way up.
 
-the user (2026-09-18), on a rigged model in the chat: "what's with this
+The user (2026-09-18), on a rigged model in the chat: "what's with this
 artifacting". MEASURED: a clean bake (385fa85ad18b/model.glb) rigged into a
 rigged.glb with identical positions, indices and texture bytes — and
 `TEXCOORD_0 == (u, 1 - v)` of the source. glTF's texture origin is the top

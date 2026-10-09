@@ -1,7 +1,7 @@
 /**
  * DOUBLE-CLICK TO INSTANT — the only number that describes a real user.
  *
- * the user: "get streaming complaint to absolute 0, ttft loading model instant when
+ * The user: "get streaming complaint to absolute 0, ttft loading model instant when
  * the app opens." The blind tester, on the same thing: "You have a number for
  * when the SERVER is up. You do not have a number for when the first token of my
  * first message arrives on a cold start. That's the only number that describes

@@ -52,7 +52,7 @@ export interface ModelFit {
  */
 export type QueueReasonKind =
   | 'ready'
-  /* The model itself is still coming up. the user: "I wanted while a model is
+  /* The model itself is still coming up. The user: "I wanted while a model is
      loading now (not prefill) for messages to appear as queued." A send during
      that window used to look accepted and then sit there; queueing says the
      true thing — it will go, and it is waiting on the machine, not on you. */

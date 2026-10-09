@@ -8,7 +8,7 @@
  * project store. After a day of probe runs the user opened the dropdown and found
  * `unify-plan6`, `unify-plan5`, `unify-plan4`, `unify-plan3`, `unify-plan2`,
  * `unify-plan`, `unify-display`, `unify-smoke` — eight throwaway directories, not
- * one of which appeared in his sidebar. His rule: "nothing should be in this
+ * one of which appeared in their sidebar. Their rule: "nothing should be in this
  * dropdown if it isn't in the left sidebar."
  *
  * Filtering one list to match the other would drift again the first time either
@@ -70,13 +70,13 @@ export interface VisibleProject {
  * Pure: the projects the picker offers — the ones in the SIDEBAR, and nothing
  * else.
  *
- * the user: "they shouldn't be there unless they're in the project sidebar on the
+ * The user: "they shouldn't be there unless they're in the project sidebar on the
  * left which I should have to make manually."
  *
  * This used to add a row per distinct chat cwd, on the reasoning that the picker
  * "has to offer the folders chats actually live in". That reasoning was wrong in
  * practice: every chat gets its own working folder, so the list grew one entry
- * per conversation — MEASURED on his machine, 199 of them named `new-chat-N` —
+ * per conversation — MEASURED on their machine, 199 of them named `new-chat-N` —
  * and not one was a project he had made. A picker nobody can find anything in
  * offers nothing.
  *

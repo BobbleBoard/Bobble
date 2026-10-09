@@ -2,7 +2,7 @@
  * Corp roles must be REAL children — the same store, the same rows, the same
  * click path as a spawn_subagent child.
  *
- * the user: "the corp things need to appear as subagents (subchats in the left
+ * The user: "the corp things need to appear as subagents (subchats in the left
  * sidebar just like regular subagents do...) and they don't." They rendered as
  * rows that looked identical and did not open a chat.
  */

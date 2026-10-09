@@ -1,7 +1,7 @@
 /**
  * ONE SENTENCE, EVERY VERIFICATION INSTRUCTION IN THE HARNESS.
  *
- * the user, 2026-08-09: "all verification instructions ever passed in any prompt
+ * The user, 2026-08-09: "all verification instructions ever passed in any prompt
  * across the entire harness (not just the corp harness) need to say explicitly,
  * 'rigorous verification including non negotiably visually where applicable'."
  *
@@ -40,7 +40,7 @@ export const RIGOROUS_VERIFICATION_INSTRUCTION =
  * The check → fix → CHECK AGAIN round, required of every role before it hands
  * anything back as finished.
  *
- * the user: "ensure every step has the secondary prompting to check -> fix -> final
+ * The user: "ensure every step has the secondary prompting to check -> fix -> final
  * check before submitting as a final round when they initially submit their
  * tasks (all engineers, managers, ceo)".
  *

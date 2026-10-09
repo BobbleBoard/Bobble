@@ -127,7 +127,7 @@ describe('detectActivity — which bash is bash', () => {
   });
 
   it('shows a command while its arguments are still streaming', () => {
-    // the user: the previous output stays visible "above this next one AS IT'S BEING
+    // The user: the previous output stays visible "above this next one AS IT'S BEING
     // TYPED" — which only means anything if a half-arrived command is shown.
     const stream = detectActivity(
       [assistant('a1', [streamingCall('c1', 'bash', '{"command": "git sta')])],
@@ -224,7 +224,7 @@ describe('detectActivity — newest wins, across kinds', () => {
   });
 
   /*
-   * the user (2026-09-21), after a Desmos run in tool-CLI mode: "the activity panel
+   * The user (2026-09-21), after a Desmos run in tool-CLI mode: "the activity panel
    * doesn't focus the working browser tab it shows a terminal actually
    * executing the browser snapshot command, and then doesn't show the user
    * anything for the actual browser actions". The whole run was `bash` lines —
@@ -288,7 +288,7 @@ describe('detectActivity — newest wins, across kinds', () => {
   });
 
   /*
-   * the user (2026-09-13): "activity tab should be computer use page if the latest
+   * The user (2026-09-13): "activity tab should be computer use page if the latest
    * command is something like 'mac snapshot'". Both spellings of the call, and
    * the manual is not driving.
    */
@@ -580,7 +580,7 @@ describe('morphActivityTab — one tab, morphing in place', () => {
   });
 
   it('THE SCROLLBACK SURVIVES a morph away and back', () => {
-    // the user: "if it runs ls -la we get shown the result there then it writes a
+    // The user: "if it runs ls -la we get shown the result there then it writes a
     // file, then it runs some other terminal command we still see above this
     // next one … the ls -la output and command from before."
     const c = new CanvasController();

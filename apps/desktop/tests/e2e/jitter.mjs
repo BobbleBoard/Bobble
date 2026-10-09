@@ -1,7 +1,7 @@
 /**
  * SEEING THE THINGS A SCREENSHOT CANNOT.
  *
- * the user: "I know you can't see 30fps video so you need to programatically detect
+ * The user: "I know you can't see 30fps video so you need to programatically detect
  * jittering, visual jitter, any snapping of an area, a button briefly appearing
  * for a few ms pushing something up then pushing everything back down again,
  * flashes of menus, things like that."

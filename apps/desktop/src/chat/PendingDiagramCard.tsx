@@ -1,7 +1,7 @@
 /**
  * THE DIAGRAM, WHILE IT IS BEING MADE.
  *
- * the user (2026-09-25): "ensure those animate/build in real time smoothly". Until
+ * The user (2026-09-25): "ensure those animate/build in real time smoothly". Until
  * this, a diagram arrived whole when the tool answered — seconds after the
  * model had started typing it — and nothing showed while it did. Now the card
  * stands beneath the chain from the call's first whole line: each time a new

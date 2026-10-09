@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 /**
- * the user's standing rule is "no purple in the UI", and it keeps being broken in
+ * The user's standing rule is "no purple in the UI", and it keeps being broken in
  * the places nobody thinks of as UI — the syntax palette was the largest purple
  * surface in the product, because keywords and properties are on almost every
  * line of every file the canvas shows.

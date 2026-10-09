@@ -1,7 +1,7 @@
 /**
  * Where Bobble puts things, in paths a person can read and type.
  *
- * the user: "I need absolutely everything that the model generates and the folders,
+ * The user: "I need absolutely everything that the model generates and the folders,
  * sandboxes it uses to all have simple names and paths, no complicated
  * var/askldfjh;lkh/asdjkgbm,3241/1324iu1b types of things."
  *

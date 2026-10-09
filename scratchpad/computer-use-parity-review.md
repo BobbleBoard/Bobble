@@ -175,7 +175,7 @@ is purple: there is none.
 
 ## 2. The references
 
-the user named none, so I went and found them. Six, chosen because each solves a
+The user named none, so I went and found them. Six, chosen because each solves a
 *different* part of this screen better than we do. Ranked by how close they sit
 to our problem. Where a reference is bad at something, I say so.
 
@@ -473,7 +473,7 @@ the surface sits on `Connecting to TextEdit / Waiting for the first frame.`
 (`08-waiting-for-first-frame.png`) **forever**, with a gently breathing glyph and
 no reason and no remedy. This machine is in exactly that state
 (`{"accessibility":true,"screenRecording":false}` from the dialog probe).
-the user's own contract already called this out — `scratchpad/computer-use-contract.md:114`:
+The user's own contract already called this out — `scratchpad/computer-use-contract.md:114`:
 *"Render the denied case as a real, actionable state (System Settings > Privacy &
 Security > Screen Recording) — it is the single most likely reason a user sees
 nothing."* Fix in three parts:

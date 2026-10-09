@@ -19,7 +19,7 @@ describe('describeProject', () => {
     expect(out).toContain('2 entries');
   });
 
-  /* the user, on a presented Godot project: "I can't as the user go and see the run
+  /* The user, on a presented Godot project: "I can't as the user go and see the run
    * even primitively... pressing f5, won't do anything. it hasn't installed
    * godot or looked for an installation." A project whose runtime is absent is
    * unopenable, and the model has no way to know that unless we say so. */

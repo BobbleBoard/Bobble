@@ -2,7 +2,7 @@
  * The picker offers exactly what the SIDEBAR lists — and the sidebar only lists
  * projects the user made.
  *
- * the user, first: "nothing should be in this dropdown if it isn't in the left
+ * The user, first: "nothing should be in this dropdown if it isn't in the left
  * sidebar." Then, after seeing what that still allowed: "they shouldn't be there
  * unless they're in the project sidebar on the left which I should have to make
  * manually." The intermediate version derived a row per distinct chat working
@@ -52,7 +52,7 @@ describe('what a user may pick', () => {
 });
 
 /**
- * the user: "project selection just doesn't actually select the project when I click
+ * The user: "project selection just doesn't actually select the project when I click
  * it." It did select — the working folder changed underneath — but the chip asked
  * the ELECTRON project store which project was active, and that store answers with
  * a path hash (`p_1a2b`) while every row in the menu is a sidebar id. Nothing

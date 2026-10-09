@@ -32,7 +32,7 @@ describe('InlineWidget', () => {
   });
 
   it('wears the card head: the kind at the left, rendered ⇄ raw, copy and the way out at the right', async () => {
-    // the user (2026-09-17, with a reference): "type in top left and copy in top right".
+    // The user (2026-09-17, with a reference): "type in top left and copy in top right".
     const { container } = await render(<InlineWidget artifact={svg} />);
     expect(container.querySelector('.pd-inline-widget-kind')?.textContent).toBe('svg');
     const toggle = container.querySelectorAll('.pd-inline-widget-toggle-btn');

@@ -1,7 +1,7 @@
 /**
  * CAPABILITIES — named groups of tools, and the one tool that turns one on.
  *
- * This replaces `tool_search`. the user: "remove tool search entirely, and instead
+ * This replaces `tool_search`. The user: "remove tool search entirely, and instead
  * replace with a 'capability' tool that returns right there as the tool result …
  * the tools can be computer use, mail, calendar, browser etc." And separately:
  * "the tool search isn't great and is a source of much looping right now."
@@ -114,7 +114,7 @@ export function findCapability(name: string): Capability | undefined {
  * Used when the model's stated intent names a tool it has not been given: it
  * wants to click, so it is browsing, so it is about to want type and scroll too.
  * Turning on the whole group costs the SAME single re-prefill as smuggling in the
- * one tool, and saves the next two. the user: "load the capability suite of browser
+ * one tool, and saves the next two. The user: "load the capability suite of browser
  * tools when it's called immediately."
  */
 export function capabilityForTool(tool: string): Capability | undefined {

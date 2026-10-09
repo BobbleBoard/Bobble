@@ -90,7 +90,7 @@ export interface KnownConnector {
    * rather than handed two tools they did not ask for. Installing it installs
    * the engine when that has not happened yet, then turns the tools on; its
    * state is "engine on disk AND turned on"; removing it turns the tools off
-   * and leaves the studio's engine alone. the user (2026-09-17): "3d should be a
+   * and leaves the studio's engine alone. The user (2026-09-17): "3d should be a
    * connector that gets recommended for install upon installing the 3d studio
    * module".
    */
@@ -637,7 +637,7 @@ const CATALOG_BASE: KnownConnector[] = [
      * third-party server from PyPI that sends its own message types to port
      * 9876 — where Blender Lab's add-on (the one Blender's own extensions
      * platform ships) listens and accepts only `execute`. Every call failed; it
-     * also carried telemetry and cloud asset downloads. the user: "fix that to be a
+     * also carried telemetry and cloud asset downloads. The user: "fix that to be a
      * small cli tool". The `blender` command (mac-connectors/blender.ts) talks
      * to that add-on directly, and is registered only where Blender is
      * installed — so this card shows only there too (built-in, detected).

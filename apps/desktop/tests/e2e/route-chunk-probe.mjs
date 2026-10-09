@@ -1,7 +1,7 @@
 /**
  * A ROUTE THAT CANNOT LOAD MUST NOT TAKE THE WINDOW WITH IT.
  *
- * the user, on the full-window crash card: "rendering error self explanatory, that
+ * The user, on the full-window crash card: "rendering error self explanatory, that
  * simply can't happen anymore, it's totally unacceptable."
  *
  * The React-#185 path was hardened separately. This is the OTHER way to get

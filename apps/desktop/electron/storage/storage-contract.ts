@@ -1,7 +1,7 @@
 /**
  * MANAGE STORAGE — the renderer's view of what is on disk, where, and how big.
  *
- * the user (2026-09-12): "a page in the model manager that says 'Manage Storage'
+ * The user (2026-09-12): "a page in the model manager that says 'Manage Storage'
  * — this shows a UI that lets us visually navigate and see how much is being
  * taken up, and view and delete models, sorted the same way, always with a
  * 'Reveal' button easy to see and use if desired."

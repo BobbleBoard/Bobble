@@ -1,7 +1,7 @@
 /**
  * THE DRAWING, WHILE IT IS DRAWN.
  *
- * the user (2026-09-21): "svgs created with the svg plugin don't show the model
+ * The user (2026-09-21): "svgs created with the svg plugin don't show the model
  * streaming the svg into an svg code block that'll render live as drawing".
  * This is that block: the same inline SVG card a presented drawing gets — the
  * rendered ⇄ raw toggle in its head, so the markup can be watched growing as

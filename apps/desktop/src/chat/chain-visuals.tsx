@@ -1,7 +1,7 @@
 /**
  * THE PICTURES A CHAIN WORKED WITH — small, beside the chain, and big on request.
  *
- * the user (2026-10-08): "if there's an image/visuals of some sort worked with in
+ * The user (2026-10-08): "if there's an image/visuals of some sort worked with in
  * the thought/tool chain put on the right side of the chat area but vertically
  * in line with the tool chain a little preview of the image, hovering it shows
  * it a bit bigger and clicking on it shows it, if there's multiple, clicking on

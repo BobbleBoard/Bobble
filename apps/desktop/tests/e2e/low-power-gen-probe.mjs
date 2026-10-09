@@ -1,7 +1,7 @@
 /**
  * LOW POWER PACES A GENERATION; IT NEVER REFUSES ONE.
  *
- * the user: "low can't stop image generation requests, it just has to lessen
+ * The user: "low can't stop image generation requests, it just has to lessen
  * compute intensivity in some way sacrificing speed to keep headroom."
  *
  * A throwaway HOME (the shared settings.json is never touched — powerMode

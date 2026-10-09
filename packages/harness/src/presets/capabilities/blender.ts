@@ -1,6 +1,6 @@
 /**
  * The `blender` capability — the user's own Blender, through the add-on Blender
- * Lab ships (packages/mac-connectors/src/blender.ts). the user (2026-10-07), on the
+ * Lab ships (packages/mac-connectors/src/blender.ts). The user (2026-10-07), on the
  * third-party MCP server it replaces: "fix that to be a small cli tool".
  *
  * Its tools are registered only on a Mac with Blender installed, and a CLI

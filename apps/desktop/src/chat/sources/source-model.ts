@@ -1,7 +1,7 @@
 /**
  * THE PAGES A TURN SAW, AND WHICH OF THEM ITS ANSWER CITES.
  *
- * the user (2026-09-24): "source citing (for research and such, examples from
+ * The user (2026-09-24): "source citing (for research and such, examples from
  * google search summary shown)". The reference is Google's AI overview: a claim,
  * then a chip naming the site it came from, a card beside the answer listing
  * every source. Everything that decides WHAT those show lives here, pure, so

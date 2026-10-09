@@ -2,7 +2,7 @@
  * The app side of `present`: show the artefact to the user, and hand the model
  * back a picture of what they will see.
  *
- * the user: "presents a file to the user, shows a card and the file open or running
+ * The user: "presents a file to the user, shows a card and the file open or running
  * in canvas, if it's a godot game or whatever, that should show up as well in the
  * canvas as well, able to work. this also will show the model an immediate
  * preview of the file/game/project via returning an image or output whatever
@@ -118,7 +118,7 @@ export async function decodePixels(
  * Entry point → the command that OPENS it, and what to say when that command is
  * missing.
  *
- * the user, on a presented Godot project: "I can't as the user go and see the run
+ * The user, on a presented Godot project: "I can't as the user go and see the run
  * even primitively following its instructions going to the folder and the file
  * and pressing f5, won't do anything. it hasn't installed godot or looked for an
  * installation or run any visual tests."
@@ -347,7 +347,7 @@ export async function buildPreview(
          * AN SVG IS SHOWN AS WHAT IT DRAWS. It used to go back as its source
          * text ("an SVG is text to a vision model") — so a model that presented
          * its icon set, or OmniSVG's lighthouse, never saw a single drawing and
-         * could not tell a lens from a heart. the user (2026-09-24): "I feel like
+         * could not tell a lens from a heart. The user (2026-09-24): "I feel like
          * there's something wrong with omnisvg or maybe just how it's used".
          * Rendered on a neutral ground, with the head of the source beside it so
          * a fix can name the element it means.
@@ -409,7 +409,7 @@ export async function buildPreview(
         /*
          * A GAME IS SHOWN, NOT DESCRIBED.
          *
-         * the user's standard for "verified": "did it attempt to get a screenshot or
+         * The user's standard for "verified": "did it attempt to get a screenshot or
          * compile and run the project at all? if it did that and got and read a
          * screenshot, then i'm willing to concede a model failure, short of
          * that, I disagree." Listing files never met it — a folder listing

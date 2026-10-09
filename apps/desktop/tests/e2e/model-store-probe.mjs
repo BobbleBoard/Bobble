@@ -1,7 +1,7 @@
 /**
  * THE MODEL STORE, end to end and for real.
  *
- * the user: "we need to be able to download anything and store it properly in an
+ * The user: "we need to be able to download anything and store it properly in an
  * organized format so that no matter what we add either now or later we have an
  * easy way to list relevant models and know where their weights are stored their
  * names relevant info etc."

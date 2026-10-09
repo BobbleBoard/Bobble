@@ -2,9 +2,9 @@
  * VISION DECIDES THE LAUNCH — which engine actually starts when the model has
  * to be able to read an image.
  *
- * the user (2026-09-23): "mmproj/vision should always be loaded and usable by
+ * The user (2026-09-23): "mmproj/vision should always be loaded and usable by
  * default unless explicitly turned off … however it should always be on unless
- * the user says to turn it off." And the note his runs kept getting — "this
+ * the user says to turn it off." And the note their runs kept getting — "this
  * model is currently running in TEXT-ONLY mode, so images cannot be read" — was
  * true: the calibrated engine was rapid-mlx with MTP, and MEASURED on this Mac
  * rapid-mlx serves a speculative decoder only on its TEXT lane ("auto-downgraded

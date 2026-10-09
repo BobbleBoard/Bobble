@@ -2,7 +2,7 @@
  * EVERY QUESTION TO THE PERSON, IN ONE PLACE — a card the composer's width,
  * standing just above it.
  *
- * the user (2026-10-01, on the "Run this command?" modal over a blurred app): "let's
+ * The user (2026-10-01, on the "Run this command?" modal over a blurred app): "let's
  * put this sort of permission popup just as a little card same width as the
  * input bar floating directly above it (not on top of), and make the 'ask user'
  * question modals and any user inputs from the model or for the chat just

@@ -170,10 +170,10 @@ describe('registerMacComputerUseTools', () => {
     expect(img).toMatchObject({ type: 'image', mimeType: 'image/png', data: 'AAAA' });
   });
 
-  /* the user (2026-09-15): "add a flag … 'visual' or 'screenshot' … to force
+  /* The user (2026-09-15): "add a flag … 'visual' or 'screenshot' … to force
      visual even on text based control apps". */
   /*
-   * the user (2026-09-23): "the snapshot tool should accept a flag that gives a
+   * The user (2026-09-23): "the snapshot tool should accept a flag that gives a
    * visual snapshot no text, when this flag is here it just passes an image
    * back." And with no text to print the picture's offset, a coordinate click
    * right after it is read straight off the picture.
@@ -297,7 +297,7 @@ describe('registerMacComputerUseTools', () => {
   /*
    * ...and the other half, which is the case that used to dead-end: an app with
    * NO Accessibility tree has no index to pass, so refusing for want of one told
-   * the model to do something impossible. the user: "if an app is not visually
+   * the model to do something impossible. The user: "if an app is not visually
    * controllable … type needs to just type into active field."
    */
   it('types into an app that exposes no Accessibility, in the background', async () => {
@@ -587,7 +587,7 @@ describe('registerMacComputerUseTools', () => {
   // --- the app's OWN dialogs, sheets and file pickers ------------------------
 
   /*
-   * the user's named failure: "the model clicks Open in TextEdit, a file dialog
+   * The user's named failure: "the model clicks Open in TextEdit, a file dialog
    * appears — that dialog is part of TextEdit, not Finder — and the model must
    * be able to see and drive it."
    */
@@ -1211,7 +1211,7 @@ describe('chrome snapshot --visual (the user 2026-09-23: "it just passes an imag
 });
 
 /*
- * the user (2026-09-23): "the active application should be persisted better … the
+ * The user (2026-09-23): "the active application should be persisted better … the
  * model seems to at times randomly say 'the user is on activity monitor'."
  */
 describe('the controlled app is remembered, and a fallback says what it is', () => {

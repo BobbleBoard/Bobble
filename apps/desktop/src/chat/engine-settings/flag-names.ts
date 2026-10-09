@@ -1,5 +1,5 @@
 /**
- * A REAL NAME FOR EVERY FLAG. the user (2026-09-13): "don't show for example
+ * A REAL NAME FOR EVERY FLAG. The user (2026-09-13): "don't show for example
  * draft settings or any for that matter as their literal flag names, write
  * real names eg. not -c instead Context Window."
  *

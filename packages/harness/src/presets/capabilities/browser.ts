@@ -14,7 +14,7 @@ import type { Capability } from './types.js';
 export const browser: Capability = {
   name: 'browser',
   /*
-   * THE WEB GOES HERE, BY DEFAULT. the user (2026-09-13): the model was reaching
+   * THE WEB GOES HERE, BY DEFAULT. The user (2026-09-13): the model was reaching
    * for computer use on the user's Chrome for ordinary web tasks. In bash-CLI
    * mode this line is all it reads about the group, so the default lives in
    * the summary: any page, any site, this browser — the user's own Chrome

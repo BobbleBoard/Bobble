@@ -23,7 +23,7 @@ import './styles/global.css';
  * Focus-ring modality, before React mounts so the very first paint is already
  * correct. See @pi-desktop/ui focus-ring.ts: `:focus-visible` alone lights up
  * on Escape-dismissal and on window refocus, which is what the user kept seeing as
- * a blue box around controls he had only clicked.
+ * a blue box around controls the user had only clicked.
  */
 installFocusRingTracking();
 

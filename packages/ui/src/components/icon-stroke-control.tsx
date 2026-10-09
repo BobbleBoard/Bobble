@@ -22,7 +22,7 @@ import { Slider } from './slider.tsx';
  */
 export const ICON_STROKE_MIN = 1;
 /**
- * Upper bound of the stroke slider. the user (2026-09-20): "a more realistic
+ * Upper bound of the stroke slider. The user (2026-09-20): "a more realistic
  * range … none of which look absolutely excessive, make sure the user can't
  * make the app just 'look bad'". LOOKED AT on the rail: 1.75 is bold and
  * still crisp; 2.0 clogs the calendar's rows and the file glyphs' letters.

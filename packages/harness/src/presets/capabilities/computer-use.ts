@@ -14,7 +14,7 @@ import type { Capability } from './types.js';
 export const computerUse: Capability = {
   name: 'computer-use',
   /*
-   * NAME THE REQUEST, not just the ability. the user asked for the Mac tools to be
+   * NAME THE REQUEST, not just the ability. The user asked for the Mac tools to be
    * "described as computer use so it knows when the user asks for 'use this
    * app' it can do that" — and in bash-CLI mode this one line is ALL the model
    * gets about the group, because the capability section that spells it out is

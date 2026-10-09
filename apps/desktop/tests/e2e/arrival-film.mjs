@@ -1,7 +1,7 @@
 /**
  * FILM cards arriving in the chat — the ones with no live build of their own.
  *
- * the user (2026-09-25): build "in real time smoothly … apply that to whatever
+ * The user (2026-09-25): build "in real time smoothly … apply that to whatever
  * possible generally". Three arrivals, each presented the way main presents a
  * card (with its `shownAt`), each filmed through the CDP screencast:
  *

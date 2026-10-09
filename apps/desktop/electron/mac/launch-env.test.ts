@@ -7,7 +7,7 @@ describe("a user's own app is launched into the USER's home", () => {
    * The failure this exists for reached the user's screen: a throwaway HOME leaked
    * into Chrome, which came up with no profile and no keychain — the profile
    * picker and a keychain alert, and a run that drove a blank Chrome that was
-   * not his. $HOME is whatever this process was handed; the password database
+   * not their. $HOME is whatever this process was handed; the password database
    * is the user's actual home.
    */
   it('uses the password-database home, not $HOME', () => {

@@ -1,7 +1,7 @@
 /**
  * A DIAGRAM ASK ON THE APP'S OWN MODEL PATH, WITH ITS PREFILL ON RECORD (VQ-10).
  *
- * the user: "always be checking whenever you do chat/harness work … ensure you log
+ * The user: "always be checking whenever you do chat/harness work … ensure you log
  * and check prefill times … make sure you don't introduce any reprefill
  * required bugs". A new tool is a new tool RESULT in the conversation, and the
  * turn after it is where a prefix that did not survive shows up — so this is

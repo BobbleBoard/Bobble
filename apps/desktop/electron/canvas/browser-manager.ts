@@ -48,7 +48,7 @@ const BROWSER_PARTITION = 'persist:pi-browser';
  * sign-in refuses embedded user agents by policy and looks for exactly those
  * markers, which is why the user's Google sign-in white-screens on
  * `accounts.google.com/gsi/*` while the identical flow completes in Safari and
- * Chrome. He found a suggestion to blocklist that URL; that only makes the
+ * Chrome. The user found a suggestion to blocklist that URL; that only makes the
  * script fail early so the page falls back, and it would rot the moment Google
  * changed a path.
  *
@@ -145,7 +145,7 @@ function attachListeners(tabId: string, view: WebContentsView, owner: WebContent
    * the request by CANCELLING the navigation — silently. SEEN 2026-09-21, a
    * Desmos graph the model had edited: every `browser navigate` to GeoGebra
    * after that reported "Navigated to https://www.desmos.com/calculator" — the
-   * page had refused to unload and nothing said so. the user: "try geogebra" went
+   * page had refused to unload and nothing said so. The user: "try geogebra" went
    * nowhere seven times. Whoever asked for the navigation — the model, or the
    * user typing in the bar — asked to leave; leaving is what happens.
    */
@@ -161,7 +161,7 @@ function attachListeners(tabId: string, view: WebContentsView, owner: WebContent
    * MEASURED, from the user signing into a site with Google: the consent screen is a
    * popup. Flattened into the opener's own view it has no `window.opener`, so
    * after "Allow" it posts its result to nothing and calls `window.close()` on a
-   * window that is not a popup — and the page goes blank. He tried the identical
+   * window that is not a popup — and the page goes blank. The user tried the identical
    * flow in Safari and Chrome, where it completes, because they open the real
    * popup. It also explains why the agent's cursor could not be seen clicking
    * those buttons: there was no separate window for it to appear over.

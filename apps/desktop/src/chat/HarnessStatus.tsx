@@ -68,7 +68,7 @@ function ProcessingRing({
    * then wears its colour and glyph instead of the generic arc. */
   capability?: string;
   /** Live elapsed time in the processing phase — a visible prefill/TTFT timer
-   * (the user) so the "processing circle" duration is readable, e.g. "45% processing
+   * (The user) so the "processing circle" duration is readable, e.g. "45% processing
    * · 2.3s". */
   elapsedMs?: number;
 }): ReactElement {
@@ -226,7 +226,7 @@ export function ThreadStatusIndicator(): ReactElement | null {
   // Both self-clear, so the ring fades on the first token and never shows on the
   // instant tool-call re-prefills. `prefillPct` drives only the displayed number.
   /*
-   * NOTHING WAS SENT, SO NOTHING IS PROCESSING. the user: "I just opened bobble,
+   * NOTHING WAS SENT, SO NOTHING IS PROCESSING. The user: "I just opened bobble,
    * clicked somewhere, there's no send button even visible and it just showed
    * me this as if i sent something, and it's staying here like this
    * permanently."
@@ -341,7 +341,7 @@ export function ThreadStatusIndicator(): ReactElement | null {
   /*
    * A MODEL SWAP IS WORK, EVEN THOUGH NOBODY SENT ANYTHING.
    *
-   * the user: "changing models mid conversation shows no sign of working … no
+   * The user: "changing models mid conversation shows no sign of working … no
    * 'switching to <model>', no 'processing… n%', no 'loading model'." Both of
    * those states were already computed and neither could ever reach the screen,
    * because everything below is gated on `processing` — which requires a turn in
@@ -362,7 +362,7 @@ export function ThreadStatusIndicator(): ReactElement | null {
   /*
    * THE TWO READY STATES LEFT THIS INDICATOR — they are the PILL now.
    *
-   * the user: "moving to a new chat shows this 'getting ready' thing that I'd like
+   * The user: "moving to a new chat shows this 'getting ready' thing that I'd like
    * to move to a pill that floats above the input bar." Right: they are not
    * about a turn, they are about whether the app can answer at all, and they
    * belong next to the thing you type into rather than in the middle of a
@@ -384,7 +384,7 @@ export function ThreadStatusIndicator(): ReactElement | null {
   }
   if (serverStarting && !processing) return null;
   /*
-   * THE PANEL LINE IS GONE. the user, with a screenshot of it alone at the foot of
+   * THE PANEL LINE IS GONE. The user, with a screenshot of it alone at the foot of
    * the thread: "◌ Writing svg-icon in the panel → · 1.6s — remove it. It is
    * pinned to the bottom, the elapsed time resets, and it tells me nothing."
    *
@@ -416,7 +416,7 @@ export function ThreadStatusIndicator(): ReactElement | null {
    * Turning a group on appends tool schemas, and those render at the FRONT of
    * the prompt — so the request right after an activation re-ingests the whole
    * conversation. Same ring, same percentage, entirely different reason, and
-   * "Reading your conversation" is actively misleading about it. the user: "when
+   * "Reading your conversation" is actively misleading about it. The user: "when
    * there's a long prefill because a capability is being loaded instead of
    * 'processing' on that turn make the prefill circle show 'loading
    * <capability>'."
@@ -454,7 +454,7 @@ export function ThreadStatusIndicator(): ReactElement | null {
     <ProcessingRing
       percent={percent}
       /*
-       * the user, on the very first wait of a run: "i'd like to say 'starting up'
+       * The user, on the very first wait of a run: "i'd like to say 'starting up'
        * or something like that if it's the first message or 'loading model' or
        * changing between the two accurately." Both are true at different
        * moments — the weights really are loading, and then the session really

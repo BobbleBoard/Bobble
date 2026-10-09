@@ -1,7 +1,7 @@
 /**
  * THE QUICK TOUR — what each screen's steps are, and which screen is showing.
  *
- * the user (2026-10-08): "in the bottom left menu a quick guided tour button that
+ * The user (2026-10-08): "in the bottom left menu a quick guided tour button that
  * shows a highlighting/tutorial style guide of whatever's on screen right now."
  *
  * So the tour is per SCREEN, read off the page at the moment it starts: the

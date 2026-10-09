@@ -95,7 +95,7 @@ describe('DIVISION_PRACTICE', () => {
   });
 
   /*
-   * NO OVERFITTING. the user: "just ensure it's not task specific … i'm not going to
+   * NO OVERFITTING. The user: "just ensure it's not task specific … i'm not going to
    * tell you you're overfitting to any task because many projects don't use git"
    * — so `git` is allowed ONCE and only hedged, and nothing narrower is allowed
    * at all. This test is the guard: a future edit that reaches for a framework or
@@ -122,7 +122,7 @@ describe('DIVISION_PRACTICE', () => {
     for (const word of banned) expect(lower, `must not mention ${word}`).not.toContain(word);
   });
 
-  /* the user allows `git` explicitly, hedged: "it's ok to say check git, but with an
+  /* The user allows `git` explicitly, hedged: "it's ok to say check git, but with an
    * if applicable and 'or equivalent'". Kept as an IMPERATIVE with the hedge
    * inside it — "Skip this if it has none" was a separate sentence granting
    * permission to ignore the line, which is the shape that makes a hedge read as

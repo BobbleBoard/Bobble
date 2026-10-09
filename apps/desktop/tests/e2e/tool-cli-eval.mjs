@@ -1,7 +1,7 @@
 /**
  * THE BASH-CLI EXPERIMENT — does one bash tool beat N JSON schemas?
  *
- * the user's hypothesis, verbatim: "I would totally bet that we get near if not
+ * The user's hypothesis, verbatim: "I would totally bet that we get near if not
  * actual 100% tool success rate because the actual tool syntax is just the one
  * bash tool and no modern model is failing to write simple bash commands these
  * days."

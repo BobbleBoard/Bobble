@@ -1,7 +1,7 @@
 /**
  * THE MATH VISUAL, AS A MODEL WRITES IT.
  *
- * the user (2026-09-25), on a 4B's hand-written Fourier page: "really low quality
+ * The user (2026-09-25), on a 4B's hand-written Fourier page: "really low quality
  * and generally bad feeling … emojis absolutely not, wall of text mixed with
  * bullets neither with reference to what the visual / interactiveness is, not
  * tied in … likely ideal to make a specialized extension for math stuffs like
@@ -885,7 +885,7 @@ function shape(v: unknown, i: number, named: Map<string, Xy>, names: readonly st
  * "0..1"} moves it by (1.5, −2.5) as t goes 0 → 1, eased; "turn": {"by": 90,
  * "about": [0, 0], "t": "1..2"} turns it 90° about a point; "scale": {"by": 2}
  * grows it from its centre. The slider named is the key; without one, the
- * first slider over its whole range. the user: "smooth move/scale/slide". The move
+ * first slider over its whole range. The user: "smooth move/scale/slide". The move
  * is written into the coordinates, so everything that reads them — the page,
  * the checks, the arrows that show a move — sees it.
  */

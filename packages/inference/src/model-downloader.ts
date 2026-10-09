@@ -153,7 +153,7 @@ export async function downloadModel(
     plan.push({ kind: 'draft', repo: model.draftRepo ?? model.hfRepo, file: model.draftModel });
   }
   /*
-   * …AND EVERY OTHER DRAFTER THE MODEL HAS A FILE FOR. the user: "when downloading
+   * …AND EVERY OTHER DRAFTER THE MODEL HAS A FILE FOR. The user: "when downloading
    * any models from the recommended tab, applicable drafter(s) should also be
    * downloaded right there and then." A DFlash or DSpark draft is a few hundred
    * megabytes beside a multi-gigabyte model, and it is what lets calibration

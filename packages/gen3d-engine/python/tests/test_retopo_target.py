@@ -1,6 +1,6 @@
 """How many quads to ask QuadriFlow for — and why a fixed number was wrong.
 
-the user, looking at a retopologised car: "does quadriflow usually destroy quality
+The user, looking at a retopologised car: "does quadriflow usually destroy quality
 like that? it seemed like it did on that example, look closer?"
 
 It did, and it was not QuadriFlow. Same binary, same input OBJ, only `-f`

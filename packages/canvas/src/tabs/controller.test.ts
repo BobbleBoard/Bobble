@@ -101,7 +101,7 @@ describe('CanvasController', () => {
 
 describe('closing the LAST tab closes the rail', () => {
   /*
-   * the user: "clicking the X on the last tab in the canvas should close the canvas
+   * The user: "clicking the X on the last tab in the canvas should close the canvas
    * sidebar." Lives on the controller because the affordances had drifted — ⌘W
    * collapsed the rail and the tab's own X did not, so the same action behaved
    * differently depending on how you performed it.

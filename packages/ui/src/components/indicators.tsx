@@ -120,7 +120,7 @@ export interface WorkingIndicatorProps extends HTMLAttributes<HTMLDivElement> {
  * Streaming "π working · 20s" indicator: the branded caret loader (Spinner), an
  * animated-tint status label, and an elapsed counter.
  *
- * the user Wave B #3 — the label KEEPS its legibility while the tint animates. The
+ * The user Wave B #3 — the label KEEPS its legibility while the tint animates. The
  * old streaming label rode the text-clip shimmer (color:transparent +
  * background-clip:text over a low-alpha base), which erased the glyphs as the
  * dim band swept through. Here the glyphs are painted at a solid, readable FLOOR

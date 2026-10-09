@@ -1,7 +1,7 @@
 /**
  * WHERE A TURN'S FINISHED PICTURES SIT WHILE IT IS STILL WORKING — and after.
  *
- * the user (2026-09-24): "the 4b qwen model has gone on and iterated visually over
+ * The user (2026-09-24): "the 4b qwen model has gone on and iterated visually over
  * the generated images improving each time toward the goal. however on each of
  * it's iterations the full image cards are presented at the very bottom of the
  * chat as if totally finished, these should be embedded in thinking blocks, not
@@ -308,7 +308,7 @@ try {
   const b = await where();
   console.log('result landed:', JSON.stringify(b));
   await shot('b-result-landed');
-  /* the user (2026-09-24, later): "have generated stuff go inside a thought process
+  /* The user (2026-09-24, later): "have generated stuff go inside a thought process
      at first and only show outside the thought process if present is called on
      it" — the newest result plays its reveal where its card stood, then files
      in with the others. */

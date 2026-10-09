@@ -191,8 +191,8 @@ def drain_output(job_id, stream, keep=None):
     surface a coarse `download` event while weights are fetched. tqdm redraws with
     \\r, so we split on both \\r and \\n. Shared by every modality's subprocess.
 
-    It also emits a throttled `log` for OTHER lines. the user reported the image
-    studio as "won't work at all"; MEASURED on his Mac with the weights already
+    It also emits a throttled `log` for OTHER lines. The user reported the image
+    studio as "won't work at all"; MEASURED on their Mac with the weights already
     cached, 94 seconds pass between pressing Generate and the first diffusion
     step, and everything the child said in that window was read here and thrown
     away unless it mentioned a download. The UI showed "Starting…" for all of
@@ -242,7 +242,7 @@ def drain_output(job_id, stream, keep=None):
 class Pacer:
     """Rest a child process for `pace` of every second — SIGSTOP, then SIGCONT.
 
-    the user: "low can't stop image generation requests, it just has to lessen
+    The user: "low can't stop image generation requests, it just has to lessen
     compute intensivity in some way sacrificing speed to keep headroom." The
     generators are subprocesses (mflux, ComfyUI, TRELLIS) whose inner loops we
     cannot slow from outside, but a stopped process submits no GPU work and

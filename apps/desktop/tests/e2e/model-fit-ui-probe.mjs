@@ -1,7 +1,7 @@
 /**
  * LOOK at the model hub's fit, sort and ordering work in the real app.
  *
- * the user's standing rule on UI work: drive the real thing and look, because tests
+ * The user's standing rule on UI work: drive the real thing and look, because tests
  * pass while the screen is wrong. This asserts what the unit tests cannot — that
  * the verdict is on screen, that it carries its arithmetic, that the dropdown
  * really is in the order the user asked for, and that the verdict CHANGES when the

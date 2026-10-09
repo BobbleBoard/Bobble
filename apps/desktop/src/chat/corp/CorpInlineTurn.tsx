@@ -210,7 +210,7 @@ export function CorpInlineTurn({
    * checklist, which the mesh never emits — so the number was not "nothing was
    * delivered", it was "nobody counted", and the screen stated it as fact.
    *
-   * the user, reading it: "it said that 0/14 tasks were done but everyone finished?"
+   * The user, reading it: "it said that 0/14 tasks were done but everyone finished?"
    * — which is exactly the confusion a false zero causes. With no checklist we
    * say what we actually know: the team finished, and here is how many worked.
    */
@@ -322,7 +322,7 @@ export function CorpInlineTurn({
         </div>
 
         {/*
-         * WHAT WAS DELEGATED, BY DEFAULT. the user, scrolling a live run: "as a
+         * WHAT WAS DELEGATED, BY DEFAULT. The user, scrolling a live run: "as a
          * user this is the most confusing chat interface i've ever encountered
          * in my life ... implementing a special UI card for each tool it should
          * show something like shown in the 'delegated n tasks' checklist ...
@@ -374,7 +374,7 @@ export function CorpInlineTurn({
                      * subchat row are the same agent, and they used to do
                      * completely different things: the sidebar opened the agent
                      * as a chat, while this expanded a little feed inside the
-                     * panel. the user: "the buttons in the situation room to check on
+                     * panel. The user: "the buttons in the situation room to check on
                      * a subagent and the buttons in the left sidebar showing
                      * subagents as 'subchats' don't do the same thing?? why don't
                      * they? ... clicking in the situation room should also put

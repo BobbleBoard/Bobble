@@ -1,7 +1,7 @@
 /**
  * CARRYING A PIECE OF MEDIA FROM WHERE IT IS TO WHERE YOU CAN WORK ON IT.
  *
- * the user, round 2: "all types of media handoff into studios and editing will also
+ * The user, round 2: "all types of media handoff into studios and editing will also
  * be tested."
  *
  * Before this there was one handoff in the app and it did not carry anything: a

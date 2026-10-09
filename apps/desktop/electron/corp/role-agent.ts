@@ -280,7 +280,7 @@ export const SAVE_GRACE = 3;
 /**
  * WHAT RUNNING OUT SOUNDS LIKE.
  *
- * the user's framing, and it is better than a budget message: what an engineer that
+ * The user's framing, and it is better than a budget message: what an engineer that
  * has been heads-down too long actually needs is its manager putting a head
  * round the door — "status, ETA, what's going on down there?" — because that is
  * a question with a useful answer whether the work is nearly done, stuck, or
@@ -632,7 +632,7 @@ function toolCallPath(args: RoleAgentToolCall['arguments']): string | undefined 
 /**
  * A write whose target CANNOT BE OPENED LATER is refused now, with the reason.
  *
- * the user, on a report a subagent wrote and handed back: "it just shows up blank in
+ * The user, on a report a subagent wrote and handed back: "it just shows up blank in
  * the canvas sidebar… it was unable to be read or clicked on or viewed by me…
  * ensure even if paths are malformed or something it gets written somewhere /
  * reprompted to specify the path if there's error."
@@ -1228,7 +1228,7 @@ export interface RoleAgentConfig {
    * pi child loads via `-e`, so a subagent's tool surface is the chat's tool
    * surface rather than a hand-picked subset.
    *
-   * the user: "why don't we treat each subagent as a new individual chat exactly the
+   * The user: "why don't we treat each subagent as a new individual chat exactly the
    * same, allowing the same tools". Before this, the corp seam injected two
    * registrars (web + browser) and everything else a role's allowlist named —
    * `mcp_call`, the connectors, generation — resolved to nothing. Two tool
@@ -1893,7 +1893,7 @@ export async function openRoleSession(
      * contract and each follow-up — lands here first, so its chat opens with
      * what it was ASKED to do instead of starting mid-monologue. This is the
      * only place that sees all of them, which is why it goes here rather than at
-     * a call site. the user: "I still don't see the blue left aligned bubble I asked
+     * a call site. The user: "I still don't see the blue left aligned bubble I asked
      * for showing the actual task/follow up messages the subagents were given."
      */
     safeEmit(turn.onActivity, { kind: 'briefing', text: userPrompt });

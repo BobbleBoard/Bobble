@@ -2,7 +2,7 @@
  * THE FOLDER THAT OPENS — a project row's glyph, morphing between the closed
  * and the open folder as the row folds and unfolds.
  *
- * the user (2026-09-20) handed over the two drawings and asked for the
+ * The user (2026-09-20) handed over the two drawings and asked for the
  * "animation between the two". The two are not the same path: the closed one
  * is a body with a tab and a shelf line, the open one a back panel and a
  * skewed front. So the morph is geometric rather than a `d` transition: each

@@ -7,11 +7,11 @@ import { wouldHang } from './hang-guard.js';
 describe('the launcher blocklist is deliberately NOT here', () => {
   /*
    * A list of names — electron, npm start, yarn dev — lived here for one commit
-   * (82082d1) after `electron .` killed run 7. the user removed it: "the
+   * (82082d1) after `electron .` killed run 7. The user removed it: "the
    * deterministic guard here is again something we need to let go of, how can
    * you make this general and reliable."
    *
-   * He is right. A blocklist catches only what somebody already thought of, and
+   * The user is right. A blocklist catches only what somebody already thought of, and
    * refuses commands that might have been fine. The general answer is a default
    * TIMEOUT on every bash command (withDefaultTimeout in ../index.ts): a clock
    * does not care what the command is, and control comes back either way.

@@ -1,7 +1,7 @@
 /**
  * A REAL DIFF OF AN EDIT — the fix for "successful edits show up as red".
  *
- * the user, with a screenshot of a `file-icon.svg` tab reading `+11 −18` over a
+ * The user, with a screenshot of a `file-icon.svg` tab reading `+11 −18` over a
  * slab of red and a smaller block of green: "editing/writing tool calls a lot
  * of the time show up as red."
  *

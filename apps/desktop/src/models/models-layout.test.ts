@@ -232,7 +232,7 @@ describe('modality is searchable', () => {
 
 describe('the Recommended / All scope', () => {
   it('hides orgs that are not on the reliable allowlist', () => {
-    // the user: "'newest' will show just a bunch of random models… have reputable
+    // The user: "'newest' will show just a bunch of random models… have reputable
     // organizations shown". Community re-quanters and individuals are the
     // firehose the toggle exists to hold back.
     const models = [

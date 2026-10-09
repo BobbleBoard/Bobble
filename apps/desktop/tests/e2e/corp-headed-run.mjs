@@ -1,7 +1,7 @@
 /**
  * corp-headed-run.mjs — start a corp run the way a USER does, in the real app.
  *
- * the user's ask, and it is the right one: every corp run so far has been driven by
+ * The user's ask, and it is the right one: every corp run so far has been driven by
  * `corp-mesh-run.mjs`, which builds the mesh directly in a bare node process. That
  * proves the harness and proves nothing about the product. It skips the app, the
  * IPC, the effort slider, the situation room — the entire surface a person
@@ -133,8 +133,8 @@ const OUT = process.env.OUT ?? path.join(repoRoot, '.corp-runs', 'corp-headed');
  * A REAL, NAMED FOLDER — never a temp path with a random suffix.
  *
  * The default used to be `mkdtemp('/tmp/corp-project-')`, which produces
- * `/tmp/corp-project-Xk9fL2`. the user, watching a run go into one: "that's just not
- * going to work." He is right, and not only aesthetically. That directory means
+ * `/tmp/corp-project-Xk9fL2`. The user, watching a run go into one: "that's just not
+ * going to work." The user is right, and not only aesthetically. That directory means
  * nothing to the person who has to open it afterwards, it is swept away by the
  * OS, and the TEAM is keyed to its path — so a project whose folder is a random
  * string is a team that can never be returned to, which is the one thing the
@@ -187,7 +187,7 @@ const app = await electron.launch({
    *
    * This used to always launch with its own `--user-data-dir`, which sounds tidy
    * and is why every headed run I did answered "fetch failed": a fresh profile
-   * has no model selected, so the app never starts a llama-server. the user, seeing
+   * has no model selected, so the app never starts a llama-server. The user, seeing
    * it: "on your test build you're getting fetch failed … this never happens on
    * the real app seemingly, make sure this doesn't happen for you."
    *
@@ -206,11 +206,11 @@ const app = await electron.launch({
     PI_DESKTOP_CORP: '1',
     /*
      * FORCE IS OPT-IN NOW. It used to default ON, and the app this probe leaves
-     * open is one the user then types into — so every message he sent, "hi" included,
+     * open is one the user then types into — so every message the user sent, "hi" included,
      * was forced into a corporation and answered with "Reading the request and
-     * deciding how to approach it." He reported it as a product bug. It was this
-     * flag: a testing-only switch that made the app I handed him behave unlike
-     * the app he ships.
+     * deciding how to approach it." The user reported it as a product bug. It was this
+     * flag: a testing-only switch that made the app I handed them behave unlike
+     * the app the user ships.
      *
      * Set FORCE=1 when a probe genuinely needs a corp on the first message.
      * Otherwise the model decides, exactly as it does for a real user.
@@ -331,7 +331,7 @@ try {
   /*
    * PIN THE MODEL when asked.
    *
-   * the user: "rerun the corp harness with the 4b qwen model, NOT the 9b model."
+   * The user: "rerun the corp harness with the 4b qwen model, NOT the 9b model."
    * With Qwen3.5-9B now the `balanced` tier pick, a run that inherits whatever
    * the profile last used could silently be a 9B run — and a trace attributing
    * 4B behaviour to a 9B is worse than no trace. `mode: 'model'` also disables
@@ -362,7 +362,7 @@ try {
   /*
    * WAIT FOR THE MODEL. Every headed run I did answered "fetch failed", and the
    * reason was mine: the probe typed the moment the window appeared, while a 4B
-   * Q8 model was still loading. the user: "this never happens on the real app
+   * Q8 model was still loading. The user: "this never happens on the real app
    * seemingly" — because a human waits for it. A test that races the model is
    * testing the race.
    */
@@ -528,7 +528,7 @@ try {
   log('task sent — watch the situation room');
 
   /*
-   * A TOUR, not a fixed camera. the user: "periodically take and review a screenshot
+   * A TOUR, not a fixed camera. The user: "periodically take and review a screenshot
    * and do some automation to click around, maybe on a tool call, screenshot
    * again, then click a different subagent/engineer chat, screenshot again… that'll
    * give you ability to build a good UI/UX checklist issue list as well as read

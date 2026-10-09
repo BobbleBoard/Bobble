@@ -344,7 +344,7 @@ describe('wireHarness', () => {
    * WAS "only at high/max". Effort is decided per MESSAGE, so this test was
    * pinning a tool that appeared and vanished between turns of one conversation
    * — and the tool list is rendered at the START of the prompt, so each flip
-   * threw away the KV prefix. the user: "yes if the talk to tool isn't loaded, load
+   * threw away the KV prefix. The user: "yes if the talk to tool isn't loaded, load
    * it." The assertion is now the opposite, and it is the point: the advertised
    * set does not move when effort does.
    */
@@ -479,7 +479,7 @@ describe('the system prompt no longer changes mid-session', () => {
    * REPLACES 'team prompt invalidation'. That suite pinned the old behaviour:
    * the cached prompt was thrown away whenever the team appeared, so the
    * instructions changed underneath a running session and cost a full KV
-   * re-prefill. the user: "ensure there's not conflicting 'mid run changes' ...
+   * re-prefill. The user: "ensure there's not conflicting 'mid run changes' ...
    * tampering with the system prompt/tools mid run for 'promotion'."
    *
    * The team guidance lives on the tool description now, so the prompt is
@@ -530,7 +530,7 @@ describe('withDefaultTimeout — every command comes back', () => {
    * waits for a human. The run died at 66 minutes without ever reaching the
    * CEO's verification turn. pi's bash says it itself — "no default timeout".
    *
-   * The first fix was a list of launcher names. the user: "the deterministic guard
+   * The first fix was a list of launcher names. The user: "the deterministic guard
    * here is again something we need to let go of, how can you make this general
    * and reliable." A clock is general: it does not care what the command is.
    */
@@ -617,7 +617,7 @@ describe('withDefaultTimeout — every command comes back', () => {
 
 describe('withBackgroundOption — "this one does not return" is a choice', () => {
   /*
-   * the user: "do all bash commands have background parameter set in the tool call
+   * The user: "do all bash commands have background parameter set in the tool call
    * inputs by the way? that could be helpful."
    *
    * pi's bash takes only `command` and `timeout`, so backgrounding meant typing

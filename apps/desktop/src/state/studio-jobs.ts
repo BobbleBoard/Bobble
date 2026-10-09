@@ -2,7 +2,7 @@
  * A STUDIO'S RUNNING JOB, KEPT OUTSIDE THE ROOM — the other half of
  * studio-runs.ts, which already did this for the finished results.
  *
- * the user (2026-09-24): "leaving a studio with a generation running and then going
+ * The user (2026-09-24): "leaving a studio with a generation running and then going
  * back doesn't keep it going, or maybe it does but the UI resets".
  *
  * It was the UI. The job runs in MAIN (gen-manager's queue) and nothing ever

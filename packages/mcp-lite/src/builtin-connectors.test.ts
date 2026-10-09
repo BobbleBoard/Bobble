@@ -63,7 +63,7 @@ describe('built-in connectors', () => {
   });
 
   it('renders a neutral (non-brand) inline SVG mark, in a hue of its own', () => {
-    // the user (2026-09-17): "a bit more colorful … simple still but with a bit of
+    // The user (2026-09-17): "a bit more colorful … simple still but with a bit of
     // color, not so simple thin white lines only" — two tones of one mid-tone
     // hue (the strokes, and a 16% wash on the closed shapes).
     for (const id of BUILTIN_CONNECTOR_IDS) {
@@ -134,7 +134,7 @@ describe('model connectors', () => {
 });
 
 describe('module connectors', () => {
-  /* the user (2026-09-17): "3d should be a connector that gets recommended for
+  /* The user (2026-09-17): "3d should be a connector that gets recommended for
      install upon installing the 3d studio module". The card is the chat's use
      of the studio's engine: its own kind, so the app can answer install /
      state / recommendation from the module rather than from a model file or

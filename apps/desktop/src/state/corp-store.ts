@@ -337,7 +337,7 @@ export const useCorpStore = create<CorpStoreState>((set) => ({
   /*
    * NOTE — one UI for "an agent's conversation" is still OUTSTANDING.
    *
-   * the user: "there shouldn't be two seperate UI's dpeneding on whether we click
+   * The user: "there shouldn't be two seperate UI's dpeneding on whether we click
    * into the situation room's buttons or the subchats in the left sidebar."
    * CorpInlineTurn already routes its clicks through setViewedChild; this path
    * pins the node instead, and ChatThread then renders CorpChatStream inline —
@@ -355,7 +355,7 @@ export const useCorpStore = create<CorpStoreState>((set) => ({
   trackChart: (rawChart) =>
     set((s) => {
       /*
-       * THE TOP-LEVEL ROLE IS IN THE ROOM. the user: "I just can't see the activity
+       * THE TOP-LEVEL ROLE IS IN THE ROOM. The user: "I just can't see the activity
        * of the original model now ... the situation room doesn't show any top
        * level role".
        *

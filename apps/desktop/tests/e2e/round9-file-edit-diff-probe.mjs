@@ -5,7 +5,7 @@
  * drew a LIVE DIFF into it — the deletions as `−` rows and the additions as `+`
  * rows, growing as the tool's arguments streamed.
  *
- * WHY IT DOES NOT ANY MORE. the user, round 21: "Editing a file shouldn't show the
+ * WHY IT DOES NOT ANY MORE. The user, round 21: "Editing a file shouldn't show the
  * diff being written in real time it should show that file and then the text as
  * the negative part of the diff is written being deleted … and then of course
  * the replace part writing animation." The diff being typed out is exactly the

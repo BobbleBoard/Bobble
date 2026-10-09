@@ -184,7 +184,7 @@ describe('applySamplingMode — the payload merge per mode', () => {
 });
 
 describe('running out reads as a manager looking in, not a budget notice', () => {
-  // the user: an engineer heads-down too long needs "status, ETA, what's going on
+  // The user: an engineer heads-down too long needs "status, ETA, what's going on
   // down there?" — a question with a useful answer whether it is nearly done,
   // stuck, or building the wrong thing. Run 13 spent 1200 seconds with zero file
   // writes and nobody asked.

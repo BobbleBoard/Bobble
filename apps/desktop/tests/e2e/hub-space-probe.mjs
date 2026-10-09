@@ -1,7 +1,7 @@
 /**
  * NO ROOM, NO DOWNLOAD — and the hub says so where the click happened.
  *
- * the user: "don't allow / warn of disk space issues when downloading a model
+ * The user: "don't allow / warn of disk space issues when downloading a model
  * that there isn't enough space for." The probe runs against the REAL volume
  * (a throwaway HOME lives on the same disk) and asks the hub to fetch a
  * recommended recipe bigger than what is free, then checks that the refusal

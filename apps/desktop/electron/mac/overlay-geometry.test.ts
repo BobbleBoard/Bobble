@@ -76,7 +76,7 @@ describe('overlayShouldShow (app-scoped visibility rule)', () => {
   });
   /* With the native mask, hiding is the mask's job — and a rule that decides
      can only decide late, which is what the user saw as "a ~1s delay until the
-     cursor disappears" every time he switched apps. */
+     cursor disappears" every time the user switched apps. */
   it('stays up under the native mask even when another app is covering it', () => {
     expect(
       overlayShouldShow({
@@ -238,7 +238,7 @@ describe('bubbleContent — the words the canvas monitor and overlay.html share'
 
 describe('the phantom hides for the point it is on, not the window it is in', () => {
   /*
-   * the user, watching a live run: "the fake cursor is an always on top invisible
+   * The user, watching a live run: "the fake cursor is an always on top invisible
    * window, so i'm seeing the fake cursor even when maps correctly open in the
    * background."
    *

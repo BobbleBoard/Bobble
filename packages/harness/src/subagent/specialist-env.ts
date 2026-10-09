@@ -1,7 +1,7 @@
 /**
  * A specialist child's tool set — pinned, exact, and nothing else.
  *
- * the user: "the model should be able to spawn a subagent that can do any of these
+ * The user: "the model should be able to spawn a subagent that can do any of these
  * as specialist workflows, with just these tools loaded, those subagents are
  * only for that purpose, we aren't putting any of this as 'capability suites'."
  *

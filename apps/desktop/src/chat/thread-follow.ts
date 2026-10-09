@@ -1,7 +1,7 @@
 /**
  * SENDING TAKES YOU TO THE BOTTOM.
  *
- * the user (2026-09-24): "pressing enter on a chat should take you to the bottom".
+ * The user (2026-09-24): "pressing enter on a chat should take you to the bottom".
  *
  * The thread follows new output only while the reader is parked at its foot,
  * and the smallest scroll up releases it (ChatThread's stick — the user's own rule,

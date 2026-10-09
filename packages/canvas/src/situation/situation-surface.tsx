@@ -115,7 +115,7 @@ const TIGHT_WIDTH = 460;
  * the agent already answering in the chat pane, not one of its own subagents.
  * True, and it made the list start at the manager, so the hierarchy read as
  * though the manager were the top of it and there was no way back to the one you
- * were actually talking to. the user: "there's no way back to the CEO, the top of
+ * were actually talking to. The user: "there's no way back to the CEO, the top of
  * the situation room shows the manager."
  *
  * So the root is listed, first, where it belongs — and selecting it routes back
@@ -196,7 +196,7 @@ export function SituationRoomSurface({
   // The root answers in the chat, so it is listed but never COUNTED as a subagent.
   const subagents = team.filter((n) => !isRootNode(n));
   /*
-   * PARKED IS NOT WORKING. the user: "how come there's '4 at work' with 4 timers
+   * PARKED IS NOT WORKING. The user: "how come there's '4 at work' with 4 timers
    * ticking up in the situation room". A lead blocked in talk_to is marked
    * `working` by the model — it has an open turn — but it is generating
    * nothing, and a clock beside it claims otherwise. `generating` is the honest
@@ -320,7 +320,7 @@ export function SituationRoomSurface({
            * A BUTTON BACK TO THE USER'S OWN CHAT, not a caption about it. This
            * was the line "Bobble — your chat, this is its team"; the user: "that
            * text is silly and just isn't what I asked for. just remove that."
-           * What he wanted was a way BACK: "pressing the manager chat in the
+           * What the user wanted was a way BACK: "pressing the manager chat in the
            * situation room bring me to the top level chat and there isn't a
            * 'main' button as I want above the 'the team'."
            */}
@@ -536,7 +536,7 @@ interface SubagentListProps {
 /**
  * WHY A ROW IS STILL — the word and the colour that go beside a stopped agent.
  *
- * the user: "they are stopped for a reason, so the reason could be red error, green
+ * The user: "they are stopped for a reason, so the reason could be red error, green
  * completed and waiting, and yellow paused." Working returns null: that state
  * already has a shimmer and a running clock, and a badge on top of them would
  * be noise on the only row that needs no explanation.
@@ -600,7 +600,7 @@ function SubagentList({ nodes, onSelectNode, selectedNodeId, nodeTiming, now }: 
                   </span>
                 ) : null}
                 {/*
-                 * WHY THIS ONE IS STOPPED. the user: "for each subagent, they are
+                 * WHY THIS ONE IS STOPPED. The user: "for each subagent, they are
                  * stopped for a reason, so the reason could be red error, green
                  * completed and waiting, and yellow paused… simple circles faint
                  * tint or glow maybe, very faint, nothing complicated, to the

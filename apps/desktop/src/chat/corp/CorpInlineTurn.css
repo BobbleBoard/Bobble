@@ -241,9 +241,9 @@
   padding: 0;
 }
 
-/* the user UI#3: WHAT WAS DELEGATED, shown by default.
+/* The user UI#3: WHAT WAS DELEGATED, shown by default.
  *
- * The reference is his own "delegated n tasks" card: the checklist IS the
+ * The reference is their own "delegated n tasks" card: the checklist IS the
  * card's body, not something you unfold to reach. It was already computed
  * (SituationState.checklist, one row per contract) and only shown to someone
  * who went looking. The team roster stays behind the expand — WHO is doing the

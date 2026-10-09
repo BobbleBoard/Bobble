@@ -1,7 +1,7 @@
 /**
  * MEDIA GENERATION IS INLINE NOW — this is the probe that looks at it.
  *
- * the user, round 21: "image/video/audio/media generation tools DO NOT GET SHOWN IN
+ * The user, round 21: "image/video/audio/media generation tools DO NOT GET SHOWN IN
  * THE CANVAS…. they get shown inline, the large card, same as each studio would
  * show. we need to have custom animations for when these are generating…
  * eg. show the bobble logo as a loader with the squares sliding clockwise like a
@@ -329,7 +329,7 @@ try {
     await page.waitForTimeout(300);
   };
   // EARLY: the picture is in the box and still resolving — this is the frame
-  // the user asked to be able to see ("the user can see image unblur in real time
+  // The user asked to be able to see ("the user can see image unblur in real time
   // as soon as it resembles anything at all").
   for (const step of [1, 2]) await pushStep(step);
   await page.waitForTimeout(400);
@@ -508,7 +508,7 @@ try {
     `the waveform collapsed in a narrow column: ${JSON.stringify(narrowWave)}`,
   );
   /*
-   * AND IT FITS. the user: the card "must look good at every size the thread renders
+   * AND IT FITS. The user: the card "must look good at every size the thread renders
    * it at". A card that is merely present while hanging off the right edge — and
    * putting a horizontal scrollbar under the whole conversation — is not.
    */
@@ -532,7 +532,7 @@ try {
 
   // ── 9. THE STUDIO WAITS THE SAME WAY ────────────────────────────────────
   /*
-   * ONE ANIMATION, NOT TWO. the user asked for the thread's card to be "the same
+   * ONE ANIMATION, NOT TWO. The user asked for the thread's card to be "the same
    * card its studio would show"; a generic shimmer in the room and the app's own
    * sliding mark in the conversation would be two answers to one question, from
    * one engine, in one app.

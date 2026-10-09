@@ -1,5 +1,5 @@
 /**
- * THE CARDS FOLLOW THE CHAT. the user (2026-09-17): "I just went back to a chat I
+ * THE CARDS FOLLOW THE CHAT. The user (2026-09-17): "I just went back to a chat I
  * earlier made some visuals in and it didn't have them there, nor in the
  * canvas when I went to files."
  *

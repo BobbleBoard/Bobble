@@ -1,7 +1,7 @@
 /**
  * THE COMPUTER-USE VIEW STAYS IN THE CHAT THAT IS DRIVING.
  *
- * the user (2026-09-12): "going to other chats, even when computer use is not
+ * The user (2026-09-12): "going to other chats, even when computer use is not
  * active in them after it previously has been in the current chat is pinning
  * a computer use tab in the canvas that reopens when closed, but when closing
  * the canvas entirely it does not reopen."

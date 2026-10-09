@@ -85,7 +85,7 @@ function session(patch: Partial<MacMonitorSessionState> = {}): MacMonitorSession
 
 describe('pickMonitorSource', () => {
   it('prefers pixels whenever a frame has one', () => {
-    // the user: "when screen recording permissions are granted always use the real
+    // The user: "when screen recording permissions are granted always use the real
     // window visual."
     expect(pickMonitorSource(session(), { bitmap: {} })).toBe('pixels');
   });

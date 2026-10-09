@@ -160,7 +160,7 @@ def _provision_trellis_mlx(registry: Registry, log) -> None:
     env["HF_HOME"] = str(registry.hf_home)
     env.update(_metal_env())
 
-    # THE PREBUILT SET. the user (2026-09-15): "all basic stuff needs to work out
+    # THE PREBUILT SET. The user (2026-09-15): "all basic stuff needs to work out
     # of the box". The Metal rasteriser and the sparse GEMM kernels only build
     # with Xcode's `metal` compiler, and the o_voxel shape encoder with a C++
     # compiler — neither of which a fresh Mac has. The app ships them built

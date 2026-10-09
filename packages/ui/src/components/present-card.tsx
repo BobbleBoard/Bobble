@@ -105,7 +105,7 @@ function FolderGlyph() {
 export interface PresentCardProps extends Omit<HTMLAttributes<HTMLElement>, 'onSelect'> {
   item: PresentedItem;
   /**
-   * The Open button — the canvas, beside the conversation. the user: "by default it
+   * The Open button — the canvas, beside the conversation. The user: "by default it
    * opens in the canvas or it should". The same thing the card body does.
    */
   onOpen?: (item: PresentedItem) => void;
@@ -133,7 +133,7 @@ export const PresentCard = forwardRef<HTMLDivElement, PresentCardProps>(function
   return (
     <div ref={ref} className={clsx('pd-present-card', className)} {...rest}>
       {/*
-       * the user: "clicking anywhere on the card besides the 'open' button [should]
+       * The user: "clicking anywhere on the card besides the 'open' button [should]
        * open it in canvas ... it wouldn't make sense for the open button to open
        * in canvas because this button is the same one shown when something IS
        * open in canvas."
@@ -149,7 +149,7 @@ export const PresentCard = forwardRef<HTMLDivElement, PresentCardProps>(function
         onClick={onActivate === undefined ? undefined : () => onActivate(item)}
       >
         {/*
-         * THE TILE IS THE FILE'S COLOUR. the user: "more color and unique icons
+         * THE TILE IS THE FILE'S COLOUR. The user: "more color and unique icons
          * for file types, not just the generic and not anything that just has
          * the generic with 'pptx' under it." A deck is vermilion with a chart,
          * a document blue with lines, a sheet green with a grid — read before
@@ -199,7 +199,7 @@ export const PresentCard = forwardRef<HTMLDivElement, PresentCardProps>(function
           </button>
         ) : null}
         {/*
-         * the user: "I want it to just be a rounded corner open button that has the
+         * The user: "I want it to just be a rounded corner open button that has the
          * same thing as the 'open' button inside the canvas when you have a file
          * open. with the little dropdown also." Literally the same component the
          * canvas operation bar renders — not a lookalike.

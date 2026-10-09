@@ -390,7 +390,7 @@ function listAllSessions(filterCwd?: string, query?: string): SessionSummary[] {
 /**
  * ONE ROW PER CONVERSATION.
  *
- * the user: "many duplicate chats appear … I made one chat and now have many named
+ * The user: "many duplicate chats appear … I made one chat and now have many named
  * the same thing", and "only ONE chat should appear in the left sidebar with one
  * clean, up-to-date latest state".
  *

@@ -936,7 +936,7 @@ export function communicationTools(
   const tools: Array<Record<string, unknown>> = [];
   /*
    * Anything this agent returns may carry an alert about somebody who STOPPED —
-   * the user's "<tool result> + additional info, <subagent> is stopped: <message>".
+   * The user's "<tool result> + additional info, <subagent> is stopped: <message>".
    * Wrapping at the return point rather than at each call site means a new tool
    * cannot forget to check; draining here is what stops the same alert repeating
    * on every result until it is ignored.
@@ -1489,7 +1489,7 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
     seenTree.set(agentId, treeNow);
     const incoming =
       agent.role === 'manager'
-        ? /* NO "Message from <x>:" HEADER. the user: "you can just totally remove that
+        ? /* NO "Message from <x>:" HEADER. The user: "you can just totally remove that
            header from the top of each message bubble it serves no purpose."
            The sender is already on the row the message arrives in, and the line
            was also what surfaced "Message from user:" inside a CEO-manager
@@ -1599,7 +1599,7 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
           // and so never submitted anything. Running out of budget now reads as
           // "conclude", which is the one thing a 4B model needs said out loud.
           /*
-           * NO STEP CAP. the user: "let's not have a tool call cap".
+           * NO STEP CAP. The user: "let's not have a tool call cap".
            *
            * It was built to stop a role that never stops — run 7's engineer spent
            * thirty-odd bash calls rewriting one file and never submitted. But a
@@ -1710,7 +1710,7 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
            * from the reply the role JUST WROTE, with its own claims listed back.
            * Not prompt text it can skim at authoring time — its words, returned.
            *
-           * the user: "the manager and CEO should be given the whole shebang about
+           * The user: "the manager and CEO should be given the whole shebang about
            * how they are looking from the point of view of the ceo (who gave the
            * manager the vision) and the ceo from the point of view of the user
            * (who asked them for this) and are going to really look and tell: did
@@ -2006,7 +2006,7 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
      * `maxStepsPerMessage` is a passthrough nothing sets, so no counter is ever
      * built — and the harness had no idea whether anything was on disk; it
      * guessed, hedged, and then the promote-tool's own sentence two lines later
-     * said "Nothing was delivered". the user, reading it: "is that an automated
+     * said "Nothing was delivered". The user, reading it: "is that an automated
      * harness line? remove it."
      *
      * MEASURED COST, run 15: the manager's turn was cut off at the OUTPUT cap
@@ -2120,7 +2120,7 @@ export async function runCorpMeshTask(opts: {
   /*
    * THE VERIFICATION CLASSIFIER, at the very start of the run.
    *
-   * the user: "determine at the very start of the task via a classifier if visual
+   * The user: "determine at the very start of the task via a classifier if visual
    * verification is going to be applicable and then per contract do the same,
    * and then seed the prompt accordingly." Seeded HERE so "check it works"
    * already has a meaning by the time anybody has written a line, rather than
@@ -2182,7 +2182,7 @@ export async function runCorpMeshTask(opts: {
      *
      * This used to run a discovered check and hand its failure back to the CEO,
      * bounded by `maxGateRounds`, and the run's verdict was that check's exit
-     * code. the user's correction, and it is the right one: that is a coding-shaped
+     * code. The user's correction, and it is the right one: that is a coding-shaped
      * assumption welded into a harness that has to be able to make a film, a
      * document, a dataset — things with no test suite and no exit code. Worse, an
      * automated check that is WRONG holds up a product that is fine, and there is

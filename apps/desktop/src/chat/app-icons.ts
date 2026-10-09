@@ -1,7 +1,7 @@
 /**
  * REAL APP ICONS, fetched once and kept.
  *
- * the user: "you can get the real app icon of any program being used right? so just
+ * The user: "you can get the real app icon of any program being used right? so just
  * use that no emoji." macOS has the icon for every bundle, so a row that says
  * "Snapshotted Google Chrome" can show Chrome rather than a glyph that looks
  * the same for every app.

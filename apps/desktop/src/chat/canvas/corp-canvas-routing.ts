@@ -2,7 +2,7 @@
  * Corp (multi-agent) → canvas bridge: what the user SEES while a team works.
  *
  * It used to open a tab per surface — a file tab per path, a terminal tab per
- * node — and every one of them took focus as it appeared. the user, trying to watch
+ * node — and every one of them took focus as it appeared. The user, trying to watch
  * a run: "if you click something and then you need to go hunting back for the
  * situation room tab once you click one of them ... needs to stay in place so we
  * can quickly and efficiently look around."
@@ -167,7 +167,7 @@ export function focusSituationTab(controller: CanvasController, taskId: string |
  * It used to jump the canvas to the node's own file or terminal tab. That reads
  * well once and is unusable in practice: you click an engineer to see what it is
  * doing, the room disappears from under you, and getting back means hunting
- * through a tab bar that grew a tab for every file anyone touched. the user: "keep
+ * through a tab bar that grew a tab for every file anyone touched. The user: "keep
  * that tab open instead of moving to the subagent's tab immediately ... we need
  * to be able to quickly swap and monitor."
  *
@@ -184,7 +184,7 @@ export function selectCorpNodeAndFocus(
   /*
    * ONE UI FOR AN AGENT'S CONVERSATION.
    *
-   * the user: "there shouldn't be two seperate UI's dpeneding on whether we click
+   * The user: "there shouldn't be two seperate UI's dpeneding on whether we click
    * into the situation room's buttons or the subchats in the left sidebar. the
    * UI that I want to see is exactly as the left sidebar shows, with the back
    * button." Clicking a row here used to pin the node and stream it INLINE
@@ -221,12 +221,12 @@ export function useCorpCanvasRouting(controller: CanvasController): void {
   const nodeCount = useCorpStore((s) => s.situation?.chart.nodes.length ?? 0);
 
   /*
-   * the user UI#5: THE ACTIVITY TAB FOLLOWS THE SELECTION, WHEREVER IT WAS MADE.
+   * The user UI#5: THE ACTIVITY TAB FOLLOWS THE SELECTION, WHEREVER IT WAS MADE.
    *
    * The tab tracks `pinnedNode` in the corp store, but selecting an agent from
    * the sidebar sets `viewedChildId` in the CHILD store and nothing else — so
    * you would open Engineer 1 as a chat and the activity tab would carry on
-   * showing whichever node had last been clicked in the situation room. the user:
+   * showing whichever node had last been clicked in the situation room. The user:
    * "clicking the left sidebar chat/subchat should have the agent activity tab
    * always turn straight to whatever it's supposed to be, corresponding agent."
    *

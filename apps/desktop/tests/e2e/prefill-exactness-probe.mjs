@@ -1,7 +1,7 @@
 /**
  * YOU WAIT FOR WHAT IS LEFT, AND NOTHING MORE.
  *
- * the user's rule for an attachment: "if the user puts in an attachment that takes
+ * The user's rule for an attachment: "if the user puts in an attachment that takes
  * 20 seconds to prefill and then types for 10s, then sends, they should be
  * waiting 10 seconds for the attachment + however much else they typed, and no
  * more … if they wait more time than their message takes to prefill, they get it
@@ -207,7 +207,7 @@ try {
     const sentAt = Date.now();
     await win.keyboard.press('Enter');
     /*
-     * AND DOES THE SCREEN SAY SO? the user's rule is "when I don't see anything I
+     * AND DOES THE SCREEN SAY SO? The user's rule is "when I don't see anything I
      * get an instant response" — which only holds if a send that is waiting out
      * a prime keeps saying it is waiting. Read the pill just after Enter, while
      * the wait is happening, not after.

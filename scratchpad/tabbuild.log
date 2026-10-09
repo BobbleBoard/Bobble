@@ -1,8 +1,9 @@
 $ vite build
 vite v8.1.3 building client environment for production...
-[2Ktransforming...[plugin rolldown:vite-resolve] Module "node:os" has been externalized for browser compatibility, imported by "/Users/user/Desktop/OSS-harness/apps/desktop/electron/workspace/project-dir.ts". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
-[plugin rolldown:vite-resolve] Module "node:fs" has been externalized for browser compatibility, imported by "/Users/user/Desktop/OSS-harness/apps/desktop/electron/workspace/project-dir.ts". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
-[plugin rolldown:vite-resolve] Module "node:path" has been externalized for browser compatibility, imported by "/Users/user/Desktop/OSS-harness/apps/desktop/electron/workspace/project-dir.ts". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+[2K
+transforming...[plugin rolldown:vite-resolve] Module "node:os" has been externalized for browser compatibility, imported by "apps/desktop/electron/workspace/project-dir.ts". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+[plugin rolldown:vite-resolve] Module "node:fs" has been externalized for browser compatibility, imported by "apps/desktop/electron/workspace/project-dir.ts". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+[plugin rolldown:vite-resolve] Module "node:path" has been externalized for browser compatibility, imported by "apps/desktop/electron/workspace/project-dir.ts". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
 ✓ 1181 modules transformed.
 rendering chunks...
 computing gzip size...
@@ -146,21 +147,24 @@ dist/assets/index-e_fCw_3Y.js                                       2,123.87 kB 
 
 ✓ built in 458ms
 vite v8.1.3 building client environment for production...
-[2Ktransforming...✓ 744 modules transformed.
+[2K
+transforming...✓ 744 modules transformed.
 rendering chunks...
 computing gzip size...
 dist-electron/main.js  1,257.96 kB │ gzip: 413.32 kB
 
 ✓ built in 150ms
 vite v8.1.3 building client environment for production...
-[2Ktransforming...✓ 26 modules transformed.
+[2K
+transforming...✓ 26 modules transformed.
 rendering chunks...
 computing gzip size...
 dist-electron/preload.js  4.62 kB │ gzip: 1.98 kB
 
 ✓ built in 6ms
 vite v8.1.3 building client environment for production...
-[2Ktransforming...✓ 32 modules transformed.
+[2K
+transforming...✓ 32 modules transformed.
 rendering chunks...
 computing gzip size...
 dist-electron/inference-supervisor.js  81.54 kB │ gzip: 26.75 kB

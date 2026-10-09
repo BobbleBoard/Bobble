@@ -1,7 +1,7 @@
 /**
  * THE DIAGRAM WHILE IT IS TYPED — main's half of the live diagram card.
  *
- * the user (2026-09-25): "ensure those animate/build in real time smoothly". A
+ * The user (2026-09-25): "ensure those animate/build in real time smoothly". A
  * `diagram` call is Mermaid the model types out line by line; the thread
  * (chat/PendingDiagramCard) asks here for a frame each time a whole new line
  * has arrived, at most every ~200 ms, and animates from one frame to the

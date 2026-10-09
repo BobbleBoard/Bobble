@@ -1,7 +1,7 @@
 /**
  * CALIBRATION, END TO END, HEADLESS: the real app, the real pi, the real cache.
  *
- * the user: "at the top bar, to the right of the chat name, show a little icon,
+ * The user: "at the top bar, to the right of the chat name, show a little icon,
  * clicking this has a dropdown that shows a little scrollable list of the
  * inference engines with a 'calibrate' button at the top, during generation
  * this should also live show tps numbers. clicking calibrate pauses anything

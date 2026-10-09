@@ -2,7 +2,7 @@
  * THE INLINE ⇄ CANVAS MOVE, MEASURED — does the morph land where the element
  * ends up?
  *
- * the user (2026-10-08): "the moving inlines between canvas and chat is good but
+ * The user (2026-10-08): "the moving inlines between canvas and chat is good but
  * the animation seems smooth mostly but theres some jitteriness both ways".
  *
  * A chart card seeded into a thread (no model). Its corner control lifts it

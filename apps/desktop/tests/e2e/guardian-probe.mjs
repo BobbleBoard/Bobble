@@ -1,7 +1,7 @@
 /**
  * THE GUARDIAN, SEEN WORKING — on a machine that stays fine throughout.
  *
- * the user: "needs monitoring for cpu and mem pressure to ensure extremes like this
+ * The user: "needs monitoring for cpu and mem pressure to ensure extremes like this
  * absolutely never happen". Proving the shed path by actually thrashing the Mac
  * would be doing the thing it exists to prevent, so the probe raises the
  * guardian's free-memory lines from the environment (PI_GUARDIAN_SHED_FREE) and

@@ -2,7 +2,7 @@
  * CAPABILITY PILLS — the coloured chips that carry most of a model row's
  * legibility in the reference.
  *
- * the user, comparing ours to Unsloth Studio: "way worse currently needs to be
+ * The user, comparing ours to Unsloth Studio: "way worse currently needs to be
  * brought up". A large part of that gap was here. Ours rendered a lowercase
  * enum value (`vision`) in one grey, or an EMOJI in a grey square — full-colour
  * glyphs in an otherwise monochrome UI, at the mercy of the system emoji font.

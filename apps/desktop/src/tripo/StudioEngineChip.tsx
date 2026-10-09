@@ -1,5 +1,5 @@
 /**
- * THE STUDIO'S OWN ENGINE, NOT THE CHAT'S. the user (2026-09-14): "some buttons
+ * THE STUDIO'S OWN ENGINE, NOT THE CHAT'S. The user (2026-09-14): "some buttons
  * shouldn't appear / aren't applicable / purpose must be changed to fit eg.
  * proper engines, steps/s for specific studio rather than text always."
  *

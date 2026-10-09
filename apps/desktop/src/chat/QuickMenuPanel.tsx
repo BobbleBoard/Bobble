@@ -2,7 +2,7 @@
  * "MORE MODELS" — every model on disk, largest first, and the controls that
  * make the quick menu the user's.
  *
- * the user asked for favouriting, a configurable quick menu (rename slots, point
+ * The user asked for favouriting, a configurable quick menu (rename slots, point
  * them at models, add more), and a "more models" surface that reveals a search
  * box once the list is long enough plus a scrollable list of everything
  * downloaded, largest to smallest, with org icons and model names.
@@ -135,7 +135,7 @@ export function QuickMenuPanel({
       </div>
 
       {/* CONFIGURING THE MENU — rename a slot, point it at a model, add one.
-          the user: "configuring the quick menu (intelligent balanced fast, add more
+          The user: "configuring the quick menu (intelligent balanced fast, add more
           if you like, rename etc just do model names)". */}
       <button
         type="button"

@@ -12,7 +12,7 @@ import type { Capability } from './types.js';
 
 export const threeD: Capability = {
   name: '3d',
-  /* the user (2026-09-17): "3d should be a connector". The two tools register
+  /* The user (2026-09-17): "3d should be a connector". The two tools register
      only when the Bobble 3D connector is on and an engine that makes meshes
      is on this Mac (PI_BOBBLE_3D_READY) — so this group, like `svg`, exists
      for the model exactly when it can be honoured and not otherwise. The

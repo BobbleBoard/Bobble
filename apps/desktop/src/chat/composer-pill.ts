@@ -2,7 +2,7 @@
  * What the pill above the input bar says, and whether it can honestly show a
  * percentage.
  *
- * the user, on the "getting ready" text that appears when you move to a new chat:
+ * The user, on the "getting ready" text that appears when you move to a new chat:
  * "I'd like to move [it] to a pill that floats above the input bar we can use …
  * both should have a % bar able to be accurately made. If no % is available or
  * able to be shown ACCURATELY, then make the circle a loading spinner."

@@ -151,7 +151,7 @@ function situationState(ids: string[]): SituationState {
 
 describe('the way back to the CEO', () => {
   /*
-   * the user: "the CEO == the original model right? there's no way back to the CEO,
+   * The user: "the CEO == the original model right? there's no way back to the CEO,
    * the top of the situation room shows the manager."
    *
    * It listed every node EXCEPT the root, on the reasoning that the root is the
@@ -361,7 +361,7 @@ describe('useCorpCanvasRouting — a corp run drives the canvas like a chat', ()
     });
     expect(useCorpStore.getState().pinnedNode?.id).toBe('eng-1');
     // THE POINT: the click changed WHAT the surfaces show, not WHICH one you are
-    // looking at. the user: "keep that tab open instead of moving to the subagent's
+    // looking at. The user: "keep that tab open instead of moving to the subagent's
     // tab immediately ... we need to be able to quickly swap and monitor."
     expect(controller.getState().activeTabId).toBe(situationId);
 
@@ -392,7 +392,7 @@ describe('useCorpCanvasRouting — a corp run drives the canvas like a chat', ()
 describe('one UI for an agent conversation', () => {
   it('clicking a situation-room agent opens the SAME child view the sidebar opens', () => {
     /*
-     * the user: "there shouldn't be two seperate UI's dpeneding on whether we click
+     * The user: "there shouldn't be two seperate UI's dpeneding on whether we click
      * into the situation room's buttons or the subchats in the left sidebar."
      */
     const controller = createCanvasController();

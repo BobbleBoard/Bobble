@@ -1,7 +1,7 @@
 /**
  * FINDING THE MEDIA A TURN JUST MADE, so the thread can show it.
  *
- * the user: "I should be able to go to a new chat and ask for any of these types of
+ * The user: "I should be able to go to a new chat and ask for any of these types of
  * media or files, all are delivered and embedded cleanly and in full quality
  * into the chat aswell as with a file presentation card(s) to export/reveal."
  *

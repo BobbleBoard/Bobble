@@ -1,6 +1,6 @@
 /**
  * Build a mock-pi fixture that streams a LONG bulleted list slowly — the shape
- * the user described when auto-scroll kept snapping him down ("if the model is
+ * The user described when auto-scroll kept snapping them down ("if the model is
  * writing a bulleted list quickly") and the shape in his gap screenshot.
  *
  *   node tests/e2e/fixtures/make-stream-fixture.mjs > /tmp/stream-fixture.json

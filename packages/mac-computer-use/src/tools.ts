@@ -308,7 +308,7 @@ function sleep(ms: number): Promise<void> {
  * rebuilt, the index still means what the model meant. It is wrong the moment a
  * sheet or file picker has opened in between: indices are namespaced per app,
  * not per window, so that number now resolves to whatever the fresh walk
- * assigned it — quite possibly a control in the window BEHIND the dialog. the user's
+ * assigned it — quite possibly a control in the window BEHIND the dialog. The user's
  * exact complaint is the model clicking through a TextEdit save panel it cannot
  * see, so the retry stops here and hands the dialog over instead.
  */
@@ -391,10 +391,10 @@ export function registerMacComputerUseTools(
    */
   const MAC_CONTROL_ENTRY = 'mac-control';
   /*
-   * …AND ACROSS CHATS. the user (2026-09-23): "the active application should be
+   * …AND ACROSS CHATS. The user (2026-09-23): "the active application should be
    * persisted better". A new chat started with nothing under control, so its
    * first bare `mac snapshot` fell back to whatever the user had in front —
-   * Activity Monitor, in his runs — and the model reported that as where the
+   * Activity Monitor, in their runs — and the model reported that as where the
    * user was. The last controlled app is kept in one small file, restored by a
    * chat that has no control of its own (while the app still runs, within 12 h),
    * and the look that uses it SAYS it was carried over.
@@ -528,7 +528,7 @@ export function registerMacComputerUseTools(
   let names = new Map<number, string>();
   /**
    * The PICTURE the last look was, when it was a `--visual` one — its screen
-   * rect and its pixel size. the user (2026-09-23): the visual snapshot "just
+   * rect and its pixel size. The user (2026-09-23): the visual snapshot "just
    * passes an image back", no text, so the offsets a text snapshot prints are
    * not there to add; a coordinate click right after one is read straight off
    * the picture and translated here. Any other look clears it.
@@ -859,7 +859,7 @@ export function registerMacComputerUseTools(
             'covers so a point read off it maps onto the screen.',
         }),
       ),
-      /* the user (2026-09-15): "add a flag / parameter to the computer use cli tool
+      /* The user (2026-09-15): "add a flag / parameter to the computer use cli tool
          for 'snapshot' that is 'visual' or 'screenshot' or something to force
          visual even on text based control apps." `--visual` used to be a
          resolver alias for --screenshot, so it worked but appeared nowhere in
@@ -896,7 +896,7 @@ export function registerMacComputerUseTools(
         const page = { find: params.find, from: params.from };
         const landed = landing(params.app);
         /*
-         * --visual: THE PICTURE AND NOTHING ELSE. the user (2026-09-23): "the
+         * --visual: THE PICTURE AND NOTHING ELSE. The user (2026-09-23): "the
          * snapshot tool should accept a flag that gives a visual snapshot no
          * text, when this flag is here it just passes an image back."
          */
@@ -976,7 +976,7 @@ export function registerMacComputerUseTools(
         /*
          * `like` — SEARCH THE PAGE, rather than filter it.
          *
-         * the user: "would it be possible to take a really small embedding model and
+         * The user: "would it be possible to take a really small embedding model and
          * quickly index and search a page ... this should be implemented as an
          * argument/flag on snapshot tools."
          *
@@ -1305,7 +1305,7 @@ export function registerMacComputerUseTools(
            * that has none: snapshot says act by coordinates, type says pass an
            * index, and the turn dead-ends between them.
            *
-           * the user: "if an app is not visually controllable, mac snapshot just
+           * The user: "if an app is not visually controllable, mac snapshot just
            * returns … a screenshot and a 'this app must be controlled visually'
            * type needs to just type into active field."
            *
@@ -1448,9 +1448,9 @@ export function registerMacComputerUseTools(
   /*
    * THE WINDOW AROUND THE PAGE.
    *
-   * the user: "for chrome, we need tab handling so it can read open tabs, switch
+   * The user: "for chrome, we need tab handling so it can read open tabs, switch
    * tab, make new tab and close tab — the dom wouldn't let it drive that, or for
-   * example profiles, settings, top bar." He is right about the DOM: a page's
+   * example profiles, settings, top bar." The user is right about the DOM: a page's
    * JavaScript can see its own document and nothing about the browser holding
    * it. The tab strip is in the ACCESSIBILITY tree though, as an ordinary
    * AXTabGroup — so this needs no Chrome setting, no Apple Events, and works the
@@ -1481,7 +1481,7 @@ export function registerMacComputerUseTools(
         /*
          * APPLE EVENTS FIRST, and it needs no setting.
          *
-         * the user: "for chrome possible without asking the user to download an
+         * The user: "for chrome possible without asking the user to download an
          * extension, that's not an option." MEASURED against a Chrome with
          * AllowJavaScriptAppleEvents OFF: `count of tabs`, `title of tab` and
          * `URL of tab` all answer — that flag only ever gated `execute
@@ -1599,7 +1599,7 @@ export function registerMacComputerUseTools(
              clause and removes the whole misreading. */
           description:
             'How far, in PIXELS — not wheel clicks (default ~300; a screenful is roughly 800).',
-          /* the user: "controlling through dom shouldn't need scroll right? ...
+          /* The user: "controlling through dom shouldn't need scroll right? ...
              scrolling should only be necessary if using visually." Right: a
              snapshot lists what is below the fold and `find` reaches it, so
              scrolling is for LOOKING, not for acting. */

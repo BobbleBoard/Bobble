@@ -1,7 +1,7 @@
 /**
  * WHAT THE APP IS DOING, in the middle of the top bar.
  *
- * the user: "remove the 'starting up' pill and put it instead in the top bar
+ * The user: "remove the 'starting up' pill and put it instead in the top bar
  * centered, centered in the top bar between new chat and canvas
  * controls/advanced settings."
  *

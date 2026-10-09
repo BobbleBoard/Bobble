@@ -1,7 +1,7 @@
 /**
  * THE MODEL-HUB LAYOUT RULES, separated from the rendering.
  *
- * the user asked to "totally copy the layout of unsloth studio and how they show
+ * The user asked to "totally copy the layout of unsloth studio and how they show
  * it", and supplied screenshots. The parts of that layout that are DECISIONS
  * rather than markup live here so they can be tested and so an adversarial
  * review has something concrete to check against the references:
@@ -22,7 +22,7 @@ import type { OutputModality } from './recommended-catalog';
 
 export type ModelFormat = 'all' | 'gguf' | 'safetensors' | 'mlx' | 'finetune';
 /**
- * Capabilities AND generation types in one axis. the user: "how about a filter by
+ * Capabilities AND generation types in one axis. The user: "how about a filter by
  * generation type, generation: we have 3d video image text etc. maybe merge in
  * capabilities". They are the same question from the user's side — "what can
  * this thing do" — so two dropdowns asking it would be two places to look.
@@ -58,7 +58,7 @@ export const FORMAT_OPTIONS: Array<{ id: ModelFormat; label: string; dot?: strin
 /**
  * HF's pipeline tag, as a readable INPUT → OUTPUT badge.
  *
- * the user: "see at a glance the hf label that is in-out eg. image-text-text or
+ * The user: "see at a glance the hf label that is in-out eg. image-text-text or
  * whatever". HF's tags already encode the modalities on each side — `text-to-
  * image`, `image-text-to-text`, `automatic-speech-recognition` — but the raw
  * string is jargon. This turns it into "text → image", "image + text → text",
@@ -122,7 +122,7 @@ export function formatPipelineTag(tag: string | undefined): string | undefined {
 /**
  * WHAT A MODEL MAKES, from its pipeline tag.
  *
- * the user: "everything filterable by output also". The output side of the tag is
+ * The user: "everything filterable by output also". The output side of the tag is
  * the axis — it is the question someone actually arrives with ("I want to make a
  * video"), where `capabilities` mixes what a model understands with what it
  * produces.
@@ -246,7 +246,7 @@ export interface HubModel {
 export interface HubFilters {
   readonly format: ModelFormat;
   /**
-   * MULTI-SELECT. the user: "have that capabilities dropdown be a checkbox that
+   * MULTI-SELECT. The user: "have that capabilities dropdown be a checkbox that
    * doesn't immediately close dropdown so you can select multiple." Empty means
    * no capability filter — which is different from a magic 'all' member, because
    * a set with an 'all' in it has two ways to say the same thing.
@@ -256,7 +256,7 @@ export interface HubFilters {
   readonly onlyFits: boolean;
   readonly query: string;
   /**
-   * Upper bound in GB, or undefined for no cap. the user asked for "maybe a slider
+   * Upper bound in GB, or undefined for no cap. The user asked for "maybe a slider
    * for size" — a MAXIMUM is the useful end of that range: the question people
    * ask a hub is "what fits", never "what is at least this big".
    */
@@ -278,7 +278,7 @@ export interface HubFilters {
    */
   readonly maxSize?: number;
   /**
-   * WHOSE REPOS TO SHOW. the user: "by default, the 'newest' will show just a bunch
+   * WHOSE REPOS TO SHOW. The user: "by default, the 'newest' will show just a bunch
    * of random models, so if you could just have reputable organizations shown,
    * for example a 'reccomended/all' toggle".
    *
@@ -292,7 +292,7 @@ export interface HubFilters {
    */
   readonly scope?: 'recommended' | 'all';
   /**
-   * WHAT IT MAKES. the user: "everything filterable by output also".
+   * WHAT IT MAKES. The user: "everything filterable by output also".
    *
    * Multi-select, and empty means no filter — the same shape as `capabilities`,
    * for the same reason: a magic 'all' member gives the set two ways to say the
@@ -313,7 +313,7 @@ export const DEFAULT_FILTERS: HubFilters = {
 /**
  * Datasets have no quant format and no inference capabilities, so they start
  * from a different baseline. Keeping the two sets SEPARATE is the fix for
- * the user's report: "searching for datasets seeming to not work because filters for
+ * The user's report: "searching for datasets seeming to not work because filters for
  * gguf vision etc persist and obviously those files don't exist in datasets,
  * save those for when the user swaps back to the models tab, don't reset their
  * filters".

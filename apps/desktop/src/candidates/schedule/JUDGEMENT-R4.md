@@ -81,7 +81,7 @@ Each item: what was asked, what the picture shows, and the shot it was checked i
    prompt box begins at y=281; under it a **Reach** block at y=478→553 in
    Connectors' label/value form — "Reaches  Calendar · Mail · Reminders",
    "Runs in  A folder of its own, kept per run" (or "OSS-harness —
-   /Users/user/Desktop/OSS-harness" in `-late`), "Runs on  whichever model
+   the repo root" in `-late`), "Runs on  whichever model
    Bobble loads first — none is loaded yet". Same recipe as
    `../connectors/shots/ledger-detail-github-bobble-dark` ("Group / Touches /
    Runs as / Command").

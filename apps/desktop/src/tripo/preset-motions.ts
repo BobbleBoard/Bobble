@@ -1,7 +1,7 @@
 /**
  * THE PRESET MOTIONS, AS DATA THE APP CAN APPLY IN A FRAME.
  *
- * the user: "the preset humanoid animation library should be existing and instantly
+ * The user: "the preset humanoid animation library should be existing and instantly
  * applicable."
  *
  * It was neither. `SEED_MOTIONS` carried only a `previewId` — the filename of a

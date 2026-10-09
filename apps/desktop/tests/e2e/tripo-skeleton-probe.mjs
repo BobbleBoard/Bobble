@@ -2,7 +2,10 @@ import { execSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { _electron as electron } from 'playwright-core';
+
+const REPO_ROOT = fileURLToPath(new URL('../../../../', import.meta.url)).replace(/\/$/, '');
 
 // Default to the newest rig the engine actually produced, so this does not
 // depend on a scratch path that a reboot can clear (it did — the probe then
@@ -20,8 +23,7 @@ if (GLB.length === 0) {
 const OUT = '/tmp/skel-ui';
 mkdirSync(OUT, { recursive: true });
 const app = await electron.launch({
-  executablePath:
-    '/Users/user/Desktop/OSS-harness/apps/desktop/release/mac-arm64/Bobble.app/Contents/MacOS/Bobble',
+  executablePath: `${REPO_ROOT}/apps/desktop/release/mac-arm64/Bobble.app/Contents/MacOS/Bobble`,
   args: [`--user-data-dir=${mkdtempSync(path.join(tmpdir(), 'pi-e2e-udd-'))}`],
   env: { ...process.env, HOME: homedir(), PI_E2E: '1', PI_DESKTOP_TRIPO: '1' },
 });

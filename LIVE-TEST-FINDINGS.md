@@ -4,7 +4,7 @@ Every task below was run against the real app, real profile, real model
 (`qwen3.5-4b-mtp`, Q8_0, MTP draft). Each entry is: what was asked, what actually
 happened, the harness failure underneath it, and the fix.
 
-the user's framing, which is the standard everything here is held to:
+The user's framing, which is the standard everything here is held to:
 
 > there's literally no reason that the 4b model can't do anything like that, none
 > of the individual steps are out of its reach … it's totally doable stuff that we

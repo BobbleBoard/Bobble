@@ -1,7 +1,7 @@
 /**
  * A SUCCESSFUL EDIT MUST NOT READ AS A FAILURE.
  *
- * the user, with a screenshot of a `file-icon.svg` canvas tab reading `+11 −18`
+ * The user, with a screenshot of a `file-icon.svg` canvas tab reading `+11 −18`
  * over a slab of red: "editing/writing tool calls a lot of the time show up as
  * red."
  *

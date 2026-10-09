@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 /**
  * THE TERMINAL DRAWS NO RECTANGLE OF ITS OWN.
  *
- * the user, from a screenshot: "the terminal styling there's that akward border".
+ * The user, from a screenshot: "the terminal styling there's that akward border".
  *
  * MEASURED in the running app before touching anything: `.pd-terminal` computed
  * to `rgba(255, 255, 255, 0.04)` — `--pd-code-block-bg` is a translucent wash,

@@ -298,7 +298,7 @@ export const GEN3D_MODEL_SPECS: readonly Gen3dModelSpec[] = [
     id: 'parakeet-asr',
     label: 'Parakeet (speech → text)',
     role: 'audio',
-    // the user asked for "FluidVoice". FluidVoice is a macOS APP (GPLv3) that
+    // The user asked for "FluidVoice". FluidVoice is a macOS APP (GPLv3) that
     // wraps other engines, not a model — vendoring it would put copyleft on
     // this codebase. Parakeet is what it runs underneath, and it has a
     // first-class MLX port. MEASURED: 0.26s for 15s of speech (~55x real

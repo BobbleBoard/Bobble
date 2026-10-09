@@ -30,7 +30,7 @@ import { emptyOrgChart, type OrgChart, type OrgNode } from './org-chart.js';
 /*
  * THE CEO TALKS TO THE MANAGER. It does not design a corporation first.
  *
- * the user, watching a max-effort run build a whole game solo with this tool sitting
+ * The user, watching a max-effort run build a whole game solo with this tool sitting
  * unused in its list: "I thought we renamed the create hierarchy to just be the
  * talk to tool that the original model (which IS the CEO) just talks to the
  * manager with."
@@ -59,7 +59,7 @@ export const CREATE_PRODUCTION_HIERARCHY = TALK_TO_MANAGER;
 /**
  * REMOVED: there is no promotion system prompt any more.
  *
- * the user: "what's 'promotion system prompt' supposed to be... let's remove that,
+ * The user: "what's 'promotion system prompt' supposed to be... let's remove that,
  * max effort just adds this talk to manager tool" — and the wording he wrote
  * lives on the TOOL DESCRIPTION, which is where a model actually reads when and
  * how to use a tool. A second prompt telling it to be a CEO only made
@@ -103,7 +103,7 @@ export const CREATE_PRODUCTION_HIERARCHY_TOOL: OpenAiFunctionTool = {
   function: {
     name: CREATE_PRODUCTION_HIERARCHY,
     /*
-     * the user's wording, verbatim — he wrote it and asked for it unedited.
+     * The user's wording, verbatim — the user wrote it and asked for it unedited.
      *
      * This is the TOOL DESCRIPTION, which is the only place it needs to live:
      * the tool is simply added to the list at high/max effort, so the
@@ -144,7 +144,7 @@ export const CREATE_PRODUCTION_HIERARCHY_TOOL: OpenAiFunctionTool = {
       'request. anything *genuinely* quick you are still free to do without this tool though. ' +
       "start by asking yourself at each turn, 'genuinely quick or should I call in the " +
       "manager?'. " +
-      // the user, 2026-08-09 — what the manager actually takes, in his words. The
+      // The user, 2026-08-09 — what the manager actually takes, in his words. The
       // run-2 manager received a one-line brief ("a Godot game") and spent 36
       // minutes inventing the requirement itself; the vision is the CEO's job.
       'WHAT THE MANAGER TAKES: a planned, fully thought out vision that you lay out ' +
@@ -155,7 +155,7 @@ export const CREATE_PRODUCTION_HIERARCHY_TOOL: OpenAiFunctionTool = {
       'what the thing IS, what it contains, how it should look and feel, and what would make ' +
       'it good; leave how to build it to the team. ' +
       /*
-       * the user's wording, VERBATIM. He wrote it after watching a CEO brief a
+       * The user's wording, VERBATIM. The user wrote it after watching a CEO brief a
        * manager from adjectives alone; the phrasing is his because the point is
        * his — an unknown you did not close is a decision handed to a 4B engineer
        * with less context than you have.

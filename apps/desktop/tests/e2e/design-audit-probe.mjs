@@ -3,7 +3,7 @@
  * in one hidden run, and dump the computed type/colour/spacing of the elements
  * that carry its hierarchy.
  *
- * the user: "get visuals of all parts of the app ... figure out the aspects that
+ * The user: "get visuals of all parts of the app ... figure out the aspects that
  * make this feel generic ... my best guess would be a lack of hierarchy."
  *
  * A hierarchy complaint cannot be answered from the stylesheet: the same token

@@ -16,7 +16,7 @@ export interface ProjectEntry {
   /**
    * FULL ACCESS — this project's model runs with no sandboxing at all.
    *
-   * the user: "in projects, add a 'full access' mode — red, with an ! in a circle —
+   * The user: "in projects, add a 'full access' mode — red, with an ! in a circle —
    * that gives the model full reign and full access: e.g. if it types in the
    * terminal it has access to have anything happen as if the user is typing in the
    * terminal, all homebrew packages, manipulate system stuff etc. No sandboxing."

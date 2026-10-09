@@ -1,6 +1,6 @@
 /**
  * LOOK at every dialog the app can open without a model, in both themes.
- * the user (2026-09-20), on the task dialog: "that modal and all similar look
+ * The user (2026-09-20), on the task dialog: "that modal and all similar look
  * incredibly generic and lack hierarchy in the slightest, redesign them".
  *
  * Each dialog is opened the way a person opens it (or, for the ones the

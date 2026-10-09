@@ -1,7 +1,7 @@
 /**
  * LOOK at the sidebar's hierarchy and the new-chat lead, light and dark.
  *
- * the user (2026-09-24): "now the left sidebar, do you see the lack of hierarchy, and then
+ * The user (2026-09-24): "now the left sidebar, do you see the lack of hierarchy, and then
  * the bobble text on a new chat". A hierarchy complaint is a claim about sizes, weights,
  * inks and gaps, so this prints one row per piece of text in the sidebar, top to bottom:
  * its size/weight, its ink's contrast against the rail, its row height and the gap above

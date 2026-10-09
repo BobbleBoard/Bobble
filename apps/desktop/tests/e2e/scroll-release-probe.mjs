@@ -1,7 +1,7 @@
 /**
  * A HAIR OF SCROLL-UP FREES YOU FROM AUTO-SCROLL; TOUCHING THE BOTTOM RE-ARMS IT.
  *
- * the user (2026-09-12): "when attempting to scroll up, if the model is writing a
+ * The user (2026-09-12): "when attempting to scroll up, if the model is writing a
  * bulleted list quickly … the auto scroll constantly snaps you back down … the
  * slightest bit of user scrolling up manually, I need to be freed from the
  * auto scroll … if they tap the bottom at all, then activate the auto scroll,

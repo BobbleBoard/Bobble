@@ -18,9 +18,10 @@
  */
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
+import { homedir } from 'node:os';
 
-const SERVER = '/Users/user/.cache/pi-desktop/llamacpp/b9934/llama-b9934/llama-server';
-const DEFAULT_MODEL = '/Users/user/.cache/pi-desktop/models/qwen3.5-4b-mtp/Qwen3.5-4B-Q8_0.gguf';
+const SERVER = `${homedir()}/.cache/pi-desktop/llamacpp/b9934/llama-b9934/llama-server`;
+const DEFAULT_MODEL = `${homedir()}/.cache/pi-desktop/models/qwen3.5-4b-mtp/Qwen3.5-4B-Q8_0.gguf`;
 
 const argv = process.argv.slice(2);
 const getOpt = (name, def) => {
@@ -34,14 +35,33 @@ const ONLY = getOpt('only', '');
 // The sampling/reasoning/spec args assembleServerArgs() emits today. Held
 // CONSTANT across configs so we isolate the perf-arg contribution only.
 const SAMPLING = [
-  '--temp', '0.8', '--top-p', '0.9', '--top-k', '50', '--min-p', '0.0',
-  '--presence-penalty', '0.0', '--repeat-penalty', '1.0',
-  '--dry-multiplier', '1.0', '--dry-base', '1.75', '--dry-allowed-length', '70',
-  '--dry-penalty-last-n', '4096',
+  '--temp',
+  '0.8',
+  '--top-p',
+  '0.9',
+  '--top-k',
+  '50',
+  '--min-p',
+  '0.0',
+  '--presence-penalty',
+  '0.0',
+  '--repeat-penalty',
+  '1.0',
+  '--dry-multiplier',
+  '1.0',
+  '--dry-base',
+  '1.75',
+  '--dry-allowed-length',
+  '70',
+  '--dry-penalty-last-n',
+  '4096',
 ];
 const REASONING = [
-  '--reasoning-preserve', '--reasoning-budget', '-1',
-  '--reasoning-budget-message', 'time limit for reasoning reached',
+  '--reasoning-preserve',
+  '--reasoning-budget',
+  '-1',
+  '--reasoning-budget-message',
+  'time limit for reasoning reached',
 ];
 const CTX = ['-c', '8192', '--parallel', '1'];
 // NOTE: spec-decode (--spec-type draft-mtp) intentionally OMITTED here — it only
@@ -59,8 +79,20 @@ const CONFIGS = {
   'kv-q8': ['-fa', 'on', '--cache-type-k', 'q8_0', '--cache-type-v', 'q8_0'],
   // The combination we'd ship on Apple Silicon:
   tuned: [
-    '-fa', 'on', '-ngl', '999', '--cache-reuse', '256',
-    '-ub', '2048', '-b', '2048', '--mlock', '-t', '5', '--no-context-shift',
+    '-fa',
+    'on',
+    '-ngl',
+    '999',
+    '--cache-reuse',
+    '256',
+    '-ub',
+    '2048',
+    '-b',
+    '2048',
+    '--mlock',
+    '-t',
+    '5',
+    '--no-context-shift',
   ],
 };
 
@@ -93,7 +125,8 @@ function bigSystemPrompt(extraLine = '') {
   return sys;
 }
 
-const U1 = 'Explain what a KV cache is in a transformer inference server, in exactly three sentences.';
+const U1 =
+  'Explain what a KV cache is in a transformer inference server, in exactly three sentences.';
 const A1 =
   'A KV cache stores the key and value tensors computed for every prior token so ' +
   'they are not recomputed on each step. It lets the server prefill a shared prompt ' +
@@ -126,11 +159,23 @@ async function waitHealth(port, timeoutMs = 90_000) {
 }
 
 async function launch(perfArgs, port) {
-  const args = ['-m', MODEL, '--host', '127.0.0.1', '--port', String(port),
-    ...CTX, ...SAMPLING, ...REASONING, ...perfArgs];
+  const args = [
+    '-m',
+    MODEL,
+    '--host',
+    '127.0.0.1',
+    '--port',
+    String(port),
+    ...CTX,
+    ...SAMPLING,
+    ...REASONING,
+    ...perfArgs,
+  ];
   const child = spawn(SERVER, args, { stdio: ['ignore', 'ignore', 'pipe'] });
   let stderr = '';
-  child.stderr.on('data', (d) => { stderr += String(d); });
+  child.stderr.on('data', (d) => {
+    stderr += String(d);
+  });
   const ok = await waitHealth(port);
   if (!ok) {
     child.kill('SIGKILL');
@@ -142,12 +187,17 @@ async function launch(perfArgs, port) {
 // ---- request helpers ------------------------------------------------------
 async function chat(port, messages, { maxTokens = 48, stream = false } = {}) {
   const body = {
-    messages, max_tokens: maxTokens, temperature: 0, cache_prompt: true, stream,
+    messages,
+    max_tokens: maxTokens,
+    temperature: 0,
+    cache_prompt: true,
+    stream,
   };
   if (!stream) {
     const t0 = performance.now();
     const r = await fetch(`http://127.0.0.1:${port}/v1/chat/completions`, {
-      method: 'POST', headers: { 'content-type': 'application/json' },
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
     });
     const j = await r.json();
@@ -157,12 +207,15 @@ async function chat(port, messages, { maxTokens = 48, stream = false } = {}) {
   // streaming: measure client TTFT (time to first content delta)
   const t0 = performance.now();
   const r = await fetch(`http://127.0.0.1:${port}/v1/chat/completions`, {
-    method: 'POST', headers: { 'content-type': 'application/json' },
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
   });
   const reader = r.body.getReader();
   const dec = new TextDecoder();
-  let ttft = null, buf = '', timings = null;
+  let ttft = null,
+    buf = '',
+    timings = null;
   for (;;) {
     const { value, done } = await reader.read();
     if (done) break;
@@ -173,7 +226,12 @@ async function chat(port, messages, { maxTokens = 48, stream = false } = {}) {
       if (!line.startsWith('data: ')) continue;
       const payload = line.slice(6).trim();
       if (payload === '[DONE]') continue;
-      let obj; try { obj = JSON.parse(payload); } catch { continue; }
+      let obj;
+      try {
+        obj = JSON.parse(payload);
+      } catch {
+        continue;
+      }
       const delta = obj.choices?.[0]?.delta?.content;
       if (ttft === null && delta) ttft = performance.now() - t0;
       if (obj.timings) timings = obj.timings;
@@ -182,13 +240,18 @@ async function chat(port, messages, { maxTokens = 48, stream = false } = {}) {
   return { ttftMs: ttft, timings };
 }
 
-function round(x, d = 1) { return x === undefined || x === null ? null : Number(x.toFixed(d)); }
+function round(x, d = 1) {
+  return x === undefined || x === null ? null : Number(x.toFixed(d));
+}
 
 // ---- scenario -------------------------------------------------------------
 async function runScenario(port) {
   const sys = bigSystemPrompt();
   const sysChurn = bigSystemPrompt('Current session id: 7f3a-CHANGED-EARLY-INSERTION-2026.');
-  const base = [{ role: 'system', content: sys }, { role: 'user', content: U1 }];
+  const base = [
+    { role: 'system', content: sys },
+    { role: 'user', content: U1 },
+  ];
 
   // warmup so Metal shaders are compiled (fair TTFT — matches 2nd+ user prompt).
   await chat(port, [{ role: 'user', content: 'hi' }], { maxTokens: 4 });
@@ -196,16 +259,26 @@ async function runScenario(port) {
   const cold = await chat(port, base);
   const hit = await chat(port, base); // identical resend
   const extend = await chat(port, [
-    ...base, { role: 'assistant', content: A1 }, { role: 'user', content: U2 },
+    ...base,
+    { role: 'assistant', content: A1 },
+    { role: 'user', content: U2 },
   ]);
   const churn = await chat(port, [
-    { role: 'system', content: sysChurn }, { role: 'user', content: U1 },
+    { role: 'system', content: sysChurn },
+    { role: 'user', content: U1 },
   ]);
   // streaming cold TTFT: use a distinct prompt so the slot cache doesn't short-circuit it
-  const streamCold = await chat(port, [
-    { role: 'system', content: bigSystemPrompt('Fresh unique prefix 918273 for a cold TTFT read.') },
-    { role: 'user', content: 'Summarize the above system prompt in one sentence.' },
-  ], { stream: true, maxTokens: 24 });
+  const streamCold = await chat(
+    port,
+    [
+      {
+        role: 'system',
+        content: bigSystemPrompt('Fresh unique prefix 918273 for a cold TTFT read.'),
+      },
+      { role: 'user', content: 'Summarize the above system prompt in one sentence.' },
+    ],
+    { stream: true, maxTokens: 24 },
+  );
 
   const row = (label, res) => ({
     phase: label,
@@ -228,7 +301,10 @@ async function main() {
   const results = {};
   for (const name of names) {
     const perfArgs = CONFIGS[name];
-    if (!perfArgs) { console.error(`unknown config: ${name}`); continue; }
+    if (!perfArgs) {
+      console.error(`unknown config: ${name}`);
+      continue;
+    }
     const port = await freePort();
     process.stdout.write(`\n=== ${name}  (perf args: ${perfArgs.join(' ') || '(none)'}) ===\n`);
     let srv;
@@ -242,7 +318,9 @@ async function main() {
       const r = await runScenario(port);
       results[name] = r;
       console.table(r.matrix);
-      console.log(`  stream cold TTFT (client): ${r.streamTtftMs} ms   (server prefill ${r.streamPrefillMs} ms)`);
+      console.log(
+        `  stream cold TTFT (client): ${r.streamTtftMs} ms   (server prefill ${r.streamPrefillMs} ms)`,
+      );
     } finally {
       srv.child.kill('SIGTERM');
       await new Promise((res) => setTimeout(res, 800));
@@ -272,10 +350,14 @@ async function main() {
     }
     console.log(
       `${name.padEnd(13)} cold: ${String(coldMs).padStart(7)}ms @${String(coldTps).padStart(6)} tps | ` +
-      `decode ${String(decTps).padStart(5)} tps | hit(prompt/cache ${hitPrompt}/${hitCache}) | ` +
-      `churn ${churnPrompt}tok/${churnMs}ms${delta}`);
+        `decode ${String(decTps).padStart(5)} tps | hit(prompt/cache ${hitPrompt}/${hitCache}) | ` +
+        `churn ${churnPrompt}tok/${churnMs}ms${delta}`,
+    );
   }
   console.log('=======================================================\n');
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

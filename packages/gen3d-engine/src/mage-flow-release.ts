@@ -14,7 +14,7 @@
  * WHERE THE BYTES ARE NOW. The diffusers checkpoint was four things, and all of
  * them are still published under their own licences, byte-identical to the
  * release — checked against the original trees saved at download time beside
- * the user's copies (`~/Bobble/Models/Image/{Generation,Editing}/microsoft__mage-flow-*`):
+ * The user's copies (`~/Bobble/Models/Image/{Generation,Editing}/microsoft__mage-flow-*`):
  *
  *  - `transformer/diffusion_pytorch_model.safetensors` IS Comfy-Org/Mage-Flow's
  *    `diffusion_models/mage_flow_{turbo,edit_turbo}_bf16.safetensors` (same

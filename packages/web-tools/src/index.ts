@@ -63,7 +63,7 @@ export * from './uv-platform.js';
  * HOW TO CITE WHAT A SEARCH FOUND — told where the model is about to use it:
  * at the end of the results, not in the always-on prompt.
  *
- * the user (2026-09-24): "source citing (for research and such, examples from
+ * The user (2026-09-24): "source citing (for research and such, examples from
  * google search summary shown)". The app turns a markdown link to a page the
  * turn saw into a citation chip after the sentence (apps/desktop/src/chat/
  * sources), so all the model has to do is write a link — which every model
@@ -214,7 +214,7 @@ export function registerWebTools(pi: ExtensionAPI, options: WebToolsOptions = {}
        * which is how a subagent's search came to look nothing like the same
        * search in the chat: the canvas browser was driven to a DuckDuckGo page
        * the user then sat watching, and when that page was a bot-challenge (as
-       * it now usually is) they watched an empty one. the user: "have web search
+       * it now usually is) they watched an empty one. The user: "have web search
        * populate the card in the tools area but not open duckduckgo or the
        * browser. use the regular chat thing, not the subagents thing, as the
        * good starting point ... duckduckgo in browser as fallback I suppose."

@@ -1,5 +1,5 @@
 /**
- * LOOK at the Bobble 3D connector. the user (2026-09-17): "3d should be a
+ * LOOK at the Bobble 3D connector. The user (2026-09-17): "3d should be a
  * connector that gets recommended for install upon installing the 3d studio
  * module".
  *

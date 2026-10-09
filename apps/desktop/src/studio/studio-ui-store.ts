@@ -3,7 +3,7 @@
  *
  * A store rather than component state because the two TOGGLES live in the top
  * bar — the app's own chrome, outside any studio — while the PANELS live inside
- * the studio surface. the user asked for the openers to sit in "the same place and
+ * the studio surface. The user asked for the openers to sit in "the same place and
  * icon as canvas" and "the same place and icon as advanced settings", which is
  * exactly that top-right cluster, so the two halves cannot be the same
  * component and need somewhere to meet.

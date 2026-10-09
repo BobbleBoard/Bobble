@@ -1,7 +1,7 @@
 /**
  * BRAND MARKS FOR THE THINGS WE LIST BUT DO NOT OWN.
  *
- * the user: "ensure you include actual official logos/icons eg. in harness picker
+ * The user: "ensure you include actual official logos/icons eg. in harness picker
  * and hf orgs and such in model manager", then "use official svgs".
  *
  * The marks are the vendors' OWN artwork, extracted from simple-icons (CC0-1.0)
@@ -126,7 +126,7 @@ export function BrandPi({ size = 20, className }: { size?: number; className?: s
 /**
  * A harness's icon AS A TILE — mark plus its own background.
  *
- * the user: "not rendering properly in this case… especially the background for the
+ * The user: "not rendering properly in this case… especially the background for the
  * icon is important for example the free floating pi looks odd in ours still."
  * Two faults: `harnessIcon` returned null for the marks we do not have, so Codex
  * and Hermes rendered as EMPTY circles, which looks broken rather than
@@ -316,7 +316,7 @@ export function OrgAvatar({
   const shell = (children: React.ReactNode, style?: React.CSSProperties) => (
     <span
       /*
-       * A BORDERED SQUIRCLE — the app-icon shape. the user, with a reference image
+       * A BORDERED SQUIRCLE — the app-icon shape. The user, with a reference image
        * of three of them: "border organization icons and embed them into shapes
        * as shown rather than circles."
        *

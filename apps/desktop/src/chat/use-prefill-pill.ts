@@ -51,7 +51,7 @@ export function usePrefillPill(inFlight: boolean, estimatedMs: number | null = n
       return;
     }
     /*
-     * THE ABSENCE OF THE PILL IS A PROMISE. the user: "if that pill dissapears, that
+     * THE ABSENCE OF THE PILL IS A PROMISE. The user: "if that pill dissapears, that
      * means the entire conversation up to the point I have started typing and
      * sent in that turn is already prefilled and will not have to be prefilled
      * at all when I send my next message."

@@ -96,7 +96,7 @@ try {
     fail(`not HF task tags: ${best.tags}`);
   if (best.buttons.some((b) => b !== 'Use')) fail('an on-disk card does not say Use');
 
-  // THE HEADINGS. the user: "the little 'recommended' text shouldn't be there, the 5
+  // THE HEADINGS. The user: "the little 'recommended' text shouldn't be there, the 5
   // cards you show should say 'Top Recommended' much larger and then 'More'".
   const headings = await win.evaluate(() => {
     const read = (sel) => {
@@ -289,7 +289,7 @@ try {
     () => document.querySelector('[data-testid="detail-gen-install"]')?.textContent?.trim() ?? null,
   );
   const realButton = await box('[data-testid="detail-download"]');
-  // the user: the "whole repository, into this app's model store" line "is not
+  // The user: the "whole repository, into this app's model store" line "is not
   // needed and especially not true in this case above" — so nothing should be
   // said here at all unless the machine cannot run what it is about to fetch.
   console.log('generation family caveat:', JSON.stringify(genBlock));

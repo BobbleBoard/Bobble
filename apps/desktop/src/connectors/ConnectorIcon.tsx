@@ -35,7 +35,7 @@ export function ConnectorIcon({
       />
     );
   }
-  /* NEVER THE EMOJI. the user (2026-10-07): "standing no emoji's rule" — seen as a
+  /* NEVER THE EMOJI. The user (2026-10-07): "standing no emoji's rule" — seen as a
      wrench on a custom server in + › Connectors. A connector without a mark
      gets the neutral connector glyph, at the size its mark would have had. */
   return (

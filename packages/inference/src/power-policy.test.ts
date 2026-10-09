@@ -125,7 +125,7 @@ describe('the lever matches the machine', () => {
   it('has no clock knob on unified memory, so every lever is a memory lever', () => {
     const d = decidePower(at({ mode: 'low', bottleneck: 'unified' }));
     /*
-     * Every lever EXCEPT the KV cache. the user: "no quantizing kv that damages a
+     * Every lever EXCEPT the KV cache. The user: "no quantizing kv that damages a
      * lot especially at this model size." The KV is what a 2B-27B model
      * remembers of the conversation, and quantising it makes every remembered
      * token slightly wrong; a smaller context is a smaller KV in exact
@@ -136,7 +136,7 @@ describe('the lever matches the machine', () => {
     expect(d.maxParallel).toBe(1);
     expect(d.threads).toBeUndefined(); // MEASURED useless on Metal
     expect(d.keepKvOnHost).toBeUndefined();
-    // the user: "low can't stop image generation requests, it just has to lessen
+    // The user: "low can't stop image generation requests, it just has to lessen
     // compute intensivity" — the job runs, paced, and without previews.
     expect(d.heavyJobPace).toBeCloseTo(0.35, 2);
     expect(d.heavyJobPreviews).toBe(false);

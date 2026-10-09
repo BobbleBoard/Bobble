@@ -1,7 +1,7 @@
 /**
  * What an attachment chip SAYS, and what a selection of them does.
  *
- * the user's brief, verbatim: "no name shown, just a box … a bit bigger, and then
+ * The user's brief, verbatim: "no name shown, just a box … a bit bigger, and then
  * slide to the right open when it's hovered over (the individual file/image)
  * this should be less colored in and have a more visible border … show name a
  * bit smaller and higher, truncate name if too long, show centered dot, file
@@ -27,7 +27,7 @@ export function formatBytes(bytes: number): string {
   /*
    * One decimal below 100, whole numbers above — and a trailing ".0" stripped,
    * because "42.0 MB" reads like a measurement and "42 MB" reads like a file.
-   * the user's own example was "10.1 MB", which a `< 10` threshold rounds away.
+   * The user's own example was "10.1 MB", which a `< 10` threshold rounds away.
    */
   const shown = value < 100 ? value.toFixed(1).replace(/\.0$/, '') : String(Math.round(value));
   return `${shown} ${units[unit]}`;
@@ -119,7 +119,7 @@ export function attachmentMeta(a: {
 
 /* ── Selection ─────────────────────────────────────────────────────────────
  *
- * the user: "clicking a file needs to highlight it blue and blue border and then
+ * The user: "clicking a file needs to highlight it blue and blue border and then
  * allow for user to press ctrl c/x/v or shift click other files to do so."
  *
  * The rules are the ones every file list has had since 1984, which is exactly

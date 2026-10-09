@@ -137,7 +137,7 @@ export function ComposerFooter({
 
   return (
     <>
-      {/* No download bar here any more. the user (2026-09-13): "remove all
+      {/* No download bar here any more. The user (2026-09-13): "remove all
           progressbar and such from the input area, move it up to the top bar"
           — the task tray's "Downloads" group (top-left) is the one place. */}
       {/* Anchor for the friendly auto-download card, which floats just above the

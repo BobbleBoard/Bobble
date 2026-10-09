@@ -140,7 +140,7 @@ describe('the file glyph', () => {
 });
 
 describe('the computer-use window lights', () => {
-  // the user (2026-10-08): "the top left buttons … have a bit of mushiness". At
+  // The user (2026-10-08): "the top left buttons … have a bit of mushiness". At
   // 16px a unit is 2/3 of a pixel and the stroke is 1px: stroked rings of r 0.7,
   // 2.2 apart, ran into one bar. The lights must stay three dots at that size.
   const PX = 16 / 24;

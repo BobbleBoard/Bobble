@@ -413,7 +413,7 @@ export function ScheduledView() {
   const [query, setQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   /*
-   * ROUTINES | TEMPLATES. the user (2026-09-18): "show a button under 'Scheduled'
+   * ROUTINES | TEMPLATES. The user (2026-09-18): "show a button under 'Scheduled'
    * header, remove the subheading text … put 2 buttons, 1 templates and one is
    * the user's set up stuff … show the templates only on templates." The
    * person's own tasks are their routines — what runs for them — and the

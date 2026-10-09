@@ -175,7 +175,7 @@ export function AdvancedParamsPanel({
           ) : null}
         </DialogHeader>
         {/*
-         * FOUR TABS, engine first. the user: "expand the advanced settings top
+         * FOUR TABS, engine first. The user: "expand the advanced settings top
          * right button to expose absolutely everything in an organized good
          * gui manner, this includes first and foremost llamacpp". The engine
          * tab is the knobs shared across engines, speculative decoding with

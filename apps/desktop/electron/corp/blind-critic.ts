@@ -45,7 +45,7 @@ export function blindCriticEnabled(env: NodeJS.ProcessEnv = process.env): boolea
 /**
  * Deliberately says nothing about what KIND of thing is being judged.
  *
- * the user's rule for this whole test cycle is that a fix has to hold across every
+ * The user's rule for this whole test cycle is that a fix has to hold across every
  * benchmark — "you can't test, fix something and retest with the same prompt,
  * this forces you to never, not even accidentally, fix something task specific".
  * A critic prompt that mentioned CSVs, or scenes, or slides, would be exactly

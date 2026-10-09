@@ -30,7 +30,7 @@ export function useWaitClock(stage: 'loading' | 'preparing' | null): number | nu
   /*
    * ONE WAIT, ONE CLOCK.
    *
-   * the user, watching a run start: "getting ready shows for 10s, then dissapears
+   * The user, watching a run start: "getting ready shows for 10s, then dissapears
    * for a second then immeidately reappears and counts to 10 again."
    *
    * The stage really does blink — the prefix warm-up can run more than once

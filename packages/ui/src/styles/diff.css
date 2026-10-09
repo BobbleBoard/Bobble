@@ -104,7 +104,7 @@ section[data-new-file] .pd-diff-row--add {
 }
 
 /* The code keeps the reading ink; the syntax spans colour their own tokens.
- * (the user, earlier: the code itself was inheriting a hue from the row tint.) */
+ * (The user, earlier: the code itself was inheriting a hue from the row tint.) */
 .pd-diff-text {
   padding: 0 12px 0 8px;
   white-space: pre;

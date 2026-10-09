@@ -1,7 +1,7 @@
 /**
  * LEAVE A STUDIO MID-GENERATION, COME BACK — is the job still there?
  *
- * the user (2026-09-24): "leaving a studio with a generation running and then going
+ * The user (2026-09-24): "leaving a studio with a generation running and then going
  * back doesn't keep it going, or maybe it does but the UI resets".
  *
  * It was the second: the job ran on in main the whole time, and the room forgot

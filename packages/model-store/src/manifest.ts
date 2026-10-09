@@ -1,7 +1,7 @@
 /**
  * THE MANIFEST — what the app knows about one model on this disk.
  *
- * the user wanted the store to answer, for anything we add now or later: where are
+ * The user wanted the store to answer, for anything we add now or later: where are
  * its weights, what is it called, what else do we know. So every entry carries
  * that in one file beside the weights, and the index is just those files read
  * back. A sidecar rather than a central database, for one reason worth stating:
@@ -9,7 +9,7 @@
  * the user is told they have a model they deleted. A manifest cannot outlive its
  * own directory.
  *
- * TASKS ARE PART OF THE IDENTITY, not a footnote. the user: "ltx 2.5 and minimax I
+ * TASKS ARE PART OF THE IDENTITY, not a footnote. The user: "ltx 2.5 and minimax I
  * think have a lot of sub models or something complicated where you download one
  * per like in-out you want eg. video+text-video or image-video or start+endframe
  * -video or text-video etc." That is true, and it means "do I have LTX-2.5?" is

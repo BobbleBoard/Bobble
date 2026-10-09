@@ -12,7 +12,7 @@ import type { Capability } from './types.js';
 
 export const chart: Capability = {
   name: 'chart',
-  /* the user (2026-09-16), Claude's inline chart beside Bobble's pipeline
+  /* The user (2026-09-16), Claude's inline chart beside Bobble's pipeline
      picture: "we need parity on these datavisuals, it's a common use case
      and very formulaic and doable … not just bar charts, all datavisuals".
      The line names every way the ask arrives — chart, plot, graph,

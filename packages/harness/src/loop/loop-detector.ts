@@ -7,7 +7,7 @@
  * was no max-iteration cap anywhere. This detector closes both gaps:
  *
  *   - identical-call streak: N consecutive tool calls with the same name + args
- *     (a stable signature) → one corrective steer. the user set N to 75: a model
+ *     (a stable signature) → one corrective steer. The user set N to 75: a model
  *     that calls the same thing three times is usually retrying, not stuck, and
  *     the yellow "nudging" bar firing that early was noise on real work.
  *   - consecutive-error streak: N consecutive tool executions that ERROR → same
@@ -17,7 +17,7 @@
  *     between — the failure the signature streak MISSES, because reading ten
  *     DIFFERENT files is ten different signatures. One "you've explored enough,
  *     act now" steer, then abort past a higher, effort-scaled threshold.
- * There is NO per-turn tool-call cap. the user: "remove the tool call cap." A cap
+ * There is NO per-turn tool-call cap. The user: "remove the tool call cap." A cap
  * cannot tell a long job from a stuck one — it only ever fires on the long job,
  * because a genuinely stuck turn trips the repeat guard or its wall clock first.
  * `maxSteps` survives as an explicit opt-in for tests (and mirrors the mesh's
@@ -98,7 +98,7 @@ export interface LoopDetectorConfig {
 /**
  * Default ERROR-streak thresholds (kept constant across effort — a loop is a loop).
  *
- * the user raised these to 75 for the same reason he raised the repeat guard: three
+ * The user raised these to 75 for the same reason the user raised the repeat guard: three
  * consecutive tool errors is a model learning a CLI's argument shape, not a
  * loop. He watched it fire on exactly that — three `mac launch` calls in a row
  * that failed on syntax, then a yellow bar in the middle of the reply — and
@@ -109,7 +109,7 @@ export const DEFAULT_LOOP_STEER_AFTER = 75;
 export const DEFAULT_LOOP_ABORT_AFTER = 100;
 /**
  * Repeat guard: consecutive IDENTICAL calls before the one "you're repeating
- * yourself" steer. the user raised this from 5 to 75. Three identical calls is a
+ * yourself" steer. The user raised this from 5 to 75. Three identical calls is a
  * retry; seventy-five is a loop — and the wall clock below still catches a slow
  * one long before the count gets there.
  */
@@ -328,7 +328,7 @@ export function createLoopDetector(config: LoopDetectorConfig): LoopDetector {
   let identicalStreakStart = now();
   let errorStreak = 0;
   /*
-   * REPEATED TEXT. the user watched a turn emit "Actually, I'll just present the
+   * REPEATED TEXT. The user watched a turn emit "Actually, I'll just present the
    * app.py." roughly forty times in a row, and nothing stopped it: every counter
    * here watches TOOL CALLS, and that loop made none. A model can stall entirely
    * in prose, which is both the most visible failure to a user and the one the
@@ -451,7 +451,7 @@ export function createLoopDetector(config: LoopDetectorConfig): LoopDetector {
         };
       }
       // Unproductive wandering: many DIFFERENT exploration calls with no action.
-      // the user: reading different files must NOT abort — so this only ever STEERS
+      // The user: reading different files must NOT abort — so this only ever STEERS
       // (one gentle nudge), never aborts (Infinity abort threshold).
       return escalate(
         unproductiveStreak,

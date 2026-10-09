@@ -3,7 +3,7 @@
  *
  *   GLB=/path/to/model.glb SHOT_DIR=/tmp/look node apps/desktop/tests/e2e/glb-look-probe.mjs
  *
- * the user (2026-09-14): "this cup shows a lot of artifacting" — the judgement is
+ * The user (2026-09-14): "this cup shows a lot of artifacting" — the judgement is
  * made on what the studio renders, so this is what the report shows.
  */
 import { copyFileSync, existsSync, mkdirSync } from 'node:fs';

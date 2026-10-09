@@ -1,7 +1,7 @@
 /**
  * THE LEFT SIDEBAR'S CLOSE, FRAME BY FRAME.
  *
- * the user: "left sidebar does not close cleanly, it's instant dissapear and then
+ * The user: "left sidebar does not close cleanly, it's instant dissapear and then
  * slide left rather than the correct slide in like the canvas sidebar does."
  *
  * Two things are measured here, because the complaint is about the RELATIONSHIP

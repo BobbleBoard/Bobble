@@ -1,7 +1,7 @@
 /**
  * SPECULATIVE DECODING, per model.
  *
- * the user: "a tab for speculative, where we should have a way to allow the user
+ * The user: "a tab for speculative, where we should have a way to allow the user
  * to select any model downloaded (w/ search bar) or search hf and quick
  * download or put a path to a model on their computer or drag and drop a file
  * to be a draft model, all the draft settings, and then maybe a bar with

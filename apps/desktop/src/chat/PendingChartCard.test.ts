@@ -7,7 +7,7 @@ import {
 } from './PendingChartCard';
 
 /*
- * the user (2026-09-17): "when a chart is generating show a skeleton card with
+ * The user (2026-09-17): "when a chart is generating show a skeleton card with
  * shimmering items as a preview that builds live". The card is drawn from
  * the call's own arguments as they stream — native or CLI.
  */

@@ -1,7 +1,7 @@
 /**
  * DRIVE BOBBLE BY HAND, HEADLESS — one real model, a person's view only.
  *
- * the user (2026-10-01): "drive bobble visually as a user … typing into the
+ * The user (2026-10-01): "drive bobble visually as a user … typing into the
  * search box reading output only by screenshotting the full app window, and
  * clicking buttons, no reading output directly, get the full UX through the
  * UI." This launches the app hidden (the e2e harness: throwaway home, the

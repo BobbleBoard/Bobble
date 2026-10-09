@@ -1,7 +1,7 @@
 /**
  * WHAT A TURN MADE, SHOWN IN THE TURN THAT MADE IT.
  *
- * the user: "all are delivered and embedded cleanly and in full quality into the
+ * The user: "all are delivered and embedded cleanly and in full quality into the
  * chat aswell as with a file presentation card(s) to export/reveal."
  *
  * This is now a thin arrangement layer. Everything about how one file LOOKS —

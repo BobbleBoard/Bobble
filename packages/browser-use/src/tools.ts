@@ -91,7 +91,7 @@ function sleep(ms: number): Promise<void> {
 /**
  * `~/Bobble/screenshots/<page>.png`, deduplicated with a small counter.
  *
- * the user: "no complicated var/askldfjh;lkh/asdjkgbm,3241/1324iu1b types of things."
+ * The user: "no complicated var/askldfjh;lkh/asdjkgbm,3241/1324iu1b types of things."
  * Captures used to land on `bobble-screenshot-m9x2k1.png` in the OS temp tree —
  * unfindable, unspeakable back to the user, and deleted whenever the OS liked.
  */
@@ -169,7 +169,7 @@ export function registerBrowserUseTools(pi: ExtensionAPI, options: BrowserUseOpt
          * It used to say "Navigated to X — call browser_snapshot to see it",
          * which is only useful if you HAVE browser_snapshot. Without it the model
          * had exactly one browser tool and no way to see anything, so it did the
-         * only thing available and navigated again. the user: "constantly reopen the
+         * only thing available and navigated again. The user: "constantly reopen the
          * same link over and over".
          *
          * Landing on a page and being shown it is one action, not two, so the
@@ -223,7 +223,7 @@ export function registerBrowserUseTools(pi: ExtensionAPI, options: BrowserUseOpt
     async execute(_id, params): Promise<AgentToolResult<BrowserDetails>> {
       if (bridge === null) return unavailable('browser_snapshot');
       /*
-       * --visual: THE PICTURE AND NOTHING ELSE. the user (2026-09-23): "the
+       * --visual: THE PICTURE AND NOTHING ELSE. The user (2026-09-23): "the
        * snapshot tool should accept a flag that gives a visual snapshot no
        * text, when this flag is here it just passes an image back." Taken at
        * the page's own CSS size, so a point read off it IS a click coordinate.
@@ -289,7 +289,7 @@ export function registerBrowserUseTools(pi: ExtensionAPI, options: BrowserUseOpt
                */
               try {
                 // ~/Bobble/screenshots/<page>.png — a path a person can read and
-                // the model can hand back. the user: "no complicated
+                // the model can hand back. The user: "no complicated
                 // var/askldfjh;lkh/... types of things."
                 const file = screenshotFile(snap.summary.url || snap.summary.title);
                 await writeFile(file, Buffer.from(b64, 'base64'));

@@ -189,7 +189,7 @@ export interface MacMonitorFeed {
   /**
    * Bring the controlled app to the front, for the person watching.
    *
-   * the user: "have a prominent Open <app icon> <app name> <square with top right
+   * The user: "have a prominent Open <app icon> <app name> <square with top right
    * arrow> prominently in the top right of the computer use canvas area." This
    * is the one place in this surface where taking the screen is the POINT — the
    * user asked for the app — so it is the only action here that does.

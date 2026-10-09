@@ -66,7 +66,7 @@ export function ensureSandboxDir(conversationId: string, home: string = os.homed
  * HOME is never an acceptable working directory for an agent: a bare "make me a
  * file" drops it straight into `~`, and the sidebar's directory grouping then
  * invents a project literally called `~` that swallows every such chat (the
- * folder name is the cwd label's last segment). the user asked for both to stop.
+ * folder name is the cwd label's last segment). The user asked for both to stop.
  * Trailing slashes are tolerated so `/Users/x/` and `/Users/x` both match.
  */
 export function isHomeDir(p: string | undefined | null, home: string = os.homedir()): boolean {

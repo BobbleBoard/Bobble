@@ -1,7 +1,7 @@
 /**
  * THE SELECTED TAB'S BORDER, UP CLOSE — light and dark.
  *
- * the user: "there's a bit of a seam on that selected tab border, the curve up is
+ * The user: "there's a bit of a seam on that selected tab border, the curve up is
  * nice but the border needs to seamlessly flow up its edges and back down
  * rather than being a straight line under the tab as well as a different one
  * around it." Two file tabs, the second selected, the strip zoomed 4× in both

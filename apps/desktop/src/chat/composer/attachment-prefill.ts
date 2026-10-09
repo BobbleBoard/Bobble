@@ -3,7 +3,7 @@
  * is ALREADY FIXED, so that pressing enter only ever prefills what you typed.
  *
  * Two things are fixed before you finish typing: the conversation so far (the
- * moment you open a chat) and any attachment (the moment you add it). the user:
+ * moment you open a chat) and any attachment (the moment you add it). The user:
  * "when I go to an existing chat and take some time, while I'm writing my prompt
  * or waiting or whatever, it's getting loaded … so no time after pressing send
  * is wasted on that stuff."
@@ -80,7 +80,7 @@ export interface PrimingNow {
  * Cancelling that either changes nothing or — if the server drops the partial KV
  * — makes the whole prefix be read again from zero.
  *
- * the user's rule is about exactly this: "if the user puts in an attachment that
+ * The user's rule is about exactly this: "if the user puts in an attachment that
  * takes 20 seconds to prefill and then types for 10s, then sends, they should be
  * waiting 10 seconds for the attachment + however much else they typed, and no
  * more." Ten seconds of remaining prime is the honest price; twenty is what a
@@ -253,7 +253,7 @@ export function useAttachmentPrefill(attachmentPrefix: string): {
    * Roughly how long the prime in flight will take on this machine, from the
    * measured rate for this model, or null before the rate is known.
    *
-   * the user's rule for the pill is that its ABSENCE is a promise: "if that pill
+   * The user's rule for the pill is that its ABSENCE is a promise: "if that pill
    * disappears, that means the entire conversation up to the point I have
    * started typing and sent in that turn is already prefilled". A fixed delay
    * before showing breaks that promise for exactly the primes worth knowing
@@ -313,7 +313,7 @@ export function useAttachmentPrefill(attachmentPrefix: string): {
   /*
    * COMING BACK TO THE WINDOW RE-PRIMES.
    *
-   * the user: "TTFT is unacceptable, I was idle for like an hour, left this in the
+   * The user: "TTFT is unacceptable, I was idle for like an hour, left this in the
    * background, and it took on a blank conversation and another essentially
    * blank one almost 10 seconds each to respond."
    *

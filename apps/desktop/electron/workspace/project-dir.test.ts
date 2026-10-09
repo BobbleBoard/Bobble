@@ -1,7 +1,7 @@
 /**
  * THE DROPDOWN IS THE END ALL BE ALL.
  *
- * the user: "if they have a project selected that dropdown right there is the end all
+ * The user: "if they have a project selected that dropdown right there is the end all
  * be all, everything is THAT DROPDOWN'S SELECTION. always always always nothing
  * competes with that." Otherwise ~/Bobble/<conversation name>.
  */

@@ -67,7 +67,7 @@ export interface GenSurfacePayload {
   /**
    * The last thing the worker said it was doing.
    *
-   * the user: "image studio won't work at all and isn't user-friendly to get working
+   * The user: "image studio won't work at all and isn't user-friendly to get working
    * in a few clicks even when something has gone wrong." A cold image run spends
    * most of its life BEFORE the first diffusion step — uv provisioning a Python
    * environment (torch is 121 MB on its own), then mflux loading a 4-bit model —

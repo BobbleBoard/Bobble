@@ -2,7 +2,7 @@
  * THE MODEL LIBRARY — a folder tree a person can open, sorted the way the app
  * is.
  *
- * the user (2026-09-12): "all models and such are dumped in .cache … a lot of
+ * The user (2026-09-12): "all models and such are dumped in .cache … a lot of
  * people complain about how some apps like lmstudio really obscure where they
  * hide their data, chats, models etc. so let's not be like that, can we manage
  * them ourselves and sort them in filesystem similarly to how their access is

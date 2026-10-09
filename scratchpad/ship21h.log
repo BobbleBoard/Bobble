@@ -11,10 +11,11 @@
 @pi-desktop/desktop:build: cache miss, executing a5f21681cc7580d2
 @pi-desktop/desktop:build: $ vite build
 @pi-desktop/desktop:build: vite v8.1.3 building client environment for production...
-@pi-desktop/desktop:build: [plugin rolldown:vite-resolve] Module "node:os" has been externalized for browser compatibility, imported by "/Users/user/Desktop/OSS-harness/apps/desktop/electron/workspace/project-dir.ts". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
-@pi-desktop/desktop:build: [plugin rolldown:vite-resolve] Module "node:fs" has been externalized for browser compatibility, imported by "/Users/user/Desktop/OSS-harness/apps/desktop/electron/workspace/project-dir.ts". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
-@pi-desktop/desktop:build: [plugin rolldown:vite-resolve] Module "node:path" has been externalized for browser compatibility, imported by "/Users/user/Desktop/OSS-harness/apps/desktop/electron/workspace/project-dir.ts". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
-@pi-desktop/desktop:build: [2K@pi-desktop/desktop:build: transforming...✓ 1193 modules transformed.
+@pi-desktop/desktop:build: [plugin rolldown:vite-resolve] Module "node:os" has been externalized for browser compatibility, imported by "apps/desktop/electron/workspace/project-dir.ts". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+@pi-desktop/desktop:build: [plugin rolldown:vite-resolve] Module "node:fs" has been externalized for browser compatibility, imported by "apps/desktop/electron/workspace/project-dir.ts". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+@pi-desktop/desktop:build: [plugin rolldown:vite-resolve] Module "node:path" has been externalized for browser compatibility, imported by "apps/desktop/electron/workspace/project-dir.ts". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+@pi-desktop/desktop:build: [2K
+@pi-desktop/desktop:build: transforming...✓ 1193 modules transformed.
 @pi-desktop/desktop:build: rendering chunks...
 @pi-desktop/desktop:build: computing gzip size...
 @pi-desktop/desktop:build: dist/assets/pcm-worklet-D3-W8sdD.js                                     1.64 kB
@@ -159,21 +160,24 @@
 @pi-desktop/desktop:build: 
 @pi-desktop/desktop:build: ✓ built in 703ms
 @pi-desktop/desktop:build: vite v8.1.3 building client environment for production...
-@pi-desktop/desktop:build: [2K@pi-desktop/desktop:build: transforming...✓ 748 modules transformed.
+@pi-desktop/desktop:build: [2K
+@pi-desktop/desktop:build: transforming...✓ 748 modules transformed.
 @pi-desktop/desktop:build: rendering chunks...
 @pi-desktop/desktop:build: computing gzip size...
 @pi-desktop/desktop:build: dist-electron/main.js  1,282.22 kB │ gzip: 420.93 kB
 @pi-desktop/desktop:build: 
 @pi-desktop/desktop:build: ✓ built in 210ms
 @pi-desktop/desktop:build: vite v8.1.3 building client environment for production...
-@pi-desktop/desktop:build: [2K@pi-desktop/desktop:build: transforming...✓ 26 modules transformed.
+@pi-desktop/desktop:build: [2K
+@pi-desktop/desktop:build: transforming...✓ 26 modules transformed.
 @pi-desktop/desktop:build: rendering chunks...
 @pi-desktop/desktop:build: computing gzip size...
 @pi-desktop/desktop:build: dist-electron/preload.js  4.64 kB │ gzip: 1.99 kB
 @pi-desktop/desktop:build: 
 @pi-desktop/desktop:build: ✓ built in 69ms
 @pi-desktop/desktop:build: vite v8.1.3 building client environment for production...
-@pi-desktop/desktop:build: [2K@pi-desktop/desktop:build: transforming...✓ 32 modules transformed.
+@pi-desktop/desktop:build: [2K
+@pi-desktop/desktop:build: transforming...✓ 32 modules transformed.
 @pi-desktop/desktop:build: rendering chunks...
 @pi-desktop/desktop:build: computing gzip size...
 @pi-desktop/desktop:build: dist-electron/inference-supervisor.js  81.54 kB │ gzip: 26.75 kB
@@ -189,36 +193,36 @@ Building for production...
 [1 / 4]
 [2 / 5] pi-afm-product
 [3 / 6] pi-afm-product
-/Users/user/Desktop/OSS-harness/packages/afm/swift/Package.swift: pi-afm-product: ld: warning: search path '/Library/Developer/CommandLineTools/Developer/usr/lib' not found
-/Users/user/Desktop/OSS-harness/packages/afm/swift/Package.swift: pi-afm-product: ld: warning: search path '/Library/Developer/CommandLineTools/Developer/Library/Frameworks' not found
+packages/afm/swift/Package.swift: pi-afm-product: ld: warning: search path '/Library/Developer/CommandLineTools/Developer/usr/lib' not found
+packages/afm/swift/Package.swift: pi-afm-product: ld: warning: search path '/Library/Developer/CommandLineTools/Developer/Library/Frameworks' not found
 [5 / 6] pi-afm-product
 Build complete! (1.50 sec)
 $ swift build -c release --package-path swift
 Building for production...
 [2 / 3] pi-mac-product
 [3 / 4] pi-mac-product
-/Users/user/Desktop/OSS-harness/packages/pi-mac/swift/Package.swift: pi-mac-product: ld: warning: search path '/Library/Developer/CommandLineTools/Developer/usr/lib' not found
-/Users/user/Desktop/OSS-harness/packages/pi-mac/swift/Package.swift: pi-mac-product: ld: warning: search path '/Library/Developer/CommandLineTools/Developer/Library/Frameworks' not found
+packages/pi-mac/swift/Package.swift: pi-mac-product: ld: warning: search path '/Library/Developer/CommandLineTools/Developer/usr/lib' not found
+packages/pi-mac/swift/Package.swift: pi-mac-product: ld: warning: search path '/Library/Developer/CommandLineTools/Developer/Library/Frameworks' not found
 [6 / 8] pi-mac-product
 [8 / 8] pi-mac-product
 Build complete! (4.49 sec)
   • electron-builder  version=26.15.3 os=27.0.0
-  • loaded configuration  file=/Users/user/Desktop/OSS-harness/apps/desktop/electron-builder.yml
-  • author is missed in the package.json  appPackageFile=/Users/user/Desktop/OSS-harness/apps/desktop/package.json
+  • loaded configuration  file=apps/desktop/electron-builder.yml
+  • author is missed in the package.json  appPackageFile=apps/desktop/package.json
   • @electron/rebuild already used by electron-builder, please consider to remove excess dependency from devDependencies
 
 To ensure your native dependencies are always matched electron version, simply add script `"postinstall": "electron-builder install-app-deps" to your `package.json`
-  • packageManager not detected by file, falling back to environment detection  resolvedPackageManager=pnpm detected=/Users/user/Desktop/OSS-harness
-  • detected workspace root for project using packageManager field  pm=pnpm config=pnpm@11.10.0 resolved=/Users/user/Desktop/OSS-harness projectDir=/Users/user/Desktop/OSS-harness/apps/desktop
-  • executing @electron/rebuild  electronVersion=43.1.0 arch=arm64 buildFromSource=false workspaceRoot=/Users/user/Desktop/OSS-harness projectDir=./ appDir=./
+  • packageManager not detected by file, falling back to environment detection  resolvedPackageManager=pnpm detected=the repo root
+  • detected workspace root for project using packageManager field  pm=pnpm config=pnpm@11.10.0 resolved=the repo root projectDir=apps/desktop
+  • executing @electron/rebuild  electronVersion=43.1.0 arch=arm64 buildFromSource=false workspaceRoot=the repo root projectDir=./ appDir=./
   • installing native dependencies  arch=arm64
   • preparing       moduleName=node-pty arch=arm64
   • finished        moduleName=node-pty arch=arm64
   • completed installing native dependencies
   • packaging       platform=darwin arch=arm64 electron=43.1.0 appOutDir=release/mac-arm64
   • downloaded      label=electron progress=100%
-  • downloaded electron zip extracted successfully  output=/Users/user/Desktop/OSS-harness/apps/desktop/release/mac-arm64
-  • searching for node modules  pm=pnpm searchDir=/Users/user/Desktop/OSS-harness/apps/desktop
+  • downloaded electron zip extracted successfully  output=apps/desktop/release/mac-arm64
+  • searching for node modules  pm=pnpm searchDir=apps/desktop
   • duplicate dependency references  dependencies=["@lexical/text@0.46.0","@pi-desktop/mac-computer-use@link:../../packages/mac-computer-use","@pi-desktop/mac-connectors@link:../../packages/mac-connectors","@pi-desktop/ui@link:../../packages/ui","lexical@0.46.0","react-dom@19.2.7","react-markdown@10.1.0","remark-gfm@4.0.1","@lexical/internal@0.46.0","unified@11.0.5","unist-util-visit@5.1.0","vfile@6.0.3","@lexical/utils@0.46.0","@lexical/link@0.46.0","@lexical/list@0.46.0","@lexical/mark@0.46.0","@lexical/rich-text@0.46.0","@lexical/table@0.46.0","@mariozechner/pi-ai@0.68.1","ajv@8.20.0","minimatch@10.2.5","unist-util-is@6.0.1","vfile-message@4.0.3","micromark-util-sanitize-uri@2.0.1","unist-util-position@5.0.0","mdast-util-from-markdown@2.0.3","mdast-util-to-markdown@2.1.2","micromark-util-combine-extensions@2.0.1","hast-util-from-parse5@8.0.3","parse5@7.3.0","@lexical/html@0.46.0","@lexical/clipboard@0.46.0","zod-to-json-schema@3.25.2","token-types@6.1.2","debug@4.4.3","unist-util-stringify-position@4.0.0","micromark-util-character@2.1.1","micromark-util-decode-numeric-character-reference@2.0.2","micromark-util-normalize-identifier@2.0.1","@types/estree-jsx@1.0.5","micromark-util-classify-character@2.0.1","micromark-util-chunked@2.0.1","micromark-core-commonmark@2.0.3","micromark-factory-space@2.0.1","micromark-util-resolve-all@2.0.1","hastscript@9.0.1","https-proxy-agent@7.0.6","socks-proxy-agent@8.0.5","@aws-sdk/token-providers@3.1080.0","@aws-sdk/types@3.973.15","@smithy/core@3.29.1","@smithy/fetch-http-handler@5.6.3","@smithy/node-http-handler@4.9.3","@smithy/types@4.15.1","string-width@4.2.3","micromark-util-subtokenize@2.1.0","@aws-sdk/nested-clients@3.997.28","@smithy/signature-v4@5.6.2","@aws-sdk/credential-provider-process@3.972.54","@aws-sdk/credential-provider-sso@3.972.60","@aws-sdk/credential-provider-web-identity@3.972.60","@smithy/credential-provider-imds@4.4.6","once@1.4.0","@pi-desktop/tool-bus@link:../../packages/tool-bus","@codemirror/lang-javascript@6.2.5","@codemirror/language@6.12.4","@codemirror/state@6.7.1","@codemirror/view@6.43.6","@lezer/highlight@1.2.3","@codemirror/autocomplete@6.20.3","@lezer/css@1.3.4","@radix-ui/react-collapsible@1.1.16","@radix-ui/react-collection@1.1.12","@radix-ui/react-compose-refs@1.1.3","@radix-ui/react-context@1.2.0","@radix-ui/react-dialog@1.1.19","@radix-ui/react-direction@1.1.2","@radix-ui/react-dismissable-layer@1.1.15","@radix-ui/react-focus-guards@1.1.4","@radix-ui/react-focus-scope@1.1.12","@radix-ui/react-label@2.1.11","@radix-ui/react-menu@2.1.20","@radix-ui/react-popper@1.3.3","@radix-ui/react-portal@1.1.13","@radix-ui/react-presence@1.1.7","@radix-ui/react-primitive@2.1.7","@radix-ui/react-roving-focus@1.1.15","@radix-ui/react-slot@1.3.0","@radix-ui/react-use-callback-ref@1.1.2","@radix-ui/react-use-controllable-state@1.2.3","@radix-ui/react-use-effect-event@0.0.3","@radix-ui/react-use-is-hydrated@0.1.1","@radix-ui/react-use-layout-effect@1.1.2","@radix-ui/react-use-size@1.1.2","@radix-ui/react-visually-hidden@1.2.7","unist-util-remove-position@5.0.0","@radix-ui/react-use-previous@1.1.2","react-style-singleton@2.2.3"]
   • platform-specific optional dependencies not bundled — add them to your project's optionalDependencies if your app requires them (pnpm 10+ does not auto-install transitive platform binaries)  dependencies=["@mariozechner/clipboard-darwin-x64@0.3.9","@mariozechner/clipboard-linux-arm64-gnu@0.3.9","@mariozechner/clipboard-linux-arm64-musl@0.3.9","@mariozechner/clipboard-linux-riscv64-gnu@0.3.9","@mariozechner/clipboard-linux-x64-gnu@0.3.9","@mariozechner/clipboard-linux-x64-musl@0.3.9","@mariozechner/clipboard-win32-arm64-msvc@0.3.9","@mariozechner/clipboard-win32-x64-msvc@0.3.9"]
   • skipped macOS code signing  reason=identity explicitly is set to null
@@ -236,7 +240,7 @@ page.waitForSelector: Timeout 15000ms exceeded.
 Call log:
   - waiting for locator('[data-testid="theme-chip"]') to be visible
 
-    at /Users/user/Desktop/OSS-harness/apps/desktop/tests/e2e/packaged-probe.mjs:35:14 {
+    at apps/desktop/tests/e2e/packaged-probe.mjs:35:14 {
   log: [
     `  - waiting for locator('[data-testid="theme-chip"]') to be visible`
   ],

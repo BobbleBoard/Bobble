@@ -406,7 +406,7 @@ describe('pi-slice — intentional restart suppresses the crash toast', () => {
   });
 
   it('says NOTHING when pi exits with nobody waiting on it', () => {
-    // the user: "assistant restarted just shouldn't show up as a notification at all
+    // The user: "assistant restarted just shouldn't show up as a notification at all
     // ... it's just always happening a single time on app startup." An idle exit
     // costs nothing — pi is back before anything is asked of it — so the
     // permanent toast was reporting a problem that had already fixed itself.

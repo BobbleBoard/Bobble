@@ -61,7 +61,7 @@ const app = await electron.launch({
     MOCK_PI_FIXTURE: fixture,
     PI_E2E: '1',
     // Invisible by DEFAULT (the user's standing rule) — this probe predates
-    // harness.mjs and was still putting a window on his screen.
+    // harness.mjs and was still putting a window on their screen.
     PI_E2E_BACKGROUND: '1',
   },
 });

@@ -6,7 +6,7 @@
  *
  * The row reads as a SETTING, not a flag: a real name (flag-names.ts), the
  * engine's default sitting IN the control as the value to edit, and an ⓘ
- * that says what it does and which flag is passed. the user (2026-09-13): "show
+ * that says what it does and which flag is passed. The user (2026-09-13): "show
  * the defaults, don't write 'default' … so the user can edit rather than
  * showing them as placeholder text", "don't show … their literal flag names".
  * Unset is still a real state ("the engine's default"): a row lights up only

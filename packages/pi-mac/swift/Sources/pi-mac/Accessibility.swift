@@ -140,7 +140,7 @@ func resolveTargetPid(_ target: SnapshotTarget) -> (pid: pid_t, name: String)? {
      * pass took the FIRST running process whose name merely contained the
      * query — a helper process ("Google Chrome Helper (Renderer)" for
      * "chrome"), or the wrong app entirely ("Monitor" → Activity Monitor)
-     * depending on launch order. the user (2026-09-23) watched a model decide "the
+     * depending on launch order. The user (2026-09-23) watched a model decide "the
      * user is on Activity Monitor"; the name matching is one of the ways a
      * look lands on the wrong app, so it is made deterministic: exact name or
      * bundle id first, then a prefix, then a substring — the last two only
@@ -569,7 +569,7 @@ func collectSnapshot(
     /*
      * A CONTROL BELOW THE FOLD IS STILL A CONTROL.
      *
-     * the user: "controlling through dom shouldn't need scroll right? why would it?
+     * The user: "controlling through dom shouldn't need scroll right? why would it?
      * especially if you can read the full page and then have a snapshot with an
      * optional search <keyword> argument, scrolling should only be necessary if
      * using visually." Exactly right, and the reason it was not true here was
@@ -875,7 +875,7 @@ func windowBoundsInfo(target: SnapshotTarget) -> [String: Any]? {
      * Whole-window coverage answers "is this app buried", which is the wrong
      * question for a phantom cursor: the overlay floats ABOVE everything, so a
      * cursor sitting on an uncovered part of a background window still paints on
-     * top of whatever window happens to be between them. the user, watching a run:
+     * top of whatever window happens to be between them. The user, watching a run:
      * "the fake cursor is an always on top invisible window, so i'm seeing the
      * fake cursor even when maps correctly open in the background."
      *
@@ -1031,12 +1031,12 @@ func snapshotResultDict(_ snap: SnapshotResult, screenshot: [String: Any]?) -> [
 /**
  * THE TAB STRIP IS IN THE TREE, and nothing else can reach it.
  *
- * the user: "for chrome, we need tab handling so it can read open tabs, switch tab,
+ * The user: "for chrome, we need tab handling so it can read open tabs, switch tab,
  * make new tab and close tab — the dom wouldn't let it drive that, or for
  * example profiles, settings, top bar. So we should possibly have some
  * dedicated chrome tools."
  *
- * He is right that the DOM cannot: a page's JavaScript sees its own document
+ * The user is right that the DOM cannot: a page's JavaScript sees its own document
  * and nothing about the window around it. But this needs no Apple Events and no
  * Chrome-specific anything either — Chrome publishes its tab strip as an
  * ordinary AXTabGroup whose children are one AXRadioButton per tab (AXValue

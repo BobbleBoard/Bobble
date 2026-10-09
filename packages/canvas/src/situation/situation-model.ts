@@ -535,7 +535,7 @@ export interface NodeTiming {
  * `finishedAt` stamped ONLY on done/retired — so a role sitting in `waiting`
  * had no finish mark and kept reading from the clock.
  *
- * the user, on a row that said "Engineer 1 · waiting · worked 12m 12s": "even more
+ * The user, on a row that said "Engineer 1 · waiting · worked 12m 12s": "even more
  * silly it shows 'waiting', and then 'worked' in the situation room, (past
  * tense) but the timer next to it is still counting up." Exactly — the label was
  * past tense because the node had stopped, and the number was live because

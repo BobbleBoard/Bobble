@@ -1,7 +1,7 @@
 /**
  * WHAT LOW POWER ACTUALLY COSTS, AND WHETHER IT HAS TO.
  *
- * the user: "what can we do actually to improve that low power mode speed without
+ * The user: "what can we do actually to improve that low power mode speed without
  * sacrificing other computer performance?"
  *
  * Today 'gentle' calls `taskpolicy -b`, which is PRIO_DARWIN_BG — on Apple
@@ -41,10 +41,24 @@ async function timePrefill(port) {
   return j.timings ?? {};
 }
 
-const child = spawn(SERVER, [
-  '-m', MODEL, '--host', '127.0.0.1', '--port', String(PORT),
-  '-c', '8192', '--parallel', '1', '-fa', 'on',
-], { stdio: ['ignore', 'ignore', 'ignore'] });
+const child = spawn(
+  SERVER,
+  [
+    '-m',
+    MODEL,
+    '--host',
+    '127.0.0.1',
+    '--port',
+    String(PORT),
+    '-c',
+    '8192',
+    '--parallel',
+    '1',
+    '-fa',
+    'on',
+  ],
+  { stdio: ['ignore', 'ignore', 'ignore'] },
+);
 
 process.on('exit', () => child.kill());
 for (let i = 0; i < 120; i += 1) {
@@ -56,12 +70,43 @@ for (let i = 0; i < 120; i += 1) {
 }
 
 const policies = [
-  { name: 'full (no policy)', apply: async () => run('taskpolicy', ['-B', '-p', String(child.pid)]) },
-  { name: 'gentle TODAY (-b)', apply: async () => run('taskpolicy', ['-b', '-p', String(child.pid)]) },
-  { name: 'thruput tier 1', apply: async () => { await run('taskpolicy', ['-B', '-p', String(child.pid)]); await run('taskpolicy', ['-t', '1', '-p', String(child.pid)]); } },
-  { name: 'thruput tier 2', apply: async () => { await run('taskpolicy', ['-B', '-p', String(child.pid)]); await run('taskpolicy', ['-t', '2', '-p', String(child.pid)]); } },
-  { name: 'latency tier 1', apply: async () => { await run('taskpolicy', ['-B', '-p', String(child.pid)]); await run('taskpolicy', ['-l', '1', '-p', String(child.pid)]); } },
-  { name: 'full again (check)', apply: async () => { await run('taskpolicy', ['-B', '-p', String(child.pid)]); await run('taskpolicy', ['-t', '0', '-p', String(child.pid)]); await run('taskpolicy', ['-l', '0', '-p', String(child.pid)]); } },
+  {
+    name: 'full (no policy)',
+    apply: async () => run('taskpolicy', ['-B', '-p', String(child.pid)]),
+  },
+  {
+    name: 'gentle TODAY (-b)',
+    apply: async () => run('taskpolicy', ['-b', '-p', String(child.pid)]),
+  },
+  {
+    name: 'thruput tier 1',
+    apply: async () => {
+      await run('taskpolicy', ['-B', '-p', String(child.pid)]);
+      await run('taskpolicy', ['-t', '1', '-p', String(child.pid)]);
+    },
+  },
+  {
+    name: 'thruput tier 2',
+    apply: async () => {
+      await run('taskpolicy', ['-B', '-p', String(child.pid)]);
+      await run('taskpolicy', ['-t', '2', '-p', String(child.pid)]);
+    },
+  },
+  {
+    name: 'latency tier 1',
+    apply: async () => {
+      await run('taskpolicy', ['-B', '-p', String(child.pid)]);
+      await run('taskpolicy', ['-l', '1', '-p', String(child.pid)]);
+    },
+  },
+  {
+    name: 'full again (check)',
+    apply: async () => {
+      await run('taskpolicy', ['-B', '-p', String(child.pid)]);
+      await run('taskpolicy', ['-t', '0', '-p', String(child.pid)]);
+      await run('taskpolicy', ['-l', '0', '-p', String(child.pid)]);
+    },
+  },
 ];
 
 await timePrefill(PORT); // warm the graph, discard

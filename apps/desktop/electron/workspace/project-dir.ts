@@ -1,7 +1,7 @@
 /**
  * WHERE THE WORK HAPPENS. One rule, and nothing competes with it.
  *
- * the user, pointing at the folder dropdown in the composer: "if they have a project
+ * The user, pointing at the folder dropdown in the composer: "if they have a project
  * selected that dropdown right there is the end all be all, everything is THAT
  * DROPDOWN'S SELECTION. always always always nothing competes with that."
  *
@@ -291,7 +291,7 @@ function ownsEmptyDir(dir: string, owner: string): boolean {
  *
  * `selected` is the composer's folder selection — null/empty means "No project".
  * A selected project is used EXACTLY as given: no slugging, no de-duplication,
- * no surprises. the user: "that dropdown right there is the end all be all ... always
+ * no surprises. The user: "that dropdown right there is the end all be all ... always
  * always always nothing competes with that."
  *
  * The directory is created either way, because a workspace that does not exist

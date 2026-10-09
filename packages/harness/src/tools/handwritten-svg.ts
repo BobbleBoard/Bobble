@@ -1,7 +1,7 @@
 /**
  * AN SVG WRITTEN BY HAND — NOW ONLY A DIAGRAM IS REFUSED.
  *
- * the user (2026-09-24): "I feel like there's something wrong with omnisvg or maybe
+ * The user (2026-09-24): "I feel like there's something wrong with omnisvg or maybe
  * just how it's used right now also, svg is a big and versatile thing". MEASURED
  * the same night (visual suite, 9B, a ceramics studio's landing page): the page's
  * seven inline icons were refused toward OmniSVG, then its logo four times over,

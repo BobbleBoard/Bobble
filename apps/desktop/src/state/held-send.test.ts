@@ -1,7 +1,7 @@
 /**
  * A SEND WHOSE MODEL DID NOT START IS HELD, NOT SENT INTO NOTHING.
  *
- * the user (2026-10-08): "our dreaded 'fetch failed'". The commonest cause was a
+ * The user (2026-10-08): "our dreaded 'fetch failed'". The commonest cause was a
  * send that waited for the chat model, found none, and dispatched anyway. Now
  * the wait's reason (auto-router `lastServerProblem`) holds the message, Try
  * again (`retryHeldSend`) sends it once a model is up, and a later send takes

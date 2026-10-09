@@ -1,7 +1,7 @@
 /**
  * Renderer → main: a live diagram card's next frame (diagram-live.ts).
  *
- * the user (2026-09-25): diagrams should "animate/build in real time smoothly".
+ * The user (2026-09-25): diagrams should "animate/build in real time smoothly".
  * While a `diagram` call's Mermaid is still arriving, the thread asks main to
  * draw the complete lines so far — with the same page, post-pass, kit and
  * roles the tool's own drawing gets (diagram-page.ts runDiagramLive), so the

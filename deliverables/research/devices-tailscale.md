@@ -7,7 +7,7 @@ Track 5 of the 2026-09-23 push. Research only: no code was changed. Written agai
 
 ## 1. Goal
 
-the user, verbatim:
+The user, verbatim:
 
 > "connect devices securely via tailscale to allow for serving (gpu icon in the top left that
 > currently serves as just inference engine could choose what device to serve from, advanced
@@ -158,7 +158,7 @@ they must be fixed first:
   admission, `gen/guardian-main.ts`). The chat model is parked to make room (`gen/make-room.ts` →
   `llm-main.parkChatModel`).
 
-### 2.5 Prior art: RemotePi (`/Users/user/RemotePi`, reference only)
+### 2.5 Prior art: RemotePi (`~/RemotePi`, reference only)
 
 - `setup.sh <linux-tailscale-ip>` wrote models.json with `"baseUrl": "http://${LINUX_IP}:8080/v1"`
   (llama-server on the Linux box). Embeddings were on `:8081` and SearXNG on `:8888`. It opened the
@@ -179,10 +179,10 @@ they must be fixed first:
 | Tailscale variant | **Standalone** (`io.tailscale.ipn.macsys`) **1.102.4**. CLI shim `/usr/local/bin/tailscale` → app binary |
 | LocalAPI credentials (macsys) | `/Library/Tailscale/ipnport → 49238`; `/Library/Tailscale/sameuserproof-49238` is `root:admin 0640` (readable by admin users only) |
 | `TAILSCALE_BE_CLI=1 … status --json` | **0.12 s** wall; `BackendState: Running`; `MagicDNSEnabled: true`; one user in `User` |
-| Peers | `linux-ms-7e59` (linux): Online, Active, `CurAddr` set (direct), home DERP `lax`. Two "Parent's MacBook Pro" (macOS): offline since April 2026, **one `Expired: true`** |
-| `tailscale ping --c 1` Mac → linux-ms-7e59 | **10, 8, 7 ms**, direct, via a **private LAN** endpoint |
+| Peers | `linux-MS-7E59` (linux): Online, Active, `CurAddr` set (direct), home DERP `lax`. Two "Parent's MacBook Pro" (macOS): offline since April 2026, **one `Expired: true`** |
+| `tailscale ping --c 1` Mac → linux-MS-7E59 | **10, 8, 7 ms**, direct, via a **private LAN** endpoint |
 | `tailscale whois --json <ip>` shape | `{CapMap, Node{StableID, ComputedName, Hostinfo, KeyExpiry, Online, User…}, UserProfile{ID, LoginName, DisplayName, ProfilePicURL}}` |
-| Ports on linux-ms-7e59 | `:8765` closed (no Bobble node), `:8080` closed (RemotePi llama-server not running) |
+| Ports on linux-MS-7E59 | `:8765` closed (no Bobble node), `:8080` closed (RemotePi llama-server not running) |
 | llama.cpp build shipped | `PINNED_LLAMACPP` is **macOS arm64 only** (`packages/inference/src/llamacpp-manifest.ts`). The Linux box cannot run a Bobble node until track 4 |
 
 ### 2.7 What is missing (the whole feature)
@@ -333,7 +333,7 @@ Bobble must never install Tailscale itself.
   (`tailscale up --auth-key` or tsnet `AuthKey`). OAuth clients and workload identity mint keys for
   fleets. They are not needed for personal use.
 - **Key expiry** defaults to **180 days**, per device, and can be disabled in the admin console
-  ([doc](https://tailscale.com/docs/features/access-control/key-expiry)). the user's tailnet already
+  ([doc](https://tailscale.com/docs/features/access-control/key-expiry)). The user's tailnet already
   shows an `Expired: true` peer, so the UI needs a "Key expired" state.
 
 ### 3.7 Paths, latency, relays, wake
@@ -494,7 +494,7 @@ Other llama.cpp facts:
 | `POST /cluster/gen/jobs` · `POST /cluster/files` · `GET /cluster/files/:id` | bearer | generate | Generation jobs (§4.8) |
 
 Versioning: `protocol` is an integer. The client refuses a mismatched major version with "Update
-Bobble on linux-ms-7e59".
+Bobble on linux-MS-7E59".
 
 ### 4.4 Discovery
 
@@ -538,7 +538,7 @@ code proves the person approved *this* request.
 7. Before sending a token, the client checks that `whois(serverIp).StableID` equals the ID pinned at
    pairing. An IP reused by another node never receives a token.
 8. **Forget** deletes the record on its own side. From the client it is also a best-effort
-   `DELETE /cluster/pair`. A revoked client gets `401 device_revoked`, and its UI says "linux-ms-7e59
+   `DELETE /cluster/pair`. A revoked client gets `401 device_revoked`, and its UI says "linux-MS-7E59
    no longer trusts this device — Pair again".
 
 **Default trust policy:**
@@ -570,7 +570,7 @@ default off). Each can be toggled per client on the serving side and is visible 
   forwarding.
 - Timeouts:
   - connect 3 s;
-  - first byte up to 10 min (a huge prefill is legitimate), with a "waiting on linux-ms-7e59" event
+  - first byte up to 10 min (a huge prefill is legitimate), with a "waiting on linux-MS-7E59" event
     after 5 s;
   - idle between chunks 120 s.
 - Errors come back as JSON the provider's `cleanProviderError` surfaces:
@@ -593,7 +593,7 @@ default off). Each can be toggled per client on the serving side and is visible 
   - `{type:'release-device'}`
 - `use-device` does four things:
   1. `POST relay/cluster/llm/start` → waits for the device's `ready` status. Progress is mirrored as
-     "Loading Qwen3.6 27B on linux-ms-7e59 · 42%".
+     "Loading Qwen3.6 27B on linux-MS-7E59 · 42%".
   2. Subscribes to `relay/cluster/events`.
   3. Stops the local `current` server unless "Keep this Mac's model loaded as a backup" is on. That
      frees the 24 GB Mac: the point of offloading.
@@ -648,7 +648,7 @@ default off). Each can be toggled per client on the serving side and is visible 
   - A device dropping (sleep, Wi-Fi roam, Tailscale stopped) is detected by the relay (connect
     failure or SSE silence over 10 s) together with Tailscale `Online:false`. The supervisor then sets
     `phase:'error'` and `device.online:false`.
-  - The top bar says "linux-ms-7e59 went offline" and offers **[Use this Mac]**. If
+  - The top bar says "linux-MS-7E59 went offline" and offers **[Use this Mac]**. If
     `deviceFallback:'local'`, the app switches automatically.
   - When the device comes back (watch event), auto-connect resumes if enabled.
 
@@ -662,7 +662,7 @@ default off). Each can be toggled per client on the serving side and is visible 
   - relaunches the model server with the extra slots.
 - **The owner of the serving machine comes first.**
   - Its guardian and power policy (memory notes *guardian*, *memory-guard*) admit or hold remote work
-    like local work. A hold surfaces to clients as "Paused on linux-ms-7e59: the machine is busy".
+    like local work. A hold surfaces to clients as "Paused on linux-MS-7E59: the machine is busy".
   - If its own user switches model while a client uses it, a confirm reads "the user's MacBook Pro is
     using this model. Switch anyway?". Clients then get `model-changed` and can follow or leave.
   - A client's `llm/start` for a *different* model gets `409 busy_with_other_model {loaded}` if there
@@ -700,8 +700,8 @@ default off). Each can be toggled per client on the serving side and is visible 
   `mlx-stream`, the generic path.
 - It goes **through the same relay**, which adds the key. Capabilities are limited to chat (no remote
   management, calibration or gen), and the UI says so.
-- A user-initiated "Look for servers on linux-ms-7e59" probes those known ports on one chosen peer.
-- **This is the user's immediate path**: a hand-run llama-server on linux-ms-7e59, as RemotePi did,
+- A user-initiated "Look for servers on linux-MS-7E59" probes those known ports on one chosen peer.
+- **This is the user's immediate path**: a hand-run llama-server on linux-MS-7E59, as RemotePi did,
   usable before track 4 makes it a full Bobble node.
 
 ### 4.10 Users without Tailscale
@@ -779,10 +779,10 @@ This Mac
   Share this Mac's models with my devices                 [ Off | On ]
   Who can connect        (•) My devices, automatically   ( ) Only ones I approve
   Remote chats at once   [1] [2] [4]
-  Connected now          linux-ms-7e59 · Qwen3.6 27B · since 14:02   [Disconnect]
+  Connected now          linux-MS-7E59 · Qwen3.6 27B · since 14:02   [Disconnect]
 
 Your devices                                                   [+ Add device]
-  [linux] linux-ms-7e59   ● Online · in use     100.101.102.110   direct · 8 ms
+  [linux] linux-MS-7E59   ● Online · in use     100.101.102.110   direct · 8 ms
           <GPU> · <VRAM> · Qwen3.6 27B loaded                      [Ping] [⋯]
   [mac]   Mac Studio     ● Online · not paired 100.x.y.z                  [Pair]
   [mac]   Parent's MBP   ○ Offline · last seen 28 Apr   100.101.102.121       [⋯]
@@ -825,7 +825,7 @@ Your devices                                                   [+ Add device]
   but keeps the pairing. Forget revokes and deletes.
 - On the serving side, a connected client's Disconnect ends its streams; Forget revokes its token.
 
-**Details** (advanced sub-view, `← Devices / linux-ms-7e59`):
+**Details** (advanced sub-view, `← Devices / linux-MS-7E59`):
 
 - Status + [Ping]
 - Addresses (IP, MagicDNS name, copy)
@@ -849,7 +849,7 @@ The advanced part is "Add a server by address" (URL + key, §4.9). Later there i
 
 **Pairing dialogs** (the app's shared dialog anatomy, memory note *chat-follow-and-dialogs*):
 
-- Client: "Pairing with linux-ms-7e59. Check that it shows **482 913**, then allow it there.
+- Client: "Pairing with linux-MS-7E59. Check that it shows **482 913**, then allow it there.
   [Cancel]"
 - Serving device: "**my-macbook-pro** wants to use this computer's models. Signed in as user@… ·
   code **482 913**. [Deny] [Allow]", with "Always allow my devices".
@@ -859,33 +859,33 @@ The advanced part is "Add a server by address" (URL + key, §4.9). Later there i
 
 ```
 Engines                                              [Calibrate]
-Qwen3.6 27B · llama.cpp · MTP · on linux-ms-7e59 · direct 8 ms
+Qwen3.6 27B · llama.cpp · MTP · on linux-MS-7E59 · direct 8 ms
 ≈ 94 tok/s
 ── Serve from ──────────────────────────────────────────────
  ● This Mac            M5 Pro · 24 GB
- ● linux-ms-7e59        <GPU> · direct 8 ms                 ✓
+ ● linux-MS-7E59        <GPU> · direct 8 ms                 ✓
  ○ Mac Studio          offline
    Manage devices…
 ── Vision ─ …
-── Available on linux-ms-7e59 ─ (that device's engines; Calibrate runs there, needs "manage")
+── Available on linux-MS-7E59 ─ (that device's engines; Calibrate runs there, needs "manage")
 ```
 
 - The trigger keeps the `engine` glyph and adds a small accent dot while a remote device serves.
-  `aria-label` becomes "Engines and speed — serving from linux-ms-7e59".
+  `aria-label` becomes "Engines and speed — serving from linux-MS-7E59".
 - Picking a device:
   1. Pauses a streaming reply, like Calibrate does today.
   2. Uses the device's loaded model. Otherwise it uses the same model id if the device has it, or
      the device's own Auto/tier pick. If a *pinned* model is missing there, it asks:
-     "linux-ms-7e59 doesn't have Qwen3.5 9B. Use its Qwen3.6 27B, or download 9B there (needs
+     "linux-MS-7E59 doesn't have Qwen3.5 9B. Use its Qwen3.6 27B, or download 9B there (needs
      'Manage')".
   3. Respawns pi on the same session (§4.6.3).
 
 **Elsewhere:**
 
-- `TopBarStatus`: "Loading Qwen3.6 27B on linux-ms-7e59…", "linux-ms-7e59 went offline [Use this
-  Mac]", "Paused on linux-ms-7e59: machine busy".
+- `TopBarStatus`: "Loading Qwen3.6 27B on linux-MS-7E59…", "linux-MS-7E59 went offline [Use this
+  Mac]", "Paused on linux-MS-7E59: machine busy".
 - Model pickers (`QuickMenuPanel`/`TierPickerMenu`): the active device's models come first, labelled
-  "On linux-ms-7e59", then "On this Mac". Choosing one switches device (LM Link's labelled models).
+  "On linux-MS-7E59", then "On this Mac". Choosing one switches device (LM Link's labelled models).
 - `auto-router.ts`: with a remote device active, tiers come from that device's `recommend()`
   (`/cluster/info`), not this Mac's.
 
@@ -929,7 +929,7 @@ Qwen3.6 27B · llama.cpp · MTP · on linux-ms-7e59 · direct 8 ms
 
 Order: DEV-0, then DEV-1 and DEV-2 in parallel, then DEV-3 → DEV-4 → DEV-5 → DEV-6, then DEV-7 and
 DEV-8 in parallel, then DEV-9. **DEV-10 can be pulled forward right after DEV-6** for an early real
-demo on linux-ms-7e59. After that: DEV-11 → DEV-15 → DEV-12 → DEV-16, and finally DEV-13 and DEV-14.
+demo on linux-MS-7E59. After that: DEV-11 → DEV-15 → DEV-12 → DEV-16, and finally DEV-13 and DEV-14.
 
 Every UI package ends with a headless probe via `apps/desktop/tests/e2e/harness.mjs` `launchApp()`
 (hidden window, throwaway `$HOME`, mock-pi unless stated, focus guard in `finish()`) with
@@ -1109,7 +1109,7 @@ logs prefill/TTFT (memory: *always check prefill*).
 - **Acceptance:** a llama.cpp endpoint gets `llamacpp-stream`; an OpenAI-generic one gets
   `mlx-stream`; the key is added by the relay; capability limits are stated in the UI.
 - **Verify headlessly:** vitest with fake servers; e2e with a local fake OpenAI server. Opt-in live
-  check against a hand-run llama-server on linux-ms-7e59.
+  check against a hand-run llama-server on linux-MS-7E59.
 
 **DEV-11: Remote model management and the sharing policy (M)**
 
@@ -1140,7 +1140,7 @@ logs prefill/TTFT (memory: *always check prefill*).
   `--auth-key` for tsnet mode.
 - **Deps:** track 4 (Linux/Windows llama.cpp in `llamacpp-manifest.ts`, hardware detection), DEV-4,
   DEV-11.
-- **Acceptance:** on linux-ms-7e59, `bobble-node serve` appears as a device and serves chat.
+- **Acceptance:** on linux-MS-7E59, `bobble-node serve` appears as a device and serves chat.
 - **Verify headlessly:** CI/container unit tests; opt-in live run on the box.
 
 **DEV-14: Bobble's own Tailscale connection (tsnet sidecar) (XL)**
@@ -1168,7 +1168,7 @@ logs prefill/TTFT (memory: *always check prefill*).
 - **Files:** `apps/desktop/tests/e2e/devices-real-probe.mjs` (opt-in).
 - **Deps:** DEV-10 (BYO endpoint) now; DEV-13 later.
 - **Acceptance:** a report table of TTFT, prefill tok/s, decode tok/s and per-turn
-  `cached_tokens`, for local M5 against linux-ms-7e59, on the same model, direct path.
+  `cached_tokens`, for local M5 against linux-MS-7E59, on the same model, direct path.
 - **Verify headlessly:** a scripted, hidden run with `PI_DIAG_PROMPTS` logs attached.
 
 ---
@@ -1178,7 +1178,7 @@ logs prefill/TTFT (memory: *always check prefill*).
 ### Blockers
 
 1. **The Linux box cannot be a Bobble node until track 4 lands.** `PINNED_LLAMACPP` ships macOS
-   arm64 only and the hardware/engine paths are Mac-first. linux-ms-7e59, his only online peer, can
+   arm64 only and the hardware/engine paths are Mac-first. linux-MS-7E59, his only online peer, can
    serve today only as a **custom endpoint** (DEV-10) running a hand-started llama-server, as RemotePi
    did.
 2. **No second online Mac on the tailnet.** Both "Parent's MacBook Pro" nodes are offline since
@@ -1227,7 +1227,7 @@ logs prefill/TTFT (memory: *always check prefill*).
 2. **Tailscale for v1.** Is it fine that v1 requires Tailscale to be installed (with a link to get
    it)? The alternative is to make Bobble's own built-in connection (tsnet, like LM Studio's LM Link;
    no install, a browser sign-in) part of the first version.
-3. **linux-ms-7e59.** Does that box have a desktop session, so the full Bobble app can run there once
+3. **linux-MS-7E59.** Does that box have a desktop session, so the full Bobble app can run there once
    Linux support lands? Or should it get a headless `bobble-node` service? Until then, is a
    hand-started llama-server there ("Add a server by address") a good first milestone?
 4. **Scope of v1.** Is chat serving enough for the first version, or should remote image generation

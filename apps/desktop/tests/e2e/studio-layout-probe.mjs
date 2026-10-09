@@ -1,7 +1,7 @@
 /**
  * THE STUDIOS AS A CONTENT ROUTE — the layout the user asked for, asserted.
  *
- * the user: "have them all auto close the left sidebar (with the same animation) and
+ * The user: "have them all auto close the left sidebar (with the same animation) and
  * just appear in the chat area as if they are just replacing the current chat…
  * a main input bar at the bottom, a top right sidebar opener (same place and
  * icon as canvas)… and then the two gears, same place and icon as advanced

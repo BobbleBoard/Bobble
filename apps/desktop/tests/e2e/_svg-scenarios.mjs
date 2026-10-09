@@ -1,7 +1,7 @@
 /**
  * DOES THE MODEL REACH FOR `svg` WHEN NOBODY SAID "SVG"?
  *
- * the user: "it should be able to if asked to make a website of some sort utilize
+ * The user: "it should be able to if asked to make a website of some sort utilize
  * the svgs firsthand instead of writing its own or if asked for simple
  * illustrations even without 'svg' mentioned". Each scenario is a fresh chat;
  * the verdict comes from the session (which commands ran, what was refused)

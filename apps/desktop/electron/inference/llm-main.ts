@@ -524,7 +524,7 @@ export async function resumeChatModel(): Promise<{ ok: boolean; reason?: string 
 
 /**
  * How gently the next heavy generation runs — the policy's answer, cached
- * here for the gen queue's hot path. the user: "low can't stop image generation
+ * here for the gen queue's hot path. The user: "low can't stop image generation
  * requests, it just has to lessen compute intensivity in some way sacrificing
  * speed to keep headroom."
  */

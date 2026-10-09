@@ -149,7 +149,7 @@ function modelFilesPresent(c: KnownConnector): boolean {
  * Its state has two halves: the engine on disk (the gen module the studio
  * installs) and the person's switch (settings `moduleConnectors`). The tools
  * register at pi's spawn only when both hold (pi-main PI_BOBBLE_3D_READY), so
- * the card says "on" on exactly the same condition. the user (2026-09-17): "3d
+ * the card says "on" on exactly the same condition. The user (2026-09-17): "3d
  * should be a connector that gets recommended for install upon installing
  * the 3d studio module".
  */

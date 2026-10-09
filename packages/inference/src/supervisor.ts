@@ -144,7 +144,7 @@ export interface LaunchConfig {
  *   the model then describes a screenshot correctly in 3.5 s.
  *
  * So the exclusion bought nothing measurable and cost the model its eyes on
- * every task that did not explicitly ask for vision. the user: "all models are
+ * every task that did not explicitly ask for vision. The user: "all models are
  * multimodal here and the mmproj should always be loaded because all tasks
  * should be able to have vision."
  *
@@ -162,7 +162,7 @@ export function assembleServerArgs(cfg: LaunchConfig): string[] {
   /*
    * NO PROMPT-CACHE FLAGS ARE SET HERE, and that absence is load-bearing.
    *
-   * the user, on the corp harness: "if currently you can only hold one prefix at once,
+   * The user, on the corp harness: "if currently you can only hold one prefix at once,
    * the build needs to be able to store KV for many instances… so if anything is
    * ever sent as a follow up that has been activated in the last hour already, it
    * just gets to use cached kv and doesn't have to reprefill."
@@ -789,7 +789,7 @@ export class LlamaServerSupervisor {
    * — the same graceful ladder as dispose(), awaited to the real exit because
    * only that proves the memory is back — and {@link resume} respawns it on
    * the SAME port, so nothing that holds the base URL (models.json, pi's
-   * provider) has to learn anything. the user: "sacrificing speed to keep
+   * provider) has to learn anything. The user: "sacrificing speed to keep
    * headroom" — the speed given up is one reload and one re-prefill.
    *
    * Nothing checks here whether a request is in flight; the caller does

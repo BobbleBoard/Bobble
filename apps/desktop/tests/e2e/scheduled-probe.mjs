@@ -83,7 +83,7 @@ try {
   console.log('\nthe page');
   await page.click('[data-testid="nav-scheduled"]');
   await page.waitForSelector('[data-testid="scheduled-view"]', { timeout: 10_000 });
-  /* the user (2026-09-18): Routines | Templates under the title, no line under
+  /* The user (2026-09-18): Routines | Templates under the title, no line under
      it, the dotted + with its line even when there is nothing yet, and the
      templates only on Templates. */
   await page.waitForSelector('[data-testid="sd-strip-add"]', { timeout: 5_000 });

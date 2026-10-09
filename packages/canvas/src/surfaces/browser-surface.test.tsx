@@ -37,7 +37,7 @@ describe('BrowserSurface', () => {
   });
 
   it('draws NO "Pi is browsing" chip, even while driving', () => {
-    // the user: "I'd like that 'Pi is browsing' and blue dot stuff to be gone." It sat
+    // The user: "I'd like that 'Pi is browsing' and blue dot stuff to be gone." It sat
     // over the page's own top-right corner — where sites put their account menu
     // and sign-in controls — narrating something already visible.
     const html = render(<BrowserSurface url="https://x.test" driving />);

@@ -1,5 +1,5 @@
 /**
- * THE ADDRESS BAR SEARCHES. the user (2026-10-08): "searching in the search bar
+ * THE ADDRESS BAR SEARCHES. The user (2026-10-08): "searching in the search bar
  * should google something not show https://<typed thing>".
  *
  * Opens a canvas browser tab, types words, presses Enter, and reads where the

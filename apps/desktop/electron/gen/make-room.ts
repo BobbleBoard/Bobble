@@ -1,7 +1,7 @@
 /**
  * MAKE ROOM: park the chat model for a generation that does not fit beside it.
  *
- * the user: "low can't stop image generation requests, it just has to lessen
+ * The user: "low can't stop image generation requests, it just has to lessen
  * compute intensivity in some way sacrificing speed to keep headroom."
  *
  * On a 24 GB Mac the resident chat model is the single largest thing in memory

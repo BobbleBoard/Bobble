@@ -1,7 +1,7 @@
 /**
  * The EXACT system prompt a CLI-mode turn runs on, written out verbatim.
  *
- * the user: "why on earth would the system prompt be 24k characters or anything near
+ * The user: "why on earth would the system prompt be 24k characters or anything near
  * that??? (in cli mode which we should be running) show me that verbatim in a md
  * file". The harness publishes the frozen prompt on `harness-prefill-system`, so
  * this reads the real thing rather than rebuilding it and hoping they match.
@@ -10,14 +10,17 @@ import { execFile } from 'node:child_process';
 import { existsSync, mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { chromium } from 'playwright-core';
 import { probeHome } from './harness.mjs';
 
+const REPO_ROOT = fileURLToPath(new URL('../../../../', import.meta.url)).replace(/\/$/, '');
+
 const run = promisify(execFile);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const PORT = 9371;
-const OUT = process.argv[2] ?? '/Users/user/Desktop/OSS-harness/scratchpad/system-prompt-cli.md';
+const OUT = process.argv[2] ?? `${REPO_ROOT}/scratchpad/system-prompt-cli.md`;
 
 const HOME = probeHome('prompt-dump');
 mkdirSync(path.join(HOME, '.cache'), { recursive: true });

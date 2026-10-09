@@ -1,7 +1,7 @@
 /**
  * THE RESULT CARD, AS A CHAT.
  *
- * the user: "no grey bars, shrink and left align the card (eg. in fox screenshot
+ * The user: "no grey bars, shrink and left align the card (eg. in fox screenshot
  * there's bars) and place the prompt up and right as if this is a chat", and
  * "edit how much should say low/med/high and say 'Edit Magnitude'".
  *
@@ -20,9 +20,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { launchApp } from './harness.mjs';
 
-const OUT =
-  process.env.OUT ??
-  '<session-scratchpad>/card';
+const OUT = process.env.OUT ?? '<session-scratchpad>/card';
 mkdirSync(OUT, { recursive: true });
 
 const home = mkdtempSync(path.join(tmpdir(), 'pd-card-home-'));

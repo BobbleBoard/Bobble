@@ -18,7 +18,7 @@
  * and a click opens it on the canvas like any other file.
  *
  * A PICTURE OPENS IN THE IMAGE VIEWER, like a picture anywhere else in the app
- * (the user, 2026-09-24: "images clicked on/fullscreened should have the new studio
+ * (The user, 2026-09-24: "images clicked on/fullscreened should have the new studio
  * like ui") — by its path or by its `pd-file://` URL alike. An SVG still opens
  * on the canvas, whose source/rendered toggle is the right room for a drawing
  * made of text; so does anything the viewer cannot open. A remote http(s)

@@ -60,10 +60,10 @@ describe('a raised hand cannot be mistaken for finished work', () => {
 });
 
 describe('the alert rides the next tool result', () => {
-  /* the user's exact mechanism: "<tool result> + 'additional info, <subagent> is
+  /* The user's exact mechanism: "<tool result> + 'additional info, <subagent> is
    * stopped: <message>'" — so a hand raised while the manager was busy reaches
    * it without needing a turn of its own. */
-  it('appends in the user's stated form', () => {
+  it('appends in the user’s stated form', () => {
     expect(handAlert([hand()])).toContain(
       'additional info, engineer:1 is stopped: The browser tool returns no elements',
     );
@@ -140,7 +140,7 @@ describe('HandLedger', () => {
 /**
  * THE MANAGER'S SIDE OF WAITING.
  *
- * the user: "maybe have the manager get a stop subagent tool call, that will pause it
+ * The user: "maybe have the manager get a stop subagent tool call, that will pause it
  * until the manager decides to message it again."
  *
  * A manager could hand work out and wait for it, but had no way to tell somebody

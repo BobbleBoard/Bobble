@@ -5,7 +5,7 @@
  * from the text (the app resolves index → element). Mirror of browser-use's
  * format.ts.
  *
- * DIALOGS ARE FIRST-CLASS HERE. the user's field report: the model clicks Open in
+ * DIALOGS ARE FIRST-CLASS HERE. The user's field report: the model clicks Open in
  * TextEdit, a file dialog appears — that dialog is part of TextEdit, not of
  * Finder — and the model has to be able to SEE it and drive it. A snapshot that
  * silently mixes a sheet's controls into the window's list leaves the model
@@ -205,7 +205,7 @@ const AIMABLE_ROLES = new Set([
  * and that picking one is the way through, instead of inferring a chooser from a
  * picture of five rounded rectangles.
  *
- * the user, who has five profiles and hit this three times in a row: "how about just
+ * The user, who has five profiles and hit this three times in a row: "how about just
  * detect, if this is the profile selection screen, take a screenshot, i'm ok
  * hardcoding this one case since chrome is popular and we're already giving it
  * sort of special treatment anyways."
@@ -628,7 +628,7 @@ export interface MacSnapshotView {
    * This look named no app and nothing was under control, so the helper
    * answered with whatever the USER has in front. Said so in the header: the user
    * (2026-09-23) watched a model announce "the user is on Activity Monitor"
-   * off a look that had simply fallen back to his frontmost window.
+   * off a look that had simply fallen back to their frontmost window.
    */
   readonly frontmostFallback?: boolean;
   /** This look named no app and used the one carried over from an earlier chat

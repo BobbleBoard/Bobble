@@ -1,7 +1,7 @@
 /**
  * A TURN THAT DID NOT FINISH — a plain account and a fix, never red text.
  *
- * the user (2026-10-08): "'The local model server returned an error. Please try
+ * The user (2026-10-08): "'The local model server returned an error. Please try
  * again.' … red text that's just a real unknown error or something that
  * doesn't have handling attached to it or can be easily done something about
  * just can't exist anymore."

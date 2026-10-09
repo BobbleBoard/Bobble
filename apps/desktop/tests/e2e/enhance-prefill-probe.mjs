@@ -1,7 +1,7 @@
 /**
  * DOES ANYTHING ELSE ON THE BOX COST THE CHAT ITS PREFIX?
  *
- * the user: "always be checking whenever you do chat/harness work at all, especially
+ * The user: "always be checking whenever you do chat/harness work at all, especially
  * longer chat testing, ensure you log and check prefill times and such and make
  * sure you don't introduce any reprefill required bugs … these are practically
  * the most important to the end user experience."

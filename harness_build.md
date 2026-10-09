@@ -24,7 +24,7 @@ still knows it next week.
 
 **Every role is a full agent, prompted like a person.**
 
-A manager handing an engineer a contract is doing exactly what the user does when he
+A manager handing an engineer a contract is doing exactly what the user does when the user
 opens a chat and asks for something: a message into an ongoing conversation with
 someone who has the whole toolset — read, write, edit, bash, grep, web search,
 browser, python — and who works in the real tree. Not a templated completion, not
@@ -219,7 +219,7 @@ than a series of strangers.
 
 ### D · Capability ledger and provisioning
 
-Not a permission system. the user's call: full capability, no artificial constraints,
+Not a permission system. The user's call: full capability, no artificial constraints,
 guard destruction hard at the terminal layer (including its python spellings —
 `shutil.rmtree`, `os.remove`, redirects, `dd`, `mkfs`).
 
@@ -464,7 +464,7 @@ pytest`. It did not replan around the constraint — it deleted the constraint, 
 changing the machine.
 
 Two costs, and the second is worse than the first. It mutated the user's home
-(`~/Library/Python/3.9/`) with packages he never sanctioned, which is precisely
+(`~/Library/Python/3.9/`) with packages the user never sanctioned, which is precisely
 what the ledger's own header says must not happen at 4am. And it made the ledger
 *wrong for the rest of the run*: every downstream decision was planned against
 "no pytest" while the gate later judged the product **with** pytest — a team told
@@ -479,7 +479,7 @@ class of bug as a cached `stat`, with a shell as the mutator. The containment fi
 (a run-private `PYTHONUSERBASE` so installs land in the run directory rather than
 in `$HOME`) is not free — redirecting the user base also hides the packages
 already there, `pyyaml` among them — so it is a task, not a one-liner. Recorded
-here rather than half-done, and the user told what landed on his machine.
+here rather than half-done, and the user told what landed on their machine.
 
 **L16 · `; true`.** Run 8's first engineer submitted this, and it was ACCEPTED:
 

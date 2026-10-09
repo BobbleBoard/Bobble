@@ -2,7 +2,7 @@
  * THE BOARD THE APP ICON IS ALREADY ON.
  *
  * The Bobble mark is three rounded squares in a 2x2 grid with the top-left cell
- * empty — which is a sliding-tile puzzle that has never been played. the user asked
+ * empty — which is a sliding-tile puzzle that has never been played. The user asked
  * for it to be: "show the bobble logo as a loader with the squares sliding
  * clockwise like a sliding tile puzzle, until there is a diffusion step ready."
  *
@@ -43,7 +43,7 @@ export const BOBBLE_CELLS: readonly TileCell[] = [
  * pink, then teal, one per beat, forever.
  */
 /*
- * ALL WHITE. the user: "make the app icon rounded corner squares all 100% white in
+ * ALL WHITE. The user: "make the app icon rounded corner squares all 100% white in
  * the app and the dock icon." The ids keep their old colour names because the
  * puzzle's beat order is written in terms of them (yellow, then pink, then
  * teal) and the tests read them; the fill is the only thing that changed.

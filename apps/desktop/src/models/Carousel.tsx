@@ -1,7 +1,7 @@
 /**
  * ONE ROW THAT SCROLLS SIDEWAYS, with arrows at the edges.
  *
- * the user: "top reccomended needs to be 1 row no stacking and h scrollable", and
+ * The user: "top reccomended needs to be 1 row no stacking and h scrollable", and
  * then a screenshot of how Unsloth does it — cards clipped at the boundary so
  * you can see there is more, and a round chevron floating over each end.
  *
@@ -13,7 +13,7 @@
  * there.
  *
  * THE EDGE FADES RATHER THAN CUTS. A card sliced by a hard line reads as a
- * rendering fault; the same card fading out reads as "there is more". the user: "no
+ * rendering fault; the same card fading out reads as "there is more". The user: "no
  * hard cutoff here." The fade is a mask on the scroller and it only applies to
  * the side that HAS more — fading the left edge at scroll zero would be a
  * promise of content that is not there.
@@ -83,7 +83,7 @@ export function Carousel({ children, testid = 'carousel' }: CarouselProps): JSX.
 
   return (
     /*
-     * `isolation: isolate` (pd-carousel-wrap) rather than a z-index race. the user:
+     * `isolation: isolate` (pd-carousel-wrap) rather than a z-index race. The user:
      * "the profile picture appears on top of the button but only when hovered."
      * A hovered card was winning the paint order against an absolutely
      * positioned sibling, which is the kind of bug that gets "fixed" by bidding

@@ -299,7 +299,7 @@ export const IcStar = make(
   <path d="M12 3.5l2.5 5.4 5.9.7-4.4 4 1.2 5.9-5.2-3-5.2 3 1.2-5.9-4.4-4 5.9-.7z" />,
 );
 /*
- * SEND TO IS THE ARROW ALONE. the user (2026-09-14): "send to SVG should only be
+ * SEND TO IS THE ARROW ALONE. The user (2026-09-14): "send to SVG should only be
  * the arrow, no L shape and 20% larger arrow." The L under it was the tray
  * every share glyph draws; without it the curved arrow takes the whole box,
  * scaled up a fifth about its centre.
@@ -311,7 +311,7 @@ export const IcShare = make(
   />,
 );
 /*
- * EXPORT IS AN ARROW OUT OF A TRAY. the user (2026-09-14): "export SVG should have
+ * EXPORT IS AN ARROW OUT OF A TRAY. The user (2026-09-14): "export SVG should have
  * up arrow with half square outline below it" — the mark macOS uses for
  * sharing out, which is what exporting a file is.
  */
@@ -323,7 +323,7 @@ export const IcExport = make(
   </>,
 );
 /*
- * JUST THE ARROW. the user: "remove the L shape in the svg and size the arrow up."
+ * JUST THE ARROW. The user: "remove the L shape in the svg and size the arrow up."
  *
  * The tray under it is the half-box every download icon draws, and at 15px it
  * was most of the mark's ink while carrying none of its meaning — the arrow
@@ -371,7 +371,7 @@ export const IcInfo = make(
   </>,
 );
 /*
- * ASSETS: a thumbnail grid, not four dots. the user: "4 dots not that great 'assets'
+ * ASSETS: a thumbnail grid, not four dots. The user: "4 dots not that great 'assets'
  * icon, something else." Four dots is a drag handle everywhere else in this app
  * — it is literally the grip on the panel's own resizer — so it read as
  * something to grab rather than the name of a tab. Four cells is what a library

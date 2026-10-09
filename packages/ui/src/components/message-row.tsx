@@ -20,7 +20,7 @@ export interface MessageRowProps extends HTMLAttributes<HTMLDivElement> {
    * It is a user-shaped bubble because that is what it IS from the receiving
    * agent's point of view: the thing it was asked to do. But it is LEFT aligned
    * with a blue border rather than right aligned, so a transcript never implies
-   * the user typed it. the user: "the manager/CEO provided messages need to be shown as
+   * The user typed it. The user: "the manager/CEO provided messages need to be shown as
    * if they are a user message, however their message bubble should be left
    * aligned instead of right aligned and should have a blue tint/border."
    *

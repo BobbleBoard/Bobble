@@ -19,7 +19,7 @@
  * …and the RUNNING JOB now does the same (state/studio-jobs.ts). It was the
  * last thing still held in here, so leaving mid-generation reset the room to
  * empty while the job ran on in main, and lost the result if it landed before
- * you came back. the user (2026-09-24): "leaving a studio with a generation running
+ * you came back. The user (2026-09-24): "leaving a studio with a generation running
  * and then going back doesn't keep it going, or maybe it does but the UI
  * resets". This hook is now only the room's view of its slot.
  */
@@ -48,7 +48,7 @@ import { type StudioModality, useStudioRuns } from '../state/studio-runs';
  * MEASURED in the round-2 settings run: EVERY video model is reserved today,
  * so the Video studio drew a live Generate button, three starters and a model
  * picker reading "Recommended", with nothing anywhere on screen saying that
- * video cannot run on this machine yet. the user, about the image room in the same
+ * video cannot run on this machine yet. The user, about the image room in the same
  * state: it "isn't user-friendly to get working in a few clicks even when
  * something has gone wrong".
  *
@@ -104,7 +104,7 @@ export interface StudioJobState {
   /**
    * What the engine last said it was doing, before there are any steps to count.
    *
-   * the user: the image studio "won't work at all". A cold run spends minutes
+   * The user: the image studio "won't work at all". A cold run spends minutes
    * provisioning a Python environment and loading weights before step 1, and the
    * room said "Starting…" through all of it — indistinguishable from broken.
    */

@@ -326,7 +326,7 @@ const REDUCED_MOTION = `/* Reduced motion: collapse transition/animation duratio
 /*
  * TERMINAL CURSOR — a caret you can actually see.
  *
- * the user: "the cursor should be a single blinking | ... should be blue in this
+ * The user: "the cursor should be a single blinking | ... should be blue in this
  * style but claude orange codex probably still blue."
  *
  * Two flavors already say the right thing with their own accent — bobble's is
@@ -342,7 +342,7 @@ const TERMINAL_CURSOR: Record<string, string> = {
 /*
  * The CURRENT row of a menu — the active project, the selected model.
  *
- * the user: "let's go with a blue hover effect + checkmark instead of the green on
+ * The user: "let's go with a blue hover effect + checkmark instead of the green on
  * the selected one". Green was `--pd-status-success-fg`, which says SUCCEEDED
  * rather than SELECTED — the wrong idea in a picker, and loud enough that it
  * pulled the eye past the row you were actually hovering.
@@ -359,7 +359,7 @@ const MENU_CURRENT: Record<string, string> = {
  *
  * It used CodeMirror's `defaultHighlightStyle`, built for a LIGHT editor: navy
  * keywords, dark purple constants. On the app's near-black code background they
- * all but vanished. the user: "why all so dark, especially the dark blue, absolutely
+ * all but vanished. The user: "why all so dark, especially the dark blue, absolutely
  * not." Then the terminal: xterm's default red on that same ground was "a dark
  * red colour that's a bit unreadable".
  *
@@ -371,7 +371,7 @@ const MENU_CURRENT: Record<string, string> = {
  * writes no override for one). One source, so the sheet and the settings
  * preview cannot disagree; `code-theme-fallback.test.ts` diffs them.
  *
- * NO PURPLE, INCLUDING IN CODE. the user's rule is a rule about the whole product,
+ * NO PURPLE, INCLUDING IN CODE. The user's rule is a rule about the whole product,
  * and the syntax palette was quietly the largest purple surface in it: keywords
  * and properties are on almost every line of every file the canvas shows, so a
  * violet keyword painted more pixels than any component. Keywords are rose,

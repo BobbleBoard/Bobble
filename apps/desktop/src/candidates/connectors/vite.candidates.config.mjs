@@ -3,7 +3,7 @@
  *
  * The app's own vite.config.ts is the wrong tool for this twice over: its
  * electronSimple plugin spawns a real Electron window the moment `vite serve`
- * has built main.ts (a window on the user's screen, against his real $HOME — hence
+ * has built main.ts (a window on the user's screen, against their real $HOME — hence
  * `PI_DEV_NO_LAUNCH=1`), and even with the launch suppressed it REBUILDS
  * `dist-electron/` on the way, under the feet of whatever e2e suite is running
  * against the built app. This config serves the SAME renderer (same root, same

@@ -2,7 +2,7 @@
 A chart INTO a document — the chart tool's drawing as native shapes in a
 slide, a Word page, a workbook or a PDF.
 
-the user (2026-09-16): "ensure these can be embedded into docs or charts or
+The user (2026-09-16): "ensure these can be embedded into docs or charts or
 whatever, that's mainly the use case, say you put a pdf in and ask the model
 to slot a chart in with the data on the second page and also reformat it to
 fit the data better, it should be able to do it, whatever chart you ask".

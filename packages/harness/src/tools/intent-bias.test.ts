@@ -31,7 +31,7 @@ describe('terms', () => {
 });
 
 describe('matchIntent', () => {
-  /* the user's screenshot, verbatim in shape: the model says the tool's own name and
+  /* The user's screenshot, verbatim in shape: the model says the tool's own name and
    * is then handed something else. A literal mention is not a guess. */
   it('takes a named tool as decisive', () => {
     const m = matchIntent(

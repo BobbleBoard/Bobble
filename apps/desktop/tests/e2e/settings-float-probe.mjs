@@ -1,7 +1,7 @@
 /**
  * DID THE SETTINGS/MODELS REWORK ACTUALLY LAND ON SCREEN?
  *
- * the user asked for two structural changes and both are the kind that a unit test
+ * The user asked for two structural changes and both are the kind that a unit test
  * happily passes while the window looks wrong:
  *   - settings "not full window taking over thing, but instead floating panel
  *     center"
@@ -334,7 +334,7 @@ try {
         sidebar: document.querySelector('.pd-sidebar-slot') !== null,
       };
     });
-    // ITS OWN SURFACE, BUT INSIDE THE SHELL. the user asked for the sidebar to stay,
+    // ITS OWN SURFACE, BUT INSIDE THE SHELL. The user asked for the sidebar to stay,
     // so the hub must NOT be full width and the chat sidebar must still exist.
     assert(!modelsGeom.insideSettings, 'the models view is still inside the settings panel');
     assert(modelsGeom.sidebar, 'the chat sidebar disappeared when the hub opened');

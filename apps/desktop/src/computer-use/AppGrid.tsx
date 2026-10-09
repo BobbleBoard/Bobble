@@ -2,7 +2,7 @@
  * THE APP CHOOSER — a grid of the Mac's real app icons with names under them,
  * each a tile you tick to let Bobble use that app without asking.
  *
- * the user (2026-09-15): "a UI on onboarding for computer use on/off and then if
+ * The user (2026-09-15): "a UI on onboarding for computer use on/off and then if
  * on choose what apps to allow control of, show this as a grid of real app
  * icons w/ names below, this is editable later in settings via a similar UI."
  *

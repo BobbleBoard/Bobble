@@ -1,7 +1,7 @@
 /**
  * THE CODING HARNESSES BOBBLE CAN DRIVE, AND HOW EACH ONE ATTACHES.
  *
- * the user: "add that harness swapping mechanism in full working easily, and add to
+ * The user: "add that harness swapping mechanism in full working easily, and add to
  * onboarding, we want codex, claude code, hermes, pi, opencode, or other I
  * guess? ideally easily support for other dropping in any custom pi config
  * somehow. system pi detected and put in also."

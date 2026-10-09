@@ -1,7 +1,7 @@
 /**
  * WHAT THE MODEL IS TOLD A PATH IS.
  *
- * the user (2026-09-17), on a reply ending "The file is located at
+ * The user (2026-09-17), on a reply ending "The file is located at
  * /Users/user/Bobble/show-me-how-svg-is-generlaly/sample.svg": "it should
  * not say or know that unless it explicitly looks for it via bash, it should
  * only know the relative path from the chat workspace's root by default, eg.

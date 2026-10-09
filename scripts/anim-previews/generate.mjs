@@ -1,26 +1,59 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { chromium } from '/Users/user/Desktop/OSS-harness/apps/desktop/node_modules/playwright-core/index.mjs';
+import { chromium } from '../../apps/desktop/node_modules/playwright-core/index.mjs';
+import { fileURLToPath } from 'node:url';
+import { homedir } from 'node:os';
+const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url)).replace(/\/$/, '');
 
-const DIST = '/Users/user/.claude/jobs/8b8d3832/tmp/animgen/dist';
-const OUT = '/Users/user/Desktop/OSS-harness/apps/desktop/src/tripo/assets/anim-previews';
+// The animation-preview page's vite build (vite.config.mjs); pass its dist folder.
+const DIST = process.env.ANIMGEN_DIST ?? `${REPO_ROOT}/scripts/anim-previews/dist`;
+const OUT = `${REPO_ROOT}/apps/desktop/src/tripo/assets/anim-previews`;
 mkdirSync(OUT, { recursive: true });
 
 const PRESETS = [
-  'angry_01', 'afraid', 'agree', 'angry_02', 'cheer', 'clap', 'dance_01', 'hello',
-  'idle', 'jump', 'kick', 'point', 'run', 'sad_01', 'walk', 'wave',
+  'angry_01',
+  'afraid',
+  'agree',
+  'angry_02',
+  'cheer',
+  'clap',
+  'dance_01',
+  'hello',
+  'idle',
+  'jump',
+  'kick',
+  'point',
+  'run',
+  'sad_01',
+  'walk',
+  'wave',
 ];
 
-const browser = await chromium.launch({ channel: 'chrome', args: ['--use-angle=metal', '--autoplay-policy=no-user-gesture-required'] });
+const browser = await chromium.launch({
+  channel: 'chrome',
+  args: ['--use-angle=metal', '--autoplay-policy=no-user-gesture-required'],
+});
 const page = await browser.newPage();
 await page.route('http://animgen.local/**', async (route) => {
   const url = new URL(route.request().url());
   let p = url.pathname;
   if (p === '/') p = '/index.html';
-  if (p === '/model.fbx') return route.fulfill({ body: readFileSync('/Users/user/Downloads/model.fbx'), contentType: 'application/octet-stream' });
-  if (p === '/dance.fbx') return route.fulfill({ body: readFileSync('/Users/user/Downloads/source/Macarena Dance.fbx'), contentType: 'application/octet-stream' });
+  if (p === '/model.fbx')
+    return route.fulfill({
+      body: readFileSync(`${homedir()}/Downloads/model.fbx`),
+      contentType: 'application/octet-stream',
+    });
+  if (p === '/dance.fbx')
+    return route.fulfill({
+      body: readFileSync(`${homedir()}/Downloads/source/Macarena Dance.fbx`),
+      contentType: 'application/octet-stream',
+    });
   try {
     const body = readFileSync(DIST + p);
-    const ct = p.endsWith('.html') ? 'text/html' : p.endsWith('.js') ? 'text/javascript' : 'application/octet-stream';
+    const ct = p.endsWith('.html')
+      ? 'text/html'
+      : p.endsWith('.js')
+        ? 'text/javascript'
+        : 'application/octet-stream';
     return route.fulfill({ body, contentType: ct });
   } catch {
     return route.fulfill({ status: 404, body: 'nf' });
@@ -43,7 +76,9 @@ for (const preset of PRESETS) {
   writeFileSync(`${OUT}/${preset}.webm`, webm);
   writeFileSync(`${OUT}/${preset}.jpg`, poster);
   total += webm.length + poster.length;
-  console.log(`  ${preset}: webm ${(webm.length / 1024).toFixed(0)}KB poster ${(poster.length / 1024).toFixed(0)}KB`);
+  console.log(
+    `  ${preset}: webm ${(webm.length / 1024).toFixed(0)}KB poster ${(poster.length / 1024).toFixed(0)}KB`,
+  );
 }
 console.log(`TOTAL ${(total / 1024 / 1024).toFixed(2)}MB → ${OUT}`);
 

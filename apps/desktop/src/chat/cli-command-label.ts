@@ -1,7 +1,7 @@
 /**
  * A BOBBLE COMMAND, SAID AS WHAT IT DID.
  *
- * the user: "cli tools showing directly to the user as terminal tools even when
+ * The user: "cli tools showing directly to the user as terminal tools even when
  * they're very parsable and should have special display/handling for visuals
  * eg. 'snapshotted <app icon inline><app>' 'scrolled'."
  *
@@ -31,7 +31,7 @@ export interface CliCommandLabel {
   /**
    * The ACTION alone, with the app's name taken out of it.
    *
-   * the user wants the row read as "<connectors icon> Used <app icon> <app name>
+   * The user wants the row read as "<connectors icon> Used <app icon> <app name>
    * <action eg. read page or listed tabs>", which means the app is a NAMED
    * PART of the row rather than a word inside a sentence — the sentence has to
    * come apart for that. `running`/`done` stay whole for the rows that have no
@@ -39,7 +39,7 @@ export interface CliCommandLabel {
    */
   readonly action?: { readonly running: string; readonly done: string };
   /**
-   * THE ROW IS ONE OF THE APP'S OWN KINDS, not a command. the user (2026-09-21),
+   * THE ROW IS ONE OF THE APP'S OWN KINDS, not a command. The user (2026-09-21),
    * watching `svg --prompt="a smiley fac…"` and `browser click` render as
    * terminal rows: "ensure all things have custom 'Clicking with browser'
    * 'Drawing SVG' rather than 'svg --prompt a smiley fac...'". So a line that
@@ -199,7 +199,7 @@ function browserLabel(verb: string, pair: [string, string], line: string): CliCo
   // The words after the verb: `browser type 14 "hello"` → ['14', 'hello'].
   const after = bare.slice(bare.indexOf(verb) + 1);
   /*
-   * A LEADING NUMBER IS AN INDEX ONLY FOR THE VERBS THAT TAKE ONE. the user
+   * A LEADING NUMBER IS AN INDEX ONLY FOR THE VERBS THAT TAKE ONE. The user
    * (2026-09-23): "what's all this about 'scrolled element 5000' or 10000 …
    * there's certainly not 10 thousand elements on page." `browser scroll 5000`
    * is a DISTANCE, and this read it as element 5000.
@@ -316,7 +316,7 @@ export function cliCommandLabel(command: string | undefined): CliCommandLabel | 
 
   /*
    * `chrome …` — the browser's own set, which is a CONNECTOR rather than an app
-   * being clicked at. the user asked for these to read as connector usage, and the
+   * being clicked at. The user asked for these to read as connector usage, and the
    * verbs are its own: tabs and a tab are things only a browser has.
    */
   if (group === 'chrome') {
@@ -434,7 +434,7 @@ export function cliCommandLabel(command: string | undefined): CliCommandLabel | 
    * web_search / web_fetch calls draw. They were terminal rows — "Searched the
    * web for …" over a reveal of the tool's raw text — which made the default
    * (CLI) mode's research read as a log while the same search in schemas mode
-   * showed what it found. the user's sources wave (2026-09-24) asked for the
+   * showed what it found. The user's sources wave (2026-09-24) asked for the
    * research to read as research: a search row lists its results (the sites'
    * icons and titles), a fetch row is a page that was read (`page` — not a
    * browser kind, so it never turns the canvas to the browser).
@@ -466,7 +466,7 @@ export function cliCommandLabel(command: string | undefined): CliCommandLabel | 
 
   /*
    * `chart bar "Units Sold" --labels … --values …` and `chart edit units.svg
-   * --look sunset`. the user (2026-09-17): four rows reading "Chart" beside a
+   * --look sunset`. The user (2026-09-17): four rows reading "Chart" beside a
    * spinner; "show something more informative, eg. '<Datavisualization
    * connector icon> Rendering <type> Chart'". The type is the first bare word
    * (or `--type x`); the title the first quoted argument after it.

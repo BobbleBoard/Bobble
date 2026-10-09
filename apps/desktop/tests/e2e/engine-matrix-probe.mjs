@@ -2,7 +2,7 @@
  * EVERY ENGINE × METHOD, THROUGH THE REAL CHAT — does it answer, does it call
  * a tool, does it error, and does the follow-up reuse the prefix?
  *
- * the user (2026-09-13): "i'm having errors with different engines eg. rapidmlx
+ * The user (2026-09-13): "i'm having errors with different engines eg. rapidmlx
  * says dflash can't work with it, but also the non dflash version is
  * returning errors and doesn't have the prefill caching work at all or as
  * well as llamacpp? test through each and make sure all engines work with

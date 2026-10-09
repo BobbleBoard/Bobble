@@ -1,7 +1,7 @@
 /**
  * The chart model — what a data visual IS, independent of who draws it.
  *
- * the user (2026-09-16), with Claude's inline chart beside Bobble's: "we need
+ * The user (2026-09-16), with Claude's inline chart beside Bobble's: "we need
  * parity on these datavisuals, it's a common use case and very formulaic and
  * doable … not just bar charts, all datavisuals". One spec, three readers: the
  * `chart` tool writes it (and a static SVG beside it), the chat renders it as

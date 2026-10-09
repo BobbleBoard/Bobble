@@ -5,7 +5,7 @@
  * ## What changed, and why
  * This hook used to be `useGen(controller)` and its whole job was to
  * `upsertTab({ kind: 'gen-image' })` for every `generate_image` /
- * `generate_video` call. the user, round 21: "image/video/audio/media generation
+ * `generate_video` call. The user, round 21: "image/video/audio/media generation
  * tools DO NOT GET SHOWN IN THE CANVAS…. they get shown inline, the large card,
  * same as each studio would show."
  *

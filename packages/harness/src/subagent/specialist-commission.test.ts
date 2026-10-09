@@ -38,7 +38,7 @@ describe('no capability round-trip', () => {
 });
 
 describe('imageLoopProtocol', () => {
-  /* the user's spec, clause by clause: "for n iterations, model generates an initial
+  /* The user's spec, clause by clause: "for n iterations, model generates an initial
    * image, decides, edit or try again from scratch at each iteration and also at
    * each iteration indicates if the newest one is better than the current best,
    * if so, replace it, otherwise discard (initial one from raw user prompt starts

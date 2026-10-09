@@ -1,7 +1,7 @@
 /**
  * GROUND TRUTH: what does the model ACTUALLY receive?
  *
- * the user: "often the issue is that the instructions we for whatever reason
+ * The user: "often the issue is that the instructions we for whatever reason
  * actually just [are] not appended to the system prompt."
  *
  * This drives the REAL app with the bash-CLI interface on, sends a fresh

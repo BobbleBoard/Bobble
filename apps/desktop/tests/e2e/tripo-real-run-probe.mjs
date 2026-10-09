@@ -1,7 +1,7 @@
 /**
  * Drive a REAL generation through the REAL UI and watch what the user watches.
  *
- * the user's report, verbatim: "from the blank screen … there was nothing in the
+ * The user's report, verbatim: "from the blank screen … there was nothing in the
  * right sidebar, now there's 2 things, and both seem selected, of course the
  * debris issue also, and then there's painting failed, and also why is the
  * plane on it's nose … generate via the real UI and check."

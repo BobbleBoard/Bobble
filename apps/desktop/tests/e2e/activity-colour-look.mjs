@@ -1,11 +1,13 @@
 /**
  * LOOK at the Activity tab's colour: a prompt with user + folder, a passing
  * command, a failing one (red), a quiet one (dim), and output that brought
- * its own colour. the user (2026-09-12): "need color coded text in the terminal
+ * its own colour. The user (2026-09-12): "need color coded text in the terminal
  * in the canvas."
  *
  *   SHOT_DIR=/tmp/activity-colour node apps/desktop/tests/e2e/activity-colour-look.mjs
  */
+
+import { homedir } from 'node:os';
 import { launchApp } from './harness.mjs';
 
 const { page, finish } = await launchApp('activity-colour', {
@@ -36,7 +38,7 @@ try {
     (msgs) => {
       const s = window.__pi_store();
       s.setState({
-        session: { ...(s.getState().session ?? {}), cwd: '/Users/user/bobble-testbed/buggyapp' },
+        session: { ...(s.getState().session ?? {}), cwd: `${homedir()}/bobble-testbed/buggyapp` },
       });
       s.setState({ messages: msgs });
     },

@@ -550,7 +550,7 @@ def main() -> None:
 def quick_mode(source, healed, prep, args, out_dir: Path) -> None:
     """A triangle low-poly in seconds, for when the minutes are the problem.
 
-    the user (2026-09-15), on a remesh he watched pass eight minutes: "remeshing
+    The user (2026-09-15), on a remesh the user watched pass eight minutes: "remeshing
     should be a quick process … attempt to find a faster alternative for a
     'quick mode'." MEASURED on that model (a 186k-face jet, this machine):
 

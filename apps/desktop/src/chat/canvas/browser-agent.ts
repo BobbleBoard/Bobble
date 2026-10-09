@@ -36,7 +36,7 @@ export function pickAgentBrowserTab(
   const browsers = tabs.filter((t) => t.kind === 'browser');
   if (browsers.length > 0) return browsers[browsers.length - 1]?.id;
   /*
-   * THE ACTIVITY TAB IS WHERE BROWSING GOES (queue item 3). the user: "doing
+   * THE ACTIVITY TAB IS WHERE BROWSING GOES (queue item 3). The user: "doing
    * something in the browser, this tab shows that." When there is no browser
    * tab to adopt, morphing the one Activity tab into the browser is what keeps
    * this from being the third tab a single turn opens — and because the tab id
@@ -101,7 +101,7 @@ export function useBrowserAgent(controller: CanvasController): void {
        * This always created its own "Pi Browser" tab, keyed AGENT_TAB_KEY. With a
        * page already open in the canvas browser that meant a SECOND, blank tab —
        * and the agent registered against that one, so `browser_snapshot` read
-       * about:blank and reported no interactive elements. the user: "it knows what tab
+       * about:blank and reported no interactive elements. The user: "it knows what tab
        * I have open but the read call is reading the about blank???" It did know;
        * it was reading somewhere else.
        *

@@ -49,7 +49,7 @@ downloaded llama.cpp tarball, a PyPI index, or this repo).
 
 ## 1. Goal
 
-the user, verbatim: *"total linux and windows amd nvidia intel gpu and cpu compatibility including
+The user, verbatim: *"total linux and windows amd nvidia intel gpu and cpu compatibility including
 computer use, specialized inference engines and OS compatibility, detection and working
 calibration."*
 
@@ -838,7 +838,7 @@ ComfyUI install on PCs:
 | **L5 real hardware** | self-hosted runners (the user's or testers' machines, reachable over Tailscale — track 5) labelled `gpu-nvidia`, `gpu-amd`, `gpu-intel`, `win-arm` | Nightly `calibrate-probe` + `engine-matrix-probe` + a generation per modality. Results as artifacts and a table. A **"Copy system report"** button (HostProfile + `--list-devices` + calibration + log tails) turns any user into an L5 data point. Optional: rented cloud GPUs (NVIDIA; AMD Developer Cloud for ROCm) when no machine is available. |
 
 On this Mac today, L0/L0b/L0c run immediately. L2 for Linux arm64 (CPU + lavapipe) could run locally if
-the user installs a container runtime (OrbStack/Colima). Nothing heavier than a tiny GGUF is needed.
+The user installs a container runtime (OrbStack/Colima). Nothing heavier than a tiny GGUF is needed.
 
 ---
 

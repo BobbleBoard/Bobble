@@ -31,7 +31,7 @@ export interface ContextGaugeTooltipProps {
 /**
  * Context-fullness hover card on the composer's context ring.
  *
- * the user: "the bar at the top and surrounding text don't look great." It led with
+ * The user: "the bar at the top and surrounding text don't look great." It led with
  * a full-width ProgressBar, which reads as a task finishing rather than a level,
  * and then repeated the number in a sentence. It is a status card now: the label
  * and the percentage on one row, a hairline track under it, the token count as a

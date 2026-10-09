@@ -39,7 +39,7 @@ const SLOW_MS = Number(process.env.SLOW_MS ?? 1200);
  * Idle between a turn finishing and the next send. THE MOST IMPORTANT KNOB HERE:
  * post-turn background work (the reviewer, the namer) sits on the single slot
  * for a while after the reply ends, so a generous gap hides exactly the stall a
- * fast typist hits. the user types the follow-up immediately — 0 is his case, and
+ * fast typist hits. The user types the follow-up immediately — 0 is their case, and
  * the default.
  */
 const GAP_MS = Number(process.env.GAP_MS ?? 0);

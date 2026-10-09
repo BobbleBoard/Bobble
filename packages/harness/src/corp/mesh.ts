@@ -77,7 +77,7 @@ export interface MeshBudget {
   /**
    * How many agent turns may be IN FLIGHT at once. Dispatched work runs in
    * parallel up to this, and the rest queues FIFO for the next free slot —
-   * the user: "even if there isn't enough compute to handle concurrency, when an
+   * The user: "even if there isn't enough compute to handle concurrency, when an
    * engineer running pauses, then run then unqueue the manager". The cap is
    * about the machine (one llama-server, a few slots), never about the design:
    * the manager's wait behaves identically either way, it just resumes sooner
@@ -203,7 +203,7 @@ export class AgentMesh {
    *
    * A manager delegates a ROUND — several engineers — and only then waits. That
    * is impossible if delegation blocks: the first hand-off would hold the stack
-   * and the second engineer could never start. the user: "when you've delegated
+   * and the second engineer could never start. The user: "when you've delegated
    * everyone you want for the round, you're either delegating more, sending
    * messages to already delegated workers, or being on standby."
    */
@@ -289,7 +289,7 @@ export class AgentMesh {
      * into "Nothing was delivered", and the CEO relayed a failure to the user
      * while a packaged .app sat on disk.
      *
-     * the user: "unless the manager returned a message to the ceo like 'we failed'
+     * The user: "unless the manager returned a message to the ceo like 'we failed'
      * how would the ceo break out of waiting for a tool result for the 'talk to'
      * tool, it should just be waiting for a tool result".
      *

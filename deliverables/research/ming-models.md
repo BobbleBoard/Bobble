@@ -9,7 +9,7 @@ Nothing was run on the GPU and nothing was downloaded beyond configs, safetensor
 
 ## 1. Goal
 
-**the user:** "support new antling ming 0.1 design models."
+**The user:** "support new antling ming 0.1 design models."
 
 **What that name means (high confidence).** "antling" is **Ant Ling**, the brand of Ant Group's
 inclusionAI lab (X: [@AntLingAGI](https://x.com/AntLingAGI), site [ant-ling.com](https://www.ant-ling.com/en/)).
@@ -94,7 +94,7 @@ FLUX.2 klein and Z-Image already cover it).
 | 5 | Ming-flash-omni 2.0 | 2026-02-11 | 100B-A6B | any-to-any | MIT | Ming, but not 0.1 and not design; far too big for 24 GB. [HF](https://huggingface.co/inclusionAI/Ming-flash-omni-2.0) |
 | 6 | Ming-UniVision-16B-A3B / Ming-Lite-Omni 1.5 | 2025 | 16-20B MoE | unified understanding + generation | MIT | Older and general-purpose. |
 
-**Verdict:** candidates 1 and 1 together; confidence ≈95%. The question for the user (§6) only asks him to
+**Verdict:** candidates 1 and 1 together; confidence ≈95%. The question for the user (§6) only asks them to
 confirm that both are wanted.
 
 ### 3.2 The two models at a glance
@@ -729,10 +729,10 @@ on upstream work or other tracks.
    Metal), and the Layer cost grows with the layer count.
 8. **The quality claim is the vendor's own.** The 1082 Elo UI/UX #1 open-weights figure comes from their
    graphic. Independently it is #45 (995) on the general board. It is a design specialist, not a photo model.
-9. **Disk.** Transient conversions of 53-65 GB need the streaming converter or a published recipe. the user's
+9. **Disk.** Transient conversions of 53-65 GB need the streaming converter or a published recipe. The user's
    disk had ~7 GB free on 2026-09-13 and has 176 GB today.
 10. **Routing drift.** Adding a raster "design" path must not pull icons and logos away from OmniSVG
-    (the user's svg rule). The tool-surface probe on the 4B guards this.
+    (The user's svg rule). The tool-surface probe on the 4B guards this.
 11. **Naming.** "antling ming 0.1" was not written out exactly. The mapping to Ming-Image-0.1-Design(+Layer)
     is about 95% certain (§3.1).
 

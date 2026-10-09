@@ -25,7 +25,7 @@ time failure title: Could not starttried just now
 time failure reason: mcp-fixture: no fixture for "mcp-server-time"
 dialog / title / name field: {"dialog":{"x":480,"y":265,"w":480,"h":371},"title":{"x":500,"y":281,"w":117,"h":28},"name":{"x":500,"y":345,"w":430,"h":32}}
 focus on open: add-server-name
-after paste: {"nameValue":"Weather Two","cmdValue":"node /Users/user/tools/weather-two/index.js"}
+after paste: {"nameValue":"Weather Two","cmdValue":"node ~/tools/weather-two/index.js"}
 focus after cancel: connectors-add-server
 focus after escape: connectors-add-server
 composer after Try in chat: Remember that the client meeting moved to Thursday, then tell me what you know about the client.

@@ -40,7 +40,7 @@ export interface ChildAgentEntry {
    * The one-word lifecycle the situation room shows for this agent — "queued",
    * "working", "waiting", "done", "blocked", "stopped".
    *
-   * the user: "that small text that shows 'queued' 'working', 'waiting' or 'error'
+   * The user: "that small text that shows 'queued' 'working', 'waiting' or 'error'
    * should show as such in the left sidebar aswell." The sidebar and the
    * situation room were describing the same agents with different vocabularies
    * (one had a dot, the other had a word), so the two panes could disagree about

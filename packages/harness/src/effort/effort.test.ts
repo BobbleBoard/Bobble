@@ -27,7 +27,7 @@ describe('effortKnobs', () => {
   });
 
   it('forces NO review or adversarial pass at ANY effort', () => {
-    // the user: "we don't by default want any reviews/adversarial or anything,
+    // The user: "we don't by default want any reviews/adversarial or anything,
     // especially if the user is just saying hi or asking for some file
     // operation." A critique after every turn is a whole extra model call on the
     // one slot, and at the default effort it fired on literally every message.
@@ -54,7 +54,7 @@ describe('effortKnobs', () => {
   });
 
   it('has NO per-turn tool-call cap at any effort', () => {
-    // the user: "remove the tool call cap." A cap can only ever fire on a long job —
+    // The user: "remove the tool call cap." A cap can only ever fire on a long job —
     // a stuck one trips the repeat guard or its wall clock long before the count.
     for (const level of EFFORT_LEVELS) {
       expect(effortKnobs(level)).not.toHaveProperty('maxTurnSteps');

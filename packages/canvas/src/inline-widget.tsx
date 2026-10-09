@@ -199,7 +199,7 @@ export function InlineWidget({
                 </button>
               </span>
             ) : null}
-            {/* the user (2026-09-21): "top right buttons on inline blocks sizes
+            {/* The user (2026-09-21): "top right buttons on inline blocks sizes
                 need to be increased" — the controls are the default 28px
                 square with 16px glyphs now, not the 26px/14px small pair. */}
             <IconButton

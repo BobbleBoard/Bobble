@@ -1,7 +1,7 @@
 /**
  * ROUND 3 — SWAPPING EFFORT, AND SEEING THE DESIRED BEHAVIOUR.
  *
- * the user: "model + harness competence: swapping effort and seeing the desired
+ * The user: "model + harness competence: swapping effort and seeing the desired
  * behavior."
  *
  * The effort table is unit-tested — the knobs are monotone, the REAL verify

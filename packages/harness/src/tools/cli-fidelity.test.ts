@@ -5,7 +5,7 @@ import { buildCli, coerceArgs, renderCommandHelp } from './tool-cli';
 /**
  * NO CAPABILITY LOSS, ON A SCHEMA THAT FIGHTS BACK.
  *
- * the user: "anything that can be provided as a schema is converted to with no
+ * The user: "anything that can be provided as a schema is converted to with no
  * capability loss a CLI based tool … make sure it works well across a range of
  * different input types and complex schemas."
  *

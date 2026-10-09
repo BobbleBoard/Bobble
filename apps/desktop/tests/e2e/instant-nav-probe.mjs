@@ -1,7 +1,7 @@
 /**
  * PRESSING A THING IN THE SIDEBAR PAINTS NOW.
  *
- * the user, twice: "clicking onto a different chat has a ~2 second delay", then
+ * The user, twice: "clicking onto a different chat has a ~2 second delay", then
  * "clicking new chat still takes a few seconds". Both had the same cause — the
  * renderer awaited a pi RPC before touching a pixel — and both are fixed the
  * same way: reset what is local immediately, settle with pi behind it.

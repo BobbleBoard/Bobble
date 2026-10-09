@@ -1,5 +1,5 @@
 /**
- * LOOK at the 3D card in the chat — the Bobble 3D connector's result. the user
+ * LOOK at the 3D card in the chat — the Bobble 3D connector's result. The user
  * (2026-09-17): "the card for during generation/texturing/segmentation/
  * rigging/.... should be the same as all the others but the card should just
  * be a little embedded viewport rotatable, not all the controls but below the
@@ -29,7 +29,7 @@ mkdirSync(SHOT_DIR, { recursive: true });
    engine sandbox — where a result lands today, inside the pd-file fence —
    before the app starts.
 
-   POST-FIX FILES ONLY. the user (2026-09-18), on a card showing f184ded6efb6:
+   POST-FIX FILES ONLY. The user (2026-09-18), on a card showing f184ded6efb6:
    "what's with this artifacting" — that model was baked 2026-08-18 15:45,
    nine hours BEFORE the dark-crackle fix (65b6ae02, `dilate_atlas`): MEASURED
    37.8% near-black gutter texels in its 4096² atlas against 0.5% in a bake

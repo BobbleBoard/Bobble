@@ -1,7 +1,7 @@
 /**
  * THE PILL ABOVE THE INPUT BAR — both of the things it says, looked at.
  *
- * the user: "moving to a new chat shows this 'getting ready' thing that I'd like to
+ * The user: "moving to a new chat shows this 'getting ready' thing that I'd like to
  * move to a pill that floats above the input bar we can use … both should have
  * a % bar able to be accurately made. If no % is available or able to be shown
  * ACCURATELY, then make the circle a loading spinner." And: "for images on non
@@ -184,7 +184,7 @@ try {
 
   /* ── 4. THE SLOT: anything can publish into it ─────────────────────────
    *
-   * the user: "I like this floating pill idea and would like to extend it a bit. so
+   * The user: "I like this floating pill idea and would like to extend it a bit. so
    * let's go for making this modular." So the pill is a slot with one rule —
    * whatever is most urgent, one at a time — rather than a component that knows
    * about three specific things.

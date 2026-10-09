@@ -265,7 +265,7 @@ describe('dispatch + wait — a manager delegates a ROUND, then stands by', () =
   });
 
   it('honours maxConcurrent, and UNQUEUES the next as a slot frees', async () => {
-    /* the user: "even if there isn't enough compute to handle concurrency, when an
+    /* The user: "even if there isn't enough compute to handle concurrency, when an
      * engineer running pauses, then run then unqueue". */
     const g = gated();
     const mesh = new AgentMesh(g.runTurn, roster, {
@@ -386,7 +386,7 @@ describe('dispatch + wait — a manager delegates a ROUND, then stands by', () =
  * cause for the empty reply, promote-tool turned that into "Nothing was
  * delivered", and the CEO reported failure while a packaged .app sat on disk.
  *
- * the user: "it should just be waiting for a tool result not running until the
+ * The user: "it should just be waiting for a tool result not running until the
  * manager calls its submit."
  */
 describe('run() keeps going while the root has work out', () => {

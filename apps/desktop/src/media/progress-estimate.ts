@@ -1,7 +1,7 @@
 /**
  * THE NUMBER ON A GENERATING CARD, BETWEEN THE ENGINE'S OWN UPDATES.
  *
- * the user (2026-09-24): "show a little bordered pill at the bottom right of the
+ * The user (2026-09-24): "show a little bordered pill at the bottom right of the
  * image card that says n% and smoothly goes up (you can interpolate but never
  * outright lie, eg. can't create any 99% stuck situation or anything similar but
  * also don't be over honest and leave it on a % and then jump, interpolate

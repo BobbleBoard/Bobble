@@ -1,7 +1,7 @@
 /**
  * THE ONE-CLICK DOWNLOAD, AND HOW IT IS TAKEN BACK.
  *
- * the user: "there needs to be on every model card on the right a just 'Download'
+ * The user: "there needs to be on every model card on the right a just 'Download'
  * button that immediately downloads recommended. download button turns into a
  * little progress bar and a red X, clicking x cancels (immediate feedback even
  * if download doesn't cancel immediately it shows up that way — progress bar
@@ -102,9 +102,9 @@ export function DownloadAction({
   }
 
   /*
-   * THE SAME BAR AS EVERYWHERE ELSE. the user asked for "a simple ---------- X
+   * THE SAME BAR AS EVERYWHERE ELSE. The user asked for "a simple ---------- X
    * progressbar and X button… no % needed", and the number that used to sit
-   * here is exactly what he was removing: it invited you to watch a transfer
+   * here is exactly what the user was removing: it invited you to watch a transfer
    * you had already decided to leave running. The size is on the row you
    * clicked, and the top bar carries the same control once you navigate away.
    */

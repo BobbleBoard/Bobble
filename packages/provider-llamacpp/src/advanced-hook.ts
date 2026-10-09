@@ -176,7 +176,7 @@ export function registerAdvancedParamsHook(
         /*
          * THE PROMPT ITSELF, not a measurement of it.
          *
-         * the user: "often the issue is that the instructions we for whatever
+         * The user: "often the issue is that the instructions we for whatever
          * reason actually just [are] not appended to the system prompt. ensure
          * you have a reliable way to pull the raw ground truth context."
          *

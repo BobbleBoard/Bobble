@@ -171,7 +171,7 @@ def theme_links(package_part, hex_colour: str) -> bool:
     of the document's own colours. The python-pptx/-docx templates carry
     Office's 0000FF and a FOLLOWED-link 800080: a purple that PowerPoint paints
     a source link in once it is clicked, whatever the run's colour says (and
-    the user: no purple, anywhere). Returns whether the theme was found."""
+    The user: no purple, anywhere). Returns whether the theme was found."""
     from lxml import etree
     try:
         rt = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme"

@@ -1,5 +1,5 @@
 /**
- * LOOK: the sidebar mark in LIGHT mode. the user, with the light-mode wordmark:
+ * LOOK: the sidebar mark in LIGHT mode. The user, with the light-mode wordmark:
  * "in light mode make these black." Reads the tiles' computed fill in both
  * modes and photographs the identity row.
  */

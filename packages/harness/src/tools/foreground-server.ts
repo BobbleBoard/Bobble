@@ -7,7 +7,7 @@
  * (withDefaultTimeout) took it back — five of the task's eight minutes, spent
  * waiting on a process whose one line of output said it was ready.
  *
- * NO LIST OF SERVER COMMANDS. the user, of the launcher blocklist this replaced:
+ * NO LIST OF SERVER COMMANDS. The user, of the launcher blocklist this replaced:
  * "the deterministic guard here is again something we need to let go of, how
  * can you make this general and reliable". The evidence here is a fact about
  * the running program, not a guess from its name: a process THIS command

@@ -236,7 +236,7 @@ export function productFingerprint(cwd: string): string {
  *
  * The corp used to root at the CHAT's folder (`req.ctx.cwd`), which in practice
  * is whatever project the conversation belongs to — the Desktop, for most of
- * the user's chats. Ask for a game at `/Users/user/bobble-testbed/platformer` and the
+ * The user's chats. Ask for a game at `/Users/user/bobble-testbed/platformer` and the
  * roles would work in `~/Desktop` instead, so every relative shell command landed
  * there: `mkdir -p platformer/scripts` built `~/Desktop/bobble-testbed/platformer`
  * while the reply named the path that had been asked for.
@@ -262,7 +262,7 @@ export function productFingerprint(cwd: string): string {
  * wrong it went wrong SILENTLY, because a team works perfectly wherever you put
  * it.
  *
- * the user settled it: "the workspace should be the workspace. default: no project,
+ * The user settled it: "the workspace should be the workspace. default: no project,
  * which makes a project specific folder that all the model's write commands,
  * terminal python etc immediately start from automatically ... or they might
  * start in a specified directory." A path in the prompt is delivery — "make a

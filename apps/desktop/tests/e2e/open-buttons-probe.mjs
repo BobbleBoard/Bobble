@@ -1,7 +1,7 @@
 /**
  * THE OPEN BUTTONS OPEN — clicked for real, observed at the OS boundary.
  *
- * the user (2026-09-23): "open buttons in the canvas / file presentation cards
+ * The user (2026-09-23): "open buttons in the canvas / file presentation cards
  * don't work, even with selection of specific applications to open with."
  *
  * No probe had ever seen one fail, because none had ever made one run: the

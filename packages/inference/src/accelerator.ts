@@ -1,7 +1,7 @@
 /**
  * WHAT IS IN THIS MACHINE — every platform, not just this Mac.
  *
- * the user: "you detect all hardware/memory, figure out for any model on the hf hub
+ * The user: "you detect all hardware/memory, figure out for any model on the hf hub
  * optimal engine… this is paramount to the whole out of the box experience on
  * any users machine… you get 99% of the way there on 99% of models on 99% of
  * hardware to a person who knows how to do their stuff and manually configures

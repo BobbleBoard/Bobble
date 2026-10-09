@@ -2,7 +2,7 @@
 /**
  * MiniCPM5 2B across every kind of task this harness can pose.
  *
- * the user: "test minicpm 5 more comprehensively i'm very interested in it's
+ * The user: "test minicpm 5 more comprehensively i'm very interested in it's
  * performance and speed for all different types of tasks."
  *
  * Five kinds, chosen because each fails differently:
@@ -23,8 +23,10 @@
 import { execFile } from 'node:child_process';
 import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url)).replace(/\/$/, '');
 
-const OUT = process.env.SUITE_OUT ?? '/Users/user/Desktop/OSS-harness/scratchpad/demos/minicpm-suite';
+const OUT = process.env.SUITE_OUT ?? `${REPO_ROOT}/scratchpad/demos/minicpm-suite`;
 mkdirSync(OUT, { recursive: true });
 const LEDGER = path.join(OUT, 'ledger.jsonl');
 
@@ -46,8 +48,12 @@ const REPEATS = Number(process.env.SUITE_REPEATS ?? 3);
 
 const run = (cmd, args, env) =>
   new Promise((resolve) => {
-    execFile(cmd, args, { env: { ...process.env, ...env }, maxBuffer: 64 * 1024 * 1024 },
-      (err, stdout, stderr) => resolve({ ok: err === null, stdout, stderr }));
+    execFile(
+      cmd,
+      args,
+      { env: { ...process.env, ...env }, maxBuffer: 64 * 1024 * 1024 },
+      (err, stdout, stderr) => resolve({ ok: err === null, stdout, stderr }),
+    );
   });
 
 const started = Date.now();

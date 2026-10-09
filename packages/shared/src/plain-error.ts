@@ -1,7 +1,7 @@
 /**
  * AN ERROR, SAID SO A PERSON CAN ACT ON IT.
  *
- * the user (2026-10-08): "red text that's just a real unknown error or something
+ * The user (2026-10-08): "red text that's just a real unknown error or something
  * that doesn't have handling attached to it or can be easily done something
  * about just can't exist anymore." The audit found some sixty places that put
  * an exception's own words on screen — "fetch failed", "ENOENT: no such file

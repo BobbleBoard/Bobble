@@ -296,7 +296,7 @@ def main() -> None:
         # that blank sheet flows on: rembg finds no subject, geometry builds
         # nothing, and the run dies ~76s later inside the texture bake with
         # "zero-size array to reduction operation minimum" — an error naming a
-        # stage that had nothing to do with it. the user hit exactly this with
+        # stage that had nothing to do with it. The user hit exactly this with
         # "T-Rex".
         #
         # MEASURED on Mage-Flow-Turbo (std of the RGB pixels; a real render is

@@ -11,7 +11,7 @@
  *
  * ## IT COSTS THE CONVERSATION'S KV CACHE, so it is asked sparingly
  *
- * the user: "sometimes at random, prefill for a short follow-up message takes upward
+ * The user: "sometimes at random, prefill for a short follow-up message takes upward
  * of 80 seconds where it hadn't earlier in the same chat."
  *
  * The utility endpoint IS the conversation's own llama-server (pi-main points it

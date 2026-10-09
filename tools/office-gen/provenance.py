@@ -17,7 +17,7 @@ average over the brief's own years, quarters or months — the number must be
 that arithmetic, not merely some arithmetic: 83% is (22 − 12) / 12, but the
 label says 2023 to 2024.
 
-the user's recommended default (PLAN.md §5 Q15) is what happens to what fails:
+The user's recommended default (PLAN.md §5 Q15) is what happens to what fails:
   - a PROVENANCE line naming a source the brief never gave is STRIPPED — it is
     pure invention, and a file that cites a fake source is worse than one that
     cites none;

@@ -1,7 +1,7 @@
 /**
  * THE CANVAS, AS A REAL USER WOULD MEET IT — assessed, not changed.
  *
- * the user: "stress test the app as a normal complex user would want, test every
+ * The user: "stress test the app as a normal complex user would want, test every
  * feature of the canvas as real user with real inputs with real models using
  * real tools, don't change anything, assess, comprehensive eg. work with every
  * file type and use case."

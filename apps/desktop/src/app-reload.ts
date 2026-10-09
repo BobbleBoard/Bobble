@@ -1,7 +1,7 @@
 /**
  * THE RELOAD THAT KEEPS YOUR CHAT.
  *
- * the user, on the render-error screen: the two buttons "do not work", he has to
+ * The user, on the render-error screen: the two buttons "do not work", the user has to
  * press ⌘R, and ⌘R "clears really everything".
  *
  * Both halves of that are one mistake — treating "the view is broken" as "the

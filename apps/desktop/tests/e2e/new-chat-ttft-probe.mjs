@@ -1,7 +1,7 @@
 /**
  * A NEW CHAT SHOULD BE INSTANT, AND IT IS NOT.
  *
- * the user: "TTFT is unacceptable, I was idle for like an hour, left this in the
+ * The user: "TTFT is unacceptable, I was idle for like an hour, left this in the
  * background, and it took on a blank conversation and another essentially blank
  * one almost 10 seconds each to respond."
  *
@@ -106,7 +106,7 @@ try {
   /*
    * WATCH THE SLOT WHILE NOBODY IS TYPING.
    *
-   * the user was idle for an hour with the app in the background and then paid a
+   * The user was idle for an hour with the app in the background and then paid a
    * full prefill. With ONE slot on the server, anything the app does in the
    * background with a different prompt overwrites the conversation's KV — so the
    * question is not "does time pass" but "does something else use the slot".

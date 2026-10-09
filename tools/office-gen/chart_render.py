@@ -1,7 +1,7 @@
 """
 A chart of DATA as an SVG — bars, horizontal bars, lines, a donut.
 
-the user (2026-09-15): "we should for example be able to get really good data
+The user (2026-09-15): "we should for example be able to get really good data
 visuals, tables, svgs drawings, and get the same quality standalone as when we
 ask for presentations or documents". MEASURED what a 4B did without this: asked
 for a bar chart of four numbers it ran image generation with the numbers in the

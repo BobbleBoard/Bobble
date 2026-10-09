@@ -156,7 +156,11 @@ describe('parsePingJson (the LocalAPI)', () => {
 
   it('reads the errors — MEASURED expired key', () => {
     expect(
-      parsePingJson({ IP: '100.101.102.120', Err: "peer's node key has expired", LatencySeconds: 0 }),
+      parsePingJson({
+        IP: '100.101.102.120',
+        Err: "peer's node key has expired",
+        LatencySeconds: 0,
+      }),
     ).toMatchObject({ ok: false, reason: 'key-expired' });
     expect(
       parsePingJson({ Err: '100.101.102.103 is local Tailscale IP', IsLocalIP: true }),

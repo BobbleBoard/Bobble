@@ -24,7 +24,7 @@ Research and design only. Base commit `c9fe7098` (main). Written 2026-09-23 by t
 
 ## 1. Goal
 
-**the user, 2026-09-23 (verbatim):** "workflows, custom created, eg. deep research w/ docs/slides/sheet/whatever outputs able to be done intelligently. image generation improve loop."
+**The user, 2026-09-23 (verbatim):** "workflows, custom created, eg. deep research w/ docs/slides/sheet/whatever outputs able to be done intelligently. image generation improve loop."
 
 **Earlier, same intent (`roadmap.md` item 3, his file):** "specailists/workflows eg. vlm see and prompt for edits/regen image + mark and save best, presnet best up to n iterations loops working to be called as tools from regular chat/corp as specialists."
 
@@ -223,7 +223,7 @@ These are **short-answer** benchmarks, not long cited reports. But they show a 4
 
 ### 4.1 The stance, and how it fits the user's principles
 
-Anthropic's split is the right frame: a **workflow** is a predefined path, and an **agent** directs itself. Bobble's chat and corp are agents on purpose. the user: "EVERYTHING SHOULD JUST BE AN AGENT RUNNING WITH TOOLS", and "prompt pressure is as good as we need". A workflow is different in kind. **The user (or the template they picked) has already stated the procedure**, so running it in code is not the harness assuming something about a task. It is the harness doing what it was told:
+Anthropic's split is the right frame: a **workflow** is a predefined path, and an **agent** directs itself. Bobble's chat and corp are agents on purpose. The user: "EVERYTHING SHOULD JUST BE AN AGENT RUNNING WITH TOOLS", and "prompt pressure is as good as we need". A workflow is different in kind. **The user (or the template they picked) has already stated the procedure**, so running it in code is not the harness assuming something about a task. It is the harness doing what it was told:
 
 - The rule the user objected to was harness machinery that "names a runtime, a file layout or a command" for arbitrary work (`user-prompt-pressure-not-enforcement`). A workflow step list is the user's own specification. The image loop's incumbent rule is the user's own spec, quoted in §1.
 - "**Every corp role must run as a scoped pi agent … never a bare completion**" (`pi-desktop-roles-in-harness`). That rule is kept, and open-ended steps (`agent`) run as a child pi with tools. The bounded calls (`plan`, `extract`, `judge`, `section`) are the shape the app already uses for the titler, the reviewer, the prompt enhancer and `make_deck.py`. They have thinking off, grammar-constrained output and capped tokens, which removes the runaway-overthinking failure mode that rule exists to prevent.

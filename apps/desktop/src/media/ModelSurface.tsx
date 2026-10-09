@@ -12,7 +12,7 @@
  * not enough. That is also why the button exists: an inline preview that cannot
  * escalate is a dead end.
  *
- * THE FEW CONTROLS. the user (2026-09-17): "not all the controls but below the
+ * THE FEW CONTROLS. The user (2026-09-17): "not all the controls but below the
  * card itself show some basic controls eg. coloring/normals/grey, if rig,
  * skeleton and if segment, then explode." They live in a {@link ModelView}
  * the card owns (model-view.ts): the strip under the card writes it, this
@@ -57,7 +57,7 @@ export function ModelSurface({ src, testid, view: given }: ModelSurfaceProps): J
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     /*
-     * LIT THE WAY THE STUDIO LIGHTS IT. the user (2026-09-18), on a card: "what's
+     * LIT THE WAY THE STUDIO LIGHTS IT. The user (2026-09-18), on a card: "what's
      * with this artifacting" — the same file was clean in the 3D studio. The
      * flecks themselves were the culling (see the material note below);
      * what remained after that was a model that read dark and flat here and
@@ -97,7 +97,7 @@ export function ModelSurface({ src, testid, view: given }: ModelSurfaceProps): J
     scene.add(rim);
 
     /*
-     * THE GRID IS NOT DECORATION. the user asked for it, and the reason it matters
+     * THE GRID IS NOT DECORATION. The user asked for it, and the reason it matters
      * on a small canvas is that a mesh floating in void has no scale and no
      * horizon — you cannot tell a turn from a tilt. The grid gives the eye a
      * ground plane to read the rotation against.

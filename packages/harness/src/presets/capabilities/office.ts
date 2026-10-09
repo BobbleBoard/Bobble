@@ -12,7 +12,7 @@ import type { Capability } from './types.js';
 
 export const office: Capability = {
   name: 'office',
-  /* the user, reading the canvas assessment: "model should not be using
+  /* The user, reading the canvas assessment: "model should not be using
      python-pptx, there is a dedicated subagent for each pptx/docx/xlsx
      creation and editing right?" The pipeline existed and was reachable from
      a corp run only; asked for a deck in chat, the model had bash and a habit

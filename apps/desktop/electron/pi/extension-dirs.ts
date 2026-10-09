@@ -59,7 +59,7 @@ const PROVIDER_PACKAGE_DIRS = ['provider-llamacpp', 'provider-afm', 'provider-ml
  * the harness, web tools, the browser, the macOS connectors, computer-use, the
  * MCP surface, and (when enabled) generation.
  *
- * This exists so a SUBAGENT gets the same tools as the chat. the user: "the original
+ * This exists so a SUBAGENT gets the same tools as the chat. The user: "the original
  * model ... has the ability for its instance to have all the tools and wires, why
  * don't we treat each subagent as a new individual chat exactly the same". They
  * were two tool surfaces — the chat loaded these dirs, while a corp role got a

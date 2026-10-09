@@ -2,7 +2,7 @@
  * A presented thing shown IN the thread — a chart's interactive card, a small
  * SVG — with the corner control that moves it to the canvas and back.
  *
- * the user (2026-09-16), Claude's inline chart beside Bobble's canvas picture:
+ * The user (2026-09-16), Claude's inline chart beside Bobble's canvas picture:
  * "we need to implement a system of some items showing inline cards like
  * anthropic has here, while larger things go to the canvas still … a quick
  * button in the canvas and on the inline items to with a smooth animation

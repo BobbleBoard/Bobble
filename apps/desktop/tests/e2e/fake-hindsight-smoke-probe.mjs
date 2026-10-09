@@ -64,7 +64,7 @@ try {
     items: [
       {
         content:
-          'User: My name is The user and I build Bobble. I prefer answers in British English.\nBobble: I set the spelling to British English for you.',
+          'User: My name is the user and I build Bobble. I prefer answers in British English.\nBobble: I set the spelling to British English for you.',
         timestamp: '2026-09-23T18:00:00Z',
         context: 'Conversation between the user and Bobble, their local AI assistant.',
         document_id: 'chat:smoke',
@@ -101,7 +101,7 @@ try {
 
   const recall = (
     await call('POST', `${BANK}/memories/recall`, {
-      query: 'Which spelling does The user prefer?',
+      query: 'Which spelling does the user prefer?',
       budget: 'mid',
       max_tokens: 800,
     })

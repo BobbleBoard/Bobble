@@ -2,7 +2,7 @@
  * ADVANCED → ENGINE: the chat-template upload beside --jinja, and no native
  * number stepper anywhere — headless, real app, real cache.
  *
- * the user: "have a drag and drop or upload custom chat template. next to the
+ * The user: "have a drag and drop or upload custom chat template. next to the
  * jinja flag as well that's useful" and "never have these buttons show up
  * ever anywhere" (the number field's up/down stepper).
  *

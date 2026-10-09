@@ -2,7 +2,7 @@
  * The chart as MEASURED ELEMENTS — what the office pipeline turns into native
  * shapes in a deck, a document or a PDF.
  *
- * the user (2026-09-16): "ensure these can be embedded into docs or charts or
+ * The user (2026-09-16): "ensure these can be embedded into docs or charts or
  * whatever, that's mainly the use case, say you put a pdf in and ask the
  * model to slot a chart in with the data on the second page".
  *

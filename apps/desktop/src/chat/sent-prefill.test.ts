@@ -2,7 +2,7 @@
  * The rule that keeps the attachment spinner alive across send — and, just as
  * importantly, the three ways it is forced to clear.
  *
- * the user asked for the spinner to survive send; he also drew the line: an
+ * The user asked for the spinner to survive send; the user also drew the line: an
  * indicator that never clears is worse than none. Both halves are pinned here.
  */
 import { describe, expect, it } from 'vitest';

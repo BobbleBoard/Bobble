@@ -1,7 +1,7 @@
 /**
  * Launch the app for a probe — invisibly, and prove it stayed that way.
  *
- * the user: "ideally headlessly … it doesn't take any focus away from me, I can use
+ * The user: "ideally headlessly … it doesn't take any focus away from me, I can use
  * the computer without any notice of any rapid test suites."
  *
  * Every probe used to hand-roll its own `electron.launch`, which meant every
@@ -269,7 +269,7 @@ export function focusComplaint(before, during) {
    * The guarantee is "the probe did not take the screen", and it was checked as
    * "the frontmost app is the same one" — which also fails when the PERSON at
    * the keyboard switches apps mid-run. Seen live: `was "Safari", became "Mail"`
-   * on a green probe, because the user read his mail while it ran. A guard that
+   * on a green probe, because the user read their mail while it ran. A guard that
    * cries wolf on someone using their own computer stops being read, which
    * costs exactly the thing it was built to protect.
    */

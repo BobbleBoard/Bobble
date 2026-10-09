@@ -1,7 +1,7 @@
 /**
  * FINDING SOMETHING ON A PAGE — BY WORD AND BY MEANING, ALWAYS BOTH.
  *
- * the user: "keep keyword search but also on any search (don't let the model choose
+ * The user: "keep keyword search but also on any search (don't let the model choose
  * between keyword and semantic, just give the top ~10 of both ordered)."
  *
  * That is the right shape and it is worth saying why: choosing between them is a
@@ -46,7 +46,7 @@ export interface PageHit extends PageLine {
  * Deliberately the narrowest possible surface: EmbeddingGemma-300M behind a
  * llama.cpp `--embedding` server satisfies it, and so does anything else. At
  * 300M parameters that is roughly 300 MB at Q8 beside a 13 GB LLM, which is why
- * the user's "if it's this small" is the right instinct — the cost of a second model
+ * The user's "if it's this small" is the right instinct — the cost of a second model
  * here is residency, never latency.
  */
 export type Embedder = (texts: readonly string[]) => Promise<readonly Float32Array[]>;

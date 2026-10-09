@@ -1,7 +1,7 @@
 /**
  * DOES A MID-RUN MESSAGE ACTUALLY REACH THE MODEL?
  *
- * the user sent a steering prompt in the middle of a run and it "completely breaks
+ * The user sent a steering prompt in the middle of a run and it "completely breaks
  * showing a different processing spinner that never clears and leaving it in the
  * conversation in the ui someplace where it was never actually put in context."
  *

@@ -415,7 +415,7 @@ async function runMode(mode) {
     );
 
     // ---- 5. The entrance animation never replays ---------------------------
-    // the user's other report: the card kept collapsing back into its corner and
+    // The user's other report: the card kept collapsing back into its corner and
     // re-opening on later steps. After the entrance window the plate must stay
     // fully revealed for the rest of the run, every single sample.
     const afterEntrance = run.filter((s) => s.t > 900);

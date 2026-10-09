@@ -1,7 +1,7 @@
 /**
  * A PRESENTED WIDGET RUNS IN THE CHAT (html-widget.ts, PresentedInline).
  *
- * the user (2026-09-24): "really clean, intuitive interactive widgets
+ * The user (2026-09-24): "really clean, intuitive interactive widgets
  * inline/+canvas, eg. for math explanation NN inner working visualizations".
  * A one-file interactive page the model presents arrives the way the present
  * tool delivers it — main's `present:show` event, its payload from the same

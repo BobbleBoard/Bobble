@@ -300,7 +300,7 @@ describe('reviewInstruction', () => {
 
 describe('present resolves ~ before touching the filesystem', () => {
   /*
-   * the user, from a screenshot: "I see a present file/folder tool call that didn't
+   * The user, from a screenshot: "I see a present file/folder tool call that didn't
    * present anything." A model writes `~/proj/app.py` constantly; nothing
    * downstream expanded it, so stat failed, present returned "There is nothing
    * at ~/proj/app.py", no present:show was emitted, and the thread showed a

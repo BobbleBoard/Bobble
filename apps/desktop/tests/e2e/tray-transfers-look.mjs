@@ -1,7 +1,7 @@
 /**
  * THE TRAY'S DOWNLOADS AND LOADS, LOOKED AT.
  *
- * the user (2026-09-24): "this top left button to show status on running tasks … put
+ * The user (2026-09-24): "this top left button to show status on running tasks … put
  * downloads/model load progress into aswell, eg. headers for 'Downloads'
  * 'Loading' for these you can use a sort of clean thin blue progressbar w/ % or
  * ngb/rgb red X on the side below some white text that says the running

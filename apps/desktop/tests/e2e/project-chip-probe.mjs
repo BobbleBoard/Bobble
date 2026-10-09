@@ -12,7 +12,7 @@
  */
 import { mkdirSync, mkdtempSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { _electron as electron } from 'playwright-core';
@@ -20,11 +20,11 @@ import { _electron as electron } from 'playwright-core';
 const require = createRequire(import.meta.url);
 const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const repoRoot = path.resolve(appRoot, '../..');
-const dir = path.resolve(process.argv[2] ?? '/Users/user/bobble-testbed/corp-godot');
+const dir = path.resolve(process.argv[2] ?? `${homedir()}/bobble-testbed/corp-godot`);
 mkdirSync(dir, { recursive: true });
 
 // ISOLATED on purpose: this only needs the project machinery, and the user's real
-// profile carries his project list — a diagnostic must not edit it.
+// profile carries their project list — a diagnostic must not edit it.
 const app = await electron.launch({
   executablePath: require('electron'),
   args: [appRoot, `--user-data-dir=${mkdtempSync(path.join(tmpdir(), 'pi-proj-'))}`],

@@ -4,18 +4,36 @@ import { execFile } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { promisify } from 'node:util';
 import { chromium } from '@playwright/test';
+import { fileURLToPath } from 'node:url';
+const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url)).replace(/\/$/, '');
 const run = promisify(execFile);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const OUT = '/Users/user/Desktop/OSS-harness/scratchpad/mist-shot';
+const OUT = `${REPO_ROOT}/scratchpad/mist-shot`;
 const PORT = 9417;
 mkdirSync(OUT, { recursive: true });
 await run('osascript', ['-e', 'tell application "Bobble" to quit']).catch(() => {});
-while (await run('pgrep', ['-f', 'Bobble.app/Contents/MacOS/Bobble']).then((r) => r.stdout.trim() !== '', () => false)) await sleep(500);
-await run('open', ['-g', '--env', 'PI_E2E=1', '-a', '/Applications/Bobble.app', '--args', `--remote-debugging-port=${PORT}`]);
+while (
+  await run('pgrep', ['-f', 'Bobble.app/Contents/MacOS/Bobble']).then(
+    (r) => r.stdout.trim() !== '',
+    () => false,
+  )
+)
+  await sleep(500);
+await run('open', [
+  '-g',
+  '--env',
+  'PI_E2E=1',
+  '-a',
+  '/Applications/Bobble.app',
+  '--args',
+  `--remote-debugging-port=${PORT}`,
+]);
 await sleep(9000);
 const browser = await chromium.connectOverCDP(`http://127.0.0.1:${PORT}`);
 const page = (browser.contexts()[0]?.pages() ?? []).find((p) => !p.url().startsWith('devtools://'));
-await page.waitForFunction(() => typeof window.piDesktop?.invoke === 'function', { timeout: 40_000 });
+await page.waitForFunction(() => typeof window.piDesktop?.invoke === 'function', {
+  timeout: 40_000,
+});
 const dbg = async (op, params) => {
   const r = await page.evaluate((x) => window.piDesktop.invoke('mac:debug', x), { op, params });
   if (r?.ok === false) throw new Error(`${op}: ${r.error}`);
@@ -24,7 +42,10 @@ const dbg = async (op, params) => {
 await run('open', ['-g', '-a', 'Maps']);
 await sleep(4000);
 const before = await dbg('bounds', { app: 'Maps' });
-console.log('bounds BEFORE:', JSON.stringify({ x: before.x, y: before.y, w: before.w, h: before.h }));
+console.log(
+  'bounds BEFORE:',
+  JSON.stringify({ x: before.x, y: before.y, w: before.w, h: before.h }),
+);
 // Push it off the right edge first, which is the condition the nudge exists for
 // (macOS renders only what is on screen, so the off-screen strip comes back
 // blank — the white bar).

@@ -6,17 +6,17 @@
  * the one painted over the PICTURE of that window in the canvas's computer-use
  * tab (packages/canvas computer-use-surface), and the one injected into the
  * page of the built-in browser while the model browses (apps/desktop/electron
- * browser-scripts). the user, seeing the browser one: "cursor is an old version not
+ * browser-scripts). The user, seeing the browser one: "cursor is an old version not
  * the computer use cursor … these should be linked and the same, current
  * computer use one is correct." And of the canvas one: "shows the old colored
  * cursor with the status pill really far away from it … it's drawn correctly
  * on the real application window."
  *
  * So the numbers live HERE, once, and the Swift overlay is the reference they
- * are copied from — the shape is the user's own SVG (his path verbatim, arcs and
- * all), the paint is his 2026-09-15 brief ("a black fill, and a subtle blue
- * edge glow", the white keyline kept at his thickness), the size his "size
- * cursor up maybe 15%", and the pill's distance his "bring pill a bit closer to
+ * are copied from — the shape is the user's own SVG (their path verbatim, arcs and
+ * all), the paint is their 2026-09-15 brief ("a black fill, and a subtle blue
+ * edge glow", the white keyline kept at their thickness), the size their "size
+ * cursor up maybe 15%", and the pill's distance their "bring pill a bit closer to
  * it". Anything that draws a phantom pointer reads these; nothing else may
  * carry its own copy. This package imports nothing, so the Electron main
  * process (which injects the browser cursor) and the canvas package (which

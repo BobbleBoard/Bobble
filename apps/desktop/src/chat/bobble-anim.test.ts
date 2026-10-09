@@ -170,7 +170,7 @@ describe('tilePos — the sliding puzzle, continuously', () => {
   });
 });
 
-describe('cascadeHeat — the user's y = x - t', () => {
+describe('cascadeHeat — the user’s y = x - t', () => {
   it('peaks exactly ON the line and decays away from it', () => {
     // A cell sitting on y = x - t has cx - cy - t === 0.
     const t = 4;

@@ -93,7 +93,7 @@ export function planSummary(plan: readonly PlanItem[]): string {
    * MEASURED in a real run: the model called `update_plan` ONCE — five items,
    * one in_progress, four pending — then did every piece of the work and never
    * touched it again. It finished with a written summary saying the app was
-   * fully compliant while the pinned checklist still read 0/5. the user reported
+   * fully compliant while the pinned checklist still read 0/5. The user reported
    * that as a UI bug; the UI was reporting exactly what it had been told.
    *
    * The reminder rides the tool's OWN result, which costs nothing and arrives at

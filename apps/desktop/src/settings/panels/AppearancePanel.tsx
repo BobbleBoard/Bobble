@@ -5,7 +5,7 @@
  * the terminal. The claude/codex flavor toggle lives in Interface → Advanced
  * (round-5 #23) so this view stays about what a person sees every day.
  *
- * the user: "in terminal in the canvas in dark mode there's a dark red color
+ * The user: "in terminal in the canvas in dark mode there's a dark red color
  * that's a bit unreadable, for the color coding please add a list of text
  * coloring styles as claude does … there's separate settings and a little
  * preview in the appearance settings menu." The reference is Claude's

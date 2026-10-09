@@ -1,7 +1,7 @@
 /**
  * DELETE A CHAT — instantly, and everything it was doing stops.
  *
- * the user (2026-09-23): "clicking delete on a chat should instantly terminate any
+ * The user (2026-09-23): "clicking delete on a chat should instantly terminate any
  * generation of any kind happening and immediately remove it from the user
  * interface, to the user it gets instantly deleted, super snappy and
  * responsive even if deletion on disk takes a while."

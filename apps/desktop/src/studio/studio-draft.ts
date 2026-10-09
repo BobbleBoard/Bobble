@@ -1,7 +1,7 @@
 /**
  * A ROOM'S OWN INPUTS OUTLIVE THE ROOM — the line in the composer and the knobs.
  *
- * the user (2026-09-24): "leaving a studio with a generation running and then going
+ * The user (2026-09-24): "leaving a studio with a generation running and then going
  * back doesn't keep it going, or maybe it does but the UI resets". With the job
  * kept outside the room (state/studio-jobs.ts), what was left of that reset was
  * the room's own state: the composer, the shape, the count, the model — each a

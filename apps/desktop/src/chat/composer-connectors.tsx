@@ -1,7 +1,7 @@
 /**
  * "+ › CONNECTORS": THE ONES THIS MAC HAS, EACH WITH ITS SWITCH.
  *
- * the user (2026-10-07), with Claude's own menu as the reference: "sample UI from
+ * The user (2026-10-07), with Claude's own menu as the reference: "sample UI from
  * the + menu provided for how it should look to be able to turn (installed) on
  * and off … except replace the left icon with their actual app / connector
  * icon". So: Browse connectors, Manage connectors, a rule, then one row per

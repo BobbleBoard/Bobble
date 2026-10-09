@@ -148,7 +148,7 @@ function synthBriefing(node: OrgNodeView): WorkerBriefingView {
   const lead = node.role === 'ceo' || node.role === 'solo';
   return {
     workerName: node.name,
-    /* NOT "Builder". the user, seeing "Manager · Builder": "ironically the message
+    /* NOT "Builder". The user, seeing "Manager · Builder": "ironically the message
      * manager 'BUILDER' which is akward as that's what we're trying to avoid" —
      * the manager doing the building is the exact failure the gates exist to
      * stop, so the label must not name it as the job. */

@@ -96,7 +96,7 @@ describe('augmentSystemPrompt', () => {
    * among seventeen was the only framing that reached the model. Result: the word
    * "manager" appears ZERO times in a 1.4MB max-effort transcript.
    *
-   * the user: "?? why wouldn't it be" / "yes if the talk to tool isn't loaded, load
+   * The user: "?? why wouldn't it be" / "yes if the talk to tool isn't loaded, load
    * it." Said once, unconditionally, next to the line that tells it to work alone
    * — so the two rules are read together rather than one of them alone.
    */
@@ -191,7 +191,7 @@ describe('the prompt must not contradict the interface it ships with', () => {
 });
 
 describe('showing the user a file is a tool call, and the prompt says so', () => {
-  /* the user (2026-09-15): "guide the model via system prompt to always utilize
+  /* The user (2026-09-15): "guide the model via system prompt to always utilize
      the present tool to display files to the user." */
   it('schemas mode carries the rule, naming `present`', () => {
     const p = augmentSystemPrompt('base', { toolInterface: 'schemas' });
@@ -272,7 +272,7 @@ describe('bash-CLI prompt is about commands, not tools', () => {
 
 describe('the working directory the model is told', () => {
   it('is the tools’ root BY NAME — never the launch dir, never the full path', () => {
-    // the user (2026-09-17): the model read the absolute folder off this line and
+    // The user (2026-09-17): the model read the absolute folder off this line and
     // told the person "The file is located at /Users/user/Bobble/…/sample.svg".
     const base =
       'Guidelines:\n- Be concise\n\nCurrent date: 2026-09-12\nCurrent working directory: /Users/user';
@@ -294,7 +294,7 @@ describe('the working directory the model is told', () => {
   });
 
   it('says that every shell command already starts there, so `cd` is never the first word', () => {
-    // the user: the model kept typing `cd <working> && <command>` on every command.
+    // The user: the model kept typing `cd <working> && <command>` on every command.
     const base = 'Current date: 2026-09-13\nCurrent working directory: /Users/user';
     const out = augmentSystemPrompt(base, { workingDirectory: '/Users/user/Bobble/x' });
     expect(out).toContain(`\n${SHELL_CWD_TRUTH}`);

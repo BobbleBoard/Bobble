@@ -14,7 +14,7 @@ MEASURED on an M5 Pro, all local, all offline once downloaded:
   tts   5.8 s of speech in 32 s cold / ~6 s warm, 2.5 GB
   sfx   ~11 s per clip, 10 GB
 
-WHY PARAKEET AND NOT WHISPER. the user asked for "FluidVoice"; FluidVoice is a
+WHY PARAKEET AND NOT WHISPER. The user asked for "FluidVoice"; FluidVoice is a
 macOS APP (GPLv3) that wraps other engines, not a model — vendoring it would
 put a copyleft licence on this codebase. Parakeet is what it runs underneath,
 it has a first-class MLX port, and it is small enough to load on demand.

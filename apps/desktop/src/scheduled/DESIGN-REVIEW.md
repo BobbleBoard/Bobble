@@ -4,7 +4,7 @@ Written 2026-09-07 against the fourteen references in `~/Desktop/refs/schedule/`
 and the two surfaces this repo has for the job:
 
 - **The shipping screen** — `apps/desktop/src/scheduled/` (`ScheduledView.tsx`,
-  `TaskDialog.tsx`, `TaskRuns.tsx`). What the user sees when he clicks *Scheduled*.
+  `TaskDialog.tsx`, `TaskRuns.tsx`). What the user sees when the user clicks *Scheduled*.
 - **The candidate, Ledger+** — `apps/desktop/src/candidates/schedule/`
   (`LedgerCandidate.tsx` with `plus`, `Composer.tsx`, `TaskEditor.tsx`,
   `RunLedger.tsx`, `shared.tsx`, `derive.ts`, `candidates.css`). Behind
@@ -38,7 +38,7 @@ you nothing about whether the last run worked, a running task is a button
 label, a missed week reads "in 2h", the dialog opens with the keyboard still
 behind it, every transition is a hard cut, four text buttons and a red
 *Delete* sit on every row, and at the app's own minimum window the task names
-are five letters wide. the user's reaction is correct. The three rounds of design
+are five letters wide. The user's reaction is correct. The three rounds of design
 work never touched it.
 
 **Ledger+ is at parity with the references on the axes they cover and above
@@ -87,7 +87,7 @@ Written before opening a single reference image or a single line of either scree
 
 ## The references (written before opening either screen)
 
-Fourteen stills in `/Users/user/Desktop/refs/schedule/`, three products. Named here by product so the work order can cite them; the filename is given once per group.
+Fourteen stills in `~/Desktop/refs/schedule/`, three products. Named here by product so the work order can cite them; the filename is given once per group.
 
 ### Claude.ai — Scheduled tasks, empty state (`11.57.43`, `11.57.58`, `11.58.02`, `11.58.07`)
 - **The decision that carries it:** the empty state is not the point of the page; the template grid is. One serif display title, one grey sentence, an illustration that takes little emotional weight, a wavy hairline, and then six real starting points in two columns — icon tile / title / two-line description / clock + schedule in words. It reads as an editorial page, not a form.
@@ -136,7 +136,7 @@ None were supplied for the parts of this surface that the three products above a
 Same probe, same seed (`seed.mjs`: nine tasks with a week of run records, one
 failed run, one running, one caught up 1h 42m late, one aged a week without a
 run, one by-hand task, one image artifact), same window sizes: **1440×868**
-(the user's clamped default), **1172×800** (a 13" laptop), **900×700**, and
+(The user's clamped default), **1172×800** (a 13" laptop), **900×700**, and
 **760×560** (the app's `minWidth`/`minHeight`). The candidate was also shot
 inside the real shell (`cand-chrome/`, sidebar + top bar) so its title stack
 could be judged. One run on each surface was **real** — *Run now* on "Sort my
@@ -1059,7 +1059,7 @@ reasons worth naming so the next round does not repeat them:
 
 1. **They judged the wrong screen.** All three rounds judged
    `?candidates=schedule` and never re-opened `src/scheduled/`. The screen
-   the user sees was never in a verdict, which is how "above the references" and
+   The user sees was never in a verdict, which is how "above the references" and
    "very not on par" were both true at once.
 2. **They judged against the references, not against the ideal.** The
    references are weak on run history, so the candidate's ledger looked like a

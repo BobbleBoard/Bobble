@@ -1,7 +1,7 @@
 /**
  * ROUND 2 — WRANGLING WITH SETTINGS AND MODELS, FOR EVERY MODALITY.
  *
- * the user: "stress tests of downloading, wrangling with settings models and such
+ * The user: "stress tests of downloading, wrangling with settings models and such
  * for all modalities".
  *
  * Settings are the part of an app that is easy to make LOOK right: a control

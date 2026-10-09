@@ -204,7 +204,7 @@ export const useGen3dStore = create<Gen3dState>((set, get) => ({
       noteStudioJob(res.jobId, generateTitle(req));
     }
     // Clear the viewport: this job builds a NEW model, so the previous one must
-    // not sit there pretending to be it. the user: "the plane stays in the
+    // not sit there pretending to be it. The user: "the plane stays in the
     // background while we generate a completely new thing." A stage op is the
     // opposite case — it transforms what is on screen, which stays put.
     if (req.imageOnly !== true) {

@@ -1,5 +1,5 @@
 /**
- * the user's acceptance test: ask a MODEL to create a document, then open what it
+ * The user's acceptance test: ask a MODEL to create a document, then open what it
  * produced in the canvas and look at it. Four independent runs — docx, xlsx,
  * pptx, pdf — because a single prompt that makes all four would tell us nothing
  * about which one broke.

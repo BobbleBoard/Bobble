@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /**
- * the user, top of his chat list: "total blank screen."
+ * The user, top of their chat list: "total blank screen."
  *
  * A render throw unmounts React's whole tree by design and leaves an empty
  * <div id="root">. The renderer PROCESS is fine, so main's crash recovery

@@ -48,7 +48,7 @@ describe('parseTailscaleStatus', () => {
     const status = parseTailscaleStatus(FIXTURE);
     expect(status.available).toBe(true);
     const names = status.peers.map((p) => p.hostname);
-    expect(names).toContain('linux-ms-7e59');
+    expect(names).toContain('linux-MS-7E59');
     expect(status.peers.filter((p) => p.self)).toHaveLength(1);
   });
 
@@ -56,12 +56,12 @@ describe('parseTailscaleStatus', () => {
     const online = parseTailscaleStatus(FIXTURE).peers.filter((p) => p.online);
     // Self plus the Linux box; the two sleeping Macs are not scheduling targets.
     expect(online.map((p) => p.hostname).sort()).toEqual(
-      ['My MacBook Pro', 'linux-ms-7e59'].sort(),
+      ['My MacBook Pro', 'linux-MS-7E59'].sort(),
     );
   });
 
   it('carries the OS, because a scheduler has to know what it is talking to', () => {
-    const linux = parseTailscaleStatus(FIXTURE).peers.find((p) => p.hostname === 'linux-ms-7e59');
+    const linux = parseTailscaleStatus(FIXTURE).peers.find((p) => p.hostname === 'linux-MS-7E59');
     expect(linux?.os).toBe('linux');
     expect(linux?.ip).toMatch(/^100\./);
   });
@@ -100,7 +100,7 @@ describe('parseTailscaleStatus', () => {
 describe('parseTailscaleStatus — the fields the Devices list needs', () => {
   const status = parseTailscaleStatus(FIXTURE);
   const self = status.peers.find((p) => p.self);
-  const linux = status.peers.find((p) => p.hostname === 'linux-ms-7e59');
+  const linux = status.peers.find((p) => p.hostname === 'linux-MS-7E59');
   const parents = status.peers.filter((p) => p.hostname === 'Parent’s MacBook Pro');
 
   it('reports the state, version and tailnet', () => {
@@ -263,7 +263,7 @@ describe('sameUserPeers', () => {
   it('lists this user’s other devices on the real tailnet', () => {
     const peers = sameUserPeers(parseTailscaleStatus(FIXTURE));
     expect(peers.map((p) => p.hostname).sort()).toEqual(
-      ['Parent’s MacBook Pro', 'Parent’s MacBook Pro', 'linux-ms-7e59'].sort(),
+      ['Parent’s MacBook Pro', 'Parent’s MacBook Pro', 'linux-MS-7E59'].sort(),
     );
     expect(peers.some((p) => p.self)).toBe(false);
   });
@@ -359,7 +359,7 @@ const HELLO: NodeHello = {
   protocol: NODE_PROTOCOL,
   version: '0.9.0',
   id: 'dev_abc',
-  name: 'linux-ms-7e59',
+  name: 'linux-MS-7E59',
   os: 'linux',
   sharing: true,
   pairing: 'auto',
@@ -402,7 +402,7 @@ describe('the public hello', () => {
 describe('the authenticated info', () => {
   const INFO = {
     id: 'dev_abc',
-    name: 'linux-ms-7e59',
+    name: 'linux-MS-7E59',
     version: '0.9.0',
     protocol: 1,
     os: 'linux',

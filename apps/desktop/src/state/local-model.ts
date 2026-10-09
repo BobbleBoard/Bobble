@@ -42,7 +42,7 @@ function engineFor(modelId: string): 'llamacpp' | 'mlx' {
 /**
  * Wait for the conversation to go idle, up to `capMs`.
  *
- * the user: changing model mid-conversation "often totally breaks … a brief flash of
+ * The user: changing model mid-conversation "often totally breaks … a brief flash of
  * 'loading model' then everything completely stops and running halts." That is
  * literal: switching stops the llama-server the current turn is generating
  * against and then disposes the pi child, so the reply dies mid-sentence with no
@@ -95,7 +95,7 @@ export async function activateLocalModel(
   /*
    * THE SWITCH IS VISIBLE NOW.
    *
-   * the user: "changing models mid conversation shows no sign of working … no
+   * The user: "changing models mid conversation shows no sign of working … no
    * 'switching to <model>', no 'processing… n%', no 'loading model'." The banner
    * state existed (model-selection-store's `switching`) but only ONE of the four
    * entry points set it, and the component that rendered it had been consolidated
@@ -306,7 +306,7 @@ export function useImageBlindness(): 'off' | 'unsupported' | null {
 /**
  * Can an image be seen AT ALL in the current setup — now, or after a relaunch?
  *
- * the user: "for images on non visual model, show a yellow circle + ! on images both
+ * The user: "for images on non visual model, show a yellow circle + ! on images both
  * in chat input and when sent and then show a quick pill bar … that just simply
  * says 'selected model does not support images'."
  *
@@ -331,7 +331,7 @@ export function resolveVisionTarget(s: VisionState): VisionDecision {
   // or this server was explicitly launched multimodal.
   if (s.visionReady === true || s.launchMode === 'multimodal') return { action: 'already-on' };
   /*
-   * OFF MEANS OFF. the user (2026-09-23): vision is on "unless the user says to turn
+   * OFF MEANS OFF. The user (2026-09-23): vision is on "unless the user says to turn
    * it off". MEASURED before this line: with the switch off, attaching a picture
    * relaunched the server multimodal behind the user's back — five minutes of
    * reload, the model then read the picture, and the switch said Off the whole

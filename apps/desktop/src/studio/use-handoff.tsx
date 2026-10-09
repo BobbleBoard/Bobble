@@ -33,7 +33,7 @@ export function studioAccepts(target: StudioTarget, name: string): boolean {
  *
  * Three routes end here and they are the same arrival: a card in the transcript
  * pressed "Open in studio", a file was dropped on the room, or the room was
- * opened with something already waiting for it. the user, round 2: "all types of
+ * opened with something already waiting for it. The user, round 2: "all types of
  * media handoff into studios and editing."
  *
  * The hook owns the whole arrival:

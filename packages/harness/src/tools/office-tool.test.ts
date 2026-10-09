@@ -1,6 +1,7 @@
 import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import { CAPABILITIES } from '../presets/capabilities.js';
 import {
@@ -114,7 +115,7 @@ function fakeSpawn(reply: Record<string, unknown> | null, stderrLines: string[] 
 }
 
 const ENV = {
-  PI_OFFICE_GEN_DIR: '/Users/user/Desktop/OSS-harness/tools/office-gen',
+  PI_OFFICE_GEN_DIR: fileURLToPath(new URL('../../../../tools/office-gen', import.meta.url)),
   PI_DESKTOP_UTILITY_BASE_URL: 'http://127.0.0.1:4242/v1',
   PI_OFFICE_GEN_PYTHON: '/usr/bin/python3',
 };

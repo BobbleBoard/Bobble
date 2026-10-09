@@ -8,7 +8,7 @@
  * unchanged tree). Each was written against a real observed dodge, and as a way
  * of making a coding agent honest it worked.
  *
- * It was also the wrong shape for this system. the user's correction: the harness has
+ * It was also the wrong shape for this system. The user's correction: the harness has
  * to be able to run a project that is a film, a document, a dataset, a piece of
  * music — things with no test suite, no exit code, and nothing for an automated
  * check to be right or wrong about. Worse, an automated check that is WRONG holds
@@ -229,7 +229,7 @@ export function createSubmitWorkTool(opts: SubmitWorkOptions): ToolLike {
       /*
        * THE FIRST CALL IS A PAUSE, THE SECOND IS THE HANDOVER.
        *
-       * the user's shape, and it does two jobs at once. It puts one deliberate
+       * The user's shape, and it does two jobs at once. It puts one deliberate
        * last-look between "I think I am done" and the manager's time — the moment
        * an engineer is most likely to notice the thing it forgot — and it gives
        * the tool a terminal state again, which it lost when the refusals went.
@@ -245,7 +245,7 @@ export function createSubmitWorkTool(opts: SubmitWorkOptions): ToolLike {
          *
          * It used to be six fixed lines, identical for every task and contract,
          * with the engineer's `summary` and `verification` sitting unread in the
-         * params. the user: "asking for general things, list out every claim that was
+         * params. The user: "asking for general things, list out every claim that was
          * just made about the final product state and verify it completely."
          *
          * So the claims it just made come back numbered, and what counts as proof

@@ -34,7 +34,7 @@ export const generation: Capability = {
    * `motion_graphics_render` were aspirational — activating this capability handed
    * the model seven tools it could not call, and (per the coercion this codebase has
    * measured twice) a bid for one of them lands on whichever advertised name is
-   * nearest. the user: "you can remove things from being explicitly in the ui gallery
+   * nearest. The user: "you can remove things from being explicitly in the ui gallery
    * card." So: the four that a real extension registers, and nothing else.
    */
   /*

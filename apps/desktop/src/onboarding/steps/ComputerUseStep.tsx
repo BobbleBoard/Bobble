@@ -2,7 +2,7 @@
  * Step — computer use. On or off, and when on, the apps Bobble may drive
  * without asking: a grid of the Mac's real app icons with names under them.
  *
- * the user (2026-09-15): "I would like a UI on onboarding for computer use on/off
+ * The user (2026-09-15): "I would like a UI on onboarding for computer use on/off
  * and then if on choose what apps to allow control of, show this as a grid of
  * real app icons w/ names below, this is editable later in settings via a
  * similar UI." The grid is the same component Settings → Computer use draws.

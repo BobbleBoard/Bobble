@@ -1,7 +1,7 @@
 /**
  * WHAT THE MODEL ACTUALLY LOOKED AT.
  *
- * the user: "log and tell me how much images are being utilized and how much
+ * The user: "log and tell me how much images are being utilized and how much
  * accessibility tree/dom is being utilized (not what's offered, grounded in the
  * runs how much is the model using and or getting or being forced on one or the
  * other)."

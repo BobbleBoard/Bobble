@@ -24,7 +24,7 @@ function chat(file: string, cwd: string, modifiedAt = 't', title = file): Sessio
 
 describe('a working folder is NOT a project', () => {
   /*
-   * the user: "not every working directory folder becomes a project, delete all
+   * The user: "not every working directory folder becomes a project, delete all
    * projects now, and projects can now only be created when explicitly done
    * so." Every cwd used to sprout its own folder, so the sidebar filled with
    * run5/run6/run7/corp-probe2 — one per experiment, none of them asked for.
@@ -64,7 +64,7 @@ describe('a working folder is NOT a project', () => {
 
 describe('shouldOfferProject — exactly the third chat', () => {
   /*
-   * the user: "the user gets a popup to 'create project' when they make their third
+   * The user: "the user gets a popup to 'create project' when they make their third
    * chat in the same working directory (excluding no project). not after or
    * before the third time." Asking at one is noise; asking at four and five is
    * nagging.
@@ -116,6 +116,6 @@ describe('displayTitle', () => {
  * machine — anything that reached pi without a usable cwd got pi's own
  * `existsSync(cwd) ? cwd : os.homedir()` fallback), and directory grouping names
  * a folder after the cwd label's last segment — so they invented a project
- * literally called `~` and every one of them joined it. the user asked for that to
+ * literally called `~` and every one of them joined it. The user asked for that to
  * stop, and for those chats to be treated as "no project".
  */

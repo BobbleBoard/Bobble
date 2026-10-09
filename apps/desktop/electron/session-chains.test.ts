@@ -1,7 +1,7 @@
 /**
  * ONE ROW PER CONVERSATION — the fix for the user's "many duplicate chats appear".
  *
- * MEASURED in his sessions directory: one conversation about spoofdpi had become
+ * MEASURED in their sessions directory: one conversation about spoofdpi had become
  * NINE files, because pi writes a fresh session (with a `parentSession` pointer)
  * every time the child is restarted on an existing one — and three of those nine
  * were created within seven seconds of each other. The chain there also FORKED:

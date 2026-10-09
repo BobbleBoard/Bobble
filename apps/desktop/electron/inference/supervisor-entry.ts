@@ -647,7 +647,7 @@ async function accelerators(): Promise<Awaited<ReturnType<typeof detectAccelerat
 /*
  * THE LIVE POWER POLICY, for this process.
  *
- * the user: "ensuring we leave a certain amount of memory available as a buffer so
+ * The user: "ensuring we leave a certain amount of memory available as a buffer so
  * the user can use computer as normal while generation and such occurs … this
  * could be dynamic even tracking what the current user memory/cpu/gpu usage is",
  * and then: "you need to handle a range of hardware and a range of situations
@@ -1398,7 +1398,7 @@ function draftsOnDisk(model: CatalogModel): ('eagle3' | 'dflash' | 'dspark')[] {
 /**
  * Everything the catalogue names beside a model, with whether each is on disk.
  *
- * the user: "when I go to minicpm 5 2b in bobble there's no fetch missing button
+ * The user: "when I go to minicpm 5 2b in bobble there's no fetch missing button
  * that fetches drafters and models" — the button used to hide inside a
  * finished calibration's skip list, so a model that was never calibrated (or
  * whose companions were catalogued after it was downloaded) had no way to ask
@@ -1836,7 +1836,7 @@ async function startExternalEngine(
         TOKENIZERS_PARALLELISM: 'false',
         /* rapid-mlx writes "[truncated — reasoning incomplete; raise
            max_tokens]" plus a tail of the thought INTO the reply when a
-           generation is cut mid-think (its R12-8 "rescue"). the user saw it as a
+           generation is cut mid-think (its R12-8 "rescue"). The user saw it as a
            thought in the thread. The cut is already said by finish_reason
            "length"; the words are not for the user. */
         RAPID_MLX_REASONING_CUTOFF_NOTICE: 'disabled',
@@ -2097,7 +2097,7 @@ async function benchServer(
 /**
  * CALIBRATE: try every (engine, method) that can run this model from what is
  * on disk, in turn, timing the app's own prompt shapes on each; keep the
- * verdict; come back up on the winner. the user: "clicking calibrate pauses
+ * verdict; come back up on the winner. The user: "clicking calibrate pauses
  * anything running in the current chat, then runs the calibration and swaps to
  * the proper engine and speculative method, ensure this doesn't require
  * internet to run the calibration".
@@ -2569,7 +2569,7 @@ async function startServerExclusive(
         }
       : chosen;
   /*
-   * VISION DECIDES THE ENGINE (vision-launch.ts). the user: "mmproj/vision should
+   * VISION DECIDES THE ENGINE (vision-launch.ts). The user: "mmproj/vision should
    * always be loaded and usable by default unless explicitly turned off". The
    * wished profile is what calibration measured or the user picked; this is
    * where it meets the setting — rapid-mlx is asked for its vision lane (no
@@ -2693,7 +2693,7 @@ async function startServerExclusive(
 
   /*
    * WILL IT EVEN FIT? A model whose weights exceed what this machine can hold
-   * does not fail cleanly — it swaps, and the whole desktop goes with it. the user,
+   * does not fail cleanly — it swaps, and the whole desktop goes with it. The user,
    * watching a 27B come up on a 24GB Mac: "whole computer now has lots of lag
    * and purple flashes ... stuttering of mouse cursor ... checkerboardings."
    *
@@ -2720,7 +2720,7 @@ async function startServerExclusive(
   // up blind and anything wanting to look at something had to force a relaunch
   // first. Measured cost of loading it eagerly on qwen3.5-4b-mtp: 43.42 tok/s
   // with the projector against 43.80 without (0.9%, inside the noise) for
-  // 641 MB. That is not worth a capability gap. the user: "all models are
+  // 641 MB. That is not worth a capability gap. The user: "all models are
   // multimodal here and the mmproj should always be loaded because all tasks
   // should be able to have vision."
   //

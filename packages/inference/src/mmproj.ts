@@ -60,7 +60,7 @@ export function mmprojFileFor(
   //
   // The premise was that a projector costs speed. Measured on qwen3.5-4b-mtp:
   // 43.42 tok/s with it, 43.80 without — 0.9%, inside the noise, for 641 MB.
-  // the user: "all models are multimodal here and the mmproj should always be
+  // The user: "all models are multimodal here and the mmproj should always be
   // loaded because all tasks should be able to have vision."
   //
   // The launch mode is kept in the signature because callers still distinguish

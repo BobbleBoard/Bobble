@@ -29,7 +29,7 @@ describe('stripPiIdentity', () => {
   });
 
   it('says nothing about identity at all — that was three lines of prefill', () => {
-    // the user, cutting the prompt down: "strip out the part about 'describing pi'
+    // The user, cutting the prompt down: "strip out the part about 'describing pi'
     // and 'you are pi'". Behaviour comes from the rules and the commands.
     const out = stripPiIdentity(BASE);
     expect(out).not.toContain('You are an expert coding assistant');

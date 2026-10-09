@@ -64,7 +64,7 @@ let lastMigration: (MigrationResult & { ranAt: string; unsorted: readonly string
  * `~/.cache/pi-desktop` → `~/.cache/bobble`, once, with a symlink left at the
  * old name.
  *
- * the user (2026-09-13): "purge any 'pi desktop' branding totally". The support
+ * The user (2026-09-13): "purge any 'pi desktop' branding totally". The support
  * root's name was the last place it showed — on the Manage Storage page, in
  * every engine's path. A rename is instant on the same volume; the symlink is
  * what keeps every venv under it working, since a venv bakes its absolute
@@ -228,7 +228,7 @@ export async function diskSpace(): Promise<{ free: number; total: number; root: 
 export const DISK_MARGIN_BYTES = 2 * 1024 ** 3;
 
 /**
- * "Not enough space" before a byte moves, or null when it fits. the user
+ * "Not enough space" before a byte moves, or null when it fits. The user
  * (2026-09-13): "don't allow / warn of disk space issues when downloading a
  * model that there isn't enough space for." The margin is what the OS and the
  * next generation need to keep breathing.

@@ -2,7 +2,7 @@
  * `chart` — a data visual, drawn in the chat in a second — and `chart_edit`,
  * the same chart changed.
  *
- * the user (2026-09-16), with Claude's inline bar chart beside the one Bobble made
+ * The user (2026-09-16), with Claude's inline bar chart beside the one Bobble made
  * through the office pipeline: "this was way quicker and is a much stronger
  * result from claude here, we need parity on these datavisuals, it's a common
  * use case and very formulaic and doable … not just bar charts, all

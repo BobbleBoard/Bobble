@@ -2,7 +2,7 @@
  * WHAT A PASTED OR DROPPED THING IS ON DISK — and a file for pixels that never
  * had one.
  *
- * the user (2026-09-24): "why not handle this natively so that any image(s)/files/
+ * The user (2026-09-24): "why not handle this natively so that any image(s)/files/
  * folders... can be pasted into the input box".
  *
  * The composer holds the Files of a paste or a drop and, through webUtils, the

@@ -203,8 +203,8 @@ def weld_and_clean(mesh_out, label: str):
 def to_gltf_up(verts):
     """TRELLIS emits Z-up; glTF is Y-up by spec. Convert (x,y,z) → (x, z, -y).
 
-    the user: "why is the plane on its nose… it seems suspiciously perfect 90
-    degrees… are you sure it generates Y up as opposed to z up". He was right,
+    The user: "why is the plane on its nose… it seems suspiciously perfect 90
+    degrees… are you sure it generates Y up as opposed to z up". The user was right,
     and it is not model-side. MEASURED on a tank, identical on BOTH backends
     (so it is TRELLIS's convention, not ours): extents X=0.516 Y=1.000 Z=0.603
     — the vehicle's LENGTH lay along Y, and a Y-up viewer therefore stood it on
@@ -316,7 +316,7 @@ MIN_TEXELS_PER_FACE = 64
 # Triangles handed to the baker, when the caller does not say.
 #
 # This was 65,000, chosen as "exactly what a 2048 atlas holds at 64 texels per
-# face" — which optimised the atlas and quietly capped the MODEL. the user hit it
+# face" — which optimised the atlas and quietly capped the MODEL. The user hit it
 # from the other end: every generation came back at exactly 65,000 faces and
 # visibly softer than the HF demo, whose decimation target defaults to 300,000
 # and which returned 288,000 for the same input image. A budget that is always
@@ -451,7 +451,7 @@ def parse_attr_layout(text: str) -> dict:
 def dilate_atlas(img, valid, passes: int = 8):
     """Pad each UV island with its OWN colour, not a blur of the empty gutter.
 
-    THE DARK-CRACKLE BUG. the user, on a textured generation: "texture wireframe
+    THE DARK-CRACKLE BUG. The user, on a textured generation: "texture wireframe
     artifacting" — every triangle edge carried a thin dark line, so the model
     looked cracked all over. The geometry is perfect (the clay render is clean),
     so it is entirely in the baked sheet.
@@ -720,7 +720,7 @@ def count_encode_voxels(mesh, resolution: int) -> int:
 def texture_from_image(args) -> None:
     """Paint an EXISTING mesh from a reference image — no voxels, no Xcode.
 
-    the user: "can I texture existing models…?"
+    The user: "can I texture existing models…?"
 
     Not before this. The Texture stage was only ever a RE-BAKE: the generation
     saved a voxel colour field beside its mesh and texturing sampled it again,
@@ -1223,7 +1223,7 @@ def run_bake_only(args) -> None:
     plus dinov2-giant) for texturing. TRELLIS already produces PBR for the model
     it generates, and the volume it sampled is small enough to keep, so
     texturing a mesh again — after a retopo, say — needs no second model at all.
-    the user: "if trellis bundles a texturing model that can do good pbr and such,
+    The user: "if trellis bundles a texturing model that can do good pbr and such,
     can you just utilize that instead of a separate hunyuan paint please (shaves
     off a bit of disk space too)".
 

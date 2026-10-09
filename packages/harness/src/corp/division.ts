@@ -14,7 +14,7 @@
  * missing thing was never intelligence, it was ORIENTATION: nobody was told what
  * already existed, and nobody looked before writing.
  *
- * the user: "work formally split as 'divisions' … 'a team of developers is/has been
+ * The user: "work formally split as 'divisions' … 'a team of developers is/has been
  * working here, you are assigned to the <division> which is responsible for
  * <work>' … <briefing on what's been done, what's to do, and or an overview (most
  * important part)>".
@@ -28,7 +28,7 @@
  *    benchmark instead of the next one. {@link DIVISION_PRACTICE} is asserted
  *    against a banned-word list in the tests for exactly this reason.
  *
- * 2. SHORT AND PLAIN. the user: "don't complicate the prompts as much as possible.
+ * 2. SHORT AND PLAIN. The user: "don't complicate the prompts as much as possible.
  *    complication/unclean and non straightforward writing is really really bad
  *    especially at this 4b size." Short sentences, concrete nouns, one idea per
  *    line. A clause a 4B has to unpick is a clause it will skip.

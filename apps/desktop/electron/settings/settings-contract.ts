@@ -64,7 +64,7 @@ export type ToolInterface = 'schemas' | 'bash-cli';
  * WHY IT EXISTS. A blind tester's rule, which is the best one anybody has given
  * this project: "if a word on the opening screen needs a sentence of explanation
  * to me, it isn't on the opening screen." "No project" and "Effort · Adaptive"
- * both need one. the user's answer was better than hiding them behind a gear — put
+ * both need one. The user's answer was better than hiding them behind a gear — put
  * them behind a MODE, one click away, with a control that says which of the two
  * things this app is you are currently doing.
  *
@@ -84,7 +84,7 @@ export const TOOL_INTERFACES = ['schemas', 'bash-cli'] as const satisfies readon
 /**
  * How hard the app may push this machine.
  *
- * the user: "ensuring we leave a certain amount of memory available as a buffer so
+ * The user: "ensuring we leave a certain amount of memory available as a buffer so
  * the user can use computer as normal while generation and such occurs … this
  * could be dynamic even tracking what the current user memory/cpu/gpu usage is."
  *
@@ -224,7 +224,7 @@ export const DEFAULT_ADVANCED: AdvancedSettings = {
 /**
  * ENGINE LAUNCH SETTINGS — the flags a user wants on an engine's command line.
  *
- * the user: "expose absolutely everything in an organized good gui manner … a
+ * The user: "expose absolutely everything in an organized good gui manner … a
  * pinned apply button that restarts the server and applies changes … a tab
  * for also just pasting args/a llama-server command".
  *
@@ -362,7 +362,7 @@ export interface DesktopSettings extends FeatureSettings {
   toolInterface: ToolInterface;
   /**
    * How tools are offered to SPECIALISTS and subagents — its own switch, not
-   * the chat's. the user: "ensure there is a cli connector for the specialists that
+   * the chat's. The user: "ensure there is a cli connector for the specialists that
    * is by default there and enabled, cli tools are a good context saver so it's
    * important that they're just the same power as schemas." A specialist runs
    * one job with a pinned kit; the CLI keeps its prompt small and loses nothing
@@ -376,7 +376,7 @@ export interface DesktopSettings extends FeatureSettings {
   /**
    * Draw the status pill beside the phantom cursor during computer use.
    *
-   * the user: "remove the pill entirely via a setting 'show computer use status
+   * The user: "remove the pill entirely via a setting 'show computer use status
    * pill'". It is the one part of the overlay that sits ON TOP of the user's own
    * windows saying words, so it is the one part somebody might not want.
    */
@@ -389,7 +389,7 @@ export interface DesktopSettings extends FeatureSettings {
    */
   powerReserveGB?: number;
   /**
-   * THE MEMORY GUARD (Settings → Experimental). the user (2026-09-16), after a
+   * THE MEMORY GUARD (Settings → Experimental). The user (2026-09-16), after a
    * restart under a 3D job: "these memory safeguards should just not let ooms
    * happen for sure … always 100% reserve enough memory … if it does anyways,
    * have safeguards in place to stop generations/runs of any sort ideally
@@ -451,7 +451,7 @@ export interface DesktopSettings extends FeatureSettings {
    */
   experimentalGeneration: boolean;
   /**
-   * VISION, ON UNLESS SAID OTHERWISE. the user (2026-09-23): "mmproj/vision should
+   * VISION, ON UNLESS SAID OTHERWISE. The user (2026-09-23): "mmproj/vision should
    * always be loaded and usable by default unless explicitly turned off, put
    * this in the engines option and leave a setting to not load vision by
    * default." True: every launch is one that can read an image — llama.cpp
@@ -476,7 +476,7 @@ export interface DesktopSettings extends FeatureSettings {
   /**
    * Where the model library lives — `null` for the default (`~/Bobble/Models`).
    * Applied to the environment before any engine reads a path; changing it
-   * moves the library (see storage-main). the user (2026-09-12): the models are not
+   * moves the library (see storage-main). The user (2026-09-12): the models are not
    * to be hidden in `~/.cache`.
    */
   modelsRoot: string | null;
@@ -491,7 +491,7 @@ export interface DesktopSettings extends FeatureSettings {
   hideDeleteModelConfirm: boolean;
   /**
    * Mac computer use — whether Bobble may drive apps at all, and which apps it
-   * may drive without asking. the user (2026-09-15): "a UI on onboarding for
+   * may drive without asking. The user (2026-09-15): "a UI on onboarding for
    * computer use on/off and then if on choose what apps to allow control of
    * … editable later in settings via a similar UI." Off refuses every `mac`
    * action with a sentence naming the setting; an app on the list is used
@@ -506,7 +506,7 @@ export interface DesktopSettings extends FeatureSettings {
    * installs an engine; turning its connector on is what puts the engine's
    * tools in every chat (read at pi's spawn, like a model connector's). Off
    * by default, so installing the 3D studio changes nothing in the chat until
-   * the person says so. the user (2026-09-17): "3d should be a connector that gets
+   * the person says so. The user (2026-09-17): "3d should be a connector that gets
    * recommended for install upon installing the 3d studio module".
    */
   moduleConnectors: Record<string, boolean>;
@@ -589,7 +589,7 @@ export interface DesktopSettingsPatch extends FeatureSettingsPatch {
 
 /**
  * Icon-stroke bounds, in pixels — mirrors the IconStrokeControl slider range.
- * the user (2026-09-20): "a more realistic range of stroke thickness none of which
+ * The user (2026-09-20): "a more realistic range of stroke thickness none of which
  * look absolutely excessive, make sure the user can't make the app just 'look
  * bad'". LOOKED AT on the rail: 1.0 is a hairline that still reads, 1.75 is
  * bold and still crisp; 2.0 clogs the calendar's rows and the file glyphs'

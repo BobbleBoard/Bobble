@@ -169,7 +169,7 @@ interface PiSliceState {
    * pi streams `tool_execution_update` the whole time a command runs; this used
    * to be dropped on the floor behind a note saying live bash rows would land
    * later. They never did, so a command at 1m 7s could tell you nothing at all.
-   * the user: "nor the live output that I should be able to see."
+   * The user: "nor the live output that I should be able to see."
    *
    * Accumulated by the sender, so each frame REPLACES the last rather than
    * appending. Entries are removed the moment the real result lands — after
@@ -856,9 +856,9 @@ export function createPiSink(
         /*
          * AN EXIT NOBODY WAS WAITING ON IS NOT NEWS.
          *
-         * the user, on the "The assistant restarted" toast: "it just shouldn't show up
+         * The user, on the "The assistant restarted" toast: "it just shouldn't show up
          * as a notification at all... it's just always happening a single time on
-         * app startup." He is right about what he saw. A dispose at startup — a
+         * app startup." The user is right about what the user saw. A dispose at startup — a
          * model select, a respawn that re-reads models.json, a restart whose exit
          * event lands after the IPC resolved and so misses the intentional flag —
          * costs the user nothing: pi comes back before anything is asked of it,

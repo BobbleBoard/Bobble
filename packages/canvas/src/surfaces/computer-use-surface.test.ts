@@ -28,7 +28,7 @@ const say = (state: Parameters<typeof bubbleText>[0], text = '', since = 0, afte
   bubbleText(state, text, since, after);
 
 describe('bubbleText — the action, never its contents', () => {
-  // the user (2026-09-13): "don't show what it's typing or what it's clicking in
+  // The user (2026-09-13): "don't show what it's typing or what it's clicking in
   // the little pill just show the action or 'thinking'".
   it('says Clicking, whatever was clicked', () => {
     expect(say('clicking', 'Save').label).toBe('Clicking');

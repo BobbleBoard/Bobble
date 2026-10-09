@@ -2,7 +2,7 @@
  * The interactive chart — Claude-parity data visuals, in the chat and in the
  * canvas.
  *
- * the user (2026-09-16), Claude's inline card beside Bobble's static picture: "we
+ * The user (2026-09-16), Claude's inline card beside Bobble's static picture: "we
  * need parity on these datavisuals … this was way quicker and is a much
  * stronger result". What theirs has and a picture cannot: a hover band with
  * the value read out, a chart ⇄ table toggle in the corner, and a size that
@@ -132,7 +132,7 @@ export function ChartView({ spec, fill = false, corner, className, enter = true 
   const theme = useAppTheme();
   const style = useMemo(() => resolveStyle(spec.style, 'clean', { theme }), [spec.style, theme]);
   /*
-   * THE CHART BUILDS ITSELF ON ARRIVAL. the user (2026-09-17): "bar ones have
+   * THE CHART BUILDS ITSELF ON ARRIVAL. The user (2026-09-17): "bar ones have
    * bars go up, pie expand smoothly, radar charts show dots going out from
    * the center … all smooth live building." The first paint carries
    * `data-enter`, which the stylesheet reads to run the per-shape entrance

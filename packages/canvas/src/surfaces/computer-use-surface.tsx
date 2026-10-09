@@ -1,7 +1,7 @@
 /**
  * ComputerUseSurface — the live view of the Mac app Pi is driving.
  *
- * the user, verbatim: "a canvas tab that shows the whole window + dialogs or
+ * The user, verbatim: "a canvas tab that shows the whole window + dialogs or
  * whatever it is live streamed into the canvas in this computer use monitoring
  * tab, if the window is not sized, show it in full but show the user's desktop
  * background wallpaper behind it (center the window and keep it sized exactly
@@ -85,8 +85,8 @@ export interface ComputerUseSurfaceProps {
  * (pi-mac Overlay.swift `pointerGlyph`), read from the one definition in
  * @pi-desktop/shared together with its paint, its size and its press.
  *
- * He sent one SVG for "the fake cursor", and there are two of them: the panel
- * painted over his real screen, and this one painted over a picture of the
+ * The user sent one SVG for "the fake cursor", and there are two of them: the panel
+ * painted over their real screen, and this one painted over a picture of the
  * window. They have to be the same drawing or the monitor is showing something
  * that is not what is happening. They had drifted: the overlay went to a black
  * body with a subtle blue edge glow and grew 15%, while this one kept the blue
@@ -107,7 +107,7 @@ const WINDOW_RADIUS = 11;
  * WHEN TO STOP FITTING THE WINDOW AND FOLLOW THE ACTION.
  *
  * This was 0.6, which is far too eager: a 900x620pt window in the rail fits at
- * 0.45 and is perfectly readable there. the user watched it flip mid-run and was
+ * 0.45 and is perfectly readable there. The user watched it flip mid-run and was
  * blunt about it — "there was no purpouse, the window being used could be seen
  * absolutely just fine… I don't think there's ever a point aside from a really
  * large window that literally can't fit on canvas screen without being
@@ -284,7 +284,7 @@ export function bubbleText(
     };
   }
   /*
-   * THE BUBBLE SAYS THE ACTION, NOT ITS CONTENTS. the user (2026-09-13): "don't
+   * THE BUBBLE SAYS THE ACTION, NOT ITS CONTENTS. The user (2026-09-13): "don't
    * show what it's typing or what it's clicking in the little pill just show
    * the action or 'thinking'". The object (what was clicked, the typed text,
    * the key) is the act strip's — a history under the picture — and never the
@@ -398,7 +398,7 @@ interface BackdropCache {
 /**
  * The wallpaper, rendered once per (image, size) and reused.
  *
- * the user, verbatim: "don't blur the wallpaper please." It used to be blurred 4px,
+ * The user, verbatim: "don't blur the wallpaper please." It used to be blurred 4px,
  * washed 58% black and vignetted 42% — three treatments to push it back, which
  * between them turned the user's own desktop into grey soup and made the tab
  * look like a modal scrim rather than a desk. It is now DRAWN AS IT IS, and the
@@ -1044,7 +1044,7 @@ export function ComputerUseSurface({ feed, className }: ComputerUseSurfaceProps)
     /*
      * NO EDGE TREATMENT AT ALL.
      *
-     * There was a translucent keyline, then a glow, then a mist. the user, having
+     * There was a translucent keyline, then a glow, then a mist. The user, having
      * looked at each: "no that's not what I was looking for, why don't we just
      * remove the border." The window's own drop shadow already lifts it off the
      * wallpaper, which was the job an edge was being asked to do.
@@ -1074,17 +1074,17 @@ export function ComputerUseSurface({ feed, className }: ComputerUseSurfaceProps)
      * 6. NO WORKING OUTLINE EITHER.
      *
      * "Something is happening belongs to the FRAME" was the argument for a
-     * breathing accent outline on the window's rounded rect. the user, looking at
+     * breathing accent outline on the window's rounded rect. The user, looking at
      * the canvas after every other edge treatment had been taken out: "i'm
      * still seeing the blue border around the edge of the window in the canvas
-     * viewer." He had already settled this for the static edge — "why don't we
+     * viewer." The user had already settled this for the static edge — "why don't we
      * just remove the border" — and this one was a second edge wearing a
      * different justification. What is happening is said by the pill, which
      * says it in words, and by the cursor, which says it where it is happening.
      */
 
     // 7. The phantom. ALWAYS, whenever there is a window for it to be on —
-    //    the user: "always show the fake cursor around there even if just idling,
+    //    The user: "always show the fake cursor around there even if just idling,
     //    looks nice and makes it feel like 'this is the model's computer'." With
     //    no live position it rests where it last actually was (or, having never
     //    been anywhere, where a hand would leave a mouse) and breathes. It is
@@ -2496,7 +2496,7 @@ function drawBubble(
   /*
    * PARKED WHERE THE OVERLAY PARKS IT. This used to sit 27×40 px from the tip
    * (the first overlay's distance) and flip at the edge of the whole viewport —
-   * the user: "the status pill really far away from it for some reason". The
+   * The user: "the status pill really far away from it for some reason". The
    * overlay has since been brought "a bit closer" (11×15) and keeps the pill
    * inside the window it belongs to, so the same rule runs here against the
    * drawn window — clipped to the viewport, since in follow mode the window

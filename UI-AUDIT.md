@@ -511,7 +511,7 @@ would be the wrong thing to tell anyone.
 
 # PART 3 — Decisions implemented (D1–D12)
 
-The twelve open calls above are decided and built. the user delegated the calls; every one below is
+The twelve open calls above are decided and built. The user delegated the calls; every one below is
 followed by the measurement that closed it.
 
 **The evidence is a new probe, not this table.** `apps/desktop/tests/e2e/tripo-decisions-probe.mjs`

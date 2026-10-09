@@ -1,5 +1,5 @@
 /**
- * THE MODEL ITSELF, through the connector's own wire. the user (2026-09-17): "3d
+ * THE MODEL ITSELF, through the connector's own wire. The user (2026-09-17): "3d
  * should be a connector … the card … a little embedded viewport rotatable".
  *
  * Drives the REAL engine (hidden app, throwaway HOME on the real cache) the

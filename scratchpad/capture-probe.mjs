@@ -11,11 +11,13 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { chromium } from '@playwright/test';
+import { fileURLToPath } from 'node:url';
+const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url)).replace(/\/$/, '');
 
 const run = promisify(execFile);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const APP = process.env.APP ?? 'Maps';
-const OUT = '/Users/user/Desktop/OSS-harness/scratchpad/capture-probe';
+const OUT = `${REPO_ROOT}/scratchpad/capture-probe`;
 const PORT = 9412;
 
 mkdirSync(OUT, { recursive: true });
@@ -29,11 +31,21 @@ while (
   await sleep(500);
 }
 // -g: never take the screen (the user's standing rule).
-await run('open', ['-g', '--env', 'PI_E2E=1', '-a', '/Applications/Bobble.app', '--args', `--remote-debugging-port=${PORT}`]);
+await run('open', [
+  '-g',
+  '--env',
+  'PI_E2E=1',
+  '-a',
+  '/Applications/Bobble.app',
+  '--args',
+  `--remote-debugging-port=${PORT}`,
+]);
 await sleep(8000);
 const browser = await chromium.connectOverCDP(`http://127.0.0.1:${PORT}`);
 const page = (browser.contexts()[0]?.pages() ?? []).find((p) => !p.url().startsWith('devtools://'));
-await page.waitForFunction(() => typeof window.piDesktop?.invoke === 'function', { timeout: 40_000 });
+await page.waitForFunction(() => typeof window.piDesktop?.invoke === 'function', {
+  timeout: 40_000,
+});
 
 const dbg = async (op, params) => {
   const res = await page.evaluate((r) => window.piDesktop.invoke('mac:debug', r), { op, params });
@@ -51,7 +63,19 @@ const snap = await dbg('snapshot', { app: APP });
 console.log('window   :', JSON.stringify(snap.window));
 console.log('bounds   :', JSON.stringify(snap.windowBounds));
 console.log('union    :', JSON.stringify(snap.union));
-console.log('windows  :', JSON.stringify((snap.windows ?? []).map((w) => ({ t: w.title, ...w.bbox ?? {}, x: w.x, y: w.y, w: w.w, h: w.h }))));
+console.log(
+  'windows  :',
+  JSON.stringify(
+    (snap.windows ?? []).map((w) => ({
+      t: w.title,
+      ...(w.bbox ?? {}),
+      x: w.x,
+      y: w.y,
+      w: w.w,
+      h: w.h,
+    })),
+  ),
+);
 
 const shot = await dbg('screenshot', { app: APP });
 console.log(

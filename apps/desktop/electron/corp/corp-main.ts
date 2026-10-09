@@ -251,7 +251,7 @@ async function handleStart(
     browserBridge === null ? undefined : createBrowserSearch(browserBridge);
   // EFFORT-GATED AGENT MESH: the top two effort levels (high/max) engage the
   // corporation — and at those levels it runs as a persistent multi-agent MESH
-  // (the user's "everyone is an agent that talks to anyone"), emitting the SAME event
+  // (The user's "everyone is an agent that talks to anyone"), emitting the SAME event
   // stream so the situation room renders it unchanged. Below high, there is no
   // delegation: the `else` branch runs a single solo agent (the deterministic path
   // with promotionAllowed=false). `corpParamsForEffort(effort).promotionAllowed` is
@@ -269,8 +269,8 @@ async function handleStart(
    * question, two different answers, and the solo one produced exactly the
    * `/var/folders/4h/nq1c73.../T/...` paths the user has asked never to see again.
    *
-   * the user, on the nested-folder symptom: "this nested folder stuff is also leading
-   * me to belive you have conflicting systems." He was right that there were two.
+   * The user, on the nested-folder symptom: "this nested folder stuff is also leading
+   * me to belive you have conflicting systems." The user was right that there were two.
    * There is one now: the directory the task names, else the chat's folder, else
    * a per-task workspace as the last resort.
    */
@@ -279,7 +279,7 @@ async function handleStart(
   ensureTimeoutShim();
   const meshTaskId = `corp-mesh-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
   /*
-   * THE DROPDOWN DECIDES. the user: "if they have a project selected that dropdown
+   * THE DROPDOWN DECIDES. The user: "if they have a project selected that dropdown
    * right there is the end all be all ... always always always nothing competes
    * with that." `req.ctx.cwd` IS that selection; "No project" arrives as absent,
    * and becomes ~/Bobble/<conversation name>.
@@ -508,7 +508,7 @@ const handlers: CorpHandlers = {
      * A MESH RUN CAN BE TALKED TO. It could not before: this branch required
      * `task.engine`, a mesh run has none, and the mesh is the implementation —
      * so every follow-up question ever asked of a corporation, running or not,
-     * got told to start a new chat. the user asked one mid-run and got exactly that.
+     * got told to start a new chat. The user asked one mid-run and got exactly that.
      */
     const ask = (task.handle as { ask?: (q: string) => Promise<string> }).ask;
     if (typeof ask !== 'function') {

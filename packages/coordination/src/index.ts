@@ -477,7 +477,7 @@ export interface WorkerTranscriptLine {
    *
    * Without it, a subagent's tool row was a header with nothing under it while
    * the identical call in the chat rendered its full output — the discrepancy
-   * the user hit on web_search ("shows no results when the subagents do it but
+   * The user hit on web_search ("shows no results when the subagents do it but
    * regularly it shows actual results").
    */
   readonly output?: string;
@@ -605,7 +605,7 @@ export interface WorkerActivityEvent {
    * `briefing` is what this role was ASKED to do — the incoming brief and every
    * follow-up. It was missing entirely, so a role chat could only ever show a
    * monologue: its own output, with the instruction that caused it invisible.
-   * the user, watching a live run: "I still don't see the blue left aligned bubble I
+   * The user, watching a live run: "I still don't see the blue left aligned bubble I
    * asked for showing the actual task/follow up messages the subagents were
    * given… this applies to all manager/corp roles etc."
    */

@@ -2,7 +2,7 @@
  * WRITTEN FILES, AS THE THREAD AND THE CANVAS SHOW THEM — live, through the
  * real chat on the real model.
  *
- * the user (2026-09-13): every written file opened in the canvas as "Could not
+ * The user (2026-09-13): every written file opened in the canvas as "Could not
  * read this file"; two "Wrote a file" rows carried no name and could not be
  * clicked; the > chevrons sat pinned to the right edge.
  *

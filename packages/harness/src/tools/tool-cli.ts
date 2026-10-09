@@ -1,7 +1,7 @@
 /**
  * EVERY TOOL AS A COMMAND LINE — the pure core.
  *
- * the user's experiment, in his words: "all mcps, etc. are parsed and resolved into
+ * The user's experiment, in their words: "all mcps, etc. are parsed and resolved into
  * a cli tool, eg. the media generation tools might become 'media' cli and then
  * the model can run --help, find out it can do media generate video/image
  * "prompt" … so any mcp, any toolset, any connector they can all be loaded at
@@ -128,7 +128,7 @@ const COMMAND_PATH_OVERRIDES: Readonly<Record<string, readonly string[]>> = {
   update_plan: ['plan'],
   spawn_subagent: ['delegate'],
   talk_to_manager: ['manager'],
-  /* the user: "svg <optional prompt> --image <optional reference image path(s)>".
+  /* The user: "svg <optional prompt> --image <optional reference image path(s)>".
      The group is `svg` and its one tool has no sub-word, so the command is the
      group name and the prompt is the positional. */
   generate_svg: [],
@@ -254,7 +254,7 @@ export function parseArgv(argv: readonly string[]): ParsedArgv {
 /**
  * THE WORD A MODEL REACHES FOR, POINTING AT THE FLAG WE ACTUALLY HAVE.
  *
- * the user: "why don't you add a flag to snapshot to force a visual eg snapshot
+ * The user: "why don't you add a flag to snapshot to force a visual eg snapshot
  * --image/visual". The flag exists — `--screenshot` — and that is exactly the
  * problem: an unknown flag is passed through untouched (see below, which is
  * right for a typo that should reach the tool as an error), but a BOOLEAN typo

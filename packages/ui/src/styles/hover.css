@@ -51,7 +51,7 @@ button.pd-chip:active:not(:disabled) {
 }
 
 /*
- * MENU ROWS DO NOT NUDGE. the user: "on dropdown menus remove the hover animation
+ * MENU ROWS DO NOT NUDGE. The user: "on dropdown menus remove the hover animation
  * that moves things to the sides, this should be a one quick fix since
  * dropdown/dropup styling should be universal."
  *

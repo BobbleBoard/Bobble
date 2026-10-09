@@ -35,7 +35,7 @@ if (!existsSync(OUT)) mkdirSync(OUT, { recursive: true });
  * A COPY of the real profile, not a fresh one.
  *
  * The first version of this probe used an empty `--user-data-dir` and could
- * never reproduce: users=0 at every step, ring never shown. the user's app has 80+
+ * never reproduce: users=0 at every step, ring never shown. The user's app has 80+
  * restored chats, and the ring appears there — so the trigger is in RESTORE, and
  * a cold profile is the one condition guaranteed to hide it. `UDD=<path>` points
  * at a copied profile; the original is never opened.

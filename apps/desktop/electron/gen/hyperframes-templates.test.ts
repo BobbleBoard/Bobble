@@ -15,7 +15,7 @@ import {
   withoutInstructions,
 } from './hyperframes-templates.js';
 
-/** the user's prompt, verbatim — the one that came back as a card of its own words (twice). */
+/** The user's prompt, verbatim — the one that came back as a card of its own words (twice). */
 const LAUNCH_DAY =
   "10-second animated title card with the text 'Launch day' in bright yellow bold letters centered on a dark gradient background with subtle pulse animation";
 /** The visual-quality research's brief (§2.2.6). */
@@ -300,7 +300,7 @@ describe('no instruction on the card, however the words are given', () => {
 
   it('keeps the words’ own punctuation, drops a sentence full stop', () => {
     expect(card('Grand Opening!').title).toBe('Grand Opening!');
-    expect(card('Welcome back, The user!').title).toBe('Welcome back, The user!');
+    expect(card('Welcome back, the user!').title).toBe('Welcome back, the user!');
     expect(card('Launch day.').title).toBe('Launch day');
     expect(card('Coming soon...').title).toBe('Coming soon...');
   });

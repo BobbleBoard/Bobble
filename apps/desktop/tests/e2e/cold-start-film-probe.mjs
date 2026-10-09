@@ -1,7 +1,7 @@
 /**
  * WHAT A COLD START ACTUALLY LOOKS LIKE, frame by frame.
  *
- * the user: "visually check things out by opening the app and then immediately
+ * The user: "visually check things out by opening the app and then immediately
  * taking a screenshot after you send a message, maybe every .5 seconds then
  * until the generation completes… from cold load, immediately after opening app
  * simulating user clicking on app and immediately firing in a question."

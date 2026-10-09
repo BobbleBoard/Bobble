@@ -7,7 +7,7 @@
  * the ⌘-Tab switcher, it posts notifications, and — during a computer-use probe
  * — it floats an always-on-top overlay over whatever you were reading.
  *
- * the user: "ideally headlessly … but it doesn't take any focus away from me, I can
+ * The user: "ideally headlessly … but it doesn't take any focus away from me, I can
  * use the computer without any notice of any rapid test suites."
  *
  * ## What this mode does
@@ -78,7 +78,7 @@ export function isBackgroundMode(env: NodeJS.ProcessEnv = process.env): boolean 
  */
 export function isHiddenMode(env: NodeJS.ProcessEnv = process.env): boolean {
   /*
-   * HEADED, NOT NOTICED. the user (2026-09-15): "run these deeper tests all
+   * HEADED, NOT NOTICED. The user (2026-09-15): "run these deeper tests all
    * headed." A visible window that never takes focus: the app stays an
    * accessory (no dock tile, no activation, no notifications, the overlay
    * headless) and the window is shown with `showInactive()`, so a run can be

@@ -1,7 +1,7 @@
 /**
  * TRY IT, PLAYED — the connector at work, the way the chat shows it.
  *
- * the user (2026-10-08): "for the connectors I would imagine we want a prominent
+ * The user (2026-10-08): "for the connectors I would imagine we want a prominent
  * card that shows a little animation of an input text bubble sliding up, and
  * then some model response that goes 'Sure i'll use <the connector> to do this'
  * the 'used <connector>' tool visual, a sped up 'worked for nm ns' and then

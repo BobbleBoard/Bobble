@@ -51,7 +51,7 @@ describe('statusDigest', () => {
     expect(statusDigest(a)).toBe(statusDigest(b));
     const doc = JSON.parse(FIXTURE) as { Peer: Record<string, Record<string, unknown>> };
     for (const peer of Object.values(doc.Peer))
-      if (peer.HostName === 'linux-ms-7e59') peer.Online = false;
+      if (peer.HostName === 'linux-MS-7E59') peer.Online = false;
     expect(statusDigest(parseTailscaleStatus(JSON.stringify(doc)))).not.toBe(statusDigest(a));
   });
 
@@ -68,7 +68,7 @@ describe('statusDigest', () => {
     const renamed = {
       ...base,
       users: Object.fromEntries(
-        Object.entries(base.users ?? {}).map(([k, u]) => [k, { ...u, displayName: 'The user' }]),
+        Object.entries(base.users ?? {}).map(([k, u]) => [k, { ...u, displayName: 'the user' }]),
       ),
     };
     expect(statusDigest(renamed)).not.toBe(d);

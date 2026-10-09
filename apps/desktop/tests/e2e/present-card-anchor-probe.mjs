@@ -1,7 +1,7 @@
 /**
  * A PRESENTED CARD STAYS WITH THE MESSAGE IT WAS HANDED OVER IN.
  *
- * the user (2026-09-12): "file cards pin themselves to the bottom of a chat
+ * The user (2026-09-12): "file cards pin themselves to the bottom of a chat
  * rather than the bottom of the message they were called in … when a new user
  * message is sent after I see this file card, I should not see it move down
  * with the chat … if the model presents the same file and it has an update

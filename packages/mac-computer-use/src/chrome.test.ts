@@ -1,7 +1,7 @@
 /**
  * Driving the user's own Chrome through its DOM.
  *
- * the user: "for google chrome specifically I'm told something like Enabling
+ * The user: "for google chrome specifically I'm told something like Enabling
  * AppleScript JavaScript Execution via defaults write com.google.Chrome
  * AllowJavaScriptAppleEvents -bool true would allow for control without asking
  * the user to download an extension we provide them, that would be a very odd

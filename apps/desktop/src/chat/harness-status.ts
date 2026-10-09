@@ -33,7 +33,7 @@ export function useHarnessStatus(): HarnessStatus | null {
 /**
  * WHAT THIS PARTICULAR WAIT IS, in words that name its cause.
  *
- * the user, watching a run: the prefill row "initially shows 'working' ... staying
+ * The user, watching a run: the prefill row "initially shows 'working' ... staying
  * at 0% for 14 seconds", and later a ten-second gap ends with "of all things
  * 'processing the prompt'" when what was actually happening was a toolset being
  * switched on. "this initial one i'd like to say 'starting up' or something
@@ -64,7 +64,7 @@ export function prefillLabel(inp: {
   const cap = inp.loadingCapability ?? null;
   if (cap !== null && cap !== '') return `Loading ${CAPABILITY_LABEL[cap] ?? cap} tools`;
   if (inp.firstOfSession === true) return 'Starting up';
-  /* the user: "change 'processing the prompt' to just 'Processing'". The long
+  /* The user: "change 'processing the prompt' to just 'Processing'". The long
      form named the mechanism; by the time a person reads it they only want to
      know the machine is busy. */
   return inp.generic ?? 'Processing';
@@ -106,7 +106,7 @@ export const PREFIX_WARM_STATUS = 'harness-prefix-warm';
  *
  * True while the server is coming up, AND while it is up but the system-prompt
  * prefix is not yet resident — because the label's real promise is "the next
- * message is instant", and llama-server answering is only half of that. the user:
+ * message is instant", and llama-server answering is only half of that. The user:
  * "when that finishes, I want any prompt I send in to be instantaneous… the
  * instant 'loading model' disappears."
  *
@@ -335,7 +335,7 @@ export function threadStatusView(inp: ThreadStatusInputs): ThreadStatusView | nu
   if (inp.promptProgress !== null) {
     const pct = Math.round(Math.max(0, Math.min(99, inp.promptProgress)));
     /*
-     * SAY WHY, when there is a why. the user: "when there's a long prefill because a
+     * SAY WHY, when there is a why. The user: "when there's a long prefill because a
      * capability is being loaded instead of 'processing' on that turn make the
      * prefill circle show 'loading <capability>'." This IS that prefill — the
      * tools that just arrived are what moved the prompt's prefix — so the wait

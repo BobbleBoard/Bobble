@@ -235,7 +235,7 @@ export function runsCommand(command: string, names: readonly string[]): boolean 
  * foreground window.
  *
  * The first fix was a list of launcher names to refuse — electron, npm start,
- * yarn dev. the user killed it, correctly: "the deterministic guard here is again
+ * yarn dev. The user killed it, correctly: "the deterministic guard here is again
  * something we need to let go of, how can you make this general and reliable."
  * A blocklist only ever catches the ones somebody already thought of, and it
  * refuses commands that might have been fine.
@@ -252,7 +252,7 @@ export function runsCommand(command: string, names: readonly string[]): boolean 
 /**
  * BACKGROUND, AS A THING THE TOOL OFFERS.
  *
- * the user: "do all bash commands have background parameter set in the tool call
+ * The user: "do all bash commands have background parameter set in the tool call
  * inputs by the way? that could be helpful. background true if this runs in the
  * background and doesn't block."
  *
@@ -367,11 +367,11 @@ interface HarnessRuntime {
    *
    * MUTABLE ON PURPOSE. It used to be fixed at spawn (the env / pi's cwd), so
    * changing the composer's folder dropdown mid-chat could not move the work
-   * without respawning pi. the user: "you don't have to restart pi ... it's not like
+   * without respawning pi. The user: "you don't have to restart pi ... it's not like
    * functionally anything should need a restart just because we're essentially
    * typing into a terminal session cd '<changed working directory path>'."
    *
-   * He is right, and pi supports it: our file tools already override pi's by
+   * The user is right, and pi supports it: our file tools already override pi's by
    * name and resolve their root per call, and pi's bash takes a `spawnHook` that
    * can rewrite cwd per command. So the root is a live value here, set by
    * `/harness workspace <path>` over the same channel that already carries
@@ -1051,11 +1051,11 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
    * be pure text and cost no re-prefill. See tools/tool-registry.ts.
    */
   /*
-   * ONE TOOL. the user, watching the mode loop on `ask_user` with a mangled
+   * ONE TOOL. The user, watching the mode loop on `ask_user` with a mangled
    * `<parameter=mode>` payload jammed into its question: "everything in this
    * mode should be cli at this point."
    *
-   * He is right, and the loop is the argument. Leaving two structured tools
+   * The user is right, and the loop is the argument. Leaving two structured tools
    * beside `bash` left the model a structured surface to fail on — which is the
    * one thing this mode exists to remove. Asking a question and updating a plan
    * are commands now (`ask user "…"`, `plan update "…"`), so there is exactly
@@ -1064,9 +1064,9 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   /*
    * ...AND THE FILE TOOLS, which is a correction to the paragraph above.
    *
-   * the user, looking at the advanced panel in CLI mode: "read write and edit
+   * The user, looking at the advanced panel in CLI mode: "read write and edit
    * native pi tools are not active which they should be as well as the bash
-   * tool, otherwise it has to write read and such via bash." He is right and
+   * tool, otherwise it has to write read and such via bash." The user is right and
    * the reasoning above does not apply to them: `ask_user` and `update_plan`
    * were removed because they were STRUCTURED surfaces the model kept failing
    * on with mangled payloads. Reading and writing a file are neither exotic nor
@@ -1172,7 +1172,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   const toolCliMode = process.env.PI_DESKTOP_TOOL_CLI === '1';
   /** The call in flight, so a result can tell whether it is a verbatim repeat. */
   let lastCallInput: { tool: string; input: unknown } | null = null;
-  /* the user: what the model actually looked at, per session — see ./modality.ts.
+  /* The user: what the model actually looked at, per session — see ./modality.ts.
      Published on `harness-modality` so a run can read the real split instead of
      the advertised one. */
   const modality = emptyTally();
@@ -1732,7 +1732,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
      * The warm-up is fire-and-forget, and the app's "Loading model" indicator
      * clears on `phase = 'ready'` — which fires when llama-server answers, some
      * seconds before this finishes. So the moment the label disappeared, a first
-     * message still paid the full prefill. the user: "when that finishes, I want any
+     * message still paid the full prefill. The user: "when that finishes, I want any
      * prompt I send in to be instantaneous… the instant 'loading model'
      * disappears."
      *
@@ -1803,7 +1803,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       },
       getFailureCount: (t) => failureCounts.get(t) ?? 0,
       /*
-       * NEVER ASK. the user, shown the dialog mid-run: "this popup doesn't need to
+       * NEVER ASK. The user, shown the dialog mid-run: "this popup doesn't need to
        * exist."
        *
        * It read `Relax "edit" schema? — edit args failed schema validation
@@ -1904,7 +1904,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
         if (ctx?.hasUI !== true) return;
         const done = !Number.isFinite(fraction) || fraction >= 1;
         /*
-         * THE NUMBER IS THE NUMBER. the user: "it lingers at 99% for the last few
+         * THE NUMBER IS THE NUMBER. The user: "it lingers at 99% for the last few
          * seconds which seems like a lie to me and not actual prefill % being
          * reported... just a suspicsion."
          *
@@ -2219,13 +2219,13 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       /*
        * THE STEER IS BACKGROUND WORK, NOT AN ANNOUNCEMENT.
        *
-       * the user, watching one fire mid-reply: "that loop guard going in the middle
+       * The user, watching one fire mid-reply: "that loop guard going in the middle
        * of a message and making the user totally confused as there's a banner
        * that just appeared, but the play button is still going in the input bar,
        * and then a few seconds later a new thinking chain appears again, this
        * should be totally background if anything at all."
        *
-       * He is right that the banner explains nothing to the person it interrupts:
+       * The user is right that the banner explains nothing to the person it interrupts:
        * it names an internal mechanism, arrives while the reply is still
        * streaming, and is followed by the model apparently starting over. The
        * correction itself is worth doing silently; a nudge the user has to
@@ -2358,7 +2358,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   );
 
   /*
-   * CAPABILITIES, not search. the user: "remove tool search entirely, and instead
+   * CAPABILITIES, not search. The user: "remove tool search entirely, and instead
    * replace with a 'capability' tool … the tools can be computer use, mail,
    * calendar, browser etc.", and "the tool search isn't great and is a source of
    * much looping right now."
@@ -2423,7 +2423,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
    * costume.
    */
   /*
-   * THE CLI IS A MODE. the user, correcting a hybrid I had built here: "the entire
+   * THE CLI IS A MODE. The user, correcting a hybrid I had built here: "the entire
    * point of the bash cli *mode* is that it's a mode, we can toggle this on and
    * off and it turns any mcp/toolset ALL OF THEM into just being behind a cli
    * based tool, it's not like this needs to be done for 2 tools but keep some
@@ -2532,7 +2532,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   /**
    * INTENT BIAS — the model says what it means to do; make that the easy thing.
    *
-   * the user: "it's still doing a lot of page reading repeating when it clearly
+   * The user: "it's still doing a lot of page reading repeating when it clearly
    * intends not to … so if it says as is common 'i need to click' then it will be
    * biased toward calling the click action and will hopefully stop the looping
    * behavior outright."
@@ -2558,7 +2558,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
    * capability at all. It would also make the mode a lie: the whole argument for
    * the CLI is that the advertised surface is one tool and stays one tool.
    *
-   * the user, on exactly this: "tool being appended mid conversation is fine, but
+   * The user, on exactly this: "tool being appended mid conversation is fine, but
    * not during cli mode, because during cli mode a tool happening mid
    * conversation is just a little tidbit at the end of the message saying 'user
    * activated <tools>, these are now able to be used via bash'." That tidbit is
@@ -2662,7 +2662,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       }
     }
     /*
-     * WATCH THE PROSE, NOT JUST THE TOOL CALLS. the user watched a turn write
+     * WATCH THE PROSE, NOT JUST THE TOOL CALLS. The user watched a turn write
      * "Actually, I'll just present the app.py." about forty times and nothing
      * stopped it — every loop counter keyed off tool calls, and that loop made
      * none.
@@ -2776,7 +2776,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   // its summary. Spawns are memory-scheduled (concurrency bounded by detected
   // RAM/cores, degrading to 1 with no utility model / low RAM / single core).
   /*
-   * `present` is the TOP-LEVEL model's alone. the user: "this is only for the top
+   * `present` is the TOP-LEVEL model's alone. The user: "this is only for the top
    * level/original model, no subagent ever has this". A child reports to whoever
    * spawned it, not to the person — a subagent presenting would put an artefact
    * in front of a user nobody decided to show it to.
@@ -2802,7 +2802,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
 
   /*
    * `office` — the document pipeline (tools/office-gen) as a tool in EVERY
-   * chat, not only inside a corp run. the user: "model should not be using
+   * chat, not only inside a corp run. The user: "model should not be using
    * python-pptx, there is a dedicated subagent for each pptx/docx/xlsx creation
    * and editing right?" Registered only where the scripts exist, so a plain pi
    * never advertises a command that can only fail. A child agent gets the tool
@@ -3020,7 +3020,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
    * session and cost a full KV re-prefill. It existed only because the team
    * guidance lived IN the prompt; it lives on the tool description now, so the
    * prompt is the same at every effort and there is nothing to resynchronise.
-   * the user: "ensure there's not conflicting 'mid run changes'".
+   * The user: "ensure there's not conflicting 'mid run changes'".
    */
 
   /*
@@ -3049,7 +3049,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
    * correctly pinned to [bash, ask_user, update_plan], and not one clause of
    * the preamble in 16,743 characters of system prompt.
    *
-   * the user, before any of this was measured: "often the issue is that the
+   * The user, before any of this was measured: "often the issue is that the
    * instructions we for whatever reason actually just [are] not appended to the
    * system prompt."
    *
@@ -3112,7 +3112,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       // renders usage lines for every registered tool, advertised or not — so
       // it is retargeted onto the commands that actually reach them.
       ...(toolCliMode ? { commandFor: toolCliCommandNames() } : {}),
-      /* the user, reading the block: "so much explanation which I can't figure out
+      /* The user, reading the block: "so much explanation which I can't figure out
          what it's explaining about" — every bullet said "it" about a different
          tool, two of which the model did not have. Named and pruned. */
       guidelines: { sources: guidelineSources(), active: advertisedNow() },
@@ -3150,7 +3150,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
        * so pi's own guidance about them ("Use `edit` for precise changes;
        * edits[].oldText must match exactly") is about a tool the model really
        * has. Renaming it to `file edit` pointed that guidance at a command,
-       * advertising one capability under two names. the user: "keep the native pi
+       * advertising one capability under two names. The user: "keep the native pi
        * file read write and edit tool format those don't go as any special cli
        * tools."
        */
@@ -3223,7 +3223,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
        * schemas. The tree was added on top of an arm that had already earned its
        * number without it.
        *
-       * the user, proposing exactly this: "you don't preload anything per tool into
+       * The user, proposing exactly this: "you don't preload anything per tool into
        * context, all bash tools are active and available and parsable, but the
        * model doesn't know anything but their name until they call them with
        * --help".
@@ -3253,9 +3253,9 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
        *
        * Every command used to get its own line with its own one-sentence
        * description — effectively `--help` for `mac` and `browser` pre-pasted
-       * into every prompt. the user: "I notice for some reason you pre advertise as
+       * into every prompt. The user: "I notice for some reason you pre advertise as
        * if it ran --help on mac and browser ... when there should just be 1
-       * about the overarching tool". He is right that it is the same content
+       * about the overarching tool". The user is right that it is the same content
        * twice: the instruction below already says to run `--help` first, and the
        * translated `open -a` prints the whole of `mac --help` at the moment a
        * model is actually reaching for an app.
@@ -3283,7 +3283,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       'works. Do not check whether anything exists first; just run the command.',
       '',
       /*
-       * FIRST USE, NOT ONLY WHEN UNSURE. the user: "add to the system prompt a
+       * FIRST USE, NOT ONLY WHEN UNSURE. The user: "add to the system prompt a
        * suggested --help before using any initially."
        *
        * "If you are unsure" leaves the model to judge its own certainty, and a
@@ -3312,7 +3312,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       'Never tell the user you are unable to do something one of these commands does.',
       '',
       /*
-       * SHOWING IS A COMMAND. the user (2026-09-15): "guide the model via system
+       * SHOWING IS A COMMAND. The user (2026-09-15): "guide the model via system
        * prompt to always utilize the present tool to display files to the
        * user." MEASURED the same day: asked to "present it", a 4B ran `open`,
        * was refused, and told the user the picture was "now visible" without
@@ -3345,7 +3345,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   function applyPreset(ctx: ExtensionContext, extraTools: readonly string[] = []): void {
     const available = pi.getAllTools().map((t) => t.name);
     /*
-     * A SPECIALIST CHILD IS PINNED, not preset. the user: "with just these tools
+     * A SPECIALIST CHILD IS PINNED, not preset. The user: "with just these tools
      * loaded, those subagents are only for that purpose". So its set REPLACES
      * the preset instead of unioning onto it — an image specialist holding the
      * coding preset is an agent that will go and read source instead of making
@@ -3448,7 +3448,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     /*
      * THE WEB TOOLS COME OFF THE TABLE WHEN THERE IS NO WEB.
      *
-     * the user: "model still has search and web tools even when there's no internet,
+     * The user: "model still has search and web tools even when there's no internet,
      * and gets confused looping in them." Telling it not to would not work —
      * llama-server pins the emitted tool name to the ADVERTISED list, so a model
      * that wants to look something up and can see `web_search` will keep calling
@@ -3755,7 +3755,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     /*
      * THE FOLDER MOVED SINCE THE MODEL WAS LAST TOLD — say so, in the turn.
      *
-     * the user, reading a fresh chat's prompt: "the working directory is by
+     * The user, reading a fresh chat's prompt: "the working directory is by
      * default users/the user when in no project??? not a sandbox..." Two things
      * were wrong. pi was spawned in HOME (fixed in the app's cwd resolver:
      * a new chat's not-yet-written session read as "nothing to defer to"),
@@ -3786,7 +3786,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     // post-turn background pass (agent_end) that never blocks the reply. Re-add
     // per-task classify later if the routing proves worth the latency.
     /*
-     * SEMANTIC TOOL PRELOAD IS GONE. the user: "ensure that semantic tool preload is
+     * SEMANTIC TOOL PRELOAD IS GONE. The user: "ensure that semantic tool preload is
      * not happening per turn or at all."
      *
      * It scored each message and appended the tools it looked like it needed, to
@@ -3982,7 +3982,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     /*
      * A TURN THAT ENDS WITH THE MODEL'S OWN CHECKLIST UNFINISHED.
      *
-     * the user, round 3: "long running tasks where you can't accept an 'I can't do
+     * The user, round 3: "long running tasks where you can't accept an 'I can't do
      * this' needs to truly run until completion." The two nudges above catch a
      * turn that stopped by ASKING and one the decoder cut off; neither catches
      * the commonest ending — three of eight things done, a good summary of the
@@ -4701,7 +4701,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       lastOpened = typeof command === 'string' ? detectOpenedApp(command) : undefined;
     }
     /*
-     * NAVIGATING IS BROWSING. the user's goal, verbatim: "load browser navigate by
+     * NAVIGATING IS BROWSING. The user's goal, verbatim: "load browser navigate by
      * default and load the capability suite of browser tools when it's called
      * immediately."
      *
@@ -4711,7 +4711,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
      * activating mid-run changed nothing at all, and the click turn was spent
      * discovering it could not click — the loop the user kept screenshotting, with
      * this code in place the whole time. The suite is in the preset now, which is
-     * the only place that can deliver on what he asked for.
+     * the only place that can deliver on what the user asked for.
      */
     const detector = runtime.loopDetector;
     if (detector === null) return;
@@ -4996,7 +4996,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
      * cross-app activation from a BACKGROUND process, and both routes
      * (AppleScript `activate` and setting AXFrontmost) report success while
      * changing nothing. Bobble drives every app from the background by design —
-     * the user's standing rule is that a run never takes his screen — so this
+     * The user's standing rule is that a run never takes their screen — so this
      * command can only ever be a silent no-op here.
      *
      * MEASURED, matrix run 1: the 4B ran it four times, got "(no output)" each
@@ -5325,7 +5325,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
         }
 
         /*
-         * THE WORKSPACE, CHANGED LIVE. the user: "you don't have to restart pi ...
+         * THE WORKSPACE, CHANGED LIVE. The user: "you don't have to restart pi ...
          * it's not like functionally anything should need a restart just because
          * we're essentially typing into a terminal session cd '<path>'."
          *

@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 /**
  * ONE ROW RECIPE, NO EXCEPTIONS.
  *
- * the user, seeing the project picker beside the other dropdowns: "dropdown styling
+ * The user, seeing the project picker beside the other dropdowns: "dropdown styling
  * and thus I assume consolidation of master switch for one style affects all was
  * not applied everywhere, examples: bottom left, projects" — then, on what it
  * should be: "consolidate, match everything else... the hover effects don't need

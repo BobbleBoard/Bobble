@@ -5,7 +5,7 @@
  * per-stage question with a per-stage download button. This asks the question
  * above that one: does this machine have the 3D module at all?
  *
- * the user: "the app can totally function WITHOUT having installed either or any of
+ * The user: "the app can totally function WITHOUT having installed either or any of
  * the models, or either or the whole 3d module, and tabs/3d studio button as a
  * whole are properly greyed out and their workspaces are blurred with a few
  * buttons that say 'download module (nGB)' and a separate 'View' button so they
@@ -41,7 +41,7 @@ export const CORE_MODULE_MODELS: readonly Gen3dModelId[] = [
 
 export type ModuleStatus =
   /**
-   * The runtime is STILL STARTING. the user: "3D studio shows 'runtime is not
+   * The runtime is STILL STARTING. The user: "3D studio shows 'runtime is not
    * available' on every first open of the app even when previously installed."
    * The first catalog call after launch always finds the sidecar down and kicks
    * a uv boot off behind itself, so `engineReady:false` on its own could not

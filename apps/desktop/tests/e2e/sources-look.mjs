@@ -2,7 +2,7 @@
  * SOURCES IN AN ANSWER — the chips, their hover card, the Sources card and the
  * search row, on a research turn staged without a model or the internet.
  *
- * the user (2026-09-24): "source citing (for research and such, examples from
+ * The user (2026-09-24): "source citing (for research and such, examples from
  * google search summary shown)" … "hyperframes and the app's own ui for
  * showing sources and such are all very much part of this".
  *
@@ -95,7 +95,7 @@ function icon(bg, fg, mark) {
  * A 480×320 "figure": glowing strands on a dark field in the page's own
  * colours — the kind of image a connectomics article leads with, without
  * being anyone's actual picture. Blues, teals, ambers and corals only: these
- * land in screenshots the user reads, and his brief for the app is "NOT violet
+ * land in screenshots the user reads, and their brief for the app is "NOT violet
  * blue purple" — two strands crossing must not mix into it either.
  */
 function figure(seed, a, b) {

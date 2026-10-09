@@ -1,7 +1,7 @@
 /**
  * A FINISHED PICTURE IN THE CHAT: click it, edit it, copy it, paste it.
  *
- * the user (2026-09-24): "clicking on a card (eg image once finished generating)
+ * The user (2026-09-24): "clicking on a card (eg image once finished generating)
  * does not expand/open it, copy and then attempting pasting into our own apps
  * input bar doesn't work", and "images clicked on/fullscreened should have the
  * new studio like ui with the left toolbar and such and a centered bottom 'edit
@@ -33,7 +33,7 @@
  *
  * THE CLIPBOARD IS THE PERSON'S, SO BY DEFAULT THIS NEVER TOUCHES IT. A run
  * used to write the system pasteboard three times and clear it after — whatever
- * the user had copied was gone, and it cannot be put back: macOS asks the person
+ * The user had copied was gone, and it cannot be put back: macOS asks the person
  * before an app reads another app's pasteboard, and that dialog would be the
  * screen taken. So main's clipboard WRITES are caught in the app (the card's
  * Copy is `clipboard.writeImage` in main) and a ⌘V is the paste event a real one

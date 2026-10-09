@@ -128,7 +128,7 @@ describe('defaultTrustMyDevices — on for a one-user tailnet', () => {
     sharee: over.sharee ?? false,
   });
 
-  it('is on when every own node has one owner (the user's tailnet today)', () => {
+  it('is on when every own node has one owner (the user’s tailnet today)', () => {
     expect(defaultTrustMyDevices([node(ME), node(ME), node(ME), node(ME)])).toBe(true);
   });
 
@@ -204,12 +204,15 @@ describe('addresses', () => {
   });
 
   it('reads Host headers the way HTTP writes them', () => {
-    expect(parseHostHeader('100.101.102.103:8765')).toEqual({ host: '100.101.102.103', port: 8765 });
+    expect(parseHostHeader('100.101.102.103:8765')).toEqual({
+      host: '100.101.102.103',
+      port: 8765,
+    });
     expect(parseHostHeader('[fd7a:115c:a1e0::ab12:cd34]:8765')).toEqual({
       host: 'fd7a:115c:a1e0::ab12:cd34',
       port: 8765,
     });
-    expect(parseHostHeader('my-macbook-pro.tail0f0f0f.ts.net.')).toEqual({
+    expect(parseHostHeader('MY-MacBook-Pro.tail0f0f0f.ts.net.')).toEqual({
       host: 'my-macbook-pro.tail0f0f0f.ts.net',
     });
     expect(parseHostHeader('fd7a::1')).toBeNull();
@@ -226,7 +229,9 @@ describe('checkGatewayRequest — the last row: Origin, Host, source', () => {
 
   it('lets a Bobble on the tailnet through', () => {
     expect(checkGatewayRequest(ok, addressing)).toEqual({ ok: true });
-    expect(checkGatewayRequest({ ...ok, host: '100.101.102.103' }, addressing)).toEqual({ ok: true });
+    expect(checkGatewayRequest({ ...ok, host: '100.101.102.103' }, addressing)).toEqual({
+      ok: true,
+    });
     expect(
       checkGatewayRequest(
         {
@@ -238,7 +243,7 @@ describe('checkGatewayRequest — the last row: Origin, Host, source', () => {
       ),
     ).toEqual({ ok: true });
     expect(
-      checkGatewayRequest({ ...ok, host: 'my-macbook-pro.tail0f0f0f.ts.net.:8765' }, addressing),
+      checkGatewayRequest({ ...ok, host: 'My-MacBook-Pro.tail0f0f0f.ts.net.:8765' }, addressing),
     ).toEqual({ ok: true });
   });
 

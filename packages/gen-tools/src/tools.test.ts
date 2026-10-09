@@ -333,7 +333,7 @@ describe('generate_video tool', () => {
   });
 
   /*
-   * ONE ANIMATION, ONE FILE IN THE TEXT. the user: "rendered 120 induvidual frames,
+   * ONE ANIMATION, ONE FILE IN THE TEXT. The user: "rendered 120 induvidual frames,
    * each of which was placed as it's own png card in the chat, severely
    * cluttering it." The thread mounts every absolute media path this text names
    * (apps/desktop/src/chat/thread-media.ts), so the text must name exactly one.

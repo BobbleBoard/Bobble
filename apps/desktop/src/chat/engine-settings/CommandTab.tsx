@@ -1,5 +1,5 @@
 /**
- * PASTE A COMMAND. the user: "there should be a tab for also just pasting args/a
+ * PASTE A COMMAND. The user: "there should be a tab for also just pasting args/a
  * llama-server command and have it parsed and flags and args added as the
  * user wants."
  *

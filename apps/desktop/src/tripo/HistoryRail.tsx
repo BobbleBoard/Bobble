@@ -1,10 +1,10 @@
 /**
  * THE HISTORY RAIL — an asset's versions as a line of stages, on the viewport.
  *
- * the user (2026-09-14), with a mock: "replace history tab with something like
+ * The user (2026-09-14), with a mock: "replace history tab with something like
  * shown, embedded not a card in the history area obviously but similar style,
  * hover to preview in viewport what it looked like at that stage, click to go
- * back, and then it can branch." His drawing: "History" with a chevron, dots
+ * back, and then it can branch." Their drawing: "History" with a chevron, dots
  * joined by a dashed line, one stage name a row, the current one blue with a
  * white core.
  *

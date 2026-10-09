@@ -60,7 +60,7 @@ export function AgentPanel() {
       </SettingRow>
 
       {/*
-       * "Task preset" REMOVED. the user: "task classification set hard? not needed".
+       * "Task preset" REMOVED. The user: "task classification set hard? not needed".
        * The classifier picks a toolset per task and does it well; a pin was a way
        * to make it worse by hand, and it duplicated a decision the harness
        * already owns. The underlying `/harness preset` route is untouched for

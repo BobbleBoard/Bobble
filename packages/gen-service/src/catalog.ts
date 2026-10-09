@@ -214,7 +214,7 @@ export const MODALITY_CATALOG: readonly ModalityModel[] = [
   // ---- IMAGE · THE DEFAULT: Qwen-Image 2.1 on MLX -------------------------
   {
     /*
-     * THE DEFAULT PICTURE MODEL. the user (2026-09-20): "this is a really strong
+     * THE DEFAULT PICTURE MODEL. The user (2026-09-20): "this is a really strong
      * new model … if possible to make this runnable at Q4 with
      * comparable/better quality to what currently runs at that speed, make
      * that the new normal/default." And, the same day: "it may be worth
@@ -383,7 +383,7 @@ export const MODALITY_CATALOG: readonly ModalityModel[] = [
      * Identical pixels, no slower, a third of the memory at the default size —
      * so every job runs that way (ImageJobSpec.lowRam) and THESE are the
      * numbers admission reads: a ~4.5 GB floor plus ~1.5 GB per megapixel.
-     * the user: "low can't stop image generation requests, it just has to lessen
+     * The user: "low can't stop image generation requests, it just has to lessen
      * compute intensivity in some way sacrificing speed to keep headroom" —
      * this is the memory half of that; the pace is the compute half.
      */
@@ -827,7 +827,7 @@ export const MODALITY_CATALOG: readonly ModalityModel[] = [
      *
      * Both deps were phantoms. Chromium is the process this app runs inside, so
      * headless Chrome was never missing; ffmpeg was only ever needed to ENCODE,
-     * and the user cut encoding when he asked for stills ("you can ignore video
+     * and the user cut encoding when the user asked for stills ("you can ignore video
      * generation … hyperframes has to be in, still renderer and all"). The
      * renderer now captures deterministic PNG frames through an offscreen
      * BrowserWindow — see apps/desktop/electron/gen/hyperframes-still.ts.

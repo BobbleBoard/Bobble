@@ -1,7 +1,7 @@
 /**
  * THE SOURCES CARD — under an answer that used the web.
  *
- * the user's reference (Google's overview, his screenshots 5 and 6): the top three
+ * The user's reference (Google's overview, their screenshots 5 and 6): the top three
  * sources as rows, a full-width "Show all" that opens the rest IN PLACE, and
  * "Show less" to fold them away again. Ours lists what the answer cites first,
  * in the order it cites it, then the pages the model opened, then the rest of

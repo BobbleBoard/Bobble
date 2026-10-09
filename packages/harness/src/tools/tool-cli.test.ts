@@ -167,7 +167,7 @@ describe('resolveCli — the line a model actually writes', () => {
   });
 
   it('resolves the POSITIONAL form, which is what gets typed', () => {
-    // the user's own example: `media generate video "prompt"`.
+    // The user's own example: `media generate video "prompt"`.
     expect(resolveCli(cli, ['media', 'generate', 'image', 'a red fox asleep'])).toEqual({
       kind: 'call',
       tool: 'generate_image',
@@ -430,7 +430,7 @@ describe('the word a model reaches for', () => {
     properties: { app: { type: 'string' }, screenshot: { type: 'boolean' } },
   } as const;
 
-  /* the user: "add a flag to snapshot to force a visual eg snapshot --image/visual".
+  /* The user: "add a flag to snapshot to force a visual eg snapshot --image/visual".
      It existed as --screenshot, and the synonyms silently did nothing. */
   it('accepts --image, --visual and friends as --screenshot', () => {
     for (const alias of ['image', 'visual', 'picture', 'shot', 'see']) {
@@ -481,7 +481,7 @@ describe('the notation the snapshot prints', () => {
 });
 
 describe('svg — a group whose one tool IS the command', () => {
-  /* the user: "svg <optional prompt> --image <optional reference image path(s)>".
+  /* The user: "svg <optional prompt> --image <optional reference image path(s)>".
      generate_svg maps to an empty path under the `svg` group, so the group
      name is the whole command and the prompt is its positional. */
   const svgTools: CliTool[] = [
@@ -531,7 +531,7 @@ describe('svg — a group whose one tool IS the command', () => {
   });
 
   it('puts the file where a page will reference it: --out', () => {
-    /* the user: a website should "utilize the svgs firsthand" — the graphic has
+    /* The user: a website should "utilize the svgs firsthand" — the graphic has
        to land beside the page, not in Generated, for <img src> to work. */
     expect(call('svg a gear icon, single colour --out assets/gear.svg')).toMatchObject({
       kind: 'call',

@@ -4,7 +4,7 @@
  * standard page in Bobble's kit (@pi-desktop/mathviz) — checked before it is
  * shown, and the checks handed back so the next call can fix the spec.
  *
- * the user (2026-09-25), on a 4B's hand-written Fourier page: "really low quality
+ * The user (2026-09-25), on a 4B's hand-written Fourier page: "really low quality
  * and generally bad feeling, instead of it remaking these math things from
  * scratch every time, let's give it a standard style and control such that we
  * can deterministically have it iterate when things look off in a number of

@@ -40,7 +40,7 @@ describe('isHiddenMode', () => {
 
 describe('the overlay opt-in', () => {
   /*
-   * the user, watching a live model-driven run: "no fake cursor window overlay
+   * The user, watching a live model-driven run: "no fake cursor window overlay
    * either idling or clicking with the thinking clicking acting.. pill that was
    * present in the demo video". It was suppressed by background mode — correctly
    * for a test suite, and wrongly for a recording whose whole subject is the

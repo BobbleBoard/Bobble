@@ -73,7 +73,7 @@ export function llamacppDir(tag: string): string {
 /**
  * THE MODEL LIBRARY ROOT — `~/Bobble/Models`, a folder a person can open.
  *
- * the user (2026-09-12): "all models and such are dumped in .cache … let's not be
+ * The user (2026-09-12): "all models and such are dumped in .cache … let's not be
  * like that." Weights live here now, sorted by what they make (see
  * @pi-desktop/model-store's library.ts for the shelves); the support root
  * above keeps engines, venvs and scratch. `PI_DESKTOP_MODELS_DIR` overrides it

@@ -100,7 +100,7 @@
   border-radius: var(--pd-radius-surface);
   overflow: hidden;
   /*
-   * EVERY RULE IN THE CANVAS, FROM ONE PLACE. the user: "need better borders on the
+   * EVERY RULE IN THE CANVAS, FROM ONE PLACE. The user: "need better borders on the
    * tabs, and across the board in the canvas."
    *
    * They were all `--pd-border-subtle` — 8% white in bobble dark — which is the
@@ -322,7 +322,7 @@
 }
 
 /*
- * CHROME'S STRIP, not Safari's. the user, with a reference screenshot: "tabs in the
+ * CHROME'S STRIP, not Safari's. The user, with a reference screenshot: "tabs in the
  * canvas: some look ok, but it just doesn't look that great. note and utilize
  * how the reference screenshot provided shows the active tab and the other
  * tabs."
@@ -360,7 +360,7 @@
   border-radius: var(--pd-radius-md);
   background: transparent;
   color: var(--pd-text-muted);
-  /* the user asked for the fold to happen "smoothly", so every property the fold
+  /* The user asked for the fold to happen "smoothly", so every property the fold
    * moves is listed here: fill, hairline, label, the two bottom corners opening
    * out, and the lift shadow being let go. No keyframes — a finite transition
    * collapses to 0.01ms on its own under `prefers-reduced-motion` via the
@@ -375,7 +375,7 @@
 }
 
 /*
- * ONE HAIRLINE, ALL THE WAY ROUND. the user: "the border needs to seamlessly flow
+ * ONE HAIRLINE, ALL THE WAY ROUND. The user: "the border needs to seamlessly flow
  * up its edges and back down rather than being a straight line under the tab
  * as well as a different one around it."
  *
@@ -420,7 +420,7 @@
  * and the hairline that came down the tab's side (the ::before above) goes on
  * round the curve to the strip's seam.
  *
- * A BORDER, NOT A GRADIENT. the user (2026-10-08): "there's a bit of wierdness
+ * A BORDER, NOT A GRADIENT. The user (2026-10-08): "there's a bit of wierdness
  * around the edges of the tabs, the curve up a bit thicker or something than
  * the rest". The arc was a ring painted inside a radial-gradient: MEASURED at
  * device pixels (canvas-edges-look.mjs), 2–2.5 px at value 47 against the
@@ -499,7 +499,7 @@
 }
 
 /*
- * THE HOVER PILL FLOATS. the user (2026-09-12): "raise the bottom bar of the hover
+ * THE HOVER PILL FLOATS. The user (2026-09-12): "raise the bottom bar of the hover
  * animation for the canvas tabs." SEEN at 3×: the hover fill was the tab's own
  * box, and that box sits flush on the strip's seam because the SELECTED tab
  * folds into the pane from exactly there — so a hovered tab read as a slab
@@ -916,7 +916,7 @@
  * `.pd-canvas-menu` used to be a SECOND dropdown surface living here: a real
  * `1px solid` border, an opaque background, no blur, no entry animation and its
  * own hover rule — while the "Open with" dropdown one control to its left used
- * the shared `.pd-menu`. the user, from a screenshot: "the styling of the dropdowns
+ * the shared `.pd-menu`. The user, from a screenshot: "the styling of the dropdowns
  * and animations for opening them varies... that dropdown also has nice
  * bordering that the others don't."
  *
@@ -949,7 +949,7 @@
 }
 
 /* The new-tab + menu pins with fixed coords (top/left set inline) so it escapes
- * the tab strip's overflow clipping. the user wants it INSTANT (round-10 #8) — no
+ * the tab strip's overflow clipping. The user wants it INSTANT (round-10 #8) — no
  * open/close animation on this menu specifically. */
 .pd-menu.pd-canvas-popmenu--fixed {
   position: fixed;
@@ -996,15 +996,15 @@
 
 /* Raw↔rendered segmented toggle sizing (surface styling comes from ui). */
 /*
- * Smaller. the user sent a crop of the operation bar with this segmented control
+ * Smaller. The user sent a crop of the operation bar with this segmented control
  * dominating it. At the shared default it is a chunky pill sitting beside 28px
  * controls, so it read as the loudest thing in a bar of quiet ones.
  * `--pd-segment-*` are the shared knobs, so this shrinks the control without
  * forking the segmented recipe.
  */
 /*
- * MEASURED, second pass. the user again: "the 'rendered/raw' buttons are pretty big
- * and could be a bit smaller and more in line, they buldge out a bit much." He
+ * MEASURED, second pass. The user again: "the 'rendered/raw' buttons are pretty big
+ * and could be a bit smaller and more in line, they buldge out a bit much." The user
  * is describing real geometry — the control was 30px tall (24 + 3px of track
  * either side) in a bar that asks for 36px with 4px of padding, so it did two
  * things at once: it stood 4px proud of the 26px icon buttons beside it, and it
@@ -1405,7 +1405,7 @@
 /* ── Terminal surface ────────────────────────────────────────────────── */
 
 /*
- * THE AWKWARD BORDER. the user, from a screenshot: "the terminal styling there's
+ * THE AWKWARD BORDER. The user, from a screenshot: "the terminal styling there's
  * that akward border".
  *
  * MEASURED in the running app before changing anything: `.pd-terminal` computed
@@ -1820,7 +1820,7 @@
  * Inline widget (THEME 2 — size-capped, NEVER scrollable)
  * ────────────────────────────────────────────────────────────────────── */
 
-/* the user (2026-09-17, with a reference): full width, the same card as a code
+/* The user (2026-09-17, with a reference): full width, the same card as a code
  * block — a drawn border, the type at the top left, rendered ⇄ raw, copy and
  * the way to the canvas at the top right. It used to shrink to the drawing's
  * width with one hover-only expand button in its corner. */
@@ -4540,7 +4540,7 @@
 }
 
 /* WHY A SUBAGENT ROW IS STILL — a faint dot and one word, to the right.
-   the user: "simple circles faint tint or glow maybe, very faint, nothing
+   The user: "simple circles faint tint or glow maybe, very faint, nothing
    complicated". Deliberately quiet: half a corporation is stopped at any
    moment, and only the error case should catch the eye. */
 .pd-sitroom-agent-why {
@@ -4649,7 +4649,7 @@
 /*
  * "Open <app icon> <app name> ↗", top right of the stage.
  *
- * the user asked for it PROMINENT, which on a surface whose whole job is to be
+ * The user asked for it PROMINENT, which on a surface whose whole job is to be
  * unobtrusive means it has to earn the exception: raised ground, a real border,
  * and the app's own icon so it reads as that app rather than as a generic
  * button. It sits over the picture rather than in the rail below, because the
@@ -5365,7 +5365,7 @@
    go and look for this exact icon in System Settings, so the panel shows the
    real one and the steps read in the order they will happen. It replaced a
    drawing of the app made from its Accessibility tree — honest, but grey, and
-   the user's call on it was right: AX has roles, names and rectangles and no colour
+   The user's call on it was right: AX has roles, names and rectangles and no colour
    or artwork, so an arbitrary app can never look like itself. */
 .pd-macmon-state[data-kind="permission"] {
   pointer-events: auto;
@@ -5636,7 +5636,7 @@
 }
 
 /*
- * THE CHART BUILDS ITSELF ON ARRIVAL. the user (2026-09-17): "bar ones have bars
+ * THE CHART BUILDS ITSELF ON ARRIVAL. The user (2026-09-17): "bar ones have bars
  * go up, pie expand smoothly, radar charts show dots going out from the
  * center … all smooth live building." `data-enter` is on the card for its
  * first second (chart-surface.tsx); each shape has its own entrance, with the
@@ -5948,7 +5948,7 @@
      the thread's 700px let through). */
   max-width: min(100%, var(--pd-thread-prose-width, 44rem));
   /* The same drawn border and corner as every other card in the thread — the
-     code block, the svg card (prose.css / .pd-inline-widget). the user
+     code block, the svg card (prose.css / .pd-inline-widget). The user
      (2026-09-18): "same card borders for dataviz please". */
   border: 1px solid color-mix(in srgb, var(--pd-text-primary) 14%, transparent);
   border-radius: 12px;

@@ -4,7 +4,7 @@ import { deliveryForSend } from './pi-connect';
 /**
  * A MID-RUN MESSAGE HAS TO REACH THE MODEL AT THE NEXT TOOL ROUND.
  *
- * the user: "I attempted to ask a follow up/steering prompt in the middle of the
+ * The user: "I attempted to ask a follow up/steering prompt in the middle of the
  * action which I assumed would be properly queued greyed out sent, and then at
  * the next tool result, my prompt would be passed along and the following
  * thinking block would address my prompt as it would be in context then. however

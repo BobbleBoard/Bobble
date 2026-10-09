@@ -4,7 +4,7 @@
  * `:focus-visible` is the right primitive and it is broader than what anyone
  * means by "the user is navigating with the keyboard". Two of its spec-correct
  * matches are exactly what the user kept reporting as a bug — a blue box around
- * controls he had only clicked:
+ * controls the user had only clicked:
  *
  *   1. ESCAPE closing a menu. Radix hands focus back to the trigger, Escape was
  *      a keypress, so the ring lights up and stays there. Dismissing something

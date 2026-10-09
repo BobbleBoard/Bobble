@@ -6,7 +6,7 @@
  * customization: the theme FLAVOR toggle and a developer entry into the
  * component GALLERY. Default icon stroke is the token value (1px).
  *
- * the user (2026-09-20): "add to the interface slider a more realistic range of
+ * The user (2026-09-20): "add to the interface slider a more realistic range of
  * stroke thickness none of which look absolutely excessive … also add to that
  * interface settings area a 'size' panel, and remove from experimental the
  * 'on device generation' button, that's just a bit silly, the whole app is

@@ -19,7 +19,7 @@ describe('tier constants + guards', () => {
 
 describe('asksForTheTeam', () => {
   /*
-   * MEASURED, twice. the user asked "ask the manager to set up a sample Godot game"
+   * MEASURED, twice. The user asked "ask the manager to set up a sample Godot game"
    * and got "I don't have access to tools that can contact your manager
    * directly". A later run opened "Ask the manager to research ... and build me
    * a slideshow", classed as basic-tools → medium, so talk_to_manager was

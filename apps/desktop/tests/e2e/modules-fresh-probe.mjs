@@ -2,7 +2,7 @@
  * ONE CLICK, FROM NOTHING — the audio and video modules on a Mac that has
  * none of this, then a generation on each.
  *
- * the user (2026-09-14): "give me reasonable confidence that this app can out of
+ * The user (2026-09-14): "give me reasonable confidence that this app can out of
  * the box do all this with a one click download of any of these modules …
  * on an m1-m6 mac." Throwaway home, throwaway APP cache (no module markers,
  * no ComfyUI, no uv env), the real Hugging Face cache for weights (weights

@@ -6,7 +6,7 @@
  * It works for clicks and quietly breaks everything else, because that element
  * is under the pointer for the whole screen:
  *
- *   the user: "needs to be able to scroll down the model card if the mouse is not
+ *   The user: "needs to be able to scroll down the model card if the mouse is not
  *   over the dropdown while it's open… I hover over something, that's the thing
  *   I want to be scrolling, that's your guiding light no matter what."
  *

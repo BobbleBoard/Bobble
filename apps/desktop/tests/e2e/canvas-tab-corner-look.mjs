@@ -1,5 +1,5 @@
 /**
- * LOOK at the selected canvas tab's two bottom corners at 8×. the user
+ * LOOK at the selected canvas tab's two bottom corners at 8×. The user
  * (2026-09-18): "super nitpick, there's some sort of artifacting/sharpness
  * that needs to go at the edges of tabs" — circled where the tab's flares
  * meet the strip's seam.

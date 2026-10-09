@@ -2,7 +2,7 @@
  * THE APPS ON THIS MAC, WITH THEIR REAL ICONS — what the computer-use chooser
  * shows, in onboarding and in Settings → Computer use.
  *
- * the user (2026-09-15): "choose what apps to allow control of, show this as a
+ * The user (2026-09-15): "choose what apps to allow control of, show this as a
  * grid of real app icons w/ names below".
  *
  * The list and the icons come from the `pi-mac` helper (`--apps`,

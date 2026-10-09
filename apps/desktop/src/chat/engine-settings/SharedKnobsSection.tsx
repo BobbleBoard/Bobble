@@ -2,7 +2,7 @@
  * SHARED ACROSS ENGINES — the knobs that mean the same thing everywhere, set
  * once, spelled per engine at launch (portable-knobs.ts).
  *
- * the user: "ensure settings and such transfer between engines as seamlessly as
+ * The user: "ensure settings and such transfer between engines as seamlessly as
  * possible and are removed/greyed out if unsupported by engine, keeping
  * preferences saved."
  *

@@ -1,7 +1,7 @@
 /**
  * REAL ORG LOGOS — Hugging Face avatars, cached to disk.
  *
- * the user: "first real svgs please". simple-icons covers about a dozen labs; the
+ * The user: "first real svgs please". simple-icons covers about a dozen labs; the
  * hub lists hundreds of orgs and individual re-publishers, so most rows fell
  * back to a monogram. HF serves everyone's actual avatar; this fetches it.
  *

@@ -1,7 +1,7 @@
 /**
  * THE PHANTOM MUST NOT FOLLOW THE USER TO ANOTHER DESKTOP.
  *
- * the user: "when I switch desktops I notice a new bug where the mouse cursor
+ * The user: "when I switch desktops I notice a new bug where the mouse cursor
  * follows instead of staying on the window in the other desktop and redoes the
  * on top of wrong window bug."
  *
@@ -134,7 +134,7 @@ try {
   if (away?.behavior?.offSpace !== true) {
     fail('the phantom kept drawing after its window left this desktop — it would follow the user');
   }
-  /* The DETECTOR has to have noticed too, not just the hiding. the user asked for
+  /* The DETECTOR has to have noticed too, not just the hiding. The user asked for
      this to be logged whenever it happens, and a log line nobody can prove
      fires is not logging. `unmasked` is the same string the panel writes to
      stderr, read back through info() so the assertion does not depend on where
@@ -159,7 +159,7 @@ try {
   /*
    * …AND A REAL WINDOW ABOVE THE TRACKED ONE MUST ERASE IT.
    *
-   * the user, twice: "cursor on top is occurring again". Everything else here is a
+   * The user, twice: "cursor on top is occurring again". Everything else here is a
    * proxy; this is the symptom. The probe's OWN Bobble window is a real window
    * sitting above Maps in the z-order, so parking the phantom inside it is the
    * cheapest honest reproduction there is — no second app to install, no

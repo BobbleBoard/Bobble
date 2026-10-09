@@ -1,6 +1,6 @@
 /**
  * Canvas-awareness — inject "what is on the canvas" into the model's context
- * (the user's gotcha: the model must always know what the user is looking at).
+ * (The user's gotcha: the model must always know what the user is looking at).
  *
  * pi's `context` hook (`ContextEvent { messages }` → `{ messages? }`) fires
  * before each LLM call and returns a NON-destructive replacement message list —

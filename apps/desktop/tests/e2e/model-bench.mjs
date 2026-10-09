@@ -1,7 +1,7 @@
 /**
  * model-bench.mjs — the same ten jobs, twice, through the real app.
  *
- * the user: "attempt to run a bunch of stuff with it (no corp) and see how it does
+ * The user: "attempt to run a bunch of stuff with it (no corp) and see how it does
  * relative to running the exact same things right after (reasonably complex,
  * step up little by little, maybe 10 test suite same on each) … nothing
  * extremely simple, eg. each task minimum difficulty would be something like

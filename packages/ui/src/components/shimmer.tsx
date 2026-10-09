@@ -192,7 +192,7 @@ interface ThoughtWellProps {
  * clamps with a bottom fade and offers a small "Show more" below the fade
  * (never a scrollbar) — the round-5 #4 affordance shared with in-chain thoughts.
  *
- * the user round-8 #9: a string thought is rendered through the shared {@link Markdown}
+ * The user round-8 #9: a string thought is rendered through the shared {@link Markdown}
  * component (markdown + KaTeX + syntax-highlight + hex swatches — the same pipeline
  * as responses), so thoughts get **bold**, code, lists and $math$. Non-string
  * children (a caller passing its own JSX) fall back to rendering as-is. The dim

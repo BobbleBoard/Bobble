@@ -1,7 +1,7 @@
 /**
  * A CHART DRAWN BY HAND WHILE `chart` IS ONE CALL AWAY.
  *
- * the user (2026-09-16): "we need parity on these datavisuals … it's a common use
+ * The user (2026-09-16): "we need parity on these datavisuals … it's a common use
  * case and very formulaic". The chart tool draws an interactive card in the
  * chat from the numbers. What a model does instead, MEASURED across the deep
  * tasks: paints the chart with image generation (caught in gen-tools), runs

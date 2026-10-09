@@ -210,7 +210,7 @@ export function assessCurrentSend(turnInFlight: boolean): {
     loadedModelId: loaded?.id ?? null,
     loadedModelName: loaded?.displayName ?? null,
     turnInFlight,
-    /* The same wait the top bar is showing. the user: "while a model is loading now
+    /* The same wait the top bar is showing. The user: "while a model is loading now
        (not prefill) ... messages [should] appear as queued" — so the two say the
        same thing off the same state rather than disagreeing on screen. */
     modelLoading: showLoadingModel(

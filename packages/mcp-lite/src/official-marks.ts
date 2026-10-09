@@ -1,5 +1,5 @@
 /**
- * THE OFFICIAL MARKS. the user (2026-09-18): "as much as you can, don't
+ * THE OFFICIAL MARKS. The user (2026-09-18): "as much as you can, don't
  * frankenstein or recreate logos, find a catalog or official svgs" — and, of
  * the catalog's one-colour Blender, "blender logo isn't correct (color)".
  *

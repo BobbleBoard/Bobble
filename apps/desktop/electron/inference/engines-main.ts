@@ -1,7 +1,7 @@
 /**
  * INSTALLING AND REMOVING INFERENCE ENGINES (Settings → Engines).
  *
- * the user asked for "downloading/uninstalling all available engines 1 click".
+ * The user asked for "downloading/uninstalling all available engines 1 click".
  * The engines are not the same KIND of thing, which is the whole difficulty:
  *
  *   llama.cpp   a downloaded binary release under ~/.cache/pi-desktop/llamacpp
@@ -545,7 +545,7 @@ const OPS: Record<string, EngineOps> = {
    * RAPID-MLX'S VISION RUNTIME — its own venv, because its vision lane needs
    * `rapid-mlx[vision]` (mlx-vlm pinned to exactly 0.6.17, torch, torchvision,
    * opencv) and the shared venv holds oMLX's git pin of mlx-vlm instead.
-   * MEASURED 2026-09-23: 1.2 GB. the user: vision "should always be on unless the
+   * MEASURED 2026-09-23: 1.2 GB. The user: vision "should always be on unless the
    * user says to turn it off" — so this is fetched with the default engines
    * while Vision is on (llm-store ensureDefaultEngines), and until it lands a
    * vision launch on rapid-mlx goes to llama.cpp (vision-launch.ts).
@@ -886,7 +886,7 @@ export async function uninstallEngine(id: string): Promise<{ success: boolean; e
 /**
  * Install whatever of a set is missing, one at a time.
  *
- * the user: "download a few generally good engines at the start of downloading the
+ * The user: "download a few generally good engines at the start of downloading the
  * app eg. if on apple silicon mac, omlx rapidmlx and dflashmlx (always llamacpp
  * also, on any machine we always have llamacpp first and foremost), on some
  * other machines like big linux boxes, vllm would be part of this set."

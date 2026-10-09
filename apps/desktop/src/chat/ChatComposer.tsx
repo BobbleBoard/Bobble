@@ -158,7 +158,7 @@ interface Attachment {
    * The `@`-mention token this attachment came from, when it came from one.
    *
    * A mentioned file is ALREADY on screen — it is the pill sitting in the
-   * sentence you are writing. the user: "at mentions should appear just the inline,
+   * sentence you are writing. The user: "at mentions should appear just the inline,
    * no attachment shown above." So these carry the file's text into the message
    * exactly like a dropped file, and draw nothing.
    *
@@ -215,7 +215,7 @@ function extLabel(name: string): string {
 /**
  * An attachment chip: a BOX, which opens to the right when you point at it.
  *
- * the user's brief, verbatim: "no name shown, just a box … a bit bigger, and then
+ * The user's brief, verbatim: "no name shown, just a box … a bit bigger, and then
  * slide to the right open when it's hovered over (the individual file/image)
  * this should be less colored in and have a more visible border … show name a
  * bit smaller and higher, truncate name if too long, show centered dot, file
@@ -318,7 +318,7 @@ function AttachmentPreview({
             }}
           />
           {/* The fact travels WITH the picture, so it is still there when the
-              pill has gone. the user: "a yellow circle + ! on images both in chat
+              pill has gone. The user: "a yellow circle + ! on images both in chat
               input and when sent". */}
           {blind ? (
             <span
@@ -508,7 +508,7 @@ export function ChatComposer({
   const [token, setToken] = useState<AcToken>(EMPTY_TOKEN);
   const [items, setItems] = useState<AcItem[]>([]);
   /*
-   * INSTALLED CONNECTORS, AS `/` COMMANDS. the user: "slash commands should just be
+   * INSTALLED CONNECTORS, AS `/` COMMANDS. The user: "slash commands should just be
    * able to reference any connector installed, eg. /gmail if a gmail connector
    * is installed should just change to the blue thing with the icon."
    *
@@ -594,7 +594,7 @@ export function ChatComposer({
   /**
    * Remove attachments and REMEMBER where they were.
    *
-   * the user: "cmd/ctrl Z needs to be able to undo accidental file removals." An
+   * The user: "cmd/ctrl Z needs to be able to undo accidental file removals." An
    * attachment is often a thing you dragged in from somewhere you have since
    * closed, so losing one to a mis-click can cost more than the message.
    */
@@ -603,7 +603,7 @@ export function ChatComposer({
     /*
      * THE UNDO ENTRY IS RECORDED HERE, NOT INSIDE THE UPDATER.
      *
-     * the user: "cmd z seems to have at some point added a duplicate file when I
+     * The user: "cmd z seems to have at some point added a duplicate file when I
      * removed it initially to test, I don't really know what happened there."
      * This is what happened: React may invoke a state updater more than once for
      * the same update — it is required to be pure — so pushing onto the undo
@@ -639,7 +639,7 @@ export function ChatComposer({
   /*
    * THE ATTACHMENT KEYBOARD — undo, copy, cut, paste.
    *
-   * the user: "cmd/ctrl Z needs to be able to undo accidental file removals,
+   * The user: "cmd/ctrl Z needs to be able to undo accidental file removals,
    * clicking a file needs to highlight it blue and blue border and then allow
    * for user to press ctrl c/x/v."
    *
@@ -811,7 +811,7 @@ export function ChatComposer({
     estimatedMs: prefillEstimateMs,
   } = useAttachmentPrefill(attachmentPrefix);
   /*
-   * ...and SAY SO when it takes long enough to matter. the user's rule for all of
+   * ...and SAY SO when it takes long enough to matter. The user's rule for all of
    * this is "when I don't see anything I get an instant response", which only
    * holds if every window where a send would not be instant says something.
    */
@@ -831,7 +831,7 @@ export function ChatComposer({
   /*
    * EVERYTHING PASTED, DROPPED OR PICKED COMES THROUGH HERE.
    *
-   * the user (2026-09-24): "why not handle this natively so that any image(s)/files/
+   * The user (2026-09-24): "why not handle this natively so that any image(s)/files/
    * folders... can be pasted into the input box". What each thing becomes is
    * composer/incoming-files.ts; this does the reading. Every File the OS handed
    * over knows its path (webUtils), and main says in one round trip which of
@@ -980,7 +980,7 @@ export function ChatComposer({
   };
 
   /*
-   * A PASTED PICTURE IS A DROPPED PICTURE. the user: "copy and then attempting
+   * A PASTED PICTURE IS A DROPPED PICTURE. The user: "copy and then attempting
    * pasting into our own apps input bar doesn't work." Same `addFiles` a drop
    * goes through, so a picture copied from a card chips up with its thumbnail,
    * a screenshot does too, and files and folders copied in Finder attach by
@@ -1104,7 +1104,7 @@ export function ChatComposer({
                   }),
                 );
         /*
-         * ...AND THE CAPABILITIES. the user: "the / should be able to show installed
+         * ...AND THE CAPABILITIES. The user: "the / should be able to show installed
          * connectors or reference specific capabilities."
          *
          * A capability is the app's own bundling of tools the way a person asks
@@ -1169,7 +1169,7 @@ export function ChatComposer({
     const picked = tokenRef.current.mode;
     const tokenStart = tokenRef.current.tokenStart;
     /*
-     * A MENTIONED FILE ARRIVES AS A PILL, not as a typed path. the user: "add blue
+     * A MENTIONED FILE ARRIVES AS A PILL, not as a typed path. The user: "add blue
      * pills with icons … not just typing them."
      *
      * The payload is the same path the model always received, but a path typed
@@ -1195,7 +1195,7 @@ export function ChatComposer({
         ...(item.iconSvg !== undefined ? { iconSvg: item.iconSvg } : {}),
       });
       /*
-       * ...AND IT IS ON. the user asked the pick to "add this cli tool to the set if
+       * ...AND IT IS ON. The user asked the pick to "add this cli tool to the set if
        * not already there": naming a connector you have installed but switched
        * off should turn it on, not fail silently when the model reaches for it.
        */
@@ -1300,7 +1300,7 @@ export function ChatComposer({
   const onGenAction = (key: GenActionKey) => {
     const plan = GEN_ACTION_PLANS[key];
     /*
-     * A PILL, NOT A TYPED SCAFFOLD. the user: "including for buttons in the + menu
+     * A PILL, NOT A TYPED SCAFFOLD. The user: "including for buttons in the + menu
      * no raw text." The words the model receives are the same — the pill's
      * payload IS the scaffold — but in the box it is one object: it removes with
      * one click or one backspace, and a stray keystroke cannot leave "Generate
@@ -1329,7 +1329,7 @@ export function ChatComposer({
     const sentAttachments = attachments;
     // A new send replaces whatever the last one armed.
     unsendRef.current = null;
-    /* the user (2026-09-24): "pressing enter on a chat should take you to the
+    /* The user (2026-09-24): "pressing enter on a chat should take you to the
        bottom" — the thread re-pins and follows the reply (thread-follow.ts). */
     followToLatest();
     const imageUris = attachments
@@ -1431,7 +1431,7 @@ export function ChatComposer({
      * This used to route EVERY submit into the corporation whenever the harness
      * flag was on, so "create a file called notes.txt with three lines in it"
      * stood up a manager, four engineers and eight specialists, and took two and
-     * a half minutes to write three lines. the user, watching it: "shouldn't be
+     * a half minutes to write three lines. The user, watching it: "shouldn't be
      * always doing this whole mesh system."
      *
      * The design already says so, in promote-tool.ts: the corp is "an OPTION the
@@ -1495,7 +1495,7 @@ export function ChatComposer({
     /*
      * A MODEL THAT IS STILL LOADING IS A REASON TO QUEUE TOO.
      *
-     * the user: "I wanted while a model is loading now (not prefill) for messages to
+     * The user: "I wanted while a model is loading now (not prefill) for messages to
      * appear as queued." Before this, a send during the load looked accepted and
      * then sat in the composer's own limbo — the message was gone from the box
      * and nothing had happened to it. Queued says the true thing: it will go,
@@ -1615,7 +1615,7 @@ export function ChatComposer({
   const discardPaused = (): void => {
     usePiStore.setState({ pausedChat: null });
   };
-  // the user #12: the primary placeholder is friendly for a first-timer — no
+  // The user #12: the primary placeholder is friendly for a first-timer — no
   // developer jargon in it. A single short line also stops the empty composer
   // from looking oversized (the old 3-line jargon overflowed and faded,
   // inflating the card).
@@ -1829,7 +1829,7 @@ export function ChatComposer({
 
           {/* While the mic is open this row IS the dictation row: X, waveform,
               confirm, standing exactly where +/mic/model/send normally are
-              (the user). One row, one purpose at a time. */}
+              (The user). One row, one purpose at a time. */}
           {dictating ? (
             <div className="pd-composer-footer">
               <DictationBar
@@ -1952,7 +1952,7 @@ export function ChatComposer({
         {/*
           THE WORKING LEDGE, WHICH IS NOT ALWAYS THERE.
 
-          the user: "have that bottom bar that has the context model and project
+          The user: "have that bottom bar that has the context model and project
           slide down and slide up when we want it, by default … slid down."
           Then (2026-09-21) the user: "remove chat vs work, just leave it on
           'work' no need for a seperate thing" — so the ledge is simply open.
@@ -1966,7 +1966,7 @@ export function ChatComposer({
         </div>
       </div>
 
-      {/* the user: when a message is queued, a small line UNDER the input — a plain
+      {/* The user: when a message is queued, a small line UNDER the input — a plain
           "Queued" prefix + the blue explainer link (no per-bubble reason text). */}
       {hasQueued ? (
         <div

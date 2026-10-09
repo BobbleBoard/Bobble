@@ -1,7 +1,7 @@
 /**
  * THE FINAL CHECK — what "verify your work" has to mean to be worth anything.
  *
- * the user, after a corp run shipped work it described in the same breath as broken:
+ * The user, after a corp run shipped work it described in the same breath as broken:
  *
  *   "is it really actually going and prompting the model directly whenever anyone
  *   submits to 'visually verify work if applicable'… better yet determine at the
@@ -237,7 +237,7 @@ export type VerificationPerspective = 'engineer' | 'manager' | 'ceo';
 /**
  * Who the reviewer is standing in for, and what question that makes them ask.
  *
- * the user: "the manager and CEO should be given the whole shebang about how they are
+ * The user: "the manager and CEO should be given the whole shebang about how they are
  * looking from the point of view of the ceo (who gave the manager the vision) and
  * the ceo from the point of view of the user (who asked them for this) and are
  * going to really look and tell: did this work out in the end as requested."
@@ -261,7 +261,7 @@ const PERSPECTIVE: Record<VerificationPerspective, { readonly who: string; reado
 /**
  * WHAT THE CEO IS TOLD EVERY TIME THE TEAM HANDS SOMETHING BACK.
  *
- * the user: "the most pragmatic thing to do is after the manager returns any talk to
+ * The user: "the most pragmatic thing to do is after the manager returns any talk to
  * tool call, we put a lot of testing instructions." The tool result is the one
  * place the CEO cannot skim past — it is the answer it was blocked waiting for —
  * so that is where the pressure goes, on EVERY return that has something on disk
@@ -312,7 +312,7 @@ export function finalCheck(opts: {
   /*
    * THE CEO'S CHECK IS A FLAT LIST, AND NOTHING ELSE.
    *
-   * the user: "your guidelines should essentially be able to be put into a clean
+   * The user: "your guidelines should essentially be able to be put into a clean
    * bulleted list." The previous version was ~45 lines in five titled sections
    * whose own ordering contradicted itself — it announced "This comes before
    * anything else" from the MIDDLE of the block. At 4B, sections are where
@@ -330,7 +330,7 @@ export function finalCheck(opts: {
     /*
      * THE BIAS POINTS AT THE RECOVERABLE OPTION, AND HARDEST ON ROUND ONE.
      *
-     * the user: "there will always be bias in the prompt, you want to ensure that
+     * The user: "there will always be bias in the prompt, you want to ensure that
      * the bias is toward the safer option especially at the start… we
      * especially at the 4b class bias the attention mechanism an incredible
      * degree away from submitting that turn."

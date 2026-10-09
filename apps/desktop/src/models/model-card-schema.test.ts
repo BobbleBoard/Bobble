@@ -16,7 +16,7 @@ const attrsFor = (tag: string): readonly unknown[] =>
 
 describe('what a model card is allowed to show', () => {
   it('allows the presentation HF cards actually use', () => {
-    // the user: "links, html, code blocks, videos images, inline tables everything".
+    // The user: "links, html, code blocks, videos images, inline tables everything".
     for (const t of ['img', 'video', 'table', 'thead', 'tbody', 'tr', 'td', 'th', 'pre', 'code']) {
       expect(tags).toContain(t);
     }

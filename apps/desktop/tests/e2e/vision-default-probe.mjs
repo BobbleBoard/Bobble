@@ -1,9 +1,9 @@
 /**
  * VISION IS ON UNLESS THE USER TURNS IT OFF — live, on a real model.
  *
- * the user (2026-09-23): "mmproj/vision should always be loaded and usable by
+ * The user (2026-09-23): "mmproj/vision should always be loaded and usable by
  * default unless explicitly turned off, put this in the engines option and
- * leave a setting to not load vision by default." And the note his computer-use
+ * leave a setting to not load vision by default." And the note their computer-use
  * runs kept getting — "this model is currently running in TEXT-ONLY mode" —
  * which was true: the chosen engine could not see.
  *

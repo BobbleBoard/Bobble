@@ -167,7 +167,7 @@ describe('followWindow', () => {
      * Covering a TALL, NARROW rail with a WIDE window is decided entirely by the
      * height, and it crops the width to a sliver. MEASURED on the Chrome runs: a
      * 440pt rail against a 1024pt window covered at 0.85 and the video showed a
-     * quarter of the window — a giant cropped "oogle" — for the whole run. the user:
+     * quarter of the window — a giant cropped "oogle" — for the whole run. The user:
      * "the zoom and following is either not working or way too much, needs at
      * least twice less zoom."
      *

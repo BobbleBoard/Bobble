@@ -1,7 +1,7 @@
 /**
  * IS THIS CALL THE MODEL DRIVING AN APP ON THE MAC?
  *
- * the user (2026-09-13): "activity tab should be computer use page if the latest
+ * The user (2026-09-13): "activity tab should be computer use page if the latest
  * command is something like 'mac snapshot'". Two spellings reach here: the
  * tool-CLI (`mac snapshot`, `chrome tabs` through the `bash` tool) and the
  * schema tools (`mac_click`, `chrome_snapshot`). A bare `mac` or `mac --help`

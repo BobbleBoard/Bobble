@@ -1,7 +1,7 @@
 /**
  * THE IMAGE & VIDEO STUDIO — the primitive one, running on ComfyUI.
  *
- * the user: "let's have comfy as a downloadable inference engine and then wire up a
+ * The user: "let's have comfy as a downloadable inference engine and then wire up a
  * primitive for now image/video studio) and have those run through it."
  *
  * PRIMITIVE IS THE SPEC, not an apology. What it does is: pick a model you have

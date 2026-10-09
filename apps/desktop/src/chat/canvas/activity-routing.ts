@@ -1,7 +1,7 @@
 /**
  * ONE TAB, "Activity" — the chat's answer to tab spam.
  *
- * the user, round 21: "can't have tab spam when the model does a lot of actions, so
+ * The user, round 21: "can't have tab spam when the model does a lot of actions, so
  * it needs one tab, 'Activity' that opens and shows what the model is doing at
  * any given moment … if a new file is edited, it shows that file, if a new file
  * is written it shows that, doing something in the browser, this tab shows that,
@@ -105,7 +105,7 @@ export type ActivityFocus =
   | { kind: 'browser'; at: number; label: string }
   /**
    * The model is driving an app on the Mac (`mac …` / `chrome …`, or the
-   * mac_* tools). the user: "activity tab should be computer use page if the
+   * mac_* tools). The user: "activity tab should be computer use page if the
    * latest command is something like 'mac snapshot'". The tab becomes the
    * live monitor of the controlled app — the same surface the phantom cursor
    * is painted on — and, newest wins, goes back to the terminal or a file when
@@ -279,7 +279,7 @@ export function detectActivity(
        * arrives as a bash line, and this loop saw no browser in it at all — so
        * while the bridge morphed the tab into the page, this pass, still
        * holding the newest thing it recognised (an `open <url>` terminal line),
-       * morphed it straight back. the user: "the activity panel doesn't focus the
+       * morphed it straight back. The user: "the activity panel doesn't focus the
        * working browser tab … doesn't show the user anything for the actual
        * browser actions".
        */

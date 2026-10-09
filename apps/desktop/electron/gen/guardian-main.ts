@@ -16,7 +16,7 @@
  * queue lives here, and a verdict that has to cross a process boundary before
  * it can cancel anything is a verdict that arrives after the freeze.
  *
- * the user: "needs monitoring for cpu and mem pressure to ensure extremes like this
+ * The user: "needs monitoring for cpu and mem pressure to ensure extremes like this
  * absolutely never happen". The two jetsam reports from the same day are in
  * /Library/Logs/DiagnosticReports; both name a 6 GB python worker.
  */
@@ -39,7 +39,7 @@ import { createPausables, type Pausable, type PausablesRegistry } from './pausab
 /**
  * THE MEMORY GUARD'S HANDS, shared by every heavy run in the app.
  *
- * the user (2026-09-16): "runs should be paused and even totally terminated if
+ * The user (2026-09-16): "runs should be paused and even totally terminated if
  * pausing fails for some reason quickly … kernel level hangs are 100%
  * unacceptable." A uv generation worker, the ComfyUI server while a job is
  * in it, the 3D sidecar while a stage runs, a pi child mid-turn: each

@@ -1,7 +1,7 @@
 /**
  * EVERY FLAG AN ENGINE HAS, read from the engine itself.
  *
- * the user: "expand the advanced settings … to expose absolutely everything in an
+ * The user: "expand the advanced settings … to expose absolutely everything in an
  * organized good gui manner, this includes first and foremost llamacpp …
  * llamacpp has a lot of settings and usability now also, popular ones are
  * 'reasoning message' and reasoning budget, but there's a lot a lot a lot that

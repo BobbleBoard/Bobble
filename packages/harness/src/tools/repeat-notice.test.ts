@@ -57,7 +57,7 @@ describe('withRepeatNotice', () => {
   /*
    * THE CASE THAT MUST NOT FIRE. Run 14's early stretch was a search NARROWING:
    * each call differed and each answer differed, ending in a real discovery.
-   * the user: "'similar calls' could be just narrowing a file search or something?"
+   * The user: "'similar calls' could be just narrowing a file search or something?"
    */
   it('stays silent while a search narrows', async () => {
     const { tool } = toolReturning([

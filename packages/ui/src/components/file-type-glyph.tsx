@@ -30,7 +30,7 @@ function Mark({ size, children }: { size: number; children: ReactNode }) {
 }
 
 /**
- * the user (2026-09-20): "all files with specific types" carry the page with the
+ * The user (2026-09-20): "all files with specific types" carry the page with the
  * extension written on it (file-glyph.tsx) — so given an extension the tile
  * shows that, on the family's colour; the family shapes below remain for a
  * folder and for anything without an extension the alphabet can set.

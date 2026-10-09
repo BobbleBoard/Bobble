@@ -1,7 +1,7 @@
 /**
  * A GENERATION ASKED FOR IN CHAT, AND FILMED INLINE.
  *
- * the user: "one for each modality should be from the chat interface inline."
+ * The user: "one for each modality should be from the chat interface inline."
  *
  * The studio path and this one are genuinely different code: the studio calls
  * `gen:generate` directly, while here a chat model has to reach for a tool, the

@@ -4,13 +4,13 @@ import { cliCommandLabel } from './cli-command-label';
 describe('a Bobble command, said as what it did', () => {
   it('names the app it looked at, and carries it for the icon', () => {
     /*
-     * the user: "cli tools showing directly to the user as terminal tools even when
+     * The user: "cli tools showing directly to the user as terminal tools even when
      * they're very parsable and should have special display/handling for
      * visuals eg. 'snapshotted <app icon inline><app>'."
      */
     expect(cliCommandLabel('mac snapshot "Google Chrome"')).toEqual({
       /* The app is a NAMED PART of the row now, not a word inside the sentence
-         — the user: "<connectors icon> Used <connector app icon> <connector app
+         — The user: "<connectors icon> Used <connector app icon> <connector app
          name> <action>". So the verb phrase comes back on its own as well. */
       action: { running: 'Looking at', done: 'Snapshotted' },
       running: 'Looking at Google Chrome',
@@ -134,7 +134,7 @@ describe("browser rows — the app's own kinds, not terminal lines (the user 202
       kind: 'browser-click',
       target: 'down 300 px',
     });
-    // the user: "scrolled element 5000" — a scroll's number is a distance, never an index.
+    // The user: "scrolled element 5000" — a scroll's number is a distance, never an index.
     expect(cliCommandLabel('browser scroll 5000')?.target).toBe('5,000 px');
     expect(cliCommandLabel('browser scroll down 10000')?.target).toBe('down 10,000 px');
     expect(cliCommandLabel('browser scroll 5000')?.target).not.toContain('element');

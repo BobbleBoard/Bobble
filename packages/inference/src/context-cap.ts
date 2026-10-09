@@ -2,7 +2,7 @@
  * Hardware-adaptive context-window cap (the user, roadmap latency/endless-run work).
  *
  * The launch context used to be a flat `min(model.contextWindow, 16384)` — the
- * same 16k on a 128GB Mac Studio and an 8GB Air. the user: "increase context window
+ * same 16k on a 128GB Mac Studio and an 8GB Air. The user: "increase context window
  * probably to about 64k when able, making sure to take into account kv size when
  * doing memory calculations for subagents and such."
  *
@@ -20,7 +20,7 @@
  * hand-set minRamGB) but makes the KV term SLOT-aware.
  */
 
-/** the user's target ceiling — ~64k when the machine can afford it. */
+/** The user's target ceiling — ~64k when the machine can afford it. */
 export const CONTEXT_CEILING = 65_536;
 /** Never launch below this — even a tight machine keeps a usable window. */
 export const CONTEXT_FLOOR = 8_192;

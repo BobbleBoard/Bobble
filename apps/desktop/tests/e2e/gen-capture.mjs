@@ -1,7 +1,7 @@
 /**
  * A STUDIO GENERATION, DRIVEN AND FILMED.
  *
- * the user: "must produce content for/from each model from the headed interface …
+ * The user: "must produce content for/from each model from the headed interface …
  * get me a video of full generation for each type from each model … when in the
  * studio, play around with settings and ensure they apply as well."
  *

@@ -39,7 +39,7 @@ mkdirSync(OUT, { recursive: true });
 process.env.SHOT_DIR = OUT;
 
 const THEMES = process.env.THEMES?.split(',') ?? ['bobble-dark', 'bobble-light'];
-/** the user's window: 1512x868 work area clamps the 1440x940 default to this. */
+/** The user's window: 1512x868 work area clamps the 1440x940 default to this. */
 const WINDOW = { width: 1440, height: 868 };
 const LAPTOP = { width: 1172, height: 800 };
 const SMALL = { width: 900, height: 700 };

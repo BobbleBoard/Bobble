@@ -77,7 +77,7 @@ geometry path in the catalog. Hunyuan3D-2.1's DiT (the only feasible Hunyuan
 geometry candidate) has mac forks, but on 24 GB the paint+shape stack is
 reported OOM-prone and its geometry quality target (v2.1) is a generation
 behind TRELLIS.2's; TRELLIS-2 is the one verified to produce a real textured
-GLB here. (the user's "find the one that performs best on this hardware": measured
+GLB here. (The user's "find the one that performs best on this hardware": measured
 numbers are in the engine report; TRELLIS-2 wins by default of being the only
 one that completes reliably.)
 
@@ -86,7 +86,7 @@ one that completes reliably.)
 TRELLIS.2 textures **natively** (tex-SLAT → PBR bake: base color, metallic,
 roughness). `generate(texture:true)` uses that native path — it is the
 verified-on-Metal route. Hunyuan Paint backs the standalone *texture* stage op
-for re-texturing an existing mesh. the user believed "trellis will auto texture
+for re-texturing an existing mesh. The user believed "trellis will auto texture
 with hunyuan paint" — the auto-texturing is real but it is TRELLIS.2's own;
 wiring Paint into generate() would only add an unverified 6.9 GB dependency to
 the happy path.

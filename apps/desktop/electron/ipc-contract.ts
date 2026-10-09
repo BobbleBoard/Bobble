@@ -158,7 +158,7 @@ export type CoreInvokeMap = {
    * navigation, and main blocks every one of those (`will-navigate` →
    * preventDefault, main.ts). That is right — the app must never navigate — but
    * it also made the crash card's two buttons inert: the user, on the render-error
-   * screen, "the reload buttons do not work", and he had to reach for ⌘R.
+   * screen, "the reload buttons do not work", and the user had to reach for ⌘R.
    *
    * So the reload asks MAIN to do it, where it is a programmatic
    * `webContents.reload()` rather than a navigation to be refused.
@@ -404,7 +404,7 @@ export interface LlmStatus {
    * WHAT IS LOADING, while `phase` is `starting`: the model the launch is bringing
    * up and when it began. `model` cannot say — the old server is disposed first,
    * so it reads null until the new one is up — and the task tray's Loading row
-   * (the user, 2026-09-24) has to name the thing it is timing.
+   * (The user, 2026-09-24) has to name the thing it is timing.
    */
   loading?: { modelId: string; displayName: string; since: number };
   /**
@@ -1099,7 +1099,7 @@ export type CanvasInvokeMap = {
   /**
    * Put a generated file on the clipboard: a picture as its pixels (so it
    * pastes into anything that takes an image) AND as a file, anything else as
-   * a file (+ its path as text). the user (2026-09-17): the media card's top-right
+   * a file (+ its path as text). The user (2026-09-17): the media card's top-right
    * "take to a new chat" button "should just be replaced with a copy button
    * that instantly copies it to clipboard."
    */

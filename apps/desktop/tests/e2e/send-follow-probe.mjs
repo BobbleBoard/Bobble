@@ -1,7 +1,7 @@
 /**
  * ENTER TAKES YOU TO THE BOTTOM.
  *
- * the user (2026-09-24): "pressing enter on a chat should take you to the bottom".
+ * The user (2026-09-24): "pressing enter on a chat should take you to the bottom".
  *
  * A long conversation, scrolled well up (a real wheel gesture, which is what
  * releases the thread's follow), then a message typed and sent with Enter. The

@@ -1,7 +1,7 @@
 /**
  * THE TASKS YOU LEFT — the rules behind the button beside the sidebar toggle.
  *
- * the user (2026-09-24): the button "only appears when you leave a running task".
+ * The user (2026-09-24): the button "only appears when you leave a running task".
  * These pin what "left" means (its place is not on screen), when a finished
  * task is news (it ended while you were elsewhere) and when it stops being
  * news (you went there, or dismissed it).

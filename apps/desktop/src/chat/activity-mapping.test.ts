@@ -303,7 +303,7 @@ describe('mapToolStep — the generate family keeps its own kind', () => {
 
 describe('mapToolStep — a chart row names the kind of chart, and a written call waits its turn', () => {
   /*
-   * the user (2026-09-17), on four rows reading "Chart" beside spinners: "show
+   * The user (2026-09-17), on four rows reading "Chart" beside spinners: "show
    * something more informative, eg. '<Datavisualization connector icon>
    * Rendering <type> Chart'" — and "why is there a seemingly bunch of command
    * executing all at once sequentially".
@@ -584,7 +584,7 @@ describe('mapToolStep', () => {
 
   /*
    * A PICTURE FROM A THIRD-PARTY IMAGE TOOL still opens in the canvas. The rule
-   * the user set is about what THIS APP generates — those results also arrive as a
+   * The user set is about what THIS APP generates — those results also arrive as a
    * media card in the thread, so the rail would be a second copy of them. An
    * arbitrary tool that returns an image has no card, so the canvas is the only
    * place it can be looked at.
@@ -996,7 +996,7 @@ describe('a call the user stopped is stopped, not failed', () => {
     expect(isStoppedResult(undefined)).toBe(false);
   });
 
-  /* the user's Stop now cancels a running generation; the chain read "1 image failed", in red. */
+  /* The user's Stop now cancels a running generation; the chain read "1 image failed", in red. */
   it("is the chain's stopped state, with the words it had while it ran", () => {
     const step = mapToolStep(
       call('g1', 'generate_image', { prompt: 'a red fox asleep' }),
@@ -1058,7 +1058,7 @@ describe('a rejected tool call is marked failed', () => {
 
 describe('chat-template markers are not thoughts', () => {
   /*
-   * the user, from a screenshot of a live run: three "Thought" rows in a row whose
+   * The user, from a screenshot of a live run: three "Thought" rows in a row whose
    * entire visible content was `<|channel>thought`. MEASURED in that run's
    * session log — the model prefixes its reasoning with a template marker and
    * often emits nothing else:
@@ -1113,7 +1113,7 @@ describe('the corp coordination rows are specific, not generic', () => {
    * speak_to_manager into one bidirectional `talk_to_manager` channel renamed
    * the tool; the registry kept only the pre-merge names, so for three runs the
    * row that PROVES a run delegated rendered as the neutral "Running a tool".
-   * the user, mid-run: "I thought we fixed this UI thing."
+   * The user, mid-run: "I thought we fixed this UI thing."
    *
    * The name is imported from the harness rather than typed here on purpose —
    * the next rename fails this test instead of silently degrading the UI.
@@ -1161,7 +1161,7 @@ describe('the corp coordination rows are specific, not generic', () => {
 
   it('talk_to says WHO on the row and reads as prose when opened', () => {
     /*
-     * the user: "the talk to, ready to delegate additionally need to be clickable
+     * The user: "the talk to, ready to delegate additionally need to be clickable
      * to show case specific not generic expansions of details of the tool
      * call." A hand-off is one recipient and one paragraph; JSON.stringify
      * buried both behind escaped newlines.
@@ -1320,7 +1320,7 @@ describe('reportedOutputPath does not mine a path out of a URL', () => {
 
 describe('a generated image does NOT open a canvas tab', () => {
   /*
-   * the user, round 21: "image/video/audio/media generation tools DO NOT GET SHOWN
+   * The user, round 21: "image/video/audio/media generation tools DO NOT GET SHOWN
    * IN THE CANVAS…. they get shown inline, the large card, same as each studio
    * would show."
    *
@@ -1370,7 +1370,7 @@ describe('a generated image does NOT open a canvas tab', () => {
 
 describe('a running command says what it is', () => {
   /*
-   * the user, watching a step sit at "Running a command · 1m 7s": "I want to know
+   * The user, watching a step sit at "Running a command · 1m 7s": "I want to know
    * what that is, I can't click to expand and see it, even worse >1m."
    *
    * The row was not expandable because the step carried no command, and it
@@ -1479,7 +1479,7 @@ describe('a refused write says why, and names no file', () => {
     'Not written: sample.svg is hand-written SVG markup, and drawing SVGs is what the `svg` command is for.';
 
   /*
-   * the user (2026-09-17, screenshot): "Could not write the file · sample.svg
+   * The user (2026-09-17, screenshot): "Could not write the file · sample.svg
    * +88" over eighty-eight green lines — "failed what exactly?" The reason was
    * in the tool result and nowhere on the row.
    */

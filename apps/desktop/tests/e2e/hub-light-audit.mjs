@@ -1,8 +1,8 @@
 /**
  * THE HUB IN LIGHT MODE, WITH THE LIST SCROLLED.
  *
- * the user reviews this app in light mode and the audits so far were all dark, so
- * the two surfaces he flagged — the pinned card's top edge while the list
+ * The user reviews this app in light mode and the audits so far were all dark, so
+ * the two surfaces the user flagged — the pinned card's top edge while the list
  * scrolls behind it, and the model card nested inside it — had never been
  * photographed on the theme he actually looks at.
  */

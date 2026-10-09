@@ -2,7 +2,7 @@
  * A REAL multi-gigabyte download, driven the way a person does it, watched the
  * way a person watches it.
  *
- * the user: "download the 27b through the model picker driving the UI via
+ * The user: "download the 27b through the model picker driving the UI via
  * playwright/automation to ensure it all works end to end and progress in
  * indicated well and non confusingly as the user uses the app as normal while
  * the download (which is far from instant in most cases) occurs."

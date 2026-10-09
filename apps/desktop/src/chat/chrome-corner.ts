@@ -8,7 +8,7 @@
  * wide it is. The collapsed top bar used to state that width by hand as `124px`,
  * which was correct for exactly as long as the corner held one button: when
  * Chat|Work moved in beside it, the chat title was laid out straight through the
- * toggle. the user: "the title overlaps with this chat/work buttons."
+ * toggle. The user: "the title overlaps with this chat/work buttons."
  *
  * Measuring it removes the number from the argument. Whatever ends up in that
  * corner, the title starts after it.

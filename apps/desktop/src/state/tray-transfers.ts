@@ -2,7 +2,7 @@
  * THE TRAY'S DOWNLOADS AND LOADS — what the task tray lists under its
  * "Downloads" and "Loading" headers.
  *
- * the user (2026-09-24): "this top left button to show status on running tasks … I
+ * The user (2026-09-24): "this top left button to show status on running tasks … I
  * wanted to lean into a bit more and put downloads/model load progress into
  * aswell, eg. headers for 'Downloads' 'Loading' for these you can use a sort of
  * clean thin blue progressbar w/ % or ngb/rgb red X on the side below some white

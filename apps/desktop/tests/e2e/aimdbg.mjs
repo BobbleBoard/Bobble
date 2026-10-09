@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
-import * as THREE from '/Users/user/Desktop/OSS-harness/node_modules/.pnpm/three@0.180.0/node_modules/three/build/three.module.js';
-import { GLTFLoader } from '/Users/user/Desktop/OSS-harness/node_modules/.pnpm/three@0.180.0/node_modules/three/examples/jsm/loaders/GLTFLoader.js';
+import * as THREE from '../../../../node_modules/.pnpm/three@0.180.0/node_modules/three/build/three.module.js';
+import { GLTFLoader } from '../../../../node_modules/.pnpm/three@0.180.0/node_modules/three/examples/jsm/loaders/GLTFLoader.js';
 
 const buf = readFileSync(process.argv[2]);
 const loader = new GLTFLoader();

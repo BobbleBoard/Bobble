@@ -3,7 +3,7 @@ Bundled fonts for textfit.py (XP-16): what measures text off macOS
 
 Every file below is under the SIL Open Font License 1.1; the licence texts are
 beside them (LICENSE-Liberation.txt, LICENSE-Gelasio.txt). Bundling OFL fonts:
-the user, deliverables/research/PLAN.md question 28, "yes to all". Downloaded
+The user, deliverables/research/PLAN.md question 28, "yes to all". Downloaded
 2026-09-24 from the projects' own upstream repositories, unmodified.
 
 Liberation Fonts 2.1.5 (Red Hat; OFL 1.1, Reserved Font Name "Liberation")

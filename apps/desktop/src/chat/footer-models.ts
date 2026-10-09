@@ -104,7 +104,7 @@ export function chipLabel(
   /*
    * A PINNED MODEL NAMES ITSELF, NOT WHATEVER IS STILL RESIDENT.
    *
-   * the user: "lfm selected, but also qwen3.5-4b still selected in the input bar."
+   * The user: "lfm selected, but also qwen3.5-4b still selected in the input bar."
    * Exactly — the picker showed a checkmark on LFM (it reads the persisted
    * selection) while this chip kept saying Qwen3.5 4B, because it returned the
    * model the inference server currently HOLDS. Two controls, one of them the

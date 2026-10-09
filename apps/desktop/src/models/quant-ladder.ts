@@ -1,7 +1,7 @@
 /**
  * WHICH QUANT, GIVEN A BUDGET — and the floor beneath which we do not go.
  *
- * the user: "don't go below Q3 xs on any model <100b, I have 0 experience with
+ * The user: "don't go below Q3 xs on any model <100b, I have 0 experience with
  * diffusion quants so that's for you to decide."
  *
  * THE FLOOR IS THE INTERESTING RULE, and it inverts what a naive recommender
@@ -98,7 +98,7 @@ export function quantForBudget(
 /**
  * Does the floor rule apply to this model?
  *
- * the user's rule is scoped to models under 100B, and the exception is deliberate:
+ * The user's rule is scoped to models under 100B, and the exception is deliberate:
  * a 400B MoE at Q2 is still a far better model than anything that fits
  * otherwise, and refusing it would leave a 128 GB workstation running a 27B.
  */

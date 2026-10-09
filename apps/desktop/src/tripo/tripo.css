@@ -57,7 +57,7 @@
    * of six overrides. Lines, balls and the negative-axis rings all draw from
    * these so the gizmo stays one object.
    *
-   * THE MIX IS 12%, DOWN FROM 24%. the user: "axes gizmo needs to be brighter" — at
+   * THE MIX IS 12%, DOWN FROM 24%. The user: "axes gizmo needs to be brighter" — at
    * 24% the light themes read as three muddy dark discs rather than an X/Y/Z
    * you can pick out of a viewport at a glance. Rendered side by side at 24, 12
    * and 0, the letters stay clearly legible at every step, so the dulling was
@@ -144,7 +144,7 @@
  *
  * Send To and Export now render in the APP's top bar, outside this subtree — so
  * `var(--tp-radius-control)` resolved to nothing and both buttons came out with
- * square corners. the user: "sqare still". A variable is only a token where it is
+ * square corners. The user: "sqare still". A variable is only a token where it is
  * inherited; the two places that use these controls both have to define it.
  */
 .tp-topbar-right,
@@ -592,7 +592,7 @@
 /*
  * FOUR CARDS, NOT FOUR SLABS.
  *
- * the user, on the corner where the right panel met the top bar: "a bunch of sharp
+ * The user, on the corner where the right panel met the top bar: "a bunch of sharp
  * edges and corners here let's fix that." The columns were full-bleed panels
  * separated by hairlines, so every one of them met the window edge and the top
  * bar at a right angle — four hard corners in the top-right alone once the tab
@@ -719,7 +719,7 @@
 /* ═══ generation panel ══════════════════════════════════════════════════ */
 
 /*
- * THE LEFT CARD FLOATS OVER THE VIEWPORT. the user (2026-09-14): "make the
+ * THE LEFT CARD FLOATS OVER THE VIEWPORT. The user (2026-09-14): "make the
  * 'generate model' and 'image' and 'segment' and all cards on the left float
  * above the viewport." It was a column of its own (302px, shrinking to 232);
  * now the viewport runs from the rail to the right panel and the card sits on
@@ -1727,7 +1727,7 @@
  * sits on a blurred pill; this matches them instead of inventing a third
  * treatment.
  */
-/* NO CARD. the user (2026-09-14): "remove the card on these let them float" —
+/* NO CARD. The user (2026-09-14): "remove the card on these let them float" —
    three lines of figures on the viewport, the way the gizmo floats. A tight
    text shadow keeps them legible over a light model. */
 .tp-stats {
@@ -2618,7 +2618,7 @@
  *
  * The strip was `--pd-bg-inset` with the active tab painted `--pd-bg-raised` on
  * top — which is a real tab metaphor, and at this size it read as a dark
- * rectangle with a hard notch cut in one corner. the user: "a bunch of sharp edges
+ * rectangle with a hard notch cut in one corner. The user: "a bunch of sharp edges
  * and corners here."
  *
  * The app already has a settled answer for "one of these three" — the segmented
@@ -4855,7 +4855,7 @@
 
 /* ── The 3D module gate ────────────────────────────────────────────────────
  * The studio renders behind this at full fidelity; only a blur sits on top, and
- * "View" removes even that. the user: not "gatekeeping the UI from being seen at all
+ * "View" removes even that. The user: not "gatekeeping the UI from being seen at all
  * as if it's a paid service". The shell stays MOUNTED while gated (inert), so
  * View is an instant unblur rather than a second load.
  */

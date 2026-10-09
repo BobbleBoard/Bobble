@@ -14,7 +14,7 @@ import {
 
 describe('the delegation gate', () => {
   it("returns the user's wording verbatim when called too early", () => {
-    // Pinned because it is his sentence, and a well-meaning rewrite would change
+    // Pinned because it is their sentence, and a well-meaning rewrite would change
     // what the manager is told to do at the one moment it is listening.
     expect(NOT_READY_TO_DELEGATE).toBe(
       'ensure you have mentally concrete plan before submitting, when ready to ' +
@@ -62,14 +62,14 @@ describe('the test-tool gate', () => {
   });
 
   it('grants read/write/edit through the file kit', () => {
-    // the user, explicitly: "file manipulation should grant read write edit tools".
+    // The user, explicitly: "file manipulation should grant read write edit tools".
     const files = toolsForKits(['files']);
     for (const t of ['read', 'write', 'edit']) expect(files).toContain(t);
   });
 
   it('takes a REASON per kit, and never checks it', () => {
     /*
-     * the user: "this is never checked by the harness, nothing is ever done with
+     * The user: "this is never checked by the harness, nothing is ever done with
      * it, but keeping it as an input implicitly combats the model asking for
      * everything every time for no reason." So the schema demands it and the
      * resolver ignores it — having to justify each kit IS the mechanism.

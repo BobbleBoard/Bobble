@@ -1,7 +1,7 @@
 /**
  * THE TOP OF THE HUB: one card per modality, for whoever opens this app.
  *
- * the user, on the first version: "there's a lot of unnessasary info for users, for
+ * The user, on the first version: "there's a lot of unnessasary info for users, for
  * example <size> is fine, but not immediately after putting needs <size> out of
  * <vram>. that's redundant. 'what the 3d studio generates with' 'runs on
  * comfyui' 'runs everywhere' doesn't need to be there either… don't display the
@@ -141,7 +141,7 @@ function Card({
 
   return (
     <div
-      /* the user: "buffer between the download and edge, margins borders needed.
+      /* The user: "buffer between the download and edge, margins borders needed.
          bordering of the card something like shown or like a shadow, reasonably
          noticable, apply to all the cards aswell." A hairline `border-subtle` on
          a dark surface is invisible; this is the default border plus a real

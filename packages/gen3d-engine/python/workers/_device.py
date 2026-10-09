@@ -1,6 +1,6 @@
 """WHICH ACCELERATOR TO USE — one answer, in one place.
 
-the user: "we target all major OS and all major hardware eventually in a modular
+The user: "we target all major OS and all major hardware eventually in a modular
 fashion such that we have a boatload of alternatives that we know of and can get
 working quick to get max out of the box no setup fast inference for any hardware
 on any OS."

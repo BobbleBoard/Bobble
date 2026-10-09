@@ -1,6 +1,6 @@
 /**
  * THE ASK CARD, LOOKED AT — every question to the person as one card the
- * composer's width, just above it (chat/AskCard.tsx). the user (2026-10-01): "let's
+ * composer's width, just above it (chat/AskCard.tsx). The user (2026-10-01): "let's
  * put this sort of permission popup just as a little card same width as the
  * input bar floating directly above it (not on top of), and make the 'ask user'
  * question modals and any user inputs from the model or for the chat just

@@ -1,7 +1,7 @@
 /**
  * THE PERSON'S STANDING ANSWER, read before any per-session question.
  *
- * the user (2026-09-15): "a UI on onboarding for computer use on/off and then if
+ * The user (2026-09-15): "a UI on onboarding for computer use on/off and then if
  * on choose what apps to allow control of … editable later in settings via a
  * similar UI." The chooser writes a policy; the consent gate reads it here.
  *

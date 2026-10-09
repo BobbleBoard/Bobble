@@ -1,7 +1,7 @@
 /**
  * Onboarding: get this machine ready to actually run something.
  *
- * the user: "at onboarding / initial setup we need to get 1. an optimal engine
+ * The user: "at onboarding / initial setup we need to get 1. an optimal engine
  * initially, download the qwen3.5 4b checkpoint" and "add that harness swapping
  * mechanism… and add to onboarding".
  *

@@ -1,7 +1,7 @@
 /**
  * LOOK at the generating card: its ground, its number, its size.
  *
- * the user (2026-09-24), with ChatGPT's generating card beside ours: "a distinct
+ * The user (2026-09-24), with ChatGPT's generating card beside ours: "a distinct
  * black background card that makes it feel raised, not lowered, but without a
  * border, just quick but noticeable falloff around the edge into the background
  * color"; "that terminal logging style text below it needs to go … show a little

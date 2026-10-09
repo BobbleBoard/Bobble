@@ -177,7 +177,7 @@ function pinnedFirst(chats: SessionSummary[], pinned: Set<string>): SessionSumma
  *
  * A folder Bobble made for a projectless chat (`~/Bobble/<slug>`) is shown with
  * SPACES, because the slug is a filesystem detail and the name is the chat's.
- * the user: "the dropdown should still show spaces rather than dashes or whatever
+ * The user: "the dropdown should still show spaces rather than dashes or whatever
  * you're using as replacement." Scoped to ~/Bobble so a user's own hyphenated
  * directory elsewhere keeps the name they gave it.
  */
@@ -212,7 +212,7 @@ export function groupChats(sessions: SessionSummary[], org: ChatOrganization): G
       else arr.push(s);
     } else {
       /*
-       * A WORKING FOLDER IS NOT A PROJECT. the user: "not every working directory
+       * A WORKING FOLDER IS NOT A PROJECT. The user: "not every working directory
        * folder becomes a project… projects can now only be created when
        * explicitly done so."
        *
@@ -248,7 +248,7 @@ export const PROJECT_PROMPT_AT = 3;
 /**
  * Should we offer to make this working folder a project, right now?
  *
- * the user: "the user gets a popup to 'create project' when they make their third
+ * The user: "the user gets a popup to 'create project' when they make their third
  * chat in the same working directory (excluding no project). not after or
  * before the third time." So this is true on EXACTLY the third — asking at one
  * is noise, and asking at every one after three is nagging.

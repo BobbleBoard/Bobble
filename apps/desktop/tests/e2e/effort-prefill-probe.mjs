@@ -1,7 +1,7 @@
 /**
  * QWEN3.8 27B AT MEDIUM EFFORT — THE LIVE SERVER, ITS PROMPT, AND ITS PREFILL.
  *
- * the user (2026-10-02): "qwen3.8-27b comes with a built in settable thinking
+ * The user (2026-10-02): "qwen3.8-27b comes with a built in settable thinking
  * effort, it's xhigh by default, set it to medium". The catalog pins
  * `reasoning_effort: 'medium'` as a chat-template kwarg (`61ede173`). This
  * checks, on the real model in the real app (headless):

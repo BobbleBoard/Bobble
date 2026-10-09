@@ -1,14 +1,14 @@
 ---
 name: harness-run-report
-description: Write the report for a Bobble corp-harness run — the bulleted flow from initial prompt through CEO research, delegation, engineers and termination, with numbered failures inline, timestamps, measured numbers, and an error diagnosis. Use this whenever a corp/mesh/agent run has finished or been stopped and you are about to tell the user what happened, whenever he asks "how did the run go", "what happened", "give me the report", or asks for the flow/trace of a run — and also when you are tempted to summarise a run in a couple of paragraphs, because that is exactly the summary this format exists to replace.
+description: Write the report for a Bobble corp-harness run — the bulleted flow from initial prompt through CEO research, delegation, engineers and termination, with numbered failures inline, timestamps, measured numbers, and an error diagnosis. Use this whenever a corp/mesh/agent run has finished or been stopped and you are about to tell the user what happened, whenever the user asks "how did the run go", "what happened", "give me the report", or asks for the flow/trace of a run — and also when you are tempted to summarise a run in a couple of paragraphs, because that is exactly the summary this format exists to replace.
 ---
 
 # Reporting on a harness run
 
 A run report has one job: let the user see **where the harness actually broke**, without
 having watched it. A prose summary cannot do that. Two paragraphs saying "the run went
-well but hit some issues" is worth nothing — he cannot act on it, and it hides the
-thing he is paying for the run to discover.
+well but hit some issues" is worth nothing — the user cannot act on it, and it hides the
+thing the user is paying for the run to discover.
 
 The format below is his, from his own words. Follow its shape rather than its letter.
 

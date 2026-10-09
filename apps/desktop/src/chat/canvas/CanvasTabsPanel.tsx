@@ -153,7 +153,7 @@ export function CanvasTabsPanel({ suppressed = false }: { suppressed?: boolean }
   useMacMonitor(controller);
   /*
    * NO GENERATION HOOK HERE ANY MORE. Image / video / audio generation used to
-   * stream into a live `gen-image` canvas tab from this list. the user, round 21:
+   * stream into a live `gen-image` canvas tab from this list. The user, round 21:
    * "image/video/audio/media generation tools DO NOT GET SHOWN IN THE CANVAS….
    * they get shown inline, the large card". The stream is subscribed at the app
    * root now (chat/gen-stream.ts) and read by the thread's own card, so the rail
@@ -174,7 +174,7 @@ export function CanvasTabsPanel({ suppressed = false }: { suppressed?: boolean }
   // open the FIRST tab.
   useArtifactCanvasRouting();
   /*
-   * ONE "Activity" TAB, not a tab per action (queue item 3). the user: "can't have
+   * ONE "Activity" TAB, not a tab per action (queue item 3). The user: "can't have
    * tab spam when the model does a lot of actions, so it needs one tab,
    * 'Activity' that opens and shows what the model is doing at any given
    * moment." It replaces the two routers that used to sit here — a file tab per
@@ -209,7 +209,7 @@ export function CanvasTabsPanel({ suppressed = false }: { suppressed?: boolean }
   /*
    * A FULL-SURFACE ROUTE GETS THE WHOLE WINDOW.
    *
-   * the user: "clicking manage models left the canvas open, showing the interface
+   * The user: "clicking manage models left the canvas open, showing the interface
    * all squished." The model hub, Scheduled and the studios render through
    * `contentOverride` — in the chat's slot, with this rail still beside them
    * taking its width — so a hub laid out for the window got what was left of it.
@@ -408,7 +408,7 @@ export function CanvasTabsPanel({ suppressed = false }: { suppressed?: boolean }
       // Prefer the REAL child instance: a subagent spawned via the app bridge runs
       // as its own pi and is keyed in the child-agent-store by the SAME id. Show
       // its live transcript in the chat area, exactly like the sidebar dropdown —
-      // not a markdown snapshot. (the user: "show it like it does when I click it in
+      // not a markdown snapshot. (The user: "show it like it does when I click it in
       // the left sidebar".)
       if (useChildAgentStore.getState().children[subagentId] !== undefined) {
         useChildAgentStore.getState().setViewedChild(subagentId);

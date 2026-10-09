@@ -2,7 +2,7 @@
  * What a presented file carries INTO the chat, so the thread can show the thing
  * itself rather than a card that points at the canvas.
  *
- * the user (2026-09-16), Claude's inline chart beside Bobble's canvas picture: "we
+ * The user (2026-09-16), Claude's inline chart beside Bobble's canvas picture: "we
  * need to implement a system of some items showing inline cards like anthropic
  * has here, while larger things go to the canvas still … small svgs, but not
  * larger 'drawing' should be shown inline too". Two things qualify:
@@ -16,7 +16,7 @@
  *   - an INTERACTIVE WIDGET: a presented .html that is one self-contained
  *     file (it loads nothing of its own by a relative path), small, with
  *     something to interact with, and not a web page (no nav, no header and
- *     footer, not a stack of sections). the user (2026-09-24): "really clean,
+ *     footer, not a stack of sections). The user (2026-09-24): "really clean,
  *     intuitive interactive widgets inline/+canvas, eg. for math explanation
  *     NN inner working visualizations". It runs in the chat's sandboxed frame;
  *     a site stays a canvas tab.

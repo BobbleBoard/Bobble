@@ -1,7 +1,7 @@
 /**
  * THE STUDIO AND THE COMFYUI ENGINE ROW, driven in the real app.
  *
- * the user: "let's have comfy as a downloadable inference engine and then wire up a
+ * The user: "let's have comfy as a downloadable inference engine and then wire up a
  * primitive for now image/video studio) and have those run through it."
  *
  * Two things this checks that only the running app can answer: the engine row

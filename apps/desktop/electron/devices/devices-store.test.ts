@@ -64,7 +64,7 @@ describe('devices.json', () => {
     const device = await store.addPaired({
       id: 'dev_linuxbox000000000000',
       tsStableId: 'nbYS7qLqVy11CNTRL',
-      name: 'linux-ms-7e59',
+      name: 'linux-MS-7E59',
       os: 'linux',
       ip: '100.101.102.110',
       dnsName: 'linux-ms-7e59.tail0f0f0f.ts.net',
@@ -141,7 +141,7 @@ describe('devices.json', () => {
     await store.load();
     fs.chmodSync(file, 0o644);
     await store.addEndpoint({
-      name: 'llama-server on linux-ms-7e59',
+      name: 'llama-server on linux-MS-7E59',
       url: 'http://100.101.102.110:8080/v1',
       api: 'llamacpp-stream',
     });

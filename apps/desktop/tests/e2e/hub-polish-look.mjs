@@ -2,7 +2,7 @@
  * THE MODEL HUB, LOOKED AT: the page, a card's quant menu with a row under the
  * pointer, and the bottom-left menu.
  *
- * the user (2026-10-08): the quant menu's hover "seems really thin … it should be a
+ * The user (2026-10-08): the quant menu's hover "seems really thin … it should be a
  * bit wider and a bunch taller"; the hub is "a mess of filters and options all
  * dumped there" and reads as a page for technical users; Discover, On device
  * and Manage storage should be the high-level things, with the machine's specs

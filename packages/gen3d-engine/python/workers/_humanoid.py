@@ -483,7 +483,7 @@ def _pull_joints_inside(
     lesson. A free move to the local surface mean scores beautifully on "is the
     joint inside the mesh" — MEASURED 23/27 inside, worst 1.3mm — while dragging
     the hand joints out of the arms and into the TORSO, which is inside the mesh
-    and utterly wrong. the user's screenshot showed the result: a skeleton with no
+    and utterly wrong. The user's screenshot showed the result: a skeleton with no
     arm bones at all. Inside-ness is necessary and nowhere near sufficient.
 
     So the neighbourhood mean is projected onto the plane through the original

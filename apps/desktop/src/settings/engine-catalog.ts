@@ -1,7 +1,7 @@
 /**
  * THE INFERENCE ENGINES WE CAN RUN, AND WHERE.
  *
- * the user: "in the settings area we need an engine panel that allows
+ * The user: "in the settings area we need an engine panel that allows
  * downloading/uninstalling all available engines 1 click. with a short blurb
  * about what each is for and their disk size (we'll only show things that are
  * large enough to matter) we show everything greyed out at bottom are
@@ -41,7 +41,7 @@ export type EnginePlatform = 'darwin' | 'win32' | 'linux';
 /**
  * WHAT AN ENGINE CAN MAKE. The second axis of the portability matrix.
  *
- * the user: "we target all major OS and all major hardware eventually in a modular
+ * The user: "we target all major OS and all major hardware eventually in a modular
  * fashion such that we have a boatload of alternatives that we know of and can
  * get working quick to get max out of the box no setup fast inference for any
  * hardware on any OS."
@@ -113,7 +113,7 @@ export interface EngineSpec {
   /**
    * WE HAVE ACTUALLY INTEGRATED THIS, versus catalogued it for later.
    *
-   * the user asked for the catalogue to cover everything worth including, "not
+   * The user asked for the catalogue to cover everything worth including, "not
    * installed on the users machine yet possibly but easily one click
    * downloadable" — which means the list will always be ahead of the wiring.
    * Saying which is which here keeps the ranking honest: an unwired engine can
@@ -271,7 +271,7 @@ export const ENGINES: readonly EngineSpec[] = [
     /*
      * COMFYUI — the engine for everything that is not text.
      *
-     * the user: "let's have comfy as a downloadable inference engine and then wire
+     * The user: "let's have comfy as a downloadable inference engine and then wire
      * up a primitive for now image/video studio) and have those run through it."
      *
      * It earns a row here because it is the same KIND of decision as the others:
@@ -541,7 +541,7 @@ export const ENGINES: readonly EngineSpec[] = [
  * THE ENGINES A FRESH INSTALL FETCHES ON ITS OWN, so Calibrate has something
  * to compare with no network at the time.
  *
- * the user: "download a few generally good engines at the start of downloading the
+ * The user: "download a few generally good engines at the start of downloading the
  * app eg. if on apple silicon mac, omlx rapidmlx and dflashmlx (always llamacpp
  * also, on any machine we always have llamacpp first and foremost), on some
  * other machines like big linux boxes, vllm would be part of this set, mac

@@ -1,7 +1,7 @@
 /**
  * Settings → Engines. One row per inference engine, install/remove in one click.
  *
- * the user: "an engine panel that allows downloading/uninstalling all available
+ * The user: "an engine panel that allows downloading/uninstalling all available
  * engines 1 click. with a short blurb about what each is for and their disk size
  * (we'll only show things that are large enough to matter) we show everything
  * greyed out at bottom are unsupported."
@@ -232,7 +232,7 @@ export function EnginePanel() {
 /**
  * HOW HARD BOBBLE MAY PUSH THIS MACHINE.
  *
- * the user: "ensuring we leave a certain amount of memory available as a buffer so
+ * The user: "ensuring we leave a certain amount of memory available as a buffer so
  * the user can use computer as normal while generation and such occurs … this
  * could be dynamic even tracking what the current user memory/cpu/gpu usage is."
  *

@@ -1,7 +1,7 @@
 /**
  * EVERYTHING HEAVY THE APP HAS RUNNING, AS THINGS THAT CAN BE STOPPED IN PLACE.
  *
- * the user (2026-09-16), after his Mac restarted under a 3D job: "these memory
+ * The user (2026-09-16), after their Mac restarted under a 3D job: "these memory
  * safeguards should just not let ooms happen for sure … have safeguards in
  * place to stop generations/runs of any sort ideally pausing them rather than
  * terminating where possible, and it should in practically all places be

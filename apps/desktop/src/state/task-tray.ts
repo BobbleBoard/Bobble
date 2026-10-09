@@ -1,7 +1,7 @@
 /**
  * THE TASKS YOU LEFT — what the button beside the sidebar toggle lists.
  *
- * the user (2026-09-24): "implement a little notifications button in the top left
+ * The user (2026-09-24): "implement a little notifications button in the top left
  * within the left sidebar or always simply to the right of the collapse
  * sidebar button, this only appears when you leave a running task, eg. chat,
  * generation etc. and clicking on it has a quick little card".

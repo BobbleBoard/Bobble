@@ -1,5 +1,5 @@
 /**
- * LOOK at Advanced (the gears): real app, real cache, headless. the user
+ * LOOK at Advanced (the gears): real app, real cache, headless. The user
  * (2026-09-13): ⓘ instead of inline blurbs, the app's own dropdowns, defaults
  * shown as editable values, Reset · Apply top right (no footer), no line under
  * the header, real names instead of flags, a separate Flags tab with the

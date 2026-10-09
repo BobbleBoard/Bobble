@@ -23,6 +23,7 @@
  * 1152 of content; 1728 / 1440 / 1188 / 928 give 1440 / 1152 / 900 / 640.
  */
 import { chmodSync, cpSync, mkdirSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import path from 'node:path';
 import { APP_ROOT, launchApp, probeHome } from './harness.mjs';
 
@@ -59,7 +60,7 @@ function fixtureHome(name) {
       id: 'filesystem',
       name: 'Filesystem',
       command: 'npx',
-      args: ['-y', '@modelcontextprotocol/server-filesystem', '/Users/user/Projects'],
+      args: ['-y', '@modelcontextprotocol/server-filesystem', `${homedir()}/Projects`],
       enabled: true,
     },
     {
@@ -75,7 +76,7 @@ function fixtureHome(name) {
       id: 'weather',
       name: 'Weather',
       command: 'node',
-      args: ['/Users/user/tools/weather-mcp/index.js'],
+      args: [`${homedir()}/tools/weather-mcp/index.js`],
       enabled: true,
     },
     {
@@ -746,7 +747,7 @@ try {
       mcpServers: {
         'weather-two': {
           command: 'node',
-          args: ['/Users/user/tools/weather-two/index.js'],
+          args: [`${homedir()}/tools/weather-two/index.js`],
           env: { WEATHER_KEY: 'abc123' },
         },
       },
@@ -766,7 +767,7 @@ try {
     note('after paste', { nameValue, cmdValue });
     check(nameValue === 'Weather Two', `name derived from the paste (${nameValue})`);
     check(
-      cmdValue === 'node /Users/user/tools/weather-two/index.js',
+      cmdValue === `node ${homedir()}/tools/weather-two/index.js`,
       `command line filled (${cmdValue})`,
     );
 

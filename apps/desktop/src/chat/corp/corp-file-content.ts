@@ -85,7 +85,7 @@ function normalizeContent(raw: string): string {
  * fails on every frame until the last one — which is exactly why a file being
  * written showed "(writing…)" and no content: the text-markup parser below only
  * sees calls a model emits as raw text, and a STRUCTURED call carries its body
- * in `argsText` instead. the user: "instead of live showing the edit streamed in
+ * in `argsText` instead. The user: "instead of live showing the edit streamed in
  * canvas it showed the file… without any content just: '(writing)…'. that's
  * unacceptable."
  *
