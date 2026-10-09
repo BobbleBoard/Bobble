@@ -1055,6 +1055,7 @@ export function ChatThread() {
                           ? { recordsByCall: turn.byCall }
                           : {})}
                         renderRecord={renderRecord}
+                        onRetry={() => retryFrom(first.id)}
                       />
                     </MessageErrorBoundary>
                   </MessageRow>

@@ -10748,3 +10748,89 @@ body[data-media-expanded="true"] .pd-studio-compose {
     animation: none;
   }
 }
+
+/* ── A turn that did not finish (chat/TurnProblemCard.tsx) ───────────────────
+ * In place of the red line an engine error used to print: a quiet card that
+ * says what happened and carries the fix as its button; the engine's own words
+ * under Details. Not red — nothing here is the person's fault, and the card is
+ * the way on, not an alarm. */
+.pd-turn-problem {
+  display: flex;
+  gap: 10px;
+  max-width: 560px;
+  padding: 12px 14px;
+  border-radius: var(--pd-radius-lg);
+  background: var(--pd-bg-raised);
+  box-shadow: 0 0 0 1px var(--pd-border-subtle);
+}
+.pd-turn-problem-icon {
+  display: inline-flex;
+  flex: none;
+  padding-top: 1px;
+  color: var(--pd-status-warning-fg, var(--pd-text-secondary));
+}
+.pd-turn-problem-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.pd-turn-problem-title {
+  margin: 0;
+  font-size: var(--pd-font-size-body);
+  font-weight: var(--pd-font-weight-medium, 500);
+  line-height: var(--pd-leading-body);
+  color: var(--pd-text-primary);
+}
+.pd-turn-problem-body {
+  margin: 0;
+  font-size: var(--pd-font-size-footnote, 13px);
+  line-height: 1.45;
+  color: var(--pd-text-secondary);
+}
+.pd-turn-problem-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.pd-turn-problem-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  margin-top: 6px;
+  padding: 0;
+  font-size: 12px;
+  color: var(--pd-text-muted);
+}
+.pd-turn-problem-more:hover {
+  color: var(--pd-text-secondary);
+}
+.pd-turn-problem-more svg {
+  transition: transform var(--pd-duration-fast) var(--pd-easing-standard);
+}
+.pd-turn-problem-more .pd-turn-problem-chev--open {
+  transform: rotate(90deg);
+}
+.pd-turn-problem-detail {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 4px;
+}
+.pd-turn-problem .pd-turn-problem-detail pre {
+  flex: 1;
+  max-height: 160px;
+  margin: 0;
+  padding: 8px 10px;
+  overflow: auto;
+  border-radius: var(--pd-radius-sm);
+  background: var(--pd-bg-inset);
+  font-family: var(--pd-font-mono);
+  font-size: 11.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--pd-text-secondary);
+}

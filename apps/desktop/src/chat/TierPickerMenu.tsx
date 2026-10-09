@@ -28,6 +28,7 @@ import type { ModelTier } from '../../../../packages/harness/src/model/tier.ts';
 import { DownloadBar } from '../models/DownloadBar';
 import { compactBytes } from '../models/models-layout';
 import { downloadFraction, type LlmDownloadState, useLlmStore } from '../state/llm-store';
+import { useModelMenuStore } from '../state/model-menu-store';
 import { selectionTier } from '../state/model-selection';
 import { usePiStore } from '../state/pi-slice';
 import { useModelSelection, useQuickMenu, useSettingsStore } from '../state/settings-store';
@@ -143,6 +144,9 @@ export function TierPickerMenu({
   const downloadModel = useLlmStore((s) => s.downloadModel);
   const cancelDownload = useLlmStore((s) => s.cancelDownload);
   const quickMenu = useQuickMenu();
+  // Open from here, or from a card that offers another model (TurnProblemCard).
+  const menuOpen = useModelMenuStore((s) => s.open);
+  const setMenuOpen = useModelMenuStore((s) => s.setOpen);
   const updateSettings = useSettingsStore((s) => s.update);
   const selection = useModelSelection();
   const isAuto = selection.mode === 'auto';
@@ -242,7 +246,9 @@ export function TierPickerMenu({
 
   return (
     <DropdownMenu
+      open={menuOpen}
       onOpenChange={(open) => {
+        setMenuOpen(open);
         // Refresh the catalog so tierModels + downloaded flags are current.
         if (open) void refreshCatalog();
       }}

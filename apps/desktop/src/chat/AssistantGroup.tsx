@@ -12,7 +12,7 @@
  * rail while streaming (a thinking run is an ActivityChain, not a component that
  * swaps type when it settles), and real tool/file activity rows.
  */
-import { type AssistantMsg, cleanErrorText, type ToolResultMsg } from '@pi-desktop/engine';
+import type { AssistantMsg, ToolResultMsg } from '@pi-desktop/engine';
 import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { type PendingKind, PendingMediaCard } from '../media/PendingMediaCard';
@@ -36,8 +36,10 @@ import { SourcesCard } from './sources/SourcesCard';
 import { TurnSourcesProvider } from './sources/turn-sources';
 import { ThreadActivityChain } from './ThreadActivity';
 import { ThreadMedia } from './ThreadMedia';
+import { TurnProblemCard } from './TurnProblemCard';
 import { mediaFromToolResult, type ThreadMediaItem } from './thread-media';
 import { type CardPlace, placeTurnCards, type TurnCall, type TurnCard } from './turn-cards';
+import { describeTurnProblem } from './turn-problem';
 
 /** A View Transition name for one file's card — a CSS ident, stable per path. */
 function handoverName(path: string): string {
@@ -165,6 +167,7 @@ export function AssistantGroup({
   live,
   recordsByCall,
   renderRecord,
+  onRetry,
 }: {
   group: AssistantMsg[];
   resultByCallId: Map<string, ToolResultMsg>;
@@ -198,6 +201,11 @@ export function AssistantGroup({
   recordsByCall?: ReadonlyMap<string, readonly PresentedRecord[]>;
   /** Draws one presented card; the thread owns the canvas handlers it needs. */
   renderRecord?: (record: PresentedRecord) => ReactNode;
+  /**
+   * Send this turn's message again — the fix on the card a turn that did not
+   * finish shows (TurnProblemCard). Absent where a turn cannot be resent.
+   */
+  onRetry?: () => void;
 }): ReactNode {
   /*
    * A RECONSTRUCTED TRANSCRIPT HAS NO isStreaming, AND THAT READ AS FINISHED.
@@ -464,10 +472,9 @@ export function AssistantGroup({
       </div>
     );
   const rawError = group.find((m) => m.errorMessage !== undefined)?.errorMessage;
-  // Clean once: a raw provider blob collapses to a short message, and a
-  // user-initiated pause/stop ("aborted"/AbortError) collapses to '' — a clean
-  // end renders NOTHING (never a red error row).
-  const errorText = rawError !== undefined ? cleanErrorText(rawError) : '';
+  // What went wrong and its fix — or null for no error and for a turn the
+  // person stopped themselves (a pause/stop is a clean end, never a problem).
+  const problem = describeTurnProblem(rawError);
   let textN = 0;
   let activityN = 0;
   /*
@@ -827,12 +834,10 @@ export function AssistantGroup({
       <div className="contents" data-testid="turn-foot">
         {foot}
       </div>
-      {errorText !== '' ? (
-        // Defense-in-depth: never render a raw provider blob (an HTTP/JSON error)
-        // in the chat — collapse it to a short human message. The provider already
-        // emits clean text; this guards replayed transcripts + future paths. An
-        // abort (pause/stop) cleaned to '' renders nothing.
-        <div className="text-footnote text-status-danger-fg">{errorText}</div>
+      {problem !== null ? (
+        // Never the engine's words in red: what happened, plainly, and the fix
+        // on a button (turn-problem.ts). The raw text sits under Details.
+        <TurnProblemCard problem={problem} {...(onRetry !== undefined ? { onRetry } : {})} />
       ) : null}
       {!streaming && answered && !suppressInlineArtifacts ? (
         <SourcesCard arriving={sawStreaming.current} />
