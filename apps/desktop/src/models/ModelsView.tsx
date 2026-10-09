@@ -2774,7 +2774,7 @@ export function ModelsView() {
                            */}
                           {fitFor(curatedPick.variant, hw?.ramGiB ?? 0) === 'too-big' ? (
                             <p
-                              className="mt-2 text-caption text-status-danger-fg"
+                              className="mt-2 text-caption text-status-warning-fg"
                               data-testid="detail-gen-install"
                             >
                               Needs more memory than this computer has. It will download, but not

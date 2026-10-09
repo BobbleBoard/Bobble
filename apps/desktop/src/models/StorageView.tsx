@@ -317,7 +317,7 @@ export function StorageView() {
     const first = r.failed[0];
     setNote(
       done > 0
-        ? `${done === 1 ? nodes[0]?.name : `${done} items`} moved to the Trash — ${bytesLabel(r.freed)} freed once it is emptied.${first !== undefined ? ` ${first.error}.` : ''}`
+        ? `${done === 1 ? nodes[0]?.name : `${done} items`} moved to the Trash — ${bytesLabel(r.freed)} freed once it is emptied.${first !== undefined ? ` ${sayIfRaw(first.error, 'move')}` : ''}`
         : (first?.error ?? 'nothing was deleted'),
     );
     setSelected(new Set());

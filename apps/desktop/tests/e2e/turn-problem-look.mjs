@@ -125,8 +125,29 @@ try {
   );
   await shot('2-details');
   await page.click('[data-testid="turn-fix-retry"]');
+  // The retry forks first, so it can take a moment to start: wait for the answer.
+  await page
+    .waitForFunction(
+      () =>
+        [...document.querySelectorAll('main p')].some((p) =>
+          (p.textContent ?? '').includes('Here is your answer.'),
+        ),
+      undefined,
+      { timeout: 30_000 },
+    )
+    .catch(() => undefined);
   check(await settle(), 'the retried turn settles');
-  await sleep(800);
+  // The fork swaps the failed turn out a beat after the answer starts.
+  const t0 = Date.now();
+  let lingering = -1;
+  while (Date.now() - t0 < 5000) {
+    lingering = await page.evaluate(
+      () => document.querySelectorAll('[data-testid="turn-problem"]').length,
+    );
+    if (lingering === 0) break;
+    await sleep(250);
+  }
+  console.log(`problem cards after the retry: ${lingering} (${Date.now() - t0} ms)`);
   const after = await page.evaluate(() => ({
     reply: [...document.querySelectorAll('[data-testid="chat-thread"] p, main p')]
       .map((p) => p.textContent ?? '')
@@ -202,6 +223,60 @@ try {
   check(menu !== null, '"Choose a smaller model" opens the model menu');
   await shot('5-model-menu');
   await page.keyboard.press('Escape');
+
+  // ── Part 3: a failure toast — amber, in words, with its fix ───────────────
+  await page.evaluate(() => {
+    let tried = 0;
+    window.__pi_store().setState((st) => ({
+      notifications: [
+        ...st.notifications,
+        {
+          id: 't1',
+          level: 'error',
+          message: 'pi rejected set_model: {"error":"no such model"}',
+          timestamp: Date.now(),
+        },
+        {
+          id: 't2',
+          level: 'error',
+          message: 'Could not open that chat.',
+          timestamp: Date.now(),
+          action: {
+            label: 'Try again',
+            run: () => {
+              tried += 1;
+              window.__toastTried = tried;
+            },
+          },
+        },
+      ],
+    }));
+  });
+  await sleep(700);
+  const toasts = await page.evaluate(() =>
+    [...document.querySelectorAll('[data-radix-toast-viewport] li, .pd-toast')].map((t) => ({
+      text: (t.textContent ?? '').replace(/\s+/g, ' ').trim(),
+      color: `${getComputedStyle(t).borderColor} ${getComputedStyle(t).backgroundColor}`,
+    })),
+  );
+  console.log('toasts', JSON.stringify(toasts));
+  check(
+    toasts.some((t) => /That did not go through/.test(t.text) && !/set_model|\{/.test(t.text)),
+    'an engine line is said in words, never raw',
+  );
+  check(
+    toasts.some((t) => /Try again/.test(t.text)),
+    'a toast can carry its fix',
+  );
+  await shot('6-toasts');
+  // The toast's own button (the cards above have a Try again too).
+  await page
+    .locator('.pd-toast', { hasText: 'Could not open that chat' })
+    .getByRole('button', { name: 'Try again' })
+    .click()
+    .catch(() => undefined);
+  await sleep(300);
+  check((await page.evaluate(() => window.__toastTried ?? 0)) === 1, 'its button runs the fix');
 } finally {
   await finish();
   await mock.close?.();
