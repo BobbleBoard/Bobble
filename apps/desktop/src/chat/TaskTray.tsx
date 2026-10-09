@@ -29,6 +29,7 @@
  * headers — the operation in words, a thin blue bar with how far, a red X when
  * it can be stopped. What those rows say is state/tray-transfers.ts.
  */
+import { sayIfRaw } from '@pi-desktop/shared';
 import {
   formatDuration,
   Glyph,
@@ -469,7 +470,9 @@ export function TaskTray({
                     >
                       <span className="pd-transfer-title">{noticeTitle(n)}</span>
                       {n.detail !== undefined ? (
-                        <span className="pd-transfer-detail">{n.detail}</span>
+                        <span className="pd-transfer-detail">
+                          {n.kind === 'failed' ? sayIfRaw(n.detail, 'download') : n.detail}
+                        </span>
                       ) : null}
                       <button
                         type="button"

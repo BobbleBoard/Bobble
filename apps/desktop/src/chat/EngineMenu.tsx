@@ -24,6 +24,8 @@
  * Every row that was measured is clickable: it relaunches the model on that
  * engine + method by hand, calibration's verdict notwithstanding.
  */
+
+import { sayIfRaw } from '@pi-desktop/shared';
 import { Glyph, IconButton, Popover, PopoverContent, PopoverTrigger, Switch } from '@pi-desktop/ui';
 import { useEffect, useMemo, useState } from 'react';
 import type { EngineState, LlmCompanion } from '../../electron/ipc-contract';
@@ -448,7 +450,9 @@ function EngineRow({
         </span>
         <span className="pd-engine-row-sub">{support.supported ? spec.blurb : support.reason}</span>
         {state?.error !== undefined ? (
-          <span className="pd-engine-row-sub pd-engine-row-sub--error">{state.error}</span>
+          <span className="pd-engine-row-sub pd-engine-row-sub--error">
+            {sayIfRaw(state.error, 'install')}
+          </span>
         ) : null}
       </span>
       <span className="pd-engine-row-side">
@@ -735,7 +739,7 @@ export function EngineMenu() {
           ) : null}
           {note !== null ? (
             <div className="pd-engine-note" data-testid="engine-menu-note">
-              {note}
+              {sayIfRaw(note, 'engine')}
             </div>
           ) : null}
           <CalibrationSection onUse={(e, s) => void onUse(e, s)} plan={plan} />

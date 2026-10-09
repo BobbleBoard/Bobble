@@ -32,6 +32,7 @@
  */
 import '../tripo/tripo.css';
 import './image-viewer.css';
+import { sayIfRaw } from '@pi-desktop/shared';
 import {
   Button,
   IconChat,
@@ -588,7 +589,7 @@ function EditBar({
         /* The studio's error line, and its one-click recovery: most failures
            are transient (a runtime still installing, a model swapped out). */
         <p className="pd-studio-error pd-viewer-error" data-testid="viewer-edit-error">
-          <span>{error}</span>
+          <span>{sayIfRaw(error, 'generate')}</span>
           <button
             type="button"
             className="pd-studio-error-retry pd-focusable"

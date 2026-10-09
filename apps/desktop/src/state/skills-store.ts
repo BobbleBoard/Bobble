@@ -5,8 +5,35 @@
  * round-trips through IPC and adopts the returned list so the tab stays in sync;
  * the pi engine picks up an installed skill on the next session/spawn.
  */
+import { sayIfRaw } from '@pi-desktop/shared';
 import { create } from 'zustand';
 import type { SkillListItem } from '../../electron/skills/skills-contract';
+import { usePiStore } from './pi-slice';
+
+/**
+ * A skill switch that did not take says so — the error used to sit in the
+ * store with nothing reading it, so the switch just sprang back (2026-10-08
+ * audit). A toast in words, with Try again.
+ */
+function sayFailed(what: string, error: unknown, retry: () => void): void {
+  usePiStore.setState((st) => ({
+    notifications: [
+      ...st.notifications.slice(-3),
+      {
+        id: `skill-${Date.now()}`,
+        level: 'error' as const,
+        message: `Couldn't ${what}. ${sayIfRaw(error, 'install')}`,
+        timestamp: Date.now(),
+        action: { label: 'Try again', run: retry },
+      },
+    ],
+  }));
+}
+
+function nameOf(skills: readonly SkillListItem[], id: string): string {
+  const s = skills.find((k) => (k as { id?: string }).id === id) as { name?: string } | undefined;
+  return s?.name ?? 'that skill';
+}
 
 interface SkillsStoreState {
   skills: SkillListItem[];
@@ -40,6 +67,9 @@ export const useSkillsStore = create<SkillsStoreState>((set, get) => ({
     try {
       const { skills, error } = await window.piDesktop.invoke('skills:install', { id });
       set({ skills, error: error ?? null });
+      if (error) sayFailed(`turn on ${nameOf(skills, id)}`, error, () => void get().install(id));
+    } catch (e) {
+      sayFailed(`turn on ${nameOf(get().skills, id)}`, e, () => void get().install(id));
     } finally {
       set({ busyId: null });
     }
@@ -50,6 +80,9 @@ export const useSkillsStore = create<SkillsStoreState>((set, get) => ({
     try {
       const { skills, error } = await window.piDesktop.invoke('skills:remove', { id });
       set({ skills, error: error ?? null });
+      if (error) sayFailed(`turn off ${nameOf(skills, id)}`, error, () => void get().remove(id));
+    } catch (e) {
+      sayFailed(`turn off ${nameOf(get().skills, id)}`, e, () => void get().remove(id));
     } finally {
       set({ busyId: null });
     }

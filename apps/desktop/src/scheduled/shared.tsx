@@ -159,7 +159,7 @@ export function StatusGlyph({
     return <IconAlert size={size} style={style('var(--pd-status-warning-fg)')} />;
   if (state.kind === 'paused') return <IconPause size={size} style={style(quiet)} />;
   if (last?.status === 'error')
-    return <IconAlert size={size} style={style('var(--pd-status-danger-fg)')} />;
+    return <IconAlert size={size} style={style('var(--pd-status-warning-fg)')} />;
   if (last?.status === 'stopped') return <IconStopCircle size={size} style={style(quiet)} />;
   if (state.kind === 'manual') return <IconHand size={size} style={style(quiet)} />;
   if (last?.status === 'ok')
@@ -172,7 +172,7 @@ export function StatusGlyph({
 export function OutcomeGlyph({ run, size = 14 }: { run: TaskRun; size?: number }) {
   if (run.status === 'running') return <Spinner size={size - 2} />;
   if (run.status === 'error')
-    return <IconAlert size={size} style={{ color: 'var(--pd-status-danger-fg)' }} />;
+    return <IconAlert size={size} style={{ color: 'var(--pd-status-warning-fg)' }} />;
   if (run.status === 'stopped')
     return <IconStopCircle size={size} style={{ color: 'var(--pd-text-muted)' }} />;
   return <IconCheck size={size} style={{ color: 'var(--pd-status-success-fg)' }} />;

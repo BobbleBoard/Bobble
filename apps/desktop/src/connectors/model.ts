@@ -14,12 +14,14 @@
  * prompt-cost arithmetic, the page's sections, and the authored copy — reach
  * lines, key help, and the example prompt each connector's detail leads with.
  */
+
 import type {
   ConnectorCategory,
   KnownConnector,
   McpMode,
   McpServerConfig,
 } from '@pi-desktop/mcp-lite';
+import { sayIfRaw } from '@pi-desktop/shared';
 import { useEffect, useMemo, useSyncExternalStore } from 'react';
 import type {
   ConnectorToolListing,
@@ -27,6 +29,7 @@ import type {
 } from '../../electron/connectors/connectors-contract';
 import type { SkillListItem } from '../../electron/skills/skills-contract';
 import { installedServer, useConnectorsStore } from '../state/connectors-store';
+import { usePiStore } from '../state/pi-slice';
 import { useSettingsStore } from '../state/settings-store';
 import { useSkillsStore } from '../state/skills-store';
 
@@ -1268,10 +1271,33 @@ export function useActions(): Actions {
   const readSkill = useSkillsStore((s) => s.readSkill);
   const update = useSettingsStore((s) => s.update);
 
-  return useMemo(
+  const actions: Actions = useMemo(
     () => ({
       add: async (item) => {
-        await install(item.id);
+        /*
+         * A FAILED ADD SAYS SO. The callers fire this and forget it, so a
+         * refusal ("the 3D engine is not installed — install it from the 3D
+         * studio first") became an unhandled rejection and the button just did
+         * nothing (2026-10-08 audit). Now it is a toast in words, with Try again.
+         */
+        try {
+          await install(item.id);
+        } catch (error) {
+          const raw = error instanceof Error ? error.message : String(error);
+          usePiStore.setState((st) => ({
+            notifications: [
+              ...st.notifications.slice(-3),
+              {
+                id: `connector-${item.id}-${Date.now()}`,
+                level: 'error' as const,
+                message: `Couldn't add ${item.name}. ${sayIfRaw(raw, 'install')}`,
+                timestamp: Date.now(),
+                action: { label: 'Try again', run: () => void actions.add(item) },
+              },
+            ],
+          }));
+          return;
+        }
         warmAfter(fetchTools, item.id);
       },
       setOn: async (item, on) => {
@@ -1325,6 +1351,7 @@ export function useActions(): Actions {
       update,
     ],
   );
+  return actions;
 }
 
 export const MODE_LABEL: Record<McpMode, string> = {

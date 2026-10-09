@@ -29,6 +29,7 @@ import {
   type PublisherDomain,
   reliableAuthorsForDomains,
 } from '@pi-desktop/inference/catalog';
+import { sayIfRaw } from '@pi-desktop/shared';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -2123,7 +2124,7 @@ export function ModelsView() {
           className="mx-6 mb-3 rounded-lg border border-border-default bg-bg-inset px-3 py-2 text-footnote text-text-secondary"
           data-testid="models-hf-error"
         >
-          {hfError}
+          {sayIfRaw(hfError, 'search')}
         </p>
       ) : null}
 
@@ -2171,7 +2172,7 @@ export function ModelsView() {
           className="mx-6 mb-3 rounded-lg border border-border-default bg-bg-inset px-3 py-2 text-footnote text-text-primary"
           data-testid="models-error"
         >
-          {error ?? downloadError?.error}
+          {sayIfRaw(error ?? downloadError?.error, 'download')}
         </p>
       ) : null}
 

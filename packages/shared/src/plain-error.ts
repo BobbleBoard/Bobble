@@ -139,3 +139,21 @@ export function plainError(raw: unknown, context: ErrorContext = 'generic'): str
   if (/abort|cancel/i.test(s)) return 'It was stopped.';
   return FALLBACK[context];
 }
+
+/** Words that mark an error as the machine's, not a sentence for a person. */
+const RAW =
+  /\b(E[A-Z]{3,}|errno|UND_ERR_\w+)\b|HTTP \d{3}|fetch failed|Traceback|\b\w*Error:|[{}<>]|\bat \S+:\d+|https?:\/\/\S+\/\S+|^\s*$/;
+
+/**
+ * For a message that may already be a sentence: keep it when it is one,
+ * translate it (plainError) when it is the machine's own words. Many failure
+ * strings in the app were written for people ("There is not enough disk space
+ * for this download"); the rest are an exception's message passed straight
+ * through. Display sites call this so both read right.
+ */
+export function sayIfRaw(raw: unknown, context: ErrorContext = 'generic'): string {
+  const s = errorText(raw).trim();
+  if (RAW.test(s)) return plainError(s, context);
+  const sentence = s.charAt(0).toUpperCase() + s.slice(1);
+  return /[.!?…]$/.test(sentence) ? sentence : `${sentence}.`;
+}

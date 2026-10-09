@@ -15,6 +15,7 @@
  *    live message ("Geometry done — texturing (step 12/30)…"), the input-image
  *    thumbnail, and Cancel. Geometry lands in the viewer the moment it exists.
  */
+import { sayIfRaw } from '@pi-desktop/shared';
 import type { CSSProperties, JSX } from 'react';
 import { useEffect, useRef } from 'react';
 import type { Gen3dModelId, Gen3dRole } from '../../electron/gen3d/gen3d-contract';
@@ -226,15 +227,25 @@ function ModelCard({ id }: { readonly id: Gen3dModelId }): JSX.Element | null {
               <span className="tp-progress-num">{pct === null ? '…' : `${pct}%`}</span>
             </div>
           ) : (
-            <button
-              type="button"
-              className="tp-dlcard-btn"
-              data-testid={`tp-download-${id}`}
-              onClick={() => void download([id])}
-            >
-              <IcDownload size={14} />
-              Download · {formatGb(model.sizeBytes)}
-            </button>
+            <>
+              {/* A download that stopped says why, and the button is its retry
+                  (the error used to be kept and never shown). */}
+              {dl?.error !== undefined && dl.error !== 'cancelled' ? (
+                <p className="tp-dlcard-note" data-testid={`tp-download-error-${id}`}>
+                  {sayIfRaw(dl.error, 'download')}
+                </p>
+              ) : null}
+              <button
+                type="button"
+                className="tp-dlcard-btn"
+                data-testid={`tp-download-${id}`}
+                onClick={() => void download([id])}
+              >
+                <IcDownload size={14} />
+                {dl?.error !== undefined && dl.error !== 'cancelled' ? 'Try again' : 'Download'} ·{' '}
+                {formatGb(model.sizeBytes)}
+              </button>
+            </>
           )}
         </div>
       </div>

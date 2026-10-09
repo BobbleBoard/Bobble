@@ -36,6 +36,7 @@
  * what the engine actually said.
  */
 
+import { sayIfRaw } from '@pi-desktop/shared';
 import type { JSX } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import type { Gen3dRole } from '../../electron/gen3d/gen3d-contract';
@@ -345,7 +346,13 @@ export function GenStage(): JSX.Element | null {
           : STAGE_TITLE[job.stage];
   // The worker's last line is often just "Done", which would read as
   // "Done · Done" beside the title. Don't echo the title back.
-  const rawDetail = job.message.length > 0 ? job.message : STAGE_HINT[job.stage];
+  // A failure says why — the job's real error, in words (it used to read
+  // "Generation failed" while the reason went to the tray in raw form).
+  const rawDetail = failed
+    ? sayIfRaw(job.error, 'generate')
+    : job.message.length > 0
+      ? job.message
+      : STAGE_HINT[job.stage];
   const detail = rawDetail.trim().toLowerCase() === title.trim().toLowerCase() ? '' : rawDetail;
   const stages = jobPlan?.jobId === job.jobId ? jobPlan.stages : [job.stage];
   const bar = (size: 'hero' | 'slim'): JSX.Element => (

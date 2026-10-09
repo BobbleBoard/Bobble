@@ -40,6 +40,7 @@ import {
   THREE,
   USDZExporter,
 } from '@pi-desktop/canvas/three';
+import { sayIfRaw } from '@pi-desktop/shared';
 import type { JSX } from 'react';
 import { useEffect, useRef } from 'react';
 import { ensureModelBytes } from './asset-registry';
@@ -232,7 +233,7 @@ async function deliverBytes(
       note(
         res.ok
           ? `Opened in ${deliver.app} — ${res.savedTo ?? fileName}`
-          : (res.error ?? `${deliver.app} could not open it`),
+          : `${deliver.app} could not open it. ${sayIfRaw(res.error, 'open')}`,
       );
     } else {
       const res = await window.piDesktop.invoke('canvas:save-bytes', {
@@ -240,10 +241,11 @@ async function deliverBytes(
         suggestedName: fileName,
       });
       if (res.ok) note(`Saved ${res.savedTo ?? fileName}`);
-      else if (res.error !== undefined) note(res.error);
+      else if (res.error !== undefined && !/cancel/i.test(res.error))
+        note(sayIfRaw(res.error, 'save'));
     }
   } catch (err) {
-    note(err instanceof Error ? err.message : String(err));
+    note(sayIfRaw(err, 'save'));
   }
 }
 

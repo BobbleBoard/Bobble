@@ -8,6 +8,7 @@
  * itself is in its ⓘ.
  */
 import { groupFlags, MANAGED_LLAMA_FLAGS } from '@pi-desktop/inference/engine-flags';
+import { sayIfRaw } from '@pi-desktop/shared';
 import { useMemo, useState } from 'react';
 import { EngineSelect } from './EngineSelect';
 import { flagMatches, POPULAR_LLAMA_FLAGS, runningValue } from './engine-settings-logic';
@@ -81,7 +82,7 @@ export function EngineFlagsTab({ d }: { d: EngineDraft }) {
       {help === null ? (
         <p className="pd-engine-note">Reading {engine}’s own --help…</p>
       ) : help.error !== undefined && flags.length === 0 ? (
-        <p className="pd-engine-note">{help.error}</p>
+        <p className="pd-engine-note">{sayIfRaw(help.error, 'engine')}</p>
       ) : null}
       {popular.length > 0 ? (
         <section className="pd-flags-group" data-testid="engine-flags-popular">

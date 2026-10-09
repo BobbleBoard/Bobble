@@ -524,7 +524,7 @@
 }
 
 .sd-run-dot[data-tone="error"] {
-  color: var(--pd-status-danger-fg);
+  color: var(--pd-status-warning-fg);
 }
 
 .sd-run-dot[data-tone="live"] {
@@ -639,7 +639,8 @@
 }
 
 .sd-run-body[data-tone="error"] {
-  color: var(--pd-status-danger-fg);
+  /* What went wrong, in words — not red (2026-10-08). */
+  color: var(--pd-text-secondary);
 }
 
 .sd-run-trail {

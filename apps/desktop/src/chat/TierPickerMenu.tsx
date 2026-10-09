@@ -10,6 +10,8 @@
  * and, optionally, an `onOpenManager` callback. Both consumers therefore stay in
  * lock-step — one fix here propagates to the bar AND the footer.
  */
+
+import { sayIfRaw } from '@pi-desktop/shared';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -338,7 +340,7 @@ export function TierPickerMenu({
                  bar flashed and vanished; the reason stayed in a log. */
               downloadError !== null && downloadError.modelId === downloadIdFor(row) ? (
                 <span className="pd-tier-download-error" data-testid="tier-download-error">
-                  {downloadError.error}
+                  {sayIfRaw(downloadError.error, 'download')}
                 </span>
               ) : (
                 describeRow(row.secondary ?? undefined, row.modelId)

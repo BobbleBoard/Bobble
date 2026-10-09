@@ -34,6 +34,8 @@
  * Finder shows when Reveal is pressed — there is no second model of the disk
  * to disagree with the first.
  */
+
+import { sayIfRaw } from '@pi-desktop/shared';
 import {
   Checkbox,
   Dialog,
@@ -618,7 +620,7 @@ export function StorageView() {
       ) : null}
       {note !== null ? (
         <div className="pd-storage-banner" data-testid="storage-note">
-          {note}
+          {sayIfRaw(note, 'move')}
         </div>
       ) : null}
 

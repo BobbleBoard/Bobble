@@ -2916,7 +2916,7 @@ h2.text-heading {
   color: var(--pd-status-success-fg);
 }
 .pd-child-row-status[data-why="error"] {
-  color: var(--pd-status-danger-fg);
+  color: var(--pd-status-warning-fg);
 }
 .pd-child-row-status[data-why="paused"] {
   color: var(--pd-status-warning-fg);
@@ -3416,8 +3416,9 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
 }
 .pd-task-tray-dot[data-tone="failed"],
 .pd-task-dot[data-tone="failed"] {
-  background: var(--pd-status-danger-fg);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pd-status-danger-fg) 22%, transparent);
+  /* Something to look at, not an alarm: amber like the failure toasts. */
+  background: var(--pd-status-warning-fg);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pd-status-warning-fg) 22%, transparent);
 }
 @media (prefers-reduced-motion: reduce) {
   .pd-task-tray-button {
@@ -3724,7 +3725,7 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   color: var(--pd-text-secondary);
 }
 .pd-transfer-notice[data-kind="failed"] .pd-transfer-detail {
-  color: var(--pd-status-danger-fg);
+  color: var(--pd-text-secondary);
 }
 .pd-transfer-notice:hover .pd-task-row-x {
   opacity: 1;
@@ -5708,7 +5709,8 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   display: flex;
   align-items: baseline;
   gap: 10px;
-  color: var(--pd-status-danger-fg);
+  /* What happened, in words, beside Try again — not red (2026-10-08). */
+  color: var(--pd-text-secondary);
 }
 /* One click back to trying, right where the bad news is (the user). */
 .pd-studio-error-retry {
@@ -5722,7 +5724,7 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   cursor: pointer;
 }
 .pd-studio-error-retry:hover {
-  background: var(--pd-status-danger-bg);
+  background: var(--pd-bg-hover);
 }
 
 /* The "working from" card, above the composer. Small — it is context for the
@@ -7729,7 +7731,7 @@ body[data-media-expanded="true"] .pd-studio-compose {
   max-width: 300px;
   white-space: normal;
   line-height: 1.35;
-  color: var(--pd-status-danger-fg);
+  color: var(--pd-text-secondary);
 }
 .pd-engine-head-title {
   font-weight: var(--pd-font-weight-semibold);
@@ -7894,7 +7896,7 @@ body[data-media-expanded="true"] .pd-studio-compose {
   -webkit-box-orient: vertical;
 }
 .pd-engine-row-sub--error {
-  color: var(--pd-status-danger-fg);
+  color: var(--pd-text-secondary);
 }
 .pd-engine-row-side {
   flex: none;

@@ -17,6 +17,7 @@
  *   - blame the weights when the RUNTIME is what is missing — that sends someone
  *     to fetch 34GB when the fix is installing uv.
  */
+import { sayIfRaw } from '@pi-desktop/shared';
 import type { JSX } from 'react';
 import { useEffect, useState } from 'react';
 import { useGenModule, useGenModulesStore } from '../state/gen-modules-store';
@@ -166,7 +167,7 @@ export function ModuleGate({ state, onView }: ModuleGateProps): JSX.Element {
 
         {error !== null || comfyFailed !== undefined ? (
           <p className="tp-gate-error" data-testid="tp-gate-error">
-            {error ?? comfyFailed}
+            {sayIfRaw(error ?? comfyFailed, 'install')}
           </p>
         ) : null}
 

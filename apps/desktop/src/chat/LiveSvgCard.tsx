@@ -14,6 +14,7 @@
  * in the same place, so the drawing settles rather than blinks.
  */
 import { InlineWidget } from '@pi-desktop/canvas';
+import { sayIfRaw } from '@pi-desktop/shared';
 import { useSvgLive } from '../state/svg-live';
 
 /** An empty page in OmniSVG's own frame, for the moment before the first shape. */
@@ -52,7 +53,7 @@ export function LiveSvgCard({ callId }: { callId: string }) {
         </div>
       )}
       <span className="pd-pending-pct" data-testid="live-svg-note" aria-live="polite">
-        {note}
+        {sayIfRaw(note, 'generate')}
       </span>
     </figure>
   );

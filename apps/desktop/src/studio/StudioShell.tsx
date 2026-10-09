@@ -24,6 +24,8 @@
  * GEARS carry sampling and steps. Three tiers, and the rule for placing a
  * control is how often you touch it, not how important it sounds.
  */
+
+import { sayIfRaw } from '@pi-desktop/shared';
 import {
   Button,
   Dialog,
@@ -382,7 +384,7 @@ export function StudioShell({
           ) : null}
           {error !== null && error !== undefined && error !== '' ? (
             <p className="pd-studio-error" data-testid="studio-error">
-              <span>{error}</span>
+              <span>{sayIfRaw(error, 'generate')}</span>
               {onRetry !== undefined ? (
                 <button
                   type="button"

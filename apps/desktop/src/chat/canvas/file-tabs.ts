@@ -210,7 +210,7 @@ async function locateFile(absPath: string, cwd: string | undefined): Promise<str
       path: absPath,
       roots: chatRoots(cwd),
     });
-    return res.found;
+    return typeof res?.found === 'string' && res.found !== '' ? res.found : null;
   } catch {
     return null;
   }

@@ -11,6 +11,7 @@
  * run, and "ran late" comes from `TaskRun.trigger` plus the slot the run was
  * catching up — never from a Run-now.
  */
+import { sayIfRaw } from '@pi-desktop/shared';
 import {
   describeSchedule,
   type Frequency,
@@ -317,7 +318,8 @@ export function tally(runs: readonly TaskRun[] | undefined): {
 
 /** The first line of a run's report — the sentence you would read in a list. */
 export function headline(run: TaskRun): string {
-  if (run.error !== undefined) return run.error;
+  // In words — a run's raw error ("could not start: spawn ENOENT") is not a headline.
+  if (run.error !== undefined) return sayIfRaw(run.error, 'run');
   if (run.status === 'stopped') {
     const first = firstLine(run.summary);
     return first === '' ? 'Stopped by hand' : `Stopped by hand — had said: ${first}`;

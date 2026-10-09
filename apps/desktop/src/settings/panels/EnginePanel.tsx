@@ -15,6 +15,8 @@
  * page mention vLLM and my app doesn't"; showing it with "Linux only" answers
  * that without a support ticket.
  */
+
+import { sayIfRaw } from '@pi-desktop/shared';
 import { SegmentedControl, Spinner } from '@pi-desktop/ui';
 import { useCallback, useEffect, useState } from 'react';
 import type { EngineState } from '../../../electron/ipc-contract';
@@ -108,7 +110,7 @@ export function EnginePanel() {
           className="rounded-lg border border-border-default bg-bg-inset px-3 py-2 text-footnote text-text-primary"
           data-testid="engine-error"
         >
-          {error}
+          {sayIfRaw(error, 'install')}
         </p>
       ) : null}
 
@@ -169,7 +171,9 @@ export function EnginePanel() {
                   </p>
                 ) : null}
                 {state?.error !== undefined ? (
-                  <p className="mt-1 text-footnote text-text-muted">{state.error}</p>
+                  <p className="mt-1 text-footnote text-text-muted">
+                    {sayIfRaw(state.error, 'install')}
+                  </p>
                 ) : null}
               </div>
 

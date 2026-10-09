@@ -4930,7 +4930,8 @@
 .tp-gate-error {
   margin: 0;
   font-size: var(--pd-font-size-footnote);
-  color: var(--pd-status-danger-fg);
+  /* What stopped the install, in words, above its button — not red. */
+  color: var(--pd-text-secondary);
 }
 .tp-gate-actions {
   display: flex;

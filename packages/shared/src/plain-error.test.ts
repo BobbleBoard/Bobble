@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { errorText, plainError } from './plain-error';
+import { errorText, plainError, sayIfRaw } from './plain-error';
 
 describe('plainError — an error said so a person can act on it', () => {
   const cases: Array<[unknown, Parameters<typeof plainError>[1], RegExp]> = [
@@ -35,4 +35,25 @@ describe('plainError — an error said so a person can act on it', () => {
       expect(out).not.toMatch(/ENOENT|EACCES|ENOSPC|ECONN|Traceback|HTTP \d|\{|fetch failed/);
     });
   }
+});
+
+describe('sayIfRaw — keep a sentence, translate the machine’s words', () => {
+  it('keeps what was written for people, tidied', () => {
+    expect(sayIfRaw('Not enough disk space for this download.', 'download')).toBe(
+      'Not enough disk space for this download.',
+    );
+    expect(sayIfRaw('the download could not start', 'download')).toBe(
+      'The download could not start.',
+    );
+  });
+  it('translates the raw ones', () => {
+    expect(sayIfRaw('GET https://hf.co/a/b failed: HTTP 404', 'download')).toMatch(
+      /not found on the server/,
+    );
+    expect(sayIfRaw('TypeError: fetch failed', 'search')).toMatch(/reach the internet/);
+    expect(sayIfRaw("Could not list x's files: fetch failed", 'search')).toMatch(
+      /reach the internet/,
+    );
+    expect(sayIfRaw('', 'download')).toMatch(/download stopped/);
+  });
 });

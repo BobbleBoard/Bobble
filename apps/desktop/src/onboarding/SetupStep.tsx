@@ -17,6 +17,8 @@
  * hold a first run hostage to, and the app can start a model later from the
  * Models view; this step exists to make the common path one click, not to gate.
  */
+
+import { sayIfRaw } from '@pi-desktop/shared';
 import { Spinner } from '@pi-desktop/ui';
 import { useCallback, useEffect, useState } from 'react';
 import type { HarnessDetected } from '../../electron/ipc-contract';
@@ -175,7 +177,7 @@ export function SetupStep() {
 
       {error !== null ? (
         <p className="text-footnote text-text-muted" data-testid="setup-error">
-          {error} You can finish setup later from Settings.
+          {sayIfRaw(error, 'install')} You can finish setup later from Settings.
         </p>
       ) : null}
 

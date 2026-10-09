@@ -12,6 +12,8 @@
  * progress figure for a run in flight because the runner has none. An image
  * the run made is on the row.
  */
+
+import { sayIfRaw } from '@pi-desktop/shared';
 import { IconFile } from '@pi-desktop/ui';
 import { useEffect, useRef, useState } from 'react';
 import type { ScheduledTask } from '../../electron/scheduled/schedule-logic';
@@ -242,7 +244,7 @@ function RunBody({ task, run }: { task: ScheduledTask; run: TaskRun }) {
     <div data-testid="sd-run-body">
       {run.error !== undefined ? (
         <p className="sd-run-body" data-tone="error">
-          {run.error}
+          {sayIfRaw(run.error, 'run')}
         </p>
       ) : null}
       {run.status === 'stopped' ? (

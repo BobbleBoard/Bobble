@@ -9,6 +9,7 @@
  */
 
 import type { McpMode, McpServerConfig } from '@pi-desktop/mcp-lite';
+import { sayIfRaw } from '@pi-desktop/shared';
 import {
   Button,
   DropdownMenu,
@@ -1061,7 +1062,7 @@ export function SkillBody({ item, actions }: { item: SkillItem; actions: Actions
     );
   }
   if (state.error !== undefined) {
-    return <p className="text-footnote text-status-danger-fg">{state.error}</p>;
+    return <p className="text-footnote text-text-secondary">{sayIfRaw(state.error, 'read')}</p>;
   }
   return (
     <section>

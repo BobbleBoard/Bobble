@@ -12,6 +12,8 @@
  *    run on the loaded model; each prompts its own model download when missing.
  *  - Animate (SkinTokens rig / ARDY motion): AnimatePanel.
  */
+
+import { sayIfRaw } from '@pi-desktop/shared';
 import type { JSX, ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import type { Gen3dModelId, Gen3dRole } from '../../electron/gen3d/gen3d-contract';
@@ -598,7 +600,7 @@ function ModelPanel(): JSX.Element {
         {/* A refused request has no job, so nothing else would ever mention it. */}
         {startError !== null ? (
           <p className="tp-stage-warn" data-testid="tp-start-error">
-            {startError}
+            {sayIfRaw(startError, 'generate')}
           </p>
         ) : null}
         {canRunReal ? (
@@ -824,7 +826,7 @@ function ImagePanel(): JSX.Element {
       <div className="tp-panel-foot">
         {startError !== null ? (
           <p className="tp-stage-warn" data-testid="tp-start-error">
-            {startError}
+            {sayIfRaw(startError, 'generate')}
           </p>
         ) : null}
         {mageReady ? (
