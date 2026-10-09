@@ -32,6 +32,7 @@ import {
 import {
   buildChatCompletionsRequest,
   buildRequestHeaders,
+  createFetchWhenBack,
   createLiveTpsReporter,
   headersToRecord,
   httpProgressProbe,
@@ -42,6 +43,8 @@ import {
   reconstructToolCallFromContent,
   repairToolCallArguments,
   resolveUnknownToolName,
+  SERVER_RETURN_POLL_MS,
+  SERVER_RETURN_WAIT_MS,
   STALL_RETRIES,
   StreamStalledError,
   type StreamWatch,
@@ -59,9 +62,6 @@ import {
   validateAgainstSchema,
   watchStream,
   withoutWrittenToolCall,
-  createFetchWhenBack,
-  SERVER_RETURN_POLL_MS,
-  SERVER_RETURN_WAIT_MS,
 } from '@pi-desktop/provider-llamacpp';
 import { fitPicturesToVisionBudget } from './picture-budget.js';
 
