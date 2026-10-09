@@ -41,6 +41,7 @@ import type { ChatProject } from '../../electron/settings/settings-contract';
 import { useRouteViewsVersion } from '../route-views';
 import { IconMoon, IconSun } from '../settings/icons';
 import type { SettingsSection } from '../settings/SettingsView';
+import { useActivePlace } from '../state/active-place';
 import { navigate } from '../state/app-nav-store';
 import { deleteChatNow } from '../state/chat-delete';
 import {
@@ -374,6 +375,9 @@ export function SessionSidebar({
    */
   onEnterChat?: () => void;
 }) {
+  // What is on screen — the one place the sidebar lights (state/active-place.ts).
+  const place = useActivePlace((s) => s.place);
+  const onChat = place.kind === 'chat';
   /*
    * THE SLIDE. the user: "left sidebar does not close cleanly, it's instant
    * dissapear and then slide left rather than the correct slide in like the
@@ -1002,7 +1006,9 @@ export function SessionSidebar({
      */
     const hasKids = kids.length > 0;
     const expanded = hasKids && !collapsedParents.has(s.file);
-    const isFocused = isThisChat(effectiveCurrentFile) && viewedChildId === null;
+    // Lit only while the chat is what is on screen — not under Extensions, a
+    // studio or Models that were opened over it (state/active-place.ts).
+    const isFocused = onChat && isThisChat(effectiveCurrentFile) && viewedChildId === null;
     const title = displayTitle(s, org);
     const pinned = org.pinned.includes(s.file);
     const assignedTo = org.assignments[s.file];
@@ -1236,7 +1242,7 @@ export function SessionSidebar({
                 key={c.childId}
                 className="pd-child-row pd-focusable"
                 data-testid={`child-row-${c.childId}`}
-                data-selected={viewedChildId === c.childId || undefined}
+                data-selected={(onChat && viewedChildId === c.childId) || undefined}
                 onClick={() => {
                   onEnterChat?.();
                   setViewedChild(c.childId);
@@ -1355,6 +1361,7 @@ export function SessionSidebar({
               key={item.id}
               icon={<Glyph name={item.glyph} />}
               label={item.label}
+              selected={place.kind === 'view' && place.view === item.id}
               onClick={() => item.onClick(workspaceNavContext)}
               data-testid={item.testid}
             />
@@ -1414,6 +1421,7 @@ export function SessionSidebar({
                       <span data-testid="modality-3d-size">{moduleSize}</span>
                     ) : undefined
                   }
+                  selected={place.kind === 'studio' && place.studio === '3d'}
                   data-testid="modality-3d"
                   data-installed={module3d.installed}
                   title={
@@ -1439,6 +1447,7 @@ export function SessionSidebar({
                 <SidebarRow
                   icon={<Glyph name="image" />}
                   label="Image"
+                  selected={place.kind === 'studio' && place.studio === 'image'}
                   data-testid="modality-image"
                   title="Image Studio"
                   onClick={() => setModalityView('image')}
@@ -1448,6 +1457,7 @@ export function SessionSidebar({
                 <SidebarRow
                   icon={<Glyph name="video" />}
                   label="Video"
+                  selected={place.kind === 'studio' && place.studio === 'video'}
                   data-testid="modality-video"
                   title="Video Studio"
                   onClick={() => setModalityView('video')}
@@ -1457,6 +1467,7 @@ export function SessionSidebar({
                 <SidebarRow
                   icon={<Glyph name="audio" />}
                   label="Audio"
+                  selected={place.kind === 'studio' && place.studio === 'audio'}
                   data-testid="modality-audio"
                   title="Audio Studio"
                   onClick={() => setModalityView('audio')}

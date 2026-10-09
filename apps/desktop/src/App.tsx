@@ -18,6 +18,7 @@ import { lazyRoute } from './RouteBoundary';
 import { type MainView, type RouteContext, useContentRoute } from './routes';
 import { startTaskRunner } from './scheduled/tasks-store';
 import { type SettingsSection, SettingsView } from './settings/SettingsView';
+import { placeOf, useActivePlace } from './state/active-place';
 import { type NavTarget, navHandler, setNavAllowList, useAppNavStore } from './state/app-nav-store';
 import { exitModality, useModalityStore } from './state/modality-store';
 import { newSession } from './state/pi-connect';
@@ -200,6 +201,10 @@ export function App() {
    * or none for the chat and the gallery. Its title replaces the chat's name.
    */
   const route = useContentRoute(view);
+  // What is on screen, for the sidebar's highlight (state/active-place.ts).
+  useEffect(() => {
+    useActivePlace.getState().set(placeOf(view, modalityView));
+  }, [view, modalityView]);
   const routeContext: RouteContext = {
     /* "Try in chat": a NEW chat, because pi reads the connector registry when a
        session starts, so the thing just turned on is only certainly there in
