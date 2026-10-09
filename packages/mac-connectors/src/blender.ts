@@ -103,10 +103,17 @@ export async function notListeningMessage(env: BlenderEnv = {}): Promise<string>
       'to start listening, then run this again.'
     );
   }
+  /*
+   * The add-on starts its server only while Blender may go online (its own
+   * startup gate) — MEASURED 2026-10-09: with "Allow Online Access" off, nothing
+   * ever listened and its Start button refuses too. So that is named first.
+   */
   return (
     `Blender is open but its MCP add-on is not listening on port ${env.port ?? BLENDER_PORT}. ` +
-    'In Blender: Edit › Preferences › Add-ons, turn on "MCP" (Blender Lab) — it starts ' +
-    'itself; if it is already on, press Start in its preferences.'
+    'The add-on only starts while Blender may go online: in Blender, Edit › Preferences › ' +
+    'System › Network, turn on "Allow Online Access" (nothing is sent anywhere by this ' +
+    'command — it talks to Blender on this Mac). Then, under Add-ons, make sure "MCP" ' +
+    '(Blender Lab) is on and press Start in its preferences.'
   );
 }
 

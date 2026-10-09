@@ -56,7 +56,9 @@ function askBlender(code, timeoutMs = 20_000) {
       reject(new Error('blender did not answer'));
     }, timeoutMs);
     socket.on('connect', () => {
-      socket.write(`${JSON.stringify({ type: 'execute', code, strict_json: true })}\0`);
+      // The add-on's namespace has no `bpy` of its own.
+      const full = `import bpy\n${code}`;
+      socket.write(`${JSON.stringify({ type: 'execute', code: full, strict_json: true })}\0`);
     });
     socket.on('data', (d) => {
       buf += d.toString('utf8');
@@ -96,7 +98,24 @@ if (await blenderRunning()) {
 
 copyFileSync(path.join(REPO_ROOT, 'scratchpad', 'demos', 'empty-scene.blend'), SCENE);
 log('opening a throwaway scene in Blender, behind everything (open -g)…');
-await run('open', ['-g', '-a', 'Blender', SCENE]);
+/*
+ * The add-on starts its server only when Blender's "Allow Online Access" is on
+ * (its startup_online_ok_or_error gate), and the user's Blender has it off — so
+ * a plain launch never listened on 9876. `--online-mode` allows it for THIS
+ * launch only (the user's preferences are not touched), and a timer starts the
+ * server in case the add-on's own auto-start is off as well.
+ */
+const START_SERVER = [
+  'import bpy',
+  'def _bobble_probe_start():',
+  '    try:',
+  '        bpy.ops.blmcp.server_start()',
+  '    except Exception as e:',
+  "        print('blmcp start:', e)",
+  '    return None',
+  'bpy.app.timers.register(_bobble_probe_start, first_interval=3.0, persistent=True)',
+].join('\n');
+await run('open', ['-g', '-a', 'Blender', '--args', '--online-mode', '--python-expr', START_SERVER, SCENE]);
 let up = false;
 for (let i = 0; i < 120 && !up; i += 1) {
   try {

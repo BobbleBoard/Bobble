@@ -15,6 +15,7 @@
  * person's call, and the studio's Generate button is right there.
  */
 import { type ReactNode, useEffect, useState } from 'react';
+import { plainPressure } from './guardian-copy';
 
 type Notice = { kind: 'shed' | 'hold' | 'pause'; text: string; at: number };
 
@@ -40,7 +41,8 @@ export function GuardianBanner({ fallback = null }: { fallback?: ReactNode } = {
 
   useEffect(() => {
     const off = window.piDesktop.onEvent('gen:guardian', (event) => {
-      const { verdict, reason, shed, queued } = event;
+      const { verdict, shed, queued } = event;
+      const reason = plainPressure(event.reason);
       if (verdict === 'pause') {
         // The running work is stopped in place, not lost — say so, and what
         // is stopped, so the frozen progress bar reads as the guard and not
@@ -61,7 +63,7 @@ export function GuardianBanner({ fallback = null }: { fallback?: ReactNode } = {
           kind: 'shed',
           text:
             n === 0
-              ? `Memory is at its limit — not starting generations (${reason})`
+              ? `Memory is low, so new generations wait until it frees up — ${reason}`
               : `Stopped ${n === 1 ? 'a generation' : `${n} generations`} to keep your Mac responsive — ${reason}`,
           at: Date.now(),
         });
