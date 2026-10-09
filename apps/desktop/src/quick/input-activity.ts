@@ -6,16 +6,16 @@
  * the moment to have the model loaded and the conversation's prefix prefilled
  * so the answer starts the instant they press Return.
  *
- * TODO(input-activity): a parallel change on main is adding an "input
- * activity" signal that loads the model and prefills as soon as the user starts
- * typing. Wire this function to it when this branch is merged; until then it
- * deliberately does nothing. Every call site in src/quick already routes here,
- * so the wiring is this one function body.
+ * It is the same signal the main composer sends (state/input-activity.ts): it
+ * restarts the five-minute idle clock and loads back a model that was unloaded
+ * while idle (electron/inference/idle-unload.ts). The panel is often the first
+ * thing touched after a long break, so it matters most here.
  */
+import { noteInputActivity } from '../state/input-activity';
 
-/** What kind of input it was — for the signal's own use once it is wired. */
+/** What kind of input it was. The signal itself does not distinguish them yet. */
 export type QuickInputKind = 'key' | 'paste' | 'drop' | 'capture' | 'talk';
 
 export function markInputActivity(_kind: QuickInputKind): void {
-  // Intentionally empty until the input-activity signal lands (see the TODO above).
+  noteInputActivity();
 }
