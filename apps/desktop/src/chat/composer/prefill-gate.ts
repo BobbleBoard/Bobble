@@ -37,6 +37,8 @@ export interface PrefillInputs {
   readonly toolsJson: unknown;
   /** Is a model server actually up? */
   readonly serverRunning: boolean;
+  /** Is it parked — its process stopped while its URL is kept (LlmStatus.parked)? */
+  readonly parked?: boolean;
   /** Is a turn using the slot right now? */
   readonly busy: boolean;
   /** Characters of fixed attachment prefix (0 when nothing is attached). */
@@ -59,6 +61,10 @@ export type PrefillDecision =
  */
 export function prefillDecision(input: PrefillInputs): PrefillDecision {
   if (!input.serverRunning) return { prime: false, because: 'no model server' };
+  // Unloaded (idle, or making room): there is no process to read the prompt
+  // into. The prime runs again the moment it is back (`parked` is in the hook's
+  // signature), which is the point of loading it on the first keystroke.
+  if (input.parked === true) return { prime: false, because: 'the model is unloaded' };
   if (input.busy) return { prime: false, because: 'a turn is using the slot' };
   if (typeof input.system !== 'string' || input.system.length === 0) {
     return { prime: false, because: 'no system prompt published yet' };

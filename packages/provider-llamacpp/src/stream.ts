@@ -448,23 +448,12 @@ export function buildChatCompletionsRequest(
   }
   if (options?.temperature !== undefined) body.temperature = options.temperature;
   if (options?.maxTokens !== undefined) body.max_tokens = options.maxTokens;
-  /*
-   * THE THINKING CAP. A reasoning model may think only as far as leaves its
-   * reply room in what is left of the window, and when the budget runs out
-   * llama-server splices in the end message and closes the thought, so the
-   * model acts instead of thinking until `length` with nothing said. Both are
-   * per-request sampling fields: they never touch the prompt, so the KV cache
-   * is unaffected. A user's own cap (the advanced-params sidecar) replaces the
-   * number afterwards; the message is always sent.
-   */
-  if (model.reasoning) {
-    body.thinking_budget_tokens = autoThinkingBudget({
-      contextWindow: model.contextWindow,
-      maxTokens: options?.maxTokens ?? model.maxTokens,
-      promptChars: JSON.stringify(messages).length + JSON.stringify(body.tools ?? []).length,
-    });
-    body.reasoning_budget_message = REASONING_BUDGET_MESSAGE;
-  }
+  body.thinking_budget_tokens = autoThinkingBudget({
+    contextWindow: model.contextWindow,
+    maxTokens: options?.maxTokens ?? model.maxTokens,
+    promptChars: JSON.stringify(messages).length + JSON.stringify(body.tools ?? []).length,
+  });
+  body.reasoning_budget_message = REASONING_BUDGET_MESSAGE;
   return body;
 }
 

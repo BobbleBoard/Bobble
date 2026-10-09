@@ -82,6 +82,17 @@ export interface GuardianMainOptions {
    * failed" against a stopped server, with 79% of memory free.
    */
   readonly resumeChatModel?: () => Promise<unknown>;
+  /**
+   * Is someone using the chat right now (input within the idle window, or a
+   * turn running)? While they are, "only N% of memory is free" alone does not
+   * park the chat model: on a 24 GB Mac the 27B lives at that line, and
+   * parking it between turns meant every turn reloaded it cold (17-26 s to the
+   * first token) — the park/resume ping-pong the user ruled out (2026-10-09:
+   * unload after five idle minutes instead, inference/idle-unload.ts). A real
+   * thrash (swapping hard, the app stalling) or the system's own critical
+   * pressure still parks it: the machine comes first.
+   */
+  readonly chatInUse?: () => boolean;
   /** Tell the app. Every change of verdict, and every shed. */
   readonly announce: (event: {
     verdict: GuardianVerdict;
@@ -186,7 +197,23 @@ export function startGuardian(opts: GuardianMainOptions): GuardianMain {
             if (resumed.length > 0) log(`RESUME ${resumed.join(', ')} after the shed`);
             // Nothing heavy to end but the machine is still at the wall: the
             // chat model is the load, and it goes rather than the Mac.
-            if (stopped.length === 0 && ended.length === 0 && opts.parkChatModel !== undefined) {
+            // A thrash (swapping, the app stalling) or the system's own critical
+            // verdict is real; anything else is memory being full, which the
+            // 27B is by itself on this Mac.
+            const memoryOnly = !/swapping|stalled|critical/.test(reason);
+            if (
+              stopped.length === 0 &&
+              ended.length === 0 &&
+              opts.parkChatModel !== undefined &&
+              memoryOnly &&
+              opts.chatInUse?.() === true
+            ) {
+              log(`KEEP the chat model (in use; memory alone, no thrash): ${reason}`);
+            } else if (
+              stopped.length === 0 &&
+              ended.length === 0 &&
+              opts.parkChatModel !== undefined
+            ) {
               log(`PARK the chat model: ${reason}`);
               void opts.parkChatModel(why).then((r) => {
                 if ((r as { ok?: boolean } | undefined)?.ok === true) parkedChat = true;
@@ -203,6 +230,21 @@ export function startGuardian(opts: GuardianMainOptions): GuardianMain {
         return;
       }
       if (verdict === 'pause' && guard) {
+        /*
+         * A CHAT ALONE IS NOT PAUSED. With nothing heavy running, the memory
+         * the machine is short of is the chat model's own, and stopping the pi
+         * child frees none of it — it only freezes the turn. MEASURED (Qwen 3.8
+         * 27B on this 24 GB Mac, idle-unload probe): free memory sits at 13-15%
+         * with the model loaded, every turn paused, the first token took 87 s,
+         * and twenty paused readings escalated to parking the model between
+         * turns. The chat is paused only beside a heavy run, which is what the
+         * pause is for; an idle model is unloaded on its own (idle-unload.ts).
+         */
+        const heavy = q?.running() === true || pausables.active();
+        if (!heavy) {
+          if (changed) log(`HOLD (nothing heavy to pause; the chat runs on): ${reason}`);
+          return;
+        }
         // Stop every heavy run in place. Idempotent: a run already stopped
         // stays stopped; one registered since is stopped now.
         const paused = pausables.pauseAll(reason);

@@ -21,6 +21,11 @@ import type {
   ModelSpecChoice,
 } from '../settings/settings-contract';
 
+/** Why the chat server's process is stopped while its URL is kept: to make
+ * room for a generation, to keep the Mac responsive, or because nobody has
+ * used it for a while (idle-unload.ts). */
+export type ParkReason = 'room' | 'memory' | 'idle';
+
 export type LlmRequestBody =
   | { type: 'get-status' }
   | { type: 'list-catalog' }
@@ -91,8 +96,10 @@ export type LlmRequestBody =
    * chat model and not beside it. Refused when a request is in flight (the
    * server's /slots say so): a turn is never cut. `resume-server` respawns it.
    */
-  | { type: 'park-server' }
-  | { type: 'resume-server' }
+  | { type: 'park-server'; reason?: ParkReason }
+  /** `onlyIf`: resume only a server parked for that reason (input wakes an idle
+   *  unload, never one a running generation made room with). */
+  | { type: 'resume-server'; onlyIf?: ParkReason }
   /**
    * How hard the app may push this machine, and how much memory to hold back.
    *

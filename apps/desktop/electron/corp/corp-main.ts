@@ -24,6 +24,7 @@ import type { CorpChatFn } from '@pi-desktop/harness/corp';
 import { createIpcEventSender, createLogger } from '@pi-desktop/shared';
 import { type BrowserSearchFn, registerWebTools } from '@pi-desktop/web-tools';
 import { app, type IpcMainInvokeEvent, ipcMain, type WebContents } from 'electron';
+import { chatActivity } from '../activity/chat-activity';
 import { ensureCorpInferenceServer } from '../inference/llm-main';
 import type { AppEventMap } from '../ipc-contract';
 import { piToolExtensionPaths } from '../pi/pi-main';
@@ -436,6 +437,8 @@ async function handleStart(
   // navigated away) so the outcome is always recorded — the harness run itself
   // proceeds in the main process regardless of who is watching.
   const startedAt = Date.now();
+  // A corp run is the model in use until its stream ends (inference/idle-unload.ts).
+  const endActivity = chatActivity.begin('subagent', `corp:${handle.taskId}`);
   void (async () => {
     try {
       for await (const event of handle.events) {
@@ -460,6 +463,7 @@ async function handleStart(
        * forever on a run that is no longer going anywhere.
        */
       settleDelivery(handle.taskId, null);
+      endActivity();
       // Do NOT drop the record on terminal — peek / org-chart / worker-transcript must
       // keep resolving AFTER `done` (the build snapshot reads the on-disk product once
       // the run finishes; the workspace persists). Retain the most recent terminal

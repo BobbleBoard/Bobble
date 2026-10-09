@@ -156,3 +156,50 @@ describe('prefillCompletion', () => {
     ).rejects.toThrow(/apply-template: server returned 500/);
   });
 });
+
+describe('prefillCompletion on an engine without /apply-template (rapid-mlx)', () => {
+  it('primes over /v1/chat/completions, rendered as the MLX turn renders', async () => {
+    const calls: Array<{ url: string; body: Record<string, unknown> | null }> = [];
+    const fetchImpl = (async (url: string, init?: { body?: string }) => {
+      calls.push({ url, body: init?.body ? JSON.parse(init.body) : null });
+      if (url.endsWith('/apply-template')) return new Response('not found', { status: 404 });
+      return new Response(
+        JSON.stringify({
+          usage: { prompt_tokens: 6000, prompt_tokens_details: { cached_tokens: 5900 } },
+        }),
+        { status: 200 },
+      );
+    }) as unknown as typeof fetch;
+    const r = await prefillCompletion({
+      baseUrl: 'http://127.0.0.1:9/v1',
+      model: 'served-id',
+      messages: [
+        { role: 'system', content: 'sys' },
+        { role: 'user', content: 'hi' },
+        { role: 'assistant', content: 'hello' },
+      ],
+      tools: [{ name: 'read', description: 'read a file', parameters: {} }],
+      fetchImpl,
+    });
+    const chat = calls.find((c) => c.url.endsWith('/v1/chat/completions'));
+    expect(chat?.body?.model).toBe('served-id');
+    expect(chat?.body?.max_tokens).toBe(1);
+    expect(chat?.body?.chat_template_kwargs).toMatchObject({
+      enable_thinking: true,
+      preserve_thinking: true,
+    });
+    expect((chat?.body?.messages as unknown[]).length).toBe(3);
+    expect(r).toEqual({ aborted: false, promptN: 6000, processedN: 100 });
+  });
+
+  it('still fails plainly without a model id to ask for', async () => {
+    const fetchImpl = (async () => new Response('nf', { status: 404 })) as unknown as typeof fetch;
+    await expect(
+      prefillCompletion({
+        baseUrl: 'http://x/v1',
+        messages: [{ role: 'user', content: 'a' }],
+        fetchImpl,
+      }),
+    ).rejects.toThrow(/apply-template/);
+  });
+});

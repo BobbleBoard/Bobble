@@ -10,6 +10,7 @@ import { connectChatJobs } from './state/chat-jobs';
 import { connectChildAgents } from './state/child-agent-store';
 import { connectGen } from './state/gen-store';
 import { connectHf } from './state/hf-store';
+import { startIdleReturnWatch } from './state/idle-return';
 import { connectLlm, ensureDefaultEngines } from './state/llm-store';
 import { connectPi } from './state/pi-connect';
 import { connectSettings } from './state/settings-store';
@@ -42,6 +43,8 @@ if (!new URLSearchParams(window.location.search).has('canvasPopout')) {
   // The tasks you walked away from, for the button beside the sidebar toggle.
   connectTaskTray();
   connectLlm();
+  // A model back from an idle unload gets its prompt warm again (state/idle-return.ts).
+  startIdleReturnWatch();
   // How long each model took to load here — the tray's Loading bar walks at it.
   connectLoadTimer();
   // The default engines for this machine, in the background (see llm-store).

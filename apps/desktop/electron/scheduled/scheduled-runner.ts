@@ -16,6 +16,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import type { PiBridgeEvent } from '@pi-desktop/engine';
 import { createLogger } from '@pi-desktop/shared';
+import { chatActivity } from '../activity/chat-activity';
 import { blockedPermission, blockedPermissionError } from './blocked-permission';
 import type {
   RunArtifact,
@@ -255,10 +256,13 @@ export function createScheduledRunner(deps: ScheduledRunnerDeps): ScheduledRunne
       let summary = '';
       const toolCalls: string[] = [];
       let settled = false;
+      // A scheduled run is the model in use (inference/idle-unload.ts).
+      const endActivity = chatActivity.begin('scheduled', `${cwd}:${startedAt}`);
 
       const finish = (status: Exclude<RunStatus, 'running'>, error?: string): void => {
         if (settled) return;
         settled = true;
+        endActivity();
         clearTimeout(timeout);
         const artifacts = scanArtifacts(cwd, startedAt, dedicated);
         // A run that started before any model was loaded loaded one itself;

@@ -223,3 +223,92 @@ describe('the memory guard in main', () => {
     g.stop();
   });
 });
+
+describe('a chat in use is not parked for full memory alone', () => {
+  it('keeps the model while the user is active, parks it for the system’s critical pressure', async () => {
+    let parks = 0;
+    let inUse = true;
+    const lines: string[] = [];
+    const g = startGuardian({
+      queue: () => null,
+      mode: () => 'auto',
+      reserveGB: () => undefined,
+      parkChatModel: async () => {
+        parks += 1;
+        return { ok: true };
+      },
+      chatInUse: () => inUse,
+      announce: () => {},
+      log: (l) => lines.push(l),
+    });
+    await new Promise((r) => setTimeout(r, 20));
+    readings.push({ memoryFree: 0.02 });
+    expect(await g.refresh()).toBe('shed');
+    await new Promise((r) => setTimeout(r, 500));
+    expect(parks).toBe(0);
+    expect(lines.some((l) => l.startsWith('KEEP the chat model'))).toBe(true);
+
+    // The system itself says critical: the machine comes first.
+    readings.push({ memory: 'critical' });
+    expect(await g.refresh()).toBe('shed');
+    await new Promise((r) => setTimeout(r, 500));
+    expect(parks).toBe(1);
+
+    // Nobody using it: full memory parks it as before.
+    inUse = false;
+    for (let i = 0; i < 12; i += 1) {
+      readings.push({ memoryFree: 0.8 });
+      await g.refresh();
+    }
+    readings.push({ memoryFree: 0.02 });
+    expect(await g.refresh()).toBe('shed');
+    await new Promise((r) => setTimeout(r, 500));
+    expect(parks).toBe(2);
+    g.stop();
+  });
+});
+
+describe('a chat alone is not paused', () => {
+  it('leaves the pi child running when nothing heavy is, and pauses it beside a heavy run', async () => {
+    const kill = vi.spyOn(process, 'kill').mockImplementation(() => true);
+    const g = startGuardian({
+      queue: () => null,
+      mode: () => 'auto',
+      reserveGB: () => undefined,
+      announce: () => {},
+      log: () => {},
+    });
+    await new Promise((r) => setTimeout(r, 20));
+    const offChat = guardRun({
+      id: 'pi:1',
+      label: 'the chat',
+      kind: 'agent',
+      light: true,
+      neverTerminate: true,
+      pid: () => 4242,
+    });
+    try {
+      readings.push({ memoryFree: 0.13 });
+      await g.refresh();
+      expect(kill).not.toHaveBeenCalledWith(4242, 'SIGSTOP');
+
+      const offHeavy = guardRun({
+        id: 'gen3d:2',
+        label: 'the 3D model',
+        kind: 'gen3d',
+        pid: () => 4343,
+        cancel: () => {},
+      });
+      readings.push({ memoryFree: 0.13 });
+      await g.refresh();
+      expect(kill).toHaveBeenCalledWith(4343, 'SIGSTOP');
+      expect(kill).toHaveBeenCalledWith(4242, 'SIGSTOP');
+      offHeavy();
+    } finally {
+      offChat();
+      pausables.resumeAll();
+      kill.mockRestore();
+      g.stop();
+    }
+  });
+});

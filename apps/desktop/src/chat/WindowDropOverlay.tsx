@@ -19,6 +19,7 @@
  * a studio or a new chat all behave the way they already do.
  */
 import { useEffect, useRef, useState } from 'react';
+import { noteInputActivity } from '../state/input-activity';
 import { useDropStore } from './composer/drop-store';
 
 /** True when the drag carries files (vs. text/element drags we should ignore). */
@@ -104,6 +105,8 @@ export function WindowDropOverlay() {
     };
 
     const onDrop = (e: DragEvent) => {
+      // A file is a message on its way (state/input-activity.ts).
+      noteInputActivity();
       depth.current = 0;
       clearSpring();
       setActive(false);

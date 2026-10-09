@@ -49,6 +49,8 @@ export function prefillLabel(inp: {
   readonly modelPhase?: string | null;
   /** The chat server is parked to make room for a generation (LlmStatus.parked). */
   readonly parked?: boolean;
+  /** Why (LlmStatus.parkedReason): an idle unload is loading back, not making room. */
+  readonly parkedReason?: 'room' | 'memory' | 'idle';
   readonly loadingCapability?: string | null;
   readonly firstOfSession?: boolean;
   /** What to say when the wait is just the prompt — the caller's own wording,
@@ -58,7 +60,11 @@ export function prefillLabel(inp: {
 }): string {
   // The most specific cause first. A model stopped on purpose for a picture
   // is not "loading" — it is making room, and comes back when the picture does.
-  if (inp.parked === true) return 'Making room for a generation';
+  if (inp.parked === true) {
+    if (inp.parkedReason === 'idle') return 'Loading model';
+    if (inp.parkedReason === 'memory') return 'Waiting for memory to free up';
+    return 'Making room for a generation';
+  }
   const phase = inp.modelPhase ?? null;
   if (phase !== null && phase !== 'ready' && phase !== 'idle') return 'Loading model';
   const cap = inp.loadingCapability ?? null;

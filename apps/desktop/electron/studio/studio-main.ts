@@ -250,3 +250,16 @@ export function disposeStudio(): void {
   void handle?.supervisor.dispose();
   handle = null;
 }
+
+/**
+ * Stop ComfyUI when nobody is using it (inference/idle-unload.ts). It keeps the
+ * last job's models in memory between jobs; the next job starts it again.
+ * Resolves true when a running server was stopped.
+ */
+export async function unloadStudioWhenIdle(): Promise<boolean> {
+  if (handle === null || running.size > 0 || handle.supervisor.running !== true) return false;
+  const stopping = handle;
+  handle = null;
+  await stopping.supervisor.dispose();
+  return true;
+}

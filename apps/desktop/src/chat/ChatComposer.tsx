@@ -33,6 +33,7 @@ import { IconMic, IconPause, IconPlay, IconStop } from '../settings/icons';
 import { useConnectorsStore } from '../state/connectors-store';
 import { abortCorpTask } from '../state/corp-connect';
 import { useCorpStore } from '../state/corp-store';
+import { noteInputActivity } from '../state/input-activity';
 import { useImageBlindness } from '../state/local-model';
 import {
   abortPi,
@@ -1684,6 +1685,14 @@ export function ChatComposer({
           className="pd-composer"
           data-bash={bashMode ? '' : undefined}
           onMouseDown={focusEditorFromBlank}
+          /* A message is on its way: load back a model unloaded while idle, and
+             keep the idle clock from running out (state/input-activity.ts).
+             Capture phase, so the editor's own handlers cannot swallow it. */
+          onKeyDownCapture={() => noteInputActivity()}
+          onPasteCapture={() => noteInputActivity()}
+          onDropCapture={() => noteInputActivity()}
+          onFocusCapture={() => noteInputActivity()}
+          onPointerDownCapture={() => noteInputActivity()}
         >
           {visibleAttachments.length > 0 ? (
             <div className="pd-composer-attachments" data-testid="composer-attachments">

@@ -1250,9 +1250,9 @@ describe('the thinking cap on every reasoning request', () => {
     expect(body.reasoning_budget_message).toBe(REASONING_BUDGET_MESSAGE);
   });
 
-  it('leaves a model that does not think alone', () => {
+  it('rides on every request — models.json never marks a model as thinking', () => {
     const body = buildChatCompletionsRequest(makeModel(), ctx) as Record<string, unknown>;
-    expect(body.thinking_budget_tokens).toBeUndefined();
-    expect(body.reasoning_budget_message).toBeUndefined();
+    expect(typeof body.thinking_budget_tokens).toBe('number');
+    expect(body.reasoning_budget_message).toBe(REASONING_BUDGET_MESSAGE);
   });
 });

@@ -21,6 +21,7 @@ import type {
 } from '@pi-desktop/engine';
 import { MANUAL_COMPACTION_FOCUS } from '@pi-desktop/harness/compaction-focus';
 
+import { chatActivity } from '../activity/chat-activity';
 import { takeVisionWant } from '../inference/vision-want';
 import type { PiInvokeMap } from './contract';
 
@@ -175,6 +176,9 @@ export function createPiSessions<S extends SessionSender>(deps: PiSessionsDeps<S
    */
   const restarting = new Map<number, Promise<unknown>>();
 
+  /** The open activity mark of each window's turn in flight. */
+  const turnEnds = new Map<number, () => void>();
+
   function liveEntry(wcId: number): SessionEntry | undefined {
     const entry = entries.get(wcId);
     return entry?.bridge.alive ? entry : undefined;
@@ -185,6 +189,8 @@ export function createPiSessions<S extends SessionSender>(deps: PiSessionsDeps<S
   }
 
   function dispose(wcId: number): void {
+    turnEnds.get(wcId)?.();
+    turnEnds.delete(wcId);
     const entry = entries.get(wcId);
     if (entry !== undefined) {
       entries.delete(wcId);
@@ -250,6 +256,20 @@ export function createPiSessions<S extends SessionSender>(deps: PiSessionsDeps<S
          * The next turn can see. Fire-and-forget: a failed relaunch must never
          * break event delivery, and it is logged inside ensureVisionServer.
          */
+        /*
+         * A TURN IS IN FLIGHT from agent_start to agent_end — reported to the
+         * activity registry, which is how the idle unloader knows an agent
+         * turn running a ten-minute build is not "nobody is using the model"
+         * (inference/idle-unload.ts).
+         */
+        const evType = (event as { type?: string }).type;
+        if (evType === 'agent_start') {
+          turnEnds.get(wcId)?.();
+          turnEnds.set(wcId, chatActivity.begin('chat', `chat:${wcId}`));
+        } else if (evType === 'agent_end' || evType === '_bridge_exit') {
+          turnEnds.get(wcId)?.();
+          turnEnds.delete(wcId);
+        }
         if (event.type === 'agent_end' && takeVisionWant() && !sender.isDestroyed()) {
           deps.sendVisionWanted?.(sender);
         }

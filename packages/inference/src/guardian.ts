@@ -585,14 +585,20 @@ export function createGuardian(options: GuardianOptions): Guardian {
       worstStallMs = 0;
       last = reading;
       const limits = options.limits();
-      const settled = settle(
-        judge(reading, limits),
-        verdict,
-        calmStreak,
-        limits,
-        hotStreak,
-        pausedStreak,
-      );
+      /*
+       * NOTHING HEAVY, NOTHING TO PAUSE: a pause line with no heavy run is a
+       * hold (no new heavy job starts). Counted as a pause it climbed to a shed
+       * after `pausedReadingsBeforeShed` readings of a big chat model simply
+       * being loaded — the 27B sits at 13-15% free here — and put "paused for
+       * 20 readings and it did not come back" on a banner over a chat in which
+       * nothing had been paused.
+       */
+      const judged = judge(reading, limits);
+      const judgement =
+        judged.verdict === 'pause' && !options.busy()
+          ? { ...judged, verdict: 'hold' as const }
+          : judged;
+      const settled = settle(judgement, verdict, calmStreak, limits, hotStreak, pausedStreak);
       verdict = settled.verdict;
       calmStreak = settled.calmStreak;
       hotStreak = settled.hotStreak;

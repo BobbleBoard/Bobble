@@ -5243,6 +5243,21 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
         }
 
         /*
+         * `/harness rewarm` — the server is new under the same URL.
+         *
+         * The app unloads an idle model by stopping its process and keeping its
+         * address (inference/idle-unload.ts), so nothing in pi changes when it
+         * comes back — but its prompt cache is empty, and `residentPrefix` still
+         * says the system prompt and tools are warm. Forgetting that lets the
+         * next status tick (once a second) warm them again, while the user is
+         * still typing; the composer re-primes a conversation's history itself.
+         */
+        case 'rewarm': {
+          forgetResidentPrefix();
+          return;
+        }
+
+        /*
          * `/harness restore <path>` — put one file back the way this turn found
          * it.
          *

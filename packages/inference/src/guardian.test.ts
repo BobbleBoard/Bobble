@@ -265,6 +265,15 @@ describe('createGuardian', () => {
     return { g, timers, verdicts, setBusy: (b: boolean) => (busy = b) };
   }
 
+  it('calls a pause line with nothing heavy running a hold, and never sheds on it', async () => {
+    const h = harness(Array.from({ length: 40 }, () => ({ memoryFree: 0.13 })));
+    h.setBusy(false);
+    for (let n = 0; n < 30; n += 1) expect(await h.g.poke()).not.toBe('shed');
+    expect(h.verdicts.every((v) => v.verdict === 'hold' || v.verdict === 'calm')).toBe(true);
+    h.setBusy(true);
+    expect(await h.g.poke()).toBe('pause');
+  });
+
   it('samples every second while heavy work runs, and slowly when idle', async () => {
     const h = harness([{ memoryFree: 0.6 }]);
     h.g.start();

@@ -22,6 +22,7 @@ import {
   type WebContents,
   type WebPreferences,
 } from 'electron';
+import { chatActivity } from './activity/chat-activity';
 import { registerAfmIpc } from './afm/afm-main';
 import { resolveBundledPackageAsset } from './app-paths';
 import type { AttachmentsInvokeMap } from './attachments/attachments-contract';
@@ -49,15 +50,17 @@ import {
 } from './gen/gen-manager';
 import type { GenModulesManager } from './gen/gen-modules';
 import { createGenModules } from './gen/gen-modules-main';
-import { startGuardian } from './gen/guardian-main';
+import { pausables, startGuardian } from './gen/guardian-main';
 import { genWorkerCandidates, resolveGenWorkerScript } from './gen/worker-path';
 import { registerGen3dIpc, setComfy3dRunner, setGen3dAdmission } from './gen3d/gen3d-main';
 import { registerHelpIpc } from './help/help-main';
 import { registerImportIpc } from './import/import-main';
+import { idleUnloadMs, startIdleUnload } from './inference/idle-unload';
 import {
   getInferenceUtility,
   getLoadedModel,
   heavyJobEco,
+  onInputActivity,
   parkChatModel,
   pushEngineLaunchSettings,
   pushPowerSettings,
@@ -94,6 +97,7 @@ import {
   comfyServerPid,
   disposeStudio,
   registerStudioIpc,
+  unloadStudioWhenIdle,
 } from './studio/studio-main';
 import { disposeAllPtys, registerPtyIpc } from './terminal/pty-manager';
 import { registerTrainingIpc } from './training/training-main';
@@ -843,6 +847,8 @@ function registerAppIpc(): void {
      * guardian's levers close over the queue.
      */
     let genQueueRef: GenQueueControl | null = null;
+    /** Set just below; read by the guardian's `chatInUse`. */
+    let idleUnloadRef: { state(): { idleForMs: number } } | null = null;
     const guardian = startGuardian({
       queue: () => genQueueRef,
       mode: () => readSettings().powerMode,
@@ -851,8 +857,11 @@ function registerAppIpc(): void {
       // terminating — the older hold/shed behaviour of the queue alone.
       guardEnabled: () => readSettings().memoryGuard !== false,
       // At the wall with nothing else to end, the chat model is what goes.
-      parkChatModel: () => parkChatModel(),
-      resumeChatModel: () => resumeChatModel(),
+      parkChatModel: () => parkChatModel('memory'),
+      resumeChatModel: () => resumeChatModel('memory'),
+      chatInUse: () =>
+        chatActivity.snapshot().busy ||
+        (idleUnloadRef !== null && idleUnloadRef.state().idleForMs < idleUnloadMs()),
       announce: (event) => {
         const wc = mainWindow?.webContents ?? null;
         if (wc !== null && !wc.isDestroyed()) events.send(wc, 'gen:guardian', event);
@@ -860,6 +869,31 @@ function registerAppIpc(): void {
       log: (line) => log.info('guardian', { line }),
     });
     app.on('before-quit', () => guardian.stop());
+
+    /*
+     * IDLE UNLOAD — see inference/idle-unload.ts. Five minutes with no input
+     * being prepared and nothing running: the chat server parks and ComfyUI
+     * stops; the first keystroke after that loads the chat model back while
+     * the message is still being typed.
+     */
+    const idleUnload = startIdleUnload({
+      busy: () =>
+        chatActivity.snapshot().busy || genQueueRef?.running() === true || pausables.active(),
+      unload: async () => {
+        const [chat, studio] = await Promise.all([
+          parkChatModel('idle').then((r) => r.ok),
+          unloadStudioWhenIdle().catch(() => false),
+        ]);
+        return chat || studio;
+      },
+      reload: async () => {
+        await resumeChatModel('idle');
+      },
+      log: (line) => log.info('idle-unload', { line }),
+    });
+    idleUnloadRef = idleUnload;
+    onInputActivity(() => idleUnload.noteInput());
+    app.on('before-quit', () => idleUnload.stop());
 
     const genWorker = resolveGenWorkerScript({
       resourcesPath: process.resourcesPath,

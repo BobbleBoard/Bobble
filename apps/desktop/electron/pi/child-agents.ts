@@ -11,6 +11,7 @@
  */
 
 import type { PiBridgeEvent } from '@pi-desktop/engine';
+import { chatActivity } from '../activity/chat-activity';
 import type { ChildAgentInfo } from './contract';
 import type { SessionLog, SessionSender } from './pi-sessions';
 
@@ -164,8 +165,13 @@ export function createChildAgents<S extends SessionSender>(
     children.get(req.childId)?.bridge.dispose();
 
     let settle: (v: { ok: boolean; summary: string; error?: string }) => void = () => {};
+    // A running subagent is the model in use (inference/idle-unload.ts).
+    const endActivity = chatActivity.begin('subagent', req.childId);
     const done = new Promise<{ ok: boolean; summary: string; error?: string }>((r) => {
-      settle = r;
+      settle = (v) => {
+        endActivity();
+        r(v);
+      };
     });
     let ended = false;
     // The child's answer, accumulated from its streamed text_deltas (get_messages

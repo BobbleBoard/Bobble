@@ -294,6 +294,9 @@ export function useAttachmentPrefill(attachmentPrefix: string): {
    */
   const slotEpoch = usePiStore((s) => s.extensionStatus['harness-slot-epoch'] ?? '');
   const serverRunning = useLlmStore((s) => s.status.serverRunning);
+  /** Unloaded (idle-unload.ts, or making room): nothing to prime until it is
+   * back — and coming back must re-prime, so it is in the signature below. */
+  const parked = useLlmStore((s) => s.status.parked !== undefined);
   /** The rate is a property of the MODEL as much as the machine, so it is
    * recorded per model — see prefill-speed.ts. */
   const modelId = useLlmStore((s) => s.status.model?.id ?? null);
@@ -378,6 +381,7 @@ export function useAttachmentPrefill(attachmentPrefix: string): {
       system,
       toolsJson,
       serverRunning,
+      parked,
       busy,
       prefixChars: prefix.length,
       historyTurns: history.length,
@@ -390,7 +394,7 @@ export function useAttachmentPrefill(attachmentPrefix: string): {
     }
 
     // Cheap dedupe key (avoid stringifying the whole prefix each render).
-    const sig = `${focusEpoch}|${slotEpoch}|${resident === null ? 't' : 'w'}${history.length}|${prefix.length}|${prefix.slice(0, 96)}`;
+    const sig = `${focusEpoch}|${slotEpoch}|${parked ? 'p' : 'u'}|${resident === null ? 't' : 'w'}${history.length}|${prefix.length}|${prefix.slice(0, 96)}`;
     if (sig === lastSig.current) return;
 
     const timer = window.setTimeout(() => {
@@ -447,7 +451,10 @@ export function useAttachmentPrefill(attachmentPrefix: string): {
       void window.piDesktop
         .invoke('pi:prefill', { messages: oaiMessages, tools: decision.tools })
         .then((res) => {
-          note({ what: 'primed', ...(res as Record<string, unknown>) });
+          // A refusal is not a prime: it logged "primed" on every MLX engine
+          // while nothing was read (prefill-completion's chat fallback).
+          const ok = (res as { success?: boolean } | undefined)?.success !== false;
+          note({ what: ok ? 'primed' : 'prime-failed', ...(res as Record<string, unknown>) });
           /*
            * EVERY PREFILL IS ALSO A MEASUREMENT of how fast this machine reads a
            * prompt under this model — which is the only honest basis for telling
@@ -475,6 +482,7 @@ export function useAttachmentPrefill(attachmentPrefix: string): {
     toolsJson,
     residentJson,
     serverRunning,
+    parked,
     busy,
     messages,
     focusEpoch,

@@ -65,6 +65,9 @@ export interface PrefillCompletionOptions {
   /** The turn's tools, in the SAME order the turn renders them (chat templates
    * emit tools positionally, so order is part of the prefix identity). */
   readonly tools?: readonly PrefillTool[];
+  /** The id the server answers to — needed only by the chat-endpoint prime an
+   * engine without `/apply-template` gets (rapid-mlx and the other MLX servers). */
+  readonly model?: string;
   /** Injected fetch (tests). Defaults to global fetch. */
   readonly fetchImpl?: typeof fetch;
   /** Aborts the request; an abort resolves `{aborted:true}` and never throws. */
@@ -179,6 +182,23 @@ export async function prefillCompletion(
       }),
       ...signalInit,
     });
+    /*
+     * NOT LLAMA-SERVER: prime over the chat endpoint instead.
+     *
+     * rapid-mlx (and every MLX server) has neither `/apply-template` nor
+     * `/completion`, so this prime failed on them every time — the composer
+     * logged "primed" and nothing was read (MEASURED by the idle-unload probe:
+     * a model loaded back on the first keystroke still re-read the whole
+     * conversation at send). Their prefix caches key on the rendered prompt,
+     * so the closed `/chat/completions` shape still leaves everything up to the
+     * point where it differs from the turn resident: a history ending on a
+     * reply differs only after that reply (the turn adds a user message, the
+     * prime a generation prompt), and an attachment prefix is resident up to
+     * the end of the attachment.
+     */
+    if (tmplRes.status === 404 && opts.model !== undefined) {
+      return await primeOverChat(opts, doFetch, signalInit);
+    }
     if (!tmplRes.ok) throw new Error(`prefill apply-template: server returned ${tmplRes.status}`);
     const rendered = (await tmplRes.json()) as { prompt?: unknown };
     if (typeof rendered.prompt !== 'string' || rendered.prompt.length === 0) {
@@ -230,4 +250,55 @@ export async function prefillCompletion(
     if (isAbort(error, opts.signal)) return { aborted: true };
     throw error;
   }
+}
+
+/**
+ * The prime for an engine without llama-server's raw endpoints: one token over
+ * `/v1/chat/completions`, rendered exactly as the MLX provider renders a turn —
+ * the same messages and tools, and the same template variables
+ * (provider-mlx `shapeForOpenAiServer`: thinking on, every past think block
+ * kept). A different `enable_thinking` alone parts the prompt from the turn at
+ * the top of the system message on some templates.
+ */
+async function primeOverChat(
+  opts: PrefillCompletionOptions,
+  doFetch: typeof fetch,
+  signalInit: { signal?: AbortSignal },
+): Promise<PrefillCompletionResult> {
+  const body = {
+    model: opts.model,
+    messages: opts.messages,
+    ...(opts.tools !== undefined && opts.tools.length > 0
+      ? { tools: toOpenAiTools(opts.tools) }
+      : {}),
+    max_tokens: 1,
+    stream: false,
+    temperature: 0,
+    chat_template_kwargs: {
+      enable_thinking: true,
+      preserve_thinking: true,
+      preserved_thinking: true,
+      preserve_reasoning: true,
+    },
+  };
+  tapRequest(body, 'prefill');
+  const res = await doFetch(`${opts.baseUrl.replace(/\/+$/, '')}/chat/completions`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+    ...signalInit,
+  });
+  if (!res.ok) throw new Error(`prefill chat: server returned ${res.status}`);
+  const j = (await res.json()) as {
+    usage?: { prompt_tokens?: number; prompt_tokens_details?: { cached_tokens?: number } };
+  };
+  const prompt = j.usage?.prompt_tokens;
+  const cached = j.usage?.prompt_tokens_details?.cached_tokens;
+  return {
+    aborted: false,
+    ...(typeof prompt === 'number' ? { promptN: prompt } : {}),
+    ...(typeof prompt === 'number' && typeof cached === 'number'
+      ? { processedN: Math.max(0, prompt - cached) }
+      : {}),
+  };
 }

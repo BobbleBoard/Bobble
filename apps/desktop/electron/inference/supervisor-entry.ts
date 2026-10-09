@@ -157,6 +157,7 @@ import type {
   LlmOutbound,
   LlmRequest,
   LlmVerifyReply,
+  ParkReason,
   UtilityParentPort,
 } from './protocol';
 
@@ -527,7 +528,13 @@ function pickFile(model: CatalogModel, quant?: string): CatalogFile | undefined 
 }
 
 /** What the status says while the chat model is parked for a generation. */
-const PARKED_NOTE = 'Paused to make room for a generation — back when it finishes';
+const PARKED_NOTES: Record<ParkReason, string> = {
+  room: 'Paused to make room for a generation — back when it finishes',
+  memory: 'Unloaded to keep your Mac responsive — back when memory frees up',
+  idle: 'Unloaded while idle — it loads again as you start typing',
+};
+/** Why the server is parked, while it is. */
+let parkedReason: ParkReason = 'room';
 
 /**
  * The launch in progress, for the status's `loading` — see LlmStatus.loading.
@@ -547,7 +554,7 @@ function status(): LlmStatus {
     // Parked counts as running: the URL is still the URL and the model comes
     // back on it — see LlmStatus.parked.
     serverRunning: (current?.supervisor.running ?? false) || parked,
-    ...(parked ? { parked: PARKED_NOTE } : {}),
+    ...(parked ? { parked: PARKED_NOTES[parkedReason], parkedReason } : {}),
     baseUrl: current?.baseUrl ?? null,
     model: current
       ? {
@@ -3139,20 +3146,40 @@ async function stopServer(): Promise<{ success: boolean }> {
 }
 
 /**
- * Is any slot of the running server mid-request? llama-server's `/slots` (on
- * by default in the builds we ship) lists them with `is_processing`; a server
- * that cannot answer is treated as busy — parking on a guess would cut a turn.
+ * Is the running server mid-request?
+ *
+ * - llama-server: `/slots` (on by default in the builds we ship) lists each
+ *   slot with `is_processing`.
+ * - rapid-mlx: `/v1/status` says `num_running` (and `status: idle|generating`).
+ *   It has no `/slots`; asking only there read every rapid-mlx server as busy,
+ *   so it could never be parked — MEASURED by the idle-unload probe: forty
+ *   refusals in a row with nothing running.
+ * - Anything else cannot say. A park to make room treats that as busy (parking
+ *   on a guess would cut a turn); an idle park trusts main, which has already
+ *   seen that no turn, run or generation is going (idle-unload.ts).
  */
-async function serverBusy(baseUrl: string): Promise<boolean> {
+async function serverBusy(baseUrl: string, assumeIdleWhenUnknown = false): Promise<boolean> {
+  const origin = baseUrl.replace(/\/v1\/?$/, '');
   try {
-    const origin = baseUrl.replace(/\/v1\/?$/, '');
     const res = await fetch(`${origin}/slots`, { signal: AbortSignal.timeout(1500) });
-    if (!res.ok) return true;
-    const slots = (await res.json()) as Array<{ is_processing?: boolean }>;
-    return !Array.isArray(slots) || slots.some((s) => s.is_processing === true);
+    if (res.ok) {
+      const slots = (await res.json()) as Array<{ is_processing?: boolean }>;
+      if (Array.isArray(slots)) return slots.some((s) => s.is_processing === true);
+    }
   } catch {
-    return true;
+    /* not llama-server, or not answering: try the next shape */
   }
+  try {
+    const res = await fetch(`${origin}/v1/status`, { signal: AbortSignal.timeout(1500) });
+    if (res.ok) {
+      const body = (await res.json()) as { num_running?: unknown; status?: unknown };
+      if (typeof body.num_running === 'number') return body.num_running > 0;
+      if (typeof body.status === 'string') return body.status !== 'idle';
+    }
+  } catch {
+    /* no status either */
+  }
+  return !assumeIdleWhenUnknown;
 }
 
 /**
@@ -3161,20 +3188,32 @@ async function serverBusy(baseUrl: string): Promise<boolean> {
  * file's size — the floor of what parking gives back, so the caller can tell
  * whether it is worth asking before it asks.
  */
-async function parkServer(): Promise<{ ok: boolean; reason?: string; bytes?: number }> {
+async function parkServer(
+  why: ParkReason = 'room',
+): Promise<{ ok: boolean; reason?: string; bytes?: number }> {
   if (current === null) return { ok: false, reason: 'no server' };
-  if (current.supervisor.parked) return { ok: true, bytes: current.file.bytes };
+  if (current.supervisor.parked) {
+    // A generation's claim outranks an idle one: it is what decides the resume.
+    if (why !== 'idle') parkedReason = why;
+    return { ok: true, bytes: current.file.bytes };
+  }
   if (phase !== 'ready') return { ok: false, reason: `server is ${phase}` };
-  if (await serverBusy(current.baseUrl)) return { ok: false, reason: 'a request is in flight' };
+  if (await serverBusy(current.baseUrl, why === 'idle')) {
+    return { ok: false, reason: 'a request is in flight' };
+  }
+  parkedReason = why;
   await current.supervisor.park();
   metrics = null;
   emitStatus();
   return { ok: true, bytes: current.file.bytes };
 }
 
-async function resumeServer(): Promise<{ ok: boolean; reason?: string }> {
+async function resumeServer(onlyIf?: ParkReason): Promise<{ ok: boolean; reason?: string }> {
   if (current === null) return { ok: false, reason: 'no server' };
   if (!current.supervisor.parked) return { ok: true };
+  if (onlyIf !== undefined && parkedReason !== onlyIf) {
+    return { ok: false, reason: `parked for ${parkedReason}, not ${onlyIf}` };
+  }
   try {
     const back = await current.supervisor.resume();
     if ((await power()).current().backgroundPriority) {
@@ -3240,9 +3279,9 @@ async function handle(req: LlmRequest): Promise<unknown> {
     case 'list-local-ggufs':
       return { files: listLocalGgufs() };
     case 'park-server':
-      return parkServer();
+      return parkServer(req.reason);
     case 'resume-server':
-      return resumeServer();
+      return resumeServer(req.onlyIf);
     case 'set-power': {
       /*
        * The user's choice, applied from the NEXT launch. A running server keeps

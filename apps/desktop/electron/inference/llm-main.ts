@@ -50,6 +50,7 @@ import type {
   LlmCatalogReply,
   LlmOutbound,
   LlmRequestBody,
+  ParkReason,
 } from './protocol';
 import { reapOrphanedServers } from './reap-orphans';
 
@@ -508,15 +509,24 @@ export function pushPowerSettings(): void {
   });
 }
 
+/** Who hears that input is being prepared — the idle unloader (main.ts). */
+let inputActivityHandler: (() => void) | null = null;
+export function onInputActivity(handler: () => void): void {
+  inputActivityHandler = handler;
+}
+
 /**
  * MAKE ROOM for a generation: park the chat server (its process stops, its
  * URL stays) and bring it back afterwards. See gen/make-room.ts for when, and
  * supervisor-entry's parkServer for the mid-request refusal.
  */
-export async function parkChatModel(): Promise<{ ok: boolean; reason?: string }> {
+export async function parkChatModel(
+  why: ParkReason = 'room',
+): Promise<{ ok: boolean; reason?: string }> {
   try {
     const r = await request<{ ok: boolean; reason?: string; bytes?: number }>({
       type: 'park-server',
+      reason: why,
     });
     log.info('park chat model', { ok: r.ok, reason: r.reason, bytes: r.bytes });
     return r;
@@ -524,9 +534,14 @@ export async function parkChatModel(): Promise<{ ok: boolean; reason?: string }>
     return { ok: false, reason: err instanceof Error ? err.message : String(err) };
   }
 }
-export async function resumeChatModel(): Promise<{ ok: boolean; reason?: string }> {
+export async function resumeChatModel(
+  onlyIf?: ParkReason,
+): Promise<{ ok: boolean; reason?: string }> {
   try {
-    const r = await request<{ ok: boolean; reason?: string }>({ type: 'resume-server' });
+    const r = await request<{ ok: boolean; reason?: string }>({
+      type: 'resume-server',
+      ...(onlyIf !== undefined ? { onlyIf } : {}),
+    });
     log.info('resume chat model', { ok: r.ok, reason: r.reason });
     return r;
   } catch (err) {
@@ -609,6 +624,10 @@ const handlers: IpcHandlers<LlmInvokeMap> = {
   },
   'llm:stop-server': () => request({ type: 'stop-server' }),
   'llm:resume-server': () => resumeChatModel(),
+  'llm:input-activity': () => {
+    inputActivityHandler?.();
+    return { ok: true };
+  },
   'llm:calibrate': (req) => {
     log.info('llm:calibrate requested', { modelId: req.modelId, quant: req.quant });
     return request<LlmCalibrateReply>({

@@ -415,6 +415,9 @@ export interface LlmStatus {
    * text is what to show for it.
    */
   parked?: string;
+  /** Why it is parked — `idle`: unloaded after five minutes unused, and it
+   *  loads again as the user starts typing (inference/idle-unload.ts). */
+  parkedReason?: 'room' | 'memory' | 'idle';
   /**
    * How the running server was launched: which engine and which speculative
    * method. Absent while nothing is up. `provider` is the models.json key the
@@ -682,6 +685,9 @@ export type LlmInvokeMap = {
   'llm:stop-server': { request: undefined; response: { success: boolean } };
   /** Bring back a chat model the app parked (its process stopped, its port kept). */
   'llm:resume-server': { request: undefined; response: { ok: boolean; reason?: string } };
+  /** Input is being prepared (typing, paste, drop, mic, focus): restarts the idle
+   *  clock and loads back a model unloaded while idle (inference/idle-unload.ts). */
+  'llm:input-activity': { request: undefined; response: { ok: boolean } };
   /**
    * Measure every engine + speculative method that can run the model from
    * what is on disk, keep the verdict, and come back up on the winner.
@@ -927,6 +933,7 @@ export const LLM_INVOKE_CHANNELS = [
   'llm:start-server',
   'llm:stop-server',
   'llm:resume-server',
+  'llm:input-activity',
   'llm:calibrate',
   'llm:calibrate-cancel',
   'llm:calibration-record',
