@@ -162,25 +162,28 @@
   <h1>Where we are</h1>
   <p class="lede">The whole project on one page: the ideas we build by, the limits we work inside, every goal with its state, what is waiting on you, and what changed. Refreshed at the end of every task.</p>
   <div class="meta">
-    <span class="chip">Updated <b>2026-10-08, 23:00</b></span>
-    <span class="chip">main <b>abbfe7d5</b></span>
+    <span class="chip">Updated <b>2026-10-09, 02:30</b></span>
+    <span class="chip">main <b>6ac999c5</b></span>
     <span class="chip">Installed in <b>/Applications/Bobble.app</b></span>
     <span class="chip">Detail: <b>STATUS.md</b> · <b>ROADMAP-LATEST.md</b></span>
   </div>
 
   <div class="glance">
     <div class="stat"><div class="k">Roadmap</div><div class="v">Step 1 of 6</div><div class="n">The corp harness has never run the 3D-game prompt end to end</div></div>
-    <div class="stat"><div class="k">Waiting on you</div><div class="v">6 decisions</div><div class="n">Park policy, thinking cap, Blender edits, prototypes, CI, "Got it!"</div></div>
-    <div class="stat"><div class="k">Reliability gaps</div><div class="v">9 open</div><div class="n">Loops, the 27B's cold start, compaction, swap</div></div>
+    <div class="stat"><div class="k">Waiting on you</div><div class="v">3 items</div><div class="n">Rewrite git history?, CI, try the quick panel on screen</div></div>
+    <div class="stat"><div class="k">Reliability gaps</div><div class="v">8 open</div><div class="n">Loops, the 27B's cold start, compaction, swap</div></div>
     <div class="stat"><div class="k">Smaller bugs</div><div class="v">9 known</div><div class="n">None that blocks a task</div></div>
-    <div class="stat"><div class="k">Shipped since 10-07</div><div class="v">5 batches</div><div class="n">Design language, chat area, errors, pictures, sidebar</div></div>
+    <div class="stat"><div class="k">Roadmap step 4</div><div class="v">Built</div><div class="n">The quick panel, ⌥⇧Space, installed</div></div>
   </div>
 
   <div class="changed">
     <h3>What changed in this update</h3>
     <ul>
-      <li>This page is new, along with a "Where we are" overview at the top of <code>STATUS.md</code>. Both are refreshed after every task.</li>
-      <li>Last task: the sidebar now lights whatever is on screen, however you got there (<code>aa2478e0</code>). Installed.</li>
+      <li>The repo carries no personal details: the name is "the user" everywhere, home paths and machine names are generic, and 125 screenshots were painted over.</li>
+      <li>Thinking is capped on every step and always ends in words: "I've been thinking about this for a long while now … I'll stop here and act." Works on llama.cpp and, through a start-up patch, on rapid-mlx.</li>
+      <li>Models unload after five minutes without input and load back on the first keystroke. 27B: first token 0.6 s after Enter following an unload.</li>
+      <li>The guard no longer pauses or parks a model you are using. The 27B was paused mid-turn: 87 s to the first token.</li>
+      <li>The quick panel (roadmap step 4) is merged and installed. A model built a Blender scene through the command. Onboarding was reviewed: 12 specifics.</li>
     </ul>
   </div>
 
@@ -218,6 +221,7 @@
       <div class="card"><span class="num">10</span><h3>No raw red errors</h3><p>Every failure is said in plain words with its fix as a button. Where the app can fix it itself, it does.</p><div class="how"><code>plainError</code>, turn-problem cards, held sends, amber toasts with actions.</div></div>
       <div class="card"><span class="num">11</span><h3>Reference-quality UI, Bobble's own language</h3><p>Teal accent, Fraunces titles, Hugeicons at 1px, grounded shadows. No emoji anywhere. Never a hand-drawn brand logo.</p><div class="how">Components are built from reference specs on one shared core, so one fix lands everywhere.</div></div>
       <div class="card"><span class="num">12</span><h3>Your attention is the scarce resource</h3><p>You judge only feel and first impressions. Everything an agent can verify, an agent verifies.</p><div class="how">Headless by default, reports with images, decisions batched for you below.</div></div>
+      <div class="card"><span class="num">13</span><h3>Keep it modular</h3><p>Every capability is a part that can be added, swapped or removed without reaching into another. Your words, 2026-10-09.</p><div class="how">Engines behind <code>baseUrl</code>, connectors as commands, generation features as modules, engine fixes as start-up patches, the quick panel as its own window, one shared UI core.</div></div>
     </div>
   </section>
 
@@ -228,7 +232,7 @@
     <div class="table limits">
       <div class="row head"><span>Limit</span><span>The number</span><span>What we do about it</span></div>
       <div class="row"><span class="t">Memory</span><span class="d">M5 Pro, <b>24 GB unified</b>, shared by the chat model, the generation models and macOS. An image model listed at 4.3 GB actually uses about 19 GB at 1024².</span><span class="d">Jobs are admitted by real footprint (the drop in free memory). One heavy job at a time. The guardian parks idle models.</span></div>
-      <div class="row"><span class="t">The 27B's start-up</span><span class="d">First send waits <b>~122 s</b>. A parked 27B reloads cold every turn: <b>17–26 s</b> to the first token.</span><span class="d">The park policy is waiting on your decision. Warming on select doesn't cover the first send yet.</span></div>
+      <div class="row"><span class="t">The 27B's start-up</span><span class="d">First send waits <b>~122 s</b> from cold. Back from an idle unload in <b>~2 s</b> while its weights are cached; Enter at once from unloaded <b>~39 s</b>.</span><span class="d">Idle unload with load and prefill on the first keystroke: first token <b>0.6 s</b> if typing outlasts the load. No more parking between turns.</span></div>
       <div class="row"><span class="t">Context window</span><span class="d"><b>32k</b> locally. pi's compaction is tuned for 200k: it fired at half the window and freed nothing.</span><span class="d">Compaction is now sized from the live window. Summarizing on a small window still costs a model call (open gap).</span></div>
       <div class="row"><span class="t">Prompt prefix</span><span class="d"><b>~9,400 tokens</b> with tool schemas, an 11.5 s warm-up. <b>1,770</b> in bash-CLI mode.</span><span class="d">Bash-CLI mode, warm-up on model select, and a price kept per tool.</span></div>
       <div class="row"><span class="t">One decode slot</span><span class="d">One conversation decodes at a time. The prompt cache reuses <b>92–99%</b> when a chat comes back, but it is a cliff: below ~1.5 GiB of cache, reuse drops to 0%.</span><span class="d">Never shrink <code>--cache-ram</code>. Keep background calls off the chat's slot: any call with a different prefix evicts it.</span></div>
@@ -239,6 +243,7 @@
       <div class="row"><span class="t">Non-determinism</span><span class="d">Every fix changes the odds. Some failures always remain.</span><span class="d">Judge a change by re-running the same task, not by a single success.</span></div>
       <div class="row"><span class="t">Hardware we can't test</span><span class="d">AMD, NVIDIA and Intel GPUs. Windows and Linux.</span><span class="d">Lemonade behind <code>baseUrl</code> (roadmap 2). A per-platform uv installer.</span></div>
       <div class="row"><span class="t">The Hub</span><span class="d">A catalog repo can disappear. OmniSVG 1.1's GGUF is not on the Hub, so a fresh install can't fetch it.</span><span class="d">Offline-first uv launches and mirror support. The OmniSVG entry still needs a working source.</span></div>
+      <div class="row"><span class="t">Blender</span><span class="d">Its MCP add-on serves only while Blender's <b>Allow Online Access</b> is on.</span><span class="d">The connector's message names that first.</span></div>
       <div class="row"><span class="t">Sleep</span><span class="d">With the lid closed, a headless run stalls (the Mac only DarkWakes).</span><span class="d">Check clamshell, keep-awake, battery and other model servers before any heavy run.</span></div>
     </div>
   </section>
@@ -250,8 +255,8 @@
     <div class="table road">
       <div class="row now"><span class="idx">1</span><div><div class="t">Corp harness</div><div class="d">Done only when <b>the full 3D-game prompt runs end to end, autonomously, without collapse</b>. That has never happened yet. Built: the agent mesh, phases 1 and 2a–c (every role a persistent agent, one CEO↔manager channel, gated to the top efforts), the preflight gate, submit verification. Open: phase 3 (emergent concurrency, injecting messages mid tool call, file attachments), coarser decomposition at xhigh/max, inter-agent Q&A with KV caching, and the acceptance run itself.</div></div><span class="pill" data-s="progress">In progress</span></div>
       <div class="row"><span class="idx">2</span><div><div class="t">Lemonade (AMD) as a backend</div><div class="d">An alternative inference server behind the existing <code>baseUrl</code> seam: the fastest route to hardware we can't test.</div></div><span class="pill" data-s="todo">Not started</span></div>
-      <div class="row"><span class="idx">3</span><div><div class="t">Connectors with zero instructions</div><div class="d">Done so far: connectors are named in the prompt and shaped as CLI commands, with switches under + › Connectors. Blender works as a command (read-only verified), and every connector page has a demo card. Not designed yet: one click that installs an add-on into Blender or Unity.</div></div><span class="pill" data-s="partly">Partly</span></div>
-      <div class="row"><span class="idx">4</span><div><div class="t">Access from anywhere, universal hotkey UI</div><div class="d">Not designed yet.</div></div><span class="pill" data-s="todo">Not started</span></div>
+      <div class="row"><span class="idx">3</span><div><div class="t">Connectors with zero instructions</div><div class="d">Done so far: connectors are named in the prompt and shaped as CLI commands, with switches under + › Connectors. Blender works as a command (a model builds scenes with it, verified from inside Blender), and every connector page has a demo card. Not designed yet: one click that installs an add-on into Blender or Unity.</div></div><span class="pill" data-s="partly">Partly</span></div>
+      <div class="row"><span class="idx">4</span><div><div class="t">Access from anywhere, universal hotkey UI</div><div class="d">The quick panel: ⌥⇧Space over any app. Ask with the window, a picked window, a dragged area, the screen, selected text, the clipboard, Finder files or the browser page. Computer use on the app in front, a command palette, pinned and large modes, per-action hotkeys with conflict checks. Verified headless (63/63); the real hotkey and captures need a try on screen.</div></div><span class="pill" data-s="done">Built</span></div>
       <div class="milestone">After step 4, the original vision of the project is fulfilled.</div>
       <div class="row"><span class="idx">5</span><div><div class="t">Ubuntu and Windows, then clustering over Tailscale</div><div class="d">Groundwork only: a per-platform uv installer, and a Tailscale Devices backend (safe reads, adapter, pairing, tokens, trust) with no UI yet.</div></div><span class="pill" data-s="partly">Groundwork</span></div>
       <div class="row"><span class="idx">6</span><div><div class="t">Autonomous fine-tuning</div><div class="d">Planned in <code>deliverables/research/PLAN.md</code>, including the harness LoRA of the 4B. Starts only after step 5.</div></div><span class="pill" data-s="todo">Plan only</span></div>
@@ -263,9 +268,11 @@
     <h2>The product today</h2>
     <p class="sub">What each part of Bobble can do now, and what is still open in it.</p>
     <div class="table pillars">
-      <div class="row"><div><div class="t">Chat and harness</div><span class="pill" data-s="done">Daily use</span></div><div class="d">Streaming, queued sends, per-chat state, background runs, child agents, projects, cooperative Stop. Since 10-08: a send that can't go out is held with the reason and a fix; a turn that doesn't finish gets a card with a fix button; tool chains are collapsed with picture thumbnails, a hover card and a lightbox. Still open: the reliability gaps below.</div></div>
+      <div class="row"><div><div class="t">Chat and harness</div><span class="pill" data-s="done">Daily use</span></div><div class="d">Thinking capped on every step, ending in words. Idle models unload after five minutes and load back on the first keystroke. Streaming, queued sends, per-chat state, background runs, child agents, projects, cooperative Stop. Since 10-08: a send that can't go out is held with the reason and a fix; a turn that doesn't finish gets a card with a fix button; tool chains are collapsed with picture thumbnails, a hover card and a lightbox. Still open: the reliability gaps below.</div></div>
+      <div class="row"><div><div class="t">Quick panel</div><span class="pill" data-s="done">New</span></div><div class="d">⌥⇧Space over any app: ask with context (window, area, screen, selection, clipboard, Finder, browser), computer use on the app in front, a command palette, recent threads. Installed; needs a try on a real screen.</div></div>
+      <div class="row"><div><div class="t">Onboarding</div><span class="pill" data-s="partly">Needs a pass</span></div><div class="d">Seven steps that work. Reviewed 10-09 with 12 specifics: two different recommended models, old names, jargon on the last step, a step with nothing in it, the page jumping between steps, old blue, an empty app grid. Proposed: four steps and a one-click model download on landing.</div></div>
       <div class="row"><div><div class="t">Visual quality</div><span class="pill" data-s="partly">Pinned 09-24</span></div><div class="d"><b>Done:</b> maths pages that play themselves (the <code>math</code> extension); SVG (OmniSVG pictures plus VFIG figures); inline charts in twelve looks; office renderers fixed. <b>Partly:</b> HyperFrames animations; widgets (built, never run by the model). <b>Not started:</b> websites and UI screens, 3D for games, mixes (a deck with diagrams, data and images), Ming design models, and one generation of each kind we're proud of.</div></div>
-      <div class="row"><div><div class="t">Studios</div><span class="pill" data-s="partly">Editors to come</span></div><div class="d">Image (Qwen-Image 2.1 by default), 3D Studio (generate, rig, retopo, texture, Finish in Grey, Color or PBR), audio. Studios as editors with click-to-comment are prototyped; the image viewer part is partly built.</div></div>
+      <div class="row"><div><div class="t">Studios</div><span class="pill" data-s="partly">Editors to come</span></div><div class="d">Image (Qwen-Image 2.1 by default), 3D Studio (generate, rig, retopo, texture, Finish in Grey, Color or PBR), audio. Studios as editors with click-to-comment are prototyped. Image editor direction A chosen, with a new input bar.</div></div>
       <div class="row"><div><div class="t">Connectors and tools</div><span class="pill" data-s="partly">Growing</span></div><div class="d">Connectors as CLI commands, the Blender command, <code>office</code>, <code>chart</code>, <code>math</code>, <code>svg</code>, the new dictation module, and computer use (background, by app, with an app chooser). Next: a Godot connector, an explore demo for every connector, and one-click injection (roadmap 3).</div></div>
       <div class="row"><div><div class="t">Models</div><span class="pill" data-s="done">Working</span></div><div class="d">The Models page (This Mac, Filters, Recommended, Hub), a library in <code>~/Bobble/Models</code>, Manage Storage, the engine menu (llama.cpp, MLX) with calibration, onboarding presets, and the quick model menu.</div></div>
       <div class="row"><div><div class="t">Design language</div><span class="pill" data-s="partly">Mostly wired</span></div><div class="d">Wired on 10-08: teal, Fraunces, hue tags, intro cards, the pop-out, the quick tour, Try-it demos. Still to do: the Made card, the toolbar, and tables, office documents and inline cards brought to the same level.</div></div>
@@ -280,13 +287,11 @@
     <p class="sub">Decisions only you can make. Nothing else is blocked on you.</p>
     <div class="table decide">
       <div class="row head"><span>Decision</span><span>Options</span><span>Since</span></div>
-      <div class="row"><span class="t">The guardian parks the 27B between turns, so every turn reloads it cold (17–26 s)</span><span class="d">(a) keep it; (b) keep an idle chat model loaded unless memory runs short or the machine stalls; (c) a smaller 27B quant; (d) run fewer apps</span><span class="d">10-02</span></div>
-      <div class="row"><span class="t">Thinking can use up the whole output budget</span><span class="d">Cap thinking at the output limit minus room for the reply (llama.cpp ships with this off)</span><span class="d">10-01</span></div>
-      <div class="row"><span class="t">A model-driven Blender run that changes a scene</span><span class="d">Needs your OK to touch your open Blender. The read-only path is verified.</span><span class="d">10-07</span></div>
-      <div class="row"><span class="t">The 10 design prototypes</span><span class="d">Image editor with click-to-comment, Devices, Workflows and Deep research, Memory, Bobble help. Open <code>deliverables/gallery.html</code>.</span><span class="d">09-23</span></div>
+      <div class="row"><span class="t">Rewrite git history?</span><span class="d">Every tracked file is clean now, but old commits still hold the name, home paths and tailnet addresses. origin/main (08-14) is already pushed; about 1,000 newer commits are not. Rewrite the unpushed part before the next push, or leave history as it is.</span><span class="d">10-09</span></div>
       <div class="row"><span class="t">CI</span><span class="d">Needs a push to the public GitHub repo</span><span class="d">09-23</span></div>
-      <div class="row"><span class="t">"Got it" or "Got it!"</span><span class="d">The voice rule bans exclamation marks. Changing it is one word.</span><span class="d">10-08</span></div>
+      <div class="row"><span class="t">Try the quick panel on screen</span><span class="d">⌥⇧Space over any app. Only a person can judge the real hotkey, captures, replacing a selection and full-screen apps.</span><span class="d">10-09</span></div>
     </div>
+    <p class="sub" style="margin-top:12px">Decided 10-09: no parking between turns (idle unload instead), thinking capped with an end message, Blender may be touched (verified), "Got it" stays, deep research is the plan card docked above the input, image editor A with a new input bar.</p>
   </section>
 
   <!-- ============ GAPS ============ -->
@@ -295,11 +300,10 @@
     <p class="sub">What still fails or feels wrong. The reliability gaps matter most to the corp harness.</p>
     <div class="split">
       <div class="list">
-        <h3>Reliability gaps (9)</h3>
+        <h3>Reliability gaps (8)</h3>
         <ul>
           <li><span class="x">A 2B looped for 26 minutes with no identical calls. The loop guard needs a wall-clock "no progress" budget.</span></li>
-          <li><span class="x">The guardian ping-pongs the 27B (park, resume, swap). It should back off after two parks.</span></li>
-          <li><span class="x">The 27B's first send waits ~122 s on "starting up".</span></li>
+                    <li><span class="x">The 27B's first send waits ~122 s on "starting up".</span></li>
           <li><span class="x">Compaction summarizes nothing on a small window and still costs a model call.</span></li>
           <li><span class="x">"Thought for 1m 28s" shown over ~20 minutes of thinking.</span></li>
           <li><span class="x">The renderer page was replaced mid-turn under swap (10–13% memory free).</span></li>
@@ -312,14 +316,14 @@
         <h3>Smaller known bugs (9)</h3>
         <ul>
           <li><span class="x">The office chip flickers (1 of 15 probe runs).</span></li>
-          <li><span class="x">rapid-mlx never lands the paste prime (~4.5k tokens read again).</span></li>
+          <li><span class="x">The chat never shows real app icons in the shipped app (fetched through a test-only channel).</span></li>
           <li><span class="x">Image-to-image edits come out too subtle.</span></li>
           <li><span class="x">A finished card remounts into the chain when the next tool starts.</span></li>
           <li><span class="x">A picture embedded in a reply shows twice.</span></li>
           <li><span class="x">⌘Z into a turn that is already answering keeps the partial reply.</span></li>
           <li><span class="x">A message with only a picture can't be rewound.</span></li>
           <li><span class="x">Ladle build in the bundle (excluded, unconfirmed).</span></li>
-          <li><span class="x">~60 unused old icon files in the design artifact.</span></li>
+          <li><span class="x">A short answer in the quick panel sits in a mostly empty panel.</span></li>
         </ul>
       </div>
     </div>
@@ -346,11 +350,11 @@
     <h2>Recently done</h2>
     <p class="sub">Each item below is verified on screen by a probe, merged to main and installed.</p>
     <div class="log">
-      <div class="e"><div class="when">2026-10-08 night</div><div class="what">The sidebar lights what is on screen</div><div class="det">Extensions, Models, Scheduled, a studio or the chat, whichever way you got there. Exactly one row is lit across ten visits through rows and other routes. <code>aa2478e0</code></div></div>
-      <div class="e"><div class="when">2026-10-08 night</div><div class="what">No more raw red errors</div><div class="det">Turn-problem cards with fix buttons, held sends (the cause behind "fetch failed"), a dictation module (before, nothing could install it), files found where they actually are, plain words at about sixty other places, amber toasts with actions.</div></div>
-      <div class="e"><div class="when">2026-10-08 night</div><div class="what">Pictures: hover card and lightbox slivers</div><div class="det">A 520×380 hover card. In the lightbox, 64 px greyed slivers of the neighbouring pictures that light up on hover and slide in when clicked.</div></div>
-      <div class="e"><div class="when">2026-10-08 late</div><div class="what">Chat area</div><div class="det">A connector demo card on every connector page, tool chains collapsed by default, pictures beside the chain, a smoother inline⇄canvas move, and the "Done" circle that had turned square.</div></div>
-      <div class="e"><div class="when">2026-10-08</div><div class="what">Design language in the app, Models page, quick tour</div><div class="det">Also lint clean in every package, one icon family (Hugeicons at 1px), and the seven finished branches merged.</div></div>
+      <div class="e"><div class="when">2026-10-09</div><div class="what">The quick panel</div><div class="det">Roadmap step 4, built by a subagent, reviewed, rebased and merged. Its input wakes an unloaded model. 63/63 headless checks. <code>5f61926a</code></div></div>
+      <div class="e"><div class="when">2026-10-09</div><div class="what">Idle unload, and the guard keeps a model in use</div><div class="det">Five minutes without input unloads. The first keystroke loads the model back and re-reads the conversation, so the 27B's first token comes 0.6 s after Enter. The composer's prime now works on rapid-mlx. <code>0b4c361c</code></div></div>
+      <div class="e"><div class="when">2026-10-09</div><div class="what">Thinking capped, ending in words</div><div class="det">The budget is sized to the window and always ends with the message; on rapid-mlx through a start-up patch, tool turns included. <code>17fe7e49</code></div></div>
+      <div class="e"><div class="when">2026-10-09</div><div class="what">A model builds a Blender scene</div><div class="det">The 27B made a plane, a red cube, a blue sphere, a sun and a camera in 10 commands, checked against Blender's own object list. <code>f3ccd07d</code></div></div>
+      <div class="e"><div class="when">2026-10-09</div><div class="what">No personal details in the repo</div><div class="det">About 1,300 files, three re-signed engine wheels, 125 painted-over screenshots, test fixtures made generic. <code>5556b7a1</code></div></div>
     </div>
   </section>
 
@@ -370,6 +374,7 @@
       <li><b>Never touch your settings file or pasteboard</b> from a probe. Never print the HF token.</li>
       <li><b>Your open Blender scene</b> is changed only with your OK.</li>
       <li><b>A branch is not done until it is on main.</b></li>
+      <li><b>No personal details in the repo.</b> "The user" (they), generic paths and hosts, no session traces.</li>
       <li><b>Don't stop for "context".</b> Long tasks keep going.</li>
     </ul>
   </section>
@@ -382,9 +387,9 @@
       <div class="list">
         <h3>State</h3>
         <ul>
-          <li><span class="x">main</span><span class="w"><code>abbfe7d5</code></span></li>
+          <li><span class="x">main</span><span class="w"><code>6ac999c5</code></span></li>
           <li><span class="x">Working branch <code>fix/chat-area-polish</code></span><span class="w">equals main</span></li>
-          <li><span class="x">Installed build</span><span class="w"><code>31a4ce4d</code>, later commits are docs only</span></li>
+          <li><span class="x">Installed build</span><span class="w"><code>6ac999c5</code></span></li>
           <li><span class="x">Lint, typecheck, unit suites</span><span class="w">clean</span></li>
         </ul>
       </div>
@@ -394,7 +399,7 @@
           <li><span class="x"><code>claude/practical-dhawan-bf1d62</code>: the 09-17 code-block frame (later work may supersede it)</span></li>
           <li><span class="x"><code>claude/loving-driscoll-74b4e8</code>: fixed differently on main</span></li>
           <li><span class="x"><code>push/vq-office-w1</code>, <code>push/w0-b</code>, <code>push/wf-00b</code>, <code>bench/bench-1</code>: unverified work in progress from 09-23</span></li>
-          <li><span class="x">Four agent branches whose fixes are already on main in another form: safe to drop</span></li>
+          <li><span class="x">Four agent branches whose fixes are already on main in another form: safe to drop. The quick-panel branch is merged.</span></li>
         </ul>
       </div>
     </div>

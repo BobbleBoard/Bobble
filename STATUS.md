@@ -1,6 +1,6 @@
 # Bobble — status
 
-Updated: 2026-10-08 23:00 · the user: "at the end of any task going forward … totally sum up where we are and status on all the goals big and small"
+Updated: 2026-10-09 02:20 · the user: approvals and decisions on the "waiting on you" list; the repo without personal details; a universal hotkey UI; keep it modular; review onboarding
 
 ## Where we are (refreshed at the end of every task)
 
@@ -16,17 +16,18 @@ The living page has this in full (source `deliverables/status/where-we-are.html`
 5. Per-step reliability is the lever: 30 steps finish 21% of the time at 95% per step, 74% at 99%.
 6. The corporation shape: scope sets the depth, memory the width, effort the review.
 7. CLI over MCP, code over screenshots.
-8. The machine comes first (the guardian).
-9. Prefill is the number people feel.
+8. The machine comes first (the guardian), and a model in use is the user's: the guard parks it only for a real thrash.
+9. Prefill is the number people feel. An idle model is unloaded, and loaded back while the next message is typed.
 10. No raw red errors.
 11. Reference-quality UI in Bobble's own language.
 12. The user's attention is the scarce resource.
+13. **Keep it modular** (the user, 2026-10-09). Every capability is a part that can be added, swapped or removed without reaching into another: engines behind `baseUrl`, connectors as commands, generation features as installable modules, engine fixes as start-up patches, the quick panel as its own window and chunk, one shared UI core.
 
 **Hard limits.**
 | Limit | Detail |
 |---|---|
-| Memory | 24 GB unified, shared by every model and macOS |
-| 27B | Cold first send ~122 s; a parked reload takes 17–26 s |
+| Memory | 24 GB unified, shared by every model and macOS. The 27B alone leaves 13-15% free |
+| 27B | Cold first send ~122 s. Back from an idle unload in ~2 s while its weights are still cached; first token 0.6 s after Enter if typing outlasts the load; Enter at once from unloaded ~39 s (load + reading 5k tokens) |
 | Context | 32k window. pi's compaction is tuned for 200k |
 | Prompt prefix | 9.4k tokens, or 1.8k in bash-CLI mode |
 | Decode slot | One decode slot. The prompt cache has a cliff below ~1.5 GiB |
@@ -38,30 +39,33 @@ The living page has this in full (source `deliverables/status/where-we-are.html`
 | Hardware | No AMD, Windows or Linux to test on |
 | Hub | Repos can vanish |
 | Sleep | A closed lid stalls runs |
+| Blender | Its MCP add-on serves only while Blender's "Allow Online Access" is on |
 
 **Goals.**
 | # | Roadmap | State |
 |---|---|---|
 | 1 | Corp harness: the full 3D-game prompt end to end, autonomously | in progress. Mesh phases 1 and 2a–c built; phase 3 and the acceptance run open. Never completed end to end |
 | 2 | Lemonade (AMD) backend | not started |
-| 3 | Connectors with zero instructions | partly: CLI connectors, + › Connectors, Blender command, demo cards. One-click injection undesigned |
-| 4 | Access from anywhere / hotkey UI | not started |
+| 3 | Connectors with zero instructions | partly: CLI connectors, + › Connectors, the Blender command (a model now builds scenes with it, verified from inside Blender), demo cards. One-click injection undesigned |
+| 4 | Access from anywhere / hotkey UI | **built (2026-10-09)**: the quick panel (⌥⇧Space), window/area/screen/selection/clipboard/Finder/browser context, computer use on the app in front, command palette. Verified headless (63/63); the real hotkey, captures and full-screen apps still need a try on screen |
 | 5 | Ubuntu + Windows, Tailscale clustering | groundwork: uv installer, Devices backend, no UI |
 | 6 | Autonomous fine-tuning | plan only, strictly after 5 |
 
 **Product today.**
-- Chat and harness: in daily use.
+- Chat and harness: in daily use. Thinking is capped on every step and always ends in words; idle models unload after five minutes.
+- Quick panel: new, installed.
 - Visual quality: math, SVG, charts and office renderers done. HyperFrames and widgets partly. Websites, 3D-for-games and mixes not started.
-- Studios: working; the editors are still to come.
+- Studios: working; the editors are still to come (image editor A chosen, with a new input bar; deep research as a plan card above the input).
 - Models: working.
-- Design language: mostly wired. The Made card and the toolbar are left.
+- Onboarding: works, needs a pass (§9 below).
+- Design language: mostly wired. The Made card and the toolbar are left; the prototypes predate it.
 - Big-push tracks: mostly prototypes or plans.
 
-**Waiting on the user (§2, 6 items).** The 27B park policy, a thinking cap, Blender scene edits, the 10 prototypes, CI, and "Got it!".
+**Waiting on the user (§2).** Whether to rewrite git history (the name is still in old commits, some already pushed), CI, and a try of the quick panel on screen.
 
-**Open (§7, §8).** 9 reliability gaps and 9 smaller bugs.
+**Open (§7, §8, §9).** 8 reliability gaps, 9 smaller bugs, the onboarding list.
 
-**Changed this update.** The living page and this overview. Last task: the sidebar lights what is on screen (`aa2478e0`), installed.
+**Changed this update.** The repo carries no personal details; thinking capped with a mandatory end message (llama.cpp and rapid-mlx); idle unload with load + prefill on the first keystroke (and the MLX prime that never worked); the guard keeps a model in use; the quick panel; Blender scene building verified; onboarding reviewed. Installed.
 
 ## Backlog — everything discussed and not yet done (consolidated 2026-10-08)
 
@@ -86,12 +90,11 @@ Still to check before dropping (not merged): `claude/practical-dhawan-bf1d62` (0
 ### 2. Waiting on the user's decision
 | Decision | Options / note | From |
 |---|---|---|
-| The guardian parks the 27B between turns (each turn reloads it cold: first token 17–26 s) | (a) keep; (b) let an idle chat model stay loaded unless swap/stall; (c) a smaller 27B quant; (d) fewer apps | 10-02 |
-| Thinking can eat the whole output budget (27B thought 20k chars, three `length` stops) | cap thinking at the output limit minus room for the reply (llama.cpp ships it off) | 10-01 |
-| A model-driven Blender run that **changes** a scene | needs your OK to touch your open Blender; the read-only path is verified | 10-07 |
-| The 10 design prototypes (`deliverables/gallery.html`: image editor click-to-comment, Devices, Workflows + Deep research, Memory, Bobble help) | waiting on your critique since 09-23 | 09-23 |
+| Rewrite git history? | The working tree and every tracked file are clean (5556b7a1, 1bc2e885), but old commits still hold the name, home paths and tailnet addresses; origin/main (2026-08-14) is already pushed, ~1,000 newer commits are not. Options: rewrite the unpushed history before the next push (git filter-repo), or leave history and only push from here on | 10-09 |
 | CI | needs a push to the public GitHub repo (XP-03/04) | 09-23 |
-| "Got it!" | the cards say "Got it" (the voice rule bans exclamation marks); one word to change back | 10-08 |
+| The quick panel on a real screen | the global hotkey, captures, selection replace and full-screen apps can only be judged by a person; everything else is verified headless | 10-09 |
+
+Decided 2026-10-09 (the user): the 27B is no longer parked between turns — every model unloads after five minutes without input and loads back on the first keystroke (`0b4c361c`); thinking is capped with a mandatory end message (`17fe7e49`); Blender may be touched — a model-driven scene build is verified (`f3ccd07d`); "Got it" stays without an exclamation mark; prototypes — deep research is the plan card floating just above the input bar, the image editor is direction A with a new input bar.
 
 ### 3. The agreed roadmap (ROADMAP-LATEST.md, in order)
 | # | Item | State |
@@ -99,7 +102,7 @@ Still to check before dropping (not merged): `claude/practical-dhawan-bf1d62` (0
 | 1 | **Corp harness**: done only when the full 3D-game prompt runs end to end, autonomously | never completed end to end. The mesh is built (phases 1, 2a–c); phase 3 open: emergent dispatch concurrency, live mid-tool-call injection, file attachments. Also open: xhigh/max effort = coarser decomposition; inter-agent Q&A with aggressive KV/context caching |
 | 2 | Lemonade (AMD inference server) as a backend behind `baseUrl` | not started |
 | 3 | Connectors / skills / scheduled tasks with zero user instructions (one click injects e.g. a Blender or Unity extension) | partly: connectors are named in the prompt, CLI-shaped, + › Connectors switches, Blender as a command (10-07). One-click injection not designed |
-| 4 | Access from anywhere / universal hotkey UI | not started |
+| 4 | Access from anywhere / universal hotkey UI | built 2026-10-09: the quick panel (merged 5f61926a, installed); needs a try on a real screen |
 | 5 | Ubuntu + Windows native, then clustering over Tailscale | uv installer per platform only; Tailscale Devices backend merged, no UI |
 | 6 | Autonomous fine-tuning (strictly after 5) | plan only |
 
@@ -138,7 +141,6 @@ Still to check before dropping (not merged): `claude/practical-dhawan-bf1d62` (0
 
 ### 7. Reliability gaps still open
 - A 2B looped 26 minutes with no identical calls: the loop guard needs a wall-clock "no progress" budget.
-- The guardian's park → resume → swap ping-pong on the 27B: back off after two parks.
 - The 27B's first send waits ~122 s "starting up" (the select-time warm-up doesn't cover it).
 - Compaction summarizes nothing on a small window and still costs a model call.
 - "Thought for 1m 28s" over ~20 minutes of thinking (same family as the fixed "Worked for").
@@ -148,8 +150,38 @@ Still to check before dropping (not merged): `claude/practical-dhawan-bf1d62` (0
 - "What time is it" sometimes runs `date` instead of the connector.
 
 ### 8. Smaller known bugs
-The office chip flicker (1 of 15 probe runs) · rapid-mlx never lands the paste prime (~4.5k tokens re-read) · img2img edits are subtle (the instruction editor needs the 3D engine) · a finished card remounts into the chain when the next tool call starts · a picture embedded in the reply shows twice · ⌘Z into a turn already answering keeps the partial reply · an image-only message can't be rewound · the Ladle build in the bundle (excluded `68cf0219`, unconfirmed) · ~60 unused old icon files in the design artifact's storage.
+The office chip flicker (1 of 15 probe runs) · the composer prime on rapid-mlx works now (a chat-endpoint prime, `0b4c361c`); an attachment prefix on it is unmeasured · the chat's app icons are fetched through `mac:debug`, which exists only in test runs, so the shipped chat never shows real app icons (found by the quick-panel agent) · a short answer in the quick panel sits in a mostly empty panel · img2img edits are subtle (the instruction editor needs the 3D engine) · a finished card remounts into the chain when the next tool call starts · a picture embedded in the reply shows twice · ⌘Z into a turn already answering keeps the partial reply · an image-only message can't be rewound · the Ladle build in the bundle (excluded `68cf0219`, unconfirmed) · ~60 unused old icon files in the design artifact's storage.
 
+
+### 9. Onboarding — specifics to work on (walked headless 2026-10-09, light and dark: `tests/e2e/onboarding-look.mjs`)
+1. **Two different models are recommended.** Step 5 says "Gemma 4 12B Instruct (16 GB) … set it up in Model Manager"; step 7 says Qwen3.5 4B is "the model Bobble starts you with". One rule should decide both (onboarding presets' `planPreset`).
+2. **Old names.** "Model Manager" (it is Models); the first-run tips say "Give **Pi** tools & skills"; "Settings → Harness".
+3. **Jargon on the last step.** "MLX DFlash · around 1.4-1.6x · its drafter arrives with the model", "pi, plus 2 agents found". A new person needs "the fastest engine for this Mac" and "a 5 GB model to start with".
+4. **The last step's controls read wrong.** Its rows carry empty circles that look unselected, and it has two buttons ("Set up now" and "Finish setup"). One primary ("Download and finish · 5 GB") and a quiet "Skip for now".
+5. **A step with nothing in it.** "Start fresh" still shows step 2, "Bring your setup … Nothing to import". Skip it (and step 3 says "Matched to your app" when there is none).
+6. **The page jumps.** Every step is centred vertically, so the dots, title and buttons move up and down between steps. Anchor to the top.
+7. **Pre-design-language colours.** Step 5's recommendation box is the old blue; titles are not Fraunces; the experience cards' hover reads as selected.
+8. **The computer-use grid arrives empty.** Grey placeholder tiles while the helper walks /Applications for icons. Start the listing at step 1 so it is ready by step 6.
+9. **"I know what llama.cpp is."** An in-joke as an option label; say what it changes ("Flag risky commands, no tutorial").
+10. **"Installs happen later" never says when.** Say "when you first use it" and queue nothing silently.
+11. **Seven steps.** Proposed four: Welcome (+ import when there is something) → Look → How hands-on (guidance + computer use) → Get running (model + engine, with the capabilities as switches).
+12. **Landing.** A fresh Mac with the download skipped lands on an empty chat with a "Getting started" popover over the sidebar; the first message is then held ("There is no model on this Mac"). A one-click "Download Qwen3.5 4B (5 GB)" in the empty chat would replace both.
+
+## Report — 2026-10-09: decisions applied, the repo anonymised, thinking capped, idle unload, the quick panel, Blender building scenes
+
+| Asked | Done | Checked |
+|---|---|---|
+| "no exclamation point is correct" | "Got it" stays | — |
+| "approved to touch blender" | A model-driven run that changes a scene, on a throwaway copy opened behind everything: the 27B built a grey plane, a red cube on it, a blue sphere beside it, a sun and a camera in 10 `blender` commands (3.5 min). The add-on only serves while Blender's Allow Online Access is on (the user's is off): the connector's sentence now says so first | blender-edit-probe: Blender's own object list read back after the turn, a render looked at (images/blender-render.png) |
+| "cap thinking but put a clever 'thinking end message' … mandatory" | Every request carries a budget sized to what is left of the window (reply keeps 30%, 512–16k) and the end message: "Okay, I've been thinking about this for a long while now. I have enough to go on, so I'll stop here and act on the best plan I have." rapid-mlx gets it through a start-up patch that also caps tool turns. A cap the user types still wins | live: the 4B cut at 60-80 tokens ends on the message then answers or calls a tool, on llama.cpp and rapid-mlx; unit tests |
+| "elaborate on the 10 design prototypes" + images | Five screens × two directions, explained, with A/B sheets (deliverables/status/prototypes/) | — |
+| The 27B parked between turns → "unload … if there's more than 5 minutes without interaction … the instant the user starts inputting, the load starts prefill starts" | Idle unload (chat server parked, ComfyUI stopped) after 5 min with no input and nothing running; the first keystroke/paste/drop/focus/mic loads it back, the composer re-primes the conversation and the harness re-warms. Found on the way: the composer prime never worked on rapid-mlx (llama-only endpoints), rapid-mlx could never be parked (the busy check asked /slots), and the guard paused the chat mid-turn on memory alone (87 s to the first token) — all fixed | idle-unload-probe: 4B back 5.3 s, first token 503 ms reading 310/6317 tokens; 27B back 2.1 s, first token 644 ms reading 22/5100; stayed loaded through a 44-78 s turn |
+| "change 'the user' to 'The user' … other info/chats … should not be findable" | ~1,300 files; home paths, hostnames, tailnet addresses and assistant-session paths made generic; runtime scripts compute their paths; 3 prebuilt wheels patched and re-signed (verified to load); 125 screenshots painted over (text recognition finds nothing now); the request ledger moved out of the repo. Git HISTORY still holds it — a decision for the user (§2) | git grep finds nothing in text or binaries; OCR over every tracked image; all suites |
+| "have a subagent … make that universal hotkey UI" | The quick panel: ⌥⇧Space over any app; ask with the window, a picked window, an area, the screen, selected text, clipboard, Finder files or the browser page; computer use on the app in front; palette; per-action hotkeys with conflict checks. Reviewed, rebased, its input wired to idle unload, merged, installed | quick-panel-probe 63/63 on the merged code; real hotkey/captures need a try on screen |
+| "keep this really modular" | Core idea 13; how it applies is recorded | — |
+| "take a look back at onboarding … specifics" | Walked headless in light and dark: 12 specifics (§9) | onboarding-look |
+
+Checks: lint, typecheck, every unit suite (39/39) on main after the merge; `ship:local` installed 6ac999c5 (the engine patch is in the bundle).
 
 ## Report — 2026-10-08 night: no more raw red errors, a way in for dictation, and the pictures' hover card and lightbox slivers
 
