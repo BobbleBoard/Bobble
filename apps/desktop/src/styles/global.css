@@ -10869,3 +10869,16 @@ body[data-media-expanded="true"] .pd-studio-compose {
   word-break: break-word;
   color: var(--pd-text-secondary);
 }
+
+/* A crash screen's raw error, folded under Details (RouteBoundary, AppErrorBoundary). */
+.pd-route-error-more,
+.pd-crash-more {
+  margin: 4px 0 12px;
+  font-size: 12px;
+  color: var(--pd-text-muted);
+}
+.pd-route-error-more > summary,
+.pd-crash-more > summary {
+  cursor: pointer;
+  user-select: none;
+}

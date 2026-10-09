@@ -113,9 +113,14 @@ class RouteErrorBoundary extends Component<BoundaryProps, { error: unknown }> {
         <div className="pd-route-error-card">
           <h2 className="pd-route-error-title">{panel.title}</h2>
           <p className="pd-route-error-copy">{panel.copy}</p>
-          <pre className="pd-route-error-detail" data-testid="route-error-detail">
-            {panel.detail}
-          </pre>
+          {/* The error's own words, for a bug report — under Details, not as
+              the message (2026-10-08). */}
+          <details className="pd-route-error-more">
+            <summary>Details</summary>
+            <pre className="pd-route-error-detail" data-testid="route-error-detail">
+              {panel.detail}
+            </pre>
+          </details>
           <div className="pd-route-error-actions">
             {panel.canRetry ? (
               <button

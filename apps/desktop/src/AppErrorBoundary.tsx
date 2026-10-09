@@ -46,7 +46,10 @@ export class AppErrorBoundary extends Component<{ children: ReactNode }, State> 
           <p className="pd-crash-copy">
             The window stopped drawing. Your chats are on disk and were not affected.
           </p>
-          <pre className="pd-crash-detail">{error.message || String(error)}</pre>
+          <details className="pd-crash-more">
+            <summary>Details</summary>
+            <pre className="pd-crash-detail">{error.message || String(error)}</pre>
+          </details>
           <div className="pd-crash-actions">
             {/*
               BOTH OF THESE USED TO DO NOTHING.

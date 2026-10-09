@@ -80,7 +80,10 @@ export class CanvasErrorBoundary extends Component<{ children: ReactNode }, Stat
               The canvas hit an error twice in a row, so it is closed for now. Your chat is
               unaffected.
             </p>
-            <pre className="pd-canvas-crash-detail">{this.state.error.message}</pre>
+            <details className="pd-crash-more">
+              <summary>Details</summary>
+              <pre className="pd-canvas-crash-detail">{this.state.error.message}</pre>
+            </details>
             <button
               type="button"
               className="pd-btn-ghost pd-focusable"
