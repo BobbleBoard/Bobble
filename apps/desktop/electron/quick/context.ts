@@ -27,7 +27,7 @@ export const QUICK_TEXT_ACTION_LABELS: Readonly<Record<QuickTextAction, string>>
   rewrite: 'Rewrite',
   translate: 'Translate',
   summarize: 'Summarize',
-  fix: 'Fix spelling and grammar',
+  fix: 'Fix spelling',
 };
 
 /** The actions whose answer is meant to REPLACE the selection. */
@@ -136,8 +136,11 @@ export function contextLabel(c: QuickContext): string {
       return `Area · ${c.width} × ${c.height}`;
     case 'screen':
       return `Screen · ${c.display}`;
-    case 'selection':
-      return `Selection in ${c.app}`;
+    case 'selection': {
+      // The words themselves, so it is plain WHICH selection came along.
+      const flat = c.text.replace(/\s+/g, ' ').trim();
+      return `“${flat.length > 34 ? `${flat.slice(0, 33).trimEnd()}…` : flat}”`;
+    }
     case 'clipboard':
       return c.image !== undefined ? 'Clipboard picture' : 'Clipboard text';
     case 'files':

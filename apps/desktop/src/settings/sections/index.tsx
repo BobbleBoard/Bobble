@@ -20,6 +20,7 @@ import { harnessSection } from './harness';
 import { interfaceSection } from './interface';
 import { memorySection } from './memory';
 import { personalizationSection } from './personalization';
+import { quickPanelSection } from './quick-panel';
 import { searchSection } from './search';
 import type { SettingsSection, SettingsSectionDef } from './types';
 
@@ -34,6 +35,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionDef[] = [
   agentSection,
   computerUseSection,
   devicesSection,
+  quickPanelSection,
   searchSection,
   connectorsSection,
   capabilitiesSection,

@@ -54,9 +54,9 @@ const OVERLAY_HTML = `<!doctype html>
   body.dragging #dim{display:none}
   #size{position:fixed;display:none;padding:3px 7px;border-radius:6px;background:rgba(20,22,24,.86);color:#fff;
     font:500 11px/1.3 -apple-system,system-ui,sans-serif;font-variant-numeric:tabular-nums;pointer-events:none}
-  #hover{position:fixed;display:none;border:2px solid rgba(22,163,163,1);background:rgba(22,163,163,.16);
-    border-radius:10px;pointer-events:none}
-  #hoverLabel{position:absolute;left:10px;top:10px;padding:4px 9px;border-radius:7px;background:rgba(20,22,24,.86);
+  #hover{position:fixed;inset:0;display:none;pointer-events:none}
+  #hover svg{position:absolute;inset:0;width:100%;height:100%}
+  #hoverLabel{position:fixed;padding:4px 9px;border-radius:7px;background:rgba(20,22,24,.86);
     color:#fff;font:500 12px/1.3 -apple-system,system-ui,sans-serif}
   #hint{position:fixed;left:50%;top:40px;transform:translateX(-50%);display:flex;gap:14px;align-items:center;
     padding:9px 16px;border-radius:999px;background:rgba(20,22,24,.86);color:#fff;
@@ -66,14 +66,14 @@ const OVERLAY_HTML = `<!doctype html>
   #hint .sub{color:rgba(255,255,255,.72)}
 </style></head>
 <body>
-<div id="backdrop"></div><div id="dim"></div><div id="hover"><span id="hoverLabel"></span></div><div id="sel"></div><div id="size"></div>
+<div id="backdrop"></div><div id="dim"></div><div id="hover"><svg id="hoverSvg" xmlns="http://www.w3.org/2000/svg"></svg><span id="hoverLabel"></span></div><div id="sel"></div><div id="size"></div>
 <div id="hint"><span class="dot"></span><span id="hintText">Drag over what you want to ask about</span>
   <span class="sub"><kbd>space</kbd> <span id="hintSwap">pick a window</span></span><span class="sub"><kbd>esc</kbd> cancel</span></div>
 <script>
 (() => {
   let cfg = { displayId: 0, mode: 'region', windows: [] };
   let mode = 'region';
-  let start = null, done = false;
+  let start = null, done = false, pressed = null;
   let settle;
   const result = new Promise((r) => { settle = r; });
   const $ = (id) => document.getElementById(id);
@@ -110,11 +110,8 @@ const OVERLAY_HTML = `<!doctype html>
   const norm = (a, b) => ({ x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), width: Math.abs(b.x - a.x), height: Math.abs(b.y - a.y) });
   addEventListener('mousedown', (e) => {
     if (e.button !== 0 || done) return;
-    if (mode === 'pick') {
-      const w = windowAt(e.clientX, e.clientY);
-      if (w) finish({ kind: 'window', displayId: cfg.displayId, windowId: w.windowId });
-      return;
-    }
+    // A window is picked on release, as a click is; the press only arms it.
+    if (mode === 'pick') { pressed = windowAt(e.clientX, e.clientY); return; }
     start = { x: e.clientX, y: e.clientY };
     document.body.classList.add('dragging');
     drawRect({ x: start.x, y: start.y, width: 0, height: 0 });
@@ -126,15 +123,39 @@ const OVERLAY_HTML = `<!doctype html>
       const h = $('hover');
       if (!w) { h.style.display = 'none'; return; }
       h.style.display = 'block';
-      h.style.left = w.rect.x + 'px'; h.style.top = w.rect.y + 'px';
-      h.style.width = w.rect.width + 'px'; h.style.height = w.rect.height + 'px';
-      $('hoverLabel').textContent = w.app;
+      // Only the part of the window you can see lights up: the windows in
+      // front of it are cut out of the highlight, as macOS's own picker does.
+      const front = cfg.windows.slice(0, cfg.windows.indexOf(w));
+      const r = w.rect;
+      const holes = front.map((f) => '<rect x="' + f.rect.x + '" y="' + f.rect.y + '" width="' + f.rect.width + '" height="' + f.rect.height + '" rx="10" fill="black"/>').join('');
+      $('hoverSvg').innerHTML =
+        '<defs><mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="' + innerWidth + '" height="' + innerHeight + '">' +
+        '<rect x="0" y="0" width="' + innerWidth + '" height="' + innerHeight + '" fill="black"/>' +
+        '<rect x="' + (r.x - 2) + '" y="' + (r.y - 2) + '" width="' + (r.width + 4) + '" height="' + (r.height + 4) + '" rx="12" fill="white"/>' + holes +
+        '</mask></defs>' +
+        '<rect mask="url(#m)" x="' + (r.x + 1) + '" y="' + (r.y + 1) + '" width="' + (r.width - 2) + '" height="' + (r.height - 2) + '" rx="10" fill="rgba(22,163,163,.18)" stroke="rgb(22,163,163)" stroke-width="2"/>';
+      // The label sits in the window's first visible corner.
+      const label = $('hoverLabel');
+      label.textContent = w.app;
+      let lx = r.x + 10, ly = r.y + 10;
+      for (const f of front) {
+        const fr = f.rect;
+        if (lx >= fr.x && lx < fr.x + fr.width && ly >= fr.y && ly < fr.y + fr.height) { ly = Math.min(r.y + r.height - 34, fr.y + fr.height + 10); }
+      }
+      label.style.left = lx + 'px'; label.style.top = ly + 'px';
       return;
     }
     if (start) drawRect(norm(start, { x: e.clientX, y: e.clientY }));
   });
   addEventListener('mouseup', (e) => {
-    if (done || mode !== 'region' || !start) return;
+    if (done) return;
+    if (mode === 'pick') {
+      const w = windowAt(e.clientX, e.clientY);
+      if (w && pressed && w.windowId === pressed.windowId) finish({ kind: 'window', displayId: cfg.displayId, windowId: w.windowId });
+      pressed = null;
+      return;
+    }
+    if (mode !== 'region' || !start) return;
     const r = norm(start, { x: e.clientX, y: e.clientY });
     start = null;
     document.body.classList.remove('dragging');
@@ -151,6 +172,7 @@ const OVERLAY_HTML = `<!doctype html>
       cfg = next;
       if (next.backdrop) $('backdrop').style.backgroundImage = 'url(' + next.backdrop + ')';
       setMode(next.mode, false);
+      document.title = 'mode:' + next.mode;
       return true;
     },
     setMode(m) { if (!done) setMode(m, false); return true; },

@@ -22,6 +22,7 @@ export type SettingsSection =
   | 'connectors'
   | 'capabilities'
   | 'computer-use'
+  | 'quick-panel'
   | 'devices'
   | 'design'
   | 'experimental';

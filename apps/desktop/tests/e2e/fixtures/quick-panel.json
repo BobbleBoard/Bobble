@@ -1,0 +1,4220 @@
+{
+  "name": "quick-panel",
+  "state": {
+    "model": {
+      "id": "qwen3.6-27b",
+      "name": "Qwen3.6 27B Q6",
+      "api": "openai-completions",
+      "provider": "llamacpp",
+      "baseUrl": "http://127.0.0.1:8080/v1",
+      "reasoning": true,
+      "input": ["text", "image"],
+      "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "contextWindow": 131072,
+      "maxTokens": 16384
+    },
+    "sessionFile": "/tmp/mock-pi/sessions/quick-panel.jsonl",
+    "sessionId": "mock-session-quick-panel"
+  },
+  "models": [
+    {
+      "id": "qwen3.6-27b",
+      "name": "Qwen3.6 27B Q6",
+      "api": "openai-completions",
+      "provider": "llamacpp",
+      "baseUrl": "http://127.0.0.1:8080/v1",
+      "reasoning": true,
+      "input": ["text", "image"],
+      "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "contextWindow": 131072,
+      "maxTokens": 16384
+    }
+  ],
+  "prompts": [
+    {
+      "match": "capital of Portugal",
+      "steps": [
+        {
+          "emit": {
+            "type": "agent_start"
+          }
+        },
+        {
+          "delayMs": 5,
+          "emit": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "emit": {
+            "type": "message_start",
+            "message": {
+              "role": "assistant",
+              "content": []
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The capital of Portugal "
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "The capital of Portugal ",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "The capital of Portugal "
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The capital of Portugal is **Lisbon**. It sits o"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "is **Lisbon**. It sits o",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "The capital of Portugal is **Lisbon**. It sits o"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The capital of Portugal is **Lisbon**. It sits on the Tagus estuary and "
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "n the Tagus estuary and ",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "The capital of Portugal is **Lisbon**. It sits on the Tagus estuary and "
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The capital of Portugal is **Lisbon**. It sits on the Tagus estuary and has been the capital sin"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "has been the capital sin",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "The capital of Portugal is **Lisbon**. It sits on the Tagus estuary and has been the capital sin"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The capital of Portugal is **Lisbon**. It sits on the Tagus estuary and has been the capital since the 13th century."
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "ce the 13th century.",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "The capital of Portugal is **Lisbon**. It sits on the Tagus estuary and has been the capital since the 13th century."
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "message_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The capital of Portugal is **Lisbon**. It sits on the Tagus estuary and has been the capital since the 13th century."
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "qwen3.6-27b",
+              "usage": {
+                "input": 180,
+                "output": 40,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 220,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 0
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "turn_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The capital of Portugal is **Lisbon**. It sits on the Tagus estuary and has been the capital since the 13th century."
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "qwen3.6-27b",
+              "usage": {
+                "input": 180,
+                "output": 40,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 220,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 0
+            },
+            "toolResults": []
+          }
+        },
+        {
+          "emit": {
+            "type": "agent_end",
+            "messages": []
+          }
+        }
+      ],
+      "response": {
+        "success": true
+      }
+    },
+    {
+      "match": "how many people",
+      "steps": [
+        {
+          "emit": {
+            "type": "agent_start"
+          }
+        },
+        {
+          "delayMs": 5,
+          "emit": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "emit": {
+            "type": "message_start",
+            "message": {
+              "role": "assistant",
+              "content": []
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "About **550,000** peopl"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "About **550,000** peopl",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "About **550,000** peopl"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "About **550,000** people live in the city itse"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "e live in the city itse",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "About **550,000** people live in the city itse"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "About **550,000** people live in the city itself, and close to **3 mi"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "lf, and close to **3 mi",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "About **550,000** people live in the city itself, and close to **3 mi"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "About **550,000** people live in the city itself, and close to **3 million** in the wider Li"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "llion** in the wider Li",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "About **550,000** people live in the city itself, and close to **3 million** in the wider Li"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "About **550,000** people live in the city itself, and close to **3 million** in the wider Lisbon metropolitan area."
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "sbon metropolitan area.",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "About **550,000** people live in the city itself, and close to **3 million** in the wider Lisbon metropolitan area."
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "message_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "About **550,000** people live in the city itself, and close to **3 million** in the wider Lisbon metropolitan area."
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "qwen3.6-27b",
+              "usage": {
+                "input": 180,
+                "output": 40,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 220,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 0
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "turn_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "About **550,000** people live in the city itself, and close to **3 million** in the wider Lisbon metropolitan area."
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "qwen3.6-27b",
+              "usage": {
+                "input": 180,
+                "output": 40,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 220,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 0
+            },
+            "toolResults": []
+          }
+        },
+        {
+          "emit": {
+            "type": "agent_end",
+            "messages": []
+          }
+        }
+      ],
+      "response": {
+        "success": true
+      }
+    },
+    {
+      "match": "screenshot of the TextEdit window",
+      "steps": [
+        {
+          "emit": {
+            "type": "agent_start"
+          }
+        },
+        {
+          "delayMs": 5,
+          "emit": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "emit": {
+            "type": "message_start",
+            "message": {
+              "role": "assistant",
+              "content": []
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "This is a **launch checklist** in TextEdit. It says the quic"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "This is a **launch checklist** in TextEdit. It says the quic",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "This is a **launch checklist** in TextEdit. It says the quic"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "This is a **launch checklist** in TextEdit. It says the quick panel ships once the hotkey, the area capture and the wind"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "k panel ships once the hotkey, the area capture and the wind",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "This is a **launch checklist** in TextEdit. It says the quick panel ships once the hotkey, the area capture and the wind"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "This is a **launch checklist** in TextEdit. It says the quick panel ships once the hotkey, the area capture and the window picker pass on two displays, with three open items:\n\n- Co"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "ow picker pass on two displays, with three open items:\n\n- Co",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "This is a **launch checklist** in TextEdit. It says the quick panel ships once the hotkey, the area capture and the window picker pass on two displays, with three open items:\n\n- Co"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "This is a **launch checklist** in TextEdit. It says the quick panel ships once the hotkey, the area capture and the window picker pass on two displays, with three open items:\n\n- Confirm the default shortcut\n- Write the permission guide\n- Re"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "nfirm the default shortcut\n- Write the permission guide\n- Re",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "This is a **launch checklist** in TextEdit. It says the quick panel ships once the hotkey, the area capture and the window picker pass on two displays, with three open items:\n\n- Confirm the default shortcut\n- Write the permission guide\n- Re"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "This is a **launch checklist** in TextEdit. It says the quick panel ships once the hotkey, the area capture and the window picker pass on two displays, with three open items:\n\n- Confirm the default shortcut\n- Write the permission guide\n- Record the walkthrough\n\nThe release notes go out on Thursday."
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "cord the walkthrough\n\nThe release notes go out on Thursday.",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "This is a **launch checklist** in TextEdit. It says the quick panel ships once the hotkey, the area capture and the window picker pass on two displays, with three open items:\n\n- Confirm the default shortcut\n- Write the permission guide\n- Record the walkthrough\n\nThe release notes go out on Thursday."
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "message_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "This is a **launch checklist** in TextEdit. It says the quick panel ships once the hotkey, the area capture and the window picker pass on two displays, with three open items:\n\n- Confirm the default shortcut\n- Write the permission guide\n- Record the walkthrough\n\nThe release notes go out on Thursday."
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "qwen3.6-27b",
+              "usage": {
+                "input": 180,
+                "output": 40,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 220,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 0
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "turn_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "This is a **launch checklist** in TextEdit. It says the quick panel ships once the hotkey, the area capture and the window picker pass on two displays, with three open items:\n\n- Confirm the default shortcut\n- Write the permission guide\n- Record the walkthrough\n\nThe release notes go out on Thursday."
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "qwen3.6-27b",
+              "usage": {
+                "input": 180,
+                "output": 40,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 220,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 0
+            },
+            "toolResults": []
+          }
+        },
+        {
+          "emit": {
+            "type": "agent_end",
+            "messages": []
+          }
+        }
+      ],
+      "response": {
+        "success": true
+      }
+    },
+    {
+      "match": "area of the screen the user selected",
+      "steps": [
+        {
+          "emit": {
+            "type": "agent_start"
+          }
+        },
+        {
+          "delayMs": 5,
+          "emit": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "emit": {
+            "type": "message_start",
+            "message": {
+              "role": "assistant",
+              "content": []
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "That area shows a **bar chart of visi"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "That area shows a **bar chart of visi",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "That area shows a **bar chart of visi"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "That area shows a **bar chart of visitors by month**. It climbs steadily f"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "tors by month**. It climbs steadily f",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "That area shows a **bar chart of visitors by month**. It climbs steadily f"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "That area shows a **bar chart of visitors by month**. It climbs steadily from left to right, ending at its high"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "rom left to right, ending at its high",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "That area shows a **bar chart of visitors by month**. It climbs steadily from left to right, ending at its high"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "That area shows a **bar chart of visitors by month**. It climbs steadily from left to right, ending at its highest point, which matches the note abo"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "est point, which matches the note abo",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "That area shows a **bar chart of visitors by month**. It climbs steadily from left to right, ending at its highest point, which matches the note abo"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "That area shows a **bar chart of visitors by month**. It climbs steadily from left to right, ending at its highest point, which matches the note above it: up 18% on the last quarter."
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "ve it: up 18% on the last quarter.",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "That area shows a **bar chart of visitors by month**. It climbs steadily from left to right, ending at its highest point, which matches the note above it: up 18% on the last quarter."
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "message_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "That area shows a **bar chart of visitors by month**. It climbs steadily from left to right, ending at its highest point, which matches the note above it: up 18% on the last quarter."
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "qwen3.6-27b",
+              "usage": {
+                "input": 180,
+                "output": 40,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 220,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 0
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "turn_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "That area shows a **bar chart of visitors by month**. It climbs steadily from left to right, ending at its highest point, which matches the note above it: up 18% on the last quarter."
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "qwen3.6-27b",
+              "usage": {
+                "input": 180,
+                "output": 40,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 220,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 0
+            },
+            "toolResults": []
+          }
+        },
+        {
+          "emit": {
+            "type": "agent_end",
+            "messages": []
+          }
+        }
+      ],
+      "response": {
+        "success": true
+      }
+    },
+    {
+      "match": "screenshot of the whole screen",
+      "steps": [
+        {
+          "emit": {
+            "type": "agent_start"
+          }
+        },
+        {
+          "delayMs": 5,
+          "emit": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "emit": {
+            "type": "message_start",
+            "message": {
+              "role": "assistant",
+              "content": []
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "You have three windows open: a **"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "You have three windows open: a **",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "You have three windows open: a **"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "You have three windows open: a **Groceries** note, a **launch chec"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "Groceries** note, a **launch chec",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "You have three windows open: a **Groceries** note, a **launch chec"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "You have three windows open: a **Groceries** note, a **launch checklist** in TextEdit and a **Quart"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "klist** in TextEdit and a **Quart",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "You have three windows open: a **Groceries** note, a **launch checklist** in TextEdit and a **Quart"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "You have three windows open: a **Groceries** note, a **launch checklist** in TextEdit and a **Quarterly report** with a visitors cha"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "erly report** with a visitors cha",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "You have three windows open: a **Groceries** note, a **launch checklist** in TextEdit and a **Quarterly report** with a visitors cha"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "You have three windows open: a **Groceries** note, a **launch checklist** in TextEdit and a **Quarterly report** with a visitors chart. The checklist is in front."
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "rt. The checklist is in front.",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "You have three windows open: a **Groceries** note, a **launch checklist** in TextEdit and a **Quarterly report** with a visitors chart. The checklist is in front."
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "message_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "You have three windows open: a **Groceries** note, a **launch checklist** in TextEdit and a **Quarterly report** with a visitors chart. The checklist is in front."
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "qwen3.6-27b",
+              "usage": {
+                "input": 180,
+                "output": 40,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 220,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 0
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "turn_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "You have three windows open: a **Groceries** note, a **launch checklist** in TextEdit and a **Quarterly report** with a visitors chart. The checklist is in front."
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "qwen3.6-27b",
+              "usage": {
+                "input": 180,
+                "output": 40,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 220,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 0
+            },
+            "toolResults": []
+          }
+        },
+        {
+          "emit": {
+            "type": "agent_end",
+            "messages": []
+          }
+        }
+      ],
+      "response": {
+        "success": true
+      }
+    },
+    {
+      "match": "screenshot of the Safari window",
+      "steps": [
+        {
+          "emit": {
+            "type": "agent_start"
+          }
+        },
+        {
+          "delayMs": 5,
+          "emit": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "emit": {
+            "type": "message_start",
+            "message": {
+              "role": "assistant",
+              "content": []
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The Safari window shows"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "The Safari window shows",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "The Safari window shows"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The Safari window shows the **Quarterly report"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": " the **Quarterly report",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "The Safari window shows the **Quarterly report"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The Safari window shows the **Quarterly report**: visitors are up 18%"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "**: visitors are up 18%",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "The Safari window shows the **Quarterly report**: visitors are up 18%"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The Safari window shows the **Quarterly report**: visitors are up 18% on the last quarter, l"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": " on the last quarter, l",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "The Safari window shows the **Quarterly report**: visitors are up 18% on the last quarter, l"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The Safari window shows the **Quarterly report**: visitors are up 18% on the last quarter, led by the new guides."
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "ed by the new guides.",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "The Safari window shows the **Quarterly report**: visitors are up 18% on the last quarter, led by the new guides."
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "message_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The Safari window shows the **Quarterly report**: visitors are up 18% on the last quarter, led by the new guides."
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "qwen3.6-27b",
+              "usage": {
+                "input": 180,
+                "output": 40,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 220,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 0
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "turn_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The Safari window shows the **Quarterly report**: visitors are up 18% on the last quarter, led by the new guides."
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "qwen3.6-27b",
+              "usage": {
+                "input": 180,
+                "output": 40,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 220,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 0
+            },
+            "toolResults": []
+          }
+        },
+        {
+          "emit": {
+            "type": "agent_end",
+            "messages": []
+          }
+        }
+      ],
+      "response": {
+        "success": true
+      }
+    },
+    {
+      "match": "screenshot of the Notes window",
+      "steps": [
+        {
+          "emit": {
+            "type": "agent_start"
+          }
+        },
+        {
+          "delayMs": 5,
+          "emit": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "emit": {
+            "type": "message_start",
+            "message": {
+              "role": "assistant",
+              "content": []
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Your note is a shor"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "Your note is a shor",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Your note is a shor"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Your note is a short **grocery list**:"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "t **grocery list**:",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Your note is a short **grocery list**:"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Your note is a short **grocery list**: oat milk, lemons, "
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": " oat milk, lemons, ",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Your note is a short **grocery list**: oat milk, lemons, "
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Your note is a short **grocery list**: oat milk, lemons, rye bread, coffee b"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "rye bread, coffee b",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Your note is a short **grocery list**: oat milk, lemons, rye bread, coffee b"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Your note is a short **grocery list**: oat milk, lemons, rye bread, coffee beans and basil."
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "eans and basil.",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Your note is a short **grocery list**: oat milk, lemons, rye bread, coffee beans and basil."
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "message_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Your note is a short **grocery list**: oat milk, lemons, rye bread, coffee beans and basil."
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "qwen3.6-27b",
+              "usage": {
+                "input": 180,
+                "output": 40,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 220,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 0
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "turn_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Your note is a short **grocery list**: oat milk, lemons, rye bread, coffee beans and basil."
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "qwen3.6-27b",
+              "usage": {
+                "input": 180,
+                "output": 40,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 220,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 0
+            },
+            "toolResults": []
+          }
+        },
+        {
+          "emit": {
+            "type": "agent_end",
+            "messages": []
+          }
+        }
+      ],
+      "response": {
+        "success": true
+      }
+    },
+    {
+      "match": "Fix the spelling and grammar",
+      "steps": [
+        {
+          "emit": {
+            "type": "agent_start"
+          }
+        },
+        {
+          "delayMs": 5,
+          "emit": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "emit": {
+            "type": "message_start",
+            "message": {
+              "role": "assistant",
+              "content": []
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The quick brown"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "The quick brown",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "The quick brown"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The quick brown fox jumps over"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": " fox jumps over",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "The quick brown fox jumps over"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The quick brown fox jumps over the lazy dog."
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": " the lazy dog.",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "The quick brown fox jumps over the lazy dog."
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "message_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The quick brown fox jumps over the lazy dog."
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "qwen3.6-27b",
+              "usage": {
+                "input": 180,
+                "output": 40,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 220,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 0
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "turn_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The quick brown fox jumps over the lazy dog."
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "qwen3.6-27b",
+              "usage": {
+                "input": 180,
+                "output": 40,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 220,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 0
+            },
+            "toolResults": []
+          }
+        },
+        {
+          "emit": {
+            "type": "agent_end",
+            "messages": []
+          }
+        }
+      ],
+      "response": {
+        "success": true
+      }
+    },
+    {
+      "match": "summoned Bobble while working in TextEdit",
+      "steps": [
+        {
+          "emit": {
+            "type": "agent_start"
+          }
+        },
+        {
+          "delayMs": 5,
+          "emit": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "emit": {
+            "type": "message_start",
+            "message": {
+              "role": "assistant",
+              "content": []
+            }
+          }
+        },
+        {
+          "delayMs": 40,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "thinking",
+                  "thinking": "The user wants the title bold in TextEdit. Look at the window first."
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": "The user wants the title bold in TextEdit. Look at the window first.",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "thinking",
+                    "thinking": "The user wants the title bold in TextEdit. Look at the window first."
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 40,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "thinking",
+                  "thinking": "The user wants the title bold in TextEdit. Look at the window first."
+                },
+                {
+                  "type": "toolCall",
+                  "id": "call_snap_1",
+                  "name": "mac_snapshot",
+                  "arguments": {
+                    "app": "TextEdit"
+                  }
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "toolcall_end",
+              "contentIndex": 1,
+              "toolCall": {
+                "type": "toolCall",
+                "id": "call_snap_1",
+                "name": "mac_snapshot",
+                "arguments": {
+                  "app": "TextEdit"
+                }
+              },
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "thinking",
+                    "thinking": "The user wants the title bold in TextEdit. Look at the window first."
+                  },
+                  {
+                    "type": "toolCall",
+                    "id": "call_snap_1",
+                    "name": "mac_snapshot",
+                    "arguments": {
+                      "app": "TextEdit"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "message_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "thinking",
+                  "thinking": "The user wants the title bold in TextEdit. Look at the window first."
+                },
+                {
+                  "type": "toolCall",
+                  "id": "call_snap_1",
+                  "name": "mac_snapshot",
+                  "arguments": {
+                    "app": "TextEdit"
+                  }
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "qwen3.6-27b",
+              "usage": {
+                "input": 180,
+                "output": 40,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 220,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "toolUse",
+              "timestamp": 0
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "tool_execution_start",
+            "toolCallId": "call_snap_1",
+            "toolName": "mac_snapshot",
+            "args": {
+              "app": "TextEdit"
+            }
+          }
+        },
+        {
+          "delayMs": 80,
+          "emit": {
+            "type": "tool_execution_end",
+            "toolCallId": "call_snap_1",
+            "toolName": "mac_snapshot",
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "TextEdit, \"Launch checklist.txt\": text area [3], heading \"Launch checklist\""
+                }
+              ],
+              "details": {}
+            },
+            "isError": false
+          }
+        },
+        {
+          "emit": {
+            "type": "turn_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "thinking",
+                  "thinking": "The user wants the title bold in TextEdit. Look at the window first."
+                },
+                {
+                  "type": "toolCall",
+                  "id": "call_snap_1",
+                  "name": "mac_snapshot",
+                  "arguments": {
+                    "app": "TextEdit"
+                  }
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "qwen3.6-27b",
+              "usage": {
+                "input": 180,
+                "output": 40,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 220,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "toolUse",
+              "timestamp": 0
+            },
+            "toolResults": [
+              {
+                "role": "toolResult",
+                "toolCallId": "call_snap_1",
+                "toolName": "mac_snapshot",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "TextEdit, \"Launch checklist.txt\": text area [3], heading \"Launch checklist\""
+                  }
+                ],
+                "isError": false,
+                "timestamp": 0
+              }
+            ]
+          }
+        },
+        {
+          "emit": {
+            "type": "extension_ui_request",
+            "id": "ui-consent-1",
+            "method": "confirm",
+            "title": "Let Bobble use TextEdit?",
+            "message": "Bobble wants to click and type in TextEdit to do what you asked. You can stop it at any time with Esc.",
+            "timeout": 120000
+          }
+        },
+        {
+          "awaitUi": "ui-consent-1"
+        },
+        {
+          "delayMs": 5,
+          "emit": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "emit": {
+            "type": "message_start",
+            "message": {
+              "role": "assistant",
+              "content": []
+            }
+          }
+        },
+        {
+          "delayMs": 40,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "toolCall",
+                  "id": "call_key_1",
+                  "name": "mac_key",
+                  "arguments": {
+                    "app": "TextEdit",
+                    "combo": "cmd+b"
+                  }
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "toolcall_end",
+              "contentIndex": 0,
+              "toolCall": {
+                "type": "toolCall",
+                "id": "call_key_1",
+                "name": "mac_key",
+                "arguments": {
+                  "app": "TextEdit",
+                  "combo": "cmd+b"
+                }
+              },
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "toolCall",
+                    "id": "call_key_1",
+                    "name": "mac_key",
+                    "arguments": {
+                      "app": "TextEdit",
+                      "combo": "cmd+b"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "message_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "toolCall",
+                  "id": "call_key_1",
+                  "name": "mac_key",
+                  "arguments": {
+                    "app": "TextEdit",
+                    "combo": "cmd+b"
+                  }
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "qwen3.6-27b",
+              "usage": {
+                "input": 180,
+                "output": 40,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 220,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "toolUse",
+              "timestamp": 0
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "tool_execution_start",
+            "toolCallId": "call_key_1",
+            "toolName": "mac_key",
+            "args": {
+              "app": "TextEdit",
+              "combo": "cmd+b"
+            }
+          }
+        },
+        {
+          "delayMs": 80,
+          "emit": {
+            "type": "tool_execution_end",
+            "toolCallId": "call_key_1",
+            "toolName": "mac_key",
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "pressed cmd+b in TextEdit"
+                }
+              ],
+              "details": {}
+            },
+            "isError": false
+          }
+        },
+        {
+          "emit": {
+            "type": "turn_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "toolCall",
+                  "id": "call_key_1",
+                  "name": "mac_key",
+                  "arguments": {
+                    "app": "TextEdit",
+                    "combo": "cmd+b"
+                  }
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "qwen3.6-27b",
+              "usage": {
+                "input": 180,
+                "output": 40,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 220,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "toolUse",
+              "timestamp": 0
+            },
+            "toolResults": [
+              {
+                "role": "toolResult",
+                "toolCallId": "call_key_1",
+                "toolName": "mac_key",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "pressed cmd+b in TextEdit"
+                  }
+                ],
+                "isError": false,
+                "timestamp": 0
+              }
+            ]
+          }
+        },
+        {
+          "delayMs": 5,
+          "emit": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "emit": {
+            "type": "message_start",
+            "message": {
+              "role": "assistant",
+              "content": []
+            }
+          }
+        },
+        {
+          "delayMs": 50,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Done. I selected the heading **Launch checklist** in TextEdit and made it bold."
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "Done. I selected the heading **Launch checklist** in TextEdit and made it bold.",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Done. I selected the heading **Launch checklist** in TextEdit and made it bold."
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "message_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Done. I selected the heading **Launch checklist** in TextEdit and made it bold."
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "qwen3.6-27b",
+              "usage": {
+                "input": 180,
+                "output": 40,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 220,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 0
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "turn_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Done. I selected the heading **Launch checklist** in TextEdit and made it bold."
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "qwen3.6-27b",
+              "usage": {
+                "input": 180,
+                "output": 40,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 220,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 0
+            },
+            "toolResults": []
+          }
+        },
+        {
+          "emit": {
+            "type": "agent_end",
+            "messages": []
+          }
+        }
+      ],
+      "response": {
+        "success": true
+      }
+    },
+    {
+      "match": "Clipboard text",
+      "steps": [
+        {
+          "emit": {
+            "type": "agent_start"
+          }
+        },
+        {
+          "delayMs": 5,
+          "emit": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "emit": {
+            "type": "message_start",
+            "message": {
+              "role": "assistant",
+              "content": []
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The clipboard holds a **m"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "The clipboard holds a **m",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "The clipboard holds a **m"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The clipboard holds a **meeting note**: the design"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "eeting note**: the design",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "The clipboard holds a **meeting note**: the design"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The clipboard holds a **meeting note**: the design review moved to Friday a"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": " review moved to Friday a",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "The clipboard holds a **meeting note**: the design review moved to Friday a"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The clipboard holds a **meeting note**: the design review moved to Friday at 10:00, and the room cha"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "t 10:00, and the room cha",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "The clipboard holds a **meeting note**: the design review moved to Friday at 10:00, and the room cha"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The clipboard holds a **meeting note**: the design review moved to Friday at 10:00, and the room changed to the second floor."
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "nged to the second floor.",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "The clipboard holds a **meeting note**: the design review moved to Friday at 10:00, and the room changed to the second floor."
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "message_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The clipboard holds a **meeting note**: the design review moved to Friday at 10:00, and the room changed to the second floor."
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "qwen3.6-27b",
+              "usage": {
+                "input": 180,
+                "output": 40,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 220,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 0
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "turn_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The clipboard holds a **meeting note**: the design review moved to Friday at 10:00, and the room changed to the second floor."
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "qwen3.6-27b",
+              "usage": {
+                "input": 180,
+                "output": 40,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 220,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 0
+            },
+            "toolResults": []
+          }
+        },
+        {
+          "emit": {
+            "type": "agent_end",
+            "messages": []
+          }
+        }
+      ],
+      "response": {
+        "success": true
+      }
+    },
+    {
+      "match": "Selected in Finder",
+      "steps": [
+        {
+          "emit": {
+            "type": "agent_start"
+          }
+        },
+        {
+          "delayMs": 5,
+          "emit": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "emit": {
+            "type": "message_start",
+            "message": {
+              "role": "assistant",
+              "content": []
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "You selected two files: **budg"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "You selected two files: **budg",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "You selected two files: **budg"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "You selected two files: **budget-2026.numbers**, a spreadshe"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "et-2026.numbers**, a spreadshe",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "You selected two files: **budget-2026.numbers**, a spreadshe"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "You selected two files: **budget-2026.numbers**, a spreadsheet, and **offsite-plan.pdf**, "
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "et, and **offsite-plan.pdf**, ",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "You selected two files: **budget-2026.numbers**, a spreadsheet, and **offsite-plan.pdf**, "
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "You selected two files: **budget-2026.numbers**, a spreadsheet, and **offsite-plan.pdf**, a document. Ask me to open eit"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "a document. Ask me to open eit",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "You selected two files: **budget-2026.numbers**, a spreadsheet, and **offsite-plan.pdf**, a document. Ask me to open eit"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "You selected two files: **budget-2026.numbers**, a spreadsheet, and **offsite-plan.pdf**, a document. Ask me to open either and I can go through it."
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "her and I can go through it.",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "You selected two files: **budget-2026.numbers**, a spreadsheet, and **offsite-plan.pdf**, a document. Ask me to open either and I can go through it."
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "message_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "You selected two files: **budget-2026.numbers**, a spreadsheet, and **offsite-plan.pdf**, a document. Ask me to open either and I can go through it."
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "qwen3.6-27b",
+              "usage": {
+                "input": 180,
+                "output": 40,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 220,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 0
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "turn_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "You selected two files: **budget-2026.numbers**, a spreadsheet, and **offsite-plan.pdf**, a document. Ask me to open either and I can go through it."
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "qwen3.6-27b",
+              "usage": {
+                "input": 180,
+                "output": 40,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 220,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 0
+            },
+            "toolResults": []
+          }
+        },
+        {
+          "emit": {
+            "type": "agent_end",
+            "messages": []
+          }
+        }
+      ],
+      "response": {
+        "success": true
+      }
+    },
+    {
+      "match": "Open in Safari",
+      "steps": [
+        {
+          "emit": {
+            "type": "agent_start"
+          }
+        },
+        {
+          "delayMs": 5,
+          "emit": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "emit": {
+            "type": "message_start",
+            "message": {
+              "role": "assistant",
+              "content": []
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The page is **The quick panel guid"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "The page is **The quick panel guid",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "The page is **The quick panel guid"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The page is **The quick panel guide**. It explains how to summon Bob"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "e**. It explains how to summon Bob",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "The page is **The quick panel guide**. It explains how to summon Bob"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The page is **The quick panel guide**. It explains how to summon Bobble from any app, how to ask about"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "ble from any app, how to ask about",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "The page is **The quick panel guide**. It explains how to summon Bobble from any app, how to ask about"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The page is **The quick panel guide**. It explains how to summon Bobble from any app, how to ask about a window or an area of the screen"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": " a window or an area of the screen",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "The page is **The quick panel guide**. It explains how to summon Bobble from any app, how to ask about a window or an area of the screen"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The page is **The quick panel guide**. It explains how to summon Bobble from any app, how to ask about a window or an area of the screen, and which permissions it needs."
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": ", and which permissions it needs.",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "The page is **The quick panel guide**. It explains how to summon Bobble from any app, how to ask about a window or an area of the screen, and which permissions it needs."
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "message_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The page is **The quick panel guide**. It explains how to summon Bobble from any app, how to ask about a window or an area of the screen, and which permissions it needs."
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "qwen3.6-27b",
+              "usage": {
+                "input": 180,
+                "output": 40,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 220,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 0
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "turn_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The page is **The quick panel guide**. It explains how to summon Bobble from any app, how to ask about a window or an area of the screen, and which permissions it needs."
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "qwen3.6-27b",
+              "usage": {
+                "input": 180,
+                "output": 40,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 220,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 0
+            },
+            "toolResults": []
+          }
+        },
+        {
+          "emit": {
+            "type": "agent_end",
+            "messages": []
+          }
+        }
+      ],
+      "response": {
+        "success": true
+      }
+    },
+    {
+      "match": "Attached file",
+      "steps": [
+        {
+          "emit": {
+            "type": "agent_start"
+          }
+        },
+        {
+          "delayMs": 5,
+          "emit": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "emit": {
+            "type": "message_start",
+            "message": {
+              "role": "assistant",
+              "content": []
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The note you dropped li"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "The note you dropped li",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "The note you dropped li"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The note you dropped lists **three ideas** for"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "sts **three ideas** for",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "The note you dropped lists **three ideas** for"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The note you dropped lists **three ideas** for the offsite: a river w"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": " the offsite: a river w",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "The note you dropped lists **three ideas** for the offsite: a river w"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The note you dropped lists **three ideas** for the offsite: a river walk, a cooking class an"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "alk, a cooking class an",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "The note you dropped lists **three ideas** for the offsite: a river walk, a cooking class an"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The note you dropped lists **three ideas** for the offsite: a river walk, a cooking class and a museum morning."
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "d a museum morning.",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "The note you dropped lists **three ideas** for the offsite: a river walk, a cooking class and a museum morning."
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "message_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The note you dropped lists **three ideas** for the offsite: a river walk, a cooking class and a museum morning."
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "qwen3.6-27b",
+              "usage": {
+                "input": 180,
+                "output": 40,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 220,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 0
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "turn_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The note you dropped lists **three ideas** for the offsite: a river walk, a cooking class and a museum morning."
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "qwen3.6-27b",
+              "usage": {
+                "input": 180,
+                "output": 40,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 220,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 0
+            },
+            "toolResults": []
+          }
+        },
+        {
+          "emit": {
+            "type": "agent_end",
+            "messages": []
+          }
+        }
+      ],
+      "response": {
+        "success": true
+      }
+    },
+    {
+      "steps": [
+        {
+          "emit": {
+            "type": "agent_start"
+          }
+        },
+        {
+          "delayMs": 5,
+          "emit": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "emit": {
+            "type": "message_start",
+            "message": {
+              "role": "assistant",
+              "content": []
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here is"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "Here is",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Here is"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here is a shor"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": " a shor",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Here is a shor"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here is a short answe"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "t answe",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Here is a short answe"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here is a short answer to th"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "r to th",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Here is a short answer to th"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here is a short answer to that."
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "at.",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Here is a short answer to that."
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "message_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here is a short answer to that."
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "qwen3.6-27b",
+              "usage": {
+                "input": 180,
+                "output": 40,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 220,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 0
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "turn_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here is a short answer to that."
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "qwen3.6-27b",
+              "usage": {
+                "input": 180,
+                "output": 40,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 220,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 0
+            },
+            "toolResults": []
+          }
+        },
+        {
+          "emit": {
+            "type": "agent_end",
+            "messages": []
+          }
+        }
+      ],
+      "response": {
+        "success": true
+      }
+    },
+    {
+      "steps": [
+        {
+          "emit": {
+            "type": "agent_start"
+          }
+        },
+        {
+          "delayMs": 5,
+          "emit": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "emit": {
+            "type": "message_start",
+            "message": {
+              "role": "assistant",
+              "content": []
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here i"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "Here i",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Here i"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here is anot"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "s anot",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Here is anot"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here is another sh"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "her sh",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Here is another sh"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here is another short an"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "ort an",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Here is another short an"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here is another short answer."
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "swer.",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Here is another short answer."
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "message_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here is another short answer."
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "qwen3.6-27b",
+              "usage": {
+                "input": 180,
+                "output": 40,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 220,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 0
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "turn_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here is another short answer."
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "qwen3.6-27b",
+              "usage": {
+                "input": 180,
+                "output": 40,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 220,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 0
+            },
+            "toolResults": []
+          }
+        },
+        {
+          "emit": {
+            "type": "agent_end",
+            "messages": []
+          }
+        }
+      ],
+      "response": {
+        "success": true
+      }
+    },
+    {
+      "steps": [
+        {
+          "emit": {
+            "type": "agent_start"
+          }
+        },
+        {
+          "delayMs": 5,
+          "emit": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "emit": {
+            "type": "message_start",
+            "message": {
+              "role": "assistant",
+              "content": []
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "And"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "And",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "And"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "And on"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": " on",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "And on"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "And one m"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "e m",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "And one m"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "And one more"
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "ore",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "And one more"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "And one more."
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": ".",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "And one more."
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "message_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "And one more."
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "qwen3.6-27b",
+              "usage": {
+                "input": 180,
+                "output": 40,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 220,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 0
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "turn_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "And one more."
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "qwen3.6-27b",
+              "usage": {
+                "input": 180,
+                "output": 40,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 220,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 0
+            },
+            "toolResults": []
+          }
+        },
+        {
+          "emit": {
+            "type": "agent_end",
+            "messages": []
+          }
+        }
+      ],
+      "response": {
+        "success": true
+      }
+    }
+  ]
+}

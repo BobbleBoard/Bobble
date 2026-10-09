@@ -6,6 +6,7 @@ import { AppErrorBoundary } from './AppErrorBoundary';
 import { completeSoftReload, onSoftReload, reloadGeneration, softReload } from './app-reload';
 import { CrashSeam } from './crash-seam';
 import { registerFeatures } from './features';
+import { connectQuickMainActions } from './quick/main-actions';
 import { connectChatJobs } from './state/chat-jobs';
 import { connectChildAgents } from './state/child-agent-store';
 import { connectGen } from './state/gen-store';
@@ -28,11 +29,25 @@ import './styles/global.css';
  */
 installFocusRingTracking();
 
+/*
+ * THE QUICK PANEL'S WINDOW (`?quickPanel=1`, electron/quick/quick-main.ts): its
+ * own pi session, the model's status and the settings — and none of the main
+ * window's sidebar, studios or scheduled tasks.
+ */
+const IS_QUICK_PANEL = new URLSearchParams(window.location.search).has('quickPanel');
+if (IS_QUICK_PANEL) {
+  document.documentElement.classList.add('qp-root');
+  connectPi();
+  connectLlm();
+  connectStoreModels();
+  connectSettings();
+}
+
 // Attach the pi + inference event streams before React mounts so nothing
 // buffered (pre-mount events) is lost, and load settings (theme is applied from
 // them). The standalone canvas pop-out window (?canvasPopout=1) mounts only the
 // canvas, so it needs none of these.
-if (!new URLSearchParams(window.location.search).has('canvasPopout')) {
+if (!IS_QUICK_PANEL && !new URLSearchParams(window.location.search).has('canvasPopout')) {
   connectPi();
   connectChildAgents();
   // Which chat started which generation — a deleted chat's jobs are stopped.
@@ -56,6 +71,8 @@ if (!new URLSearchParams(window.location.search).has('canvasPopout')) {
   // What the push's features add to shared surfaces, before the first paint
   // (src/features.ts). Nothing yet.
   registerFeatures();
+  // The main window's half of the quick panel: "Open in Bobble" and friends.
+  connectQuickMainActions();
 }
 
 const rootElement = document.getElementById('root');
@@ -103,8 +120,21 @@ function AppRoot() {
   );
 }
 
-createRoot(rootElement).render(
-  <StrictMode>
-    <AppRoot />
-  </StrictMode>,
-);
+if (IS_QUICK_PANEL) {
+  // Its own chunk, so the main window never loads the panel's code or styles.
+  void import('./quick/QuickPanelApp').then(({ QuickPanelApp }) => {
+    createRoot(rootElement).render(
+      <StrictMode>
+        <AppErrorBoundary>
+          <QuickPanelApp />
+        </AppErrorBoundary>
+      </StrictMode>,
+    );
+  });
+} else {
+  createRoot(rootElement).render(
+    <StrictMode>
+      <AppRoot />
+    </StrictMode>,
+  );
+}

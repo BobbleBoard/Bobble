@@ -178,7 +178,13 @@ describe('helpers', () => {
 
   it('labels chips in plain words', () => {
     expect(contextLabel(win)).toBe('TextEdit · Notes.txt');
-    expect(contextLabel(selection)).toBe('Selection in Mail');
+    expect(contextLabel(selection)).toBe('“teh quick brwon fox”');
+    expect(
+      contextLabel({
+        ...selection,
+        text: 'one two three four five six seven eight nine',
+      } as QuickContext),
+    ).toBe('“one two three four five six seven…”');
     expect(contextLabel({ kind: 'files', id: 'f', paths: ['/a/b/report.pdf'] })).toBe('report.pdf');
     expect(contextLabel({ kind: 'app', id: 'a', app: 'Notes', pid: 1 })).toBe('Use Notes');
   });

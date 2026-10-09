@@ -1,0 +1,763 @@
+/*
+ * THE QUICK PANEL — Bobble's own floating panel over other apps.
+ *
+ * One surface (the window itself is the card: macOS rounds it and draws its
+ * shadow), the app's tokens throughout, teal only where something is chosen or
+ * pressed. Two faces: COMPACT, a field with what can go with it, hugging its
+ * content like a launcher; and the THREAD, a small chat with its composer at
+ * the foot.
+ */
+
+html.qp-root,
+html.qp-root body,
+html.qp-root #root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: var(--pd-bg-raised);
+}
+
+.qp {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  color: var(--pd-text-primary);
+  background: var(--pd-bg-raised);
+  box-shadow: inset 0 0 0 0.5px var(--pd-border-default);
+  font-family: var(--pd-font-sans);
+  font-size: var(--pd-font-size-body);
+  line-height: var(--pd-leading-body);
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.qp[data-face="compact"] {
+  height: auto;
+}
+
+.qp-drag {
+  -webkit-app-region: drag;
+}
+
+.qp-drag button,
+.qp-drag input,
+.qp-drag textarea,
+.qp-drag a,
+.qp-drag [role="button"] {
+  -webkit-app-region: no-drag;
+}
+
+/* ── the field ───────────────────────────────────────────────────────────── */
+
+.qp-field {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--pd-space-md);
+  padding: 14px var(--pd-space-lg) 10px;
+}
+
+.qp-field-mark {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin-top: 1px;
+  color: var(--pd-text-primary);
+}
+
+.qp-input {
+  flex: 1;
+  min-width: 0;
+  min-height: 28px;
+  max-height: 168px;
+  padding: 3px 0;
+  border: 0;
+  outline: none;
+  resize: none;
+  background: transparent;
+  color: var(--pd-text-primary);
+  font: inherit;
+  font-size: 17px;
+  line-height: 22px;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.qp-input::placeholder {
+  color: var(--pd-text-placeholder);
+}
+
+.qp[data-face="thread"] .qp-input {
+  font-size: var(--pd-font-size-body);
+  line-height: var(--pd-leading-body);
+  min-height: 20px;
+  padding: 4px 0;
+}
+
+.qp-field-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ── chips ───────────────────────────────────────────────────────────────── */
+
+.qp-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 var(--pd-space-lg) 10px 56px;
+}
+
+.qp[data-face="thread"] .qp-chips {
+  padding-left: var(--pd-space-md);
+}
+
+.qp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 280px;
+  height: 30px;
+  padding: 0 4px 0 6px;
+  border-radius: var(--pd-radius-sm);
+  border: 1px solid var(--pd-border-default);
+  background: var(--pd-bg-inset);
+  color: var(--pd-text-secondary);
+  font-size: var(--pd-font-size-footnote);
+  line-height: var(--pd-leading-footnote);
+}
+
+.qp-chip[data-kind="app"] {
+  border-color: color-mix(in srgb, var(--pd-accent-primary) 45%, transparent);
+  background: var(--pd-accent-subtle);
+  color: var(--pd-text-primary);
+}
+
+.qp-chip-thumb {
+  flex: none;
+  width: 34px;
+  height: 22px;
+  border-radius: 4px;
+  object-fit: cover;
+  box-shadow: 0 0 0 0.5px var(--pd-border-strong);
+}
+
+.qp-chip-icon {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  color: var(--pd-text-muted);
+}
+
+.qp-chip-icon img {
+  width: 18px;
+  height: 18px;
+}
+
+.qp-chip-label {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.qp-chip-remove {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--pd-text-muted);
+  cursor: pointer;
+}
+
+.qp-chip-remove:hover {
+  background: var(--pd-bg-hover);
+  color: var(--pd-text-primary);
+}
+
+.qp-chip[data-busy="true"] .qp-chip-label {
+  color: var(--pd-text-muted);
+}
+
+/* ── the rows of things to do ────────────────────────────────────────────── */
+
+.qp-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 0 var(--pd-space-lg) 10px 56px;
+}
+
+.qp-row-label {
+  margin-right: 2px;
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+}
+
+.qp-act {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px 0 8px;
+  border: 1px solid var(--pd-border-subtle);
+  border-radius: var(--pd-radius-full);
+  background: transparent;
+  color: var(--pd-text-secondary);
+  font: inherit;
+  font-size: var(--pd-font-size-footnote);
+  line-height: var(--pd-leading-footnote);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease;
+}
+
+.qp-act:hover {
+  background: var(--pd-bg-hover);
+  color: var(--pd-text-primary);
+  border-color: var(--pd-border-default);
+}
+
+.qp-act:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.qp-act[data-primary="true"] {
+  border-color: color-mix(in srgb, var(--pd-accent-primary) 50%, transparent);
+  background: var(--pd-accent-subtle);
+  color: var(--pd-text-primary);
+}
+
+.qp-act img {
+  width: 16px;
+  height: 16px;
+}
+
+.qp-act .pd-icon {
+  color: var(--pd-text-muted);
+}
+
+.qp-act:hover .pd-icon,
+.qp-act[data-primary="true"] .pd-icon {
+  color: var(--pd-text-primary);
+}
+
+.qp-act-key {
+  margin-left: 2px;
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-caption);
+}
+
+/* ── the foot ────────────────────────────────────────────────────────────── */
+
+.qp-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--pd-space-md);
+  min-height: 34px;
+  padding: 0 var(--pd-space-md) 0 var(--pd-space-lg);
+  border-top: 1px solid var(--pd-border-subtle);
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+}
+
+.qp-foot-app {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.qp-foot-app img {
+  width: 16px;
+  height: 16px;
+}
+
+.qp-foot-keys {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--pd-space-md);
+  white-space: nowrap;
+}
+
+.qp-foot-keys button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--pd-text-muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.qp-foot-keys button:hover {
+  background: var(--pd-bg-hover);
+  color: var(--pd-text-primary);
+}
+
+.qp-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 5px;
+  background: var(--pd-bg-inset);
+  box-shadow: inset 0 0 0 0.5px var(--pd-border-default);
+  color: var(--pd-text-secondary);
+  font-size: 11px;
+  line-height: 1;
+}
+
+/* ── the thread face ─────────────────────────────────────────────────────── */
+
+.qp-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--pd-space-sm);
+  height: 44px;
+  padding: 0 var(--pd-space-sm) 0 var(--pd-space-lg);
+  border-bottom: 1px solid var(--pd-border-subtle);
+}
+
+.qp-head-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--pd-text-primary);
+  font-size: var(--pd-font-size-footnote);
+  font-weight: 500;
+}
+
+.qp-head-tools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.qp-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.qp-thread {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pd-space-lg);
+  padding: var(--pd-space-lg) var(--pd-space-lg) var(--pd-space-xl);
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.qp-user {
+  align-self: flex-end;
+  max-width: 82%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.qp-user-text {
+  padding: 8px 12px;
+  border-radius: var(--pd-radius-bubble);
+  /* The chat's own bubble, so a question looks the same in both places. */
+  background: var(--pd-user-bubble-bg);
+  color: var(--pd-user-bubble-fg);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.qp-user-images {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.qp-user-images img {
+  max-width: 180px;
+  max-height: 110px;
+  border-radius: var(--pd-radius-md);
+  box-shadow: 0 0 0 0.5px var(--pd-border-strong);
+  object-fit: cover;
+}
+
+.qp-reply {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pd-space-sm);
+  min-width: 0;
+}
+
+.qp-reply .pd-prose {
+  font-size: var(--pd-font-size-body);
+}
+
+.qp-reply-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 2px;
+}
+
+.qp-thinking {
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-footnote);
+}
+
+.qp-artifact-note {
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-footnote);
+}
+
+.qp-dock {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px var(--pd-space-md) 10px;
+  border-top: 1px solid var(--pd-border-subtle);
+}
+
+.qp-dock .qp-field {
+  align-items: flex-end;
+  padding: 6px 8px 6px 12px;
+  border: 1px solid var(--pd-border-default);
+  border-radius: var(--pd-radius-lg);
+  background: var(--pd-bg-base);
+}
+
+.qp-dock .qp-row {
+  padding: 0 2px;
+}
+
+.qp-dock .qp-chips {
+  padding: 0 2px;
+}
+
+.qp-tool-icons {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 2px;
+}
+
+/* ── cards ───────────────────────────────────────────────────────────────── */
+
+.qp-card {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--pd-space-md);
+  margin: 0 var(--pd-space-lg) 10px 56px;
+  padding: var(--pd-space-md) var(--pd-space-md) var(--pd-space-md) 14px;
+  border: 1px solid var(--pd-border-default);
+  border-radius: var(--pd-radius-md);
+  background: var(--pd-bg-base);
+}
+
+.qp-dock .qp-card {
+  margin: 0;
+}
+
+.qp-card-icon {
+  flex: none;
+  margin-top: 1px;
+  color: var(--pd-accent-primary);
+}
+
+.qp-card-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.qp-card-title {
+  margin: 0;
+  color: var(--pd-text-primary);
+  font-size: var(--pd-font-size-footnote);
+  line-height: var(--pd-leading-footnote);
+  font-weight: 600;
+}
+
+.qp-card-body {
+  margin: 2px 0 0;
+  color: var(--pd-text-secondary);
+  font-size: var(--pd-font-size-footnote);
+  line-height: var(--pd-leading-footnote);
+}
+
+.qp-card-fixes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.qp-card-close {
+  flex: none;
+}
+
+/* A module's own Download card (it is a card already: no second frame). */
+.qp-module {
+  margin: 0 var(--pd-space-lg) 10px 56px;
+}
+
+.qp-dock .qp-module {
+  margin: 0;
+}
+
+/* ── sub-views: the window picker, the palette, recent threads ───────────── */
+
+.qp-view-head {
+  display: flex;
+  align-items: center;
+  gap: var(--pd-space-sm);
+  padding: var(--pd-space-lg) var(--pd-space-lg) var(--pd-space-sm);
+}
+
+.qp-view-head h2 {
+  flex: 1;
+  color: var(--pd-text-primary);
+}
+
+.qp-view-sub {
+  padding: 0 var(--pd-space-lg) var(--pd-space-md);
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-footnote);
+}
+
+.qp-windows {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--pd-space-md);
+  padding: 0 var(--pd-space-lg) var(--pd-space-lg);
+}
+
+.qp-window {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--pd-border-subtle);
+  border-radius: var(--pd-radius-md);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.qp-window:hover,
+.qp-window[data-active="true"] {
+  border-color: color-mix(in srgb, var(--pd-accent-primary) 60%, transparent);
+  background: var(--pd-accent-subtle);
+}
+
+.qp-window-shot {
+  aspect-ratio: 16 / 10;
+  width: 100%;
+  border-radius: 6px;
+  background: var(--pd-bg-inset);
+  object-fit: contain;
+}
+
+.qp-window-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.qp-window-meta img {
+  flex: none;
+  width: 20px;
+  height: 20px;
+}
+
+.qp-window-names {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.qp-window-app {
+  color: var(--pd-text-primary);
+  font-size: var(--pd-font-size-footnote);
+  line-height: var(--pd-leading-footnote);
+  font-weight: 500;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.qp-window-title {
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.qp-search {
+  display: flex;
+  align-items: center;
+  gap: var(--pd-space-sm);
+  margin: 0 var(--pd-space-lg) var(--pd-space-sm);
+  padding: 0 var(--pd-space-md);
+  height: 36px;
+  border: 1px solid var(--pd-border-default);
+  border-radius: var(--pd-radius-md);
+  background: var(--pd-bg-base);
+  color: var(--pd-text-muted);
+}
+
+.qp-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--pd-text-primary);
+  font: inherit;
+}
+
+/* Rows line up with the search field above them: same edges, icons on one line. */
+.qp-list {
+  display: flex;
+  flex-direction: column;
+  padding: 0 var(--pd-space-lg) var(--pd-space-md);
+}
+
+.qp-list-section {
+  padding: 10px var(--pd-space-md) 4px;
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+  font-weight: 500;
+}
+
+.qp-list-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+  padding: 0 var(--pd-space-md);
+  border: 0;
+  border-radius: var(--pd-radius-menu-item);
+  background: transparent;
+  color: var(--pd-text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.qp-list-row[data-active="true"] {
+  background: var(--pd-bg-selected);
+}
+
+.qp-list-row .pd-icon {
+  flex: none;
+  color: var(--pd-text-muted);
+}
+
+.qp-list-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.qp-list-hint {
+  flex: none;
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-caption);
+}
+
+.qp-empty {
+  padding: var(--pd-space-xl) var(--pd-space-lg);
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-footnote);
+  text-align: center;
+}
+
+/* While a capture is under way the chip row says so. */
+.qp-capturing {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--pd-text-secondary);
+  font-size: var(--pd-font-size-footnote);
+}
+
+.qp-capturing-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--pd-accent-primary);
+  box-shadow: 0 0 0 3px var(--pd-accent-subtle);
+  animation: qp-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes qp-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qp-capturing-dot {
+    animation: none;
+  }
+}
+
+/* Dropping a file on the panel. */
+.qp-drop {
+  position: absolute;
+  inset: 6px;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  border: 1.5px dashed color-mix(in srgb, var(--pd-accent-primary) 70%, transparent);
+  border-radius: var(--pd-radius-lg);
+  background: color-mix(in srgb, var(--pd-bg-raised) 88%, transparent);
+  color: var(--pd-text-primary);
+  font-size: var(--pd-font-size-footnote);
+  pointer-events: none;
+}
+
+.qp-dictation .pd-dictation {
+  margin: 0;
+}

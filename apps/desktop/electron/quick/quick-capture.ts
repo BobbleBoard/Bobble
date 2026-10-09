@@ -19,10 +19,10 @@
  * window, so a probe exercises every path with no permission and no picture of
  * anyone's screen.
  */
-import { app, BrowserWindow, desktopCapturer, type NativeImage, nativeImage } from 'electron';
+import { BrowserWindow, desktopCapturer, type NativeImage, nativeImage } from 'electron';
 import { openStillWindow } from '../gen/hyperframes-window';
 import { screenCaptureGrant } from '../mac/window-capture';
-import type { Grant } from './quick-mac';
+import { fakeAppIcon, type Grant } from './quick-mac';
 import { capturePixelSize, type DisplayGeometry } from './region-math';
 
 export interface WindowSource {
@@ -118,13 +118,6 @@ export function createRealCapture(): QuickCapture {
 
 // ── the stand-in ────────────────────────────────────────────────────────────
 
-/** Where the fake windows' REAL icons come from — the system draws them. */
-const FAKE_APP_PATHS: Readonly<Record<string, string>> = {
-  TextEdit: '/System/Applications/TextEdit.app',
-  Safari: '/Applications/Safari.app',
-  Notes: '/System/Applications/Notes.app',
-};
-
 const FAKE_DOC = `
   <div class="doc">
     <h1>Launch checklist</h1>
@@ -136,6 +129,21 @@ const FAKE_DOC = `
     <p class="muted">Owner: design · Due: Thursday</p>
   </div>`;
 
+/** What each stand-in window shows, so a picked window looks like itself. */
+const FAKE_BODIES: Readonly<Record<string, string>> = {
+  'Quarterly report': `<div class="doc"><h1>Visitors by month</h1><p>Up 18% on the last quarter, led by the new guides.</p>
+    <div style="display:flex;align-items:flex-end;gap:14px;height:220px;margin-top:24px">${[
+      40, 55, 48, 70, 82, 95,
+    ]
+      .map(
+        (v) =>
+          `<i style="display:block;width:52px;height:${v}%;background:#2f7d84;border-radius:5px 5px 0 0"></i>`,
+      )
+      .join('')}</div></div>`,
+  Groceries: `<div class="doc"><h1>Groceries</h1><ul><li>Oat milk</li><li>Lemons</li><li>Rye bread</li>
+    <li>Coffee beans</li><li>Basil</li></ul></div>`,
+};
+
 function fakeWindowHtml(title: string, w: number, h: number): string {
   return `<!doctype html><html><body style="margin:0;width:${w}px;height:${h}px;font-family:-apple-system,system-ui,sans-serif;background:#fff;color:#1d1d1f">
   <style>
@@ -146,7 +154,7 @@ function fakeWindowHtml(title: string, w: number, h: number): string {
     h1{font-size:22px;margin:0 0 12px} .muted{color:#888;font-size:13px}
   </style>
   <div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="t">${title}</span></div>
-  ${FAKE_DOC}</body></html>`;
+  ${FAKE_BODIES[title] ?? FAKE_DOC}</body></html>`;
 }
 
 function fakeDesktopHtml(w: number, h: number): string {
@@ -164,7 +172,7 @@ function fakeDesktopHtml(w: number, h: number): string {
   <div class="win" style="left:60px;top:300px;width:600px;height:480px"><div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>&nbsp; Notes</div>
     <div class="doc"><h1>Groceries</h1><p>Oat milk, lemons, rye bread, coffee beans, basil.</p></div></div>
   <div class="win" style="left:180px;top:120px;width:760px;height:520px"><div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>&nbsp; Launch checklist.txt</div>${FAKE_DOC}</div>
-  <div class="win" style="left:${Math.min(w - 920, 760)}px;top:220px;width:900px;height:600px"><div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>&nbsp; Quarterly report</div>
+  <div class="win" style="left:${Math.min(w - 920, 520)}px;top:220px;width:900px;height:600px"><div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>&nbsp; Quarterly report</div>
     <div class="doc"><h1>Visitors by month</h1><p>Up 18% on the last quarter, led by the new guides.</p></div>
     <div class="chart"><i style="height:40%"></i><i style="height:55%"></i><i style="height:48%"></i><i style="height:70%"></i><i style="height:82%"></i><i style="height:95%"></i></div></div>
   </body></html>`;
@@ -226,16 +234,8 @@ export function createFakeCapture(state: {
       if (state.grant !== 'granted') return [];
       const out: WindowSource[] = [];
       for (const w of state.windows()) {
-        const path = FAKE_APP_PATHS[w.app];
-        let icon: NativeImage | null = null;
-        if (path !== undefined) {
-          try {
-            const got = await app.getFileIcon(path, { size: 'large' });
-            icon = got.isEmpty() ? null : got;
-          } catch {
-            icon = null;
-          }
-        }
+        const iconUrl = await fakeAppIcon(w.app);
+        const icon = iconUrl === null ? null : nativeImage.createFromDataURL(iconUrl);
         const img = await windowImage(w.windowId);
         out.push({
           windowId: w.windowId,

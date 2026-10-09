@@ -44,7 +44,15 @@ const OLD_TITLES: Record<string, string> = {
 
 describe('the settings section registry', () => {
   it('lists exactly the old nav, in the old order, with the old words', () => {
-    expect(SETTINGS_NAV.map((s) => [s.id, s.label])).toEqual(OLD_NAV);
+    // Sections added since keep the old ones exactly as they were around them.
+    const old = SETTINGS_NAV.filter((s) => s.id !== 'quick-panel');
+    expect(old.map((s) => [s.id, s.label])).toEqual(OLD_NAV);
+  });
+
+  it('puts Quick panel right after Computer use in the nav', () => {
+    const nav = SETTINGS_NAV.map((s) => s.id);
+    expect(nav.indexOf('quick-panel')).toBe(nav.indexOf('computer-use') + 1);
+    expect(settingsSection('quick-panel').title).toBe('Quick panel');
   });
 
   it('titles every old section as before', () => {

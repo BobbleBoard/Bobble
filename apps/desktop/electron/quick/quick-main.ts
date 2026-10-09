@@ -132,6 +132,8 @@ let panelLoaded: Promise<void> | null = null;
 let visible = false;
 let pinned = false;
 let size: PanelSize = 'compact';
+/** The compact panel's last measured content height. */
+let fitHeight: number | undefined;
 /** A capture is under way: losing the keyboard to an overlay is not a dismissal. */
 let busy = 0;
 let quitting = false;
@@ -140,6 +142,8 @@ let previous: QuickFrontApp | null = null;
 let hotkeyStatus: QuickHotkeyStatus[] = [];
 const registered = new Set<string>();
 let overlay: OverlayRun | null = null;
+/** Test runs: the last hand-off to the main window, for a probe to read. */
+let lastMainAction: QuickMainAction | null = null;
 
 const background = (): boolean => isBackgroundMode();
 const ownPids = (): number[] => [process.pid];
@@ -272,8 +276,8 @@ function conceal(): void {
 
 function placeOnPointerDisplay(): void {
   if (panel === null || pinned) return;
-  const bounds = panelBounds(displayUnderPointer().workArea, size);
-  panel.setBounds(bounds, false);
+  const area = displayUnderPointer().workArea;
+  panel.setBounds(resizeInPlace(panelBounds(area, size), size, area, fitHeight), false);
 }
 
 function onBlur(): void {
@@ -326,19 +330,25 @@ async function summon(action: QuickAction): Promise<void> {
   }
   await ensurePanel();
   const wasVisible = visible;
-  if (!wasVisible) {
-    // What is in front, read while it still has the keyboard.
-    previous = await within(mac.frontApp(ownPids()), FRONT_READ_MS, null);
-  }
   let selection: QuickContext | null = null;
   let selectionProblem: QuickProblem | undefined;
-  if (!wasVisible && settings.readSelection && previous !== null && previous.isBobble !== true) {
-    const read = await within(mac.selection(previous.pid), SELECTION_READ_MS, null);
-    if (read?.ok && read.value.text.trim() !== '') {
+  if (!wasVisible) {
+    // What is in front, and what is selected in it — read while it still has
+    // the keyboard. The icon is fetched alongside, never in the way.
+    previous = await within(mac.frontApp(ownPids()), FRONT_READ_MS, null);
+    const other = previous !== null && previous.isBobble !== true ? previous : null;
+    const [icon, read] = await Promise.all([
+      other === null ? null : within(mac.appIcon(other), FRONT_READ_MS, null),
+      other === null || !settings.readSelection
+        ? null
+        : within(mac.selection(other.pid), SELECTION_READ_MS, null),
+    ]);
+    if (other !== null && icon !== null) previous = { ...other, icon };
+    if (other !== null && read?.ok && read.value.text.trim() !== '') {
       selection = {
         kind: 'selection',
         id: randomUUID(),
-        app: read.value.app || previous.name,
+        app: read.value.app || other.name,
         text: read.value.text,
         editable: read.value.editable,
       };
@@ -627,6 +637,7 @@ async function replaceSelection(
 // ── the main window's half ─────────────────────────────────────────────────
 
 function deliverToMain(win: BrowserWindow, action: QuickMainAction): void {
+  lastMainAction = action;
   const go = () => {
     if (!win.isDestroyed()) events.send(win.webContents, 'quick:main-action', action);
   };
@@ -743,9 +754,14 @@ const handlers: IpcHandlers<QuickInvokeMap> = {
   },
   'quick:resize': (req) => {
     size = req.size;
+    if (req.height !== undefined) fitHeight = req.height;
     if (panel !== null && !panel.isDestroyed()) {
       const area = screen.getDisplayMatching(panel.getBounds()).workArea;
-      panel.setBounds(resizeInPlace(panel.getBounds(), size, area), !background());
+      const next = resizeInPlace(panel.getBounds(), size, area, req.height);
+      const now = panel.getBounds();
+      // Growing to hug the content is not worth an animation; a size change is.
+      const animate = !background() && (next.width !== now.width || req.height === undefined);
+      panel.setBounds(next, animate);
     }
     return { ok: true, size };
   },
@@ -827,6 +843,11 @@ const handlers: IpcHandlers<QuickInvokeMap> = {
     hotkeys: hotkeyStatus,
     front: previous,
   }),
+  'quick:suspend-hotkeys': (req) => {
+    if (req.suspended) unregisterHotkeys();
+    else applyHotkeys();
+    return { ok: true };
+  },
   'quick:history': () => ({ threads: readHistory() }),
   'quick:remember-thread': (req) => {
     const rest = readHistory().filter((t) => t.file !== req.file);
@@ -859,6 +880,13 @@ const handlers: IpcHandlers<QuickInvokeMap> = {
             size,
             busy,
             overlay: overlay !== null,
+            overlayShownOnScreen:
+              overlay?.windows.some((w) => !w.isDestroyed() && w.isVisible()) ?? false,
+            lastMainAction,
+            mainWindowAlive: (() => {
+              const w = deps?.getMainWindow() ?? null;
+              return w !== null && !w.isDestroyed();
+            })(),
             bounds: panel?.getBounds() ?? null,
             panelShownOnScreen: panel?.isVisible() ?? false,
             previous,
@@ -908,10 +936,15 @@ export function registerQuickPanel(
     if (!next.quickPanel.enabled && before.quickPanel.enabled && visible) void dismiss('escape');
   });
   applyHotkeys();
-  // Made ahead of the first hotkey, after the main window has had its start.
-  const make = () => {
-    if (!quitting && readSettings().quickPanel.enabled) void ensurePanel();
-  };
-  if (process.env.PI_E2E === '1') make();
-  else setTimeout(make, PRECREATE_DELAY_MS);
+  /*
+   * Made ahead of the first hotkey, after the main window has had its start.
+   * NOT in a test run: every probe takes `app.firstWindow()` for the main
+   * window and some count the windows, so a test run makes the panel only when
+   * a probe presses one of its keys.
+   */
+  if (process.env.PI_E2E !== '1') {
+    setTimeout(() => {
+      if (!quitting && readSettings().quickPanel.enabled) void ensurePanel();
+    }, PRECREATE_DELAY_MS);
+  }
 }

@@ -15,10 +15,15 @@
  * and a probe sets what the fake reports through `quick:debug`.
  */
 import { execFile } from 'node:child_process';
+import { readFileSync, rmSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { promisify } from 'node:util';
 import { clipboard, shell, systemPreferences } from 'electron';
 import { macHelperRequest } from '../mac/mac-agent';
+import { piMacHelperPath } from '../mac/pi-mac-path';
 import { registerForScreenRecording, SCREEN_RECORDING_SETTINGS_URL } from '../mac/window-capture';
+import { CHROME_LIKE, isReadableBrowser, SAFARI_LIKE } from './browsers';
 import type { QuickFrontApp, QuickProblem, QuickSystemPane } from './quick-contract';
 import type { ScreenWindow } from './region-math';
 
@@ -58,6 +63,8 @@ export interface QuickMac {
   /** ⌘V into whatever has the keyboard. */
   pasteKeystroke(): Promise<boolean>;
   accessibility(): Promise<Grant>;
+  /** An app's real icon, drawn by the system, as a data URL. */
+  appIcon(app: QuickFrontApp): Promise<string | null>;
   finderSelection(): Promise<Read<string[]>>;
   browserPage(appName: string): Promise<Read<BrowserRead>>;
   clipboardRead(): Read<{ text?: string; image?: string }>;
@@ -73,23 +80,6 @@ const PANE_URLS: Readonly<Record<QuickSystemPane, string>> = {
   automation: 'x-apple.systempreferences:com.apple.preference.security?Privacy_Automation',
   microphone: 'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone',
 };
-
-/** The browsers whose page can be read, by the name macOS shows. Fixed strings only:
- *  an app name is never spliced into a script from anywhere else. */
-const SAFARI_LIKE: ReadonlySet<string> = new Set(['Safari', 'Safari Technology Preview']);
-const CHROME_LIKE: ReadonlySet<string> = new Set([
-  'Google Chrome',
-  'Google Chrome Canary',
-  'Chromium',
-  'Brave Browser',
-  'Microsoft Edge',
-  'Arc',
-  'Vivaldi',
-]);
-
-export function isReadableBrowser(appName: string): boolean {
-  return SAFARI_LIKE.has(appName) || CHROME_LIKE.has(appName);
-}
 
 /** osascript's "not allowed to send Apple events" answer. */
 function automationRefused(err: unknown): boolean {
@@ -124,7 +114,26 @@ export function imageDataUrl(img: Electron.NativeImage, maxEdge = 1600): string 
 
 export function createRealMac(): QuickMac {
   let axCache: { at: number; grant: Grant } | null = null;
+  const icons = new Map<string, string | null>();
   return {
+    async appIcon(app) {
+      const key = app.bundleId ?? app.name;
+      if (icons.has(key)) return icons.get(key) ?? null;
+      try {
+        const r = await macHelperRequest<{ ok?: boolean; base64?: string; mimeType?: string }>(
+          'appIcon',
+          { pid: app.pid, app: app.bundleId ?? app.name, size: 64 },
+        );
+        const url =
+          r.ok === true && typeof r.base64 === 'string'
+            ? `data:${r.mimeType ?? 'image/png'};base64,${r.base64}`
+            : null;
+        icons.set(key, url);
+        return url;
+      } catch {
+        return null;
+      }
+    },
     async frontApp(ownPids) {
       const r = await macHelperRequest<{
         ok?: boolean;
@@ -414,6 +423,48 @@ export function defaultFakeMacState(): FakeMacState {
   };
 }
 
+/** Where the stand-in finds REAL icons for the apps it pretends are open. */
+const FAKE_APP_PATHS: Readonly<Record<string, string>> = {
+  TextEdit: '/System/Applications/TextEdit.app',
+  Safari: '/Applications/Safari.app',
+  Notes: '/System/Applications/Notes.app',
+  Finder: '/System/Library/CoreServices/Finder.app',
+  Mail: '/System/Applications/Mail.app',
+};
+
+/**
+ * The system's own icon for an app the stand-in names — drawn by the `pi-mac`
+ * helper's `--app-icon` mode, the same way the computer-use chooser gets its
+ * icons. (Electron's `app.getFileIcon` ends the process with SIGTRAP on this
+ * macOS, so it is not used.) Cached per app for the run.
+ */
+const fakeIcons = new Map<string, Promise<string | null>>();
+export function fakeAppIcon(name: string): Promise<string | null> {
+  const appPath = FAKE_APP_PATHS[name];
+  if (appPath === undefined) return Promise.resolve(null);
+  let got = fakeIcons.get(name);
+  if (got === undefined) {
+    got = (async () => {
+      const file = path.join(
+        os.tmpdir(),
+        `pd-quick-icon-${process.pid}-${name.replace(/\W+/g, '')}.png`,
+      );
+      try {
+        await execFileAsync(piMacHelperPath(), ['--app-icon', appPath, '64', file], {
+          timeout: 10_000,
+        });
+        const png = readFileSync(file);
+        rmSync(file, { force: true });
+        return `data:image/png;base64,${png.toString('base64')}`;
+      } catch {
+        return null;
+      }
+    })();
+    fakeIcons.set(name, got);
+  }
+  return got;
+}
+
 export function createFakeMac(): QuickMac & {
   readonly state: FakeMacState;
   readonly calls: FakeMacCall[];
@@ -424,6 +475,7 @@ export function createFakeMac(): QuickMac & {
   return {
     state,
     calls,
+    appIcon: (front) => fakeAppIcon(front.name),
     set(patch) {
       Object.assign(state, patch);
     },

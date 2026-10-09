@@ -33,6 +33,14 @@ export function useStudioDraft<T>(
   return [value, setValue];
 }
 
+/**
+ * Put a value in a room's draft before the room opens — the quick panel's
+ * "make a picture of …" lands in the Image studio's prompt this way.
+ */
+export function seedStudioDraft(room: string, name: string, value: unknown): void {
+  drafts.set(`${room}:${name}`, value);
+}
+
 /** What a room has kept, for tests and probes. */
 export function studioDraft(room: string, name: string): unknown {
   return drafts.get(`${room}:${name}`);

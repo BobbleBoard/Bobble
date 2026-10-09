@@ -21,6 +21,8 @@ export interface QuickFrontApp {
   readonly windowId?: number;
   /** True when the app in front was Bobble itself. */
   readonly isBobble?: boolean;
+  /** Its real icon, from the system, as a data URL. */
+  readonly icon?: string;
 }
 
 /**
@@ -94,15 +96,18 @@ export type QuickMainAction =
   | { readonly kind: 'new-chat'; readonly prompt?: string }
   /** A `bobble:` link or its short form (`settings:quick-panel`, `studio:image`). */
   | { readonly kind: 'navigate'; readonly target: string }
-  | { readonly kind: 'image-studio'; readonly prompt: string }
-  | { readonly kind: 'search-chats'; readonly query: string };
+  | { readonly kind: 'image-studio'; readonly prompt: string };
 
 export type QuickSystemPane = 'screen-recording' | 'accessibility' | 'automation' | 'microphone';
 
 export type QuickInvokeMap = {
   /** Put the panel away. Main decides whether the keyboard needs handing back. */
   'quick:dismiss': { request: { reason: DismissReason }; response: { ok: boolean } };
-  'quick:resize': { request: { size: PanelSize }; response: { ok: boolean; size: PanelSize } };
+  /** `height` (compact only): what the content measures, so the panel hugs it. */
+  'quick:resize': {
+    request: { size: PanelSize; height?: number };
+    response: { ok: boolean; size: PanelSize };
+  };
   /** Pinned: clicking outside does not put it away, and it stays where it was dragged. */
   'quick:set-pinned': { request: { pinned: boolean }; response: { ok: boolean } };
   /**
@@ -151,6 +156,11 @@ export type QuickInvokeMap = {
       front: QuickFrontApp | null;
     };
   };
+  /**
+   * Let go of every hotkey while Settings records a new one — a registered key
+   * would otherwise be swallowed before the recorder could see it.
+   */
+  'quick:suspend-hotkeys': { request: { suspended: boolean }; response: { ok: boolean } };
   'quick:history': { request: undefined; response: { threads: QuickThread[] } };
   'quick:remember-thread': { request: QuickThread; response: { ok: boolean } };
   'quick:forget-thread': { request: { file: string }; response: { ok: boolean } };
@@ -199,6 +209,7 @@ export const QUICK_INVOKE_CHANNELS = [
   'quick:open-in-main',
   'quick:open-system-settings',
   'quick:status',
+  'quick:suspend-hotkeys',
   'quick:history',
   'quick:remember-thread',
   'quick:forget-thread',

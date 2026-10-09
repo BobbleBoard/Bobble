@@ -1,0 +1,71 @@
+/* The shortcut recorder (ShortcutRecorder.tsx): key caps in a field. */
+
+.pd-shortcut {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  max-width: 340px;
+}
+
+.pd-shortcut-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pd-shortcut-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 132px;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--pd-border-default);
+  border-radius: var(--pd-radius-sm);
+  background: var(--pd-bg-base);
+  color: var(--pd-text-primary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.pd-shortcut-field:hover {
+  border-color: var(--pd-border-strong);
+}
+
+.pd-shortcut-field[data-recording="true"] {
+  border-color: var(--pd-accent-primary);
+  box-shadow: 0 0 0 3px var(--pd-accent-subtle);
+}
+
+.pd-shortcut-cap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 5px;
+  background: var(--pd-bg-inset);
+  box-shadow: inset 0 0 0 0.5px var(--pd-border-default);
+  color: var(--pd-text-primary);
+  font: 500 12px / 1 var(--pd-font-sans);
+}
+
+.pd-shortcut-empty {
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-footnote);
+}
+
+.pd-shortcut-note {
+  margin: 0;
+  text-align: right;
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-footnote);
+  line-height: var(--pd-leading-footnote);
+}
+
+/* An empty key keeps the remove button's place, so every field lines up. */
+.pd-shortcut-row .pd-shortcut-spacer {
+  visibility: hidden;
+}

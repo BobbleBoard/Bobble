@@ -26,6 +26,10 @@ export const PANEL_SIZES: Readonly<Record<PanelSize, { width: number; height: nu
   large: { width: 960, height: 760 },
 };
 
+/** The range a compact panel may hug its content within. */
+export const COMPACT_MIN_HEIGHT = 96;
+export const COMPACT_MAX_HEIGHT = 420;
+
 /** How far down the work area the panel's top sits. */
 const TOP_FRACTION = 0.2;
 /** Never closer to a work-area edge than this. */
@@ -53,10 +57,20 @@ export function panelBounds(workArea: Rect, size: PanelSize): Rect {
  * it), and it is nudged back inside the work area only if growing would push it
  * off — a large panel near the bottom slides up rather than hanging off-screen.
  */
-export function resizeInPlace(current: Rect, size: PanelSize, workArea: Rect): Rect {
+export function resizeInPlace(
+  current: Rect,
+  size: PanelSize,
+  workArea: Rect,
+  /** Compact only: the height the content asked for, so the panel hugs it. */
+  fitHeight?: number,
+): Rect {
   const want = PANEL_SIZES[size];
   const width = Math.min(want.width, workArea.width - MARGIN * 2);
-  const height = Math.min(want.height, workArea.height - MARGIN * 2);
+  const asked =
+    size === 'compact' && fitHeight !== undefined && Number.isFinite(fitHeight)
+      ? Math.max(COMPACT_MIN_HEIGHT, Math.min(COMPACT_MAX_HEIGHT, Math.round(fitHeight)))
+      : want.height;
+  const height = Math.min(asked, workArea.height - MARGIN * 2);
   // Keep the horizontal centre, so compact → expanded grows evenly to both sides.
   const cx = current.x + current.width / 2;
   let x = Math.round(cx - width / 2);

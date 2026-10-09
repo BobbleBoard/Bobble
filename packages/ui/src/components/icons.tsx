@@ -20,21 +20,28 @@ import Add01Icon from '@hugeicons/core-free-icons/Add01Icon';
 import AiBrain01Icon from '@hugeicons/core-free-icons/AiBrain01Icon';
 import Alert02Icon from '@hugeicons/core-free-icons/Alert02Icon';
 import Analytics01Icon from '@hugeicons/core-free-icons/Analytics01Icon';
+import AppWindowMacIcon from '@hugeicons/core-free-icons/AppWindowMacIcon';
 import ArrowDown01Icon from '@hugeicons/core-free-icons/ArrowDown01Icon';
 import ArrowExpand02Icon from '@hugeicons/core-free-icons/ArrowExpand02Icon';
 import ArrowLeft01Icon from '@hugeicons/core-free-icons/ArrowLeft01Icon';
 import ArrowRight01Icon from '@hugeicons/core-free-icons/ArrowRight01Icon';
+import ArrowShrink02Icon from '@hugeicons/core-free-icons/ArrowShrink02Icon';
 import ArrowUp02Icon from '@hugeicons/core-free-icons/ArrowUp02Icon';
 import Attachment01Icon from '@hugeicons/core-free-icons/Attachment01Icon';
+import BulbIcon from '@hugeicons/core-free-icons/BulbIcon';
 import Camera01Icon from '@hugeicons/core-free-icons/Camera01Icon';
 import Cancel01Icon from '@hugeicons/core-free-icons/Cancel01Icon';
 import CheckmarkCircle02Icon from '@hugeicons/core-free-icons/CheckmarkCircle02Icon';
+import ClipboardIcon from '@hugeicons/core-free-icons/ClipboardIcon';
 import Clock01Icon from '@hugeicons/core-free-icons/Clock01Icon';
+import CommandIcon from '@hugeicons/core-free-icons/CommandIcon';
 import CommandLineIcon from '@hugeicons/core-free-icons/CommandLineIcon';
 import Copy01Icon from '@hugeicons/core-free-icons/Copy01Icon';
 import CpuIcon from '@hugeicons/core-free-icons/CpuIcon';
 import CubeIcon from '@hugeicons/core-free-icons/CubeIcon';
 import Cursor01Icon from '@hugeicons/core-free-icons/Cursor01Icon';
+import CursorInWindowIcon from '@hugeicons/core-free-icons/CursorInWindowIcon';
+import CursorRectangleSelection01Icon from '@hugeicons/core-free-icons/CursorRectangleSelection01Icon';
 import DashboardSpeed02Icon from '@hugeicons/core-free-icons/DashboardSpeed02Icon';
 import DashboardSquare01Icon from '@hugeicons/core-free-icons/DashboardSquare01Icon';
 import Delete02Icon from '@hugeicons/core-free-icons/Delete02Icon';
@@ -51,9 +58,11 @@ import Key01Icon from '@hugeicons/core-free-icons/Key01Icon';
 import KeyboardIcon from '@hugeicons/core-free-icons/KeyboardIcon';
 import LayoutLeftIcon from '@hugeicons/core-free-icons/LayoutLeftIcon';
 import LayoutRightIcon from '@hugeicons/core-free-icons/LayoutRightIcon';
+import LeftToRightListBulletIcon from '@hugeicons/core-free-icons/LeftToRightListBulletIcon';
 import LinkSquare02Icon from '@hugeicons/core-free-icons/LinkSquare02Icon';
 import Menu01Icon from '@hugeicons/core-free-icons/Menu01Icon';
 import Mic01Icon from '@hugeicons/core-free-icons/Mic01Icon';
+import MonitorIcon from '@hugeicons/core-free-icons/MonitorIcon';
 import Moon02Icon from '@hugeicons/core-free-icons/Moon02Icon';
 import MoreHorizontalIcon from '@hugeicons/core-free-icons/MoreHorizontalIcon';
 import MusicNote03Icon from '@hugeicons/core-free-icons/MusicNote03Icon';
@@ -62,9 +71,12 @@ import PauseIcon from '@hugeicons/core-free-icons/PauseIcon';
 import PencilEdit01Icon from '@hugeicons/core-free-icons/PencilEdit01Icon';
 import PieChartIcon from '@hugeicons/core-free-icons/PieChartIcon';
 import Pin02Icon from '@hugeicons/core-free-icons/Pin02Icon';
+import PinOffIcon from '@hugeicons/core-free-icons/PinOffIcon';
 import PlayIcon from '@hugeicons/core-free-icons/PlayIcon';
 import Plug01Icon from '@hugeicons/core-free-icons/Plug01Icon';
+import QuillWrite01Icon from '@hugeicons/core-free-icons/QuillWrite01Icon';
 import Refresh01Icon from '@hugeicons/core-free-icons/Refresh01Icon';
+import ReplaceIcon from '@hugeicons/core-free-icons/ReplaceIcon';
 import Search01Icon from '@hugeicons/core-free-icons/Search01Icon';
 import SentIcon from '@hugeicons/core-free-icons/SentIcon';
 import Settings01Icon from '@hugeicons/core-free-icons/Settings01Icon';
@@ -75,6 +87,7 @@ import SlidersHorizontalIcon from '@hugeicons/core-free-icons/SlidersHorizontalI
 import SourceCodeIcon from '@hugeicons/core-free-icons/SourceCodeIcon';
 import SparkleIcon from '@hugeicons/core-free-icons/SparkleIcon';
 import SparklesIcon from '@hugeicons/core-free-icons/SparklesIcon';
+import SpellCheckIcon from '@hugeicons/core-free-icons/SpellCheckIcon';
 import SquareLock02Icon from '@hugeicons/core-free-icons/SquareLock02Icon';
 import StarIcon from '@hugeicons/core-free-icons/StarIcon';
 import StopIcon from '@hugeicons/core-free-icons/StopIcon';
@@ -83,6 +96,7 @@ import TaskDone01Icon from '@hugeicons/core-free-icons/TaskDone01Icon';
 import ThumbsDownIcon from '@hugeicons/core-free-icons/ThumbsDownIcon';
 import ThumbsUpIcon from '@hugeicons/core-free-icons/ThumbsUpIcon';
 import Tick02Icon from '@hugeicons/core-free-icons/Tick02Icon';
+import TranslateIcon from '@hugeicons/core-free-icons/TranslateIcon';
 import Video01Icon from '@hugeicons/core-free-icons/Video01Icon';
 import ViewIcon from '@hugeicons/core-free-icons/ViewIcon';
 import Wrench01Icon from '@hugeicons/core-free-icons/Wrench01Icon';
@@ -530,4 +544,73 @@ export function IconExpand(props: IconProps) {
 /** The 3D Studio, as the sidebar draws it. */
 export function IconStudio3d(props: IconProps) {
   return <FromGlyph glyph="studio3d" {...props} />;
+}
+
+/* The quick panel's set: what it can look at, read and do. */
+
+/** A window, traffic lights and all: "the window in front". */
+export function IconAppWindow(props: IconProps) {
+  return <Huge icon={AppWindowMacIcon} {...props} />;
+}
+
+/** A pointer inside a window: "click the window you mean". */
+export function IconPickWindow(props: IconProps) {
+  return <Huge icon={CursorInWindowIcon} {...props} />;
+}
+
+/** A pointer dragging out a rectangle: "an area of the screen". */
+export function IconAreaSelect(props: IconProps) {
+  return <Huge icon={CursorRectangleSelection01Icon} {...props} />;
+}
+
+/** The whole screen. */
+export function IconMonitor(props: IconProps) {
+  return <Huge icon={MonitorIcon} {...props} />;
+}
+
+export function IconClipboard(props: IconProps) {
+  return <Huge icon={ClipboardIcon} {...props} />;
+}
+
+/** The command key: the command palette. */
+export function IconCommand(props: IconProps) {
+  return <Huge icon={CommandIcon} {...props} />;
+}
+
+/** Explain. */
+export function IconBulb(props: IconProps) {
+  return <Huge icon={BulbIcon} {...props} />;
+}
+
+/** Rewrite. */
+export function IconQuill(props: IconProps) {
+  return <Huge icon={QuillWrite01Icon} {...props} />;
+}
+
+export function IconTranslate(props: IconProps) {
+  return <Huge icon={TranslateIcon} {...props} />;
+}
+
+/** Summarize. */
+export function IconListBullet(props: IconProps) {
+  return <Huge icon={LeftToRightListBulletIcon} {...props} />;
+}
+
+/** Fix spelling and grammar. */
+export function IconSpellCheck(props: IconProps) {
+  return <Huge icon={SpellCheckIcon} {...props} />;
+}
+
+/** Put the answer where the selection was. */
+export function IconReplace(props: IconProps) {
+  return <Huge icon={ReplaceIcon} {...props} />;
+}
+
+export function IconPinOff(props: IconProps) {
+  return <Huge icon={PinOffIcon} {...props} />;
+}
+
+/** Make smaller: the arrows of IconExpand, turned inward. */
+export function IconShrink(props: IconProps) {
+  return <Huge icon={ArrowShrink02Icon} {...props} />;
 }
