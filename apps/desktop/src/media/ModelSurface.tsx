@@ -327,7 +327,9 @@ export function ModelSurface({ src, testid, view: given }: ModelSurfaceProps): J
       undefined,
       () => {
         if (!stopped) {
-          setError('This model could not be shown — the file may be damaged. Opening it in its app may still work.');
+          setError(
+            'This model could not be shown — the file may be damaged. Opening it in its app may still work.',
+          );
           setLoading(false);
         }
       },

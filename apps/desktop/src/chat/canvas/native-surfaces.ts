@@ -164,8 +164,13 @@ function canvasShellInvoke(channel: string, req: unknown, appName?: string): voi
     if (window.__pi_canvas_ipc === undefined) window.__pi_canvas_ipc = [];
     window.__pi_canvas_ipc.push({ channel, req });
   }
-  // biome-ignore lint/suspicious/noExplicitAny: narrowed by the overloads above.
-  const run = () => window.piDesktop.invoke(channel as any, req as any) as Promise<OpenOutcome>;
+  // Narrowed by the overloads above; the bridge's own types cannot see that.
+  const invoke = window.piDesktop.invoke as unknown as (
+    channel: string,
+    req: unknown,
+  ) => Promise<OpenOutcome>;
+  const runWith = (r: unknown) => invoke(channel, r);
+  const run = () => runWith(req);
   if (channel === 'canvas:open-external') {
     void run().catch(() => undefined);
     return;
@@ -175,12 +180,7 @@ function canvasShellInvoke(channel: string, req: unknown, appName?: string): voi
     verb: channel === 'canvas:reveal' ? 'reveal' : 'open',
     path,
     ...(appName !== undefined ? { appName } : {}),
-    retryAt: (p) =>
-      // biome-ignore lint/suspicious/noExplicitAny: narrowed by the overloads above.
-      window.piDesktop.invoke(
-        channel as any,
-        { ...(req as object), path: p } as any,
-      ) as Promise<OpenOutcome>,
+    retryAt: (p) => runWith({ ...(req as object), path: p }),
   });
 }
 

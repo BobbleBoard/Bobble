@@ -286,7 +286,7 @@ if (process.env.REAL_INSTALL === '1') {
       `a tone ends as "nothing heard" or a transcript, never a raw error (${end.problem})`,
     );
     await shot('6-after-stop');
-    if (process.env.DIAG === '1') console.log('MAIN\n  ' + mainLines.join('\n  '));
+    if (process.env.DIAG === '1') console.log(`MAIN\n  ${mainLines.join('\n  ')}`);
     if (process.env.DIAG === '1') {
       const raw = await page.evaluate(async () => {
         const out = {};
