@@ -59,12 +59,18 @@ import {
   validateAgainstSchema,
   watchStream,
   withoutWrittenToolCall,
+  createFetchWhenBack,
+  SERVER_RETURN_POLL_MS,
+  SERVER_RETURN_WAIT_MS,
 } from '@pi-desktop/provider-llamacpp';
 import { fitPicturesToVisionBudget } from './picture-budget.js';
 
 export interface MlxStreamDeps {
   /** Injectable fetch (tests / proxies). Defaults to global fetch. */
   readonly fetchImpl?: typeof fetch;
+  /** How long a refused request waits for the server to come back (tests: 0). */
+  readonly serverReturnWaitMs?: number;
+  readonly serverReturnPollMs?: number;
   /** Rung-2 fixer-model call (optional; injected by the harness in prod). */
   readonly fixer?: ToolCallFixer;
   /** The harness's rungs 3–5. */
@@ -312,7 +318,19 @@ function engineCapsByDefault(engine: string | undefined): boolean {
  * times TPS on the client (MLX sends no `timings`).
  */
 export function createMlxStream(deps: MlxStreamDeps = {}): MlxStreamFn {
-  const doFetch = deps.fetchImpl ?? fetch;
+  const rawFetch = deps.fetchImpl ?? fetch;
+  /*
+   * WAIT FOR A SERVER ON ITS WAY BACK, as llama.cpp does. A parked or
+   * respawning MLX engine refused the connection and the turn ended at once in
+   * a raw "fetch failed" (the user's "our dreaded 'fetch failed'"). Only the chat
+   * request waits; the status probe below fails fast as before.
+   */
+  const doFetch = createFetchWhenBack(rawFetch, {
+    waitMs: deps.serverReturnWaitMs ?? SERVER_RETURN_WAIT_MS,
+    pollMs: deps.serverReturnPollMs ?? SERVER_RETURN_POLL_MS,
+    healthFor: (url) => url.replace(/\/chat\/completions$/, '/models'),
+    label: 'pi-mlx',
+  });
 
   return (model, context, options) => {
     const stream = createAssistantMessageEventStream();
@@ -641,7 +659,7 @@ export function createMlxStream(deps: MlxStreamDeps = {}): MlxStreamFn {
             : httpProgressProbe(
                 `${model.baseUrl}/status`,
                 rapidMlxWorkCounter,
-                doFetch,
+                rawFetch,
                 buildRequestHeaders(model, options),
               );
         for (let attempt = 1; ; attempt++) {

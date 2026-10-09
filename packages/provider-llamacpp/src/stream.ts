@@ -512,6 +512,53 @@ export function isConnectionRefused(error: unknown): boolean {
 }
 
 /**
+ * A fetch that waits for a server on its way back.
+ *
+ * A connection refused is not "no model": the app parks the chat server's
+ * process to make room for a generation and brings it back on the same port,
+ * and the supervisor respawns a crashed one on the same port too. Either gap
+ * is seconds. A turn that failed with "fetch failed" in it would hand the user
+ * an error for the app's own housekeeping, so the request waits — polling the
+ * server's health URL — up to `waitMs`, and only then is the refusal real.
+ * Shared by the llama.cpp and MLX providers (their health URLs differ).
+ */
+export function createFetchWhenBack(
+  doFetch: typeof fetch,
+  opts: {
+    readonly waitMs: number;
+    readonly pollMs: number;
+    /** The health URL for a request URL. */
+    readonly healthFor: (url: string) => string;
+    readonly label?: string;
+  },
+): typeof fetch {
+  return (async (url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+    try {
+      return await doFetch(url, init);
+    } catch (error) {
+      if (!isConnectionRefused(error) || opts.waitMs <= 0) throw error;
+      const health = opts.healthFor(String(url));
+      const deadline = Date.now() + opts.waitMs;
+      // eslint-disable-next-line no-console
+      console.log(
+        `[${opts.label ?? 'pi-llm'}] server not answering — waiting up to ${Math.round(opts.waitMs / 1000)}s for it to come back`,
+      );
+      while (Date.now() < deadline) {
+        if (init?.signal?.aborted === true) throw error;
+        await new Promise<void>((resolve) => setTimeout(resolve, opts.pollMs));
+        try {
+          const h = await doFetch(health, { signal: init?.signal ?? null });
+          if (h.ok) return await doFetch(url, init);
+        } catch {
+          // still away
+        }
+      }
+      throw error;
+    }
+  }) as typeof fetch;
+}
+
+/**
  * `Headers` → a plain record, because pi's `ProviderResponse` wants one.
  *
  * Exported so the MLX and Apple-FM providers can call the same host hooks
@@ -539,41 +586,12 @@ export function createLlamaCppStream(deps: LlamaCppStreamDeps = {}): LlamaCppStr
   const doFetch = deps.fetchImpl ?? fetch;
   const waitMs = deps.serverReturnWaitMs ?? SERVER_RETURN_WAIT_MS;
   const pollMs = deps.serverReturnPollMs ?? SERVER_RETURN_POLL_MS;
-  /**
-   * The request, waiting for a server that is on its way back.
-   *
-   * A connection refused here is not "no model": the app parks the chat
-   * server's process to make room for a generation and brings it back on the
-   * same port when the picture is done (gen/make-room.ts), and the supervisor
-   * respawns a crashed one on the same port too. Either gap is seconds. A turn
-   * that failed with "fetch failed" in it would hand the user an error for the
-   * app's own housekeeping, so the request waits — polling /health — up to
-   * `waitMs`, and only then is the refusal real.
-   */
-  const fetchWhenBack: typeof doFetch = async (url, init) => {
-    try {
-      return await doFetch(url, init);
-    } catch (error) {
-      if (!isConnectionRefused(error) || waitMs <= 0) throw error;
-      const health = `${String(url).replace(/\/v1\/chat\/completions$/, '')}/health`;
-      const deadline = Date.now() + waitMs;
-      // eslint-disable-next-line no-console
-      console.log(
-        `[pi-llm] server not answering — waiting up to ${Math.round(waitMs / 1000)}s for it to come back`,
-      );
-      while (Date.now() < deadline) {
-        if (init?.signal?.aborted === true) throw error;
-        await new Promise<void>((resolve) => setTimeout(resolve, pollMs));
-        try {
-          const h = await doFetch(health, { signal: init?.signal ?? null });
-          if (h.ok) return await doFetch(url, init);
-        } catch {
-          // still away
-        }
-      }
-      throw error;
-    }
-  };
+  /** The request, waiting for a server that is on its way back (createFetchWhenBack). */
+  const fetchWhenBack = createFetchWhenBack(doFetch, {
+    waitMs,
+    pollMs,
+    healthFor: (url) => `${url.replace(/\/v1\/chat\/completions$/, '')}/health`,
+  });
 
   return (model, context, options) => {
     const stream = createAssistantMessageEventStream();
